@@ -4,17 +4,20 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 // Check permissions
 if (!canView('purchase_orders')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to view purchase orders']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to view purchase orders')]);
     exit;
 }
 
@@ -31,7 +34,7 @@ try {
 
     if ($warehouse_id && !userCan('warehouse', $warehouse_id)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
         exit;
     }
 
@@ -155,5 +158,5 @@ try {
 
 } catch (Exception $e) {
     error_log("Error fetching purchase orders: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error']);
+    echo json_encode(['success' => false, 'message' => t('Database error')]);
 }

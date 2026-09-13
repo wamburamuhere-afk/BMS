@@ -42,16 +42,16 @@ if (empty($GLOBALS['__bms_table_assets']['purchase_returns'])) {
 
 // Keys MUST stay in the same order as columns() in the JS module.
 $pr_tbl_columns = [
-    'sno'            => ['label' => 'S/NO',        'attrs' => 'style="width:50px;"'],
-    'return_number'  => ['label' => 'Return #',    'attrs' => ''],
-    'return_date'    => ['label' => 'Date',        'attrs' => ''],
-    'supplier'       => ['label' => 'Supplier',    'attrs' => ''],
-    'receipt_number' => ['label' => 'GRN Number',  'attrs' => ''],
-    'total_items'    => ['label' => 'Items',       'attrs' => ''],
-    'total_amount'   => ['label' => 'Total Value', 'attrs' => ''],
-    'reason'         => ['label' => 'Reason',      'attrs' => ''],
-    'status'         => ['label' => 'Status',      'attrs' => ''],
-    'actions'        => ['label' => 'Actions',     'attrs' => 'class="d-print-none"'],
+    'sno'            => ['label' => t('S/NO'),        'attrs' => 'style="width:50px;"'],
+    'return_number'  => ['label' => t('Return #'),    'attrs' => ''],
+    'return_date'    => ['label' => t('Date'),        'attrs' => ''],
+    'supplier'       => ['label' => t('Supplier'),    'attrs' => ''],
+    'receipt_number' => ['label' => t('GRN Number'),  'attrs' => ''],
+    'total_items'    => ['label' => t('Items'),       'attrs' => ''],
+    'total_amount'   => ['label' => t('Total Value'), 'attrs' => ''],
+    'reason'         => ['label' => t('Reason'),      'attrs' => ''],
+    'status'         => ['label' => t('Status'),      'attrs' => ''],
+    'actions'        => ['label' => t('Actions'),     'attrs' => 'class="d-print-none"'],
 ];
 ?>
 <div class="table-responsive">

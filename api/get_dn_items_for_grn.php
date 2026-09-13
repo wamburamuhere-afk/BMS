@@ -2,16 +2,19 @@
 // scope-audit: skip — read-only DN items lookup for GRN create pre-fill; delivery_id validated against inbound dn_type; GRN save enforces scope via assertScopeForRecord at write time
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 $delivery_id = intval($_GET['delivery_id'] ?? 0);
 
 if (!$delivery_id) {
-    echo json_encode(['success' => false, 'message' => 'delivery_id required']);
+    echo json_encode(['success' => false, 'message' => t('delivery_id required')]);
     exit;
 }
 
@@ -28,7 +31,7 @@ try {
     $header = $hdr->fetch(PDO::FETCH_ASSOC);
 
     if (!$header) {
-        echo json_encode(['success' => false, 'message' => 'Delivery Note not found']);
+        echo json_encode(['success' => false, 'message' => t('Delivery Note not found')]);
         exit;
     }
 
@@ -67,5 +70,5 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error']);
+    echo json_encode(['success' => false, 'message' => t('Database error')]);
 }

@@ -19,6 +19,42 @@
 
 **Tested:** `php -l` clean on all 5 changed/new files. New `tests/test_pos_shop_terminology_cli.php` (20 assertions, all passing) drives `isShopLabel()`/`wLabel()`/`wLabelE()` directly across every flag combination (pos off; pos+projects on; pos+projects off; no tenant resolved) and both languages, plus an HTML-escaping check. Confirmed via grep that zero raw `t('...Warehouse...')` calls remain in the 4 POS module files touched. Ran the existing `tests/test_warehouse_scope_cli.php` (171/172 passing) — the 1 failure is pre-existing on `develop` (reproduced identically with this branch's changes stashed out), unrelated to this change.
 
+## 2026-09-13 (feat/procurement-i18n-coverage) - Swahili translation coverage for Procurement: Purchase Returns (module 4 of 5, IN PROGRESS)
+
+**Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the Purchase Returns module.
+
+**Status: partial.** `purchase_return_view.php` and `includes/tables/purchase_returns_table.php` are fully wrapped. `purchase_returns.php` (1431 lines — the list/create page) is partially wrapped; work stopped mid-file (around the Edit Return modal) when the session hit its rate limit. The 4 print templates (`print_purchase_return.php` + navy/corporate/banded) have not been started yet — still plain English.
+
+**Fix so far:** wrapped every user-facing string touched so far in `t()`/`te()`, following the same convention as RFQ/PO/GRN (label+value patterns for "Web:"/"Email:" etc., a `PRV_I18N` JS object + inline `json_encode(t())` for dynamic Swal dialogs in the view page). Added 68 new Swahili entries to `lang/sw.php` for the strings wrapped so far.
+
+**Tested:** `php -l` clean on all 3 touched files + `lang/sw.php`. Confirmed no fragment-concatenation bugs in the partial `purchase_returns.php` work. Confirmed every `t()`/`te()` key currently used across these 3 files has a `lang/sw.php` translation (except the 4 intentionally-skipped print-theme names, matching PO/GRN precedent). No duplicate keys introduced.
+
+**Remaining for a future session:** finish wrapping the rest of `purchase_returns.php`, then the 4 print templates, then the 8 remaining API files (`create_purchase_return.php`, `delete_purchase_return.php`, `export_purchase_returns.php`, `get_purchase_return.php`, `get_purchase_return_stats.php`, `get_purchase_returns.php`, `update_purchase_return.php`, `update_purchase_return_status.php`, `api/account/approve_purchase_return.php`, `api/account/review_purchase_return.php`), add their `lang/sw.php` entries, then Module 5 (Debit Notes).
+
+## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: GRN (module 3 of 5)
+
+**Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the GRN (Goods Received Note) module.
+
+**Fix:** Wrapped every user-facing string in `t()`/`te()` across 19 GRN files: 5 pages (`grn.php`, `grn_create.php`, `grn_edit.php`, `grn_print.php`, `grn_view.php`), the shared `includes/tables/grn_table.php`, and 13 API endpoints. Scoped strictly to the actual GRN (inbound goods-receipt) files — `app/bms/grn/` also holds unrelated outbound Delivery Note/Delivery Order pages (`delivery_notes.php`, `dn_create.php`, `dn_outbound.php`, `do_create.php`, etc.) which are sales-side and out of scope for this pass. Added the `loadLanguage($_SESSION['user_lang'])` boilerplate to every API/print file, and per-page `GRN_I18N`/`tFormat()` helpers for dynamic JS strings, matching the PO module's pattern. Found and fixed one fragment-concatenation bug in `grn_edit.php`'s print footer (`t('This document was Printed by') . name . t('on') . date`, split across three separate calls) by restructuring it the same way `grn_create.php` already had, into a single `sprintf(t('This document was Printed by %s on %s'), ...)` call. Added 163 new Swahili entries to `lang/sw.php`.
+
+**Tested:** `php -l` clean on all 19 files + `lang/sw.php`. Wrote a coverage-check script confirming all 277 distinct `t()`/`te()` keys across the module have a non-empty `lang/sw.php` translation. Verified no new duplicate keys introduced. Live `loadLanguage('sw')` spot-checks confirm representative keys, including `sprintf()`-templated ones, resolve correctly.
+
+## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: Purchase Orders (module 2 of 5)
+
+**Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the Purchase Order module.
+
+**Fix:** Wrapped every user-facing string in `t()`/`te()` across all 15 PO files: 3 pages (`purchase_orders.php`, `purchase_order_create.php`, `purchase_order_details.php`), 8 `api/account/*purchase_order*.php` endpoints, and 4 print templates (standard/navy/corporate/banded). Added the `loadLanguage($_SESSION['user_lang'])` boilerplate to every API/print file. Introduced a `tFormat(str, ...args)` helper (numbered `{0}`/`{1}` placeholders) in each page's `<script>` block for dynamic Swal/JS messages, and small pre-translated JS objects (`PO_I18N`, `POD_I18N`, `POC_I18N`) for strings reused inside JS template literals — avoiding the sentence-fragment-concatenation anti-pattern throughout (e.g. `sprintf(t('Purchase Order status updated to %s'), $status)` instead of concatenating translated pieces). Fixed one pre-existing mistranslation found along the way: `lang/sw.php`'s `'Delivery Notes'` key held an unrelated/wrong Swahili string from `services.php`'s feature-list usage; corrected it to `'Hati za Usafirishaji'` since `purchase_order_details.php` now shares the same key. Added 196 new Swahili entries total (176 from pages/APIs + 18 from print templates, minus 2 pre-existing-key hits). Print-template theme names (Standard/Navy/Corporate/Banded) are wrapped in `t()` but intentionally left untranslated, matching the precedent already set by RFQ.
+
+**Tested:** `php -l` clean on all 15 files + `lang/sw.php`. Wrote a coverage-check script (mirrors `tests/test_pos_i18n_coverage_cli.php`'s `extractTKeys()` approach) confirming all 314 distinct `t()`/`te()` keys across the module have a non-empty `lang/sw.php` translation except the 4 intentionally-skipped theme names. Verified no new duplicate keys introduced (29 pre-existing duplicates elsewhere in the catalogue, unchanged). Live `loadLanguage('sw')` spot-checks confirm representative keys (including `{0}`-placeholder `tFormat()` templates) resolve correctly.
+
+## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: RFQ (module 1 of 5)
+
+**Request:** Continue the language-translation rollout (same standard as the Settings/Inventory/POS i18n work) into the Procurement dropdown, covering RFQ through Debit Note.
+
+**Fix:** RFQ pages (`app/bms/purchase/rfq.php`, `rfq_create.php`, `rfq_view.php`) and `includes/tables/rfq_table.php` already had every user-facing string wrapped in `t()`/`te()` from prior in-progress work; the 9 `api/*rfq*.php` files already called `loadLanguage($_SESSION['user_lang'])` and wrapped their messages. Found and fixed 6 spots using the "translate sentence fragments, concatenate at runtime" anti-pattern (e.g. `t('RFQ #') . $number . t(' created successfully.')`) — converted to single-sentence `%s`-placeholder templates (`sprintf(t('RFQ #%s created successfully.'), $number)`) so word order stays correct in Swahili. Added 137 new Swahili entries to `lang/sw.php` (194 total keys used across the module; 57 already existed from shared/earlier work).
+
+**Tested:** `php -l` clean on all 13 files + `lang/sw.php`. Static scan confirmed no un-wrapped user-facing strings remain (labels, placeholders, titles, table headers). Verified no duplicate keys introduced. Live `loadLanguage('sw')` check confirms representative keys (including the fixed `sprintf()` templates) resolve to correct Swahili and `loadLanguage('en')` reverts cleanly.
+
 ## 2026-09-12 (feat/pos-terminal-default-landing) - POS terminal is now the direct landing page; stats hub demoted to a secondary "Workspace" link
 
 **Request:** follow-up to the POS UX advisory review ("Now i need to improve much custer user friendly of this system... just only for POS from you experise"), where I flagged that `header.php`'s "POS" nav link sent every user to `pos_dashboard.php` (a stats/shift-history hub) instead of straight to the selling screen — an extra click standing between login and actually ringing up a sale, every single day. User selected this fix explicitly: "For what to implement i will select by number. Implement 1 only for now."

@@ -144,13 +144,13 @@ if ($is_edit) {
     <!-- Breadcrumbs & Header -->
     <nav aria-label="breadcrumb" class="mb-3 po-create-sticky-nav">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
             <?php if ($from_project): ?>
-            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project POs</a></li>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>"><?= t('Project POs') ?></a></li>
             <?php else: ?>
-            <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>">Purchase Orders</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>"><?= t('Purchase Orders') ?></a></li>
             <?php endif; ?>
-            <li class="breadcrumb-item active"><?= $is_edit ? 'Edit Order' : 'New Order' ?></li>
+            <li class="breadcrumb-item active"><?= $is_edit ? t('Edit Order') : t('New Order') ?></li>
         </ol>
     </nav>
 
@@ -160,22 +160,22 @@ if ($is_edit) {
                 <div>
                     <h2 class="fw-bold">
                         <i class="bi <?= $is_edit ? 'bi-pencil-square' : 'bi-cart-plus' ?> text-primary"></i>
-                        <?= $is_edit ? 'Edit Purchase Order' : 'Create Purchase Order' ?>
+                        <?= $is_edit ? t('Edit Purchase Order') : t('Create Purchase Order') ?>
                     </h2>
-                    <p class="text-muted mb-0"><?= $is_edit ? 'Update existing purchase order details' : 'Issue a new purchase request to a supplier' ?></p>
+                    <p class="text-muted mb-0"><?= $is_edit ? t('Update existing purchase order details') : t('Issue a new purchase request to a supplier') ?></p>
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <?php if ($from_project): ?>
                     <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-outline-primary">
-                        <i class="bi bi-arrow-left"></i> Back to Project
+                        <i class="bi bi-arrow-left"></i> <?= t('Back to Project') ?>
                     </a>
                     <?php elseif ($project_id > 0 && $enable_projects): ?>
                     <a href="<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement" class="btn btn-outline-primary">
-                        <i class="bi bi-arrow-left"></i> Back to Project
+                        <i class="bi bi-arrow-left"></i> <?= t('Back to Project') ?>
                     </a>
                     <?php else: ?>
                     <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to List
+                        <i class="bi bi-arrow-left"></i> <?= t('Back to List') ?>
                     </a>
                     <?php endif; ?>
                 </div>
@@ -190,15 +190,15 @@ if ($is_edit) {
             <div class="col-lg-12">
                 <div class="card mb-4 shadow-sm">
                     <div class="card-header bg-primary text-white py-3">
-                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i> Basic Information</h5>
+                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i> <?= t('Basic Information') ?></h5>
                     </div>
                     <div class="card-body p-4">
                         <div class="row g-4">
                             <!-- 1. Supplier -->
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold">Supplier <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= t('Supplier') ?> <span class="text-danger">*</span></label>
                                 <select class="form-select select2-static" id="supplier_id" name="supplier_id" required>
-                                    <option value="">Select a supplier</option>
+                                    <option value=""><?= t('Select a supplier') ?></option>
                                     <?php foreach ($suppliers as $s): ?>
                                         <option value="<?= $s['supplier_id'] ?>"
                                             <?= $supplier_id == $s['supplier_id'] ? 'selected' : '' ?>
@@ -214,14 +214,14 @@ if ($is_edit) {
                             <?php if ($enable_projects): ?>
                             <div class="col-md-4">
                                 <?php if ($project_id > 0 && !$is_edit): ?>
-                                <label class="form-label fw-semibold">Project</label>
+                                <label class="form-label fw-semibold"><?= t('Project') ?></label>
                                 <input type="hidden" name="project_id" id="project_id" value="<?= $project_id ?>">
                                 <input type="text" class="form-control bg-light text-muted" value="<?= htmlspecialchars($projects[0]['project_name'] ?? '') ?>" readonly tabindex="-1">
-                                <div class="form-text"><i class="bi bi-lock-fill me-1"></i>Locked to this project</div>
+                                <div class="form-text"><i class="bi bi-lock-fill me-1"></i><?= t('Locked to this project') ?></div>
                                 <?php else: ?>
-                                <label class="form-label fw-semibold">Project <span class="text-muted small fw-normal">(Optional)</span></label>
+                                <label class="form-label fw-semibold"><?= t('Project') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                 <select class="form-select select2-static" id="project_id" name="project_id">
-                                    <option value="">No Project</option>
+                                    <option value=""><?= t('No Project') ?></option>
                                     <?php foreach ($projects as $proj): ?>
                                         <option value="<?= $proj['project_id'] ?>"
                                             <?= $project_id == $proj['project_id'] ? 'selected' : '' ?>>
@@ -235,9 +235,9 @@ if ($is_edit) {
 
                             <!-- 3. Warehouse -->
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold">Warehouse / Delivery Point <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= t('Warehouse / Delivery Point') ?> <span class="text-danger">*</span></label>
                                 <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
-                                    <option value="">Select Warehouse</option>
+                                    <option value=""><?= t('Select Warehouse') ?></option>
                                     <?php foreach ($warehouses as $w): ?>
                                         <option value="<?= $w['warehouse_id'] ?>"
                                             data-project="<?= $w['project_id'] ?>"
@@ -252,9 +252,9 @@ if ($is_edit) {
 
                             <!-- Row 2: RFQ, Order Date, Expected Delivery -->
                             <div class="col-md-4" id="rfq_ref_div">
-                                <label class="form-label fw-semibold">RFQ Reference <span class="text-success small fw-normal">(Optional — leave blank to skip)</span></label>
+                                <label class="form-label fw-semibold"><?= t('RFQ Reference') ?> <span class="text-success small fw-normal">(<?= t('Optional — leave blank to skip') ?>)</span></label>
                                 <select class="form-select select2-static" id="rfq_reference" name="rfq_reference">
-                                    <option value="">Select RFQ (Optional)</option>
+                                    <option value=""><?= t('Select RFQ (Optional)') ?></option>
                                     <?php if ($is_edit && $po_data['rfq_id']): ?>
                                         <?php 
                                             $rfq_stmt = $pdo->prepare("SELECT rfq_number, rfq_date FROM rfq WHERE rfq_id = ?");
@@ -266,52 +266,52 @@ if ($is_edit) {
                                         </option>
                                     <?php endif; ?>
                                 </select>
-                                <div class="form-text text-muted">RFQs matching selection</div>
+                                <div class="form-text text-muted"><?= t('RFQs matching selection') ?></div>
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold">Order Date <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= t('Order Date') ?> <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" name="order_date" value="<?= $is_edit ? $po_data['order_date'] : date('Y-m-d') ?>" required>
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold">Expected Delivery</label>
+                                <label class="form-label fw-semibold"><?= t('Expected Delivery') ?></label>
                                 <input type="date" class="form-control" name="expected_delivery_date" value="<?= ($is_edit && isset($po_data['expected_date'])) ? $po_data['expected_date'] : '' ?>">
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold">Supplier Quote Reference <span class="text-muted small fw-normal">(Optional)</span></label>
+                                <label class="form-label fw-semibold"><?= t('Supplier Quote Reference') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                 <input type="text" class="form-control" name="supplier_quote_ref"
                                        value="<?= $is_edit ? htmlspecialchars($po_data['supplier_quote_ref'] ?? '') : '' ?>"
-                                       placeholder="e.g. QUO-2026-0042">
-                                <div class="form-text text-muted">Supplier's own quotation number</div>
+                                       placeholder="<?= t('e.g. QUO-2026-0042') ?>">
+                                <div class="form-text text-muted"><?= t("Supplier's own quotation number") ?></div>
                             </div>
 
                             <!-- Row 3: Currency & Payment Terms -->
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Currency <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= t('Currency') ?> <span class="text-danger">*</span></label>
                                 <select class="form-select select2-static" id="currency" name="currency" required>
                                     <?php foreach ($currencies as $code => $name): ?>
                                         <option value="<?= $code ?>" <?= ($is_edit && $po_data['currency'] == $code) ? 'selected' : '' ?>>
-                                            <?= $code ?> - <?= $name ?>
+                                            <?= $code ?> - <?= t($name) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Payment Terms</label>
+                                <label class="form-label fw-semibold"><?= t('Payment Terms') ?></label>
                                 <select class="form-select" id="payment_terms" name="payment_terms" onchange="togglePaymentTermsOther(this.value)">
-                                    <option value="immediate" <?= ($is_edit && $po_data['payment_terms'] == 'immediate') ? 'selected' : '' ?>>Immediate</option>
-                                    <option value="net_15" <?= ($is_edit && $po_data['payment_terms'] == 'net_15') ? 'selected' : '' ?>>Net 15 Days</option>
-                                    <option value="net_30" <?= ($is_edit && $po_data['payment_terms'] == 'net_30') ? 'selected' : '' ?>>Net 30 Days</option>
-                                    <option value="net_60" <?= ($is_edit && $po_data['payment_terms'] == 'net_60') ? 'selected' : '' ?>>Net 60 Days</option>
-                                    <option value="other" <?= ($is_edit && !in_array($po_data['payment_terms'] ?? '', ['immediate','net_15','net_30','net_60'])) ? 'selected' : '' ?>>Other (Specify)</option>
+                                    <option value="immediate" <?= ($is_edit && $po_data['payment_terms'] == 'immediate') ? 'selected' : '' ?>><?= t('Immediate') ?></option>
+                                    <option value="net_15" <?= ($is_edit && $po_data['payment_terms'] == 'net_15') ? 'selected' : '' ?>><?= t('Net 15 Days') ?></option>
+                                    <option value="net_30" <?= ($is_edit && $po_data['payment_terms'] == 'net_30') ? 'selected' : '' ?>><?= t('Net 30 Days') ?></option>
+                                    <option value="net_60" <?= ($is_edit && $po_data['payment_terms'] == 'net_60') ? 'selected' : '' ?>><?= t('Net 60 Days') ?></option>
+                                    <option value="other" <?= ($is_edit && !in_array($po_data['payment_terms'] ?? '', ['immediate','net_15','net_30','net_60'])) ? 'selected' : '' ?>><?= t('Other (Specify)') ?></option>
                                 </select>
                                 <div id="payment_terms_custom_div" class="input-group mt-1 <?= ($is_edit && !in_array($po_data['payment_terms'] ?? '', ['immediate','net_15','net_30','net_60'])) ? '' : 'd-none' ?>">
-                                    <input type="text" class="form-control" id="payment_terms_input" name="payment_terms_custom" 
-                                           value="<?= $is_edit ? htmlspecialchars($po_data['payment_terms'] ?? '') : '' ?>" placeholder="e.g. Net 45 Days, 50% Advance">
-                                    <button type="button" class="btn btn-outline-secondary" onclick="resetPaymentTerms()" title="Back to list"><i class="bi bi-x-lg"></i></button>
+                                    <input type="text" class="form-control" id="payment_terms_input" name="payment_terms_custom"
+                                           value="<?= $is_edit ? htmlspecialchars($po_data['payment_terms'] ?? '') : '' ?>" placeholder="<?= t('e.g. Net 45 Days, 50% Advance') ?>">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="resetPaymentTerms()" title="<?= t('Back to list') ?>"><i class="bi bi-x-lg"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -322,7 +322,7 @@ if ($is_edit) {
                 <div class="card mb-4 shadow-sm border-0">
                     <div class="card-header bg-light border-bottom py-3">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-list-task me-2 text-primary"></i> Order Items</h5>
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-list-task me-2 text-primary"></i> <?= t('Order Items') ?></h5>
                             
                         </div>
                     </div>
@@ -331,12 +331,12 @@ if ($is_edit) {
                             <table class="table table-hover align-middle mb-0" id="itemsTable">
                                 <thead class="bg-light text-uppercase small fw-bold">
                                     <tr>
-                                        <th style="width: 50px;">S/NO</th>
-                                        <th style="min-width: 300px;">Product / Service</th>
-                                        <th style="width: 150px;">Quantity</th>
-                                        <th style="width: 200px;">Unit Price</th>
-                                        <th style="width: 200px;">Tax Rate</th>                                        
-                                        <th class="text-end" style="width: 150px;">Total</th>
+                                        <th style="width: 50px;"><?= t('S/NO') ?></th>
+                                        <th style="min-width: 300px;"><?= t('Product / Service') ?></th>
+                                        <th style="width: 150px;"><?= t('Quantity') ?></th>
+                                        <th style="width: 200px;"><?= t('Unit Price') ?></th>
+                                        <th style="width: 200px;"><?= t('Tax Rate') ?></th>
+                                        <th class="text-end" style="width: 150px;"><?= t('Total') ?></th>
                                         <th style="width: 50px;"></th>
                                     </tr>
                                 </thead>
@@ -353,6 +353,7 @@ if ($is_edit) {
                                                                oninput="openProductSearch('<?= $rowId ?>', this.value)"
                                                                onclick="openProductSearch('<?= $rowId ?>', this.value)"
                                                                style="cursor:text;background:#fff;" autocomplete="off"
+                                                               placeholder="<?= t('Type to search product...') ?>"
                                                                value="<?= htmlspecialchars($item['item_name']) ?>">
                                                         <button type="button" class="btn btn-outline-secondary" onclick="openProductSearch('<?= $rowId ?>')">
                                                             <i class="bi bi-search"></i>
@@ -373,9 +374,9 @@ if ($is_edit) {
                                                 </td>
                                                 <td>
                                                     <select class="form-select tax-selector" name="taxId" onchange="calculateRowTotal('<?= $rowId ?>')">
-                                                        <option value="0" data-rate="0">No Tax (0%)</option>
+                                                        <option value="0" data-rate="0"><?= t('No Tax (0%)') ?></option>
                                                         <?php foreach ($tax_rates as $tr): ?>
-                                                            <option value="<?= $tr['rate_id'] ?>" data-rate="<?= $tr['rate_percentage'] ?>" 
+                                                            <option value="<?= $tr['rate_id'] ?>" data-rate="<?= $tr['rate_percentage'] ?>"
                                                                 <?= ($item['tax_rate_id'] == $tr['rate_id']) ? 'selected' : '' ?>>
                                                                 <?= htmlspecialchars($tr['rate_name']) ?> (<?= $tr['rate_percentage'] ?>%)
                                                             </option>
@@ -395,7 +396,7 @@ if ($is_edit) {
                                 </tbody>
                                 <tfoot>
                                     <tr class="bg-light">
-                                        <td colspan="5" class="text-end fw-bold">Subtotal:</td>
+                                        <td colspan="5" class="text-end fw-bold"><?= t('Subtotal:') ?></td>
                                         <td class="text-end fw-bold pt-3" id="subtotal_display">TSh 0.00</td>
                                         <td></td>
                                     </tr>
@@ -405,7 +406,7 @@ if ($is_edit) {
                     </div>
                 </div>
                  <button type="button" class="btn btn-primary btn-sm" onclick="addItemRow()">
-                                <i class="bi bi-plus-circle"></i> Add Item
+                                <i class="bi bi-plus-circle"></i> <?= t('Add Item') ?>
                             </button>
 
                 <!-- Shipping & Notes Section -->
@@ -413,19 +414,19 @@ if ($is_edit) {
                     <div class="col-md-7">
                         <div class="card mb-4 shadow-sm">
                             <div class="card-header bg-light py-3">
-                                <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text me-2"></i> Notes & Terms</h6>
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text me-2"></i> <?= t('Notes & Terms') ?></h6>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold">Internal Notes</label>
-                                    <textarea class="form-control" name="notes" rows="3" placeholder="Notes for internal team..."><?= $is_edit ? htmlspecialchars($po_data['notes'] ?? '') : '' ?></textarea>
+                                    <label class="form-label fw-semibold"><?= t('Internal Notes') ?></label>
+                                    <textarea class="form-control" name="notes" rows="3" placeholder="<?= t('Notes for internal team...') ?>"><?= $is_edit ? htmlspecialchars($po_data['notes'] ?? '') : '' ?></textarea>
                                 </div>
                                 <div class="mb-0">
-                                    <label class="form-label fw-semibold">Terms & Conditions</label>
-                                    <textarea class="form-control" name="terms_conditions" rows="3" placeholder="Standard PO terms..."><?= $is_edit ? htmlspecialchars($po_data['terms_conditions'] ?? '') : '' ?></textarea>
+                                    <label class="form-label fw-semibold"><?= t('Terms & Conditions') ?></label>
+                                    <textarea class="form-control" name="terms_conditions" rows="3" placeholder="<?= t('Standard PO terms...') ?>"><?= $is_edit ? htmlspecialchars($po_data['terms_conditions'] ?? '') : '' ?></textarea>
                                 </div>
                                 <div class="mb-0 mt-3">
-                                    <label class="form-label fw-semibold mb-2">Order Attachments <span class="text-muted small fw-normal">(Optional)</span></label>
+                                    <label class="form-label fw-semibold mb-2"><?= t('Order Attachments') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                     
                                     <div id="attachments-container" class="border rounded p-3 bg-light">
                                         <div id="attachment-fields">
@@ -433,12 +434,12 @@ if ($is_edit) {
                                                 <?php foreach ($po_attachments as $att): ?>
                                                     <div class="row g-2 attachment-row mb-2 align-items-center">
                                                         <div class="col-md-5">
-                                                            <input type="text" class="form-control form-control-sm" name="attachment_names[]" value="<?= htmlspecialchars($att['file_name']) ?>" placeholder="Document Name">
+                                                            <input type="text" class="form-control form-control-sm" name="attachment_names[]" value="<?= htmlspecialchars($att['file_name']) ?>" placeholder="<?= t('Document Name') ?>">
                                                         </div>
                                                         <div class="col-md-6">
                                                             <div class="custom-file-input-wrapper">
                                                                 <label class="input-group input-group-sm mb-0 cursor-pointer">
-                                                                    <span class="input-group-text bg-light border-end-0">Choose File</span>
+                                                                    <span class="input-group-text bg-light border-end-0"><?= t('Choose File') ?></span>
                                                                     <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">
                                                                         <i class="bi bi-file-earmark-check text-success me-1"></i> <?= htmlspecialchars(basename($att['file_path'])) ?>
                                                                     </div>
@@ -448,7 +449,7 @@ if ($is_edit) {
                                                             </div>
                                                         </div>
                                                     <div class="col-md-1 text-end">
-                                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="<?= t('Remove') ?>">
                                                             <i class="bi bi-trash fs-5"></i>
                                                         </button>
                                                     </div>
@@ -460,13 +461,13 @@ if ($is_edit) {
                                             <?php if (!$is_edit || count($po_attachments) == 0): ?>
                                             <div class="row g-2 attachment-row mb-2">
                                                 <div class="col-md-5">
-                                                    <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Contract, Specs)">
+                                                    <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="<?= t('Document Name (e.g. Contract, Specs)') ?>">
                                                 </div>
                                                 <div class="col-md-6">
                                                     <input type="file" class="form-control form-control-sm" name="attachments[]">
                                                 </div>
                                                 <div class="col-md-1 text-end">
-                                                    <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                                    <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="<?= t('Remove') ?>">
                                                         <i class="bi bi-trash fs-5"></i>
                                                     </button>
                                                 </div>
@@ -474,10 +475,10 @@ if ($is_edit) {
                                             <?php endif; ?>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-primary shadow-sm" onclick="addAttachmentRow()">
-                                            <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                                            <i class="bi bi-plus-circle me-1"></i> <?= t('Add Attachment') ?>
                                         </button>
                                     </div>
-                                    <div class="form-text text-muted mt-2">Accepted: PDF, DOC, DOCX, JPG, PNG (max 10MB each). Saved to Document Library.</div>
+                                    <div class="form-text text-muted mt-2"><?= t('Accepted: PDF, DOC, DOCX, JPG, PNG (max 10MB each). Saved to Document Library.') ?></div>
                                 </div>
                             </div>
                         </div>
@@ -485,41 +486,41 @@ if ($is_edit) {
                     <div class="col-md-5">
                         <div class="card shadow-sm border-primary">
                             <div class="card-header bg-primary text-white py-3">
-                                <h6 class="mb-0 fw-bold"><i class="bi bi-calculator me-2"></i> Order Summary</h6>
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-calculator me-2"></i> <?= t('Order Summary') ?></h6>
                             </div>
                             <div class="card-body p-4">
                                 <div class="d-flex justify-content-between mb-3 text-muted">
-                                    <span>Items Subtotal</span>
+                                    <span><?= t('Items Subtotal') ?></span>
                                     <span id="summary-subtotal">0.00</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-3 text-muted">
-                                    <span>Total Tax</span>
+                                    <span><?= t('Total Tax') ?></span>
                                     <span id="summary-tax">0.00</span>
                                 </div>
                                 <div class="row mb-3 align-items-center">
-                                    <div class="col-6 text-muted">Shipping Cost</div>
+                                    <div class="col-6 text-muted"><?= t('Shipping Cost') ?></div>
                                     <div class="col-6">
-                                        <input type="number" step="0.01" class="form-control form-control-sm text-end" 
+                                        <input type="number" step="0.01" class="form-control form-control-sm text-end"
                                                id="shipping_cost" name="shipping_cost" value="<?= $is_edit ? $po_data['shipping_cost'] : '0.00' ?>" oninput="calculateGrandTotal()">
                                     </div>
                                 </div>
                                 <hr class="my-3">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <h4 class="mb-0 fw-bold text-dark">Total Value</h4>
+                                    <h4 class="mb-0 fw-bold text-dark"><?= t('Total Value') ?></h4>
                                     <h4 class="mb-0 fw-bold text-primary" id="summary-grand-total">TSh 0.00</h4>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="d-grid gap-2 mt-4">
                             <button type="submit" class="btn btn-success btn-lg shadow-sm">
-                                <i class="bi bi-check2-all me-2"></i> <?= $is_edit ? 'Update Purchase Order' : 'Create Purchase Order' ?>
+                                <i class="bi bi-check2-all me-2"></i> <?= $is_edit ? t('Update Purchase Order') : t('Create Purchase Order') ?>
                             </button>
                             <button type="button" class="btn btn-outline-primary" onclick="window.saveDraft()">
-                                <i class="bi bi-save me-2"></i> Save as Draft
+                                <i class="bi bi-save me-2"></i> <?= t('Save as Draft') ?>
                             </button>
                             <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-link text-decoration-none text-muted">
-                                Cancel and return
+                                <?= t('Cancel and return') ?>
                             </a>
                         </div>
                     </div>
@@ -535,10 +536,10 @@ if ($is_edit) {
         <table class="table table-sm table-hover mb-0">
             <thead class="bg-light sticky-top">
                 <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Stock</th>
-                    <th>Cost Price</th>
+                    <th><?= t('Product') ?></th>
+                    <th><?= t('SKU') ?></th>
+                    <th><?= t('Stock') ?></th>
+                    <th><?= t('Cost Price') ?></th>
                 </tr>
             </thead>
             <tbody id="productsSearchBody">
@@ -560,6 +561,24 @@ const editId = <?= json_encode($edit_id) ?>;
 const isEdit    = <?= json_encode($is_edit) ?>;
 const rfqRefId  = <?= (int)$rfq_ref_id ?>;
 
+// Pre-translated strings used inside JS template literals / dynamic UI below.
+const POC_I18N = {
+    selectRfqOptional: <?= json_encode(t('Select RFQ (Optional)')) ?>,
+    selectWarehouse:   <?= json_encode(t('Select Warehouse')) ?>,
+    selectDefault:     <?= json_encode(t('Select...')) ?>,
+    noProductsFound:   <?= json_encode(t('No products found')) ?>,
+    na:                <?= json_encode(t('N/A')) ?>,
+    noSku:             <?= json_encode(t('No SKU')) ?>,
+    req:               <?= json_encode(t('Req:')) ?>,
+    rem:               <?= json_encode(t('Rem:')) ?>,
+    editPurchaseOrder: <?= json_encode(t('Edit Purchase Order')) ?>,
+    updateOrder:       <?= json_encode(t('Update Order')) ?>
+};
+
+function tFormat(str, ...args) {
+    return str.replace(/\{(\d+)\}/g, (m, i) => (args[i] !== undefined ? args[i] : m));
+}
+
 // ── Global Functions ──────────────────────────────────────────────
 
 function handleFileSelect(input) {
@@ -577,20 +596,20 @@ function addAttachmentRow() {
         <div class="attachment-row mb-2" id="${rowId}">
             <div class="row g-2 align-items-center">
                 <div class="col-md-5">
-                    <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Contract, Specs)">
+                    <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="<?= t('Document Name (e.g. Contract, Specs)') ?>">
                 </div>
                 <div class="col-md-6">
                     <div class="custom-file-input-wrapper">
                         <label class="input-group input-group-sm mb-0 cursor-pointer">
-                            <span class="input-group-text bg-light border-end-0">Choose File</span>
-                            <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                            <span class="input-group-text bg-light border-end-0"><?= t('Choose File') ?></span>
+                            <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0"><?= t('No file chosen') ?></div>
                             <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
                         </label>
                         <input type="hidden" name="existing_attachments[]" value="">
                     </div>
                 </div>
                 <div class="col-md-1 text-end">
-                    <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="$('#${rowId}').remove()" title="Remove">
+                    <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="$('#${rowId}').remove()" title="<?= t('Remove') ?>">
                         <i class="bi bi-trash fs-5"></i>
                     </button>
                 </div>
@@ -611,7 +630,7 @@ function initSelect2Fields() {
         if ($el.data('select2')) return;
         $el.select2({
             theme: 'bootstrap-5',
-            placeholder: $el.find('option:first').text() || 'Select...',
+            placeholder: $el.find('option:first').text() || POC_I18N.selectDefault,
             allowClear: true,
             width: '100%'
         });
@@ -637,7 +656,7 @@ function reinitRfqSelect2() {
     if ($rfq.data('select2')) $rfq.select2('destroy');
     $rfq.select2({
         theme: 'bootstrap-5',
-        placeholder: 'Select RFQ (Optional)',
+        placeholder: POC_I18N.selectRfqOptional,
         allowClear: true,
         width: '100%'
     });
@@ -659,8 +678,8 @@ $(document).ready(function() {
     });
 
     if (isEdit) {
-        $('h2').html('<i class="bi bi-pencil-square text-primary"></i> Edit Purchase Order');
-        $('button[type="submit"]').html('<i class="bi bi-save me-2"></i> Update Order');
+        $('h2').html('<i class="bi bi-pencil-square text-primary"></i> ' + POC_I18N.editPurchaseOrder);
+        $('button[type="submit"]').html('<i class="bi bi-save me-2"></i> ' + POC_I18N.updateOrder);
     }
 
     // Initial load
@@ -734,7 +753,7 @@ function loadRFQs(callback) {
 
     // Need at least one filter to avoid loading all RFQs unfiltered
     if (!supplierId && !warehouseId && !projectId) {
-        $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
+        $('#rfq_reference').html(`<option value="">${POC_I18N.selectRfqOptional}</option>`);
         reinitRfqSelect2();
         if (callback) callback();
         return;
@@ -748,12 +767,12 @@ function loadRFQs(callback) {
     $.getJSON('<?= getUrl("api/get_rfqs") ?>', params, function(res) {
         const data = res.data || [];
         if (!data.length) {
-            $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
+            $('#rfq_reference').html(`<option value="">${POC_I18N.selectRfqOptional}</option>`);
             reinitRfqSelect2();
             if (callback) callback();
             return;
         }
-        let opts = '<option value="">Select RFQ (Optional)</option>';
+        let opts = `<option value="">${POC_I18N.selectRfqOptional}</option>`;
         data.forEach(r => {
             const parts = [r.rfq_number, r.rfq_date];
             if (!supplierId && r.supplier_name) parts.push(r.supplier_name);
@@ -770,7 +789,7 @@ function loadRFQs(callback) {
         reinitRfqSelect2();
         if (callback) callback();
     }).fail(function() {
-        $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
+        $('#rfq_reference').html(`<option value="">${POC_I18N.selectRfqOptional}</option>`);
         reinitRfqSelect2();
         if (callback) callback();
     });
@@ -785,7 +804,7 @@ $(document).on('change', '#rfq_reference', function() {
     }
 
     Swal.fire({
-        title: 'Loading RFQ Items...',
+        title: <?= json_encode(t('Loading RFQ Items...')) ?>,
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
     });
@@ -793,11 +812,11 @@ $(document).on('change', '#rfq_reference', function() {
     $.getJSON('<?= getUrl("api/get_rfq_items") ?>', { rfq_id: rfqId }, function(res) {
         Swal.close();
         if (!res.success) {
-            Swal.fire('Error', res.message || 'Failed to load items', 'error');
+            Swal.fire(<?= json_encode(t('Error')) ?>, res.message || <?= json_encode(t('Failed to load items')) ?>, 'error');
             return;
         }
         if (!res.items || res.items.length === 0) {
-            Swal.fire('Info', 'All items in this RFQ have already been fully ordered or no items were found.', 'info');
+            Swal.fire(<?= json_encode(t('Info')) ?>, <?= json_encode(t('All items in this RFQ have already been fully ordered or no items were found.')) ?>, 'info');
             return;
         }
         $('#itemsBody').empty();
@@ -814,13 +833,13 @@ $(document).on('change', '#rfq_reference', function() {
                 const price       = matched
                     ? (parseFloat(matched.cost_price) || parseFloat(matched.purchase_price) || 0).toFixed(2)
                     : '0.00';
-                const taxOpts = `<option value="0" data-rate="0">No Tax (0%)</option><?php foreach ($tax_rates as $tr): ?><option value="<?= $tr['rate_id'] ?>" data-rate="<?= $tr['rate_percentage'] ?>"><?= htmlspecialchars($tr['rate_name']) ?> (<?= $tr['rate_percentage'] ?>%)</option><?php endforeach; ?>`;
+                const taxOpts = `<option value="0" data-rate="0"><?= t('No Tax (0%)') ?></option><?php foreach ($tax_rates as $tr): ?><option value="<?= $tr['rate_id'] ?>" data-rate="<?= $tr['rate_percentage'] ?>"><?= htmlspecialchars($tr['rate_name']) ?> (<?= $tr['rate_percentage'] ?>%)</option><?php endforeach; ?>`;
                 $('#itemsBody').append(`
                 <tr id="${rowId}">
                     <td class="serial-number text-center fw-bold text-muted"></td>
                     <td>
                         <div class="input-group">
-                            <input type="text" class="form-control product-selector" placeholder="Type to search product..." required
+                            <input type="text" class="form-control product-selector" placeholder="<?= t('Type to search product...') ?>" required
                                    oninput="openProductSearch('${rowId}', this.value)"
                                    onclick="openProductSearch('${rowId}', this.value)"
                                    style="cursor:text;background:#fff;" autocomplete="off"
@@ -837,7 +856,7 @@ $(document).on('change', '#rfq_reference', function() {
                                min="0.001" max="${item.remaining_qty || ''}" step="0.001" 
                                oninput="validateRfqQty(this); calculateRowTotal('${rowId}')" required>
                         <div class="form-text text-muted small mt-1">
-                            Req: ${item.requested_qty} | <span class="text-primary fw-bold">Rem: ${item.remaining_qty}</span>
+                            ${POC_I18N.req} ${item.requested_qty} | <span class="text-primary fw-bold">${POC_I18N.rem} ${item.remaining_qty}</span>
                         </div>
                     </td>
                     <td>
@@ -848,7 +867,7 @@ $(document).on('change', '#rfq_reference', function() {
                     </td>
                     <td>
                         <select class="form-select tax-selector" name="taxId" onchange="calculateRowTotal('${rowId}')">
-                            <option value="0" data-rate="0">No Tax (0%)</option>${taxOpts}
+                            <option value="0" data-rate="0"><?= t('No Tax (0%)') ?></option>${taxOpts}
                         </select>
                     </td>
                     <td class="text-end fw-bold"><span class="row-total">0.00</span></td>
@@ -866,11 +885,11 @@ $(document).on('change', '#rfq_reference', function() {
             initTaxSelect2();
             Toast.fire({
                 icon: 'success',
-                title: res.items.length + ' item(s) loaded from RFQ'
+                title: tFormat(<?= json_encode(t('{0} item(s) loaded from RFQ')) ?>, res.items.length)
             });
-        }).fail(function() { 
+        }).fail(function() {
             Swal.close();
-            Swal.fire('Error', 'Could not reach the server.', 'error');
+            Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Could not reach the server.')) ?>, 'error');
         });
 });
 
@@ -884,7 +903,7 @@ function rebuildPoWarehouses(projectId) {
 
     const sel = document.getElementById('warehouse_id');
     const currentVal = sel.value;
-    sel.innerHTML = '<option value="">Select Warehouse</option>';
+    sel.innerHTML = `<option value="">${POC_I18N.selectWarehouse}</option>`;
     const filtered = filterWarehousesForProject(allWarehouses, projectId);
     filtered.forEach(w => {
         const opt = document.createElement('option');
@@ -897,7 +916,7 @@ function rebuildPoWarehouses(projectId) {
 
     $wSel.select2({
         theme: 'bootstrap-5',
-        placeholder: 'Select Warehouse',
+        placeholder: POC_I18N.selectWarehouse,
         allowClear: true,
         width: '100%'
     });
@@ -932,8 +951,8 @@ function validateRfqQty(input) {
     if (max > 0 && val > max) {
         Swal.fire({
             icon: 'warning',
-            title: 'Limit Exceeded',
-            text: `This item has only ${max} units remaining in the RFQ. You cannot order ${val}.`,
+            title: <?= json_encode(t('Limit Exceeded')) ?>,
+            text: tFormat(<?= json_encode(t('This item has only {0} units remaining in the RFQ. You cannot order {1}.')) ?>, max, val),
             confirmButtonColor: '#0d6efd'
         });
     }
@@ -942,7 +961,7 @@ function validateFileSize(input) {
     if (input.files && input.files[0]) {
         const f = input.files[0];
         if (f.size > 10 * 1024 * 1024) {
-            Swal.fire({icon:'warning',title:'File Too Large',text:'Maximum file size is 10MB.',confirmButtonColor:'#0d6efd',confirmButtonText:'OK'});
+            Swal.fire({icon:'warning',title:<?= json_encode(t('File Too Large')) ?>,text:<?= json_encode(t('Maximum file size is 10MB.')) ?>,confirmButtonColor:'#0d6efd',confirmButtonText:<?= json_encode(t('OK')) ?>});
             input.value = '';
             return;
         }
@@ -1005,8 +1024,8 @@ function addItemRow() {
             <td class="serial-number text-center fw-bold text-muted"></td>
             <td>
                 <div class="input-group">
-                    <input type="text" class="form-control product-selector" 
-                           placeholder="Type to search product..." required
+                    <input type="text" class="form-control product-selector"
+                           placeholder="<?= t('Type to search product...') ?>" required
                            oninput="openProductSearch('${rowId}', this.value)"
                            onclick="openProductSearch('${rowId}', this.value)"
                            style="cursor: text; background-color: #fff;"
@@ -1028,7 +1047,7 @@ function addItemRow() {
             </td>
             <td>
                 <select class="form-select tax-selector" name="taxId" onchange="calculateRowTotal('${rowId}')">
-                    <option value="0" data-rate="0">No Tax (0%)</option>
+                    <option value="0" data-rate="0"><?= t('No Tax (0%)') ?></option>
                     <?php foreach ($tax_rates as $tr): ?>
                         <option value="<?= $tr['rate_id'] ?>" data-rate="<?= $tr['rate_percentage'] ?>">
                             <?= htmlspecialchars($tr['rate_name']) ?> (<?= $tr['rate_percentage'] ?>%)
@@ -1058,8 +1077,8 @@ function addEditItemRow(item) {
             <td class="serial-number text-center fw-bold text-muted"></td>
             <td>
                 <div class="input-group">
-                    <input type="text" class="form-control product-selector" 
-                           placeholder="Type to search product..." required
+                    <input type="text" class="form-control product-selector"
+                           placeholder="<?= t('Type to search product...') ?>" required
                            oninput="openProductSearch('${rowId}', this.value)"
                            onclick="openProductSearch('${rowId}', this.value)"
                            style="cursor: text; background-color: #fff;"
@@ -1082,7 +1101,7 @@ function addEditItemRow(item) {
             </td>
             <td>
                 <select class="form-select tax-selector" name="taxId" onchange="calculateRowTotal('${rowId}')">
-                    <option value="0" data-rate="0">No Tax (0%)</option>
+                    <option value="0" data-rate="0"><?= t('No Tax (0%)') ?></option>
                     <?php foreach ($tax_rates as $tr): ?>
                         <option value="<?= $tr['rate_id'] ?>" data-rate="<?= $tr['rate_percentage'] ?>" ${item.tax_rate_id == <?= $tr['rate_id'] ?> ? 'selected' : ''}>
                             <?= htmlspecialchars($tr['rate_name']) ?> (<?= $tr['rate_percentage'] ?>%)
@@ -1113,8 +1132,8 @@ function openProductSearch(rowId, term = '') {
     if (!$('#warehouse_id').val()) {
         Swal.fire({
             icon: 'warning',
-            title: 'Select Warehouse First',
-            text: 'Please select a Warehouse / Delivery Point before searching for products.',
+            title: <?= json_encode(t('Select Warehouse First')) ?>,
+            text: <?= json_encode(t('Please select a Warehouse / Delivery Point before searching for products.')) ?>,
             confirmButtonColor: '#0d6efd'
         });
         return;
@@ -1149,7 +1168,7 @@ function searchProducts(term = '') {
     }
 
     if (results.length === 0) {
-        tbody.append(`<tr><td colspan="4" class="text-center text-danger p-3">No products found</td></tr>`);
+        tbody.append(`<tr><td colspan="4" class="text-center text-danger p-3">${POC_I18N.noProductsFound}</td></tr>`);
         return;
     }
 
@@ -1159,9 +1178,9 @@ function searchProducts(term = '') {
             <tr onclick="selectProduct(${product.product_id})">
                 <td>
                     <strong>${product.product_name}</strong><br>
-                    <small class="text-muted">${product.sku || 'No SKU'}</small>
+                    <small class="text-muted">${product.sku || POC_I18N.noSku}</small>
                 </td>
-                <td>${product.sku || 'N/A'}</td>
+                <td>${product.sku || POC_I18N.na}</td>
                 <td>${product.current_stock || 0}</td>
                 <td>${costPrice.toLocaleString()}</td>
             </tr>
@@ -1259,7 +1278,7 @@ function saveOrder(status) {
     });
 
     if (items.length === 0) {
-        Swal.fire('Error', 'Please add at least one item', 'error');
+        Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Please add at least one item')) ?>, 'error');
         return;
     }
 
@@ -1268,7 +1287,7 @@ function saveOrder(status) {
     formData.append('items', JSON.stringify(items));
 
     Swal.fire({
-        title: 'Saving Purchase Order...',
+        title: <?= json_encode(t('Saving Purchase Order...')) ?>,
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
     });
@@ -1294,10 +1313,10 @@ function saveOrder(status) {
                 
                 Swal.fire({
                     icon: 'success',
-                    title: editId ? 'Purchase Order Updated!' : 'Purchase Order Created!',
-                    text: editId ? 'The purchase order has been successfully updated.' : 'The purchase order has been successfully created.',
+                    title: editId ? <?= json_encode(t('Purchase Order Updated!')) ?> : <?= json_encode(t('Purchase Order Created!')) ?>,
+                    text: editId ? <?= json_encode(t('The purchase order has been successfully updated.')) ?> : <?= json_encode(t('The purchase order has been successfully created.')) ?>,
                     confirmButtonColor: '#28a745',
-                    confirmButtonText: 'OK',
+                    confirmButtonText: <?= json_encode(t('OK')) ?>,
                     timer: 3000
                 }).then(() => {
                     window.location.href = '<?= htmlspecialchars($back_url) ?>';
@@ -1305,18 +1324,18 @@ function saveOrder(status) {
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Creation Failed',
-                    text: response.message || 'An unknown error occurred while creating the purchase order.',
-                    confirmButtonText: 'OK'
+                    title: <?= json_encode(t('Creation Failed')) ?>,
+                    text: response.message || <?= json_encode(t('An unknown error occurred while creating the purchase order.')) ?>,
+                    confirmButtonText: <?= json_encode(t('OK')) ?>
                 });
             }
         },
         error: function() {
             Swal.fire({
                 icon: 'error',
-                title: 'System Error',
-                text: 'A network or server error occurred. Please check your connection and try again.',
-                confirmButtonText: 'OK'
+                title: <?= json_encode(t('System Error')) ?>,
+                text: <?= json_encode(t('A network or server error occurred. Please check your connection and try again.')) ?>,
+                confirmButtonText: <?= json_encode(t('OK')) ?>
             });
         }
     });

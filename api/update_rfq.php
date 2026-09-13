@@ -3,15 +3,18 @@
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 try {
-    if (!isAuthenticated()) throw new Exception('Unauthorized');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
+    if (!isAuthenticated()) throw new Exception(t('Unauthorized'));
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception(t('Invalid method'));
     csrf_check();
 
     if (!canEdit('rfq')) {
         http_response_code(403);
-        throw new Exception('Access Denied: you do not have permission to edit RFQs');
+        throw new Exception(t('Access Denied: you do not have permission to edit RFQs'));
     }
 
     $rfq_id       = intval($_POST['rfq_id'] ?? 0);
@@ -22,25 +25,25 @@ try {
     $deadline     = $_POST['deadline_date'] ?? null ?: null;
     $items        = json_decode($_POST['items'] ?? '[]', true);
 
-    if (!$rfq_id)       throw new Exception('Invalid RFQ');
-    if (!$supplier_id)  throw new Exception('Supplier is required');
-    if (!$warehouse_id) throw new Exception('Warehouse is required');
-    if (empty($items))  throw new Exception('At least one item is required');
+    if (!$rfq_id)       throw new Exception(t('Invalid RFQ'));
+    if (!$supplier_id)  throw new Exception(t('Supplier is required'));
+    if (!$warehouse_id) throw new Exception(t('Warehouse is required'));
+    if (empty($items))  throw new Exception(t('At least one item is required'));
 
     // Phase C — block edits against RFQs on projects not in user scope,
     // and verify the incoming project_id is also in user scope.
     assertScopeForRecord('rfq', 'rfq_id', $rfq_id);
     if ($project_id && !userCan('project', $project_id)) {
         http_response_code(403);
-        throw new Exception('Access denied: this project is not in your scope.');
+        throw new Exception(t('Access denied: this project is not in your scope.'));
     }
 
     // Confirm RFQ exists and is still editable (draft only)
     $row = $pdo->prepare("SELECT rfq_id, rfq_number, status FROM rfq WHERE rfq_id = ?");
     $row->execute([$rfq_id]);
     $rfq = $row->fetch(PDO::FETCH_ASSOC);
-    if (!$rfq) throw new Exception('RFQ not found');
-    if ($rfq['status'] !== 'draft') throw new Exception('Only draft RFQs can be edited');
+    if (!$rfq) throw new Exception(t('RFQ not found'));
+    if ($rfq['status'] !== 'draft') throw new Exception(t('Only draft RFQs can be edited'));
 
     $pdo->beginTransaction();
 
@@ -111,7 +114,7 @@ try {
     }
 
     logActivity($pdo, $_SESSION['user_id'], 'Edit RFQ', "User edited RFQ: {$rfq['rfq_number']} (ID $rfq_id)");
-    echo json_encode(['success' => true, 'message' => "RFQ #{$rfq['rfq_number']} updated successfully."]);
+    echo json_encode(['success' => true, 'message' => sprintf(t('RFQ #%s updated successfully.'), $rfq['rfq_number'])]);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();

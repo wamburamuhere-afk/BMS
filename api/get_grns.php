@@ -11,16 +11,20 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); 
 ini_set('log_errors', 1);
 
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 // Check permissions (View GRN)
 if (!canView('grn')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to view GRN data.']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to view GRN data.')]);
     exit;
 }
 
@@ -38,7 +42,7 @@ try {
 
     if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
         exit;
     }
 
@@ -203,6 +207,6 @@ try {
 
 } catch (Exception $e) {
     error_log("Error fetching GRNs: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error']);
+    echo json_encode(['success' => false, 'message' => t('Database error')]);
 }
 ?>

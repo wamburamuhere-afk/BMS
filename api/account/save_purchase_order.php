@@ -3,16 +3,19 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => t('Method not allowed')]);
     exit;
 }
 
@@ -23,13 +26,13 @@ $is_update = ($purchase_order_id > 0);
 if ($is_update) {
     if (!canEdit('purchase_orders')) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to edit purchase orders']);
+        echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to edit purchase orders')]);
         exit;
     }
 } else {
     if (!canCreate('purchase_orders')) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to create purchase orders']);
+        echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to create purchase orders')]);
         exit;
     }
 }
@@ -44,7 +47,7 @@ try {
     }
     if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        echo json_encode(['success' => false, 'message' => t('Access denied: this project is not in your scope.')]);
         exit;
     }
 
@@ -71,7 +74,7 @@ try {
     $items = json_decode($items_json, true);
 
     if (empty($supplier_id) || empty($order_date) || empty($items)) {
-        throw new Exception("Missing required fields (Supplier, Date, or Items)");
+        throw new Exception(t('Missing required fields (Supplier, Date, or Items)'));
     }
 
     // Calculate totals based on actual items
@@ -272,7 +275,7 @@ try {
 
                 assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$i]);
                 if (!@move_uploaded_file($tmp_name, $dest_path)) {
-                    throw new Exception("Failed to save attachment \"{$original_name}\". The uploads directory may not be writable on the server.");
+                    throw new Exception(sprintf(t('Failed to save attachment "%s". The uploads directory may not be writable on the server.'), $original_name));
                 }
 
                 $doc_name = !empty($attachment_names[$i]) ? $attachment_names[$i] : $original_name;
@@ -316,7 +319,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Purchase Order saved successfully',
+        'message' => t('Purchase Order saved successfully'),
         'purchase_order_id' => $purchase_order_id,
         'order_number' => $order_number ?? ''
     ]);

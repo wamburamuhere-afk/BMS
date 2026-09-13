@@ -5,15 +5,18 @@
 require_once __DIR__ . '/../roots.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 if (!canDelete('grn')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete GRNs']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to delete GRNs')]);
     exit;
 }
 
@@ -21,7 +24,7 @@ try {
     $receipt_id = intval($_POST['receipt_id'] ?? 0);
 
     if ($receipt_id <= 0) {
-        throw new Exception('Invalid GRN ID');
+        throw new Exception(t('Invalid GRN ID'));
     }
 
     // Phase C — block deletes against GRNs on projects not in user scope.
@@ -34,7 +37,7 @@ try {
     $grn = $stmt->fetch();
 
     if (!$grn) {
-        throw new Exception('GRN not found');
+        throw new Exception(t('GRN not found'));
     }
 
     // If completed, we should ideally reverse stock before deleting, 
@@ -63,7 +66,7 @@ try {
     logActivity($pdo, $_SESSION['user_id'], 'Delete grn',
         "deleted GRN #{$grn['receipt_number']} with id {$receipt_id} (was {$grn['status']})");
 
-    echo json_encode(['success' => true, 'message' => "GRN #{$grn['receipt_number']} deleted successfully"]);
+    echo json_encode(['success' => true, 'message' => sprintf(t('GRN #%s deleted successfully'), $grn['receipt_number'])]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

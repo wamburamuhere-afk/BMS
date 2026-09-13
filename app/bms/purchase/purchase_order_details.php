@@ -77,9 +77,9 @@ if ($order_id) {
 <div class="container-fluid mt-4">
     <nav aria-label="breadcrumb" class="mb-3 po-sticky-nav">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>">Purchase Orders</a></li>
-            <li class="breadcrumb-item active">View Order</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>"><?= t('Purchase Orders') ?></a></li>
+            <li class="breadcrumb-item active"><?= t('View Order') ?></li>
         </ol>
     </nav>
 
@@ -103,45 +103,45 @@ if ($order_id) {
         <p class="text-dark mb-1 small text-uppercase text-center">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
 
         <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
+            <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>
 
         <div class="mt-3 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Purchase Order</h2>
-            <h4 style="color: #6c757d; margin: 0; font-size: 12pt;">Order #<span class="orderNumberPrint"></span></h4>
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('Purchase Order') ?></h2>
+            <h4 style="color: #6c757d; margin: 0; font-size: 12pt;"><?= t('Order #') ?><span class="orderNumberPrint"></span></h4>
         </div>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
     <div id="loading" class="text-center py-5 d-print-none">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden"><?= t('Loading...') ?></span>
         </div>
-        <p class="mt-2 text-muted">Loading order details...</p>
+        <p class="mt-2 text-muted"><?= t('Loading order details...') ?></p>
     </div>
 
     <div id="content" style="display: none;">
         <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-2">
             <div>
-                <h2 class="fw-bold mb-0">Purchase Order <span id="orderNumber" class="text-primary"></span></h2>
+                <h2 class="fw-bold mb-0"><?= t('Purchase Order') ?> <span id="orderNumber" class="text-primary"></span></h2>
                 <span id="orderStatus" class="badge rounded-pill mt-2 px-3 py-2"></span>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <!-- Back Button -->
                 <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-blue-touch shadow-sm">
-                    <i class="bi bi-arrow-left me-1"></i> Back
+                    <i class="bi bi-arrow-left me-1"></i> <?= t('Back') ?>
                 </a>
 
                 <!-- ── WORKFLOW ACTION BUTTONS ── -->
@@ -151,21 +151,21 @@ if ($order_id) {
                 <!-- ── END WORKFLOW ── -->
 
                 <a href="#" id="editLink" class="btn btn-outline-primary shadow-sm">
-                    <i class="bi bi-pencil me-1"></i> Edit
+                    <i class="bi bi-pencil me-1"></i> <?= t('Edit') ?>
                 </a>
                 <div class="btn-group shadow-sm">
                     <button onclick="printOrder(<?= $order_id ?>)" class="btn btn-blue-touch">
-                        <i class="bi bi-printer me-1"></i> Print
+                        <i class="bi bi-printer me-1"></i> <?= t('Print') ?>
                     </button>
                     <button type="button" class="btn btn-blue-touch dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="visually-hidden">Choose print template</span>
+                        <span class="visually-hidden"><?= t('Choose print template') ?></span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><h6 class="dropdown-header">Print Template</h6></li>
-                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'navy'); return false;">Navy</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'corporate'); return false;">Corporate</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'banded'); return false;">Banded</a></li>
+                        <li><h6 class="dropdown-header"><?= t('Print Template') ?></h6></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'standard'); return false;"><i class="bi bi-check2 me-2"></i><?= t('Standard (default)') ?></a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'navy'); return false;"><?= t('Navy') ?></a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'corporate'); return false;"><?= t('Corporate') ?></a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'banded'); return false;"><?= t('Banded') ?></a></li>
                     </ul>
                 </div>
             </div>
@@ -178,20 +178,20 @@ if ($order_id) {
                     <div class="card-body">
                         <div class="row mb-4">
                             <div class="col-sm-6">
-                                <h6 class="text-muted text-uppercase small fw-bold">Supplier</h6>
+                                <h6 class="text-muted text-uppercase small fw-bold"><?= t('Supplier') ?></h6>
                                 <h5 class="fw-bold mb-1" id="supplierName"></h5>
                                 <p class="mb-0" id="supplierAddress"></p>
                                 <p class="mb-0"><a href="#" id="supplierEmail" class="text-decoration-none"></a></p>
                                 <p class="mb-0" id="supplierPhone"></p>
                             </div>
                             <div class="col-sm-6 text-sm-end">
-                                <h6 class="text-muted text-uppercase small fw-bold">Order Details</h6>
-                                <p class="mb-1"><strong>Date:</strong> <span id="orderDate"></span></p>
-                                <p class="mb-1" id="projectRow" style="display:none;"><strong>Project:</strong> <span id="projectName" class="text-primary fw-bold"></span></p>
-                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong>Warehouse:</strong> <span id="warehouseName" class="text-success fw-bold"></span></p>
-                                <p class="mb-1"><strong>Expected Delivery:</strong> <span id="expectedDate"></span></p>
-                                <p class="mb-1" id="supplierQuoteRow" style="display:none;"><strong>Quote Ref:</strong> <span id="supplierQuoteRef" class="text-secondary"></span></p>
-                                <p class="mb-1"><strong>Created By:</strong> <span id="createdBy"></span></p>
+                                <h6 class="text-muted text-uppercase small fw-bold"><?= t('Order Details') ?></h6>
+                                <p class="mb-1"><strong><?= t('Date:') ?></strong> <span id="orderDate"></span></p>
+                                <p class="mb-1" id="projectRow" style="display:none;"><strong><?= t('Project:') ?></strong> <span id="projectName" class="text-primary fw-bold"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= t('Warehouse:') ?></strong> <span id="warehouseName" class="text-success fw-bold"></span></p>
+                                <p class="mb-1"><strong><?= t('Expected Delivery:') ?></strong> <span id="expectedDate"></span></p>
+                                <p class="mb-1" id="supplierQuoteRow" style="display:none;"><strong><?= t('Quote Ref:') ?></strong> <span id="supplierQuoteRef" class="text-secondary"></span></p>
+                                <p class="mb-1"><strong><?= t('Created By:') ?></strong> <span id="createdBy"></span></p>
                             </div>
                         </div>
 
@@ -199,39 +199,39 @@ if ($order_id) {
                             <table class="table table-hover align-middle">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th>Product</th>
-                                        <th class="text-center">Ordered</th>
-                                        <th class="text-center">Received</th>
-                                        <th class="text-center">Outstanding</th>
-                                        <th class="text-end">Unit Price</th>
-                                        <th class="text-end">Tax</th>
-                                        <th class="text-end">Total</th>
+                                        <th><?= t('Product') ?></th>
+                                        <th class="text-center"><?= t('Ordered') ?></th>
+                                        <th class="text-center"><?= t('Received') ?></th>
+                                        <th class="text-center"><?= t('Outstanding') ?></th>
+                                        <th class="text-end"><?= t('Unit Price') ?></th>
+                                        <th class="text-end"><?= t('Tax') ?></th>
+                                        <th class="text-end"><?= t('Total') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody id="itemsTableBody"></tbody>
                                 <tfoot class="border-top">
                                     <tr>
-                                        <td colspan="6" class="text-end text-muted">Subtotal</td>
+                                        <td colspan="6" class="text-end text-muted"><?= t('Subtotal') ?></td>
                                         <td class="text-end fw-bold" id="subtotal"></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="6" class="text-end text-muted">VAT (18%)</td>
+                                        <td colspan="6" class="text-end text-muted"><?= t('VAT (18%)') ?></td>
                                         <td class="text-end fw-bold" id="taxTotal"></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="6" class="text-end text-muted">Shipping</td>
+                                        <td colspan="6" class="text-end text-muted"><?= t('Shipping') ?></td>
                                         <td class="text-end fw-bold" id="shipping"></td>
                                     </tr>
                                     <tr class="bg-light">
-                                        <td colspan="6" class="text-end fw-bold fs-5">Grand Total</td>
+                                        <td colspan="6" class="text-end fw-bold fs-5"><?= t('Grand Total') ?></td>
                                         <td class="text-end fw-bold fs-5 text-primary" id="grandTotal"></td>
                                     </tr>
                                     <tr id="billingRow" class="d-none">
-                                        <td colspan="6" class="text-end text-muted">Invoiced</td>
+                                        <td colspan="6" class="text-end text-muted"><?= t('Invoiced') ?></td>
                                         <td class="text-end" id="poBilled"></td>
                                     </tr>
                                     <tr id="billingRemainingRow" class="d-none">
-                                        <td colspan="6" class="text-end fw-semibold">Remaining to Invoice</td>
+                                        <td colspan="6" class="text-end fw-semibold"><?= t('Remaining to Invoice') ?></td>
                                         <td class="text-end fw-semibold" id="poRemaining"></td>
                                     </tr>
                                 </tfoot>
@@ -248,21 +248,21 @@ if ($order_id) {
                 <!-- Workflow Trail -->
                 <div class="card shadow-sm border-0 mb-3" id="workflowCard" style="display:none;">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i> Authorization Trail</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i> <?= t('Authorization Trail') ?></h6>
                     </div>
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush small">
                             <div class="list-group-item">
-                                <div class="text-muted small">Prepared By:</div>
+                                <div class="text-muted small"><?= t('Prepared By:') ?></div>
                                 <div id="preparedByDisplay" class="fw-bold"></div>
                             </div>
                             <div class="list-group-item" id="reviewedByRow" style="display:none;">
-                                <div class="text-muted small">Reviewed By:</div>
+                                <div class="text-muted small"><?= t('Reviewed By:') ?></div>
                                 <div id="reviewedByDisplay" class="fw-bold"></div>
                                 <div id="reviewedAtDisplay" class="text-muted" style="font-size:0.75rem;"></div>
                             </div>
                             <div class="list-group-item" id="approvedByRow" style="display:none;">
-                                <div class="text-muted small">Approved By:</div>
+                                <div class="text-muted small"><?= t('Approved By:') ?></div>
                                 <div id="approvedByDisplay" class="fw-bold"></div>
                                 <div id="approvedAtDisplay" class="text-muted" style="font-size:0.75rem;"></div>
                             </div>
@@ -272,22 +272,22 @@ if ($order_id) {
 
                 <div class="card shadow-sm border-0 mb-3">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i> Notes</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i> <?= t('Notes') ?></h6>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted small mb-1">Internal Notes:</p>
-                        <p id="internalNotes" class="mb-3 fst-italic">No notes provided.</p>
+                        <p class="text-muted small mb-1"><?= t('Internal Notes:') ?></p>
+                        <p id="internalNotes" class="mb-3 fst-italic"><?= t('No notes provided.') ?></p>
 
                         <hr>
 
-                        <p class="text-muted small mb-1">Terms & Conditions:</p>
-                        <p id="termsConditions" class="mb-0 small">No terms provided.</p>
+                        <p class="text-muted small mb-1"><?= t('Terms & Conditions:') ?></p>
+                        <p id="termsConditions" class="mb-0 small"><?= t('No terms provided.') ?></p>
                     </div>
                 </div>
 
                 <div id="attachmentsSection" class="card shadow-sm border-0 mb-3 d-print-none" style="display: none;">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i> Documents & Attachments</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i> <?= t('Documents & Attachments') ?></h6>
                     </div>
                     <div class="card-body">
                         <div id="attachmentsList" class="d-grid gap-2">
@@ -303,9 +303,9 @@ if ($order_id) {
         <div class="d-print-none mt-4">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h5 class="fw-bold mb-0">
-                    <i class="bi bi-truck me-2 text-primary"></i>Delivery Note
+                    <i class="bi bi-truck me-2 text-primary"></i><?= t('Delivery Note') ?>
                 </h5>
-                <small class="text-muted"><?= count($dn_list) ?> delivery note<?= count($dn_list) > 1 ? 's' : '' ?></small>
+                <small class="text-muted"><?= count($dn_list) ?> <?= count($dn_list) > 1 ? t('delivery notes') : t('delivery note') ?></small>
             </div>
 
             <?php foreach ($dn_list as $dn): ?>
@@ -317,7 +317,7 @@ if ($order_id) {
                     </span>
                     <?php if ($dn['received_by']): ?>
                     <span class="ms-3 text-muted small">
-                        <i class="bi bi-person-check me-1"></i>Received by: <?= htmlspecialchars($dn['received_by']) ?>
+                        <i class="bi bi-person-check me-1"></i><?= t('Received by:') ?> <?= htmlspecialchars($dn['received_by']) ?>
                     </span>
                     <?php endif; ?>
                 </div>
@@ -327,12 +327,12 @@ if ($order_id) {
                         <table class="table table-sm table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">Product</th>
-                                    <th class="text-center">Qty Delivered</th>
-                                    <th class="text-center">PO Qty</th>
-                                    <th class="text-center">Unit</th>
-                                    <th class="text-center">Condition</th>
-                                    <th class="text-center">Coverage</th>
+                                    <th class="ps-3"><?= t('Product') ?></th>
+                                    <th class="text-center"><?= t('Qty Delivered') ?></th>
+                                    <th class="text-center"><?= t('PO Qty') ?></th>
+                                    <th class="text-center"><?= t('Unit') ?></th>
+                                    <th class="text-center"><?= t('Condition') ?></th>
+                                    <th class="text-center"><?= t('Coverage') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -357,7 +357,7 @@ if ($order_id) {
                                     <td class="text-center small"><?= htmlspecialchars($di['unit'] ?? '') ?></td>
                                     <td class="text-center small <?= $condClass ?>">
                                         <i class="bi bi-<?= $di['condition'] === 'good' ? 'check-circle' : ($di['condition'] === 'damaged' ? 'exclamation-triangle' : 'x-circle') ?> me-1"></i>
-                                        <?= ucfirst($di['condition'] ?? '') ?>
+                                        <?= t(ucfirst($di['condition'] ?? '')) ?>
                                     </td>
                                     <td class="text-center" style="min-width:120px;">
                                         <?php if ($pct !== null): ?>
@@ -391,10 +391,10 @@ if ($order_id) {
                             <div class="fw-bold"><?= htmlspecialchars($di['product_name']) ?></div>
                             <?php if ($di['sku']): ?><small class="text-muted d-block mb-1"><?= htmlspecialchars($di['sku']) ?></small><?php endif; ?>
                             <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
-                                <span class="text-muted">Delivered: <strong><?= number_format((float)$di['quantity_delivered'], 2) ?></strong></span>
-                                <?php if ($dpo_qty > 0): ?><span class="text-muted">PO Qty: <strong><?= number_format($dpo_qty, 2) ?></strong></span><?php endif; ?>
+                                <span class="text-muted"><?= t('Delivered:') ?> <strong><?= number_format((float)$di['quantity_delivered'], 2) ?></strong></span>
+                                <?php if ($dpo_qty > 0): ?><span class="text-muted"><?= t('PO Qty:') ?> <strong><?= number_format($dpo_qty, 2) ?></strong></span><?php endif; ?>
                                 <?php if (!empty($di['unit'])): ?><span class="text-muted"><?= htmlspecialchars($di['unit']) ?></span><?php endif; ?>
-                                <span class="<?= $dcondClass ?>"><i class="bi bi-<?= $dcondIcon ?> me-1"></i><?= ucfirst($di['condition'] ?? '') ?></span>
+                                <span class="<?= $dcondClass ?>"><i class="bi bi-<?= $dcondIcon ?> me-1"></i><?= t(ucfirst($di['condition'] ?? '')) ?></span>
                                 <?php if ($dpct !== null): ?>
                                 <div class="d-flex align-items-center gap-1" style="min-width:90px;">
                                     <div class="progress flex-grow-1" style="height:6px;"><div class="progress-bar <?= $dpct >= 100 ? 'bg-success' : 'bg-warning' ?>" style="width:<?= $dpct ?>%"></div></div>
@@ -406,7 +406,7 @@ if ($order_id) {
                         <?php endforeach; ?>
                     </div>
                     <?php else: ?>
-                    <p class="text-muted small p-3 mb-0">No items recorded on this delivery note.</p>
+                    <p class="text-muted small p-3 mb-0"><?= t('No items recorded on this delivery note.') ?></p>
                     <?php endif; ?>
                     <?php if ($dn['notes']): ?>
                     <div class="px-3 pb-3 pt-2 border-top">
@@ -424,15 +424,15 @@ if ($order_id) {
         <div id="no-delivery-notes-prompt" class="d-print-none mt-4" style="display:none;">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h5 class="fw-bold mb-0">
-                    <i class="bi bi-truck me-2 text-primary"></i>Delivery Notes
+                    <i class="bi bi-truck me-2 text-primary"></i><?= t('Delivery Notes') ?>
                 </h5>
             </div>
             <div class="card shadow-sm border-0">
                 <div class="card-body text-center py-4 text-muted">
                     <i class="bi bi-truck fs-1 d-block mb-2 opacity-50"></i>
-                    <p class="mb-2">No delivery notes recorded yet.</p>
+                    <p class="mb-2"><?= t('No delivery notes recorded yet.') ?></p>
                     <a href="#" id="no-dn-add-link" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-plus-circle me-1"></i> Add First Delivery Note
+                        <i class="bi bi-plus-circle me-1"></i> <?= t('Add First Delivery Note') ?>
                     </a>
                 </div>
             </div>
@@ -509,6 +509,34 @@ const PO_CAN_APPROVE = <?= $po_can_approve ? 'true' : 'false' ?>;
 const PO_IS_ADMIN    = <?= $po_is_admin    ? 'true' : 'false' ?>;
 const PO_CAN_CREATE_INVOICE = <?= $can_create_received_invoice ? 'true' : 'false' ?>;
 
+// Pre-translated strings used inside JS template literals below.
+const POD_I18N = {
+    markReviewed:     <?= json_encode(t('Mark Reviewed')) ?>,
+    approveOrder:     <?= json_encode(t('Approve Order')) ?>,
+    addDeliveryNote:  <?= json_encode(t('Add Delivery Note')) ?>,
+    fullyInvoiced:    <?= json_encode(t('Fully Invoiced')) ?>,
+    fullyInvoicedTitle: <?= json_encode(t('This PO is fully invoiced')) ?>,
+    convertToInvoice: <?= json_encode(t('Convert to Invoice')) ?>,
+    na:               <?= json_encode(t('N/A')) ?>,
+    staff:            <?= json_encode(t('Staff')) ?>,
+    ordered:          <?= json_encode(t('Ordered:')) ?>,
+    received:         <?= json_encode(t('Received:')) ?>,
+    outstanding:      <?= json_encode(t('Outstanding:')) ?>,
+    unit:             <?= json_encode(t('Unit:')) ?>,
+    tax:              <?= json_encode(t('Tax:')) ?>,
+    subtotal:         <?= json_encode(t('Subtotal')) ?>,
+    vat:              <?= json_encode(t('VAT (18%)')) ?>,
+    shipping:         <?= json_encode(t('Shipping')) ?>,
+    grandTotal:       <?= json_encode(t('Grand Total')) ?>
+};
+
+// Per-page local convention: a tiny numbered-placeholder formatter so a
+// translated sentence stays ONE coherent unit instead of being concatenated
+// from English word-order fragments.
+function tFormat(str, ...args) {
+    return str.replace(/\{(\d+)\}/g, (m, i) => (args[i] !== undefined ? args[i] : m));
+}
+
 $(document).ready(function() {
     loadOrderDetails();
 });
@@ -526,7 +554,7 @@ function loadOrderDetails() {
         onData: function(response) {
             if (!response.success) {
                 // Not found / access denied — redirect rather than offer a retry.
-                Swal.fire('Error', response.message, 'error').then(() => {
+                Swal.fire(<?= json_encode(t('Error')) ?>, response.message, 'error').then(() => {
                     window.location.href = '<?= getUrl("purchase_orders") ?>';
                 });
                 return;
@@ -564,13 +592,13 @@ function renderOrder(data) {
     if ((o.status === 'pending' || o.status === 'draft') && PO_CAN_REVIEW) {
         workflow.append(`
             <button class="btn btn-blue-touch shadow-sm" onclick="submitForReview()">
-                <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                <i class="bi bi-check2 me-1"></i> ${POD_I18N.markReviewed}
             </button>
         `);
     } else if (o.status === 'reviewed' && PO_CAN_APPROVE) {
         workflow.append(`
             <button class="btn btn-success shadow-sm" onclick="approvePO()">
-                <i class="bi bi-check-circle-fill me-1"></i> Approve Order
+                <i class="bi bi-check-circle-fill me-1"></i> ${POD_I18N.approveOrder}
             </button>
         `);
     }
@@ -578,7 +606,7 @@ function renderOrder(data) {
     if (o.status === 'approved' && dnOverallStatus !== 'complete') {
         workflow.append(`
             <a href="<?= getUrl('dn_create') ?>?po_id=${o.purchase_order_id}" class="btn btn-outline-info shadow-sm">
-                <i class="bi bi-truck me-1"></i> Add Delivery Note
+                <i class="bi bi-truck me-1"></i> ${POD_I18N.addDeliveryNote}
             </a>
         `);
     }
@@ -590,14 +618,14 @@ function renderOrder(data) {
         if (o.billing_status === 'fully_billed' || remaining <= 0.001) {
             // Nothing left to bill — don't offer Convert; show a clear state instead.
             workflow.append(`
-                <button class="btn btn-outline-secondary shadow-sm" disabled title="This PO is fully invoiced">
-                    <i class="bi bi-check2-all me-1"></i> Fully Invoiced
+                <button class="btn btn-outline-secondary shadow-sm" disabled title="${POD_I18N.fullyInvoicedTitle}">
+                    <i class="bi bi-check2-all me-1"></i> ${POD_I18N.fullyInvoiced}
                 </button>
             `);
         } else {
             const label = billed > 0.001
-                ? `Invoice Remaining (${fmtMoney(remaining)})`
-                : 'Convert to Invoice';
+                ? tFormat(<?= json_encode(t('Invoice Remaining ({0})')) ?>, fmtMoney(remaining))
+                : POD_I18N.convertToInvoice;
             workflow.append(`
                 <button class="btn btn-outline-success shadow-sm" onclick="convertToInvoice(${o.purchase_order_id}, ${remaining})">
                     <i class="bi bi-receipt me-1"></i> ${label}
@@ -634,7 +662,7 @@ function renderOrder(data) {
         $('#warehouseName').text(o.warehouse_name);
         $('#warehouseRow').show();
     }
-    $('#expectedDate').text(o.expected_delivery_date || o.expected_date || 'N/A');
+    $('#expectedDate').text(o.expected_delivery_date || o.expected_date || POD_I18N.na);
     if (o.supplier_quote_ref) {
         $('#supplierQuoteRow').show();
         $('#supplierQuoteRef').text(o.supplier_quote_ref);
@@ -643,7 +671,7 @@ function renderOrder(data) {
 
     // Populate Workflow Trail
     $('#workflowCard').show();
-    $('#preparedByDisplay').html(`${o.prepared_by_name || o.created_by_name || 'N/A'} <br><small class="text-muted fw-normal">${o.prepared_by_role || 'Staff'}</small>`);
+    $('#preparedByDisplay').html(`${o.prepared_by_name || o.created_by_name || POD_I18N.na} <br><small class="text-muted fw-normal">${o.prepared_by_role || POD_I18N.staff}</small>`);
     
     if (o.reviewed_by_name) {
         $('#reviewedByRow').show();
@@ -724,11 +752,11 @@ function renderOrder(data) {
             <div class="border rounded mb-2 p-2 bg-white" style="font-size:0.82rem;">
                 <div class="fw-bold">${item.product_name}${item.sku ? '<br><small class="text-muted">' + item.sku + '</small>' : ''}</div>
                 <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
-                    <span class="text-muted">Ordered: <strong>${mOrdered} ${item.unit || ''}</strong></span>
-                    ${mReceived > 0 ? `<span class="text-muted">Received: <strong>${mReceived}</strong></span>` : ''}
-                    <span class="${mOutstanding > 0 ? 'text-warning fw-bold' : 'text-success'}">Outstanding: <strong>${mOutstanding > 0 ? mOutstanding : '✓'}</strong></span>
-                    <span class="text-muted">Unit: <strong>${formatCurrency(item.unit_price, currency)}</strong></span>
-                    ${item.tax_name ? `<span class="text-muted">Tax: <strong>${item.tax_name}</strong></span>` : ''}
+                    <span class="text-muted">${POD_I18N.ordered} <strong>${mOrdered} ${item.unit || ''}</strong></span>
+                    ${mReceived > 0 ? `<span class="text-muted">${POD_I18N.received} <strong>${mReceived}</strong></span>` : ''}
+                    <span class="${mOutstanding > 0 ? 'text-warning fw-bold' : 'text-success'}">${POD_I18N.outstanding} <strong>${mOutstanding > 0 ? mOutstanding : '✓'}</strong></span>
+                    <span class="text-muted">${POD_I18N.unit} <strong>${formatCurrency(item.unit_price, currency)}</strong></span>
+                    ${item.tax_name ? `<span class="text-muted">${POD_I18N.tax} <strong>${item.tax_name}</strong></span>` : ''}
                     <span class="text-danger fw-bold">${formatCurrency(lineTotal, currency)}</span>
                 </div>
             </div>
@@ -736,10 +764,10 @@ function renderOrder(data) {
     });
     $mobileItems.append(`
         <div class="border rounded p-2 bg-light mt-1" style="font-size:0.82rem;">
-            <div class="d-flex justify-content-between mb-1"><span class="text-muted">Subtotal</span><strong>${formatCurrency(calculatedSubtotal, currency)}</strong></div>
-            <div class="d-flex justify-content-between mb-1"><span class="text-muted">VAT (18%)</span><strong>${formatCurrency(taxTotal, currency)}</strong></div>
-            <div class="d-flex justify-content-between mb-1"><span class="text-muted">Shipping</span><strong>${formatCurrency(shippingCost, currency)}</strong></div>
-            <div class="d-flex justify-content-between fw-bold text-primary border-top pt-1"><span>Grand Total</span><span>${formatCurrency(grandTotalAmt, currency)}</span></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">${POD_I18N.subtotal}</span><strong>${formatCurrency(calculatedSubtotal, currency)}</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">${POD_I18N.vat}</span><strong>${formatCurrency(taxTotal, currency)}</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">${POD_I18N.shipping}</span><strong>${formatCurrency(shippingCost, currency)}</strong></div>
+            <div class="d-flex justify-content-between fw-bold text-primary border-top pt-1"><span>${POD_I18N.grandTotal}</span><span>${formatCurrency(grandTotalAmt, currency)}</span></div>
         </div>
     `);
 
@@ -787,20 +815,20 @@ function getStatusColor(status) {
 
 function submitForReview() {
     Swal.fire({
-        title: 'Submit for Review?',
-        text: 'This Purchase Order will be sent for review and will no longer be editable.',
+        title: <?= json_encode(t('Submit for Review?')) ?>,
+        text: <?= json_encode(t('This Purchase Order will be sent for review and will no longer be editable.')) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#0d6efd',
-        confirmButtonText: 'Yes, Submit',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, Submit')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
         $.post('<?= getUrl('api/review_purchase_order') ?>', { purchase_order_id: orderId }, function(res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Submitted!', text: res.message }).then(() => location.reload());
+                Swal.fire({ icon: 'success', title: <?= json_encode(t('Submitted!')) ?>, text: res.message }).then(() => location.reload());
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message });
             }
         }, 'json');
     });
@@ -808,20 +836,20 @@ function submitForReview() {
 
 function approvePO() {
     Swal.fire({
-        title: 'Approve Purchase Order?',
-        text: 'Are you sure you want to approve this order?',
+        title: <?= json_encode(t('Approve Purchase Order?')) ?>,
+        text: <?= json_encode(t('Are you sure you want to approve this order?')) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#198754',
-        confirmButtonText: 'Yes, Approve',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, Approve')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
         $.post('<?= getUrl('api/approve_purchase_order') ?>', { purchase_order_id: orderId }, function(res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message }).then(() => location.reload());
+                Swal.fire({ icon: 'success', title: <?= json_encode(t('Approved!')) ?>, text: res.message }).then(() => location.reload());
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message });
             }
         }, 'json');
     });
@@ -849,33 +877,31 @@ function convertToInvoice(poId, remaining) {
         ? 'TZS ' + Number(remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : null;
     Swal.fire({
-        title: 'Convert to Supplier Invoice?',
+        title: <?= json_encode(t('Convert to Supplier Invoice?')) ?>,
         text: remTxt
-            ? 'A new received invoice (status: Pending) for the remaining balance of ' + remTxt + ' will be created and linked to this PO.'
-            : 'A new received invoice (status: Pending) will be created pre-filled with this PO\'s items and linked back to this PO.',
+            ? tFormat(<?= json_encode(t('A new received invoice (status: Pending) for the remaining balance of {0} will be created and linked to this PO.')) ?>, remTxt)
+            : <?= json_encode(t("A new received invoice (status: Pending) will be created pre-filled with this PO's items and linked back to this PO.")) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#198754',
-        confirmButtonText: 'Yes, Convert',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, Convert')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
         $.post('<?= buildUrl('api/account/po_to_supplier_invoice.php') ?>', { po_id: poId }, function(res) {
             if (res.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Invoice Created',
-                    html: 'Invoice <strong>' + res.invoice_ref + '</strong> created as Pending.<br>' +
-                          '<a href="<?= getUrl('received_invoices') ?>" class="btn btn-sm btn-outline-primary mt-2">' +
-                          '<i class="bi bi-list me-1"></i>View Bills</a>',
+                    title: <?= json_encode(t('Invoice Created')) ?>,
+                    html: tFormat(<?= json_encode(t('Invoice <strong>{0}</strong> created as Pending.<br><a href="{1}" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-list me-1"></i>View Bills</a>')) ?>, res.invoice_ref, <?= json_encode(getUrl('received_invoices')) ?>),
                     showConfirmButton: true,
-                    confirmButtonText: 'OK'
+                    confirmButtonText: <?= json_encode(t('OK')) ?>
                 });
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message });
             }
         }, 'json').fail(function() {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
+            Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Server error. Please try again.')) ?> });
         });
     });
 }

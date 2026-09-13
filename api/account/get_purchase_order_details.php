@@ -5,17 +5,20 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($order_id <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Invalid Order ID']);
+    echo json_encode(['success' => false, 'message' => t('Invalid Order ID')]);
     exit;
 }
 
@@ -43,7 +46,7 @@ try {
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$order) {
-        echo json_encode(['success' => false, 'message' => 'Order not found']);
+        echo json_encode(['success' => false, 'message' => t('Order not found')]);
         exit;
     }
 
@@ -52,7 +55,7 @@ try {
     // shouldn't be able to open a PO drawn from a different one.
     if (!empty($order['warehouse_id']) && !userCan('warehouse', (int)$order['warehouse_id'])) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
         exit;
     }
 

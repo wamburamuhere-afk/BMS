@@ -4,16 +4,19 @@ require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 // Check if user is logged in
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Please login to continue']);
+    echo json_encode(['success' => false, 'message' => t('Please login to continue')]);
     exit();
 }
 
 // Check permissions - Key for GRN is 'grn' based on permission mapping
 if (!canCreate('grn') && !isAdmin()) {
-    echo json_encode(['success' => false, 'message' => 'Access denied: You do not have permission to create GRN']);
+    echo json_encode(['success' => false, 'message' => t('Access denied: You do not have permission to create GRN')]);
     exit();
 }
 
@@ -95,14 +98,14 @@ try {
     // Phase E — project-scope gate: can only create GRN for a project in scope
     if (!empty($project_id) && function_exists('userCan') && !userCan('project', (int)$project_id)) {
         http_response_code(403);
-        throw new Exception('Access denied: project not in your scope.');
+        throw new Exception(t('Access denied: project not in your scope.'));
     }
 
     // Parse items
     $items = json_decode($_POST['items'], true);
-    
+
     if (empty($items)) {
-        throw new Exception('No items received');
+        throw new Exception(t('No items received'));
     }
 
     // Insert into purchase_receipts
@@ -322,7 +325,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'GRN created successfully',
+        'message' => t('GRN created successfully'),
         'receipt_id' => $receipt_id
     ]);
 
@@ -332,6 +335,6 @@ try {
     }
     echo json_encode([
         'success' => false,
-        'message' => 'Error creating GRN: ' . $e->getMessage()
+        'message' => sprintf(t('Error creating GRN: %s'), $e->getMessage())
     ]);
 }

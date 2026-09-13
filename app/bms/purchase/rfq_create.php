@@ -96,13 +96,13 @@ if ($selected_project > 0) {
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
             <?php if ($from_project): ?>
-            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project RFQs</a></li>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>"><?= t('Project RFQs') ?></a></li>
             <?php else: ?>
-            <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>">Request for Quotation</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>"><?= t('Request for Quotation') ?></a></li>
             <?php endif; ?>
-            <li class="breadcrumb-item active"><?= $is_edit ? 'Edit RFQ' : 'Create RFQ' ?></li>
+            <li class="breadcrumb-item active"><?= $is_edit ? t('Edit RFQ') : t('Create RFQ') ?></li>
         </ol>
     </nav>
 
@@ -110,14 +110,14 @@ if ($selected_project > 0) {
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h2 class="fw-bold mb-1">
-                <i class="bi bi-file-earmark-plus text-primary me-2"></i><?= $is_edit ? 'Edit RFQ' : 'Create RFQ' ?>
+                <i class="bi bi-file-earmark-plus text-primary me-2"></i><?= $is_edit ? t('Edit RFQ') : t('Create RFQ') ?>
             </h2>
             <p class="text-muted mb-0 small">
-                <?= $is_edit ? 'Update the request for quotation details' : 'Create a new request for quotation to a supplier' ?>
+                <?= $is_edit ? t('Update the request for quotation details') : t('Create a new request for quotation to a supplier') ?>
             </p>
         </div>
         <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left me-1"></i> Back<?= $from_project ? ' to Project' : '' ?>
+            <i class="bi bi-arrow-left me-1"></i> <?= $from_project ? t('Back to Project') : t('Back') ?>
         </a>
     </div>
 
@@ -130,16 +130,16 @@ if ($selected_project > 0) {
         <!-- RFQ Details Card -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-light py-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i>RFQ Details</h6>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i><?= t('RFQ Details') ?></h6>
             </div>
             <div class="card-body">
                 <div class="row g-3">
 
                     <!-- Supplier -->
                     <div class="col-12 col-md-4">
-                        <label class="form-label fw-semibold">Supplier <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold"><?= t('Supplier') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" name="supplier_id" id="supplier_id" required>
-                            <option value="">Select Supplier</option>
+                            <option value=""><?= t('Select Supplier') ?></option>
                             <?php foreach ($suppliers as $s): ?>
                             <option value="<?= $s['supplier_id'] ?>" <?= $selected_supplier == $s['supplier_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($s['supplier_name']) ?>
@@ -152,11 +152,11 @@ if ($selected_project > 0) {
                     <?php if ($enable_projects): ?>
                     <div class="col-12 col-md-4">
                         <label class="form-label fw-semibold">
-                            Project <span class="text-muted small fw-normal">(Optional)</span>
+                            <?= t('Project') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span>
                         </label>
                         <select class="form-select" name="project_id" id="project_id"
                             onchange="filterRfqWarehouses(this.value)">
-                            <option value="">No Project</option>
+                            <option value=""><?= t('No Project') ?></option>
                             <?php foreach ($projects as $p): ?>
                             <option value="<?= $p['project_id'] ?>" <?= $selected_project == $p['project_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($p['project_name']) ?>
@@ -168,9 +168,9 @@ if ($selected_project > 0) {
 
                     <!-- Warehouse -->
                     <div class="col-12 col-md-4">
-                        <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" name="warehouse_id" id="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= t('Select Warehouse') ?></option>
                             <?php foreach ($all_warehouses as $w): ?>
                             <option value="<?= $w['warehouse_id'] ?>"
                                 data-project="<?= $w['project_id'] ?>"
@@ -181,16 +181,16 @@ if ($selected_project > 0) {
                         </select>
                         <div class="form-text text-muted" id="warehouseHint">
                             <?php if ($enable_projects): ?>
-                            Select a project first to filter warehouses, or leave project empty to see unlinked warehouses.
+                            <?= t('Select a project first to filter warehouses, or leave project empty to see unlinked warehouses.') ?>
                             <?php else: ?>
-                            Select the destination warehouse.
+                            <?= t('Select the destination warehouse.') ?>
                             <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- RFQ Date -->
                     <div class="col-12 col-md-4">
-                        <label class="form-label fw-semibold">RFQ Date <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold"><?= t('RFQ Date') ?> <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" name="rfq_date"
                             value="<?= $is_edit ? htmlspecialchars($rfq_data['rfq_date'] ?? date('Y-m-d')) : date('Y-m-d') ?>" required>
                     </div>
@@ -198,7 +198,7 @@ if ($selected_project > 0) {
                     <!-- Response Deadline -->
                     <div class="col-12 col-md-4">
                         <label class="form-label fw-semibold">
-                            Response Deadline <span class="text-muted small fw-normal">(Optional)</span>
+                            <?= t('Response Deadline') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span>
                         </label>
                         <input type="date" class="form-control" name="deadline_date"
                             value="<?= $is_edit ? htmlspecialchars($rfq_data['deadline_date'] ?? '') : '' ?>">
@@ -211,17 +211,17 @@ if ($selected_project > 0) {
         <!-- RFQ Items Card -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-light py-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-list-task me-2"></i>RFQ Items</h6>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-list-task me-2"></i><?= t('RFQ Items') ?></h6>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0" id="itemsTable">
                         <thead class="text-uppercase small fw-bold" style="background:#f8fafc;">
                             <tr>
-                                <th class="ps-4" style="width:55px;">S/No</th>
-                                <th>Description <span class="text-danger">*</span></th>
-                                <th style="width:140px;">Unit</th>
-                                <th style="width:120px;">Qty <span class="text-danger">*</span></th>
+                                <th class="ps-4" style="width:55px;"><?= t('S/No') ?></th>
+                                <th><?= t('Description') ?> <span class="text-danger">*</span></th>
+                                <th style="width:140px;"><?= t('Unit') ?></th>
+                                <th style="width:120px;"><?= t('Qty') ?> <span class="text-danger">*</span></th>
                                 <th class="text-center" style="width:60px;"></th>
                             </tr>
                         </thead>
@@ -234,7 +234,7 @@ if ($selected_project > 0) {
                                     <div class="input-group">
                                         <input type="text" class="form-control product-selector" name="description[]"
                                             value="<?= htmlspecialchars($item['description']) ?>"
-                                            placeholder="Type to search product..." required
+                                            placeholder="<?= t('Type to search product...') ?>" required
                                             oninput="openRfqProductSearch('row_e<?= $i ?>', this.value)"
                                             onclick="openRfqProductSearch('row_e<?= $i ?>', this.value)"
                                             autocomplete="off">
@@ -246,13 +246,13 @@ if ($selected_project > 0) {
                                 </td>
                                 <td><input type="text" class="form-control" name="unit[]"
                                     value="<?= htmlspecialchars($item['unit'] ?? '') ?>"
-                                    placeholder="e.g. pcs, kg, m" <?= !empty($item['product_id']) ? 'readonly' : '' ?>></td>
+                                    placeholder="<?= t('e.g. pcs, kg, m') ?>" <?= !empty($item['product_id']) ? 'readonly' : '' ?>></td>
                                 <td><input type="number" class="form-control" name="qty[]"
                                     value="<?= htmlspecialchars($item['qty']) ?>"
                                     min="0.01" step="any" required></td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-danger border-0"
-                                        onclick="removeRow(this)" title="Remove item">
+                                        onclick="removeRow(this)" title="<?= t('Remove item') ?>">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </td>
@@ -264,7 +264,7 @@ if ($selected_project > 0) {
             </div>
             <div class="card-footer bg-white border-top-0 pb-3 ps-3">
                 <button type="button" class="btn btn-primary btn-sm" onclick="addItemRow()">
-                    <i class="bi bi-plus-circle me-1"></i> Add Item
+                    <i class="bi bi-plus-circle me-1"></i> <?= t('Add Item') ?>
                 </button>
             </div>
         </div>
@@ -272,13 +272,13 @@ if ($selected_project > 0) {
         <!-- Attachments Card -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-light py-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i>Attachments <span class="text-muted small fw-normal">(Optional)</span></h6>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i><?= t('Attachments') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></h6>
             </div>
             <div class="card-body">
 
                 <?php if (!empty($existing_attachments)): ?>
                 <!-- Existing attachments (edit mode) -->
-                <p class="text-muted small fw-semibold mb-2">Saved attachments:</p>
+                <p class="text-muted small fw-semibold mb-2"><?= t('Saved attachments:') ?></p>
                 <div id="existingAttachmentsContainer">
                     <?php foreach ($existing_attachments as $att): ?>
                     <div class="d-flex align-items-center gap-2 mb-2 existing-att-row" id="existing_att_<?= $att['attachment_id'] ?>">
@@ -286,7 +286,7 @@ if ($selected_project > 0) {
                         <span class="fw-semibold"><?= htmlspecialchars($att['attachment_name'] ?: $att['original_name']) ?></span>
                         <a href="<?= getUrl($att['file_path']) ?>" target="_blank"
                            class="btn btn-sm btn-outline-primary py-0 px-2">
-                            <i class="bi bi-eye me-1"></i>View
+                            <i class="bi bi-eye me-1"></i><?= t('View') ?>
                         </a>
                         <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
                                 onclick="removeExistingAttachment(<?= $att['attachment_id'] ?>)">
@@ -296,27 +296,27 @@ if ($selected_project > 0) {
                     <?php endforeach; ?>
                 </div>
                 <hr class="my-3">
-                <p class="text-muted small mb-2">Add more attachments:</p>
+                <p class="text-muted small mb-2"><?= t('Add more attachments:') ?></p>
                 <?php else: ?>
-                <p class="text-muted small mb-2">Add one or more attachments. Each attachment requires a name and a file.</p>
+                <p class="text-muted small mb-2"><?= t('Add one or more attachments. Each attachment requires a name and a file.') ?></p>
                 <?php endif; ?>
 
                 <!-- New attachment rows (added dynamically) -->
                 <div id="newAttachmentsContainer"></div>
 
                 <button type="button" class="btn btn-outline-primary btn-sm mt-1" onclick="addAttachmentRow()">
-                    <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                    <i class="bi bi-plus-circle me-1"></i> <?= t('Add Attachment') ?>
                 </button>
-                <div class="form-text text-muted mt-2">Accepted: PDF, Word, Excel, images. Max 10 MB per file.</div>
+                <div class="form-text text-muted mt-2"><?= t('Accepted: PDF, Word, Excel, images. Max 10 MB per file.') ?></div>
             </div>
         </div>
 
         <!-- Submit Buttons -->
         <div class="d-flex justify-content-end gap-2">
-            <a href="<?= getUrl('rfq') ?>" class="btn btn-outline-secondary px-4">Cancel</a>
+            <a href="<?= getUrl('rfq') ?>" class="btn btn-outline-secondary px-4"><?= t('Cancel') ?></a>
             <button type="submit" class="btn btn-primary px-5 shadow-sm">
                 <i class="bi bi-send me-1"></i>
-                <?= $is_edit ? 'Update RFQ' : 'Submit RFQ' ?>
+                <?= $is_edit ? t('Update RFQ') : t('Submit RFQ') ?>
             </button>
         </div>
     </form>
@@ -328,9 +328,9 @@ if ($selected_project > 0) {
         <table class="table table-sm table-hover mb-0">
             <thead class="bg-light sticky-top">
                 <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Unit</th>
+                    <th><?= t('Product') ?></th>
+                    <th><?= t('SKU') ?></th>
+                    <th><?= t('Unit') ?></th>
                 </tr>
             </thead>
             <tbody id="rfqProductsSearchBody"></tbody>
@@ -397,7 +397,7 @@ function rfqSearchProducts(term) {
         );
     }
     if (!results.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted p-3 fst-italic">No match — will be created as new product on save</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted p-3 fst-italic">' + <?= json_encode(t('No match — will be created as new product on save')) ?> + '</td></tr>';
         return;
     }
     results.slice(0, 50).forEach(p => {
@@ -447,7 +447,7 @@ function addAttachmentRow() {
     row.innerHTML = `
         <div class="col-12 col-md-4">
             <input type="text" class="form-control form-control-sm" name="attachment_name[]"
-                placeholder="Attachment name / description" maxlength="255">
+                placeholder="<?= t('Attachment name / description') ?>" maxlength="255">
         </div>
         <div class="col-12 col-md-6">
             <input type="file" class="form-control form-control-sm" name="attachment_file[]"
@@ -455,7 +455,7 @@ function addAttachmentRow() {
         </div>
         <div class="col-auto">
             <button type="button" class="btn btn-sm btn-outline-danger"
-                    onclick="document.getElementById('att_row_${idx}').remove()" title="Remove row">
+                    onclick="document.getElementById('att_row_${idx}').remove()" title="<?= t('Remove row') ?>">
                 <i class="bi bi-trash"></i>
             </button>
         </div>`;
@@ -466,13 +466,13 @@ function addAttachmentRow() {
 <?php if ($is_edit): ?>
 function removeExistingAttachment(attId) {
     Swal.fire({
-        title: 'Remove attachment?',
-        text: 'This file will be permanently deleted.',
+        title: <?= json_encode(t('Remove attachment?')) ?>,
+        text: <?= json_encode(t('This file will be permanently deleted.')) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc3545',
-        confirmButtonText: 'Yes, remove',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, remove')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
         const csrf = document.querySelector('[name="_csrf"]').value;
@@ -487,10 +487,10 @@ function removeExistingAttachment(attId) {
             if (res.success) {
                 document.getElementById('existing_att_' + attId)?.remove();
             } else {
-                Swal.fire({icon:'error', title:'Error', text: res.message || 'Could not remove attachment.'});
+                Swal.fire({icon:'error', title: <?= json_encode(t('Error')) ?>, text: res.message || <?= json_encode(t('Could not remove attachment.')) ?>});
             }
         })
-        .catch(() => Swal.fire({icon:'error', title:'Error', text:'Server error.'}));
+        .catch(() => Swal.fire({icon:'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Server error.')) ?>}));
     });
 }
 <?php endif; ?>
@@ -514,18 +514,18 @@ function filterRfqWarehouses(projectId) {
     const curVal = sel.value;
 
     // Clear options
-    sel.innerHTML = '<option value="">Select Warehouse</option>';
+    sel.innerHTML = '<option value="">' + <?= json_encode(t('Select Warehouse')) ?> + '</option>';
 
     const filtered = filterWarehousesForProject(rfqAllWarehouses, projectId);
     if (hint) {
         if (projectId === undefined) {
-            hint.textContent = 'Showing every warehouse.';
+            hint.textContent = <?= json_encode(t('Showing every warehouse.')) ?>;
         } else if (!projectId || projectId === '' || projectId === '0') {
-            hint.textContent = 'Showing warehouses not linked to any project.';
+            hint.textContent = <?= json_encode(t('Showing warehouses not linked to any project.')) ?>;
         } else {
             hint.textContent = filtered.length === 0
-                ? 'No warehouses found for this project.'
-                : `Showing ${filtered.length} warehouse(s) for the selected project.`;
+                ? <?= json_encode(t('No warehouses found for this project.')) ?>
+                : <?= json_encode(t('Showing')) ?> + ' ' + filtered.length + ' ' + <?= json_encode(t('warehouse(s) for the selected project.')) ?>;
         }
     }
 
@@ -566,7 +566,7 @@ function addItemRow() {
         <td>
             <div class="input-group">
                 <input type="text" class="form-control product-selector" name="description[]"
-                    placeholder="Type to search product..." required
+                    placeholder="<?= t('Type to search product...') ?>" required
                     oninput="openRfqProductSearch('${rowId}', this.value)"
                     onclick="openRfqProductSearch('${rowId}', this.value)"
                     autocomplete="off">
@@ -576,7 +576,7 @@ function addItemRow() {
             </div>
             <input type="hidden" class="item-product-id">
         </td>
-        <td><input type="text" class="form-control" name="unit[]" placeholder="e.g. pcs, kg, m"></td>
+        <td><input type="text" class="form-control" name="unit[]" placeholder="<?= t('e.g. pcs, kg, m') ?>"></td>
         <td><input type="number" class="form-control" name="qty[]" value="1" min="0.01" step="any" required></td>
         <td class="text-center">
             <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeRow(this)">
@@ -613,7 +613,7 @@ document.getElementById('rfqForm').addEventListener('submit', async function(e) 
 
     const rows = document.querySelectorAll('#itemsBody tr');
     if (!rows.length) {
-        Swal.fire({icon:'warning',title:'No Items',text:'Please add at least one RFQ item.',confirmButtonColor:'#0d6efd',confirmButtonText:'OK'});
+        Swal.fire({icon:'warning',title:<?= json_encode(t('No Items')) ?>,text:<?= json_encode(t('Please add at least one RFQ item.')) ?>,confirmButtonColor:'#0d6efd',confirmButtonText:<?= json_encode(t('OK')) ?>});
         return;
     }
 
@@ -628,13 +628,13 @@ document.getElementById('rfqForm').addEventListener('submit', async function(e) 
     });
 
     if (!rawItems.length) {
-        Swal.fire({icon:'warning',title:'No Valid Items',text:'Please fill in item descriptions.',confirmButtonColor:'#0d6efd',confirmButtonText:'OK'});
+        Swal.fire({icon:'warning',title:<?= json_encode(t('No Valid Items')) ?>,text:<?= json_encode(t('Please fill in item descriptions.')) ?>,confirmButtonColor:'#0d6efd',confirmButtonText:<?= json_encode(t('OK')) ?>});
         return;
     }
 
     const warehouseId = document.getElementById('warehouse_id').value;
 
-    Swal.fire({title:'Saving RFQ...', allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
+    Swal.fire({title:<?= json_encode(t('Saving RFQ...')) ?>, allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
 
     // For any item without a product_id, auto-create the product in the selected warehouse
     const items = [];
@@ -665,16 +665,16 @@ document.getElementById('rfqForm').addEventListener('submit', async function(e) 
         if (res.success) {
             Swal.fire({
                 icon:'success',
-                title:'<?= $is_edit ? 'RFQ Updated!' : 'RFQ Created!' ?>',
-                text: res.message || 'RFQ saved successfully.',
+                title: <?= json_encode($is_edit ? t('RFQ Updated!') : t('RFQ Created!')) ?>,
+                text: res.message || <?= json_encode(t('RFQ saved successfully.')) ?>,
                 confirmButtonColor:'#198754',
-                confirmButtonText:'OK'
+                confirmButtonText: <?= json_encode(t('OK')) ?>
             }).then(() => window.location.href = '<?= $back_url ?>');
         } else {
-            Swal.fire({icon:'error',title:'Failed',text:res.message||'An error occurred.',confirmButtonColor:'#0d6efd',confirmButtonText:'OK'});
+            Swal.fire({icon:'error',title:<?= json_encode(t('Failed')) ?>,text:res.message||<?= json_encode(t('An error occurred.')) ?>,confirmButtonColor:'#0d6efd',confirmButtonText:<?= json_encode(t('OK')) ?>});
         }
     } catch(err) {
-        Swal.fire({icon:'error',title:'Server Error',text:'Please try again.',confirmButtonText:'OK'});
+        Swal.fire({icon:'error',title:<?= json_encode(t('Server Error')) ?>,text:<?= json_encode(t('Please try again.')) ?>,confirmButtonText:<?= json_encode(t('OK')) ?>});
     }
 });
 </script>

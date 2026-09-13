@@ -15,7 +15,7 @@ $can_create_grn = isAdmin() || canCreate('grn');
 // Get parameters
 $receipt_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($receipt_id <= 0) {
-    header("Location: grn.php?error=Invalid GRN ID");
+    header("Location: grn.php?error=" . urlencode(t('Invalid GRN ID')));
     exit();
 }
 
@@ -26,7 +26,7 @@ $stmt->execute([$receipt_id]);
 $grn = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$grn) {
-    header("Location: grn.php?error=GRN Not Found");
+    header("Location: grn.php?error=" . urlencode(t('GRN Not Found')));
     exit();
 }
 
@@ -36,7 +36,7 @@ $po_id = $grn['purchase_order_id'];
 $project_id_param = $grn['project_id'];
 $type = isset($_GET['type']) ? htmlspecialchars($_GET['type']) : 'grn';
 $is_dn = ($type === 'delivery_note');
-$doc_label = $is_dn ? 'Received Note' : 'Goods Received Note';
+$doc_label = $is_dn ? t('Received Note') : t('Goods Received Note');
 $doc_short = $is_dn ? 'DN' : 'GRN';
 $doc_icon = 'bi-pencil-square';
 
@@ -224,12 +224,14 @@ function generate_grn_number() {
     <!-- PRINT FOOTER (fixed - matches tenders) -->
     <div class="print-footer d-none d-print-block">
         <p class="mb-1 text-muted" style="font-size:8pt;">
-            This document was Printed by
-            <span class="fw-bold text-dark"><?= ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))) ?> - <?= ucwords($_SESSION['user_role'] ?? 'Staff') ?></span>
-            on <span class="fw-bold text-dark"><?= date('d M, Y \\a\\t h:i A') ?></span>
+            <?php
+            $printed_by_html = '<span class="fw-bold text-dark">' . ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))) . ' - ' . ucwords($_SESSION['user_role'] ?? t('Staff')) . '</span>';
+            $printed_at_html = '<span class="fw-bold text-dark">' . date('d M, Y \\a\\t h:i A') . '</span>';
+            echo sprintf(t('This document was Printed by %s on %s'), $printed_by_html, $printed_at_html);
+            ?>
         </p>
         <p class="mb-0 fw-bold text-primary" style="font-size:10pt;letter-spacing:0.5px;">
-            Powered By BJP Technologies &copy; 2026
+            <?= t('Powered By BJP Technologies') ?> &copy; 2026
         </p>
     </div>
 
@@ -238,16 +240,16 @@ function generate_grn_number() {
         <div class="col-12">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
-                    <h2 class="mb-1"><i class="bi <?= $doc_icon ?>"></i> Edit <?= $doc_label ?> (<?= $doc_short ?>)</h2>
-                    <p class="text-muted mb-0">Modify Goods Received Note #<?= safe_output($grn['receipt_number']) ?></p>
+                    <h2 class="mb-1"><i class="bi <?= $doc_icon ?>"></i> <?= t('Edit') ?> <?= $doc_label ?> (<?= $doc_short ?>)</h2>
+                    <p class="text-muted mb-0"><?= sprintf(t('Modify Goods Received Note #%s'), safe_output($grn['receipt_number'])) ?></p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
+                        <i class="bi bi-arrow-left"></i> <?= sprintf(t('Back to %ss'), $doc_short) ?>
                     </a>
                     <?php if ($project_id_param > 0): ?>
                     <a href="<?= $project_return_url ?>" class="btn btn-outline-primary">
-                        <i class="bi bi-kanban"></i> Back to Project
+                        <i class="bi bi-kanban"></i> <?= t('Back to Project') ?>
                     </a>
                     <?php endif; ?>
                 </div>
@@ -258,7 +260,7 @@ function generate_grn_number() {
     <!-- Main Form -->
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> <?= $doc_short ?> Details</h5>
+            <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> <?= sprintf(t('%s Details'), $doc_short) ?></h5>
         </div>
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
@@ -267,19 +269,19 @@ function generate_grn_number() {
                 <!-- Basic Information -->
                 <div class="row mb-4">
                     <div class="col-md-4 mb-3">
-                        <label for="receipt_number" class="form-label"><?= $doc_short ?> Number <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="receipt_number" name="receipt_number" 
+                        <label for="receipt_number" class="form-label"><?= sprintf(t('%s Number'), $doc_short) ?> <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="receipt_number" name="receipt_number"
                                value="<?= safe_output($grn['receipt_number']) ?>" required readonly>
                     </div>
-                    
+
                     <div class="col-md-4 mb-3">
-                        <label for="receipt_date" class="form-label">Receipt Date <span class="text-danger">*</span></label>
-                        <input type="date" class="form-control" id="receipt_date" name="receipt_date" 
+                        <label for="receipt_date" class="form-label"><?= t('Receipt Date') ?> <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="receipt_date" name="receipt_date"
                                value="<?= $grn['receipt_date'] ?>" required>
                     </div>
-                    
+
                     <div class="col-md-4 mb-3">
-                        <label for="received_by" class="form-label">Received By <span class="text-danger">*</span></label>
+                        <label for="received_by" class="form-label"><?= t('Received By') ?> <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="received_by" name="received_by" 
                                value="<?= safe_output($grn['received_by']) ?>" required>
                     </div>
@@ -288,9 +290,9 @@ function generate_grn_number() {
                 <!-- Supplier, Warehouse and Project -->
                 <div class="row mb-4">
                     <div class="col-md-4 mb-3">
-                        <label for="supplier_id" class="form-label">Supplier <span class="text-danger">*</span></label>
+                        <label for="supplier_id" class="form-label"><?= t('Supplier') ?> <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" id="supplier_id" name="supplier_id" required onchange="loadSupplierInfo()">
-                            <option value="">Select Supplier</option>
+                            <option value=""><?= t('Select Supplier') ?></option>
                             <?php foreach ($suppliers as $supp): ?>
                                 <option value="<?= $supp['supplier_id'] ?>" 
                                     <?= ($supplier_id > 0 && $supp['supplier_id'] == $supplier_id) ? 'selected' : '' ?>>
@@ -305,10 +307,10 @@ function generate_grn_number() {
                     
                     <?php if (projectsModuleActive()): ?>
                     <div class="col-md-4 mb-3">
-                        <label for="project_id" class="form-label">Project <span class="text-muted small">(Optional)</span></label>
+                        <label for="project_id" class="form-label"><?= t('Project') ?> <span class="text-muted small">(<?= t('Optional') ?>)</span></label>
                         <select class="form-select select2-static" id="project_id" name="project_id"
                             onchange="filterGrnWarehouses(this.value); $('#projectIdHidden').val(this.value)">
-                            <option value="">No Project</option>
+                            <option value=""><?= t('No Project') ?></option>
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
                                     <?= ($project_id_param > 0 && $proj['project_id'] == $project_id_param) ? 'selected' : '' ?>>
@@ -316,14 +318,14 @@ function generate_grn_number() {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted" id="grnWarehouseHint">Select project to filter warehouses.</small>
+                        <small class="text-muted" id="grnWarehouseHint"><?= t('Select project to filter warehouses.') ?></small>
                     </div>
                     <?php endif; ?>
 
                     <div class="col-md-4 mb-3">
-                        <label for="warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= t('Select Warehouse') ?></option>
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"
                                     data-project="<?= $wh['project_id'] ?>"
@@ -339,39 +341,39 @@ function generate_grn_number() {
                 <!-- Purchase Order Selection -->
                 <div class="row mb-4" id="poSelectionDiv" style="display: none;">
                     <div class="col-md-6 mb-3">
-                        <label for="purchase_order_id" class="form-label">Purchase Order (Optional)</label>
+                        <label for="purchase_order_id" class="form-label"><?= t('Purchase Order') ?> (<?= t('Optional') ?>)</label>
                         <div class="input-group">
                             <select class="form-select select2-static" id="purchase_order_id" name="purchase_order_id" onchange="loadPurchaseOrderItems()">
-                                <option value="">Select Purchase Order</option>
+                                <option value=""><?= t('Select Purchase Order') ?></option>
                                 <?php foreach ($pending_pos as $po): ?>
                                     <option value="<?= $po['purchase_order_id'] ?>" 
                                         <?= ($po_id > 0 && $po['purchase_order_id'] == $po_id) ? 'selected' : '' ?>
                                         data-supplier-id="<?= $po['supplier_id'] ?? 0 ?>">
-                                        <?= safe_output($po['order_number']) ?> - 
-                                        <?= safe_output($po['supplier_name']) ?> 
-                                        (<?= $po['pending_qty'] ?> items pending)
+                                        <?= safe_output($po['order_number']) ?> -
+                                        <?= safe_output($po['supplier_name']) ?>
+                                        (<?= sprintf(t('%s items pending'), $po['pending_qty']) ?>)
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                             <button type="button" class="btn btn-outline-secondary" onclick="clearPOSelection()">
-                                <i class="bi bi-x"></i> Clear
+                                <i class="bi bi-x"></i> <?= t('Clear') ?>
                             </button>
                         </div>
-                        <small class="text-muted">Select a purchase order to auto-populate items</small>
+                        <small class="text-muted"><?= t('Select a purchase order to auto-populate items') ?></small>
                     </div>
-                    
+
                     <div class="col-md-6 mb-3">
-                        <label for="delivery_note" class="form-label">Delivery Note Number</label>
-                        <input type="text" class="form-control" id="delivery_note" name="delivery_note" 
+                        <label for="delivery_note" class="form-label"><?= t('Delivery Note Number') ?></label>
+                        <input type="text" class="form-control" id="delivery_note" name="delivery_note"
                                value="<?= safe_output($grn['delivery_note']) ?>"
-                               placeholder="Supplier's delivery note number">
+                               placeholder="<?= t("Supplier's delivery note number") ?>">
                     </div>
                 </div>
                 
                 <!-- Supplier Information Card -->
                 <div class="card mb-4" id="supplierInfoCard" style="display: none;">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-truck"></i> Supplier Information</h6>
+                        <h6 class="mb-0"><i class="bi bi-truck"></i> <?= t('Supplier Information') ?></h6>
                     </div>
                     <div class="card-body" id="supplierInfoBody">
                         <!-- Supplier info will be loaded here -->
@@ -381,13 +383,13 @@ function generate_grn_number() {
                 <!-- Received Items -->
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0"><i class="bi bi-list-check"></i> Received Items</h6>
+                        <h6 class="mb-0"><i class="bi bi-list-check"></i> <?= t('Received Items') ?></h6>
                         <div>
                             <button type="button" class="btn btn-sm btn-light" onclick="addItemRow()">
-                                <i class="bi bi-plus-circle"></i> Add Item
+                                <i class="bi bi-plus-circle"></i> <?= t('Add Item') ?>
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="clearAllItems()">
-                                <i class="bi bi-trash"></i> Clear All
+                                <i class="bi bi-trash"></i> <?= t('Clear All') ?>
                             </button>
                         </div>
                     </div>
@@ -396,18 +398,18 @@ function generate_grn_number() {
                             <table class="table" id="itemsTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 50px;">S/NO</th>
-                                        <th width="30%">Product/Item <span class="text-danger">*</span></th>
-                                        <th width="10%">SKU/Barcode</th>
-                                        <th width="10%">Quantity <span class="text-danger">*</span></th>
-                                        <th width="10%">Unit</th>
+                                        <th style="width: 50px;"><?= t('S/NO') ?></th>
+                                        <th width="30%"><?= t('Product/Item') ?> <span class="text-danger">*</span></th>
+                                        <th width="10%"><?= t('SKU/Barcode') ?></th>
+                                        <th width="10%"><?= t('Quantity') ?> <span class="text-danger">*</span></th>
+                                        <th width="10%"><?= t('Unit') ?></th>
                                         <?php if (!$is_dn): ?>
-                                        <th width="12%">Unit Price</th>
+                                        <th width="12%"><?= t('Unit Price') ?></th>
                                         <?php endif; ?>
-                                        <th width="10%">Batch No.</th>
-                                        <th width="10%">Expiry Date</th>
+                                        <th width="10%"><?= t('Batch No.') ?></th>
+                                        <th width="10%"><?= t('Expiry Date') ?></th>
                                         <?php if (!$is_dn): ?>
-                                        <th width="5%">Total</th>
+                                        <th width="5%"><?= t('Total') ?></th>
                                         <?php endif; ?>
                                         <th width="3%"></th>
                                     </tr>
@@ -421,16 +423,16 @@ function generate_grn_number() {
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <div>
                                                     <button type="button" class="btn btn-sm btn-primary" onclick="addItemRow()">
-                                                        <i class="bi bi-plus-circle"></i> Add Item
+                                                        <i class="bi bi-plus-circle"></i> <?= t('Add Item') ?>
                                                     </button>
                                                     <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="scanBarcode()">
-                                                        <i class="bi bi-upc-scan"></i> Scan Barcode
+                                                        <i class="bi bi-upc-scan"></i> <?= t('Scan Barcode') ?>
                                                     </button>
                                                 </div>
                                                 <div class="text-end">
-                                                    <strong>Total Items: <span id="totalItems">0</span></strong><br>
+                                                    <strong><?= t('Total Items:') ?> <span id="totalItems">0</span></strong><br>
                                                     <?php if (!$is_dn): ?>
-                                                    <strong>Total Value: <span id="totalValue">0.00</span> TZS</strong>
+                                                    <strong><?= t('Total Value:') ?> <span id="totalValue">0.00</span> TZS</strong>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
@@ -445,7 +447,7 @@ function generate_grn_number() {
                 <!-- Attachments Section -->
                 <div class="card mb-4 shadow-sm border-0">
                     <div class="card-header bg-light border-bottom py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2 text-primary"></i> Documents & Attachments</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2 text-primary"></i> <?= t('Documents & Attachments') ?></h6>
                     </div>
                     <div class="card-body">
                         <div id="attachments-container" class="border rounded p-3 bg-light">
@@ -455,12 +457,12 @@ function generate_grn_number() {
                                 <div class="row g-2 attachment-row mb-2" data-type="existing">
                                     <input type="hidden" name="attachment_ids[]" value="<?= $att['attachment_id'] ?>">
                                     <div class="col-md-5">
-                                        <input type="text" class="form-control form-control-sm" name="attachment_names[]" 
-                                               value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
+                                        <input type="text" class="form-control form-control-sm" name="attachment_names[]"
+                                               value="<?= safe_output($att['file_name']) ?>" placeholder="<?= t('Document Name') ?>">
                                     </div>
                                     <div class="col-md-6">
                                         <div class="input-group input-group-sm">
-                                            <label class="input-group-text mb-0 cursor-pointer" for="file_<?= $att['attachment_id'] ?>">Choose File</label>
+                                            <label class="input-group-text mb-0 cursor-pointer" for="file_<?= $att['attachment_id'] ?>"><?= t('Choose File') ?></label>
                                             <input type="text" class="form-control bg-white cursor-pointer" readonly 
                                                    value="<?= basename($att['file_path']) ?>" 
                                                    onclick="document.getElementById('file_<?= $att['attachment_id'] ?>').click()">
@@ -469,7 +471,7 @@ function generate_grn_number() {
                                         </div>
                                     </div>
                                     <div class="col-md-1 text-end">
-                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="<?= t('Remove') ?>">
                                             <i class="bi bi-trash fs-5"></i>
                                         </button>
                                     </div>
@@ -481,13 +483,13 @@ function generate_grn_number() {
                                 <div class="row g-2 attachment-row mb-2" data-type="new">
                                     <input type="hidden" name="attachment_ids[]" value="0">
                                     <div class="col-md-5">
-                                        <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name">
+                                        <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="<?= t('Document Name') ?>">
                                     </div>
                                     <div class="col-md-6">
                                         <input type="file" class="form-control form-control-sm" name="attachments[]">
                                     </div>
                                     <div class="col-md-1 text-end">
-                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="<?= t('Remove') ?>">
                                             <i class="bi bi-trash fs-5"></i>
                                         </button>
                                     </div>
@@ -495,10 +497,10 @@ function generate_grn_number() {
                                 <?php endif; ?>
                             </div>
                             <button type="button" class="btn btn-sm btn-outline-primary shadow-sm" onclick="addAttachmentRow()">
-                                <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                                <i class="bi bi-plus-circle me-1"></i> <?= t('Add Attachment') ?>
                             </button>
                         </div>
-                        <div class="form-text text-muted mt-2">Accepted: PDF, DOC, DOCX, JPG, PNG (max 10MB each).</div>
+                        <div class="form-text text-muted mt-2"><?= t('Accepted: PDF, DOC, DOCX, JPG, PNG (max 10MB each).') ?></div>
                     </div>
                 </div>
                 
@@ -507,33 +509,33 @@ function generate_grn_number() {
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-header bg-light">
-                                <h6 class="mb-0"><i class="bi bi-clipboard-check"></i> Quality Check</h6>
+                                <h6 class="mb-0"><i class="bi bi-clipboard-check"></i> <?= t('Quality Check') ?></h6>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Overall Condition</label>
+                                    <label class="form-label"><?= t('Overall Condition') ?></label>
                                     <select class="form-select" name="quality_condition">
-                                        <option value="excellent">Excellent</option>
-                                        <option value="good" selected>Good</option>
-                                        <option value="fair">Fair</option>
-                                        <option value="poor">Poor</option>
+                                        <option value="excellent"><?= t('Excellent') ?></option>
+                                        <option value="good" selected><?= t('Good') ?></option>
+                                        <option value="fair"><?= t('Fair') ?></option>
+                                        <option value="poor"><?= t('Poor') ?></option>
                                     </select>
                                 </div>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" name="packaging_ok" id="packaging_ok" checked>
-                                    <label class="form-check-label" for="packaging_ok">Packaging OK</label>
+                                    <label class="form-check-label" for="packaging_ok"><?= t('Packaging OK') ?></label>
                                 </div>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" name="quantity_ok" id="quantity_ok" checked>
-                                    <label class="form-check-label" for="quantity_ok">Quantity OK</label>
+                                    <label class="form-check-label" for="quantity_ok"><?= t('Quantity OK') ?></label>
                                 </div>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" name="damage_check" id="damage_check">
-                                    <label class="form-check-label" for="damage_check">Damage Checked</label>
+                                    <label class="form-check-label" for="damage_check"><?= t('Damage Checked') ?></label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="expiry_check" id="expiry_check">
-                                    <label class="form-check-label" for="expiry_check">Expiry Dates Checked</label>
+                                    <label class="form-check-label" for="expiry_check"><?= t('Expiry Dates Checked') ?></label>
                                 </div>
                             </div>
                         </div>
@@ -542,16 +544,16 @@ function generate_grn_number() {
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-header bg-light">
-                                <h6 class="mb-0"><i class="bi bi-chat-left-text"></i> Notes & Remarks</h6>
+                                <h6 class="mb-0"><i class="bi bi-chat-left-text"></i> <?= t('Notes & Remarks') ?></h6>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label for="notes" class="form-label">Notes</label>
-                                    <textarea class="form-control" id="notes" name="notes" rows="4" 
-                                              placeholder="Any special notes, remarks, or observations about the received goods"><?= safe_output($grn['notes']) ?></textarea>
+                                    <label for="notes" class="form-label"><?= t('Notes') ?></label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="4"
+                                              placeholder="<?= t('Any special notes, remarks, or observations about the received goods') ?>"><?= safe_output($grn['notes']) ?></textarea>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="inspected_by" class="form-label">Inspected By</label>
+                                    <label for="inspected_by" class="form-label"><?= t('Inspected By') ?></label>
                                     <input type="text" class="form-control" id="inspected_by" name="inspected_by" 
                                            value="<?= safe_output($username) ?>">
                                 </div>
@@ -571,13 +573,13 @@ function generate_grn_number() {
                 <!-- Form Actions -->
                 <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
                     <button type="button" class="btn btn-sm btn-outline-secondary px-3" style="min-width: 120px;" onclick="window.history.back()">
-                        <i class="bi bi-x-circle"></i> Cancel
+                        <i class="bi bi-x-circle"></i> <?= t('Cancel') ?>
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-primary px-3" style="min-width: 120px;" onclick="saveAsDraft()">
-                        <i class="bi bi-save"></i> Save as Draft
+                        <i class="bi bi-save"></i> <?= t('Save as Draft') ?>
                     </button>
                     <button type="submit" class="btn btn-sm btn-primary px-3" style="min-width: 120px;">
-                        <i class="bi bi-check-circle"></i> Update <?= $doc_short ?>
+                        <i class="bi bi-check-circle"></i> <?= sprintf(t('Update %s'), $doc_short) ?>
                     </button>
                 </div>
             </form>
@@ -591,10 +593,10 @@ function generate_grn_number() {
         <table class="table table-sm table-hover mb-0">
             <thead class="bg-light sticky-top">
                 <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Stock</th>
-                    <th>Cost Price</th>
+                    <th><?= t('Product') ?></th>
+                    <th><?= t('SKU') ?></th>
+                    <th><?= t('Stock') ?></th>
+                    <th><?= t('Cost Price') ?></th>
                 </tr>
             </thead>
             <tbody id="productsSearchBody">
@@ -610,27 +612,27 @@ function generate_grn_number() {
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="barcodeScannerModalLabel">
-                    <i class="bi bi-upc-scan"></i> Barcode Scanner
+                    <i class="bi bi-upc-scan"></i> <?= t('Barcode Scanner') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <div class="modal-body">
                 <div class="text-center mb-3">
                     <i class="bi bi-upc" style="font-size: 3rem;"></i>
-                    <p class="mt-2">Scan barcode or enter manually</p>
+                    <p class="mt-2"><?= t('Scan barcode or enter manually') ?></p>
                 </div>
                 <div class="mb-3">
-                    <label for="barcodeInput" class="form-label">Barcode</label>
-                    <input type="text" class="form-control" id="barcodeInput" placeholder="Scan or enter barcode" autofocus>
-                    <small class="text-muted">Press Enter after scanning or typing</small>
+                    <label for="barcodeInput" class="form-label"><?= t('Barcode') ?></label>
+                    <input type="text" class="form-control" id="barcodeInput" placeholder="<?= t('Scan or enter barcode') ?>" autofocus>
+                    <small class="text-muted"><?= t('Press Enter after scanning or typing') ?></small>
                 </div>
                 <div id="barcodeResult" class="d-none">
                     <!-- Barcode scan result will be shown here -->
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success" onclick="addScannedItem()">Add Item</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Close') ?></button>
+                <button type="button" class="btn btn-success" onclick="addScannedItem()"><?= t('Add Item') ?></button>
             </div>
         </div>
     </div>
@@ -643,11 +645,71 @@ let currentItemIndex = null;
 let itemCount = 0;
 let productsCache = [];
 
+// Pre-translated strings used inside JS template literals / dynamic UI below.
+const GRN_I18N = {
+    selectSupplier:        <?= json_encode(t('Select Supplier')) ?>,
+    noProject:             <?= json_encode(t('No Project')) ?>,
+    selectPurchaseOrder:   <?= json_encode(t('Select Purchase Order')) ?>,
+    selectWarehouse:       <?= json_encode(t('Select Warehouse')) ?>,
+    typeToSearchProduct:   <?= json_encode(t('Type to search product...')) ?>,
+    sku:                   <?= json_encode(t('SKU')) ?>,
+    batchNo:               <?= json_encode(t('Batch No.')) ?>,
+    noSku:                 <?= json_encode(t('No SKU')) ?>,
+    na:                    <?= json_encode(t('N/A')) ?>,
+    pleaseSelectWarehouseFirst: <?= json_encode(t('Please select a warehouse first')) ?>,
+    noProductsFound:       <?= json_encode(t('No products found')) ?>,
+    warehousesNotLinked:   <?= json_encode(t('Showing warehouses not linked to any project.')) ?>,
+    noWarehousesForProject: <?= json_encode(t('No warehouses found for this project.')) ?>,
+    showingNWarehouses:    <?= json_encode(t('Showing {0} warehouse(s) for selected project.')) ?>,
+    clearAllItemsTitle:    <?= json_encode(t('Clear All Items?')) ?>,
+    clearAllItemsText:     <?= json_encode(t('Are you sure you want to remove all items?')) ?>,
+    yesClearAll:           <?= json_encode(t('Yes, Clear All')) ?>,
+    cancel:                <?= json_encode(t('Cancel')) ?>,
+    productFound:          <?= json_encode(t('Product Found:')) ?>,
+    skuLabel:              <?= json_encode(t('SKU:')) ?>,
+    unitLabel:             <?= json_encode(t('Unit:')) ?>,
+    productNotFound:       <?= json_encode(t('Product Not Found')) ?>,
+    barcodeNotFound:       <?= json_encode(t('Barcode "{0}" not found in database.')) ?>,
+    noItems:               <?= json_encode(t('No Items')) ?>,
+    pleaseAddAtLeastOneItem: <?= json_encode(t('Please add at least one received item.')) ?>,
+    invalidItems:          <?= json_encode(t('Invalid Items')) ?>,
+    pleaseEnsureAtLeastOneItem: <?= json_encode(t('Please ensure at least one item has a name and quantity > 0.')) ?>,
+    missingInformation:    <?= json_encode(t('Missing Information')) ?>,
+    pleaseFillInField:     <?= json_encode(t('Please fill in the {0} field.')) ?>,
+    documentName:          <?= json_encode(t('Document Name')) ?>,
+    itemsLoaded:           <?= json_encode(t('Items Loaded')) ?>,
+    itemsLoadedFromPO:     <?= json_encode(t('{0} items loaded from purchase order.')) ?>,
+    error:                 <?= json_encode(t('Error')) ?>,
+    failedToLoadPoItems:   <?= json_encode(t('Failed to load purchase order items.')) ?>,
+    poCleared:             <?= json_encode(t('PO Cleared')) ?>,
+    poSelectionCleared:    <?= json_encode(t('Purchase order selection cleared.')) ?>,
+    updatingGrn:           <?= json_encode(t('Updating GRN...')) ?>,
+    pleaseWait:            <?= json_encode(t('Please wait')) ?>,
+    updated:               <?= json_encode(t('Updated!')) ?>,
+    updateFailed:          <?= json_encode(t('Update Failed')) ?>,
+    serverError:           <?= json_encode(t('Server Error')) ?>,
+    couldNotConnectApi:    <?= json_encode(t('Could not connect to the update API. Check if the file exists on the server.')) ?>,
+    remove:                <?= json_encode(t('Remove')) ?>,
+    contactLabel:          <?= json_encode(t('Contact:')) ?>,
+    phoneLabel:            <?= json_encode(t('Phone:')) ?>,
+    emailLabel:            <?= json_encode(t('Email:')) ?>,
+    addressLabel:          <?= json_encode(t('Address:')) ?>,
+    cityLabel:             <?= json_encode(t('City:')) ?>,
+    countryLabel:          <?= json_encode(t('Country:')) ?>
+};
+
+// Per-page local convention: a tiny numbered-placeholder formatter so a
+// translated sentence stays ONE coherent unit instead of being concatenated
+// from English word-order fragments.
+function tFormat(str, ...args) {
+    return str.replace(/\{(\d+)\}/g, (m, i) => (args[i] !== undefined ? args[i] : m));
+}
+
 $(document).ready(function() {
     // Select2 on DB-backed selects
-    $('#supplier_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Supplier' });
-    $('#project_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'No Project' });
-    $('#purchase_order_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Purchase Order' });
+    $('#supplier_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: GRN_I18N.selectSupplier });
+    $('#project_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: GRN_I18N.noProject });
+    $('#purchase_order_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: GRN_I18N.selectPurchaseOrder });
 
     // Load existing items
     const existingItems = <?= json_encode($grn_items) ?>;
@@ -783,9 +845,9 @@ function addItemRow(product = null) {
             <td class="row-sn text-center fw-bold text-muted">${$('#itemsBody tr').length + 1}</td>
             <td>
                 <div class="input-group">
-                    <input type="text" class="form-control item-name" 
-                           name="items[${index}][product_name]" 
-                           placeholder="Type to search product..." required
+                    <input type="text" class="form-control item-name"
+                           name="items[${index}][product_name]"
+                           placeholder="${GRN_I18N.typeToSearchProduct}" required
                            oninput="openProductSearch(${index}, this.value)"
                            onclick="openProductSearch(${index}, this.value)"
                            style="cursor: text; background-color: #fff;"
@@ -804,9 +866,9 @@ function addItemRow(product = null) {
                        value="${product && (product.item_id || product.order_item_id) ? (product.item_id || product.order_item_id) : ''}">
             </td>
             <td>
-                <input type="text" class="form-control item-sku" 
-                       name="items[${index}][sku]" 
-                       placeholder="SKU" 
+                <input type="text" class="form-control item-sku"
+                       name="items[${index}][sku]"
+                       placeholder="${GRN_I18N.sku}"
                        value="${product && product.sku ? product.sku : ''}">
             </td>
             <td>
@@ -835,9 +897,9 @@ function addItemRow(product = null) {
                 </div>
             </td>
             <td>
-                <input type="text" class="form-control item-batch" 
-                       name="items[${index}][batch_number]" 
-                       placeholder="Batch No.">
+                <input type="text" class="form-control item-batch"
+                       name="items[${index}][batch_number]"
+                       placeholder="${GRN_I18N.batchNo}">
             </td>
             <td>
                 <input type="date" class="form-control item-expiry" 
@@ -886,7 +948,7 @@ function searchProducts(term = '') {
     tbody.empty();
 
     if (!$('#warehouse_id').val()) {
-        tbody.html('<tr><td colspan="4" class="text-center text-warning p-3"><i class="bi bi-exclamation-triangle me-1"></i>Please select a warehouse first</td></tr>');
+        tbody.html(`<tr><td colspan="4" class="text-center text-warning p-3"><i class="bi bi-exclamation-triangle me-1"></i>${GRN_I18N.pleaseSelectWarehouseFirst}</td></tr>`);
         return;
     }
 
@@ -902,19 +964,19 @@ function searchProducts(term = '') {
     }
     
     if (results.length === 0) {
-        tbody.html('<tr><td colspan="4" class="text-center text-danger p-3">No products found</td></tr>');
+        tbody.html(`<tr><td colspan="4" class="text-center text-danger p-3">${GRN_I18N.noProductsFound}</td></tr>`);
         return;
     }
-    
+
     results.slice(0, 50).forEach(product => {
         const costPrice = parseFloat(product.cost_price) || parseFloat(product.purchase_price) || 0;
         tbody.append(`
             <tr onclick="selectProduct(${product.product_id})">
                 <td>
                     <strong>${product.product_name}</strong><br>
-                    <small class="text-muted">${product.sku || 'No SKU'}</small>
+                    <small class="text-muted">${product.sku || GRN_I18N.noSku}</small>
                 </td>
-                <td>${product.sku || 'N/A'}</td>
+                <td>${product.sku || GRN_I18N.na}</td>
                 <td>${product.current_stock || 0}</td>
                 <td>${costPrice.toLocaleString()}</td>
             </tr>
@@ -980,12 +1042,12 @@ function removeItemRow(index) {
 
 function clearAllItems() {
     Swal.fire({
-        title: 'Clear All Items?',
-        text: 'Are you sure you want to remove all items?',
+        title: GRN_I18N.clearAllItemsTitle,
+        text: GRN_I18N.clearAllItemsText,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Clear All',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: GRN_I18N.yesClearAll,
+        cancelButtonText: GRN_I18N.cancel
     }).then((result) => {
         if (result.isConfirmed) {
             $('#itemsBody').empty();
@@ -1008,16 +1070,16 @@ function filterGrnWarehouses(projectId) {
     const sel   = document.getElementById('warehouse_id');
     const hint  = document.getElementById('grnWarehouseHint');
     const curVal = parseInt(sel.value) || 0;
-    sel.innerHTML = '<option value="">Select Warehouse</option>';
+    sel.innerHTML = `<option value="">${GRN_I18N.selectWarehouse}</option>`;
     // The filtering rule lives in the shared assets/js/warehouse-project-filter.js.
     const filtered = filterWarehousesForProject(grnAllWarehouses, projectId);
     if (hint) {
         if (!projectId || projectId === '' || projectId === '0') {
-            hint.textContent = 'Showing warehouses not linked to any project.';
+            hint.textContent = GRN_I18N.warehousesNotLinked;
         } else {
             hint.textContent = filtered.length === 0
-                ? 'No warehouses found for this project.'
-                : 'Showing ' + filtered.length + ' warehouse(s) for selected project.';
+                ? GRN_I18N.noWarehousesForProject
+                : tFormat(GRN_I18N.showingNWarehouses, filtered.length);
         }
     }
     filtered.forEach(w => {
@@ -1029,7 +1091,7 @@ function filterGrnWarehouses(projectId) {
         sel.appendChild(opt);
     });
     if (filtered.length === 1) sel.value = filtered[0].warehouse_id;
-    $sel.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
+    $sel.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: GRN_I18N.selectWarehouse });
     // Whatever warehouse ended up selected (retained, auto-picked, or none),
     // reload the product cache scoped to it — rebuilding the <option> list
     // above doesn't fire a native 'change' event, so this can't rely on the
@@ -1065,14 +1127,14 @@ function loadSupplierInfo() {
                     <div class="row">
                         <div class="col-md-6">
                             <p><strong>${supplier.supplier_name}</strong></p>
-                            ${supplier.contact_person ? `<p>Contact: ${supplier.contact_person}</p>` : ''}
-                            ${supplier.phone ? `<p>Phone: ${supplier.phone}</p>` : ''}
-                            ${supplier.email ? `<p>Email: ${supplier.email}</p>` : ''}
+                            ${supplier.contact_person ? `<p>${GRN_I18N.contactLabel} ${supplier.contact_person}</p>` : ''}
+                            ${supplier.phone ? `<p>${GRN_I18N.phoneLabel} ${supplier.phone}</p>` : ''}
+                            ${supplier.email ? `<p>${GRN_I18N.emailLabel} ${supplier.email}</p>` : ''}
                         </div>
                         <div class="col-md-6">
-                            ${supplier.address ? `<p>Address: ${supplier.address}</p>` : ''}
-                            ${supplier.city ? `<p>City: ${supplier.city}</p>` : ''}
-                            ${supplier.country ? `<p>Country: ${supplier.country}</p>` : ''}
+                            ${supplier.address ? `<p>${GRN_I18N.addressLabel} ${supplier.address}</p>` : ''}
+                            ${supplier.city ? `<p>${GRN_I18N.cityLabel} ${supplier.city}</p>` : ''}
+                            ${supplier.country ? `<p>${GRN_I18N.countryLabel} ${supplier.country}</p>` : ''}
                         </div>
                     </div>
                 `;
@@ -1136,8 +1198,8 @@ function loadPurchaseOrderItems() {
                 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Items Loaded',
-                    text: `${response.data.items.length} items loaded from purchase order.`,
+                    title: GRN_I18N.itemsLoaded,
+                    text: tFormat(GRN_I18N.itemsLoadedFromPO, response.data.items.length),
                     timer: 1500,
                     showConfirmButton: false
                 });
@@ -1147,8 +1209,8 @@ function loadPurchaseOrderItems() {
             console.error('Error loading PO items:', error);
             Swal.fire({
                 icon: 'error',
-                title: 'Error',
-                text: 'Failed to load purchase order items.'
+                title: GRN_I18N.error,
+                text: GRN_I18N.failedToLoadPoItems
             });
         }
     });
@@ -1160,8 +1222,8 @@ function clearPOSelection() {
     $('#projectIdHidden').val('');
     Swal.fire({
         icon: 'info',
-        title: 'PO Cleared',
-        text: 'Purchase order selection cleared.',
+        title: GRN_I18N.poCleared,
+        text: GRN_I18N.poSelectionCleared,
         timer: 1500,
         showConfirmButton: false
     });
@@ -1181,8 +1243,8 @@ function handleBarcodeInput(barcode) {
         // Show product found
         $('#barcodeResult').removeClass('d-none').html(`
             <div class="alert alert-success">
-                <strong>Product Found:</strong> ${product.product_name}<br>
-                <small>SKU: ${product.sku || 'N/A'} | Unit: ${product.unit || 'pcs'}</small>
+                <strong>${GRN_I18N.productFound}</strong> ${product.product_name}<br>
+                <small>${GRN_I18N.skuLabel} ${product.sku || GRN_I18N.na} | ${GRN_I18N.unitLabel} ${product.unit || 'pcs'}</small>
             </div>
         `);
         
@@ -1198,8 +1260,8 @@ function handleBarcodeInput(barcode) {
     } else {
         $('#barcodeResult').removeClass('d-none').html(`
             <div class="alert alert-warning">
-                <strong>Product Not Found</strong><br>
-                <small>Barcode "${barcode}" not found in database.</small>
+                <strong>${GRN_I18N.productNotFound}</strong><br>
+                <small>${tFormat(GRN_I18N.barcodeNotFound, barcode)}</small>
             </div>
         `);
     }
@@ -1216,26 +1278,26 @@ function addScannedItem() {
 
 function validateForm(isDraft = false) {
     if ($('[id^="item-row-"]').length === 0) {
-        Swal.fire({ icon: 'warning', title: 'No Items', text: 'Please add at least one received item.' });
+        Swal.fire({ icon: 'warning', title: GRN_I18N.noItems, text: GRN_I18N.pleaseAddAtLeastOneItem });
         return false;
     }
-    
+
     let hasValidItems = false;
     $('[id^="item-row-"]').each(function() {
         const productName = $(this).find('.item-name').val();
         const quantity = parseFloat($(this).find('.item-quantity').val()) || 0;
         if (productName && quantity > 0) hasValidItems = true;
     });
-    
+
     if (!hasValidItems) {
-        Swal.fire({ icon: 'warning', title: 'Invalid Items', text: 'Please ensure at least one item has a name and quantity > 0.' });
+        Swal.fire({ icon: 'warning', title: GRN_I18N.invalidItems, text: GRN_I18N.pleaseEnsureAtLeastOneItem });
         return false;
     }
-    
+
     const requiredFields = ['receipt_number', 'receipt_date', 'received_by', 'supplier_id', 'warehouse_id'];
     for (const field of requiredFields) {
         if (!$(`#${field}`).val() && !isDraft) {
-            Swal.fire({ icon: 'warning', title: 'Missing Information', text: `Please fill in the ${field.replace('_', ' ')} field.` });
+            Swal.fire({ icon: 'warning', title: GRN_I18N.missingInformation, text: tFormat(GRN_I18N.pleaseFillInField, field.replace('_', ' ')) });
             $(`#${field}`).focus();
             return false;
         }
@@ -1248,13 +1310,13 @@ function addAttachmentRow() {
         <div class="row g-2 attachment-row mb-2" data-type="new">
             <input type="hidden" name="attachment_ids[]" value="0">
             <div class="col-md-5">
-                <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name">
+                <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="${GRN_I18N.documentName}">
             </div>
             <div class="col-md-6">
                 <input type="file" class="form-control form-control-sm" name="attachments[]">
             </div>
             <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="${GRN_I18N.remove}">
                     <i class="bi bi-trash fs-5"></i>
                 </button>
             </div>
@@ -1294,8 +1356,8 @@ function updateGRN() {
     formData.append('items', JSON.stringify(items));
 
     Swal.fire({
-        title: 'Updating GRN...',
-        text: 'Please wait',
+        title: GRN_I18N.updatingGrn,
+        text: GRN_I18N.pleaseWait,
         allowOutsideClick: false,
         didOpen: () => { Swal.showLoading(); }
     });
@@ -1311,7 +1373,7 @@ function updateGRN() {
             if (response.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Updated!',
+                    title: GRN_I18N.updated,
                     text: response.message,
                     timer: 2000,
                     showConfirmButton: false
@@ -1320,15 +1382,15 @@ function updateGRN() {
                     window.location.href = (returnUrl && returnUrl.length > 5) ? returnUrl : '<?= getUrl('grn_view') ?>?id=' + response.receipt_id;
                 });
             } else {
-                Swal.fire({ icon: 'error', title: 'Update Failed', text: response.message });
+                Swal.fire({ icon: 'error', title: GRN_I18N.updateFailed, text: response.message });
             }
         },
         error: function(xhr, status, error) {
             console.error('Update Error:', error, xhr.responseText);
             Swal.fire({
                 icon: 'error',
-                title: 'Server Error',
-                text: 'Could not connect to the update API. Check if the file exists on the server.'
+                title: GRN_I18N.serverError,
+                text: GRN_I18N.couldNotConnectApi
             });
         }
     });
