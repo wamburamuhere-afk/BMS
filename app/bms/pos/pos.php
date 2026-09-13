@@ -139,6 +139,13 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
             </div>
             <div class="vr text-white opacity-50"></div>
             <div id="posShiftButtons">
+                <!-- The terminal is the default landing page for POS (header.php's
+                     "POS" link goes straight here) — this is the one way back to
+                     the stats/shift-history/catalog-setup hub for whoever wants it,
+                     without forcing every cashier through it first every day. -->
+                <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= t('POS Workspace — stats, shift history, catalog setup') ?>">
+                    <i class="bi bi-speedometer2"></i> <?= t('Workspace') ?>
+                </a>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
                     <i class="bi bi-cash"></i> <?= t('Open Drawer') ?>

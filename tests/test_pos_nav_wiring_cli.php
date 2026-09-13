@@ -102,8 +102,17 @@ try {
     // when Sales is open) and one in the new standalone <li> (used when
     // Sales is closed but POS is still on). Only one of the two ever
     // actually renders for a given tenant — proven live in section C below.
-    $posDashCount = substr_count($hdr, "getUrl('pos/dashboard')");
-    ok($posDashCount === 2, "header.php links to pos/dashboard from exactly two branches — the Sales dropdown and the standalone fallback (found $posDashCount)");
+    //
+    // 2026-09-12 (product owner request, part 2: "make the terminal itself
+    // the direct landing page ... keep the stats hub as a secondary link for
+    // whoever wants it") — both of those occurrences now point straight at
+    // the terminal (getUrl('pos')), not the hub (getUrl('pos/dashboard')).
+    // The hub stays one click away via the "Workspace" link inside pos.php's
+    // own header bar (#posShiftButtons) — not header.php's job to prove that,
+    // pos.php's own structure is checked separately if ever needed.
+    $posCount = substr_count($hdr, "getUrl('pos')");
+    ok($posCount === 2, "header.php links to the POS terminal from exactly two branches — the Sales dropdown and the standalone fallback (found $posCount)");
+    ok(strpos($hdr, "getUrl('pos/dashboard')") === false, "header.php no longer sends anyone to the POS hub by default — the terminal is the direct landing page");
     ok(strpos($hdr, "getUrl('pos/price-groups')") === false, "header.php no longer links pos/price-groups directly (moved behind the hub's Catalog Setup card)");
     ok(!preg_match('/canView\(\'pos_advanced\'\).*?pos\/price-groups/s', $hdr), "header.php's Sales dropdown no longer gates a POS sub-item on pos_advanced — nothing left to gate at that layer");
 
@@ -221,8 +230,13 @@ try {
         $features = array_merge($baseFeatures, $features);
         $html = _nav_worker_run($root, 'app/dashboard.php', $session, $features);
         $hasSalesDropdown = strpos($html, 'id="salesDropdown"') !== false;
-        $hasStandalonePos = (bool)preg_match('/<li class="nav-item">\s*<a class="nav-link" href="[^"]*\/pos\/dashboard">/', $html);
-        $hasNestedPos      = strpos($html, 'class="dropdown-item" href="' ) !== false && strpos($html, "/pos/dashboard\"><i class=\"bi bi-cart-check\"") !== false;
+        // 2026-09-12 (part 2): both the standalone link and the nested dropdown
+        // item now target the terminal (getUrl('pos')), not the hub
+        // (getUrl('pos/dashboard')). The trailing '"' in each check anchors the
+        // href to end exactly at "/pos" so this doesn't false-match
+        // "/pos/dashboard", "/pos/shifts", or "/pos_config_settings".
+        $hasStandalonePos = (bool)preg_match('/<li class="nav-item">\s*<a class="nav-link" href="[^"]*\/pos">/', $html);
+        $hasNestedPos      = strpos($html, 'class="dropdown-item" href="' ) !== false && strpos($html, "/pos\"><i class=\"bi bi-cart-check\"") !== false;
 
         if ($label === 'sales ON, pos ON') {
             ok($hasSalesDropdown, "[$label] Sales dropdown is present");
@@ -232,7 +246,7 @@ try {
             ok($hasStandalonePos, "[$label] POS renders as a direct, standalone header link");
         } else { // sales OFF, pos OFF
             ok(!$hasSalesDropdown, "[$label] Sales dropdown is absent");
-            ok(!$hasStandalonePos && strpos($html, 'href="/pos/dashboard"') === false, "[$label] no POS link anywhere — neither form renders");
+            ok(!$hasStandalonePos && strpos($html, 'href="/pos"') === false, "[$label] no POS link anywhere — neither form renders");
         }
     }
 

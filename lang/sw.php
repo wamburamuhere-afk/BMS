@@ -3625,4 +3625,8 @@ return [
     'Wrong Specifications' => 'Vipimo Visivyo Sahihi',
     'Yes, send for review' => 'Ndiyo, tuma kwa mapitio',
     'optional — enables qty guard' => 'hiari — inawezesha ulinzi wa kiasi',
+
+    // POS terminal — "Workspace" link back to the stats/shift-history hub
+    'Workspace' => 'Sehemu ya Kazi',
+    'POS Workspace — stats, shift history, catalog setup' => 'Sehemu ya Kazi ya POS — takwimu, historia ya zamu, usanidi wa katalogi',
 ];
