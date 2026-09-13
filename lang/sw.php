@@ -1231,6 +1231,7 @@ return [
     'Walk-in Customer' => 'Mteja wa Kawaida',
     'pts' => 'pointi',
     '— Select Warehouse —' => '— Chagua Ghala —',
+    '— Select Shop —' => '— Chagua Duka —',
 
     // ------------------------------------------------------------------
     // POS — Printed sale receipt (api/pos/print_receipt.php)
@@ -1372,6 +1373,7 @@ return [
     'No held sales found' => 'Hakuna mauzo yaliyowekwa pembeni yaliyopatikana',
     'No products found' => 'Hakuna bidhaa zilizopatikana',
     'No warehouse is assigned to your account — contact an administrator.' => 'Hakuna ghala lililopangiwa akaunti yako — wasiliana na msimamizi.',
+    'No shop is assigned to your account — contact an administrator.' => 'Hakuna duka lililopangiwa akaunti yako — wasiliana na msimamizi.',
     'Note: Other valid items were updated.' => 'Kumbuka: Vipengele vingine sahihi vimesasishwa.',
     'Outstanding' => 'Deni Lililopo',
     'Override and Proceed' => 'Batilisha Kikomo na Endelea',
@@ -1381,6 +1383,7 @@ return [
     'Percentage cannot be greater than 100.' => 'Asilimia haiwezi kuzidi 100.',
     'Please enter the customer\'s name.' => 'Tafadhali weka jina la mteja.',
     'Please select a warehouse before processing the sale.' => 'Tafadhali chagua ghala kabla ya kuchakata muuzo.',
+    'Please select a shop before processing the sale.' => 'Tafadhali chagua duka kabla ya kuchakata muuzo.',
     'Please select at least one product to discount.' => 'Tafadhali chagua angalau bidhaa moja ya kupunguza bei.',
     'Please start a shift first.' => 'Tafadhali anza zamu kwanza.',
     'Price Validation Failed' => 'Uhakiki wa Bei Umeshindwa',
@@ -1410,6 +1413,7 @@ return [
     'Try a different search or category' => 'Jaribu utafutaji au aina tofauti',
     'View Z-Report' => 'Ona Ripoti ya Z',
     'Warehouse required' => 'Ghala linahitajika',
+    'Shop required' => 'Duka linahitajika',
     'Yes, Load it' => 'Ndiyo, ipakie',
     'Yes, clear it!' => 'Ndiyo, ifute!',
     'You do not have permission to apply a discount.' => 'Huna ruhusa ya kutumia punguzo.',
@@ -1793,6 +1797,7 @@ return [
     'Each unit of this product is sold as a specific, traceable serial/IMEI number instead of a plain quantity. Serial numbers are entered when receiving stock via GRN.' => 'Kila kipande cha bidhaa hii kinauzwa kwa namba maalum ya serial/IMEI inayofuatiliwa badala ya idadi tu. Namba za serial huingizwa wakati wa kupokea hisa kupitia GRN.',
     'Loading serial numbers...' => 'Inapakia namba za serial...',
     'No serial numbers available in this warehouse.' => 'Hakuna namba za serial zinazopatikana kwenye ghala hili.',
+    'No serial numbers available in this shop.' => 'Hakuna namba za serial zinazopatikana kwenye duka hili.',
     'One or more selected serial numbers for \'%s\' are no longer available.' => 'Namba moja au zaidi za serial ulizochagua kwa \'%s\' hazipatikani tena.',
     'Select at least one serial number.' => 'Chagua angalau namba moja ya serial.',
     'Select exactly %d serial number(s) for \'%s\'.' => 'Chagua namba %d za serial kwa \'%s\'.',
@@ -1936,6 +1941,7 @@ return [
     'No Show' => 'Hakuja',
     'No tables found.' => 'Hakuna meza zilizopatikana.',
     'No tables set up for this warehouse yet. Ask an admin to add floors and tables under Restaurant > Floors & Tables.' => 'Hakuna meza zilizowekwa kwa ghala hili bado. Muombe msimamizi aongeze ghorofa na meza chini ya Mkahawa > Ghorofa na Meza.',
+    'No tables set up for this shop yet. Ask an admin to add floors and tables under Restaurant > Floors & Tables.' => 'Hakuna meza zilizowekwa kwa duka hili bado. Muombe msimamizi aongeze ghorofa na meza chini ya Mkahawa > Ghorofa na Meza.',
     "No warehouse in your scope is set to Restaurant or Hybrid mode yet. Switch a warehouse's POS Mode first." => 'Hakuna ghala katika wigo wako lililowekwa kwenye hali ya Mkahawa au Mchanganyiko bado. Badilisha Hali ya POS ya ghala kwanza.',
     'Occupied' => 'Imechukuliwa',
     'Option' => 'Chaguo',

@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-13 (feat/pos-shop-terminology) - Phase 1: POS terminal says "Shop"/"Duka" instead of "Warehouse"/"Ghala" for retail-only tenants
+
+**Request:** on a POS-enabled tenant, cashiers shouldn't have to think in "warehouse" terms at the till — the location picker and every POS message referencing it should say "Shop" (Swahili: "Duka"). Explicitly scoped as display-text only — "no logic change just only name to change accordingly." Working through this as an advisory first (agreed design below) before touching any file.
+
+**Design agreed with user:** the swap is driven by two existing tenant module-entitlement flags (`tenantFeatureEnabled('pos')` / `tenantFeatureEnabled('projects')`), not a new column or any change to the `warehouses` table/queries/variable names:
+- POS off → "Warehouse"/"Ghala" everywhere, unchanged.
+- POS on + Projects on → "Shop"/"Duka" only on the two POS core screens (pos.php, POS dashboard); every other screen (Inventory, HR, Reports, product creation) keeps "Warehouse" — a tenant that also runs project-based work still needs "Warehouse" for its project materials stores, which share the same table.
+- POS on + Projects off → "Shop"/"Duka" everywhere the app has been converted to call the new helper.
+- Superadmin/platform screens (no tenant resolved) are never converted — always "Warehouse".
+
+**Fix (Phase 1 — POS module only; Inventory/Product/HR/Reports are later phases):**
+- `core/terminology.php` — new file: `isShopLabel(bool $isPosCoreScreen = false)` resolves the above rule; `wLabel($warehouseText, $shopText, $isPosCoreScreen = false)` / `wLabelE(...)` pick the right key and run it through the existing `t()`/`te()` i18n pipeline — Swahili wording still lives entirely in `lang/sw.php`, same mechanism every other translated string already uses.
+- `roots.php` — requires the new file right after `core/permissions.php` (which loads `core/feature_registry.php`, the source of `tenantFeatureEnabled()`).
+- `app/bms/pos/pos.php` — the warehouse `<select>` placeholder now goes through `wLabel(..., true)`.
+- `app/bms/pos/pos_scripts_new.php` — 5 user-facing strings (serials-unavailable notice, "Warehouse required" title/text, no-warehouse-assigned warning, no-tables-set-up-for-restaurant-mode message) converted the same way. `pos_dashboard.php`/`pos_modals_new.php` had no plain-text "Warehouse" wording to convert.
+- `lang/sw.php` — added the 6 new "Shop" -form English keys with their Duka-wording Swahili translations, each placed next to its existing Warehouse/Ghala counterpart.
+
+**Tested:** `php -l` clean on all 5 changed/new files. New `tests/test_pos_shop_terminology_cli.php` (20 assertions, all passing) drives `isShopLabel()`/`wLabel()`/`wLabelE()` directly across every flag combination (pos off; pos+projects on; pos+projects off; no tenant resolved) and both languages, plus an HTML-escaping check. Confirmed via grep that zero raw `t('...Warehouse...')` calls remain in the 4 POS module files touched. Ran the existing `tests/test_warehouse_scope_cli.php` (171/172 passing) — the 1 failure is pre-existing on `develop` (reproduced identically with this branch's changes stashed out), unrelated to this change.
+
 ## 2026-09-13 (feat/procurement-i18n-coverage) - Swahili translation coverage for Procurement: Purchase Returns (module 4 of 5, IN PROGRESS)
 
 **Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the Purchase Returns module.
