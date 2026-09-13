@@ -5,7 +5,11 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 
-if (!isAuthenticated()) die("Unauthorized");
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
+if (!isAuthenticated()) die(t('Unauthorized'));
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 assertScopeForRecordHtml('purchase_orders', 'purchase_order_id', $order_id);
@@ -33,7 +37,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$order) die("Order not found");
+if (!$order) die(t('Order not found'));
 
 $stmtItems = $pdo->prepare("
     SELECT poi.*, p.product_name, p.sku, p.unit
@@ -101,7 +105,7 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Purchase Order #<?= htmlspecialchars($order['order_number']) ?></title>
+    <title><?= t('Purchase Order') ?> #<?= htmlspecialchars($order['order_number']) ?></title>
     <style>
         :root { --accent: <?= htmlspecialchars($accent) ?>; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -171,8 +175,8 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
 <body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
-        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
-        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
+        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;"><?= t('Print') ?></button>
+        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;"><?= t('Close') ?></button>
     </div>
 
 
@@ -187,31 +191,31 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
             <?php
             $line = [];
             if (!empty($comp['address'])) $line[] = htmlspecialchars($comp['address']);
-            if (!empty($comp['phone']))   $line[] = 'Tel: ' . htmlspecialchars($comp['phone']);
+            if (!empty($comp['phone']))   $line[] = t('Tel:') . ' ' . htmlspecialchars($comp['phone']);
             if (!empty($comp['email']))   $line[] = htmlspecialchars($comp['email']);
             if ($line): ?><p><?= implode(' &nbsp;|&nbsp; ', $line) ?></p><?php endif; ?>
             <?php
             $tv = [];
-            if (!empty($comp['tin'])) $tv[] = 'TIN: ' . htmlspecialchars($comp['tin']);
-            if (!empty($comp['vrn'])) $tv[] = 'VRN: ' . htmlspecialchars($comp['vrn']);
-            if (!empty($comp['website'])) $tv[] = 'Web: ' . htmlspecialchars($comp['website']);
+            if (!empty($comp['tin'])) $tv[] = t('TIN:') . ' ' . htmlspecialchars($comp['tin']);
+            if (!empty($comp['vrn'])) $tv[] = t('VRN:') . ' ' . htmlspecialchars($comp['vrn']);
+            if (!empty($comp['website'])) $tv[] = t('Web:') . ' ' . htmlspecialchars($comp['website']);
             if ($tv): ?><p><?= implode(' &nbsp;|&nbsp; ', $tv) ?></p><?php endif; ?>
         </div>
     </div>
 
     <!-- TITLE BAR -->
     <div class="title-bar">
-        <h2>PURCHASE ORDER</h2>
+        <h2><?= t('PURCHASE ORDER') ?></h2>
         <div class="meta">
-            <p><strong>PO #:</strong> <?= htmlspecialchars($order['order_number']) ?></p>
-            <p><strong>Date:</strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
+            <p><strong><?= t('PO #:') ?></strong> <?= htmlspecialchars($order['order_number']) ?></p>
+            <p><strong><?= t('Date:') ?></strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
         </div>
     </div>
 
     <!-- VENDOR + ORDER INFORMATION -->
     <div class="two-col">
         <div>
-            <div class="section-label">Vendor Information</div>
+            <div class="section-label"><?= t('Vendor Information') ?></div>
             <div class="section-body">
                 <p><strong><?= htmlspecialchars($order['supplier_name']) ?></strong></p>
                 <?php if (!empty($order['company_name'])): ?><p><?= htmlspecialchars($order['company_name']) ?></p><?php endif; ?>
@@ -221,20 +225,20 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
                 <?php if (!empty($order['s_email'])): ?><p><?= htmlspecialchars($order['s_email']) ?></p><?php endif; ?>
                 <?php
                 $s_tv = [];
-                if (!empty($order['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($order['s_tin']);
-                if (!empty($order['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($order['s_vrn']);
+                if (!empty($order['s_tin'])) $s_tv[] = t('TIN:') . ' ' . htmlspecialchars($order['s_tin']);
+                if (!empty($order['s_vrn'])) $s_tv[] = t('VRN:') . ' ' . htmlspecialchars($order['s_vrn']);
                 if ($s_tv): ?><p><?= implode(' | ', $s_tv) ?></p><?php endif; ?>
             </div>
         </div>
         <div>
-            <div class="section-label">Order Information</div>
+            <div class="section-label"><?= t('Order Information') ?></div>
             <div class="section-body">
-                <p><strong>Expected Delivery:</strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : 'Not specified' ?></p>
-                <?php if (!empty($order['supplier_quote_ref'])): ?><p><strong>Quote Ref:</strong> <?= htmlspecialchars($order['supplier_quote_ref']) ?></p><?php endif; ?>
-                <?php if (!empty($order['project_contract_no'])): ?><p><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></p><?php endif; ?>
-                <?php if (!empty($order['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
-                <?php if (!empty($order['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
-                <p><strong>Created By:</strong> <?= htmlspecialchars($order['username'] ?? 'N/A') ?></p>
+                <p><strong><?= t('Expected Delivery:') ?></strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : t('Not specified') ?></p>
+                <?php if (!empty($order['supplier_quote_ref'])): ?><p><strong><?= t('Quote Ref:') ?></strong> <?= htmlspecialchars($order['supplier_quote_ref']) ?></p><?php endif; ?>
+                <?php if (!empty($order['project_contract_no'])): ?><p><strong><?= t('Contract No:') ?></strong> <?= htmlspecialchars($order['project_contract_no']) ?></p><?php endif; ?>
+                <?php if (!empty($order['project_name'])): ?><p><strong><?= t('Project:') ?></strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
+                <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
+                <p><strong><?= t('Created By:') ?></strong> <?= htmlspecialchars($order['username'] ?? t('N/A')) ?></p>
             </div>
         </div>
     </div>
@@ -243,12 +247,12 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
-                <th class="text-center" style="width:100px;">Product Code</th>
-                <th class="text-center">Item / Description</th>
-                <th class="text-right" style="width:80px;">Qty</th>
-                <th class="text-right" style="width:105px;">Unit Price</th>
-                <th class="text-right" style="width:115px;">Total (<?= $currency ?>)</th>
+                <th class="text-center" style="width:38px;"><?= t('S/NO') ?></th>
+                <th class="text-center" style="width:100px;"><?= t('Product Code') ?></th>
+                <th class="text-center"><?= t('Item / Description') ?></th>
+                <th class="text-right" style="width:80px;"><?= t('Qty') ?></th>
+                <th class="text-right" style="width:105px;"><?= t('Unit Price') ?></th>
+                <th class="text-right" style="width:115px;"><?= sprintf(t('Total (%s)'), $currency) ?></th>
             </tr>
         </thead>
         <tbody>
@@ -259,7 +263,7 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? t('Unknown Product')) ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>
@@ -271,38 +275,38 @@ $accent = getSetting('print_template_color_po_corporate', '#000000');
     <!-- ORDER STATUS + DELIVERY DETAILS (real fields only — no fabricated checklist) -->
     <div class="status-delivery">
         <div>
-            <div class="section-label">Order Status</div>
+            <div class="section-label"><?= t('Order Status') ?></div>
             <div class="section-body">
                 <span class="status-badge"><?= strtoupper($order['status']) ?></span>
-                <?php if (!empty($order['reviewed_at'])): ?><p style="margin-top:8px;"><strong>Reviewed:</strong> <?= date('d M Y', strtotime($order['reviewed_at'])) ?></p><?php endif; ?>
-                <?php if (!empty($order['approved_at'])): ?><p><strong>Approved:</strong> <?= date('d M Y', strtotime($order['approved_at'])) ?></p><?php endif; ?>
+                <?php if (!empty($order['reviewed_at'])): ?><p style="margin-top:8px;"><strong><?= t('Reviewed:') ?></strong> <?= date('d M Y', strtotime($order['reviewed_at'])) ?></p><?php endif; ?>
+                <?php if (!empty($order['approved_at'])): ?><p><strong><?= t('Approved:') ?></strong> <?= date('d M Y', strtotime($order['approved_at'])) ?></p><?php endif; ?>
             </div>
         </div>
         <div>
-            <div class="section-label">Delivery Details</div>
+            <div class="section-label"><?= t('Delivery Details') ?></div>
             <div class="section-body">
-                <p><strong>Expected:</strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : 'Not specified' ?></p>
-                <?php if (!empty($order['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
-                <?php if (!empty($order['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
+                <p><strong><?= t('Expected:') ?></strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : t('Not specified') ?></p>
+                <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
+                <?php if (!empty($order['project_name'])): ?><p><strong><?= t('Project:') ?></strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
             </div>
         </div>
     </div>
 
     <!-- TOTALS -->
     <div class="totals">
-        <div class="totals-row"><span>Subtotal:</span><span><?= $currency ?> <?= number_format($order['subtotal'], 2) ?></span></div>
-        <div class="totals-row"><span>VAT (18%):</span><span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span></div>
-        <div class="totals-row"><span>Shipping:</span><span><?= $currency ?> <?= number_format($order['shipping_cost'], 2) ?></span></div>
-        <div class="totals-row grand-total"><span>GRAND TOTAL:</span><span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span></div>
+        <div class="totals-row"><span><?= t('Subtotal:') ?></span><span><?= $currency ?> <?= number_format($order['subtotal'], 2) ?></span></div>
+        <div class="totals-row"><span><?= t('VAT (18%):') ?></span><span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span></div>
+        <div class="totals-row"><span><?= t('Shipping:') ?></span><span><?= $currency ?> <?= number_format($order['shipping_cost'], 2) ?></span></div>
+        <div class="totals-row grand-total"><span><?= t('GRAND TOTAL:') ?></span><span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span></div>
     </div>
 
     <!-- NOTES -->
     <div class="notes-section">
         <?php if (!empty($order['notes'])): ?>
-        <div><strong>Notes</strong><p><?= nl2br(htmlspecialchars($order['notes'])) ?></p></div>
+        <div><strong><?= t('Notes') ?></strong><p><?= nl2br(htmlspecialchars($order['notes'])) ?></p></div>
         <?php endif; ?>
         <?php if (!empty($order['terms_conditions'])): ?>
-        <div><strong>Terms &amp; Conditions</strong><p><?= nl2br(htmlspecialchars($order['terms_conditions'])) ?></p></div>
+        <div><strong><?= t('Terms & Conditions') ?></strong><p><?= nl2br(htmlspecialchars($order['terms_conditions'])) ?></p></div>
         <?php endif; ?>
     </div>
 

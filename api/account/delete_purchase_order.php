@@ -4,10 +4,13 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
@@ -17,7 +20,7 @@ if (!isAuthenticated()) {
 $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
 
 if ($order_id <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Invalid Order ID']);
+    echo json_encode(['success' => false, 'message' => t('Invalid Order ID')]);
     exit;
 }
 
@@ -40,14 +43,14 @@ try {
         $pdo->commit();
         // Phase 3a — financial-write audit trail.
         logActivity($pdo, $_SESSION['user_id'], "Delete purchase order", "deleted purchase order with id $order_id");
-        echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);
+        echo json_encode(['success' => true, 'message' => t('Order deleted successfully')]);
     } else {
         $pdo->rollBack();
-        echo json_encode(['success' => false, 'message' => 'Order could not be deleted or does not exist']);
+        echo json_encode(['success' => false, 'message' => t('Order could not be deleted or does not exist')]);
     }
 
 } catch (PDOException $e) {
     $pdo->rollBack();
-    echo json_encode(['success' => false, 'message' => 'Database Error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => sprintf(t('Database Error: %s'), $e->getMessage())]);
 }
 ?>

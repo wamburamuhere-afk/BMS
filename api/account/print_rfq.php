@@ -7,10 +7,14 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 
-if (!isAuthenticated()) die('Unauthorized');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
+if (!isAuthenticated()) die(t('Unauthorized'));
 
 $rfq_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-if (!$rfq_id) die('Invalid RFQ ID');
+if (!$rfq_id) die(t('Invalid RFQ ID'));
 assertScopeForRecordHtml('rfq', 'rfq_id', $rfq_id);
 
 global $pdo;
@@ -31,7 +35,7 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$rfq_id]);
 $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$rfq) die('RFQ not found');
+if (!$rfq) die(t('RFQ not found'));
 
 $stmt2 = $pdo->prepare("SELECT * FROM rfq_items WHERE rfq_id = ? ORDER BY item_order");
 $stmt2->execute([$rfq_id]);
@@ -236,8 +240,8 @@ $wf = [
 <body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
-        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
-        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
+        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;"><?= t('Print') ?></button>
+        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;"><?= t('Close') ?></button>
     </div>
 
 
@@ -258,12 +262,12 @@ $wf = [
                     <p><?= htmlspecialchars($comp['postal_address']) ?></p>
                     <?php endif; ?>
                     <?php if (!empty($comp['phone'])): ?>
-                    <p>Phone: <?= htmlspecialchars($comp['phone']) ?></p>
+                    <p><?= t('Phone:') ?> <?= htmlspecialchars($comp['phone']) ?></p>
                     <?php endif; ?>
                     <?php
                     $we = [];
-                    if (!empty($comp['website'])) $we[] = 'Web: '   . htmlspecialchars($comp['website']);
-                    if (!empty($comp['email']))   $we[] = 'Email: ' . htmlspecialchars($comp['email']);
+                    if (!empty($comp['website'])) $we[] = t('Web:')   . ' ' . htmlspecialchars($comp['website']);
+                    if (!empty($comp['email']))   $we[] = t('Email:') . ' ' . htmlspecialchars($comp['email']);
                     if ($we): ?>
                     <p><?= implode(' | ', $we) ?></p>
                     <?php endif; ?>
@@ -279,17 +283,17 @@ $wf = [
         </div>
 
         <div class="po-title">
-            <h2>REQUEST FOR QUOTATION</h2>
-            <p><strong>RFQ #:</strong> <?= htmlspecialchars($rfq['rfq_number']) ?></p>
-            <p><strong>Date:</strong> <?= date('d M Y', strtotime($rfq['rfq_date'])) ?></p>
-            <p><strong>Status:</strong> <?= strtoupper($status) ?></p>
+            <h2><?= t('REQUEST FOR QUOTATION') ?></h2>
+            <p><strong><?= t('RFQ #:') ?></strong> <?= htmlspecialchars($rfq['rfq_number']) ?></p>
+            <p><strong><?= t('Date:') ?></strong> <?= date('d M Y', strtotime($rfq['rfq_date'])) ?></p>
+            <p><strong><?= t('Status:') ?></strong> <?= strtoupper($status) ?></p>
         </div>
     </div>
 
     <!-- VENDOR + RFQ INFO -->
     <div class="details-grid">
         <div class="box">
-            <h3>Vendor</h3>
+            <h3><?= t('Vendor') ?></h3>
             <p><strong><?= htmlspecialchars($rfq['supplier_name'] ?? '—') ?></strong></p>
             <?php if (!empty($rfq['supplier_company'])): ?>
             <p><?= htmlspecialchars($rfq['supplier_company']) ?></p>
@@ -317,18 +321,18 @@ $wf = [
             <?php endif; ?>
         </div>
         <div class="box">
-            <h3>RFQ Information</h3>
-            <p><strong>Response Deadline:</strong> <?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : 'Not specified' ?></p>
+            <h3><?= t('RFQ Information') ?></h3>
+            <p><strong><?= t('Response Deadline:') ?></strong> <?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : t('Not specified') ?></p>
             <?php if (!empty($rfq['project_contract_no'])): ?>
-            <p><strong>Contract No:</strong> <?= htmlspecialchars($rfq['project_contract_no']) ?></p>
+            <p><strong><?= t('Contract No:') ?></strong> <?= htmlspecialchars($rfq['project_contract_no']) ?></p>
             <?php endif; ?>
             <?php if (!empty($rfq['project_name'])): ?>
-            <p><strong>Project:</strong> <?= htmlspecialchars($rfq['project_name']) ?></p>
+            <p><strong><?= t('Project:') ?></strong> <?= htmlspecialchars($rfq['project_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($rfq['warehouse_name'])): ?>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($rfq['warehouse_name']) ?></p>
+            <p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($rfq['warehouse_name']) ?></p>
             <?php endif; ?>
-            <p><strong>Created By:</strong> <?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></p>
+            <p><strong><?= t('Created By:') ?></strong> <?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></p>
         </div>
     </div>
 
@@ -336,15 +340,15 @@ $wf = [
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
-                <th>Item / Description</th>
-                <th class="text-center" style="width:120px;">Unit</th>
-                <th class="text-right" style="width:100px;">Qty</th>
+                <th class="text-center" style="width:38px;"><?= t('S/NO') ?></th>
+                <th><?= t('Item / Description') ?></th>
+                <th class="text-center" style="width:120px;"><?= t('Unit') ?></th>
+                <th class="text-right" style="width:100px;"><?= t('Qty') ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($items)): ?>
-                <tr><td colspan="4" style="text-align:center;color:#999;padding:20px;">No items found</td></tr>
+                <tr><td colspan="4" style="text-align:center;color:#999;padding:20px;"><?= t('No items found') ?></td></tr>
             <?php else: ?>
                 <?php foreach ($items as $i => $item): ?>
                 <tr>

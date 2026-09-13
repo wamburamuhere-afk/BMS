@@ -44,23 +44,23 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('purchase_returns') ?>">Purchase Returns</a></li>
-            <li class="breadcrumb-item active">View Return</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('purchase_returns') ?>"><?= t('Purchase Returns') ?></a></li>
+            <li class="breadcrumb-item active"><?= t('View Return') ?></li>
         </ol>
     </nav>
 
     <div id="loading" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden"><?= t('Loading...') ?></span>
         </div>
-        <p class="mt-2 text-muted">Loading return details...</p>
+        <p class="mt-2 text-muted"><?= t('Loading return details...') ?></p>
     </div>
 
     <div id="content" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h2 class="fw-bold mb-0">Return <span id="returnNumber" class="text-primary"></span></h2>
+                <h2 class="fw-bold mb-0"><?= t('Return') ?> <span id="returnNumber" class="text-primary"></span></h2>
                 <div class="mt-2">
                     <span id="returnStatus" class="badge rounded-pill me-2"></span>
                     <span class="text-muted"><i class="bi bi-calendar-event"></i> <span id="returnDate"></span></span>
@@ -68,36 +68,36 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
             </div>
             <div class="d-flex gap-2 d-print-none">
                 <button id="btnSendForReview" type="button" onclick="sendForReview()" class="btn btn-warning px-4 shadow-sm" style="display:none;">
-                    <i class="bi bi-send-check"></i> Send for Review
+                    <i class="bi bi-send-check"></i> <?= t('Send for Review') ?>
                 </button>
                 <button id="btnApprove" type="button" onclick="approveReturn()" class="btn btn-success px-4 shadow-sm" style="display:none;">
-                    <i class="bi bi-check-circle"></i> Approve
+                    <i class="bi bi-check-circle"></i> <?= t('Approve') ?>
                 </button>
                 <?php if ($existing_dn): ?>
                 <a href="<?= getUrl('debit_note_view') ?>?id=<?= (int)$existing_dn['debit_note_id'] ?>" class="btn btn-primary px-4 shadow-sm">
-                    <i class="bi bi-receipt-cutoff"></i> View Debit Note <?= safe_output($existing_dn['debit_note_number']) ?>
+                    <i class="bi bi-receipt-cutoff"></i> <?= t('View Debit Note') ?> <?= safe_output($existing_dn['debit_note_number']) ?>
                 </a>
                 <?php elseif ($can_create_dn): ?>
                 <a id="btnCreateDebitNote" href="<?= getUrl('debit_note_create') ?>?purchase_return_id=<?= $return_id ?><?= $dn_create_qs ?>" class="btn btn-primary px-4 shadow-sm" style="display:none;">
-                    <i class="bi bi-receipt-cutoff"></i> Create Debit Note
+                    <i class="bi bi-receipt-cutoff"></i> <?= t('Create Debit Note') ?>
                 </a>
                 <?php endif; ?>
                 <a href="<?= getUrl('purchase_returns') ?>" class="btn btn-outline-secondary px-4 shadow-sm">
-                    <i class="bi bi-arrow-left"></i> Back
+                    <i class="bi bi-arrow-left"></i> <?= t('Back') ?>
                 </a>
                 <div class="btn-group shadow-sm">
                     <button onclick="printReturn()" class="btn btn-outline-dark px-4">
-                        <i class="bi bi-printer"></i> Print
+                        <i class="bi bi-printer"></i> <?= t('Print') ?>
                     </button>
                     <button type="button" class="btn btn-outline-dark dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="visually-hidden">Choose print template</span>
+                        <span class="visually-hidden"><?= t('Choose print template') ?></span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><h6 class="dropdown-header">Print Template</h6></li>
-                        <li><a class="dropdown-item" href="#" onclick="printReturn('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printReturn('navy'); return false;">Navy</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printReturn('corporate'); return false;">Corporate</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printReturn('banded'); return false;">Banded</a></li>
+                        <li><h6 class="dropdown-header"><?= t('Print Template') ?></h6></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('standard'); return false;"><i class="bi bi-check2 me-2"></i><?= t('Standard (default)') ?></a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('navy'); return false;"><?= t('Navy') ?></a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('corporate'); return false;"><?= t('Corporate') ?></a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('banded'); return false;"><?= t('Banded') ?></a></li>
                     </ul>
                 </div>
             </div>
@@ -110,7 +110,7 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                     <div class="card-body">
                         <div class="row mb-5">
                             <div class="col-sm-6">
-                                <h6 class="text-muted text-uppercase small fw-bold mb-3">Supplier Information</h6>
+                                <h6 class="text-muted text-uppercase small fw-bold mb-3"><?= t('Supplier Information') ?></h6>
                                 <h5 class="fw-bold mb-1" id="supplierName"></h5>
                                 <p class="mb-0 text-muted" id="companyName"></p>
                                 <div class="mt-2">
@@ -120,12 +120,12 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                                 </div>
                             </div>
                             <div class="col-sm-6 text-sm-end">
-                                <h6 class="text-muted text-uppercase small fw-bold mb-3">Return Details</h6>
-                                <p class="mb-1"><strong id="referenceLabel">Reference:</strong> <span id="orderReference"></span></p>
-                                <p class="mb-1"><strong>Return Reason:</strong> <span id="returnReason" class="text-capitalize"></span></p>
-                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong>Warehouse:</strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
-                                <p class="mb-1"><strong>Prepared By:</strong> <span id="createdBy"></span></p>
-                                <p class="mb-1"><strong>Last Updated:</strong> <span id="updatedAt"></span></p>
+                                <h6 class="text-muted text-uppercase small fw-bold mb-3"><?= t('Return Details') ?></h6>
+                                <p class="mb-1"><strong id="referenceLabel"><?= t('Reference:') ?></strong> <span id="orderReference"></span></p>
+                                <p class="mb-1"><strong><?= t('Return Reason:') ?></strong> <span id="returnReason" class="text-capitalize"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= t('Warehouse:') ?></strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
+                                <p class="mb-1"><strong><?= t('Prepared By:') ?></strong> <span id="createdBy"></span></p>
+                                <p class="mb-1"><strong><?= t('Last Updated:') ?></strong> <span id="updatedAt"></span></p>
                             </div>
                         </div>
 
@@ -133,27 +133,27 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                             <table class="table table-hover align-middle border-top">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th class="py-3">Product Description</th>
-                                        <th class="text-center py-3">Quantity</th>
-                                        <th class="text-end py-3">Unit Price</th>
-                                        <th class="text-end py-3">Total Amount</th>
-                                        <th class="py-3">Item Reason</th>
+                                        <th class="py-3"><?= t('Product Description') ?></th>
+                                        <th class="text-center py-3"><?= t('Quantity') ?></th>
+                                        <th class="text-end py-3"><?= t('Unit Price') ?></th>
+                                        <th class="text-end py-3"><?= t('Total Amount') ?></th>
+                                        <th class="py-3"><?= t('Item Reason') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody id="itemsTableBody"></tbody>
                                 <tfoot class="border-top bg-light">
                                     <tr>
-                                        <td colspan="3" class="text-end text-muted py-2">Subtotal</td>
+                                        <td colspan="3" class="text-end text-muted py-2"><?= t('Subtotal') ?></td>
                                         <td class="text-end py-2 font-monospace" id="subtotalDisplay"></td>
                                         <td></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="3" class="text-end text-muted py-1">VAT (18%)</td>
+                                        <td colspan="3" class="text-end text-muted py-1"><?= t('VAT (18%)') ?></td>
                                         <td class="text-end py-1 font-monospace" id="vatDisplay"></td>
                                         <td></td>
                                     </tr>
                                     <tr class="border-top">
-                                        <td colspan="3" class="text-end fw-bold py-2">Grand Total</td>
+                                        <td colspan="3" class="text-end fw-bold py-2"><?= t('Grand Total') ?></td>
                                         <td class="text-end fw-bold py-2 text-primary fs-5" id="grandTotal"></td>
                                         <td></td>
                                     </tr>
@@ -162,7 +162,7 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                         </div>
 
                         <div class="mt-4 pt-3 border-top">
-                            <h6 class="fw-bold mb-2">Detailed Reason:</h6>
+                            <h6 class="fw-bold mb-2"><?= t('Detailed Reason:') ?></h6>
                             <p id="reasonDetails" class="text-muted mb-0"></p>
                         </div>
                     </div>
@@ -173,32 +173,32 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
             <div class="col-lg-4">
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-primary text-white py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text me-2"></i> Additional Notes</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text me-2"></i> <?= t('Additional Notes') ?></h6>
                     </div>
                     <div class="card-body">
                         <div id="returnNotes" class="bg-light p-3 rounded border-start border-4 border-primary">
-                            <p class="mb-0 small fst-italic">No additional notes provided for this return.</p>
+                            <p class="mb-0 small fst-italic"><?= t('No additional notes provided for this return.') ?></p>
                         </div>
                     </div>
                 </div>
 
                 <div class="card shadow-sm border-0 mb-4 d-print-none" id="returnAttachmentSection" style="display:none;">
                     <div class="card-header bg-white py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i> Attachment</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i> <?= t('Attachment') ?></h6>
                     </div>
                     <div class="card-body">
                         <a id="returnAttachmentLink" href="#" target="_blank" class="btn btn-sm btn-outline-primary w-100">
-                            <i class="bi bi-file-earmark-arrow-down me-1"></i> View / Download
+                            <i class="bi bi-file-earmark-arrow-down me-1"></i> <?= t('View / Download') ?>
                         </a>
                     </div>
                 </div>
 
                 <div class="card shadow-sm border-0 mb-4 d-print-none">
                     <div class="card-header bg-white py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i> Return Status</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i> <?= t('Return Status') ?></h6>
                     </div>
                     <div class="card-body">
-                        <p class="small text-muted mb-3">Current status for tracking and auditing purposes.</p>
+                        <p class="small text-muted mb-3"><?= t('Current status for tracking and auditing purposes.') ?></p>
                         <div class="d-grid">
                             <div class="alert mb-0 text-center" id="statusAlert"></div>
                         </div>
@@ -232,11 +232,30 @@ function printReturn(template) {
     window.open(base + '?id=' + returnId, '_blank');
 }
 
+// Pre-translated strings used inside JS template literals / dynamic rendering.
+const PRV_I18N = {
+    error: <?= json_encode(t('Error')) ?>,
+    invalidReturnId: <?= json_encode(t('Invalid return ID provided.')) ?>,
+    poRef: <?= json_encode(t('PO Ref:')) ?>,
+    project: <?= json_encode(t('Project:')) ?>,
+    reference: <?= json_encode(t('Reference:')) ?>,
+    noReference: <?= json_encode(t('No Reference')) ?>,
+    na: <?= json_encode(t('N/A')) ?>,
+    system: <?= json_encode(t('System')) ?>,
+    noAddress: <?= json_encode(t('No address provided')) ?>,
+    noEmail: <?= json_encode(t('No email')) ?>,
+    noPhone: <?= json_encode(t('No phone')) ?>,
+    noDetailedReason: <?= json_encode(t('No detailed reason provided.')) ?>,
+    product: <?= json_encode(t('Product')) ?>,
+    noItemsFound: <?= json_encode(t('No items found for this return')) ?>,
+    status: <?= json_encode(t('STATUS:')) ?>
+};
+
 $(document).ready(function() {
     if (returnId > 0) {
         loadReturnDetails();
     } else {
-        Swal.fire('Error', 'Invalid return ID provided.', 'error');
+        Swal.fire(PRV_I18N.error, PRV_I18N.invalidReturnId, 'error');
     }
 });
 
@@ -253,7 +272,7 @@ function loadReturnDetails() {
         onData: function(response) {
             if (!response.success) {
                 // Not found / access denied — redirect rather than offer a retry.
-                Swal.fire('Error', response.message, 'error').then(() => {
+                Swal.fire(PRV_I18N.error, response.message, 'error').then(() => {
                     window.location.href = '<?= getUrl("purchase_returns") ?>';
                 });
                 return;
@@ -272,35 +291,35 @@ function renderReturn(data) {
     const status = data.status || 'pending';
     const statusColor = getStatusColor(status);
     $('#returnStatus').text(status.toUpperCase()).addClass('bg-' + statusColor);
-    $('#statusAlert').addClass('alert-' + statusColor).text('STATUS: ' + status.toUpperCase());
+    $('#statusAlert').addClass('alert-' + statusColor).text(PRV_I18N.status + ' ' + status.toUpperCase());
     updateWorkflowButtons(status);
 
     // Supplier Info
-    $('#supplierName').text(data.supplier_name || 'N/A');
+    $('#supplierName').text(data.supplier_name || PRV_I18N.na);
     $('#companyName').text(data.company_name || '');
-    $('#supplierAddress').text(data.supplier_address || 'No address provided');
-    $('#supplierEmail').text(data.supplier_email || 'No email');
-    $('#supplierPhone').text(data.supplier_phone || 'No phone');
+    $('#supplierAddress').text(data.supplier_address || PRV_I18N.noAddress);
+    $('#supplierEmail').text(data.supplier_email || PRV_I18N.noEmail);
+    $('#supplierPhone').text(data.supplier_phone || PRV_I18N.noPhone);
 
     // Return Details Meta
     let refHtml = '';
     if (data.order_number) {
-        $('#referenceLabel').text('PO Ref:');
+        $('#referenceLabel').text(PRV_I18N.poRef);
         refHtml = data.order_number;
     } else if (data.project_name) {
-        $('#referenceLabel').text('Project:');
+        $('#referenceLabel').text(PRV_I18N.project);
         refHtml = `<a href="<?= getUrl('project_view') ?>?id=${data.project_id}" class="text-decoration-none">${data.project_name}</a>`;
     } else {
-        $('#referenceLabel').text('Reference:');
-        refHtml = `<span class="text-muted fst-italic">No Reference</span>`;
+        $('#referenceLabel').text(PRV_I18N.reference);
+        refHtml = `<span class="text-muted fst-italic">${PRV_I18N.noReference}</span>`;
     }
     $('#orderReference').html(refHtml);
 
     $('#returnReason').text(data.reason.replace(/_/g, ' '));
     if (data.warehouse_name) { $('#warehouseName').text(data.warehouse_name); $('#warehouseRow').show(); }
-    $('#createdBy').text(data.created_by_name || 'System');
-    $('#updatedAt').text(data.updated_at ? formatDateTime(data.updated_at) : 'N/A');
-    $('#reasonDetails').text(data.reason_details || 'No detailed reason provided.');
+    $('#createdBy').text(data.created_by_name || PRV_I18N.system);
+    $('#updatedAt').text(data.updated_at ? formatDateTime(data.updated_at) : PRV_I18N.na);
+    $('#reasonDetails').text(data.reason_details || PRV_I18N.noDetailedReason);
 
     // Items Table
     const tbody = $('#itemsTableBody');
@@ -320,7 +339,7 @@ function renderReturn(data) {
             tbody.append(`
                 <tr>
                     <td class="py-3">
-                        <div class="fw-bold">${item.product_name || 'Product'}</div>
+                        <div class="fw-bold">${item.product_name || PRV_I18N.product}</div>
                     </td>
                     <td class="text-center py-3">${parseFloat(item.quantity).toLocaleString()}</td>
                     <td class="text-end py-3">TZS ${parseFloat(item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
@@ -330,7 +349,7 @@ function renderReturn(data) {
             `);
         });
     } else {
-        tbody.append('<tr><td colspan="5" class="text-center py-4 text-muted">No items found for this return</td></tr>');
+        tbody.append(`<tr><td colspan="5" class="text-center py-4 text-muted">${PRV_I18N.noItemsFound}</td></tr>`);
     }
 
     const fmt = v => 'TZS ' + v.toLocaleString(undefined, {minimumFractionDigits: 2});
@@ -379,68 +398,68 @@ function updateWorkflowButtons(status) {
 
 function sendForReview() {
     Swal.fire({
-        title: 'Send for Review?',
-        text: 'This will mark the return as reviewed and capture your e-signature.',
+        title: <?= json_encode(t('Send for Review?')) ?>,
+        text: <?= json_encode(t('This will mark the return as reviewed and capture your e-signature.')) ?>,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, send for review',
+        confirmButtonText: <?= json_encode(t('Yes, send for review')) ?>,
         confirmButtonColor: '#ffc107'
     }).then((result) => {
         if (!result.isConfirmed) return;
-        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        Swal.fire({ title: <?= json_encode(t('Processing...')) ?>, didOpen: () => Swal.showLoading() });
         $.post('<?= buildUrl("api/account/review_purchase_return.php") ?>',
             { return_id: returnId },
             function(response) {
                 if (response.success) {
-                    Swal.fire('Reviewed', response.message, 'success').then(() => location.reload());
+                    Swal.fire(<?= json_encode(t('Reviewed')) ?>, response.message, 'success').then(() => location.reload());
                 } else {
-                    Swal.fire('Error', response.message, 'error');
+                    Swal.fire(PRV_I18N.error, response.message, 'error');
                 }
             }, 'json'
         ).fail(function(xhr) {
-            var msg = 'Server error.';
+            var msg = <?= json_encode(t('Server error.')) ?>;
             try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
-            Swal.fire('Error', msg, 'error');
+            Swal.fire(PRV_I18N.error, msg, 'error');
         });
     });
 }
 
 function approveReturn() {
     Swal.fire({
-        title: 'Approve Purchase Return?',
-        text: 'This will deduct stock from the warehouse and capture your e-signature.',
+        title: <?= json_encode(t('Approve Purchase Return?')) ?>,
+        text: <?= json_encode(t('This will deduct stock from the warehouse and capture your e-signature.')) ?>,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, approve',
+        confirmButtonText: <?= json_encode(t('Yes, approve')) ?>,
         confirmButtonColor: '#198754'
     }).then((result) => {
         if (!result.isConfirmed) return;
-        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        Swal.fire({ title: <?= json_encode(t('Processing...')) ?>, didOpen: () => Swal.showLoading() });
         $.post('<?= buildUrl("api/account/approve_purchase_return.php") ?>',
             { return_id: returnId },
             function(response) {
                 if (response.success) {
-                    Swal.fire('Approved', response.message, 'success').then(() => location.reload());
+                    Swal.fire(<?= json_encode(t('Approved')) ?>, response.message, 'success').then(() => location.reload());
                 } else {
-                    Swal.fire('Error', response.message, 'error');
+                    Swal.fire(PRV_I18N.error, response.message, 'error');
                 }
             }, 'json'
         ).fail(function(xhr) {
-            var msg = 'Server error.';
+            var msg = <?= json_encode(t('Server error.')) ?>;
             try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
-            Swal.fire('Error', msg, 'error');
+            Swal.fire(PRV_I18N.error, msg, 'error');
         });
     });
 }
 
 function formatDate(dateStr) {
-    if (!dateStr) return 'N/A';
+    if (!dateStr) return PRV_I18N.na;
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateStr).toLocaleDateString(undefined, options);
 }
 
 function formatDateTime(dateStr) {
-    if (!dateStr) return 'N/A';
+    if (!dateStr) return PRV_I18N.na;
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return new Date(dateStr).toLocaleString(undefined, options);
 }

@@ -66,14 +66,14 @@ $can_approve = canApprove('rfq');
 
 // Status badge colour map
 $statusMap = [
-    'draft'     => ['class' => 'secondary', 'label' => 'Draft'],
-    'review'    => ['class' => 'primary',   'label' => 'In Review'],
-    'approved'  => ['class' => 'success',   'label' => 'Approved'],
-    'sent'      => ['class' => 'info',      'label' => 'Sent'],
-    'received'  => ['class' => 'info',      'label' => 'Quote Received'],
-    'evaluated' => ['class' => 'primary',   'label' => 'Evaluated'],
-    'awarded'   => ['class' => 'success',   'label' => 'Awarded'],
-    'cancelled' => ['class' => 'danger',    'label' => 'Cancelled'],
+    'draft'     => ['class' => 'secondary', 'label' => t('Draft')],
+    'review'    => ['class' => 'primary',   'label' => t('In Review')],
+    'approved'  => ['class' => 'success',   'label' => t('Approved')],
+    'sent'      => ['class' => 'info',      'label' => t('Sent')],
+    'received'  => ['class' => 'info',      'label' => t('Quote Received')],
+    'evaluated' => ['class' => 'primary',   'label' => t('Evaluated')],
+    'awarded'   => ['class' => 'success',   'label' => t('Awarded')],
+    'cancelled' => ['class' => 'danger',    'label' => t('Cancelled')],
 ];
 $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($status)];
 ?>
@@ -89,23 +89,23 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
         <p class="small text-uppercase mb-1"><?php $we=[];if(!empty($c_web))$we[]='Web: '.safe_output($c_web);if(!empty($c_email))$we[]='Email: '.safe_output($c_email);echo implode(' | ',$we); ?></p>
         <p class="small text-uppercase mb-1"><?php $tv=[];if(!empty($c_tin))$tv[]='TIN: '.safe_output($c_tin);if(!empty($c_vrn))$tv[]='VRN: '.safe_output($c_vrn);echo implode(' | ',$tv); ?></p>
         <div class="mt-2">
-            <h2 style="color:#495057;font-weight:600;text-transform:uppercase;font-size:14pt;letter-spacing:2px;">REQUEST FOR QUOTATION</h2>
-            <p style="color:#6c757d;font-size:9pt;">Generated: <?= date('d M Y, h:i A') ?></p>
+            <h2 style="color:#495057;font-weight:600;text-transform:uppercase;font-size:14pt;letter-spacing:2px;"><?= t('REQUEST FOR QUOTATION') ?></h2>
+            <p style="color:#6c757d;font-size:9pt;"><?= t('Generated:') ?> <?= date('d M Y, h:i A') ?></p>
         </div>
         <div style="border-bottom:3px solid #0d6efd;margin:10px 0 20px;"></div>
     </div>
     <div class="d-none d-print-block" style="position:fixed;bottom:0;left:0;right:0;border-top:1px solid #dee2e6;padding:5px 0;text-align:center;">
-        <small style="color:#666;font-size:8pt;"><?= safe_output($c_name) ?> &mdash; RFQ #<?= safe_output($rfq['rfq_number']) ?> &mdash; Printed: <?= date('d M Y, h:i A') ?></small>
+        <small style="color:#666;font-size:8pt;"><?= safe_output($c_name) ?> &mdash; RFQ #<?= safe_output($rfq['rfq_number']) ?> &mdash; <?= t('Printed:') ?> <?= date('d M Y, h:i A') ?></small>
     </div>
 
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
             <?php if ($from_project): ?>
-            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project RFQs</a></li>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>"><?= t('Project RFQs') ?></a></li>
             <?php else: ?>
-            <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>">RFQ</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>"><?= t('RFQ') ?></a></li>
             <?php endif; ?>
             <li class="breadcrumb-item active"><?= safe_output($rfq['rfq_number']) ?></li>
         </ol>
@@ -114,8 +114,8 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     <!-- Page Header -->
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4 d-print-none">
         <div>
-            <h2 class="fw-bold mb-1"><i class="bi bi-file-earmark-text text-primary me-2"></i>RFQ Details</h2>
-            <p class="text-muted mb-0 small">View all details of this request for quotation</p>
+            <h2 class="fw-bold mb-1"><i class="bi bi-file-earmark-text text-primary me-2"></i><?= t('RFQ Details') ?></h2>
+            <p class="text-muted mb-0 small"><?= t('View all details of this request for quotation') ?></p>
         </div>
         <div class="d-flex gap-2 flex-wrap align-items-center">
             <!-- Status Badge -->
@@ -123,19 +123,19 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
 
             <!-- Back Button -->
             <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
-                <i class="bi bi-arrow-left me-1"></i> Back<?= $from_project ? ' to Project' : '' ?>
+                <i class="bi bi-arrow-left me-1"></i> <?= $from_project ? t('Back to Project') : t('Back') ?>
             </a>
 
             <!-- ── WORKFLOW ACTION BUTTONS ── -->
             <?php if ($status === 'draft' && $can_review): ?>
             <button id="btnReview" class="btn btn-blue-touch btn-sm px-3 shadow-sm" onclick="submitForReview()">
-                <i class="bi bi-eye-fill me-1"></i> Review
+                <i class="bi bi-eye-fill me-1"></i> <?= t('Review') ?>
             </button>
             <?php endif; ?>
 
             <?php if ($status === 'review' && $can_approve): ?>
             <button id="btnApprove" class="btn btn-success btn-sm px-3 shadow-sm" onclick="approveRFQ()">
-                <i class="bi bi-check-circle-fill me-1"></i> Approve
+                <i class="bi bi-check-circle-fill me-1"></i> <?= t('Approve') ?>
             </button>
             <?php endif; ?>
             <!-- ── END WORKFLOW ── -->
@@ -150,28 +150,28 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             ?>
             <a href="<?= htmlspecialchars($po_create_url) ?>"
                class="btn btn-outline-primary btn-sm px-3">
-                <i class="bi bi-cart-plus me-1"></i> Create PO
+                <i class="bi bi-cart-plus me-1"></i> <?= t('Create PO') ?>
             </a>
             <?php endif; ?>
 
             <div class="btn-group shadow-sm">
                 <button onclick="printRfqDoc()" class="btn btn-blue-touch btn-sm px-3">
-                    <i class="bi bi-printer me-1"></i> Print
+                    <i class="bi bi-printer me-1"></i> <?= t('Print') ?>
                 </button>
                 <button type="button" class="btn btn-blue-touch btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="visually-hidden">Choose print template</span>
+                    <span class="visually-hidden"><?= t('Choose print template') ?></span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><h6 class="dropdown-header">Print Template</h6></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('navy'); return false;">Striped</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('corporate'); return false;">Minimal</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('banded'); return false;">Radiant</a></li>
+                    <li><h6 class="dropdown-header"><?= t('Print Template') ?></h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i><?= t('Standard (default)') ?></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('navy'); return false;"><?= t('Striped') ?></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('corporate'); return false;"><?= t('Minimal') ?></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('banded'); return false;"><?= t('Radiant') ?></a></li>
                 </ul>
             </div>
             <?php if ($status === 'draft'): ?>
             <a href="<?= getUrl('rfq_create') ?>?edit=<?= $rfq_id ?><?= $return_url ? '&return_url=' . urlencode($back_url) : '' ?>" class="btn btn-outline-info btn-sm">
-                <i class="bi bi-pencil me-1"></i> Edit
+                <i class="bi bi-pencil me-1"></i> <?= t('Edit') ?>
             </a>
             <?php endif; ?>
         </div>
@@ -180,37 +180,37 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     <!-- RFQ Info Card -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-light py-3">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i>RFQ Information</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i><?= t('RFQ Information') ?></h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">RFQ Number</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('RFQ Number') ?></p>
                     <span class="rfq-code"><?= safe_output($rfq['rfq_number']) ?></span>
                 </div>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">RFQ Date</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('RFQ Date') ?></p>
                     <strong><?= safe_output($rfq['rfq_date'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Deadline</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Deadline') ?></p>
                     <strong><?= safe_output($rfq['deadline_date'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Status</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Status') ?></p>
                     <span class="badge bg-<?= $badge['class'] ?> text-uppercase"><?= $badge['label'] ?></span>
                 </div>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Supplier</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Supplier') ?></p>
                     <strong><?= safe_output($rfq['supplier_name'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Warehouse</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Warehouse') ?></p>
                     <strong><?= safe_output($rfq['warehouse_name'] ?? '—') ?></strong>
                 </div>
                 <?php if (!empty($rfq['project_name'])): ?>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Project</p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Project') ?></p>
                     <strong><?= safe_output($rfq['project_name']) ?></strong>
                 </div>
                 <?php endif; ?>
@@ -221,22 +221,22 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     <!-- Items Table -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-light py-3">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-list-task me-2"></i>RFQ Items</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-list-task me-2"></i><?= t('RFQ Items') ?></h6>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="text-uppercase small fw-bold" style="background:#f8fafc;">
                         <tr>
-                            <th class="ps-4" style="width:55px;">S/No</th>
-                            <th>Description</th>
-                            <th style="width:130px;">Unit</th>
-                            <th style="width:120px;">Qty</th>
+                            <th class="ps-4" style="width:55px;"><?= t('S/No') ?></th>
+                            <th><?= t('Description') ?></th>
+                            <th style="width:130px;"><?= t('Unit') ?></th>
+                            <th style="width:120px;"><?= t('Qty') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($items)): ?>
-                        <tr><td colspan="4" class="text-center py-4 text-muted">No items found</td></tr>
+                        <tr><td colspan="4" class="text-center py-4 text-muted"><?= t('No items found') ?></td></tr>
                         <?php else: ?>
                         <?php foreach ($items as $i => $item): ?>
                         <tr>
@@ -266,7 +266,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     ?>
     <div class="card border-0 shadow-sm mb-4 auth-panel">
         <div class="card-header py-3" style="background:linear-gradient(135deg,#0d6efd15,#19875415);">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2 text-success"></i>Authorization Trail</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2 text-success"></i><?= t('Authorization Trail') ?></h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
@@ -276,16 +276,16 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                     <div class="auth-box auth-prepared p-3 rounded-3 h-100">
                         <div class="auth-label mb-2">
                             <i class="bi bi-pencil-square me-1"></i>
-                            <span class="text-uppercase fw-bold small">Prepared By</span>
+                            <span class="text-uppercase fw-bold small"><?= t('Prepared By') ?></span>
                         </div>
                         <?php if ($has_prepared): ?>
                         <div class="auth-name fw-bold"><?= safe_output($rfq['prepared_by_name']) ?></div>
                         <div class="auth-role text-muted small"><?= safe_output($rfq['prepared_by_role'] ?? '') ?></div>
                         <?php else: ?>
-                        <div class="text-muted small fst-italic">Not yet recorded</div>
+                        <div class="text-muted small fst-italic"><?= t('Not yet recorded') ?></div>
                         <?php endif; ?>
                         <div class="auth-line mt-3"></div>
-                        <div class="auth-line-label small text-muted">Signature</div>
+                        <div class="auth-line-label small text-muted"><?= t('Signature') ?></div>
                     </div>
                 </div>
 
@@ -294,7 +294,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                     <div class="auth-box auth-reviewed p-3 rounded-3 h-100">
                         <div class="auth-label mb-2">
                             <i class="bi bi-eye-fill me-1"></i>
-                            <span class="text-uppercase fw-bold small">Reviewed By</span>
+                            <span class="text-uppercase fw-bold small"><?= t('Reviewed By') ?></span>
                         </div>
                         <?php if ($has_reviewed): ?>
                         <div class="auth-name fw-bold"><?= safe_output($rfq['reviewed_by_name']) ?></div>
@@ -305,10 +305,10 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                             <?php endif; ?>
                         </div>
                         <?php else: ?>
-                        <div class="text-muted small fst-italic">Pending review</div>
+                        <div class="text-muted small fst-italic"><?= t('Pending review') ?></div>
                         <?php endif; ?>
                         <div class="auth-line mt-3"></div>
-                        <div class="auth-line-label small text-muted">Signature</div>
+                        <div class="auth-line-label small text-muted"><?= t('Signature') ?></div>
                     </div>
                 </div>
 
@@ -317,7 +317,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                     <div class="auth-box auth-approved p-3 rounded-3 h-100">
                         <div class="auth-label mb-2">
                             <i class="bi bi-check-circle-fill me-1"></i>
-                            <span class="text-uppercase fw-bold small">Approved By</span>
+                            <span class="text-uppercase fw-bold small"><?= t('Approved By') ?></span>
                         </div>
                         <?php if ($has_approved): ?>
                         <div class="auth-name fw-bold"><?= safe_output($rfq['approved_by_name']) ?></div>
@@ -328,10 +328,10 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                             <?php endif; ?>
                         </div>
                         <?php else: ?>
-                        <div class="text-muted small fst-italic">Pending approval</div>
+                        <div class="text-muted small fst-italic"><?= t('Pending approval') ?></div>
                         <?php endif; ?>
                         <div class="auth-line mt-3"></div>
-                        <div class="auth-line-label small text-muted">Signature</div>
+                        <div class="auth-line-label small text-muted"><?= t('Signature') ?></div>
                     </div>
                 </div>
 
@@ -344,7 +344,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     <?php if (!empty($attachments)): ?>
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-light py-3">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i>Attachments
+            <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i><?= t('Attachments') ?>
                 <span class="badge bg-secondary ms-1"><?= count($attachments) ?></span>
             </h6>
         </div>
@@ -361,7 +361,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                     </div>
                     <a href="<?= getUrl($att['file_path']) ?>" target="_blank"
                        class="btn btn-sm btn-outline-primary py-1 d-print-none">
-                        <i class="bi bi-file-earmark-arrow-down me-1"></i>Download
+                        <i class="bi bi-file-earmark-arrow-down me-1"></i><?= t('Download') ?>
                     </a>
                     <span class="d-none d-print-inline small text-muted"><?= safe_output($att['file_path']) ?></span>
                 </li>
@@ -434,60 +434,60 @@ function printRfqDoc(template) {
 
 function submitForReview() {
     Swal.fire({
-        title: 'Submit for Review?',
-        text: 'RFQ #<?= safe_output($rfq['rfq_number']) ?> will be sent for review. You will no longer be able to edit it.',
+        title: <?= json_encode(t('Submit for Review?')) ?>,
+        text: <?= json_encode(sprintf(t('RFQ #%s will be sent for review. You will no longer be able to edit it.'), safe_output($rfq['rfq_number']))) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#0d6efd',
-        confirmButtonText: 'Yes, Submit',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, Submit')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
-        $('#btnReview').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Submitting...');
+        $('#btnReview').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> <?= t('Submitting...') ?>');
         $.post(reviewUrl, { rfq_id: rfqId }, function(res) {
             if (res.success) {
                 Swal.fire({
-                    icon: 'success', title: 'Submitted for Review!',
+                    icon: 'success', title: <?= json_encode(t('Submitted for Review!')) ?>,
                     text: res.message, confirmButtonColor: '#0d6efd',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: <?= json_encode(t('OK')) ?>
                 }).then(() => location.reload());
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not submit for review.' });
-                $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> Review');
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message || <?= json_encode(t('Could not submit for review.')) ?> });
+                $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> <?= t('Review') ?>');
             }
         }, 'json').fail(() => {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
-            $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> Review');
+            Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Server error. Please try again.')) ?> });
+            $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> <?= t('Review') ?>');
         });
     });
 }
 
 function approveRFQ() {
     Swal.fire({
-        title: 'Approve this RFQ?',
-        text: 'RFQ #<?= safe_output($rfq['rfq_number']) ?> will be marked as approved.',
+        title: <?= json_encode(t('Approve this RFQ?')) ?>,
+        text: <?= json_encode(sprintf(t('RFQ #%s will be marked as approved.'), safe_output($rfq['rfq_number']))) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#198754',
-        confirmButtonText: 'Yes, Approve',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, Approve')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
-        $('#btnApprove').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Approving...');
+        $('#btnApprove').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> <?= t('Approving...') ?>');
         $.post(approveUrl, { rfq_id: rfqId }, function(res) {
             if (res.success) {
                 Swal.fire({
-                    icon: 'success', title: 'RFQ Approved!',
+                    icon: 'success', title: <?= json_encode(t('RFQ Approved!')) ?>,
                     text: res.message, confirmButtonColor: '#198754',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: <?= json_encode(t('OK')) ?>
                 }).then(() => location.reload());
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not approve RFQ.' });
-                $('#btnApprove').prop('disabled', false).html('<i class="bi bi-check-circle-fill me-1"></i> Approve');
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message || <?= json_encode(t('Could not approve RFQ.')) ?> });
+                $('#btnApprove').prop('disabled', false).html('<i class="bi bi-check-circle-fill me-1"></i> <?= t('Approve') ?>');
             }
         }, 'json').fail(() => {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
-            $('#btnApprove').prop('disabled', false).html('<i class="bi bi-check-circle-fill me-1"></i> Approve');
+            Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Server error. Please try again.')) ?> });
+            $('#btnApprove').prop('disabled', false).html('<i class="bi bi-check-circle-fill me-1"></i> <?= t('Approve') ?>');
         });
     });
 }

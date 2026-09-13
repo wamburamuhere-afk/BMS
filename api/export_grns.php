@@ -5,9 +5,13 @@
  */
 require_once __DIR__ . '/../roots.php';
 
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 // Check permissions
 if (!isset($_SESSION['user_id'])) {
-    die("Unauthorized access");
+    die(t('Unauthorized access'));
 }
 
 try {
@@ -27,7 +31,7 @@ try {
     $output = fopen('php://output', 'w');
 
     // CSV Headers
-    fputcsv($output, ['DN Number', 'GRN Number', 'Date', 'Supplier', 'PO Number', 'Warehouse', 'Items Count', 'Total Value', 'Received By', 'Status', 'Notes']);
+    fputcsv($output, [t('DN Number'), t('GRN Number'), t('Date'), t('Supplier'), t('PO Number'), t('Warehouse'), t('Items Count'), t('Total Value'), t('Received By'), t('Status'), t('Notes')]);
 
     // Build query with filters
     $query = "
@@ -100,5 +104,5 @@ try {
     exit();
 
 } catch (Exception $e) {
-    die("Export Failed: " . $e->getMessage());
+    die(sprintf(t('Export Failed: %s'), $e->getMessage()));
 }

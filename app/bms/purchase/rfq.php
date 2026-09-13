@@ -66,10 +66,10 @@ $c_vrn   = getSetting('company_vrn', '');
         </h1>
         <div class="mt-2 text-center">
             <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:5px 0;font-size:14pt;letter-spacing:2px;">
-                REQUEST FOR QUOTATION LIST
+                <?= t('REQUEST FOR QUOTATION LIST') ?>
             </h2>
             <p style="color:#444;margin:5px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">
-                Generated At: <?= date('d M Y, h:i A') ?>
+                <?= t('Generated At:') ?> <?= date('d M Y, h:i A') ?>
             </p>
         </div>
         <div style="border-bottom:3px solid #0d6efd;margin-top:15px;margin-bottom:25px;"></div>
@@ -78,7 +78,7 @@ $c_vrn   = getSetting('company_vrn', '');
     <!-- Print Summary Cards -->
     <div class="d-none d-print-block mb-4">
         <div class="row g-2">
-            <?php foreach([['Total RFQs',$stats['total']],['Pending / Sent',$stats['pending']],['Quotes Received',$stats['received']],['Closed / Cancelled',$stats['closed']]] as $sc): ?>
+            <?php foreach([[t('Total RFQs'),$stats['total']],[t('Pending / Sent'),$stats['pending']],[t('Quotes Received'),$stats['received']],[t('Closed / Cancelled'),$stats['closed']]] as $sc): ?>
             <div class="col" style="flex:1 0 0%;">
                 <div style="border:1px solid #dee2e6;padding:10px;text-align:center;">
                     <p style="color:#666;font-size:8pt;text-transform:uppercase;margin-bottom:2px;font-weight:600;"><?= $sc[0] ?></p>
@@ -92,20 +92,20 @@ $c_vrn   = getSetting('company_vrn', '');
     <!-- ===== BREADCRUMB ===== -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item">Procurement</li>
-            <li class="breadcrumb-item active">Request for Quotation</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><?= t('Procurement') ?></li>
+            <li class="breadcrumb-item active"><?= t('Request for Quotation') ?></li>
         </ol>
     </nav>
 
     <!-- ===== PAGE HEADER ===== -->
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4 d-print-none">
         <div>
-            <h2 class="fw-bold mb-1"><i class="bi bi-file-earmark-text text-primary me-2"></i>Request for Quotation</h2>
-            <p class="text-muted mb-0 small">Manage and track supplier quotation requests</p>
+            <h2 class="fw-bold mb-1"><i class="bi bi-file-earmark-text text-primary me-2"></i><?= t('Request for Quotation') ?></h2>
+            <p class="text-muted mb-0 small"><?= t('Manage and track supplier quotation requests') ?></p>
         </div>
         <a href="<?= getUrl('rfq_create') ?>" class="btn btn-primary shadow-sm">
-            <i class="bi bi-plus-circle me-1"></i> Create RFQ
+            <i class="bi bi-plus-circle me-1"></i> <?= t('Create RFQ') ?>
         </a>
     </div>
 
@@ -113,10 +113,10 @@ $c_vrn   = getSetting('company_vrn', '');
     <div class="row g-3 mb-4 d-print-none">
         <?php
         $cards = [
-            ['id'=>'stat-total',    'icon'=>'bi-file-earmark-text', 'val'=>$stats['total'],    'lbl'=>'Total RFQs'],
-            ['id'=>'stat-pending',  'icon'=>'bi-hourglass-split',   'val'=>$stats['pending'],  'lbl'=>'Pending / Sent'],
-            ['id'=>'stat-approved', 'icon'=>'bi-check2-circle',     'val'=>$stats['approved'], 'lbl'=>'Approved / Partial'],
-            ['id'=>'stat-closed',   'icon'=>'bi-x-circle',          'val'=>$stats['closed'],   'lbl'=>'Completed / Closed'],
+            ['id'=>'stat-total',    'icon'=>'bi-file-earmark-text', 'val'=>$stats['total'],    'lbl'=>t('Total RFQs')],
+            ['id'=>'stat-pending',  'icon'=>'bi-hourglass-split',   'val'=>$stats['pending'],  'lbl'=>t('Pending / Sent')],
+            ['id'=>'stat-approved', 'icon'=>'bi-check2-circle',     'val'=>$stats['approved'], 'lbl'=>t('Approved / Partial')],
+            ['id'=>'stat-closed',   'icon'=>'bi-x-circle',          'val'=>$stats['closed'],   'lbl'=>t('Completed / Closed')],
         ];
         foreach ($cards as $c): ?>
         <div class="col-6 col-md-3">
@@ -136,14 +136,14 @@ $c_vrn   = getSetting('company_vrn', '');
     <!-- ===== FILTERS ===== -->
     <div class="card border-0 shadow-sm mb-4 d-print-none">
         <div class="card-header bg-light py-3">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2"></i>Filters &amp; Search</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2"></i><?= t('Filters & Search') ?></h6>
         </div>
         <div class="card-body">
             <form id="filterForm" class="row g-3">
                 <div class="col-12 col-sm-6 col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Supplier</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Supplier') ?></label>
                     <select class="form-select" name="supplier">
-                        <option value="">All Suppliers</option>
+                        <option value=""><?= t('All Suppliers') ?></option>
                         <?php foreach ($suppliers as $s): ?>
                         <option value="<?= $s['supplier_id'] ?>" <?= $rfq_supplier_filter == $s['supplier_id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['supplier_name']) ?></option>
                         <?php endforeach; ?>
@@ -151,9 +151,9 @@ $c_vrn   = getSetting('company_vrn', '');
                 </div>
                 <?php if ($enable_projects): ?>
                 <div class="col-12 col-sm-6 col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Project</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Project') ?></label>
                     <select class="form-select" name="project">
-                        <option value="">All Projects</option>
+                        <option value=""><?= t('All Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
                         <option value="<?= $p['project_id'] ?>"><?= htmlspecialchars($p['project_name']) ?></option>
                         <?php endforeach; ?>
@@ -161,26 +161,26 @@ $c_vrn   = getSetting('company_vrn', '');
                 </div>
                 <?php endif; ?>
                 <div class="col-12 col-sm-6 col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Warehouse</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Warehouse') ?></label>
                     <select class="form-select" name="warehouse">
-                        <option value="">All Warehouses</option>
+                        <option value=""><?= t('All Warehouses') ?></option>
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-6 col-sm-3 col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">From</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('From') ?></label>
                     <input type="date" class="form-control" name="date_from">
                 </div>
                 <div class="col-6 col-sm-3 col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">To</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('To') ?></label>
                     <input type="date" class="form-control" name="date_to">
                 </div>
                 <div class="col-12 d-flex justify-content-end gap-2">
-                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-search me-1"></i> Filter</button>
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-search me-1"></i> <?= t('Filter') ?></button>
                     <button type="button" class="btn btn-outline-secondary px-4" onclick="clearFilters()">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i> Clear
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> <?= t('Clear') ?>
                     </button>
                 </div>
             </form>
@@ -191,22 +191,22 @@ $c_vrn   = getSetting('company_vrn', '');
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3 d-print-none">
         <div class="btn-group" style="border:1px solid #dee2e6;border-radius:6px;overflow:hidden;">
             <button onclick="window.print()" class="btn btn-sm fw-medium px-3 py-2" style="background:#fff;color:#444;border:none;">
-                <i class="bi bi-printer text-primary me-1"></i> Print
+                <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
             </button>
             <div style="width:1px;background:#eee;height:20px;margin-top:7px;"></div>
             <button onclick="exportRFQ()" class="btn btn-sm fw-medium px-3 py-2" style="background:#fff;color:#444;border:none;">
-                <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
+                <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Export') ?>
             </button>
         </div>
         <div class="d-flex align-items-center bg-white px-3 py-1" style="border:1px solid #dee2e6;border-radius:6px;">
-            <span class="small text-muted me-2">Show:</span>
+            <span class="small text-muted me-2"><?= t('Show:') ?></span>
             <select class="form-select form-select-sm border-0 p-0 fw-bold" style="width:55px;box-shadow:none;background:transparent;"
                 onchange="$('#rfqTable').DataTable().page.len(this.value=='-1'?-1:parseInt(this.value)).draw()">
                 <option value="10" selected>10</option>
                 <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
-                <option value="-1">All</option>
+                <option value="-1"><?= t('All') ?></option>
             </select>
         </div>
     </div>
