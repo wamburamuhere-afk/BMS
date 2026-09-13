@@ -924,6 +924,21 @@ return [
     'Final price at which you sell to customers' => 'Bei ya mwisho unayouzia wateja',
     'Wholesale Price' => 'Bei ya Jumla',
     'Price for bulk/wholesale buyers' => 'Bei kwa wanunuzi wa jumla',
+
+    // ------------------------------------------------------------------
+    // POS "Add Product" shortcut — New Product / Restock Product (pos.php)
+    // ------------------------------------------------------------------
+    'New Product' => 'Bidhaa Mpya',
+    'Restock Product' => 'Ongeza Hisa ya Bidhaa',
+    'Buying Price' => 'Bei ya Ununuzi',
+    'Retail Price' => 'Bei ya Reja Reja',
+    'Paid From' => 'Imelipwa Kutoka',
+    '— Select Account —' => '— Chagua Akaunti —',
+    'The buying price is assumed already paid from this account.' => 'Bei ya ununuzi inachukuliwa kuwa imekwisha lipwa kutoka akaunti hii.',
+    'Save Restock' => 'Hifadhi Uongezaji Hisa',
+    'Product restocked successfully!' => 'Bidhaa imeongezwa hisa kwa mafanikio!',
+    'Restock Failed' => 'Kuongeza Hisa Kumeshindwa',
+    'Select a product first.' => 'Chagua bidhaa kwanza.',
     'Discount Rate (%)' => 'Kiwango cha Punguzo (%)',
     'Max discount allowed in POS' => 'Punguzo la juu linaloruhusiwa katika POS',
     'Min Selling Price' => 'Bei ya Chini ya Kuuza',

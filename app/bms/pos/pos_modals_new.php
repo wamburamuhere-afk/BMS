@@ -1,5 +1,8 @@
 <?php
 // File: pos_modals_new.php - Modal dialogs for new POS
+if ($can_restock_product ?? false) {
+    require_once ROOT_DIR . '/core/payment_source.php';
+}
 ?>
 
 <!-- Product Quick View Modal -->
@@ -79,6 +82,74 @@
         </div>
     </div>
 </div>
+
+<?php if ($can_restock_product ?? false): ?>
+<!-- Restock Product Modal -->
+<div class="modal fade" id="restockProductModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-arrow-repeat me-1"></i> <?= t('Restock Product') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="restockProductForm" autocomplete="off">
+                <div class="modal-body">
+                    <div id="restock-message" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Product') ?> <span class="text-danger">*</span></label>
+                        <select class="form-select" id="restock_product_id" name="product_id" required style="width:100%"></select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label"><?= t('Date') ?></label>
+                            <input type="date" class="form-control" id="restock_date" name="date" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label"><?= t('Quantity') ?> <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="restock_quantity" name="quantity" min="0.001" step="0.001" required>
+                        </div>
+                    </div>
+                    <?php if (count($_pos_warehouse_scoped ?? []) > 1): ?>
+                    <div class="mb-3 mt-2">
+                        <label class="form-label"><?= t('Shop') ?> <span class="text-danger">*</span></label>
+                        <select class="form-select" id="restock_warehouse_id" name="warehouse_id" required>
+                            <?= renderWarehouseOptions($_pos_warehouse_scoped) ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    <div class="row g-2 mt-1">
+                        <div class="col-4">
+                            <label class="form-label"><?= t('Buying Price') ?> <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="restock_buying_price" name="buying_price" min="0" step="0.01" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label"><?= t('Wholesale Price') ?></label>
+                            <input type="number" class="form-control" id="restock_wholesale_price" name="wholesale_price" min="0" step="0.01">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label"><?= t('Retail Price') ?> <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="restock_selling_price" name="selling_price" min="0" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-2">
+                        <label class="form-label"><?= t('Paid From') ?> <span class="text-danger">*</span></label>
+                        <select class="form-select" id="restock_paid_from_account_id" name="paid_from_account_id" required>
+                            <option value=""><?= t('— Select Account —') ?></option>
+                            <?= paidFromSelectOptions($pdo) ?>
+                        </select>
+                        <small class="text-muted"><?= t('The buying price is assumed already paid from this account.') ?></small>
+                    </div>
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i> <?= t('Save Restock') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Held Sales Modal -->
 <div class="modal fade" id="heldSalesModal" tabindex="-1">

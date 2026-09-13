@@ -82,7 +82,8 @@ $ev = $pdo->query("SELECT * FROM notification_events WHERE event_key = 'product.
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. Wiring');
-has(src($root, 'api/approve_grn.php'), 'INSERT INTO product_batches', 'approve_grn.php writes product_batches');
+has(src($root, 'api/approve_grn.php'), 'receiveProductBatch(', 'approve_grn.php writes product_batches (via core/stock_intake.php::receiveProductBatch)');
+has(src($root, 'core/stock_intake.php'), 'INSERT INTO product_batches', 'receiveProductBatch() writes product_batches');
 has(src($root, 'api/pos/process_sale.php'), 'consumeFefoBatches(', 'process_sale.php consumes via FEFO');
 has(src($root, 'api/pos/void_sale.php'), 'reverseFefoBatchConsumption(', 'void_sale.php reverses batch consumption');
 has(src($root, 'api/pos/create_return.php'), 'reverseFefoBatchConsumption(', 'create_return.php reverses batch consumption (partial)');

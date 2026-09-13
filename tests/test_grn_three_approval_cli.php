@@ -122,9 +122,13 @@ try {
 // ─────────────────────────────────────────────────────────────────────────────
 section('6. Source-code contracts');
 // ─────────────────────────────────────────────────────────────────────────────
-$reviewApi  = readSrc($root, 'api/review_grn.php');
-$approveApi = readSrc($root, 'api/approve_grn.php');
-$createApi  = readSrc($root, 'api/create_grn.php');
+$reviewApi   = readSrc($root, 'api/review_grn.php');
+$approveApi  = readSrc($root, 'api/approve_grn.php');
+$createApi   = readSrc($root, 'api/create_grn.php');
+// The stock-quantity bump lives in core/stock_intake.php's receiveProductBatch()
+// now (shared with the POS Restock Product shortcut) — approve_grn.php calls it
+// instead of inlining the UPDATE, so the contract check looks in both places.
+$stockIntake = readSrc($root, 'core/stock_intake.php');
 $listPage   = readSrc($root, 'app/bms/grn/grn.php');
 // The list table (columns, permission flags, review/approve wiring, the menu
 // itself) is now a shared module included by both grn.php and the Goods
@@ -145,7 +149,8 @@ str_contains($approveApi, 'product_stocks')   ? pass('approve_grn.php updates pr
                                                 : fail('approve_grn.php missing product_stocks update');
 str_contains($approveApi, 'stock_movements')  ? pass('approve_grn.php logs to stock_movements (side-effect preserved)')
                                                 : fail('approve_grn.php missing stock_movements log');
-str_contains($approveApi, 'stock_quantity')   ? pass('approve_grn.php bumps products.stock_quantity (side-effect preserved)')
+(str_contains($approveApi, 'stock_quantity') || (str_contains($approveApi, 'receiveProductBatch(') && str_contains($stockIntake, 'stock_quantity')))
+                                               ? pass('approve_grn.php bumps products.stock_quantity (side-effect preserved, via core/stock_intake.php)')
                                                 : fail('approve_grn.php missing products.stock_quantity bump');
 
 // create_grn forces pending
