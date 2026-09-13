@@ -29,7 +29,7 @@ $origin_project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 
 $origin_qs = $origin_project_id > 0 ? ('&project_id=' . $origin_project_id) : '';
 
 if ($receipt_id <= 0) {
-    header("Location: grn.php?error=Invalid GRN ID");
+    header("Location: grn.php?error=" . urlencode(t('Invalid GRN ID')));
     exit();
 }
 
@@ -62,7 +62,7 @@ $stmt->execute([$receipt_id]);
 $grn = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$grn) {
-    header("Location: grn.php?error=GRN Not Found");
+    header("Location: grn.php?error=" . urlencode(t('GRN Not Found')));
     exit();
 }
 
@@ -71,7 +71,7 @@ if (!$grn) {
 // able to open a GRN drawn from a different one.
 if (!empty($grn['warehouse_id']) && !userCan('warehouse', (int)$grn['warehouse_id'])) {
     if (!headers_sent()) http_response_code(403);
-    die('Access denied: this warehouse is not in your assigned scope.');
+    die(t('Access denied: this warehouse is not in your assigned scope.'));
 }
 
 // Fetch GRN Items
@@ -89,8 +89,9 @@ $grnItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
 // DN Mode detection
 $is_dn = isset($_GET['type']) && $_GET['type'] === 'delivery_note';
-$doc_label = $is_dn ? 'Received Note' : 'Goods Received Note';
-$doc_short = $is_dn ? 'DN' : 'GRN';
+$doc_label = $is_dn ? t('Received Note') : t('Goods Received Note');
+$doc_details_label = $is_dn ? t('Received Note Details') : t('Goods Received Note Details');
+$doc_short = $is_dn ? t('DN') : t('GRN');
 
 // Page Title
 $page_title = $doc_short . " #" . $grn['receipt_number'];
@@ -190,34 +191,34 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
     <div class="row mb-4 d-print-none align-items-center">
         <div class="col-md-7">
             <h3 class="fw-bold text-dark mb-1">
-                <i class="bi bi-file-earmark-check text-primary me-2"></i><?= $doc_label ?> Details
+                <i class="bi bi-file-earmark-check text-primary me-2"></i><?= $doc_details_label ?>
             </h3>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="<?= getUrl('grn') ?>" class="text-decoration-none">Procurement</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">View <?= $doc_short ?></li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('grn') ?>" class="text-decoration-none"><?= t('Procurement') ?></a></li>
+                    <li class="breadcrumb-item active" aria-current="page"><?= sprintf(t('View %s'), $doc_short) ?></li>
                 </ol>
             </nav>
         </div>
         <div class="col-md-5 text-md-end mt-3 mt-md-0">
             <div class="d-flex flex-wrap justify-content-md-end gap-2">
                 <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary px-3 shadow-sm">
-                    <i class="bi bi-arrow-left me-1"></i> Back to <?= $doc_short ?>s
+                    <i class="bi bi-arrow-left me-1"></i> <?= $is_dn ? t('Back to DNs') : t('Back to GRNs') ?>
                 </a>
                 <?php if ($origin_project_id > 0): ?>
                 <a href="<?= getUrl('project_view') ?>?id=<?= $origin_project_id ?>&tab=grn" class="btn btn-outline-primary px-3 shadow-sm">
-                    <i class="bi bi-kanban me-1"></i> Back to Project
+                    <i class="bi bi-kanban me-1"></i> <?= t('Back to Project') ?>
                 </a>
                 <?php endif; ?>
                 <a href="<?= getUrl('grn_print') ?>?id=<?= $receipt_id ?>" target="_blank" class="btn btn-primary px-3 shadow-sm">
-                    <i class="bi bi-printer me-1"></i> Print <?= $doc_short ?>
+                    <i class="bi bi-printer me-1"></i> <?= sprintf(t('Print %s'), $doc_short) ?>
                 </a>
                 <?php
                 $grn_can_edit_now = canEdit('grn') && canEditDocument($grn['status'], $grn_is_admin);
                 if ($grn_can_edit_now):
                 ?>
                 <a href="<?= getUrl('grn_edit') ?>?id=<?= $receipt_id ?><?= $origin_qs ?>" class="btn btn-outline-primary px-3 shadow-sm">
-                    <i class="bi bi-pencil me-1"></i> Edit
+                    <i class="bi bi-pencil me-1"></i> <?= t('Edit') ?>
                 </a>
                 <?php endif; ?>
                 <?php
@@ -227,11 +228,11 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     if ($grn['status'] === 'pending'):
                 ?>
                 <button type="button" class="btn btn-primary fw-bold px-3 shadow-sm" onclick="markReviewedFromView()">
-                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                    <i class="bi bi-check2 me-1"></i> <?= t('Mark Reviewed') ?>
                 </button>
                 <?php else: ?>
-                <button type="button" class="btn btn-outline-secondary px-3" disabled title="Already reviewed">
-                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                <button type="button" class="btn btn-outline-secondary px-3" disabled title="<?= t('Already reviewed') ?>">
+                    <i class="bi bi-check2 me-1"></i> <?= t('Mark Reviewed') ?>
                 </button>
                 <?php
                     endif;
@@ -240,11 +241,11 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     if ($grn['status'] === 'reviewed'):
                 ?>
                 <button type="button" class="btn btn-success fw-bold px-3 shadow-sm" onclick="approveGRNFromView()">
-                    <i class="bi bi-check-circle me-1"></i> Approve GRN
+                    <i class="bi bi-check-circle me-1"></i> <?= t('Approve GRN') ?>
                 </button>
                 <?php else: ?>
-                <button type="button" class="btn btn-outline-secondary px-3" disabled title="Must be reviewed before approval">
-                    <i class="bi bi-check-circle me-1"></i> Approve GRN
+                <button type="button" class="btn btn-outline-secondary px-3" disabled title="<?= t('Must be reviewed before approval') ?>">
+                    <i class="bi bi-check-circle me-1"></i> <?= t('Approve GRN') ?>
                 </button>
                 <?php
                     endif;
@@ -273,24 +274,24 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
     <script>
     const GRN_ID = <?= (int)$receipt_id ?>;
     function markReviewedFromView() {
-        Swal.fire({ title: 'Mark as Reviewed?', text: 'GRN will move to Reviewed and become approvable.', icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed' })
+        Swal.fire({ title: <?= json_encode(t('Mark as Reviewed?')) ?>, text: <?= json_encode(t('GRN will move to Reviewed and become approvable.')) ?>, icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: <?= json_encode(t('Yes, mark reviewed')) ?> })
             .then(r => {
                 if (!r.isConfirmed) return;
                 $.post('<?= buildUrl('api/review_grn.php') ?>', { receipt_id: GRN_ID }, function(res) {
                     if (res.success) {
-                        Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false }).then(() => location.reload());
-                    } else { Swal.fire('Error', res.message, 'error'); }
+                        Swal.fire({ icon: 'success', title: <?= json_encode(t('Reviewed!')) ?>, text: res.message, timer: 1800, showConfirmButton: false }).then(() => location.reload());
+                    } else { Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error'); }
                 }, 'json');
             });
     }
     function approveGRNFromView() {
-        Swal.fire({ title: 'Approve GRN?', text: 'Stock will be updated on approval.', icon: 'question', showCancelButton: true, confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve' })
+        Swal.fire({ title: <?= json_encode(t('Approve GRN?')) ?>, text: <?= json_encode(t('Stock will be updated on approval.')) ?>, icon: 'question', showCancelButton: true, confirmButtonColor: '#198754', confirmButtonText: <?= json_encode(t('Yes, approve')) ?> })
             .then(r => {
                 if (!r.isConfirmed) return;
                 $.post('<?= buildUrl('api/approve_grn.php') ?>', { receipt_id: GRN_ID }, function(res) {
                     if (res.success) {
-                        Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false }).then(() => location.reload());
-                    } else { Swal.fire('Error', res.message, 'error'); }
+                        Swal.fire({ icon: 'success', title: <?= json_encode(t('Approved!')) ?>, text: res.message, timer: 2000, showConfirmButton: false }).then(() => location.reload());
+                    } else { Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error'); }
                 }, 'json');
             });
     }
@@ -307,7 +308,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         <div class="mt-4 text-center">
             <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 18pt; letter-spacing: 2px;"><?= $doc_label ?></h2>
             <h4 style="color: #000; margin: 0; font-size: 14pt;"><?= $doc_short ?> #<?= safe_output($grn['receipt_number']) ?></h4>
-            <p style="color: #000; margin: 0; font-size: 11pt;">Date: <?= date('d M Y', strtotime($grn['receipt_date'])) ?></p>
+            <p style="color: #000; margin: 0; font-size: 11pt;"><?= t('Date:') ?> <?= date('d M Y', strtotime($grn['receipt_date'])) ?></p>
         </div>
         <div style="border-bottom: 3px solid #000; margin-top: 15px; margin-bottom: 25px;"></div>
     </div>
@@ -316,7 +317,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
     <div class="alert alert-<?= get_status_badge_class($grn['status']) ?> d-flex align-items-center" role="alert">
         <i class="bi bi-info-circle-fill me-2"></i>
         <div>
-            <strong>Current Status:</strong> <?= ucfirst(str_replace('_', ' ', $grn['status'])) ?>
+            <strong><?= t('Current Status:') ?></strong> <?= t(ucfirst(str_replace('_', ' ', $grn['status']))) ?>
         </div>
     </div>
 
@@ -326,22 +327,22 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         <div id="print-info-block" class="col-12 d-none d-print-block mb-4">
             <div class="row">
                 <div class="col-6">
-                    <h5 class="fw-bold mb-2 text-decoration-underline">Supplier</h5>
+                    <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Supplier') ?></h5>
                     <div class="fw-bold"><?= safe_output($grn['supplier_name']) ?></div>
                     <?php if (!empty($grn['company_name'])): ?>
                         <div><?= safe_output($grn['company_name']) ?></div>
                     <?php endif; ?>
                     <?php if (!empty($grn['supplier_phone'])): ?>
-                        <div>Tel: <?= safe_output($grn['supplier_phone']) ?></div>
+                        <div><?= t('Tel:') ?> <?= safe_output($grn['supplier_phone']) ?></div>
                     <?php endif; ?>
                 </div>
                 <div class="col-6 text-end">
-                    <h5 class="fw-bold mb-2 text-decoration-underline">Details</h5>
-                    <div><strong>Warehouse:</strong> <?= safe_output($grn['warehouse_name']) ?></div>
+                    <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Details') ?></h5>
+                    <div><strong><?= t('Warehouse:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
                     <?php if (!empty($grn['order_number'])): ?>
-                        <div><strong>PO Ref:</strong> <?= safe_output($grn['order_number']) ?></div>
+                        <div><strong><?= t('PO Ref:') ?></strong> <?= safe_output($grn['order_number']) ?></div>
                     <?php endif; ?>
-                    <div><strong>Received By:</strong> <?= safe_output($grn['received_by_name'] ?? 'N/A') ?></div>
+                    <div><strong><?= t('Received By:') ?></strong> <?= safe_output($grn['received_by_name'] ?? t('N/A')) ?></div>
                 </div>
             </div>
         </div>
@@ -350,19 +351,19 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0 fw-bold text-primary">Received Items</h5>
+                    <h5 class="mb-0 fw-bold text-primary"><?= t('Received Items') ?></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th class="ps-4" style="width: 80px;">S/NO</th>
-                                    <th>Product / Item</th>
-                                    <th class="text-center" style="width: 150px;">Quantity</th>
+                                    <th class="ps-4" style="width: 80px;"><?= t('S/NO') ?></th>
+                                    <th><?= t('Product / Item') ?></th>
+                                    <th class="text-center" style="width: 150px;"><?= t('Quantity') ?></th>
                                     <?php if (!$is_dn): ?>
-                                    <th class="text-end" style="width: 150px;">Unit Price (TZS)</th>
-                                    <th class="text-end pe-4" style="width: 150px;">Total (TZS)</th>
+                                    <th class="text-end" style="width: 150px;"><?= t('Unit Price (TZS)') ?></th>
+                                    <th class="text-end pe-4" style="width: 150px;"><?= t('Total (TZS)') ?></th>
                                     <?php endif; ?>
                                 </tr>
                             </thead>
@@ -378,7 +379,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                                     <td>
                                         <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
                                         <?php if($item['sku']): ?>
-                                            <small class="text-muted">SKU: <?= safe_output($item['sku']) ?></small>
+                                            <small class="text-muted"><?= t('SKU:') ?> <?= safe_output($item['sku']) ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
@@ -396,7 +397,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                             <?php if (!$is_dn): ?>
                             <tfoot class="bg-light">
                                 <tr>
-                                    <td colspan="4" class="text-end fw-bold fs-5">Total Value:</td>
+                                    <td colspan="4" class="text-end fw-bold fs-5"><?= t('Total Value:') ?></td>
                                     <td class="text-end pe-4 fw-bold fs-5 text-primary font-monospace">
                                         <?= number_format($total_cost, 2) ?>
                                     </td>
@@ -412,7 +413,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
             <?php if (!empty($attachments)): ?>
             <div class="card shadow-sm mb-4 d-print-none">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-paperclip me-2"></i> Attachments & Documents</h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-paperclip me-2"></i> <?= t('Attachments & Documents') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="list-group list-group-flush">
@@ -440,7 +441,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                                 </div>
                             </div>
                             <a href="<?= htmlspecialchars($file_url) ?>" class="btn btn-sm btn-outline-primary rounded-pill px-3 flex-shrink-0" target="_blank">
-                                <i class="bi bi-eye me-1"></i> View
+                                <i class="bi bi-eye me-1"></i> <?= t('View') ?>
                             </a>
                         </div>
                         <?php endforeach; ?>
@@ -453,7 +454,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
             <?php if (!empty($grn['notes'])): ?>
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold">GRN Notes</h6>
+                    <h6 class="mb-0 fw-bold"><?= t('GRN Notes') ?></h6>
                 </div>
                 <div class="card-body">
                     <p class="mb-0 text-muted"><?= nl2br(safe_output($grn['notes'])) ?></p>
@@ -472,7 +473,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
             <!-- Supplier Info -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold">Supplier Information</h6>
+                    <h6 class="mb-0 fw-bold"><?= t('Supplier Information') ?></h6>
                 </div>
                 <div class="card-body">
                     <h5 class="fw-bold mb-1"><?= safe_output($grn['supplier_name']) ?></h5>
@@ -508,16 +509,16 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
             <!-- GRN Info -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold">GRN Information</h6>
+                    <h6 class="mb-0 fw-bold"><?= t('GRN Information') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Receipt Date:</span>
+                        <span class="text-muted"><?= t('Receipt Date:') ?></span>
                         <span class="fw-medium"><?= date('M d, Y', strtotime($grn['receipt_date'])) ?></span>
                     </div>
                     <?php if (!empty($grn['order_number'])): ?>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Purchase Order:</span>
+                        <span class="text-muted"><?= t('Purchase Order:') ?></span>
                         <span class="fw-medium">
                             <a href="purchase_order_view.php?id=<?= $grn['purchase_order_id'] ?>" class="text-decoration-none">
                                 <?= safe_output($grn['order_number']) ?>
@@ -526,16 +527,16 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     </div>
                     <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Warehouse:</span>
+                        <span class="text-muted"><?= t('Warehouse:') ?></span>
                         <span class="fw-medium"><?= safe_output($grn['warehouse_name']) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Received By:</span>
-                        <span class="fw-medium"><?= safe_output($grn['received_by_name'] ?? 'N/A') ?></span>
+                        <span class="text-muted"><?= t('Received By:') ?></span>
+                        <span class="fw-medium"><?= safe_output($grn['received_by_name'] ?? t('N/A')) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Created By:</span>
-                        <span class="fw-medium"><?= safe_output($grn['created_by_name'] ?? 'N/A') ?></span>
+                        <span class="text-muted"><?= t('Created By:') ?></span>
+                        <span class="fw-medium"><?= safe_output($grn['created_by_name'] ?? t('N/A')) ?></span>
                     </div>
                 </div>
             </div>
@@ -545,22 +546,22 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         <div class="d-none d-print-block w-100 mb-4">
             <div class="row">
                 <div class="col-6">
-                    <h5 class="fw-bold mb-2 text-decoration-underline">Supplier</h5>
+                    <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Supplier') ?></h5>
                     <div class="fw-bold"><?= safe_output($grn['supplier_name']) ?></div>
                     <?php if (!empty($grn['company_name'])): ?>
                         <div><?= safe_output($grn['company_name']) ?></div>
                     <?php endif; ?>
                     <?php if (!empty($grn['supplier_phone'])): ?>
-                        <div>Tel: <?= safe_output($grn['supplier_phone']) ?></div>
+                        <div><?= t('Tel:') ?> <?= safe_output($grn['supplier_phone']) ?></div>
                     <?php endif; ?>
                 </div>
                 <div class="col-6 text-end">
-                    <h5 class="fw-bold mb-2 text-decoration-underline">Details</h5>
-                    <div><strong>Warehouse:</strong> <?= safe_output($grn['warehouse_name']) ?></div>
+                    <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Details') ?></h5>
+                    <div><strong><?= t('Warehouse:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
                     <?php if (!empty($grn['order_number'])): ?>
-                        <div><strong>PO Ref:</strong> <?= safe_output($grn['order_number']) ?></div>
+                        <div><strong><?= t('PO Ref:') ?></strong> <?= safe_output($grn['order_number']) ?></div>
                     <?php endif; ?>
-                    <div><strong>Received By:</strong> <?= safe_output($grn['received_by_name'] ?? 'N/A') ?></div>
+                    <div><strong><?= t('Received By:') ?></strong> <?= safe_output($grn['received_by_name'] ?? t('N/A')) ?></div>
                 </div>
             </div>
         </div>

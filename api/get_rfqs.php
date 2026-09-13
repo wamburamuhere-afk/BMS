@@ -4,9 +4,12 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/warehouse_scope.php';
 global $pdo;
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 try {
-    if (!isAuthenticated()) throw new Exception('Unauthorized');
+    if (!isAuthenticated()) throw new Exception(t('Unauthorized'));
 
     $supplier  = isset($_GET['supplier'])  ? intval($_GET['supplier'])  : 0;
     $project   = isset($_GET['project'])   ? intval($_GET['project'])   : 0;
@@ -17,7 +20,7 @@ try {
     $date_to      = $_GET['date_to']      ?? '';
 
     if ($warehouse && !userCan('warehouse', $warehouse)) {
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(t('Access denied: this warehouse is not in your assigned scope.'));
     }
 
     $where  = ['1=1'];

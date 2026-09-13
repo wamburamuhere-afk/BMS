@@ -6,20 +6,23 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Please login to continue']);
+    echo json_encode(['success' => false, 'message' => t('Please login to continue')]);
     exit();
 }
 
 if (!canEdit('grn') && !isAdmin()) {
-    echo json_encode(['success' => false, 'message' => 'Access denied: You do not have permission to edit GRN']);
+    echo json_encode(['success' => false, 'message' => t('Access denied: You do not have permission to edit GRN')]);
     exit();
 }
 
 try {
     $receipt_id = intval($_POST['receipt_id'] ?? 0);
-    if ($receipt_id <= 0) throw new Exception('Invalid GRN ID');
+    if ($receipt_id <= 0) throw new Exception(t('Invalid GRN ID'));
 
     // AUTO-MIGRATION: Ensure columns exist (for online server stability)
     $columns_to_check = [
@@ -37,7 +40,7 @@ try {
     $stmtOld = $pdo->prepare("SELECT * FROM purchase_receipts WHERE receipt_id = ?");
     $stmtOld->execute([$receipt_id]);
     $oldGrn = $stmtOld->fetch(PDO::FETCH_ASSOC);
-    if (!$oldGrn) throw new Exception('GRN not found');
+    if (!$oldGrn) throw new Exception(t('GRN not found'));
 
     // Phase E — project-scope gate
     if (function_exists('assertScopeForRecord')) {
@@ -48,7 +51,7 @@ try {
     // ledger and moved stock). Corrections go through void/reverse, not edit.
     require_once __DIR__ . '/../core/code_generator.php';
     if (documentGlPosted($pdo, 'grn', $receipt_id) || ($oldGrn['status'] ?? '') === 'approved') {
-        echo json_encode(['success' => false, 'message' => 'This GRN is posted/approved and locked. Void or reverse it to make changes.']);
+        echo json_encode(['success' => false, 'message' => t('This GRN is posted/approved and locked. Void or reverse it to make changes.')]);
         exit();
     }
 
@@ -62,7 +65,7 @@ try {
     $notes = $_POST['notes'] ?? '';
     $items = json_decode($_POST['items'], true);
     
-    if (empty($items)) throw new Exception('No items provided');
+    if (empty($items)) throw new Exception(t('No items provided'));
 
     // Re-code on edit, but only while this GRN is not yet posted to the GL.
     require_once __DIR__ . '/../core/code_generator.php';
@@ -225,9 +228,9 @@ try {
 
     logActivity($pdo, $_SESSION['user_id'], "Updated GRN", "GRN Receipt ID: $receipt_id, Items: " . count($items));
 
-    echo json_encode(['success' => true, 'message' => 'GRN updated successfully', 'receipt_id' => $receipt_id]);
+    echo json_encode(['success' => true, 'message' => t('GRN updated successfully'), 'receipt_id' => $receipt_id]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
-    echo json_encode(['success' => false, 'message' => 'Error updating GRN: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => sprintf(t('Error updating GRN: %s'), $e->getMessage())]);
 }

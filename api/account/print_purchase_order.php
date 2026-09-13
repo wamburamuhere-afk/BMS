@@ -5,7 +5,11 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 
-if (!isAuthenticated()) die("Unauthorized");
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
+if (!isAuthenticated()) die(t('Unauthorized'));
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 assertScopeForRecordHtml('purchase_orders', 'purchase_order_id', $order_id);
@@ -33,7 +37,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$order) die("Order not found");
+if (!$order) die(t('Order not found'));
 
 $stmtItems = $pdo->prepare("
     SELECT poi.*, p.product_name, p.sku, p.unit
@@ -96,7 +100,7 @@ try {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Purchase Order #<?= htmlspecialchars($order['order_number']) ?></title>
+    <title><?= t('Purchase Order') ?> #<?= htmlspecialchars($order['order_number']) ?></title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -329,8 +333,8 @@ try {
 <body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
-        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
-        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
+        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;"><?= t('Print') ?></button>
+        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;"><?= t('Close') ?></button>
     </div>
 
 
@@ -351,19 +355,19 @@ try {
                     <p><?= htmlspecialchars($comp['postal_address']) ?></p>
                     <?php endif; ?>
                     <?php if (!empty($comp['phone'])): ?>
-                    <p>Phone: <?= htmlspecialchars($comp['phone']) ?></p>
+                    <p><?= t('Phone:') ?> <?= htmlspecialchars($comp['phone']) ?></p>
                     <?php endif; ?>
                     <?php
                     $we = [];
-                    if (!empty($comp['website'])) $we[] = 'Web: '   . htmlspecialchars($comp['website']);
-                    if (!empty($comp['email']))   $we[] = 'Email: ' . htmlspecialchars($comp['email']);
+                    if (!empty($comp['website'])) $we[] = t('Web:')   . ' ' . htmlspecialchars($comp['website']);
+                    if (!empty($comp['email']))   $we[] = t('Email:') . ' ' . htmlspecialchars($comp['email']);
                     if ($we): ?>
                     <p><?= implode(' | ', $we) ?></p>
                     <?php endif; ?>
                     <?php
                     $tv = [];
-                    if (!empty($comp['tin'])) $tv[] = 'TIN: ' . htmlspecialchars($comp['tin']);
-                    if (!empty($comp['vrn'])) $tv[] = 'VRN: ' . htmlspecialchars($comp['vrn']);
+                    if (!empty($comp['tin'])) $tv[] = t('TIN:') . ' ' . htmlspecialchars($comp['tin']);
+                    if (!empty($comp['vrn'])) $tv[] = t('VRN:') . ' ' . htmlspecialchars($comp['vrn']);
                     if ($tv): ?>
                     <p><?= implode(' | ', $tv) ?></p>
                     <?php endif; ?>
@@ -372,17 +376,17 @@ try {
         </div>
 
         <div class="po-title">
-            <h2>PURCHASE ORDER</h2>
-            <p><strong>PO #:</strong> <?= htmlspecialchars($order['order_number']) ?></p>
-            <p><strong>Date:</strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
-            <p><strong>Status:</strong> <?= strtoupper($order['status']) ?></p>
+            <h2><?= t('PURCHASE ORDER') ?></h2>
+            <p><strong><?= t('PO #:') ?></strong> <?= htmlspecialchars($order['order_number']) ?></p>
+            <p><strong><?= t('Date:') ?></strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
+            <p><strong><?= t('Status:') ?></strong> <?= strtoupper($order['status']) ?></p>
         </div>
     </div>
 
     <!-- VENDOR + ORDER INFO -->
     <div class="details-grid">
         <div class="box">
-            <h3>Vendor</h3>
+            <h3><?= t('Vendor') ?></h3>
             <p><strong><?= htmlspecialchars($order['supplier_name']) ?></strong></p>
             <?php if (!empty($order['company_name'])): ?>
             <p><?= htmlspecialchars($order['company_name']) ?></p>
@@ -409,28 +413,28 @@ try {
             <?php endif; ?>
             <?php
             $s_tv = [];
-            if (!empty($order['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($order['s_tin']);
-            if (!empty($order['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($order['s_vrn']);
+            if (!empty($order['s_tin'])) $s_tv[] = t('TIN:') . ' ' . htmlspecialchars($order['s_tin']);
+            if (!empty($order['s_vrn'])) $s_tv[] = t('VRN:') . ' ' . htmlspecialchars($order['s_vrn']);
             if ($s_tv): ?>
             <p><?= implode(' | ', $s_tv) ?></p>
             <?php endif; ?>
         </div>
         <div class="box">
-            <h3>Order Information</h3>
-            <p><strong>Expected Delivery:</strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : 'Not specified' ?></p>
+            <h3><?= t('Order Information') ?></h3>
+            <p><strong><?= t('Expected Delivery:') ?></strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : t('Not specified') ?></p>
             <?php if (!empty($order['supplier_quote_ref'])): ?>
-            <p><strong>Quote Ref:</strong> <?= htmlspecialchars($order['supplier_quote_ref']) ?></p>
+            <p><strong><?= t('Quote Ref:') ?></strong> <?= htmlspecialchars($order['supplier_quote_ref']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['project_contract_no'])): ?>
-            <p><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></p>
+            <p><strong><?= t('Contract No:') ?></strong> <?= htmlspecialchars($order['project_contract_no']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['project_name'])): ?>
-            <p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p>
+            <p><strong><?= t('Project:') ?></strong> <?= htmlspecialchars($order['project_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['warehouse_name'])): ?>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
+            <p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
             <?php endif; ?>
-            <p><strong>Created By:</strong> <?= htmlspecialchars($order['username'] ?? 'N/A') ?></p>
+            <p><strong><?= t('Created By:') ?></strong> <?= htmlspecialchars($order['username'] ?? t('N/A')) ?></p>
         </div>
     </div>
 
@@ -438,12 +442,12 @@ try {
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
-                <th class="text-center" style="width:100px;">Product Code</th>
-                <th class="text-center">Item / Description</th>
-                <th class="text-right" style="width:80px;">Qty</th>
-                <th class="text-right" style="width:105px;">Unit Price</th>
-                <th class="text-right" style="width:115px;">Total (<?= $currency ?>)</th>
+                <th class="text-center" style="width:38px;"><?= t('S/NO') ?></th>
+                <th class="text-center" style="width:100px;"><?= t('Product Code') ?></th>
+                <th class="text-center"><?= t('Item / Description') ?></th>
+                <th class="text-right" style="width:80px;"><?= t('Qty') ?></th>
+                <th class="text-right" style="width:105px;"><?= t('Unit Price') ?></th>
+                <th class="text-right" style="width:115px;"><?= sprintf(t('Total (%s)'), $currency) ?></th>
             </tr>
         </thead>
         <tbody>
@@ -454,7 +458,7 @@ try {
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? t('Unknown Product')) ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>
@@ -466,19 +470,19 @@ try {
     <!-- TOTALS -->
     <div class="totals">
         <div class="totals-row">
-            <span>Subtotal:</span>
+            <span><?= t('Subtotal:') ?></span>
             <span><?= $currency ?> <?= number_format($order['subtotal'], 2) ?></span>
         </div>
         <div class="totals-row">
-            <span>VAT (18%):</span>
+            <span><?= t('VAT (18%):') ?></span>
             <span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span>
         </div>
         <div class="totals-row">
-            <span>Shipping:</span>
+            <span><?= t('Shipping:') ?></span>
             <span><?= $currency ?> <?= number_format($order['shipping_cost'], 2) ?></span>
         </div>
         <div class="totals-row grand-total">
-            <span>GRAND TOTAL:</span>
+            <span><?= t('GRAND TOTAL:') ?></span>
             <span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span>
         </div>
     </div>
@@ -487,13 +491,13 @@ try {
     <div class="notes-section">
         <?php if (!empty($order['notes'])): ?>
         <div>
-            <strong>Internal Notes:</strong>
+            <strong><?= t('Internal Notes:') ?></strong>
             <p><?= nl2br(htmlspecialchars($order['notes'])) ?></p>
         </div>
         <?php endif; ?>
         <?php if (!empty($order['terms_conditions'])): ?>
         <div>
-            <strong>Terms &amp; Conditions:</strong>
+            <strong><?= t('Terms & Conditions:') ?></strong>
             <p><?= nl2br(htmlspecialchars($order['terms_conditions'])) ?></p>
         </div>
         <?php endif; ?>

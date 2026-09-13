@@ -3,18 +3,21 @@
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 try {
-    if (!isAuthenticated()) throw new Exception('Unauthorized');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
+    if (!isAuthenticated()) throw new Exception(t('Unauthorized'));
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception(t('Invalid method'));
 
     if (!canDelete('rfq')) {
         http_response_code(403);
-        throw new Exception('Access Denied: you do not have permission to delete RFQs');
+        throw new Exception(t('Access Denied: you do not have permission to delete RFQs'));
     }
 
     $rfq_id = intval($_POST['rfq_id'] ?? 0);
-    if (!$rfq_id) throw new Exception('RFQ ID is required');
+    if (!$rfq_id) throw new Exception(t('RFQ ID is required'));
 
     // Phase C — block deletes against RFQs on projects not in user scope
     assertScopeForRecord('rfq', 'rfq_id', $rfq_id);
@@ -22,7 +25,7 @@ try {
     $stmt = $pdo->prepare("SELECT rfq_number FROM rfq WHERE rfq_id = ?");
     $stmt->execute([$rfq_id]);
     $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$rfq) throw new Exception('RFQ not found');
+    if (!$rfq) throw new Exception(t('RFQ not found'));
 
     $pdo->beginTransaction();
     $pdo->prepare("DELETE FROM rfq_items WHERE rfq_id = ?")->execute([$rfq_id]);
@@ -30,7 +33,7 @@ try {
     $pdo->commit();
 
     logActivity($pdo, $_SESSION['user_id'], "Delete rfq", "deleted RFQ #{$rfq['rfq_number']} with id $rfq_id");
-    echo json_encode(['success' => true, 'message' => "RFQ #{$rfq['rfq_number']} deleted successfully."]);
+    echo json_encode(['success' => true, 'message' => sprintf(t('RFQ #%s deleted successfully.'), $rfq['rfq_number'])]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

@@ -60,18 +60,18 @@ if (empty($GLOBALS['__bms_table_assets']['grn'])) {
 // Column catalogue — keys MUST stay in the same order as columns() in
 // assets/js/tables/bms-grn-table.js, or headers drift from data.
 $grn_tbl_columns = [
-    'sno'            => ['label' => 'S/NO',        'attrs' => 'class="text-center" style="width:50px;"'],
-    'receipt_number' => ['label' => 'GRN #',       'attrs' => 'class="text-center"'],
-    'receipt_date'   => ['label' => 'Date',        'attrs' => 'class="text-center"'],
-    'supplier'       => ['label' => 'Supplier',    'attrs' => 'class="text-center"'],
-    'order_number'   => ['label' => 'PO #',        'attrs' => 'class="text-center"'],
-    'project'        => ['label' => 'Project',     'attrs' => 'class="text-center"'],
-    'warehouse'      => ['label' => 'Warehouse',   'attrs' => 'class="text-center"'],
-    'total_items'    => ['label' => 'Items',       'attrs' => 'class="text-center"'],
-    'total_value'    => ['label' => 'Total Value', 'attrs' => 'class="text-center"'],
-    'received_by'    => ['label' => 'Received By', 'attrs' => 'class="text-center"'],
-    'status'         => ['label' => 'Status',      'attrs' => 'class="text-center"'],
-    'actions'        => ['label' => 'Actions',     'attrs' => 'class="text-center d-print-none"'],
+    'sno'            => ['label' => t('S/NO'),        'attrs' => 'class="text-center" style="width:50px;"'],
+    'receipt_number' => ['label' => t('GRN #'),       'attrs' => 'class="text-center"'],
+    'receipt_date'   => ['label' => t('Date'),        'attrs' => 'class="text-center"'],
+    'supplier'       => ['label' => t('Supplier'),    'attrs' => 'class="text-center"'],
+    'order_number'   => ['label' => t('PO #'),        'attrs' => 'class="text-center"'],
+    'project'        => ['label' => t('Project'),     'attrs' => 'class="text-center"'],
+    'warehouse'      => ['label' => t('Warehouse'),   'attrs' => 'class="text-center"'],
+    'total_items'    => ['label' => t('Items'),       'attrs' => 'class="text-center"'],
+    'total_value'    => ['label' => t('Total Value'), 'attrs' => 'class="text-center"'],
+    'received_by'    => ['label' => t('Received By'), 'attrs' => 'class="text-center"'],
+    'status'         => ['label' => t('Status'),      'attrs' => 'class="text-center"'],
+    'actions'        => ['label' => t('Actions'),     'attrs' => 'class="text-center d-print-none"'],
 ];
 ?>
 <div class="table-responsive">

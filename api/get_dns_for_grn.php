@@ -2,9 +2,12 @@
 // scope-audit: skip — read-only DN lookup for GRN create dropdown; filtered by supplier_id supplied by caller; no project-sensitive rows returned directly
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
@@ -12,7 +15,7 @@ $supplier_id = intval($_GET['supplier_id'] ?? 0);
 $po_id       = intval($_GET['po_id'] ?? 0);
 
 if (!$supplier_id) {
-    echo json_encode(['success' => false, 'message' => 'supplier_id required']);
+    echo json_encode(['success' => false, 'message' => t('supplier_id required')]);
     exit;
 }
 
@@ -43,5 +46,5 @@ try {
     echo json_encode(['success' => true, 'data' => $dns]);
 
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error']);
+    echo json_encode(['success' => false, 'message' => t('Database error')]);
 }

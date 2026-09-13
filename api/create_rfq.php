@@ -3,15 +3,18 @@
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 try {
-    if (!isAuthenticated()) throw new Exception('Unauthorized');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
+    if (!isAuthenticated()) throw new Exception(t('Unauthorized'));
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception(t('Invalid method'));
     csrf_check();
 
     if (!canCreate('rfq')) {
         http_response_code(403);
-        throw new Exception('Access Denied: you do not have permission to create RFQs');
+        throw new Exception(t('Access Denied: you do not have permission to create RFQs'));
     }
 
     $supplier_id  = intval($_POST['supplier_id'] ?? 0);
@@ -21,14 +24,14 @@ try {
     $deadline     = $_POST['deadline_date'] ?? null ?: null;
     $items        = json_decode($_POST['items'] ?? '[]', true);
 
-    if (!$supplier_id)  throw new Exception('Supplier is required');
-    if (!$warehouse_id) throw new Exception('Warehouse is required');
-    if (empty($items))  throw new Exception('At least one item is required');
+    if (!$supplier_id)  throw new Exception(t('Supplier is required'));
+    if (!$warehouse_id) throw new Exception(t('Warehouse is required'));
+    if (empty($items))  throw new Exception(t('At least one item is required'));
 
     // Phase C — when project_id is supplied, it must be in user scope.
     if ($project_id && !userCan('project', (int)$project_id)) {
         http_response_code(403);
-        throw new Exception('Access denied: this project is not in your scope.');
+        throw new Exception(t('Access denied: this project is not in your scope.'));
     }
 
     // ── Company-prefixed sequential RFQ number (BFS-RFQ-0001) ───────────
@@ -114,7 +117,7 @@ try {
     }
 
     logActivity($pdo, $_SESSION['user_id'], 'Create RFQ', "User created a new RFQ: $rfq_number (ID $rfq_id)");
-    echo json_encode(['success' => true, 'message' => "RFQ #{$rfq_number} created successfully.", 'rfq_id' => $rfq_id]);
+    echo json_encode(['success' => true, 'message' => sprintf(t('RFQ #%s created successfully.'), $rfq_number), 'rfq_id' => $rfq_id]);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
