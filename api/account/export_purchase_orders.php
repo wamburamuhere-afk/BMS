@@ -2,10 +2,14 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 // Check permissions
 if (!canView('purchase_orders')) {
     header("HTTP/1.1 403 Forbidden");
-    echo "Access Denied: You do not have permission to export purchase orders.";
+    echo t('Access Denied: You do not have permission to export purchase orders.');
     exit();
 }
 
@@ -44,7 +48,7 @@ try {
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo "<table border='1'>";
-    echo "<tr><th>Order #</th><th>Supplier</th><th>Date</th><th>Amount</th><th>Currency</th><th>Status</th><th>Created By</th></tr>";
+    echo "<tr><th>" . t('Order #') . "</th><th>" . t('Supplier') . "</th><th>" . t('Date') . "</th><th>" . t('Amount') . "</th><th>" . t('Currency') . "</th><th>" . t('Status') . "</th><th>" . t('Created By') . "</th></tr>";
     
     foreach ($orders as $row) {
         echo "<tr>";
@@ -60,5 +64,5 @@ try {
     echo "</table>";
 
 } catch (Exception $e) {
-    echo "Error exporting data: " . $e->getMessage();
+    echo sprintf(t('Error exporting data: %s'), $e->getMessage());
 }

@@ -58,24 +58,24 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
 
         <p class="text-dark mb-1 small text-uppercase">
-            <?php 
+            <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>
 
         <div class="mt-3">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Purchase Order List</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: <?= date('F j, Y, g:i a') ?></p>
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('Purchase Order List') ?></h2>
+            <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> <?= date('F j, Y, g:i a') ?></p>
         </div>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
@@ -83,8 +83,8 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none po-list-sticky-nav">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item active">Purchase Orders</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item active"><?= t('Purchase Orders') ?></li>
         </ol>
     </nav>
 
@@ -92,12 +92,12 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="d-print-none flex-grow-1">
-                    <h2 class="fw-bold mb-0 fs-4 fs-md-3 text-nowrap"><i class="bi bi-cart-check text-success me-2"></i>Purchase Orders</h2>
-                    <p class="text-muted mb-0 small d-none d-md-block">Procurement and stock replenishment management</p>
+                    <h2 class="fw-bold mb-0 fs-4 fs-md-3 text-nowrap"><i class="bi bi-cart-check text-success me-2"></i><?= t('Purchase Orders') ?></h2>
+                    <p class="text-muted mb-0 small d-none d-md-block"><?= t('Procurement and stock replenishment management') ?></p>
                 </div>
                 <div class="d-flex align-items-center gap-2 d-print-none">
                     <a href="<?= getUrl('purchase_order_create') ?>" class="btn btn-primary btn-sm shadow-sm px-3 text-nowrap" style="border-radius: 6px;">
-                        <i class="bi bi-plus-circle me-1"></i> New Order
+                        <i class="bi bi-plus-circle me-1"></i> <?= t('New Order') ?>
                     </a>
                     
                 </div>
@@ -109,10 +109,10 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
     <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
         <i class="bi bi-funnel-fill fs-5 text-warning"></i>
         <div class="flex-grow-1">
-            <strong>Showing only purchase orders that need attention</strong>
-            <span class="text-muted small d-block">Goods receipt pending &mdash; past the expected date, still open, nothing received yet.</span>
+            <strong><?= t('Showing only purchase orders that need attention') ?></strong>
+            <span class="text-muted small d-block"><?= t('Goods receipt pending — past the expected date, still open, nothing received yet.') ?></span>
         </div>
-        <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all POs</a>
+        <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> <?= t('Show all POs') ?></a>
     </div>
     <?php endif; ?>
 
@@ -124,7 +124,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     <div class="stats-icon flex-shrink-0 d-none d-sm-flex"><i class="bi bi-file-earmark-text"></i></div>
                     <div class="flex-grow-1 overflow-hidden text-center text-sm-start">
                         <h4 class="mb-0 fw-bold text-nowrap" id="stat-total-orders" style="font-size: 1.1rem;">0</h4>
-                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;">Total Orders</small>
+                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;"><?= t('Total Orders') ?></small>
                     </div>
                 </div>
             </div>
@@ -135,7 +135,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     <div class="stats-icon flex-shrink-0 d-none d-sm-flex"><i class="bi bi-cash-stack"></i></div>
                     <div class="flex-grow-1 overflow-hidden text-center text-sm-start">
                         <h4 class="mb-0 fw-bold" id="stat-total-amount" style="font-size: 1.1rem; word-break: break-word;">TSh 0.00</h4>
-                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;">Total Value</small>
+                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;"><?= t('Total Value') ?></small>
                     </div>
                 </div>
             </div>
@@ -146,7 +146,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     <div class="stats-icon flex-shrink-0 d-none d-sm-flex"><i class="bi bi-clock-history"></i></div>
                     <div class="flex-grow-1 overflow-hidden text-center text-sm-start">
                         <h4 class="mb-0 fw-bold text-nowrap" id="stat-pending-orders" style="font-size: 1.1rem;">0</h4>
-                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;">Pending</small>
+                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;"><?= t('Pending') ?></small>
                     </div>
                 </div>
             </div>
@@ -157,7 +157,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     <div class="stats-icon flex-shrink-0 d-none d-sm-flex"><i class="bi bi-check-circle"></i></div>
                     <div class="flex-grow-1 overflow-hidden text-center text-sm-start">
                         <h4 class="mb-0 fw-bold" id="stat-approved-amount" style="font-size: 1.1rem; word-break: break-word;">TSh 0.00</h4>
-                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;">Approved</small>
+                        <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;"><?= t('Approved') ?></small>
                     </div>
                 </div>
             </div>
@@ -167,46 +167,46 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
     <!-- Filters Card -->
     <div class="card mb-4 border-0 shadow-sm d-print-none">
         <div class="card-header bg-light py-3">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2"></i>Filters & Search</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2"></i><?= t('Filters & Search') ?></h6>
         </div>
         <div class="card-body">
             <form id="filterForm" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Status') ?></label>
                     <select class="form-select select2-static" id="po_filter_status" name="status">
-                        <option value="" <?= !$status ? 'selected' : '' ?>>All Statuses</option>
-                        <option value="draft" <?= $status == 'draft' ? 'selected' : '' ?>>Draft</option>
-                        <option value="pending" <?= $status == 'pending' ? 'selected' : '' ?>>Pending</option>
-                        <option value="reviewed" <?= $status == 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
-                        <option value="approved" <?= $status == 'approved' ? 'selected' : '' ?>>Approved</option>
-                        <option value="ordered" <?= $status == 'ordered' ? 'selected' : '' ?>>Ordered</option>
-                        <option value="received" <?= $status == 'received' ? 'selected' : '' ?>>Received</option>
-                        <option value="completed" <?= $status == 'completed' ? 'selected' : '' ?>>Completed</option>
+                        <option value="" <?= !$status ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
+                        <option value="draft" <?= $status == 'draft' ? 'selected' : '' ?>><?= t('Draft') ?></option>
+                        <option value="pending" <?= $status == 'pending' ? 'selected' : '' ?>><?= t('Pending') ?></option>
+                        <option value="reviewed" <?= $status == 'reviewed' ? 'selected' : '' ?>><?= t('Reviewed') ?></option>
+                        <option value="approved" <?= $status == 'approved' ? 'selected' : '' ?>><?= t('Approved') ?></option>
+                        <option value="ordered" <?= $status == 'ordered' ? 'selected' : '' ?>><?= t('Ordered') ?></option>
+                        <option value="received" <?= $status == 'received' ? 'selected' : '' ?>><?= t('Received') ?></option>
+                        <option value="completed" <?= $status == 'completed' ? 'selected' : '' ?>><?= t('Completed') ?></option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Supplier</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Supplier') ?></label>
                     <select class="form-select select2-static" id="po_filter_supplier" name="supplier">
-                        <option value="">All Suppliers</option>
+                        <option value=""><?= t('All Suppliers') ?></option>
                         <?php foreach ($suppliers as $s): ?>
                             <option value="<?= $s['supplier_id'] ?>" <?= $supplier_id == $s['supplier_id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['supplier_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">From</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('From') ?></label>
                     <input type="date" class="form-control" name="date_from">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">To</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('To') ?></label>
                     <input type="date" class="form-control" name="date_to">
                 </div>
                 <div class="col-12 d-flex justify-content-end gap-2 mt-3">
                     <button type="submit" class="btn btn-primary px-4">
-                        <i class="bi bi-filter me-1"></i> Apply Filter
+                        <i class="bi bi-filter me-1"></i> <?= t('Apply Filter') ?>
                     </button>
                     <button type="button" class="btn btn-outline-secondary px-4" onclick="clearFilters()">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i> Clear
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> <?= t('Clear') ?>
                     </button>
                 </div>
             </form>
@@ -216,7 +216,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
     <!-- Actions Bar -->
     <div class="mb-3 d-print-none text-start">
         <span class="badge bg-white text-dark border border-light-subtle px-3 py-2 fs-6 rounded-2 shadow-sm">
-            <i class="bi bi-cart-check-fill text-success me-1"></i> Purchase Order Records
+            <i class="bi bi-cart-check-fill text-success me-1"></i> <?= t('Purchase Order Records') ?>
         </span>
     </div>
 
@@ -224,20 +224,20 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
             <div class="d-flex flex-nowrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                 <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; height: 38px;">
-                    <i class="bi bi-clipboard text-info me-1"></i> Copy
+                    <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 38px;"></div>
                 <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportOrders()" style="background: #fff; height: 38px;">
-                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Excel
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Excel') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 38px;"></div>
                 <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printList()" style="background: #fff; height: 38px;">
-                    <i class="bi bi-printer text-primary me-1"></i> Print
+                    <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                 </button>
             </div>
-            
+
             <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
-                <span class="small text-muted me-2 text-nowrap"><i class="bi bi-list-ol"></i> Show:</span>
+                <span class="small text-muted me-2 text-nowrap"><i class="bi bi-list-ol"></i> <?= t('Show:') ?></span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" id="filter_limit" style="width: 45px; background: transparent;" onchange="$('#purchaseOrdersTable').DataTable().page.len(this.value).draw();">
                     <option value="10" selected>10</option>
                     <option value="25">25</option>
@@ -253,12 +253,12 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <!-- Table Card -->
         <div class="card border-0 shadow-sm print-flow-card">
             <div class="card-header bg-white border-bottom d-flex align-items-center py-2 px-3 d-print-none">
-                <span class="fw-bold text-muted small">Purchase Order Records</span>
+                <span class="fw-bold text-muted small"><?= t('Purchase Order Records') ?></span>
                 <div class="btn-group shadow-sm ms-auto d-none d-md-flex" role="group">
-                    <button type="button" class="btn btn-primary btn-sm text-white" id="btn-table-view" onclick="toggleView('table')" title="Table View">
+                    <button type="button" class="btn btn-primary btn-sm text-white" id="btn-table-view" onclick="toggleView('table')" title="<?= t('Table View') ?>">
                         <i class="bi bi-table"></i>
                     </button>
-                    <button type="button" class="btn btn-light btn-sm border" id="btn-card-view" onclick="toggleView('card')" title="Card View">
+                    <button type="button" class="btn btn-light btn-sm border" id="btn-card-view" onclick="toggleView('card')" title="<?= t('Card View') ?>">
                         <i class="bi bi-grid-3x3-gap"></i>
                     </button>
                 </div>
@@ -268,14 +268,14 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     <table class="table table-hover align-middle mb-0" id="purchaseOrdersTable" style="width: 100%;">
                         <thead class="bg-light text-uppercase small fw-bold">
                             <tr>
-                                <th style="width:50px;" class="ps-4">S/NO</th>
-                                <th class="ps-4">Order #</th>
-                                <th>Supplier</th>
-                                <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
-                                <th>Order Date</th>
-                                <th class="text-end">Total Amount</th>
-                                <th>Status</th>
-                                <th class="text-end pe-4 d-print-none">Actions</th>
+                                <th style="width:50px;" class="ps-4"><?= t('S/NO') ?></th>
+                                <th class="ps-4"><?= t('Order #') ?></th>
+                                <th><?= t('Supplier') ?></th>
+                                <?php if ($enable_projects): ?><th><?= t('Project') ?></th><?php endif; ?>
+                                <th><?= t('Order Date') ?></th>
+                                <th class="text-end"><?= t('Total Amount') ?></th>
+                                <th><?= t('Status') ?></th>
+                                <th class="text-end pe-4 d-print-none"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody class="border-top-0">
@@ -300,6 +300,29 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
 const PO_CAN_REVIEW  = <?= $po_can_review  ? 'true' : 'false' ?>;
 const PO_CAN_APPROVE = <?= $po_can_approve ? 'true' : 'false' ?>;
 const PO_IS_ADMIN    = <?= $po_is_admin    ? 'true' : 'false' ?>;
+
+// Pre-translated strings used inside JS template literals below.
+const PO_I18N = {
+    viewDetails:       <?= json_encode(t('View Details')) ?>,
+    markReviewed:      <?= json_encode(t('Mark Reviewed')) ?>,
+    approveOrder:      <?= json_encode(t('Approve Order')) ?>,
+    editOrder:         <?= json_encode(t('Edit Order')) ?>,
+    printOrder:        <?= json_encode(t('Print Order')) ?>,
+    chooseTemplate:    <?= json_encode(t('Choose a different template')) ?>,
+    navyTemplate:      <?= json_encode(t('Navy Template')) ?>,
+    corporateTemplate: <?= json_encode(t('Corporate Template')) ?>,
+    bandedTemplate:    <?= json_encode(t('Banded Template')) ?>,
+    addDeliveryNote:   <?= json_encode(t('Add Delivery Note')) ?>,
+    cancelOrder:       <?= json_encode(t('Cancel Order')) ?>,
+    date:              <?= json_encode(t('Date:')) ?>,
+    total:             <?= json_encode(t('Total:')) ?>,
+    project:           <?= json_encode(t('Project:')) ?>,
+    view:              <?= json_encode(t('View')) ?>,
+    approve:           <?= json_encode(t('Approve')) ?>,
+    edit:              <?= json_encode(t('Edit')) ?>,
+    print:             <?= json_encode(t('Print')) ?>,
+    delete:            <?= json_encode(t('Delete')) ?>
+};
 
 $(document).ready(function() {
     // Log page view
@@ -395,25 +418,25 @@ $(document).ready(function() {
                                 <i class="bi bi-gear"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" onclick="logReportAction('Viewed Purchase Order Details Link', 'User clicked to view details for PO #${row.order_number}')"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
-                                ${(isDraftPending && PO_CAN_REVIEW) ? `<li><a class="dropdown-item py-2 text-primary fw-bold" href="#" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check2 me-2"></i> Mark Reviewed</a></li>` : ''}
-                                ${(isReviewed && PO_CAN_APPROVE) ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
-                                ${canEditNow ? `<li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>` : ''}
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" onclick="logReportAction('Viewed Purchase Order Details Link', 'User clicked to view details for PO #${row.order_number}')"><i class="bi bi-eye text-primary me-2"></i> ${PO_I18N.viewDetails}</a></li>
+                                ${(isDraftPending && PO_CAN_REVIEW) ? `<li><a class="dropdown-item py-2 text-primary fw-bold" href="#" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check2 me-2"></i> ${PO_I18N.markReviewed}</a></li>` : ''}
+                                ${(isReviewed && PO_CAN_APPROVE) ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> ${PO_I18N.approveOrder}</a></li>` : ''}
+                                ${canEditNow ? `<li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> ${PO_I18N.editOrder}</a></li>` : ''}
                                 <li>
                                     <div class="d-flex align-items-center dropdown-item py-0 pe-1">
-                                        <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}'); return false;"><i class="bi bi-printer text-dark me-2"></i> Print Order</a>
-                                        <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#poTplSub${row.purchase_order_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                        <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}'); return false;"><i class="bi bi-printer text-dark me-2"></i> ${PO_I18N.printOrder}</a>
+                                        <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="${PO_I18N.chooseTemplate}" onclick="event.stopPropagation(); $('#poTplSub${row.purchase_order_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
                                             <i class="bi bi-chevron-down"></i>
                                         </button>
                                     </div>
                                     <ul class="list-unstyled ms-4 mb-1 d-none" id="poTplSub${row.purchase_order_id}">
-                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Navy Template</a></li>
-                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Corporate Template</a></li>
-                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Banded Template</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i> ${PO_I18N.navyTemplate}</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i> ${PO_I18N.corporateTemplate}</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i> ${PO_I18N.bandedTemplate}</a></li>
                                     </ul>
                                 </li>
-                                ${(isApproved && row.delivery_status !== 'complete') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
-                                ${canEditNow ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> Cancel Order</a></li>` : ''}
+                                ${(isApproved && row.delivery_status !== 'complete') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> ${PO_I18N.addDeliveryNote}</a></li>` : ''}
+                                ${canEditNow ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> ${PO_I18N.cancelOrder}</a></li>` : ''}
                             </ul>
                         </div>
                     `;
@@ -456,28 +479,28 @@ $(document).ready(function() {
                                 </div>
                                 <div class="mb-3">
                                     <div class="d-flex justify-content-between small mb-1">
-                                        <span class="text-muted">Date:</span>
+                                        <span class="text-muted">${PO_I18N.date}</span>
                                         <span class="fw-medium">${row.order_date}</span>
                                     </div>
                                     <div class="d-flex justify-content-between small mb-1">
-                                        <span class="text-muted">Total:</span>
+                                        <span class="text-muted">${PO_I18N.total}</span>
                                         <span class="fw-bold text-dark">${formatCurrency(row.grand_total)} ${row.currency}</span>
                                     </div>
                                     <?php if ($enable_projects): ?>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Project:</span>
+                                        <span class="text-muted">${PO_I18N.project}</span>
                                         <span class="text-info">${row.project_name || '-'}</span>
                                     </div>
                                     <?php endif; ?>
                                 </div>
                                 <div style="display:flex;flex-wrap:nowrap;gap:4px;padding-top:0.65rem;border-top:1px solid #dee2e6;margin-top:0.5rem;background:#fff;">
-                                    <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></a>
-                                    ${((row.status === 'pending' || row.status === 'draft') && PO_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')" title="Mark Reviewed" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check2"></i></button>` : ''}
-                                    ${(row.status === 'reviewed' && PO_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')" title="Approve" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check-circle"></i></button>` : ''}
-                                    ${(row.status !== 'approved' || PO_IS_ADMIN) ? `<a class="btn btn-sm btn-outline-warning" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></a>` : ''}
-                                    <button class="btn btn-sm btn-outline-dark" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')" title="Print" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
-                                    ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}" title="Add Delivery Note" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-truck"></i></a>` : ''}
-                                    ${(row.status !== 'approved' || PO_IS_ADMIN) ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelOrder(${row.purchase_order_id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>` : ''}
+                                    <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" title="${PO_I18N.view}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></a>
+                                    ${((row.status === 'pending' || row.status === 'draft') && PO_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')" title="${PO_I18N.markReviewed}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check2"></i></button>` : ''}
+                                    ${(row.status === 'reviewed' && PO_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')" title="${PO_I18N.approve}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check-circle"></i></button>` : ''}
+                                    ${(row.status !== 'approved' || PO_IS_ADMIN) ? `<a class="btn btn-sm btn-outline-warning" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" title="${PO_I18N.edit}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></a>` : ''}
+                                    <button class="btn btn-sm btn-outline-dark" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')" title="${PO_I18N.print}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
+                                    ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}" title="${PO_I18N.addDeliveryNote}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-truck"></i></a>` : ''}
+                                    ${(row.status !== 'approved' || PO_IS_ADMIN) ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelOrder(${row.purchase_order_id})" title="${PO_I18N.delete}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -530,6 +553,13 @@ function formatCurrency(v) {
     return new Intl.NumberFormat('en-TZ', { style: 'decimal', minimumFractionDigits: 2 }).format(v);
 }
 
+// Per-page local convention: a tiny numbered-placeholder formatter so a
+// translated sentence stays ONE coherent unit instead of being concatenated
+// from English word-order fragments.
+function tFormat(str, ...args) {
+    return str.replace(/\{(\d+)\}/g, (m, i) => (args[i] !== undefined ? args[i] : m));
+}
+
 function clearFilters() {
     $('#filterForm')[0].reset();
     $('.select2-static').trigger('change');
@@ -565,7 +595,7 @@ function copyTable() {
     document.execCommand('copy');
     window.getSelection().removeAllRanges();
     logReportAction('Copied Purchase Orders List', 'User copied purchase orders list to clipboard');
-    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1000, showConfirmButton: false });
+    Swal.fire({ icon: 'success', title: <?= json_encode(t('Copied!')) ?>, text: <?= json_encode(t('Table data copied to clipboard')) ?>, timer: 1000, showConfirmButton: false });
 }
 
 function exportOrders() {
@@ -588,14 +618,14 @@ function exportOrders() {
 
 function cancelOrder(id) {
     Swal.fire({
-        title: 'Cancel Order?',
-        text: "This will permanently delete the order. You won't be able to revert this!",
+        title: <?= json_encode(t('Cancel Order?')) ?>,
+        text: <?= json_encode(t("This will permanently delete the order. You won't be able to revert this!")) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, delete it!',
-        cancelButtonText: 'No, keep it'
+        confirmButtonText: <?= json_encode(t('Yes, delete it!')) ?>,
+        cancelButtonText: <?= json_encode(t('No, keep it')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
@@ -608,8 +638,8 @@ function cancelOrder(id) {
                         logReportAction('Deleted Purchase Order', 'User deleted purchase order #' + id);
                         Swal.fire({
                             icon: 'success',
-                            title: 'Deleted!',
-                            text: 'The purchase order has been deleted.',
+                            title: <?= json_encode(t('Deleted!')) ?>,
+                            text: <?= json_encode(t('The purchase order has been deleted.')) ?>,
                             timer: 2000,
                             showConfirmButton: false
                         });
@@ -617,16 +647,16 @@ function cancelOrder(id) {
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Error',
-                            text: response.message || 'Failed to delete order'
+                            title: <?= json_encode(t('Error')) ?>,
+                            text: response.message || <?= json_encode(t('Failed to delete order')) ?>
                         });
                     }
                 },
                 error: function() {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Error',
-                        text: 'Communication error. Please try again.'
+                        title: <?= json_encode(t('Error')) ?>,
+                        text: <?= json_encode(t('Communication error. Please try again.')) ?>
                     });
                 }
             });
@@ -636,14 +666,14 @@ function cancelOrder(id) {
 
 function reviewOrder(id, orderNumber) {
     Swal.fire({
-        title: 'Mark as Reviewed?',
-        text: 'PO #' + orderNumber + ' will move to "Reviewed" and become approvable.',
+        title: <?= json_encode(t('Mark as Reviewed?')) ?>,
+        text: tFormat(<?= json_encode(t('PO #{0} will move to "Reviewed" and become approvable.')) ?>, orderNumber),
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#0d6efd',
         cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, mark reviewed',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, mark reviewed')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then((result) => {
         if (!result.isConfirmed) return;
         $.ajax({
@@ -654,27 +684,27 @@ function reviewOrder(id, orderNumber) {
             success: function(response) {
                 if (response.success) {
                     logReportAction('Reviewed Purchase Order', 'User marked purchase order #' + orderNumber + ' as reviewed');
-                    Swal.fire({ icon: 'success', title: 'Reviewed!', text: response.message, timer: 1800, showConfirmButton: false });
+                    Swal.fire({ icon: 'success', title: <?= json_encode(t('Reviewed!')) ?>, text: response.message, timer: 1800, showConfirmButton: false });
                     $('#purchaseOrdersTable').DataTable().ajax.reload();
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Failed to mark reviewed' });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: response.message || <?= json_encode(t('Failed to mark reviewed')) ?> });
                 }
             },
-            error: function() { Swal.fire({ icon: 'error', title: 'Error', text: 'Communication error. Please try again.' }); }
+            error: function() { Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Communication error. Please try again.')) ?> }); }
         });
     });
 }
 
 function approveOrder(id, orderNumber) {
     Swal.fire({
-        title: 'Approve Order?',
-        text: 'Are you sure you want to approve PO #' + orderNumber + '?',
+        title: <?= json_encode(t('Approve Order?')) ?>,
+        text: tFormat(<?= json_encode(t('Are you sure you want to approve PO #{0}?')) ?>, orderNumber),
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#198754',
         cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, approve it!',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, approve it!')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
@@ -687,18 +717,18 @@ function approveOrder(id, orderNumber) {
                         logReportAction('Approved Purchase Order', 'User approved purchase order #' + orderNumber);
                         Swal.fire({
                             icon: 'success',
-                            title: 'Approved!',
-                            text: 'Purchase order has been approved.',
+                            title: <?= json_encode(t('Approved!')) ?>,
+                            text: <?= json_encode(t('Purchase order has been approved.')) ?>,
                             timer: 2000,
                             showConfirmButton: false
                         });
                         $('#purchaseOrdersTable').DataTable().ajax.reload();
                     } else {
-                        Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Failed to approve order' });
+                        Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: response.message || <?= json_encode(t('Failed to approve order')) ?> });
                     }
                 },
                 error: function() {
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'Communication error. Please try again.' });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Communication error. Please try again.')) ?> });
                 }
             });
         }

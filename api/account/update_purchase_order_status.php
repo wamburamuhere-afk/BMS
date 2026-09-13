@@ -3,23 +3,26 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => t('Method not allowed')]);
     exit;
 }
 
 // Check permissions
 if (!canEdit('purchase_orders')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to update purchase orders']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to update purchase orders')]);
     exit;
 }
 
@@ -27,7 +30,7 @@ $purchase_order_id = $_POST['purchase_order_id'] ?? 0;
 $status = $_POST['status'] ?? '';
 
 if (!$purchase_order_id || !$status) {
-    echo json_encode(['success' => false, 'message' => 'Purchase Order ID and status required']);
+    echo json_encode(['success' => false, 'message' => t('Purchase Order ID and status required')]);
     exit;
 }
 
@@ -42,7 +45,7 @@ try {
     $order = $stmt->fetch();
     
     if (!$order) {
-        throw new Exception("Purchase Order not found");
+        throw new Exception(t('Purchase Order not found'));
     }
 
     $update_sql = "UPDATE purchase_orders SET status = ?, updated_at = NOW()";
@@ -62,9 +65,9 @@ try {
     if ($result) {
         // Phase 3a — financial-write audit trail.
         logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Purchase Order Status", "PO ID: $purchase_order_id, new status: $status");
-        echo json_encode(['success' => true, 'message' => 'Purchase Order status updated to ' . $status]);
+        echo json_encode(['success' => true, 'message' => sprintf(t('Purchase Order status updated to %s'), $status)]);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to update status']);
+        echo json_encode(['success' => false, 'message' => t('Failed to update status')]);
     }
 
 } catch (Exception $e) {

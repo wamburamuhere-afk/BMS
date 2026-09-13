@@ -6,21 +6,24 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 if (!canReview('purchase_orders')) {
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to review purchase orders']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to review purchase orders')]);
     exit;
 }
 
 try {
     global $pdo;
     $po_id = isset($_POST['purchase_order_id']) ? intval($_POST['purchase_order_id']) : 0;
-    if (!$po_id) throw new Exception("Invalid Purchase Order ID");
+    if (!$po_id) throw new Exception(t('Invalid Purchase Order ID'));
 
     // Phase C — block reviews against POs on projects not in user scope
     assertScopeForRecord('purchase_orders', 'purchase_order_id', $po_id);
@@ -30,7 +33,7 @@ try {
     $stmt = $pdo->prepare("SELECT status FROM purchase_orders WHERE purchase_order_id = ? FOR UPDATE");
     $stmt->execute([$po_id]);
     $current_status = $stmt->fetchColumn();
-    if ($current_status === false) throw new Exception("Purchase Order not found");
+    if ($current_status === false) throw new Exception(t('Purchase Order not found'));
 
     assertReviewable($current_status);
 
@@ -56,9 +59,9 @@ try {
 
     $pdo->commit();
 
-    $response = ['success' => true, 'message' => 'Purchase Order marked as reviewed.'];
+    $response = ['success' => true, 'message' => t('Purchase Order marked as reviewed.')];
     if (!$sigResult['has_signature']) {
-        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+        $response['sig_warning'] = t('Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.');
     }
     echo json_encode($response);
 

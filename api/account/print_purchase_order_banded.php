@@ -5,7 +5,11 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 
-if (!isAuthenticated()) die("Unauthorized");
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
+if (!isAuthenticated()) die(t('Unauthorized'));
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 assertScopeForRecordHtml('purchase_orders', 'purchase_order_id', $order_id);
@@ -33,7 +37,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$order) die("Order not found");
+if (!$order) die(t('Order not found'));
 
 $stmtItems = $pdo->prepare("
     SELECT poi.*, p.product_name, p.sku, p.unit
@@ -101,7 +105,7 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Purchase Order #<?= htmlspecialchars($order['order_number']) ?></title>
+    <title><?= t('Purchase Order') ?> #<?= htmlspecialchars($order['order_number']) ?></title>
     <style>
         :root { --accent: <?= htmlspecialchars($accent) ?>; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -169,8 +173,8 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
 <body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
-        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
-        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
+        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;"><?= t('Print') ?></button>
+        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;"><?= t('Close') ?></button>
     </div>
 
 
@@ -184,9 +188,9 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
             <h1><?= htmlspecialchars($comp['name']) ?></h1>
         </div>
         <div class="meta">
-            <p style="font-size:15px; font-weight:800;">PURCHASE ORDER</p>
-            <p><strong>Date:</strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
-            <p><strong>PO #:</strong> <?= htmlspecialchars($order['order_number']) ?></p>
+            <p style="font-size:15px; font-weight:800;"><?= t('PURCHASE ORDER') ?></p>
+            <p><strong><?= t('Date:') ?></strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
+            <p><strong><?= t('PO #:') ?></strong> <?= htmlspecialchars($order['order_number']) ?></p>
         </div>
     </div>
 
@@ -195,21 +199,21 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
         <?php if (!empty($comp['address'])): ?><p><?= htmlspecialchars($comp['address']) ?></p><?php endif; ?>
         <?php
         $ln = [];
-        if (!empty($comp['phone'])) $ln[] = 'Phone: ' . htmlspecialchars($comp['phone']);
-        if (!empty($comp['email'])) $ln[] = 'Email: ' . htmlspecialchars($comp['email']);
-        if (!empty($comp['website'])) $ln[] = 'Web: ' . htmlspecialchars($comp['website']);
+        if (!empty($comp['phone'])) $ln[] = t('Phone:') . ' ' . htmlspecialchars($comp['phone']);
+        if (!empty($comp['email'])) $ln[] = t('Email:') . ' ' . htmlspecialchars($comp['email']);
+        if (!empty($comp['website'])) $ln[] = t('Web:') . ' ' . htmlspecialchars($comp['website']);
         if ($ln): ?><p><?= implode(' &nbsp;|&nbsp; ', $ln) ?></p><?php endif; ?>
         <?php
         $tv = [];
-        if (!empty($comp['tin'])) $tv[] = 'TIN: ' . htmlspecialchars($comp['tin']);
-        if (!empty($comp['vrn'])) $tv[] = 'VRN: ' . htmlspecialchars($comp['vrn']);
+        if (!empty($comp['tin'])) $tv[] = t('TIN:') . ' ' . htmlspecialchars($comp['tin']);
+        if (!empty($comp['vrn'])) $tv[] = t('VRN:') . ' ' . htmlspecialchars($comp['vrn']);
         if ($tv): ?><p><?= implode(' &nbsp;|&nbsp; ', $tv) ?></p><?php endif; ?>
     </div>
 
     <!-- VENDOR + DELIVER TO -->
     <div class="two-col">
         <div class="band">
-            <div class="band-title">Vendor</div>
+            <div class="band-title"><?= t('Vendor') ?></div>
             <p><strong><?= htmlspecialchars($order['supplier_name']) ?></strong></p>
             <?php if (!empty($order['company_name'])): ?><p><?= htmlspecialchars($order['company_name']) ?></p><?php endif; ?>
             <?php if (!empty($order['s_postal_address'])): ?><p><?= htmlspecialchars($order['s_postal_address']) ?></p><?php endif; ?>
@@ -218,14 +222,14 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
             <?php if (!empty($order['s_email'])): ?><p><?= htmlspecialchars($order['s_email']) ?></p><?php endif; ?>
             <?php
             $s_tv = [];
-            if (!empty($order['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($order['s_tin']);
-            if (!empty($order['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($order['s_vrn']);
+            if (!empty($order['s_tin'])) $s_tv[] = t('TIN:') . ' ' . htmlspecialchars($order['s_tin']);
+            if (!empty($order['s_vrn'])) $s_tv[] = t('VRN:') . ' ' . htmlspecialchars($order['s_vrn']);
             if ($s_tv): ?><p><?= implode(' | ', $s_tv) ?></p><?php endif; ?>
         </div>
         <div class="band">
-            <div class="band-title">Deliver To</div>
+            <div class="band-title"><?= t('Deliver To') ?></div>
             <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= htmlspecialchars($order['warehouse_name']) ?></strong></p><?php endif; ?>
-            <?php if (!empty($order['project_name'])): ?><p>Project: <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
+            <?php if (!empty($order['project_name'])): ?><p><?= t('Project:') ?> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
             <?php if (empty($order['warehouse_name']) && empty($order['project_name']) && !empty($comp['address'])): ?><p><?= htmlspecialchars($comp['address']) ?></p><?php endif; ?>
         </div>
     </div>
@@ -233,19 +237,19 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
     <!-- META STRIP (real fields only) -->
     <div class="meta-strip">
         <div class="band">
-            <div class="band-title">Requisitioner</div>
-            <p><?= htmlspecialchars($order['username'] ?? 'N/A') ?></p>
+            <div class="band-title"><?= t('Requisitioner') ?></div>
+            <p><?= htmlspecialchars($order['username'] ?? t('N/A')) ?></p>
         </div>
         <div class="band">
-            <div class="band-title">Quote Ref</div>
+            <div class="band-title"><?= t('Quote Ref') ?></div>
             <p><?= !empty($order['supplier_quote_ref']) ? htmlspecialchars($order['supplier_quote_ref']) : '—' ?></p>
         </div>
         <div class="band">
-            <div class="band-title">Contract No</div>
+            <div class="band-title"><?= t('Contract No') ?></div>
             <p><?= !empty($order['project_contract_no']) ? htmlspecialchars($order['project_contract_no']) : '—' ?></p>
         </div>
         <div class="band">
-            <div class="band-title">Expected Delivery</div>
+            <div class="band-title"><?= t('Expected Delivery') ?></div>
             <p><?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : '—' ?></p>
         </div>
     </div>
@@ -254,12 +258,12 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
-                <th class="text-center" style="width:100px;">Product Code</th>
-                <th class="text-center">Item / Description</th>
-                <th class="text-right" style="width:80px;">Qty</th>
-                <th class="text-right" style="width:105px;">Unit Price</th>
-                <th class="text-right" style="width:115px;">Total (<?= $currency ?>)</th>
+                <th class="text-center" style="width:38px;"><?= t('S/NO') ?></th>
+                <th class="text-center" style="width:100px;"><?= t('Product Code') ?></th>
+                <th class="text-center"><?= t('Item / Description') ?></th>
+                <th class="text-right" style="width:80px;"><?= t('Qty') ?></th>
+                <th class="text-right" style="width:105px;"><?= t('Unit Price') ?></th>
+                <th class="text-right" style="width:115px;"><?= sprintf(t('Total (%s)'), $currency) ?></th>
             </tr>
         </thead>
         <tbody>
@@ -270,7 +274,7 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? t('Unknown Product')) ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>
@@ -281,19 +285,19 @@ $accent = getSetting('print_template_color_po_banded', '#1f7ae0');
 
     <!-- TOTALS -->
     <div class="totals">
-        <div class="totals-row"><span>Subtotal:</span><span><?= $currency ?> <?= number_format($order['subtotal'], 2) ?></span></div>
-        <div class="totals-row"><span>VAT (18%):</span><span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span></div>
-        <div class="totals-row"><span>Shipping:</span><span><?= $currency ?> <?= number_format($order['shipping_cost'], 2) ?></span></div>
-        <div class="totals-row grand-total"><span>GRAND TOTAL:</span><span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span></div>
+        <div class="totals-row"><span><?= t('Subtotal:') ?></span><span><?= $currency ?> <?= number_format($order['subtotal'], 2) ?></span></div>
+        <div class="totals-row"><span><?= t('VAT (18%):') ?></span><span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span></div>
+        <div class="totals-row"><span><?= t('Shipping:') ?></span><span><?= $currency ?> <?= number_format($order['shipping_cost'], 2) ?></span></div>
+        <div class="totals-row grand-total"><span><?= t('GRAND TOTAL:') ?></span><span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span></div>
     </div>
 
     <!-- NOTES -->
     <div class="notes-section">
         <?php if (!empty($order['notes'])): ?>
-        <div><strong>Notes</strong><p><?= nl2br(htmlspecialchars($order['notes'])) ?></p></div>
+        <div><strong><?= t('Notes') ?></strong><p><?= nl2br(htmlspecialchars($order['notes'])) ?></p></div>
         <?php endif; ?>
         <?php if (!empty($order['terms_conditions'])): ?>
-        <div><strong>Terms &amp; Conditions</strong><p><?= nl2br(htmlspecialchars($order['terms_conditions'])) ?></p></div>
+        <div><strong><?= t('Terms & Conditions') ?></strong><p><?= nl2br(htmlspecialchars($order['terms_conditions'])) ?></p></div>
         <?php endif; ?>
     </div>
 

@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: Purchase Orders (module 2 of 5)
+
+**Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the Purchase Order module.
+
+**Fix:** Wrapped every user-facing string in `t()`/`te()` across all 15 PO files: 3 pages (`purchase_orders.php`, `purchase_order_create.php`, `purchase_order_details.php`), 8 `api/account/*purchase_order*.php` endpoints, and 4 print templates (standard/navy/corporate/banded). Added the `loadLanguage($_SESSION['user_lang'])` boilerplate to every API/print file. Introduced a `tFormat(str, ...args)` helper (numbered `{0}`/`{1}` placeholders) in each page's `<script>` block for dynamic Swal/JS messages, and small pre-translated JS objects (`PO_I18N`, `POD_I18N`, `POC_I18N`) for strings reused inside JS template literals — avoiding the sentence-fragment-concatenation anti-pattern throughout (e.g. `sprintf(t('Purchase Order status updated to %s'), $status)` instead of concatenating translated pieces). Fixed one pre-existing mistranslation found along the way: `lang/sw.php`'s `'Delivery Notes'` key held an unrelated/wrong Swahili string from `services.php`'s feature-list usage; corrected it to `'Hati za Usafirishaji'` since `purchase_order_details.php` now shares the same key. Added 196 new Swahili entries total (176 from pages/APIs + 18 from print templates, minus 2 pre-existing-key hits). Print-template theme names (Standard/Navy/Corporate/Banded) are wrapped in `t()` but intentionally left untranslated, matching the precedent already set by RFQ.
+
+**Tested:** `php -l` clean on all 15 files + `lang/sw.php`. Wrote a coverage-check script (mirrors `tests/test_pos_i18n_coverage_cli.php`'s `extractTKeys()` approach) confirming all 314 distinct `t()`/`te()` keys across the module have a non-empty `lang/sw.php` translation except the 4 intentionally-skipped theme names. Verified no new duplicate keys introduced (29 pre-existing duplicates elsewhere in the catalogue, unchanged). Live `loadLanguage('sw')` spot-checks confirm representative keys (including `{0}`-placeholder `tFormat()` templates) resolve correctly.
+
 ## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: RFQ (module 1 of 5)
 
 **Request:** Continue the language-translation rollout (same standard as the Settings/Inventory/POS i18n work) into the Procurement dropdown, covering RFQ through Debit Note.
