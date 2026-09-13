@@ -13,6 +13,24 @@
  * selling_price; they only override it, per-product, per-group.
  */
 
+if (!function_exists('wholesalePriceGroupId')) {
+    /**
+     * The 'Wholesale' price_groups row seeded by the Phase 14 migration.
+     * Returns null when price groups aren't set up on this tenant yet (older,
+     * un-migrated database) — callers treat that as "no wholesale tier
+     * available", same leniency pettyCashFunds() uses for its own table.
+     */
+    function wholesalePriceGroupId(PDO $pdo): ?int
+    {
+        try {
+            $id = $pdo->query("SELECT price_group_id FROM price_groups WHERE name = 'Wholesale' LIMIT 1")->fetchColumn();
+            return $id ? (int)$id : null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+}
+
 /**
  * Resolve the effective price for a set of products under one price group,
  * with an active promotional price (Phase 25) taking priority over the

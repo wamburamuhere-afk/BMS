@@ -371,13 +371,23 @@ function createProduct(status = 'active') {
                 // Only present on the edit page (linking needs an existing
                 // product_id) and only when the restaurant_pos entitlement
                 // rendered the picker at all.
+                // A caller (e.g. the POS "New Product" shortcut) can ask to land
+                // back on its own page instead of the general Products list by
+                // opening this page with ?return=<url-encoded target>. Only a
+                // same-site relative path is honoured (never http(s):// or a
+                // protocol-relative //host — an open-redirect guard, since this
+                // value comes straight from the URL a user clicked).
+                const returnParam = new URLSearchParams(window.location.search).get('return');
+                const returnTo = (returnParam && /^[A-Za-z0-9_\-\/?=&.]+$/.test(returnParam) && !returnParam.startsWith('//'))
+                    ? returnParam
+                    : 'products';
                 const finish = () => Swal.fire({
                     icon: 'success',
                     title: isEdit ? PE_I18N.product_updated : PE_I18N.product_created,
                     text: res.message,
                     confirmButtonColor: '#28a745',
                     confirmButtonText: PE_I18N.ok
-                }).then(() => window.location.href = 'products');
+                }).then(() => window.location.href = returnTo);
 
                 if (isEdit && $('#modifier_groups_select').length) {
                     $.post('<?= getUrl("/api/restaurant/save_product_modifier_links.php") ?>', {

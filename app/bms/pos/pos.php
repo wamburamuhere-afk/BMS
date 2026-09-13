@@ -98,6 +98,14 @@ $pos_denomination_list = posDenominationList();
 // Phase 30 (pos_upgrade_plan.md §9) — restaurant module entitlement + the
 // per-warehouse pos_mode map built above.
 $restaurant_pos_enabled = canView('restaurant_pos');
+
+// "Add Product" shortcut (pos_upgrade_plan.md-style) — two options gated
+// independently: New Product needs the same permission product_create.php
+// itself enforces; Restock Product needs adjust_stock, the same permission
+// the Products page's own stock-adjustment action already requires (it's a
+// stock/pricing action reachable from POS, not a sales action).
+$can_add_new_product = canCreate('products');
+$can_restock_product  = hasPermission('adjust_stock') || isAdmin();
 ?>
 <script>
 // Phase 30 (pos_upgrade_plan.md §9) — populated once from PHP, never fetched
@@ -248,6 +256,25 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                             <button class="btn btn-outline-secondary" type="button" onclick="searchProducts()">
                                 <i class="bi bi-search"></i>
                             </button>
+                            <?php if ($can_add_new_product || $can_restock_product): ?>
+                            <button class="btn btn-outline-success dropdown-toggle" type="button"
+                                    id="addProductDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                                    title="<?= t('Add Product') ?>">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="addProductDropdown">
+                                <?php if ($can_add_new_product): ?>
+                                <li><a class="dropdown-item" href="#" onclick="openNewProductPage(); return false;">
+                                    <i class="bi bi-box-seam me-2"></i><?= t('New Product') ?>
+                                </a></li>
+                                <?php endif; ?>
+                                <?php if ($can_restock_product): ?>
+                                <li><a class="dropdown-item" href="#" onclick="openRestockProductModal(); return false;">
+                                    <i class="bi bi-arrow-repeat me-2"></i><?= t('Restock Product') ?>
+                                </a></li>
+                                <?php endif; ?>
+                            </ul>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="col-md-7">

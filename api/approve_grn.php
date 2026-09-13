@@ -8,6 +8,7 @@ require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
+require_once __DIR__ . '/../core/stock_intake.php';
 
 header('Content-Type: application/json');
 if (isset($_SESSION['user_lang'])) {
@@ -81,27 +82,6 @@ try {
     $project_id   = $grn['project_id'] ? (int)$grn['project_id'] : null;
     $reserve_qty_factor = $project_id ? 1 : 0; // reserve for project-bound GRNs
 
-    $bumpProduct  = $pdo->prepare("UPDATE products SET current_stock = current_stock + ?, stock_quantity = stock_quantity + ? WHERE product_id = ?");
-    $checkStock   = $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
-    $updateStock  = $pdo->prepare("UPDATE product_stocks SET stock_quantity = IFNULL(stock_quantity, 0) + ?, reserved_quantity = IFNULL(reserved_quantity, 0) + ?, last_updated = NOW() WHERE stock_id = ?");
-    $insertStock  = $pdo->prepare("INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity, last_updated) VALUES (?, ?, ?, ?, NOW())");
-    // Phase 17 (pos_upgrade_plan.md §8) — real batch/lot stock ledger, fed
-    // right here at the moment stock genuinely enters the warehouse (not at
-    // GRN creation, which is still 'pending' and may never be approved).
-    // Sparse: a line with neither batch_number nor expiry_date gets no row —
-    // that product keeps behaving exactly as it did before this phase.
-    $insertBatch  = $pdo->prepare("
-        INSERT INTO product_batches (product_id, warehouse_id, batch_number, expiry_date, quantity_received, quantity_remaining, unit_cost, receipt_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    ");
-    // Phase 26 (pos_upgrade_plan.md §9) — one product_serials row per
-    // physical unit, written only for track_serials=1 products, at the
-    // moment stock genuinely enters the warehouse (same "stock arrives on
-    // approval, not creation" rule Phase 17 established for batches).
-    $insertSerial = $pdo->prepare("
-        INSERT IGNORE INTO product_serials (product_id, warehouse_id, serial_number, status, receipt_id, created_at)
-        VALUES (?, ?, ?, 'in_stock', ?, NOW())
-    ");
     // stock_movements has two strict ENUMs:
     //   movement_type  must be one of: purchase_in, sale_out, adjustment_in, adjustment_out, transfer_in, transfer_out, return_in, return_out, production_in, production_out, damaged, expired, found, theft, correction, issue_out
     //   reference_type must be one of: purchase_order, sales_order, pos_sale, invoice, stock_adjustment, stock_transfer, return, production_order, manual
@@ -109,9 +89,15 @@ try {
     //   movement_type='purchase_in', reference_type='purchase_order'.
     // Using literals outside the ENUMs causes MySQL to silently truncate
     // and raise SQLSTATE[01000] 1265, rolling back the whole approve.
-    // Movement rows are now written via recordStockMovement() so that value,
-    // reference_number and running balance are always populated (core/stock_ledger.php).
-
+    //
+    // Phase 17/26 (pos_upgrade_plan.md §8/§9) — product_batches/product_serials
+    // rows are written right here, at the moment stock genuinely enters the
+    // warehouse (not at GRN creation, which is still 'pending' and may never
+    // be approved). Sparse: a line with neither batch_number nor expiry_date
+    // gets no batch row — that product keeps behaving exactly as before.
+    // core/stock_intake.php's receiveProductBatch() is the shared function
+    // this loop and the POS Restock Product shortcut both call, so a fix here
+    // reaches both instead of drifting apart.
     foreach ($items as $it) {
         $pid = (int)$it['product_id'];
         $qty = (float)$it['qty'];
@@ -120,43 +106,8 @@ try {
         $tracked = isset($it['track_inventory']) ? (bool)$it['track_inventory'] : true;
         if (!$tracked) continue;
 
-        $reserve_qty = $reserve_qty_factor * $qty;
-
-        $bumpProduct->execute([$qty, $qty, $pid]);
-        $checkStock->execute([$pid, $warehouse_id]);
-        $stockId = $checkStock->fetchColumn();
-        if ($stockId) {
-            $updateStock->execute([$qty, $reserve_qty, $stockId]);
-        } else {
-            $insertStock->execute([$pid, $warehouse_id, $qty, $reserve_qty]);
-        }
-        recordStockMovement($pdo, [
-            'product_id'       => $pid,
-            'warehouse_id'     => $warehouse_id,
-            'project_id'       => $project_id,
-            'movement_type'    => 'purchase_in',
-            'quantity'         => $qty,
-            'reference_id'     => $receipt_id,
-            'reference_type'   => 'purchase_order',
-            'reference_number' => $grn['receipt_number'],
-            'movement_date'    => $grn['receipt_date'],
-            'created_by'       => $_SESSION['user_id'],
-            'notes'            => "GRN approved: " . $grn['receipt_number'],
-        ]);
-
-        // Phase 17 — only when the line actually specified a batch or expiry.
         $batchNumber = trim((string)($it['batch_number'] ?? ''));
         $expiryDate  = $it['expiry_date'] ?? null;
-        if ($batchNumber !== '' || !empty($expiryDate)) {
-            $insertBatch->execute([
-                $pid, $warehouse_id,
-                $batchNumber !== '' ? $batchNumber : null,
-                !empty($expiryDate) ? $expiryDate : null,
-                $qty, $qty,
-                (float)($it['unit_price'] ?? 0),
-                $receipt_id,
-            ]);
-        }
 
         // Phase 26 — only for a track_serials=1 product with serial numbers
         // actually entered on this line. Lenient by design: whatever count of
@@ -165,14 +116,33 @@ try {
         // (an operator can still add the rest later via a future GRN or a
         // manual adjustment), consistent with GRN approval never blocking on
         // batch/expiry sparsity either.
+        $serials = [];
         if (!empty($it['track_serials']) && !empty($it['serial_numbers'])) {
             $raw = (string)$it['serial_numbers'];
             $serials = preg_split('/[\r\n,]+/', $raw);
             $serials = array_values(array_unique(array_filter(array_map('trim', $serials), fn($s) => $s !== '')));
-            foreach ($serials as $sn) {
-                $insertSerial->execute([$pid, $warehouse_id, $sn, $receipt_id]);
-            }
         }
+
+        receiveProductBatch($pdo, [
+            'product_id'       => $pid,
+            'warehouse_id'     => $warehouse_id,
+            'quantity'         => $qty,
+            'unit_cost'        => (float)($it['unit_price'] ?? 0),
+            'write_batch'      => ($batchNumber !== '' || !empty($expiryDate)),
+            'batch_number'     => $batchNumber !== '' ? $batchNumber : null,
+            'expiry_date'      => !empty($expiryDate) ? $expiryDate : null,
+            'receipt_id'       => $receipt_id,
+            'reserve_quantity' => $reserve_qty_factor * $qty,
+            'project_id'       => $project_id,
+            'movement_type'    => 'purchase_in',
+            'reference_type'   => 'purchase_order',
+            'reference_id'     => $receipt_id,
+            'reference_number' => $grn['receipt_number'],
+            'movement_date'    => $grn['receipt_date'],
+            'created_by'       => $_SESSION['user_id'],
+            'notes'            => "GRN approved: " . $grn['receipt_number'],
+            'serials'          => $serials,
+        ]);
     }
 
     $sigResult = workflowCaptureSignature($pdo, 'grn', $receipt_id, 'approved',
