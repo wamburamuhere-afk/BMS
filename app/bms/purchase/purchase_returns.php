@@ -211,26 +211,26 @@ $initial_stats = [
       
         
         <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
+            <?php
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
 
         <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
+            <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>
 
         <div class="mt-3 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">PURCHASE RETURNS REPORT</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: <?= date('F j, Y, g:i a') ?></p>
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('PURCHASE RETURNS REPORT') ?></h2>
+            <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> <?= date('F j, Y, g:i a') ?></p>
         </div>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
@@ -240,37 +240,37 @@ $initial_stats = [
         <div class="row g-2">
             <div class="col" style="flex: 1 0 0%;">
                 <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
-                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Returns</p>
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;"><?= t('Total Returns') ?></p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= $initial_stats['total_returns'] ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
                 <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
-                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Pending</p>
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;"><?= t('Pending') ?></p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= $initial_stats['pending'] ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
                 <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
-                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Approved</p>
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;"><?= t('Approved') ?></p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= $initial_stats['approved'] ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
                 <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
-                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Completed</p>
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;"><?= t('Completed') ?></p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= $initial_stats['completed'] ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
                 <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
-                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Rejected</p>
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;"><?= t('Rejected') ?></p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= $initial_stats['rejected'] ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
                 <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
-                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Value</p>
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;"><?= t('Total Value') ?></p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 11pt;"><?= format_currency($initial_stats['total_value']) ?></h4>
                 </div>
             </div>
@@ -280,9 +280,9 @@ $initial_stats = [
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('purchases') ?>">Purchases</a></li>
-            <li class="breadcrumb-item active">Purchase Returns</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('purchases') ?>"><?= t('Purchases') ?></a></li>
+            <li class="breadcrumb-item active"><?= t('Purchase Returns') ?></li>
         </ol>
     </nav>
 
@@ -291,17 +291,17 @@ $initial_stats = [
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-return-left text-primary"></i> Purchase Returns</h2>
-                    <p class="text-muted mb-0">Professional management of supplier returns</p>
+                    <h2 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-return-left text-primary"></i> <?= t('Purchase Returns') ?></h2>
+                    <p class="text-muted mb-0"><?= t('Professional management of supplier returns') ?></p>
                 </div>
                 <div class="d-flex gap-2">
                     <?php if (canCreate('purchase_returns')): ?>
                     <button type="button" class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#addReturnModal">
-                        <i class="bi bi-plus-circle me-1"></i> New Return
+                        <i class="bi bi-plus-circle me-1"></i> <?= t('New Return') ?>
                     </button>
                     <?php endif; ?>
                     <a href="<?= getUrl('reports') ?>?report=purchase_returns" class="btn btn-outline-info px-4 shadow-sm">
-                        <i class="bi bi-graph-up me-1"></i> Reports
+                        <i class="bi bi-graph-up me-1"></i> <?= t('Reports') ?>
                     </a>
                 </div>
             </div>
@@ -314,7 +314,7 @@ $initial_stats = [
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h4 class="mb-0"><?= $initial_stats['total_returns'] ?></h4><p class="mb-0 small">Total Returns</p></div>
+                        <div><h4 class="mb-0"><?= $initial_stats['total_returns'] ?></h4><p class="mb-0 small"><?= t('Total Returns') ?></p></div>
                         <div><i class="bi bi-box-arrow-left fs-2"></i></div>
                     </div>
                 </div>
@@ -324,7 +324,7 @@ $initial_stats = [
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h4 class="mb-0"><?= $initial_stats['pending'] ?></h4><p class="mb-0 small">Pending</p></div>
+                        <div><h4 class="mb-0"><?= $initial_stats['pending'] ?></h4><p class="mb-0 small"><?= t('Pending') ?></p></div>
                         <div><i class="bi bi-clock fs-2"></i></div>
                     </div>
                 </div>
@@ -334,7 +334,7 @@ $initial_stats = [
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h4 class="mb-0"><?= $initial_stats['approved'] ?></h4><p class="mb-0 small">Approved</p></div>
+                        <div><h4 class="mb-0"><?= $initial_stats['approved'] ?></h4><p class="mb-0 small"><?= t('Approved') ?></p></div>
                         <div><i class="bi bi-check-circle fs-2"></i></div>
                     </div>
                 </div>
@@ -344,7 +344,7 @@ $initial_stats = [
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h4 class="mb-0"><?= $initial_stats['completed'] ?></h4><p class="mb-0 small">Completed</p></div>
+                        <div><h4 class="mb-0"><?= $initial_stats['completed'] ?></h4><p class="mb-0 small"><?= t('Completed') ?></p></div>
                         <div><i class="bi bi-check2-all fs-2"></i></div>
                     </div>
                 </div>
@@ -354,7 +354,7 @@ $initial_stats = [
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h4 class="mb-0"><?= $initial_stats['rejected'] ?></h4><p class="mb-0 small">Rejected</p></div>
+                        <div><h4 class="mb-0"><?= $initial_stats['rejected'] ?></h4><p class="mb-0 small"><?= t('Rejected') ?></p></div>
                         <div><i class="bi bi-x-circle fs-2"></i></div>
                     </div>
                 </div>
@@ -364,7 +364,7 @@ $initial_stats = [
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h5 class="mb-0 fw-bold" style="font-size: 1rem;"><?= format_currency($initial_stats['total_value']) ?></h5><p class="mb-0 small">Total Value</p></div>
+                        <div><h5 class="mb-0 fw-bold" style="font-size: 1rem;"><?= format_currency($initial_stats['total_value']) ?></h5><p class="mb-0 small"><?= t('Total Value') ?></p></div>
                         <div><i class="bi bi-cash fs-2"></i></div>
                     </div>
                 </div>
@@ -375,25 +375,25 @@ $initial_stats = [
     <!-- Filters Card -->
     <div class="card mb-4 d-print-none border-0 shadow-sm">
         <div class="card-header bg-light border-bottom">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> Filters & Parameters</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> <?= t('Filters & Parameters') ?></h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Status</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Status') ?></label>
                     <select class="form-select" id="filter_status">
-                        <option value="">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="completed">Completed</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value=""><?= t('All Statuses') ?></option>
+                        <option value="pending"><?= t('Pending') ?></option>
+                        <option value="approved"><?= t('Approved') ?></option>
+                        <option value="completed"><?= t('Completed') ?></option>
+                        <option value="rejected"><?= t('Rejected') ?></option>
+                        <option value="cancelled"><?= t('Cancelled') ?></option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Supplier</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Supplier') ?></label>
                     <select class="form-select select2-static" id="filter_supplier">
-                        <option value="">All Suppliers</option>
+                        <option value=""><?= t('All Suppliers') ?></option>
                         <?php foreach ($suppliers as $supplier): ?>
                             <option value="<?= $supplier['supplier_id'] ?>">
                                 <?= safe_output($supplier['supplier_name']) ?>
@@ -402,19 +402,19 @@ $initial_stats = [
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Date From</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Date From') ?></label>
                     <input type="date" class="form-control" id="filter_date_from">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Date To</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Date To') ?></label>
                     <input type="date" class="form-control" id="filter_date_to">
                 </div>
                 <div class="col-12 d-flex justify-content-end">
                     <button type="button" class="btn btn-primary px-4 me-2" onclick="refreshTable()">
-                        <i class="bi bi-filter"></i> Apply Filters
+                        <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                     </button>
                     <button type="button" class="btn btn-outline-secondary px-4" onclick="resetFilters()">
-                        <i class="bi bi-arrow-clockwise"></i> Reset
+                        <i class="bi bi-arrow-clockwise"></i> <?= t('Reset') ?>
                     </button>
                 </div>
             </div>
@@ -426,34 +426,34 @@ $initial_stats = [
         <div class="d-flex align-items-center gap-3">
             <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="printList()" style="background: #fff; color: #444;">
-                    <i class="bi bi-printer text-primary me-1"></i> Print
+                    <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportReturns()" style="background: #fff; color: #444;">
-                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Export') ?>
                 </button>
             </div>
 
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
-                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
+                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> <?= t('Show:') ?></span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="BMSReturnsTable.dt('returnsTable').page.len(this.value).draw();">
                     <option value="10">10</option>
                     <option value="25" selected>25</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
-                    <option value="-1">All</option>
+                    <option value="-1"><?= t('All') ?></option>
                 </select>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span id="returns-count-badge" class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
-                <i class="bi bi-check-circle-fill me-1"></i> Purchase Returns
+                <i class="bi bi-check-circle-fill me-1"></i> <?= t('Purchase Returns') ?>
             </span>
             <div class="d-none d-md-flex align-items-center gap-1 ms-2">
-                <span class="small fw-bold text-muted"><i class="bi bi-display"></i> View:</span>
+                <span class="small fw-bold text-muted"><i class="bi bi-display"></i> <?= t('View:') ?></span>
                 <div class="btn-group btn-group-sm shadow-sm">
-                    <button type="button" class="btn btn-outline-primary" id="prTableViewBtn" onclick="togglePRView('table')" title="Table View"><i class="bi bi-table"></i></button>
-                    <button type="button" class="btn btn-outline-primary" id="prCardViewBtn" onclick="togglePRView('card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                    <button type="button" class="btn btn-outline-primary" id="prTableViewBtn" onclick="togglePRView('table')" title="<?= t('Table View') ?>"><i class="bi bi-table"></i></button>
+                    <button type="button" class="btn btn-outline-primary" id="prCardViewBtn" onclick="togglePRView('card')" title="<?= t('Card View') ?>"><i class="bi bi-grid-3x3-gap"></i></button>
                 </div>
             </div>
         </div>
@@ -462,7 +462,7 @@ $initial_stats = [
     <!-- Returns Table -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
-            <h5 class="mb-0 fw-bold">Purchase Returns List</h5>
+            <h5 class="mb-0 fw-bold"><?= t('Purchase Returns List') ?></h5>
         </div>
         <div class="card-body">
             <div id="prTableView">
@@ -500,18 +500,18 @@ $initial_stats = [
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Create Purchase Return</h5>
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> <?= t('Create Purchase Return') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="addReturnForm">
                 <div class="modal-body">
                     <div id="add-return-message" class="mb-3"></div>
-                    
+
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label for="warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                            <label for="warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'supplier_id')">
-                                <option value="">Select Warehouse</option>
+                                <option value=""><?= t('Select Warehouse') ?></option>
                                 <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>">
                                     <?= safe_output($wh['warehouse_name']) ?>
@@ -521,74 +521,74 @@ $initial_stats = [
                         </div>
 
                         <div class="col-md-4 mb-3">
-                            <label for="supplier_id" class="form-label">Supplier <span class="text-danger">*</span></label>
+                            <label for="supplier_id" class="form-label"><?= t('Supplier') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="supplier_id" name="supplier_id" required onchange="loadWarehouseSupplierGRNs($('#warehouse_id').val(), this.value, 'receipt_id'); loadInvoicesForReturn(this.value, 'supplier_invoice_id')">
-                                <option value="">Select Supplier First</option>
+                                <option value=""><?= t('Select Supplier First') ?></option>
                             </select>
                         </div>
 
                         <div class="col-md-4 mb-3">
                             <label for="supplier_invoice_id" class="form-label">
-                                Supplier Invoice <span class="text-muted small">(optional — enables qty guard)</span>
+                                <?= t('Supplier Invoice') ?> <span class="text-muted small">(<?= t('optional — enables qty guard') ?>)</span>
                             </label>
                             <select class="form-select" id="supplier_invoice_id" name="supplier_invoice_id" onchange="loadInvoiceItemsForReturn(this.value, 'returnItemsBody')">
-                                <option value="">Select Invoice</option>
+                                <option value=""><?= t('Select Invoice') ?></option>
                             </select>
                         </div>
 
                         <div class="col-md-4 mb-3">
-                            <label for="receipt_id" class="form-label">Select GRN <small class="text-muted">(optional)</small></label>
+                            <label for="receipt_id" class="form-label"><?= t('Select GRN') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
                             <select class="form-select" id="receipt_id" name="receipt_id" onchange="loadGRNItems(this.value, 'returnItemsBody')">
-                                <option value="">Select GRN</option>
+                                <option value=""><?= t('Select GRN') ?></option>
                             </select>
                         </div>
 
-                        
+
                         <div class="col-md-6 mb-3">
-                            <label for="return_date" class="form-label">Return Date <span class="text-danger">*</span></label>
+                            <label for="return_date" class="form-label"><?= t('Return Date') ?> <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="return_date" name="return_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
-                        
+
                         <div class="col-md-6 mb-3">
-                            <label for="reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                            <label for="reason" class="form-label"><?= t('Reason') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="reason" name="reason" required>
-                                <option value="">Select Reason</option>
-                                <option value="damaged">Damaged Goods</option>
-                                <option value="wrong_item">Wrong Item Received</option>
-                                <option value="quality_issue">Quality Issue</option>
-                                <option value="over_supply">Over Supply</option>
-                                <option value="expired">Expired Goods</option>
-                                <option value="wrong_spec">Wrong Specifications</option>
-                                <option value="other">Other</option>
+                                <option value=""><?= t('Select Reason') ?></option>
+                                <option value="damaged"><?= t('Damaged Goods') ?></option>
+                                <option value="wrong_item"><?= t('Wrong Item Received') ?></option>
+                                <option value="quality_issue"><?= t('Quality Issue') ?></option>
+                                <option value="over_supply"><?= t('Over Supply') ?></option>
+                                <option value="expired"><?= t('Expired Goods') ?></option>
+                                <option value="wrong_spec"><?= t('Wrong Specifications') ?></option>
+                                <option value="other"><?= t('Other') ?></option>
                             </select>
                         </div>
-                        
+
                         <div class="col-12 mb-3">
-                            <label for="reason_details" class="form-label">Reason Details</label>
-                            <textarea class="form-control" id="reason_details" name="reason_details" rows="2" placeholder="Provide detailed explanation"></textarea>
+                            <label for="reason_details" class="form-label"><?= t('Reason Details') ?></label>
+                            <textarea class="form-control" id="reason_details" name="reason_details" rows="2" placeholder="<?= t('Provide detailed explanation') ?>"></textarea>
                         </div>
-                        
+
                         <!-- Items Section -->
                         <div class="col-12 mb-3">
                             <div class="card">
                                 <div class="card-header bg-light">
-                                    <h6 class="mb-0"><i class="bi bi-list-check"></i> Return Items</h6>
+                                    <h6 class="mb-0"><i class="bi bi-list-check"></i> <?= t('Return Items') ?></h6>
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm" id="returnItemsTable">
                                             <thead>
                                                 <tr>
-                                                    <th style="width:35px;">S/NO</th>
-                                                    <th width="25%">Product/Item *</th>
-                                                    <th width="9%">SKU</th>
-                                                    <th width="9%" class="inv-qty-col d-none text-center text-info" title="Qty on invoice">Inv Qty</th>
-                                                    <th width="9%" class="inv-qty-col d-none text-center text-warning" title="Max you can return">Max Return</th>
-                                                    <th width="9%">Qty *</th>
-                                                    <th width="7%">Unit</th>
-                                                    <th width="11%">Unit Price</th>
-                                                    <th width="9%">VAT</th>
-                                                    <th width="9%">Total</th>
+                                                    <th style="width:35px;"><?= t('S/NO') ?></th>
+                                                    <th width="25%"><?= t('Product/Item') ?> *</th>
+                                                    <th width="9%"><?= t('SKU') ?></th>
+                                                    <th width="9%" class="inv-qty-col d-none text-center text-info" title="<?= t('Qty on invoice') ?>"><?= t('Inv Qty') ?></th>
+                                                    <th width="9%" class="inv-qty-col d-none text-center text-warning" title="<?= t('Max you can return') ?>"><?= t('Max Return') ?></th>
+                                                    <th width="9%"><?= t('Qty') ?> *</th>
+                                                    <th width="7%"><?= t('Unit') ?></th>
+                                                    <th width="11%"><?= t('Unit Price') ?></th>
+                                                    <th width="9%"><?= t('VAT') ?></th>
+                                                    <th width="9%"><?= t('Total') ?></th>
                                                     <th width="4%"></th>
                                                 </tr>
                                             </thead>
@@ -596,7 +596,7 @@ $initial_stats = [
                                         </table>
                                     </div>
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="addReturnItem()">
-                                        <i class="bi bi-plus-circle"></i> Add Item
+                                        <i class="bi bi-plus-circle"></i> <?= t('Add Item') ?>
                                     </button>
                                 </div>
                             </div>
@@ -606,15 +606,15 @@ $initial_stats = [
                             <div class="d-flex justify-content-end">
                                 <div style="min-width:280px;">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted small">Subtotal:</span>
+                                        <span class="text-muted small"><?= t('Subtotal:') ?></span>
                                         <span class="fw-bold small" id="add-subtotal">0.00</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted small">VAT (18%):</span>
+                                        <span class="text-muted small"><?= t('VAT (18%):') ?></span>
                                         <span class="fw-bold small" id="add-vat-total">0.00</span>
                                     </div>
                                     <div class="d-flex justify-content-between border-top pt-1">
-                                        <span class="fw-bold">Grand Total:</span>
+                                        <span class="fw-bold"><?= t('Grand Total:') ?></span>
                                         <span class="fw-bold text-primary" id="add-grand-total">0.00</span>
                                     </div>
                                 </div>
@@ -622,19 +622,19 @@ $initial_stats = [
                         </div>
 
                         <div class="col-12 mb-3">
-                            <label for="notes" class="form-label">Notes</label>
+                            <label for="notes" class="form-label"><?= t('Notes') ?></label>
                             <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
                         </div>
 
                         <div class="col-12 mb-3">
-                            <label for="add_attachment" class="form-label">Attachment <small class="text-muted">(PDF, JPG, PNG — max 10MB)</small></label>
+                            <label for="add_attachment" class="form-label"><?= t('Attachment') ?> <small class="text-muted">(<?= t('PDF, JPG, PNG — max 10MB') ?>)</small></label>
                             <input type="file" class="form-control" id="add_attachment" name="attachment" accept=".pdf,.jpg,.jpeg,.png">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Return</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><?= t('Create Return') ?></button>
                 </div>
             </form>
         </div>
@@ -646,10 +646,10 @@ $initial_stats = [
         <table class="table table-sm table-hover mb-0">
             <thead class="bg-light sticky-top">
                 <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Stock</th>
-                    <th>Price</th>
+                    <th><?= t('Product') ?></th>
+                    <th><?= t('SKU') ?></th>
+                    <th><?= t('Stock') ?></th>
+                    <th><?= t('Price') ?></th>
                 </tr>
             </thead>
             <tbody id="productsSearchBody">
@@ -665,19 +665,19 @@ $initial_stats = [
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Purchase Return</h5>
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> <?= t('Edit Purchase Return') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="editReturnForm">
                 <div class="modal-body">
                     <div id="edit-return-message" class="mb-3"></div>
                     <input type="hidden" id="edit_return_id" name="return_id">
-                    
+
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label for="edit_warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                            <label for="edit_warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" id="edit_warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'edit_supplier_id')">
-                                <option value="">Select Warehouse</option>
+                                <option value=""><?= t('Select Warehouse') ?></option>
                                 <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>">
                                     <?= safe_output($wh['warehouse_name']) ?>
@@ -687,63 +687,63 @@ $initial_stats = [
                         </div>
 
                         <div class="col-md-4 mb-3">
-                            <label for="edit_supplier_id" class="form-label">Supplier <span class="text-danger">*</span></label>
+                            <label for="edit_supplier_id" class="form-label"><?= t('Supplier') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="edit_supplier_id" name="supplier_id" required onchange="loadWarehouseSupplierGRNs($('#edit_warehouse_id').val(), this.value, 'edit_receipt_id')">
-                                <option value="">Select Supplier First</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <label for="edit_receipt_id" class="form-label">Select GRN <span class="text-danger">*</span></label>
-                            <select class="form-select" id="edit_receipt_id" name="receipt_id" required onchange="loadGRNItems(this.value, 'editReturnItemsBody', 'edit')">
-                                <option value="">Select GRN</option>
+                                <option value=""><?= t('Select Supplier First') ?></option>
                             </select>
                         </div>
 
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="edit_return_date" class="form-label">Return Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="edit_return_date" name="return_date" required>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="edit_reason" class="form-label">Reason <span class="text-danger"></span></label>
-                            <select class="form-select" id="edit_reason" name="reason" required>
-                                <option value="">Select Reason</option>
-                                <option value="damaged">Damaged Goods</option>
-                                <option value="wrong_item">Wrong Item Received</option>
-                                <option value="quality_issue">Quality Issue</option>
-                                <option value="over_supply">Over Supply</option>
-                                <option value="expired">Expired Goods</option>
-                                <option value="wrong_spec">Wrong Specifications</option>
-                                <option value="other">Other</option>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_receipt_id" class="form-label"><?= t('Select GRN') ?> <span class="text-danger">*</span></label>
+                            <select class="form-select" id="edit_receipt_id" name="receipt_id" required onchange="loadGRNItems(this.value, 'editReturnItemsBody', 'edit')">
+                                <option value=""><?= t('Select GRN') ?></option>
                             </select>
                         </div>
-                        
-                        <div class="col-12 mb-3">
-                            <label for="edit_reason_details" class="form-label">Reason Details</label>
-                            <textarea class="form-control" id="edit_reason_details" name="reason_details" rows="2" placeholder="Provide detailed explanation"></textarea>
+
+
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_return_date" class="form-label"><?= t('Return Date') ?> <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="edit_return_date" name="return_date" required>
                         </div>
-                        
+
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_reason" class="form-label"><?= t('Reason') ?> <span class="text-danger"></span></label>
+                            <select class="form-select" id="edit_reason" name="reason" required>
+                                <option value=""><?= t('Select Reason') ?></option>
+                                <option value="damaged"><?= t('Damaged Goods') ?></option>
+                                <option value="wrong_item"><?= t('Wrong Item Received') ?></option>
+                                <option value="quality_issue"><?= t('Quality Issue') ?></option>
+                                <option value="over_supply"><?= t('Over Supply') ?></option>
+                                <option value="expired"><?= t('Expired Goods') ?></option>
+                                <option value="wrong_spec"><?= t('Wrong Specifications') ?></option>
+                                <option value="other"><?= t('Other') ?></option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="edit_reason_details" class="form-label"><?= t('Reason Details') ?></label>
+                            <textarea class="form-control" id="edit_reason_details" name="reason_details" rows="2" placeholder="<?= t('Provide detailed explanation') ?>"></textarea>
+                        </div>
+
                         <!-- Items Section -->
                         <div class="col-12 mb-3">
                             <div class="card">
                                 <div class="card-header bg-light">
-                                    <h6 class="mb-0"><i class="bi bi-list-check"></i> Return Items</h6>
+                                    <h6 class="mb-0"><i class="bi bi-list-check"></i> <?= t('Return Items') ?></h6>
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm" id="editReturnItemsTable">
                                             <thead>
                                                 <tr>
-                                                    <th style="width: 50px;">S/NO</th>
-                                                    <th width="28%">Product/Item</th>
-                                                    <th width="12%">SKU/Barcode</th>
-                                                    <th width="10%">Quantity</th>
-                                                    <th width="8%">Unit</th>
-                                                    <th width="13%">Unit Price</th>
-                                                    <th width="11%">VAT</th>
-                                                    <th width="13%">Total</th>
+                                                    <th style="width: 50px;"><?= t('S/NO') ?></th>
+                                                    <th width="28%"><?= t('Product/Item') ?></th>
+                                                    <th width="12%"><?= t('SKU/Barcode') ?></th>
+                                                    <th width="10%"><?= t('Quantity') ?></th>
+                                                    <th width="8%"><?= t('Unit') ?></th>
+                                                    <th width="13%"><?= t('Unit Price') ?></th>
+                                                    <th width="11%"><?= t('VAT') ?></th>
+                                                    <th width="13%"><?= t('Total') ?></th>
                                                     <th width="5%"></th>
                                                 </tr>
                                             </thead>
@@ -751,31 +751,31 @@ $initial_stats = [
                                         </table>
                                     </div>
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="addReturnItem('edit')">
-                                        <i class="bi bi-plus-circle"></i> Add Item
+                                        <i class="bi bi-plus-circle"></i> <?= t('Add Item') ?>
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-12 mb-3">
-                            <label for="edit_notes" class="form-label">Notes</label>
+                            <label for="edit_notes" class="form-label"><?= t('Notes') ?></label>
                             <textarea class="form-control" id="edit_notes" name="notes" rows="2"></textarea>
                         </div>
 
                         <div class="col-12 mb-3">
-                            <label for="edit_attachment" class="form-label">Attachment <small class="text-muted">(PDF, JPG, PNG — max 10MB)</small></label>
+                            <label for="edit_attachment" class="form-label"><?= t('Attachment') ?> <small class="text-muted">(<?= t('PDF, JPG, PNG — max 10MB') ?>)</small></label>
                             <div id="edit_current_attachment" class="mb-2" style="display:none;">
-                                <small class="text-muted">Current: </small>
+                                <small class="text-muted"><?= t('Current:') ?> </small>
                                 <a id="edit_attachment_link" href="#" target="_blank" class="small text-primary"><i class="bi bi-paperclip"></i> <span id="edit_attachment_name"></span></a>
                             </div>
                             <input type="file" class="form-control" id="edit_attachment" name="attachment" accept=".pdf,.jpg,.jpeg,.png">
-                            <small class="text-muted">Leave blank to keep existing attachment.</small>
+                            <small class="text-muted"><?= t('Leave blank to keep existing attachment.') ?></small>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Update Return</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><?= t('Update Return') ?></button>
                 </div>
             </form>
         </div>

@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-13 (feat/procurement-i18n-coverage) - Swahili translation coverage for Procurement: Purchase Returns (module 4 of 5, IN PROGRESS)
+
+**Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the Purchase Returns module.
+
+**Status: partial.** `purchase_return_view.php` and `includes/tables/purchase_returns_table.php` are fully wrapped. `purchase_returns.php` (1431 lines — the list/create page) is partially wrapped; work stopped mid-file (around the Edit Return modal) when the session hit its rate limit. The 4 print templates (`print_purchase_return.php` + navy/corporate/banded) have not been started yet — still plain English.
+
+**Fix so far:** wrapped every user-facing string touched so far in `t()`/`te()`, following the same convention as RFQ/PO/GRN (label+value patterns for "Web:"/"Email:" etc., a `PRV_I18N` JS object + inline `json_encode(t())` for dynamic Swal dialogs in the view page). Added 68 new Swahili entries to `lang/sw.php` for the strings wrapped so far.
+
+**Tested:** `php -l` clean on all 3 touched files + `lang/sw.php`. Confirmed no fragment-concatenation bugs in the partial `purchase_returns.php` work. Confirmed every `t()`/`te()` key currently used across these 3 files has a `lang/sw.php` translation (except the 4 intentionally-skipped print-theme names, matching PO/GRN precedent). No duplicate keys introduced.
+
+**Remaining for a future session:** finish wrapping the rest of `purchase_returns.php`, then the 4 print templates, then the 8 remaining API files (`create_purchase_return.php`, `delete_purchase_return.php`, `export_purchase_returns.php`, `get_purchase_return.php`, `get_purchase_return_stats.php`, `get_purchase_returns.php`, `update_purchase_return.php`, `update_purchase_return_status.php`, `api/account/approve_purchase_return.php`, `api/account/review_purchase_return.php`), add their `lang/sw.php` entries, then Module 5 (Debit Notes).
+
 ## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: GRN (module 3 of 5)
 
 **Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the GRN (Goods Received Note) module.
