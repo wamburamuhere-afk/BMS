@@ -4,22 +4,25 @@
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 try {
-    if (!isAuthenticated()) throw new Exception('Unauthorized');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
+    if (!isAuthenticated()) throw new Exception(t('Unauthorized'));
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception(t('Invalid method'));
 
     if (!canCreate('products') && !canEdit('rfq')) {
         http_response_code(403);
-        throw new Exception('Access Denied: you do not have permission to quick-add products for RFQ');
+        throw new Exception(t('Access Denied: you do not have permission to quick-add products for RFQ'));
     }
 
     $product_name = trim($_POST['product_name'] ?? '');
     $unit         = trim($_POST['unit'] ?? 'pcs');
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
 
-    if (!$product_name) throw new Exception('Product name is required');
-    if (!$warehouse_id) throw new Exception('Warehouse is required');
+    if (!$product_name) throw new Exception(t('Product name is required'));
+    if (!$warehouse_id) throw new Exception(t('Warehouse is required'));
     if (!$unit) $unit = 'pcs';
 
     // Check if product already exists (case-insensitive)

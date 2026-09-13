@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: RFQ (module 1 of 5)
+
+**Request:** Continue the language-translation rollout (same standard as the Settings/Inventory/POS i18n work) into the Procurement dropdown, covering RFQ through Debit Note.
+
+**Fix:** RFQ pages (`app/bms/purchase/rfq.php`, `rfq_create.php`, `rfq_view.php`) and `includes/tables/rfq_table.php` already had every user-facing string wrapped in `t()`/`te()` from prior in-progress work; the 9 `api/*rfq*.php` files already called `loadLanguage($_SESSION['user_lang'])` and wrapped their messages. Found and fixed 6 spots using the "translate sentence fragments, concatenate at runtime" anti-pattern (e.g. `t('RFQ #') . $number . t(' created successfully.')`) — converted to single-sentence `%s`-placeholder templates (`sprintf(t('RFQ #%s created successfully.'), $number)`) so word order stays correct in Swahili. Added 137 new Swahili entries to `lang/sw.php` (194 total keys used across the module; 57 already existed from shared/earlier work).
+
+**Tested:** `php -l` clean on all 13 files + `lang/sw.php`. Static scan confirmed no un-wrapped user-facing strings remain (labels, placeholders, titles, table headers). Verified no duplicate keys introduced. Live `loadLanguage('sw')` check confirms representative keys (including the fixed `sprintf()` templates) resolve to correct Swahili and `loadLanguage('en')` reverts cleanly.
+
 ## 2026-09-12 (feat/pos-walkin-receipt-and-enter-to-cart) - POS: receipts always print "Walk-in Customer", Enter key adds to cart
 
 **Request:** "Nataka kama sjamchagua kwenye risit awe kwenye sehemu ya castomer name iwe ni walk in customer. Iandike kabisa kwenye risit." Plus: "kwenye click product then click enter piah namba paganye kazi" — pressing Enter after typing a quantity should add the item to the cart, same as clicking "Add to Cart".

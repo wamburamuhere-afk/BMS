@@ -41,14 +41,14 @@ if (empty($GLOBALS['__bms_table_assets']['rfq'])) {
 
 // Keys MUST stay in the same order as columns() in the JS module.
 $rfq_tbl_columns = [
-    'sno'        => ['label' => 'S/No',      'attrs' => 'class="ps-4" style="width:55px;"'],
-    'rfq_number' => ['label' => 'RFQ #',     'attrs' => ''],
-    'rfq_date'   => ['label' => 'Date',      'attrs' => ''],
-    'supplier'   => ['label' => 'Supplier',  'attrs' => ''],
-    'project'    => ['label' => 'Project',   'attrs' => ''],
-    'warehouse'  => ['label' => 'Warehouse', 'attrs' => ''],
-    'status'     => ['label' => 'Status',    'attrs' => ''],
-    'actions'    => ['label' => 'Actions',   'attrs' => 'class="text-end pe-4 d-print-none"'],
+    'sno'        => ['label' => t('S/No'),      'attrs' => 'class="ps-4" style="width:55px;"'],
+    'rfq_number' => ['label' => t('RFQ #'),     'attrs' => ''],
+    'rfq_date'   => ['label' => t('Date'),      'attrs' => ''],
+    'supplier'   => ['label' => t('Supplier'),  'attrs' => ''],
+    'project'    => ['label' => t('Project'),   'attrs' => ''],
+    'warehouse'  => ['label' => t('Warehouse'), 'attrs' => ''],
+    'status'     => ['label' => t('Status'),    'attrs' => ''],
+    'actions'    => ['label' => t('Actions'),   'attrs' => 'class="text-end pe-4 d-print-none"'],
 ];
 $rfq_tbl_visible = array_diff(array_keys($rfq_tbl_columns), $rfq_tbl_hide);
 ?>
