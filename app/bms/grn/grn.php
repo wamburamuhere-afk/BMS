@@ -458,25 +458,25 @@ function generate_grn_number() {
         <!-- Breadcrumbs -->
         <nav aria-label="breadcrumb" class="mb-2">
             <ol class="breadcrumb mb-0" style="font-size: 0.85rem;">
-                <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>" class="text-decoration-none">Dashboard</a></li>
-                <li class="breadcrumb-item active">Goods Received Notes</li>
+                <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>" class="text-decoration-none"><?= t('Dashboard') ?></a></li>
+                <li class="breadcrumb-item active"><?= t('Goods Received Notes') ?></li>
             </ol>
         </nav>
 
         <!-- Page Header Content -->
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="flex-grow-1">
-                <h2 class="fw-bold text-dark mb-0"><i class="bi bi-clipboard-check-fill text-primary"></i> GRNs</h2>
-                <p class="text-muted mb-0 small d-none d-md-block">Professional goods receipt management</p>
+                <h2 class="fw-bold text-dark mb-0"><i class="bi bi-clipboard-check-fill text-primary"></i> <?= t('GRNs') ?></h2>
+                <p class="text-muted mb-0 small d-none d-md-block"><?= t('Professional goods receipt management') ?></p>
             </div>
             <div class="d-flex gap-2">
                 <?php if ($can_create_grn): ?>
                 <a href="<?= getUrl('grn_create') ?>" class="btn btn-primary btn-sm btn-responsive px-3 shadow-sm">
-                    <i class="bi bi-plus-circle me-1"></i> New GRN
+                    <i class="bi bi-plus-circle me-1"></i> <?= t('New GRN') ?>
                 </a>
                 <?php endif; ?>
                 <a href="<?= getUrl('reports') ?>?report=grn_summary" class="btn btn-outline-info btn-sm btn-responsive px-3 shadow-sm">
-                    <i class="bi bi-graph-up me-1"></i> Reports
+                    <i class="bi bi-graph-up me-1"></i> <?= t('Reports') ?>
                 </a>
             </div>
         </div>
@@ -492,7 +492,7 @@ function generate_grn_number() {
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <h4 class="mb-0 fw-bold text-nowrap" id="stat-total-grns" style="font-size: 1.25rem;"><?= $total_grns ?></h4>
-                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75">Total GRNs</p>
+                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75"><?= t('Total GRNs') ?></p>
                         </div>
                         <div class="flex-shrink-0 ms-2">
                             <i class="bi bi-clipboard-data" style="font-size: 1.8rem; opacity: 0.8;"></i>
@@ -507,7 +507,7 @@ function generate_grn_number() {
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <h4 class="mb-0 fw-bold text-nowrap" id="stat-draft-grns" style="font-size: 1.25rem;"><?= count($draft_grns) ?></h4>
-                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75">Draft Sheets</p>
+                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75"><?= t('Draft Sheets') ?></p>
                         </div>
                         <div class="flex-shrink-0 ms-2">
                             <i class="bi bi-file-earmark" style="font-size: 1.8rem; opacity: 0.8;"></i>
@@ -522,7 +522,7 @@ function generate_grn_number() {
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <h4 class="mb-0 fw-bold text-nowrap" id="stat-completed-grns" style="font-size: 1.25rem;"><?= count($completed_grns) ?></h4>
-                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75">Completed</p>
+                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75"><?= t('Completed') ?></p>
                         </div>
                         <div class="flex-shrink-0 ms-2">
                             <i class="bi bi-check2-all" style="font-size: 1.8rem; opacity: 0.8;"></i>
@@ -537,7 +537,7 @@ function generate_grn_number() {
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <h4 class="mb-0 fw-bold" id="stat-total-value" style="font-size: 1.1rem; word-break: break-word;"><?= format_currency(array_sum(array_column($grns, 'total_value'))) ?></h4>
-                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75">Total Value</p>
+                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75"><?= t('Total Value') ?></p>
                         </div>
                         <div class="flex-shrink-0 ms-2">
                             <i class="bi bi-cash-stack" style="font-size: 1.8rem; opacity: 0.8;"></i>
@@ -551,25 +551,25 @@ function generate_grn_number() {
     <!-- Filters Card -->
     <div class="card mb-4 d-print-none border-0 shadow-sm">
         <div class="card-header bg-light border-bottom">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> Filters & Parameters</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> <?= t('Filters & Parameters') ?></h6>
         </div>
         <div class="card-body">
             <form id="filterForm" method="GET" action="" class="row g-3">
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">Status</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Status') ?></label>
                     <select class="form-select" name="status">
-                        <option value="">All Statuses</option>
-                        <option value="pending"   <?= $status_filter == 'pending'   ? 'selected' : '' ?>>Pending</option>
-                        <option value="reviewed"  <?= $status_filter == 'reviewed'  ? 'selected' : '' ?>>Reviewed</option>
-                        <option value="approved"  <?= $status_filter == 'approved'  ? 'selected' : '' ?>>Approved</option>
-                        <option value="completed" <?= $status_filter == 'completed' ? 'selected' : '' ?>>Completed (legacy)</option>
-                        <option value="cancelled" <?= $status_filter == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                        <option value=""><?= t('All Statuses') ?></option>
+                        <option value="pending"   <?= $status_filter == 'pending'   ? 'selected' : '' ?>><?= t('Pending') ?></option>
+                        <option value="reviewed"  <?= $status_filter == 'reviewed'  ? 'selected' : '' ?>><?= t('Reviewed') ?></option>
+                        <option value="approved"  <?= $status_filter == 'approved'  ? 'selected' : '' ?>><?= t('Approved') ?></option>
+                        <option value="completed" <?= $status_filter == 'completed' ? 'selected' : '' ?>><?= t('Completed (legacy)') ?></option>
+                        <option value="cancelled" <?= $status_filter == 'cancelled' ? 'selected' : '' ?>><?= t('Cancelled') ?></option>
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">Supplier</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Supplier') ?></label>
                     <select class="form-select select2-static" id="grn_filter_supplier" name="supplier">
-                        <option value="">All Suppliers</option>
+                        <option value=""><?= t('All Suppliers') ?></option>
                         <?php foreach ($suppliers as $supplier): ?>
                             <option value="<?= $supplier['supplier_id'] ?>" <?= $supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>>
                                 <?= safe_output($supplier['supplier_name']) ?>
@@ -578,9 +578,9 @@ function generate_grn_number() {
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">Warehouse</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Warehouse') ?></label>
                     <select class="form-select select2-static" id="grn_filter_warehouse" name="warehouse">
-                        <option value="">All Warehouses</option>
+                        <option value=""><?= t('All Warehouses') ?></option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>" <?= $warehouse_filter == $warehouse['warehouse_id'] ? 'selected' : '' ?>>
                                 <?= safe_output($warehouse['warehouse_name']) ?>
@@ -590,9 +590,9 @@ function generate_grn_number() {
                 </div>
                 <?php if ($enable_projects): ?>
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">Project</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Project') ?></label>
                     <select class="form-select select2-static" id="grn_filter_project" name="project">
-                        <option value="">All Projects</option>
+                        <option value=""><?= t('All Projects') ?></option>
                         <?php foreach ($projects as $project): ?>
                             <option value="<?= $project['project_id'] ?>" <?= $project_filter == $project['project_id'] ? 'selected' : '' ?>>
                                 <?= safe_output($project['project_name']) ?>
@@ -602,19 +602,19 @@ function generate_grn_number() {
                 </div>
                 <?php endif; ?>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Date From</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Date From') ?></label>
                     <input type="date" class="form-control" name="date_from" value="<?= $date_from ?>">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Date To</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Date To') ?></label>
                     <input type="date" class="form-control" name="date_to" value="<?= $date_to ?>">
                 </div>
                 <div class="col-md-6 d-flex align-items-end justify-content-end">
                     <button type="submit" class="btn btn-primary px-4 me-2">
-                        <i class="bi bi-filter"></i> Apply Filters
+                        <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                     </button>
                     <a href="<?= getUrl('grn') ?>" class="btn btn-outline-secondary px-4">
-                        <i class="bi bi-arrow-clockwise"></i> Reset
+                        <i class="bi bi-arrow-clockwise"></i> <?= t('Reset') ?>
                     </a>
                 </div>
             </form>
@@ -626,35 +626,35 @@ function generate_grn_number() {
         <div class="d-flex align-items-center gap-3">
             <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed GRNs List', 'User generated a printed report of the GRN list'); window.print()" style="background: #fff; color: #444;">
-                    <i class="bi bi-printer text-primary me-1"></i> Print
+                    <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportGRNs()" style="background: #fff; color: #444;">
-                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Export') ?>
                 </button>
             </div>
-            
+
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
-                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
+                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> <?= t('Show:') ?></span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="BMSGrnTable.dt('grnTable').page.len(this.value).draw();">
                     <option value="10" selected>10</option>
                     <option value="25">25</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
-                    <option value="-1">All</option>
+                    <option value="-1"><?= t('All') ?></option>
                 </select>
             </div>
         </div>
         <div class="d-none d-md-flex align-items-center gap-2">
-            <span class="small fw-bold text-muted me-1"><i class="bi bi-display"></i> View:</span>
+            <span class="small fw-bold text-muted me-1"><i class="bi bi-display"></i> <?= t('View:') ?></span>
             <div class="btn-group shadow-sm" role="group" aria-label="View Mode Toggle">
                 <input type="radio" class="btn-check" name="viewMode" id="tableViewBtn" checked onchange="toggleViewMode('table')">
-                <label class="btn btn-outline-primary px-3" for="tableViewBtn" title="Table View">
+                <label class="btn btn-outline-primary px-3" for="tableViewBtn" title="<?= t('Table View') ?>">
                     <i class="bi bi-table"></i>
                 </label>
-                
+
                 <input type="radio" class="btn-check" name="viewMode" id="cardViewBtn" onchange="toggleViewMode('card')">
-                <label class="btn btn-outline-primary px-3" for="cardViewBtn" title="Card View">
+                <label class="btn btn-outline-primary px-3" for="cardViewBtn" title="<?= t('Card View') ?>">
                     <i class="bi bi-grid-3x3-gap"></i>
                 </label>
             </div>
@@ -668,24 +668,24 @@ function generate_grn_number() {
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
 
         <p class="text-dark mb-1 small text-uppercase">
-            <?php 
+            <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>
 
         <div class="mt-3">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">GOODS RECEIVED NOTES REPORT</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: <?= date('F j, Y, g:i a') ?></p>
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('GOODS RECEIVED NOTES REPORT') ?></h2>
+            <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> <?= date('F j, Y, g:i a') ?></p>
         </div>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
@@ -694,19 +694,19 @@ function generate_grn_number() {
     <div class="d-none d-print-block mb-3">
         <div style="display: flex !important; flex-direction: row !important; gap: 8px !important; align-items: stretch !important;">
             <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 80px; overflow: hidden;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;">Total GRNs</p>
+                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;"><?= t('Total GRNs') ?></p>
                 <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt; line-height: 1.1;"><?= number_format($total_grns) ?></h3>
             </div>
             <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 80px; overflow: hidden;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;">Draft Sheets</p>
+                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;"><?= t('Draft Sheets') ?></p>
                 <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt; line-height: 1.1;"><?= number_format(count($draft_grns)) ?></h3>
             </div>
             <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 80px; overflow: hidden;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;">Completed</p>
+                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;"><?= t('Completed') ?></p>
                 <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt; line-height: 1.1;"><?= number_format(count($completed_grns)) ?></h3>
             </div>
             <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 80px; overflow: hidden;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;">Total Value</p>
+                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;"><?= t('Total Value') ?></p>
                 <h3 style="color: #0d6efd; font-weight: 800; margin: 0; font-size: 12pt; line-height: 1.1;"><?= format_currency(array_sum(array_column($grns, 'total_value'))) ?></h3>
             </div>
         </div>
@@ -715,7 +715,7 @@ function generate_grn_number() {
     <!-- Table -->
     <div class="card border-0 shadow-sm" id="grnTableCard">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
-            <h5 class="mb-0 fw-bold">Goods Received Notes List</h5>
+            <h5 class="mb-0 fw-bold"><?= t('Goods Received Notes List') ?></h5>
         </div>
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
@@ -802,10 +802,10 @@ function generate_grn_number() {
 
     $(document).ready(function() {
         // Select2 on DB-backed filter selects
-        $('#grn_filter_supplier').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Suppliers' });
-        $('#grn_filter_warehouse').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Warehouses' });
+        $('#grn_filter_supplier').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('All Suppliers')) ?> });
+        $('#grn_filter_warehouse').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('All Warehouses')) ?> });
         <?php if ($enable_projects): ?>
-        $('#grn_filter_project').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Projects' });
+        $('#grn_filter_project').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('All Projects')) ?> });
         <?php endif; ?>
 
         // Initial responsive check

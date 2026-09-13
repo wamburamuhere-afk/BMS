@@ -7,6 +7,9 @@
 require_once __DIR__ . '/../../roots.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 // No session_start() here — roots.php above already handled it, and it then
 // releases the session lock (see core/session_guard.php), which legitimately
@@ -15,14 +18,14 @@ header('Content-Type: application/json');
 // one and turn every request into "Unauthorized".
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 $po_id = isset($_GET['po_id']) ? intval($_GET['po_id']) : 0;
 
 if ($po_id <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Invalid purchase order ID']);
+    echo json_encode(['success' => false, 'message' => t('Invalid purchase order ID')]);
     exit;
 }
 
@@ -38,7 +41,7 @@ try {
     $po = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$po) {
-        echo json_encode(['success' => false, 'message' => 'Purchase order not found']);
+        echo json_encode(['success' => false, 'message' => t('Purchase order not found')]);
         exit;
     }
 
@@ -98,5 +101,5 @@ try {
     ]);
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => sprintf(t('Database error: %s'), $e->getMessage())]);
 }

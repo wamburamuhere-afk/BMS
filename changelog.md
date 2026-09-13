@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: GRN (module 3 of 5)
+
+**Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the GRN (Goods Received Note) module.
+
+**Fix:** Wrapped every user-facing string in `t()`/`te()` across 19 GRN files: 5 pages (`grn.php`, `grn_create.php`, `grn_edit.php`, `grn_print.php`, `grn_view.php`), the shared `includes/tables/grn_table.php`, and 13 API endpoints. Scoped strictly to the actual GRN (inbound goods-receipt) files — `app/bms/grn/` also holds unrelated outbound Delivery Note/Delivery Order pages (`delivery_notes.php`, `dn_create.php`, `dn_outbound.php`, `do_create.php`, etc.) which are sales-side and out of scope for this pass. Added the `loadLanguage($_SESSION['user_lang'])` boilerplate to every API/print file, and per-page `GRN_I18N`/`tFormat()` helpers for dynamic JS strings, matching the PO module's pattern. Found and fixed one fragment-concatenation bug in `grn_edit.php`'s print footer (`t('This document was Printed by') . name . t('on') . date`, split across three separate calls) by restructuring it the same way `grn_create.php` already had, into a single `sprintf(t('This document was Printed by %s on %s'), ...)` call. Added 163 new Swahili entries to `lang/sw.php`.
+
+**Tested:** `php -l` clean on all 19 files + `lang/sw.php`. Wrote a coverage-check script confirming all 277 distinct `t()`/`te()` keys across the module have a non-empty `lang/sw.php` translation. Verified no new duplicate keys introduced. Live `loadLanguage('sw')` spot-checks confirm representative keys, including `sprintf()`-templated ones, resolve correctly.
+
 ## 2026-09-12 (feat/procurement-i18n-coverage) - Full Swahili translation coverage for Procurement: Purchase Orders (module 2 of 5)
 
 **Request:** Continue the Procurement i18n rollout (RFQ → Debit Note) into the Purchase Order module.

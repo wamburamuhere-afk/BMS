@@ -6,15 +6,18 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 if (!canEdit('grn')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to change GRN status']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to change GRN status')]);
     exit;
 }
 
@@ -23,7 +26,7 @@ try {
     $status = $_POST['status'] ?? '';
 
     if ($receipt_id <= 0 || !in_array($status, ['cancelled', 'pending'])) {
-        throw new Exception('Invalid parameters');
+        throw new Exception(t('Invalid parameters'));
     }
 
     // Phase C — block status changes against GRNs on projects not in user scope
@@ -35,7 +38,7 @@ try {
     $grn = $stmt->fetch();
 
     if (!$grn) {
-        throw new Exception('GRN not found');
+        throw new Exception(t('GRN not found'));
     }
 
     $pdo->beginTransaction();
@@ -91,7 +94,7 @@ try {
         'description' => "Updated GRN #{$grn['receipt_number']} status from {$grn['status']} to $status"
     ]);
 
-    echo json_encode(['success' => true, 'message' => "GRN status updated to $status"]);
+    echo json_encode(['success' => true, 'message' => sprintf(t('GRN status updated to %s'), $status)]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

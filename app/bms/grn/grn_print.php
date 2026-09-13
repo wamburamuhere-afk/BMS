@@ -6,13 +6,17 @@ require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 
-if (!isAuthenticated()) die("Unauthorized");
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
+if (!isAuthenticated()) die(t('Unauthorized'));
 
 // Phase 5a — print pages get a canView gate (admin auto-bypass)
-if (!canView('grn')) die("Access Denied");
+if (!canView('grn')) die(t('Access Denied'));
 
 $receipt_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-if ($receipt_id <= 0) die("Invalid GRN ID");
+if ($receipt_id <= 0) die(t('Invalid GRN ID'));
 
 // Phase C — block printing GRNs on projects not in user scope (HTML-safe)
 assertScopeForRecordHtml('purchase_receipts', 'receipt_id', $receipt_id);
@@ -43,7 +47,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$receipt_id]);
 $grn = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$grn) die("GRN Not Found");
+if (!$grn) die(t('GRN Not Found'));
 
 // Fetch GRN Items
 $stmtItems = $pdo->prepare("
@@ -105,7 +109,7 @@ $wf = [
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GRN #<?= htmlspecialchars($grn['receipt_number']) ?></title>
+    <title><?= t('GRN') ?> #<?= htmlspecialchars($grn['receipt_number']) ?></title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -334,8 +338,8 @@ $wf = [
 <body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
-        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
-        <button onclick="closePrintWindow()" style="padding:6px 16px; cursor:pointer;">Close</button>
+        <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;"><?= t('Print') ?></button>
+        <button onclick="closePrintWindow()" style="padding:6px 16px; cursor:pointer;"><?= t('Close') ?></button>
     </div>
 
     <div class="print-scale-wrapper">
@@ -375,19 +379,19 @@ $wf = [
                     <p>P.O. Box <?= htmlspecialchars($comp['postal_address']) ?></p>
                     <?php endif; ?>
                     <?php if (!empty($comp['phone'])): ?>
-                    <p>Phone: <?= htmlspecialchars($comp['phone']) ?></p>
+                    <p><?= t('Phone:') ?> <?= htmlspecialchars($comp['phone']) ?></p>
                     <?php endif; ?>
                     <?php
                     $we = [];
-                    if (!empty($comp['website'])) $we[] = 'Web: '   . htmlspecialchars($comp['website']);
-                    if (!empty($comp['email']))   $we[] = 'Email: ' . htmlspecialchars($comp['email']);
+                    if (!empty($comp['website'])) $we[] = t('Web:')   . ' ' . htmlspecialchars($comp['website']);
+                    if (!empty($comp['email']))   $we[] = t('Email:') . ' ' . htmlspecialchars($comp['email']);
                     if ($we): ?>
                     <p><?= implode(' | ', $we) ?></p>
                     <?php endif; ?>
                     <?php
                     $tv = [];
-                    if (!empty($comp['tin'])) $tv[] = 'TIN: ' . htmlspecialchars($comp['tin']);
-                    if (!empty($comp['vrn'])) $tv[] = 'VRN: ' . htmlspecialchars($comp['vrn']);
+                    if (!empty($comp['tin'])) $tv[] = t('TIN:') . ' ' . htmlspecialchars($comp['tin']);
+                    if (!empty($comp['vrn'])) $tv[] = t('VRN:') . ' ' . htmlspecialchars($comp['vrn']);
                     if ($tv): ?>
                     <p><?= implode(' | ', $tv) ?></p>
                     <?php endif; ?>
@@ -396,17 +400,17 @@ $wf = [
         </div>
 
         <div class="doc-title-box">
-            <h2>GOODS RECEIVED NOTE</h2>
-            <p><strong>GRN #:</strong> <?= htmlspecialchars($grn['receipt_number']) ?></p>
-            <p><strong>Date:</strong> <?= date('d M Y', strtotime($grn['receipt_date'])) ?></p>
-            <p><strong>Status:</strong> <?= strtoupper($grn['status'] ?: 'COMPLETED') ?></p>
+            <h2><?= t('GOODS RECEIVED NOTE') ?></h2>
+            <p><strong><?= t('GRN #:') ?></strong> <?= htmlspecialchars($grn['receipt_number']) ?></p>
+            <p><strong><?= t('Date:') ?></strong> <?= date('d M Y', strtotime($grn['receipt_date'])) ?></p>
+            <p><strong><?= t('Status:') ?></strong> <?= t(strtoupper($grn['status'] ?: 'COMPLETED')) ?></p>
         </div>
     </div>
 
     <!-- VENDOR + GRN INFO -->
     <div class="details-grid">
         <div class="box">
-            <h3>Supplier</h3>
+            <h3><?= t('Supplier') ?></h3>
             <p><strong><?= htmlspecialchars($grn['supplier_name']) ?></strong></p>
             <?php if (!empty($grn['supplier_company'])): ?>
             <p><?= htmlspecialchars($grn['supplier_company']) ?></p>
@@ -423,21 +427,21 @@ $wf = [
             <?php endif; ?>
             <?php
             $s_tv = [];
-            if (!empty($grn['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($grn['s_tin']);
-            if (!empty($grn['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($grn['s_vrn']);
+            if (!empty($grn['s_tin'])) $s_tv[] = t('TIN:') . ' ' . htmlspecialchars($grn['s_tin']);
+            if (!empty($grn['s_vrn'])) $s_tv[] = t('VRN:') . ' ' . htmlspecialchars($grn['s_vrn']);
             if ($s_tv): ?>
             <p><?= implode(' | ', $s_tv) ?></p>
             <?php endif; ?>
         </div>
         <div class="box">
-            <h3>Receipt Information</h3>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($grn['warehouse_name'] ?: 'N/A') ?></p>
+            <h3><?= t('Receipt Information') ?></h3>
+            <p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($grn['warehouse_name'] ?: t('N/A')) ?></p>
             <?php if (!empty($grn['po_ref_number'])): ?>
-            <p><strong>PO Reference:</strong> <?= htmlspecialchars($grn['po_ref_number']) ?></p>
+            <p><strong><?= t('PO Reference:') ?></strong> <?= htmlspecialchars($grn['po_ref_number']) ?></p>
             <?php endif; ?>
             <hr style="margin: 8px 0; border: none; border-top: 1px solid #dee2e6;">
-            <p><strong>Received By:</strong> <?= htmlspecialchars($grn['received_by_name'] ?? 'Staff') ?></p>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($grn_creator_name ?: 'Staff') ?></p>
+            <p><strong><?= t('Received By:') ?></strong> <?= htmlspecialchars($grn['received_by_name'] ?? t('Staff')) ?></p>
+            <p><strong><?= t('Prepared By:') ?></strong> <?= htmlspecialchars($grn_creator_name ?: t('Staff')) ?></p>
         </div>
     </div>
 
@@ -445,12 +449,12 @@ $wf = [
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
-                <th class="text-center" style="width:100px;">Product Code</th>
-                <th>Item / Description</th>
-                <th class="text-right" style="width:100px;">Qty Received</th>
-                <th class="text-right" style="width:105px;">Unit Cost</th>
-                <th class="text-right" style="width:115px;">Total Cost</th>
+                <th class="text-center" style="width:38px;"><?= t('S/NO') ?></th>
+                <th class="text-center" style="width:100px;"><?= t('Product Code') ?></th>
+                <th><?= t('Item / Description') ?></th>
+                <th class="text-right" style="width:100px;"><?= t('Qty Received') ?></th>
+                <th class="text-right" style="width:105px;"><?= t('Unit Cost') ?></th>
+                <th class="text-right" style="width:115px;"><?= t('Total Cost') ?></th>
             </tr>
         </thead>
         <tbody>
@@ -468,7 +472,7 @@ $wf = [
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? 'Unknown Product') ?></td>
+                <td><?= htmlspecialchars($item['product_name'] ?? t('Unknown Product')) ?></td>
                 <td class="text-right fw-bold"><?= number_format($item['quantity_received'], 2) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>
@@ -480,15 +484,15 @@ $wf = [
     <!-- TOTALS -->
     <div class="totals">
         <div class="totals-row">
-            <span>Subtotal:</span>
+            <span><?= t('Subtotal:') ?></span>
             <span><?= number_format($subtotal, 2) ?></span>
         </div>
         <div class="totals-row">
-            <span>VAT (18%):</span>
+            <span><?= t('VAT (18%):') ?></span>
             <span><?= number_format($totalTax, 2) ?></span>
         </div>
         <div class="totals-row grand-total">
-            <span>TOTAL RECEIPT VALUE:</span>
+            <span><?= t('TOTAL RECEIPT VALUE:') ?></span>
             <span><?= number_format($subtotal + $totalTax, 2) ?></span>
         </div>
     </div>
@@ -497,7 +501,7 @@ $wf = [
     <?php if (!empty($grn['notes'])): ?>
     <div class="notes-section">
         <div>
-            <strong>Reception Notes:</strong>
+            <strong><?= t('Reception Notes:') ?></strong>
             <p><?= nl2br(htmlspecialchars($grn['notes'])) ?></p>
         </div>
     </div>

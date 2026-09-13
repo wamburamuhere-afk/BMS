@@ -4,9 +4,12 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
@@ -15,7 +18,7 @@ try {
     $receipt_id = isset($_GET['receipt_id']) ? intval($_GET['receipt_id']) : 0;
 
     if ($receipt_id <= 0) {
-        throw new Exception("Missing GRN ID");
+        throw new Exception(t('Missing GRN ID'));
     }
 
     $stmt = $pdo->prepare("

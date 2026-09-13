@@ -10,21 +10,24 @@ require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 if (!isAuthenticated()) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
 if (!canApprove('grn')) {
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to approve GRNs']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: You do not have permission to approve GRNs')]);
     exit;
 }
 
 try {
     global $pdo;
     $receipt_id = isset($_POST['receipt_id']) ? intval($_POST['receipt_id']) : 0;
-    if (!$receipt_id) throw new Exception("Invalid GRN ID");
+    if (!$receipt_id) throw new Exception(t('Invalid GRN ID'));
 
     // Phase E — project-scope gate
     if (function_exists('assertScopeForRecord')) {
@@ -41,7 +44,7 @@ try {
     ");
     $stmt->execute([$receipt_id]);
     $grn = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$grn) throw new Exception("GRN not found");
+    if (!$grn) throw new Exception(t('GRN not found'));
 
     assertApprovable($grn['status']);
 
@@ -242,9 +245,9 @@ try {
 
     $pdo->commit();
 
-    $response = ['success' => true, 'message' => 'GRN approved and stock updated.'];
+    $response = ['success' => true, 'message' => t('GRN approved and stock updated.')];
     if (!$sigResult['has_signature']) {
-        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+        $response['sig_warning'] = t('Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.');
     }
     echo json_encode($response);
 
