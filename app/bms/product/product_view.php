@@ -878,9 +878,11 @@ global $company_logo, $company_name;
                                                         <tr>
                                                             <th>Batch #</th>
                                                             <th>Warehouse</th>
+                                                            <th>Date Received</th>
                                                             <th>Expiry Date</th>
                                                             <th>Received</th>
                                                             <th>Remaining</th>
+                                                            <th>Status</th>
                                                             <th>Unit Cost</th>
                                                             <th>Source GRN</th>
                                                         </tr>
@@ -890,9 +892,21 @@ global $company_logo, $company_name;
                                                             $days = $b['days_remaining'] !== null ? (int)$b['days_remaining'] : null;
                                                             $expiredClass = ($days !== null && $days <= 0) ? 'text-danger fw-bold' : (($days !== null && $days <= 30) ? 'text-warning fw-bold' : '');
                                                         ?>
+                                                        <?php
+                                                            $isExhausted = (float)$b['quantity_remaining'] <= 0.0001;
+                                                            $isExpired   = ($days !== null && $days <= 0);
+                                                            if ($isExhausted) {
+                                                                $statusBadge = '<span class="badge bg-secondary">Exhausted</span>';
+                                                            } elseif ($isExpired) {
+                                                                $statusBadge = '<span class="badge bg-danger">Expired</span>';
+                                                            } else {
+                                                                $statusBadge = '<span class="badge bg-success">Active</span>';
+                                                            }
+                                                        ?>
                                                         <tr>
                                                             <td><?= safe_output($b['batch_number'] ?? '—') ?></td>
                                                             <td><?= safe_output($b['warehouse_name'] ?? 'N/A') ?></td>
+                                                            <td><?= $b['created_at'] ? date('d M Y', strtotime($b['created_at'])) : '—' ?></td>
                                                             <td class="<?= $expiredClass ?>">
                                                                 <?= $b['expiry_date'] ? date('d M Y', strtotime($b['expiry_date'])) : '—' ?>
                                                                 <?php if ($days !== null && $days <= 30): ?>
@@ -901,6 +915,7 @@ global $company_logo, $company_name;
                                                             </td>
                                                             <td><?= format_number($b['quantity_received'], 3) ?></td>
                                                             <td><?= format_number($b['quantity_remaining'], 3) ?></td>
+                                                            <td><?= $statusBadge ?></td>
                                                             <td><?= format_currency($b['unit_cost']) ?></td>
                                                             <td><?= safe_output($b['receipt_number'] ?? '—') ?></td>
                                                         </tr>

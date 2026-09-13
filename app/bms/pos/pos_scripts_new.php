@@ -179,7 +179,12 @@ const PT = {
     loadingVariants: <?= json_encode(t('Loading variants...')) ?>,
     noVariantsAvailable: <?= json_encode(t('No variants available.')) ?>,
     // Mobile product-grid render cap.
-    showingFirstNProducts: <?= json_encode(t('Showing %shown% of %total% products — search to find more.')) ?>
+    showingFirstNProducts: <?= json_encode(t('Showing %shown% of %total% products — search to find more.')) ?>,
+    // "Add Product" shortcut — Restock Product modal.
+    restockSaving: <?= json_encode(t('Saving...')) ?>,
+    restockSaved: <?= json_encode(t('Product restocked successfully!')) ?>,
+    restockFailed: <?= json_encode(t('Restock Failed')) ?>,
+    restockSelectProductFirst: <?= json_encode(t('Select a product first.')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -205,6 +210,24 @@ function safeOutput(str) {
         .replace(/'/g, '&#039;');
 }
 
+// "Add Product" shortcut — opens the full product registration page, tagged
+// to redirect back here (not to the general Products list) once saved.
+function openNewProductPage() {
+    const returnUrl = <?= json_encode(getUrl('pos')) ?>;
+    window.location.href = <?= json_encode(getUrl('product_create')) ?> + '?return=' + encodeURIComponent(returnUrl);
+}
+
+// "Add Product" shortcut — Restock Product modal. Pre-selects the modal's own
+// shop field (when shown, i.e. the cashier is scoped to more than one shop)
+// to whatever is currently active at the till, so the common single-shop case
+// needs no extra click at all.
+function openRestockProductModal() {
+    if ($('#restock_warehouse_id').length) {
+        $('#restock_warehouse_id').val($('#posWarehouseId').val());
+    }
+    new bootstrap.Modal(document.getElementById('restockProductModal')).show();
+}
+
 $(document).ready(function() {
     // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
     // the old plain <select> hard-limited to 50 rows with no search at all.
@@ -216,6 +239,75 @@ $(document).ready(function() {
             data: p => ({ q: p.term })
         }
     });
+
+    // "Add Product" shortcut — Restock Product modal (only rendered when the
+    // cashier has adjust_stock permission; pos_modals_new.php's own PHP gate).
+    if ($('#restockProductModal').length) {
+        $('#restock_product_id').select2({
+            theme: 'bootstrap-5', width: '100%', dropdownParent: $('#restockProductModal'),
+            placeholder: <?= json_encode(t('Search product by name or SKU')) ?>,
+            ajax: {
+                url: '<?= buildUrl('/api/pos/search_products_for_restock.php') ?>',
+                dataType: 'json', delay: 300, cache: true,
+                data: p => ({ q: p.term })
+            }
+        });
+
+        // Prefill buying/wholesale/retail price from the product's most recent
+        // batch in the currently-relevant shop (falls back to the product's
+        // own purchase/selling price when it has never been batch-tracked here).
+        $('#restock_product_id').on('select2:select', function () {
+            const pid = $(this).val();
+            const wid = $('#restock_warehouse_id').length ? $('#restock_warehouse_id').val() : $('#posWarehouseId').val();
+            if (!pid || !wid) return;
+            $.getJSON('<?= buildUrl('/api/pos/get_restock_defaults.php') ?>', { product_id: pid, warehouse_id: wid }, function (res) {
+                if (res.success) {
+                    $('#restock_buying_price').val(res.data.buying_price || '');
+                    $('#restock_wholesale_price').val(res.data.wholesale_price || '');
+                    $('#restock_selling_price').val(res.data.selling_price || '');
+                }
+            });
+        });
+
+        $('#restockProductModal').on('hidden.bs.modal', function () {
+            $('#restockProductForm')[0].reset();
+            $('#restock_product_id').val(null).trigger('change');
+            $('#restock_date').val(<?= json_encode(date('Y-m-d')) ?>);
+            $('#restock-message').html('');
+        });
+
+        $('#restockProductForm').on('submit', function (e) {
+            e.preventDefault();
+            if (!$('#restock_product_id').val()) {
+                Swal.fire({ icon: 'warning', title: PT.restockSelectProductFirst });
+                return;
+            }
+            const btn = $(this).find('[type="submit"]');
+            const orig = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.restockSaving);
+            $.ajax({
+                url: '<?= buildUrl('/api/pos/quick_restock.php') ?>',
+                type: 'POST',
+                data: $(this).serialize(),
+                dataType: 'json',
+                success: function (res) {
+                    if (res.success) {
+                        Swal.fire({ icon: 'success', title: PT.restockSaved, timer: 1800, showConfirmButton: false })
+                            .then(() => {
+                                $('#restockProductModal').modal('hide');
+                                if (typeof loadProducts === 'function') loadProducts();
+                            });
+                    } else {
+                        $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message) + '</div>');
+                    }
+                },
+                error: function () {
+                    $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(PT.restockFailed) + '</div>');
+                },
+                complete: function () { btn.prop('disabled', false).html(orig); }
+            });
+        });
+    }
 
     // Phase 11 (pos_upgrade_plan.md §7) — show the selected customer's loyalty
     // balance and cap how many points they can redeem. Walk-in (no selection)
