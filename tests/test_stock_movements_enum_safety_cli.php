@@ -74,7 +74,10 @@ $IN_SCOPE = [
 // helper-call path (section 1b).
 $HELPER_CALLERS = [
     'api/approve_dn.php',
-    'api/approve_grn.php',
+    // api/approve_grn.php's own recordStockMovement() call was extracted into
+    // core/stock_intake.php's receiveProductBatch() (shared with the POS
+    // Restock Product shortcut) — checked there instead, below.
+    'core/stock_intake.php',
     'api/create_grn.php',
     'api/update_grn_status.php',
     'api/pos/process_sale.php',
