@@ -119,6 +119,16 @@ if (!function_exists('createModuleRequest')) {
     {
         $fail = fn(string $msg) => ['ok' => false, 'error' => $msg, 'request_id' => null, 'already_updated' => false];
 
+        // Same defensive check listAvailableModulesForTenant() already makes
+        // before touching this table — a control DB that hasn't had
+        // scripts/setup_control_db.php (re-)run on it yet must fail cleanly
+        // here too, not throw an uncaught PDOException (seen in production:
+        // Sentry 97fe087a894a40b38c3f295629c3db29, demo_control missing
+        // feature_upgrade_requests).
+        if (!moduleRequestsTableReady()) {
+            return $fail('Module requests are not set up on this installation yet. Contact your platform administrator.');
+        }
+
         $registry = bmsFeatureRegistry();
         if (!isset($registry[$featureKey])) return $fail('Unknown module.');
 
