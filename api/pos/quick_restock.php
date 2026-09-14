@@ -29,6 +29,8 @@ require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/payment_source.php';
 require_once __DIR__ . '/../../core/gl_accounts.php';
 require_once __DIR__ . '/../../core/code_generator.php';
+require_once __DIR__ . '/../../core/pos_nav.php';        // posSimpleModeEnabled()
+require_once __DIR__ . '/../../core/sales_posting.php';  // posReceiptAccountId() — the Simple Mode default account
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
@@ -52,6 +54,17 @@ $buying_price           = (float)($_POST['buying_price'] ?? 0);
 $wholesale_price_raw    = $_POST['wholesale_price'] ?? '';
 $selling_price          = (float)($_POST['selling_price'] ?? 0);
 $paid_from_account_id   = (int)($_POST['paid_from_account_id'] ?? 0);
+
+// Simple Mode — the modal never shows an account picker for a "normal
+// business man" (pos_modals_new.php), so nothing is posted for
+// paid_from_account_id; resolve the same default cash account cash POS
+// sales already post to (posReceiptAccountId()'s own ① setting -> ② code
+// default '1-1130' Cash Drawer -> ③ first active cash/bank leaf fallback
+// chain), silently, in the background. A pro business (Simple Mode off)
+// still always sends its own explicit choice from the modal, unaffected.
+if ($paid_from_account_id <= 0 && posSimpleModeEnabled()) {
+    $paid_from_account_id = (int)(posReceiptAccountId($pdo, 'cash') ?? 0);
+}
 
 if ($product_id <= 0) { echo json_encode(['success' => false, 'message' => t('Select a product.')]); exit; }
 if ($quantity <= 0)   { echo json_encode(['success' => false, 'message' => t('Quantity must be greater than zero.')]); exit; }

@@ -301,8 +301,15 @@ $(document).ready(function() {
                         $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message) + '</div>');
                     }
                 },
-                error: function () {
-                    $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(PT.restockFailed) + '</div>');
+                error: function (xhr) {
+                    // A caught server-side exception still replies with real
+                    // JSON (success:false, message:<reason>) but a non-2xx
+                    // status code — jQuery routes that to error(), not
+                    // success(), so the actual reason was silently discarded
+                    // and only the generic "Restock Failed" ever showed.
+                    let msg = PT.restockFailed;
+                    try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+                    $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(msg) + '</div>');
                 },
                 complete: function () { btn.prop('disabled', false).html(orig); }
             });
