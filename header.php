@@ -4,6 +4,9 @@ require_once __DIR__ . '/includes/config.php';
 // AI Assistant helpers (aiConfigured) — so the Comms menu can show "Ask BMS"
 // only when AI is enabled. Cheap; reads a few settings. Never fatals.
 if (is_file(__DIR__ . '/core/ai_service.php')) require_once __DIR__ . '/core/ai_service.php';
+// posSimpleModeEnabled() — Reports/Finance menus collapse to a shopkeeper-simple
+// view when a tenant turns this on (POS Settings). See pos_config_settings.php.
+require_once __DIR__ . '/core/pos_nav.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -815,7 +818,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('budget')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('budget') ?>"><i class="bi bi-pie-chart"></i> <?= t('Budget') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('chart_of_accounts')): ?>
+                                <?php if(canView('chart_of_accounts') && !posSimpleModeEnabled()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('chart_of_accounts') ?>"><i class="bi bi-diagram-3"></i> <?= t('Chart of Accounts') ?></a></li>
                                 <?php endif; ?>
 
@@ -836,7 +839,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_reconciliation') ?>"><i class="bi bi-check-circle"></i> <?= t('Reconciliation') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_statement') ?>"><i class="bi bi-card-list"></i> <?= t('Bank Statement') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('journals')): ?>
+                                <?php if(canView('journals') && !posSimpleModeEnabled()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('journals') ?>"><i class="bi bi-journal-text"></i> <?= t('Journals') ?></a></li>
                                 <?php endif; ?>
 
@@ -1178,10 +1181,23 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         
                         <!-- Reports -->
                         <?php if(hasReportsAccess()): ?>
-                        <li class="nav-item mega-dropdown">
+                        <li class="nav-item<?= posSimpleModeEnabled() ? '' : ' mega-dropdown' ?>">
                             <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-graph-up"></i> <?= t('Reports') ?>
                             </a>
+                            <?php if (posSimpleModeEnabled()): ?>
+                            <!-- Simple Mode — a short, plain-language report list for a small
+                                 shop with no accountant. Same canView() gates as the full menu
+                                 below; only the GL-facing columns (Financial/Analytics/Compliance)
+                                 are dropped. See core/pos_nav.php::posSimpleModeEnabled(). -->
+                            <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
+                                <li><h6 class="dropdown-header"><?= t('Business Reports') ?></h6></li>
+                                <?php if(canView('sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> <?= t('Sales Report') ?></a></li><?php endif; ?>
+                                <?php if(canView('purchase_report')): ?><li><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> <?= t('Purchase Report') ?></a></li><?php endif; ?>
+                                <?php if(canView('inventory_report')): ?><li><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> <?= t('Inventory Report') ?></a></li><?php endif; ?>
+                                <?php if(canView('expense_report')): ?><li><a class="dropdown-item" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('Expense Report') ?></a></li><?php endif; ?>
+                            </ul>
+                            <?php else: ?>
                             <div class="dropdown-menu mega-dropdown-menu" aria-labelledby="reportsDropdown">
                                 <div class="row">
                                     <div class="col-lg-3 mega-column">
@@ -1228,9 +1244,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                     </div>
                                 </div>
                             </div>
+                            <?php endif; // posSimpleModeEnabled() ?>
                         </li>
                         <?php endif; ?>
-                        
+
                         <!-- Settings — each item gated individually. Everything strictly
                              admin-only (Users, Roles & Permissions, Payments, Backup, Login
                              History, Zoom Integration, Company Profile, Notification Rules,
