@@ -24,6 +24,12 @@ require_once __DIR__ . '/../../../header.php';
 // sensible instead of an empty/broken list.
 $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
 $modules  = listAvailableModulesForTenant($tenantId);
+
+// Simple Mode — reachable straight from the "Point of Sale" card below via its
+// "More" button, instead of only being buried in POS Settings. Same
+// underlying system_settings key either page writes to (api/pos/save_simple_mode.php),
+// so both stay in sync automatically. See core/pos_nav.php::posSimpleModeEnabled().
+$pos_simple_mode_value = get_setting('pos_simple_mode', '0');
 ?>
 
 <div class="container-fluid mt-4">
@@ -62,9 +68,16 @@ $modules  = listAvailableModulesForTenant($tenantId);
                     <?php endif; ?>
 
                     <?php if ($m['active']): ?>
-                        <button class="btn btn-sm btn-outline-primary mt-auto" disabled>
-                            <i class="bi bi-check-circle me-1"></i> <?= t('Included in your plan') ?>
-                        </button>
+                        <div class="d-flex gap-2 mt-auto">
+                            <button class="btn btn-sm btn-outline-primary flex-grow-1" disabled>
+                                <i class="bi bi-check-circle me-1"></i> <?= t('Included in your plan') ?>
+                            </button>
+                            <?php if ($m['key'] === 'pos'): ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#posSimpleModeModal">
+                                <?= t('More') ?>
+                            </button>
+                            <?php endif; ?>
+                        </div>
                     <?php elseif ($m['pending']): ?>
                         <button class="btn btn-sm btn-outline-secondary mt-auto" disabled>
                             <i class="bi bi-hourglass-split me-1"></i> <?= t('Awaiting approval') ?>
@@ -83,8 +96,50 @@ $modules  = listAvailableModulesForTenant($tenantId);
     </div>
 </div>
 
+<!-- Simple Mode — opened from the Point of Sale card's "More" button. -->
+<div class="modal fade" id="posSimpleModeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-shop me-1"></i> <?= t('Simple Mode') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="posSimpleModeCheckbox" <?= $pos_simple_mode_value === '1' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="posSimpleModeCheckbox"><?= t('Simple mode for a small shop (no accountant)') ?></label>
+                </div>
+                <div class="form-text mt-2"><?= t('Hides accounting-style menus and reports for everyone in this business. The Dashboard shows only what was bought vs what was sold, and Reports becomes a short list: Sales, Purchases, Stock, Expenses. Nothing about how sales are recorded changes — this only changes what is shown.') ?></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="button" class="btn btn-primary" id="posSimpleModeSaveBtn"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).ready(function () {
+    $('#posSimpleModeSaveBtn').on('click', function () {
+        const $btn = $(this);
+        const orig = $btn.html();
+        const enabled = $('#posSimpleModeCheckbox').is(':checked') ? 1 : 0;
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> ' + <?= json_encode(t('Saving...')) ?>);
+        $.post('<?= buildUrl('api/pos/save_simple_mode.php') ?>', { enabled: enabled, _csrf: CSRF_TOKEN }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: <?= json_encode(t('Saved')) ?>, text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
+                $btn.prop('disabled', false).html(orig);
+            }
+        }, 'json').fail(function () {
+            Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Server error. Please try again.')) ?>, 'error');
+            $btn.prop('disabled', false).html(orig);
+        });
+    });
+
     $('.btn-request-module').on('click', function () {
         const key = $(this).data('key');
         const label = $(this).data('label');
