@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-14 (feat/pos-simple-mode) - POS "Simple Mode" — reachable from the Available Modules "Point of Sale" card
+
+**Request:** user pointed at the "Point of Sale — POS terminal, POS dashboard and customer display" card on the Available Modules page and asked for a "More" button there that opens the Simple Mode switch directly, instead of it only being reachable via POS Settings.
+
+**Fix:**
+- `app/constant/settings/available_modules.php` — a "More" button next to the "Included in your plan" badge, shown only on the `pos` module's own card (`$m['key'] === 'pos'`). Opens a small modal with the same Simple Mode checkbox + help text as POS Settings (same `t()` keys reused, not duplicated/hardcoded), saves via AJAX, reloads on success.
+- `api/pos/save_simple_mode.php` — new single-purpose endpoint (`canEdit('pos_config_settings')`-gated, CSRF-checked) that writes the same `pos_simple_mode` key `pos_config_settings.php` already writes — both pages stay in sync automatically, single source of truth.
+- `lang/sw.php` — added `'More' => 'Zaidi'`.
+- `tests/test_pos_simple_mode_cli.php` — extended with section F/F2 (19 more assertions): modal wiring, endpoint gating, and a live in-process save→persist→restore check against the real `system_settings` table.
+
+**Verified:** `tests/test_pos_simple_mode_cli.php` (78/78), `tests/test_pos_i18n_coverage_cli.php` (131/132 — same pre-existing unrelated failure as before), `tests/test_module_requests_cli.php` (52/52, unaffected).
+
 ## 2026-09-14 (feat/pos-simple-mode) - POS "Simple Mode" — shopkeeper-simple dashboard + Reports menu, ledger untouched
 
 **Request:** user wants POS usable by a small shop owner with no accounting background — no GL/double-entry concepts, just a plain buying-vs-selling view and a short report list, opt-in per business, off by default.

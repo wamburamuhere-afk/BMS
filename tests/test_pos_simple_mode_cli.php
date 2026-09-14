@@ -61,6 +61,8 @@ try {
         'app/dashboard.php'                              => "$root/app/dashboard.php",
         'app/constant/settings/pos_config_settings.php'  => "$root/app/constant/settings/pos_config_settings.php",
         'api/pos/get_simple_dashboard_chart.php'         => "$root/api/pos/get_simple_dashboard_chart.php",
+        'app/constant/settings/available_modules.php'    => "$root/app/constant/settings/available_modules.php",
+        'api/pos/save_simple_mode.php'                   => "$root/api/pos/save_simple_mode.php",
     ];
 
     // ── A. Lint ────────────────────────────────────────────────
@@ -233,6 +235,59 @@ try {
 
         $fallback = posSimpleBuySellSeries($pdo, $from, $to, 'not-a-real-period', '');
         ok(count($fallback) === count($series), 'an unknown period string falls back to monthly grouping (' . count($fallback) . ' periods)');
+    }
+
+    // ── F. Available Modules — "More" button on the Point of Sale card ─
+    section('F. Available Modules wiring');
+
+    $avail = src($files['app/constant/settings/available_modules.php']);
+    ok(strpos($avail, 'id="posSimpleModeModal"') !== false, 'Simple Mode modal present');
+    ok(strpos($avail, "\$m['key'] === 'pos'") !== false, '"More" button only rendered for the pos module card');
+    ok(strpos($avail, 'data-bs-target="#posSimpleModeModal"') !== false, '"More" button opens the Simple Mode modal');
+    ok(strpos($avail, 'id="posSimpleModeCheckbox"') !== false, 'Simple Mode checkbox present in the modal');
+    ok(strpos($avail, 'api/pos/save_simple_mode.php') !== false, 'modal saves via api/pos/save_simple_mode.php');
+    ok(strpos($avail, "t('Simple Mode')") !== false && strpos($avail, "t('Simple mode for a small shop (no accountant)')") !== false,
+        'modal reuses the SAME translation keys as POS Settings (not new hardcoded text)');
+
+    $saveApi = src($files['api/pos/save_simple_mode.php']);
+    ok(strpos($saveApi, 'isAuthenticated()') !== false, 'save_simple_mode.php checks isAuthenticated()');
+    ok(strpos($saveApi, "canEdit('pos_config_settings')") !== false, 'save_simple_mode.php gated on canEdit(pos_config_settings) — same permission POS Settings itself requires to edit');
+    ok(strpos($saveApi, 'csrf_check()') !== false, 'save_simple_mode.php enforces CSRF');
+    ok(strpos($saveApi, "save_setting('pos_simple_mode'") !== false, 'save_simple_mode.php writes the SAME pos_simple_mode key POS Settings writes (single source of truth)');
+
+    section('F2. Live — save_simple_mode.php actually persists (in-process, admin session)');
+
+    $uid = (int)$pdo->query("SELECT user_id FROM users WHERE role_id=1 ORDER BY user_id LIMIT 1")->fetchColumn();
+    if (!$uid) {
+        ok(true, 'no admin user row available — live save_simple_mode.php check skipped');
+    } else {
+        $before = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+
+        $_SESSION['user_id'] = $uid; $_SESSION['role_id'] = 1; $_SESSION['is_admin'] = true;
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+
+        $_POST = ['enabled' => 1, '_csrf' => csrf_token()];
+        ob_start(); include "$root/api/pos/save_simple_mode.php"; $json1 = ob_get_clean();
+        $res1 = json_decode($json1, true);
+        ok($res1 && !empty($res1['success']), 'save_simple_mode.php(enabled=1) succeeds in-process');
+        $stored1 = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($stored1 === '1', "system_settings row is '1' immediately after saving (got " . var_export($stored1, true) . ')');
+
+        $_POST = ['enabled' => 0, '_csrf' => csrf_token()];
+        ob_start(); include "$root/api/pos/save_simple_mode.php"; $json2 = ob_get_clean();
+        $res2 = json_decode($json2, true);
+        ok($res2 && !empty($res2['success']), 'save_simple_mode.php(enabled=0) succeeds in-process');
+        $stored2 = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($stored2 === '0', "system_settings row is '0' immediately after disabling (got " . var_export($stored2, true) . ')');
+
+        // Restore whatever was there before this block ran.
+        if ($before === false) {
+            $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+        } else {
+            $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$before]);
+        }
+        $afterRestore = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($afterRestore === $before, 'pos_simple_mode restored to its pre-test value after the live check');
     }
 
 } catch (Throwable $e) {
