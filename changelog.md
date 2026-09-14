@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/enum-guard-stock-intake) - Swahili translation: Stock/Inventory now "Ghala" instead of "Hisa"
+
+**Request:** user flagged that the Swahili UI used "Hisa" for Stock/Inventory labels and asked for "Ghala" instead, confirming (after being warned it would collide with "Warehouse", also "Ghala") to replace all of them anyway.
+
+**Fix:**
+- `lang/sw.php` — replaced every "Hisa"/"hisa"/"HISA" occurrence that means Stock/Inventory (Stock Management, Add Stock, Inventory Report, Low Stock, etc. — 107 lines) with "Ghala"/"ghala"/"GHALA".
+- Left untouched: the 3 lines where "Hisa" means company shares/equity (`'Equity' => 'Hisa'`, `'Share Capital...' => 'Mtaji wa Hisa...'`, and the Balance Sheet Equity section note) — a different, legitimate meaning of the same word.
+- Some phrases now repeat "ghala" twice (e.g. "Enter the current stock quantity for each warehouse/store below:" → "Weka kiasi cha ghala ya sasa kwa kila ghala/duka hapa chini:") since Stock and Warehouse are now the same word — accepted by user.
+
 ## 2026-09-13 (feat/pos-quick-restock) - POS "Add Product" shortcut: New Product + Restock Product (per-batch, price-group-aware, already-paid GL posting)
 
 **Request:** an "Add Product" button on pos.php's left side, opening two options — New Product (the existing registration form) and a new fast-restock path for a product already in the system, entering product/date/buying price/selling price, defaulted from the previous batch. Followed up with: batches must show received date + remaining/exhausted status per shop; `post_principle.md` must be followed, with the buying price treated as already paid. Scouted the environment first (advisory, agreed before coding): `product_batches`/FEFO consumption/GRN batch-writing already existed; missing pieces were a per-batch price history, a shared intake function, and the correct GL treatment.
