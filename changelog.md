@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/pos-simple-mode-remove-tenant-lock-toggle) - Superadmin: POS Advanced + Restaurant POS grouped into "Point of Sale > More"
+
+**Request:** user asked for "POS Advanced" and "Restaurant POS" to stop being separate top-level rows on the superadmin Tenant Detail Modules panel and instead live inside Point of Sale's own "More" dialog — "all are pos... will not be professional to separate it."
+
+**Fix:**
+- `app/superadmin/tenant_view.php` — `$features` split into `$mainFeatures` (rendered in the main grid as before) with `pos_advanced`/`restaurant_pos` pulled out into their own variables and rendered nowhere in the grid. Their current state (`available`/`effective`/`reason`) is baked into page-load JS constants (`POS_ADVANCED`, `RESTAURANT_POS`) — no extra request needed, since (unlike Simple Mode) reading them only touches the control DB, which the page already reads for the main grid.
+- The "More" dialog (renamed `openPosSimpleModeModal()` → `openPosMoreModal()`) now shows three toggles: POS Advanced, Restaurant POS, Simple Mode. Saving fires two requests in parallel — `actions/superadmin_tenant_features.php` with just `{pos_advanced, restaurant_pos}` (confirmed `setTenantFeatures()` treats an unlisted key as "leave alone," so this can never touch any other module) and the existing `actions/superadmin_tenant_pos_simple_mode.php` — then reloads on full success.
+- `tests/test_superadmin_pos_simple_mode_cli.php` — section 4 extended: proves POS Advanced/Restaurant POS are no longer standalone grid rows, the JS constants are present, and the dialog wires them into the same `superadmin_tenant_features.php` the main grid already uses.
+
+**Verified:** `tests/test_superadmin_pos_simple_mode_cli.php` (47/47), real rendered `<script>` block extracted and syntax-checked with `node --check` (valid), `tests/test_pos_simple_mode_cli.php` (62/62, unaffected), `tests/test_pos_phase13_entitlement_cli.php` (20/20, unaffected). Also ran `tests/test_feature_panel_cli.php` for general regression safety — found 12 pre-existing failures **unrelated to this change** (confirmed: that test's own fixture sets every feature key `true` including `pos_advanced`/`restaurant_pos` in the same call it sets `pos` false, which `setTenantFeatures()`'s dependency-conflict rejection — unmodified by this PR — correctly refuses; not something this PR touched or should fix). No leftover DB state from that failed run.
+
 ## 2026-09-14 (chore/automate-control-db-setup) - `scripts/setup_control_db.php` now runs automatically on every deploy
 
 **Request:** user asked that every migration run automatically, not wait on a manual step — directly prompted by the demo_control incident: `feature_upgrade_requests` was added to the control-DB schema after `demo_control` was first provisioned, nobody re-ran the setup script by hand afterward, and "Request this module" broke silently for two weeks until it started throwing 500s in production.

@@ -238,9 +238,23 @@ section('4. tenant_view.php — the "More" button, on-demand only');
 
 $html = route(SA_HOST, '/tenants/view?id=' . $tenantId);
 ok('renders with no PHP fatal', !str_contains($html, 'Fatal error'));
-ok('the "More" button for POS is present', str_contains($html, 'openPosSimpleModeModal()'));
+ok('the "More" button for POS is present', str_contains($html, 'openPosMoreModal()'));
 ok('the page never embeds this tenant\'s current pos_simple_mode value on load (on-demand only)',
     !str_contains($html, 'saPosSimpleEnabled" checked'));
+
+// POS Advanced / Restaurant POS moved OUT of the main Modules grid (no
+// longer separate top-level rows — "will not be professional to separate
+// it", grouped inside Point of Sale > More instead) and INTO the modal's
+// JS constants, which — unlike Simple Mode — need no on-demand fetch since
+// they're plain control-DB reads already available at render time.
+ok('POS Advanced is no longer a standalone row in the main Modules grid', !str_contains($html, 'id="f_pos_advanced"'));
+ok('Restaurant POS is no longer a standalone row in the main Modules grid', !str_contains($html, 'id="f_restaurant_pos"'));
+ok('POS_ADVANCED JS constant is present for the More dialog', str_contains($html, 'const POS_ADVANCED = {'));
+ok('RESTAURANT_POS JS constant is present for the More dialog', str_contains($html, 'const RESTAURANT_POS = {'));
+ok('the More dialog\'s JS wires POS Advanced into the same superadmin_tenant_features.php the main grid uses',
+    str_contains($html, 'pos_advanced: result.value.posAdvanced'));
+ok('the More dialog\'s JS wires Restaurant POS into the same superadmin_tenant_features.php the main grid uses',
+    str_contains($html, 'restaurant_pos: result.value.restaurantPos'));
 
 $htmlDeleted = route(SA_HOST, '/tenants/view?id=' . $deadId);
 ok('a deleted tenant\'s page renders with no PHP fatal either', !str_contains($htmlDeleted, 'Fatal error'));
