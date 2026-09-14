@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/pos-simple-mode-remove-tenant-lock-toggle) - Dashboard chart defaults to Daily when Simple Mode is on
+
+**Request:** user asked that the Bought vs Sold chart default to Daily, not Monthly, when Simple Mode is on — "most of small business prefer to see daily sales made as increase or decrease" — while leaving the period dropdown itself untouched so they can still switch to Weekly/Monthly/etc. themselves. Non-simple tenants keep the existing Monthly default, unchanged.
+
+**Fix:**
+- `app/dashboard.php` — `$defaultChartPeriod = $pos_simple_mode ? 'daily' : 'monthly';`, used to set which `<option>` in `#chartPeriod` carries `selected` (previously hardcoded to Monthly for everyone). The initial `loadPerformanceChart()` call now reads `$('#chartPeriod').val()` instead of relying on the JS function's own hardcoded default, so the dropdown's selected option and the first chart render can never disagree.
+- `tests/test_dashboard_performance_chart_cli.php` — fixed one now-stale assertion (`'<option value="daily">'` no longer appears verbatim once the `selected` attribute became conditional; loosened to match the tag itself).
+- `tests/test_pos_simple_mode_cli.php` — new section G: static checks, plus a **live** check that actually renders `app/dashboard.php` twice (Simple Mode on, then off, via two separate processes — save and render must be separate here, same `get_setting()` per-process-cache reason section D already documents) and confirms which `<option>` truly carries `selected` in the real HTML, not just that the right PHP source exists.
+
+**Verified:** `tests/test_pos_simple_mode_cli.php` (70/70), `tests/test_dashboard_performance_chart_cli.php` (19/19), real `<script>` block extracted from the rendered file and syntax-checked with `node --check` (valid).
+
 ## 2026-09-14 (fix/pos-simple-mode-remove-tenant-lock-toggle) - Superadmin: POS Advanced + Restaurant POS grouped into "Point of Sale > More"
 
 **Request:** user asked for "POS Advanced" and "Restaurant POS" to stop being separate top-level rows on the superadmin Tenant Detail Modules panel and instead live inside Point of Sale's own "More" dialog — "all are pos... will not be professional to separate it."
