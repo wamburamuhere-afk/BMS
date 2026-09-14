@@ -689,23 +689,16 @@ function openPosSimpleModeModal() {
         Swal.fire({
             title: 'POS Simple Mode',
             html: '<div class="text-start">'
-                + '<p class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way.</p>'
-                + '<div class="form-check mb-2">'
+                + '<p class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way. Superadmin-only — the tenant\'s own admin cannot change this themselves.</p>'
+                + '<div class="form-check">'
                 + '<input class="form-check-input" type="checkbox" id="saPosSimpleEnabled"' + (res.enabled ? ' checked' : '') + '>'
                 + '<label class="form-check-label" for="saPosSimpleEnabled">Simple Mode enabled for this tenant</label>'
-                + '</div>'
-                + '<div class="form-check">'
-                + '<input class="form-check-input" type="checkbox" id="saPosSimpleEditable"' + (res.locked ? '' : ' checked') + '>'
-                + '<label class="form-check-label" for="saPosSimpleEditable">This tenant\'s own admin may change it themselves</label>'
                 + '</div>'
                 + '</div>',
             showCancelButton: true,
             confirmButtonText: 'Save',
             preConfirm: function () {
-                return {
-                    enabled: document.getElementById('saPosSimpleEnabled').checked,
-                    locked: !document.getElementById('saPosSimpleEditable').checked,
-                };
+                return { enabled: document.getElementById('saPosSimpleEnabled').checked };
             }
         }).then(function (result) {
             if (!result.isConfirmed) return;
@@ -715,7 +708,9 @@ function openPosSimpleModeModal() {
                 data: {
                     _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
                     enabled: result.value.enabled ? 1 : 0,
-                    locked: result.value.locked ? 1 : 0
+                    // Always locked — the tenant's own admin never manages
+                    // this themselves, superadmin-only by design.
+                    locked: 1
                 }
             }).done(function (res2) {
                 if (res2 && res2.success) {

@@ -16,6 +16,21 @@
 
 **Verified:** YAML parses cleanly (`yaml.safe_load`); the exact semicolon-joined one-line form `appleboy/ssh-action` executes (its own documented newline→`;` join quirk) passes `bash -n`; the new CI guard step runs end-to-end and correctly passes against the real file and fails against a stub with the invocation missing entirely and a stub with it present-but-unguarded; `tests/test_pos_migration_resilience_cli.php` (26/26) and `tests/test_tenant_control_db_cli.php` (59/59) unaffected.
 
+## 2026-09-14 (fix/pos-simple-mode-remove-tenant-lock-toggle) - POS Simple Mode is now superadmin-only, permanently — removed all tenant self-service
+
+**Request:** user decided the tenant should never be able to grant themselves control of Simple Mode at all — only the superadmin. Asked to remove "This tenant's own admin may change it themselves" from the superadmin dialog and take away the tenant's ability entirely, not just default-lock it.
+
+**Fix (removes, doesn't just hide):**
+- `api/pos/save_simple_mode.php` — deleted. The tenant-facing "More" button on Available Modules and the Simple Mode section on POS Settings had no other caller left once removed.
+- `app/constant/settings/available_modules.php` — the "More" button/modal on the Point of Sale card, and the `pos_simple_mode`/`pos_simple_mode_locked` variables that drove it, removed entirely (not conditionally hidden).
+- `app/constant/settings/pos_config_settings.php` — the Simple Mode checkbox/section and its save-path removed entirely; the now-unused `core/pos_nav.php` require dropped too.
+- `app/superadmin/tenant_view.php` — the "This tenant's own admin may change it themselves" checkbox removed from the POS Simple Mode dialog; it now always submits `locked=1`. Superadmin still toggles enabled/disabled as before.
+- `core/tenant_admin.php`/`actions/superadmin_tenant_pos_simple_mode.php`/`tenants.pos_simple_mode_locked` — left in place (harmless, always 1 in practice now) rather than a second migration to drop the column; still real defense-in-depth if anything ever calls `setTenantPosSimpleMode()` with `locked=false` again.
+- `tests/test_pos_simple_mode_cli.php` — section F rewritten to prove the *negative*: no tenant-facing file mentions `pos_simple_mode` at all any more.
+- `tests/test_superadmin_pos_simple_mode_cli.php` — section 5 rewritten: proves there's no tenant path even with the lock column explicitly set to 0 (real provisioned tenant, real subdomain routing) — "nothing left to unlock," not "currently locked." Dead `--tenant-endpoint` worker/helper removed.
+
+**Verified:** `tests/test_superadmin_pos_simple_mode_cli.php` (41/41), `tests/test_pos_simple_mode_cli.php` (62/62), `tests/test_pos_i18n_coverage_cli.php` (134/135 — same pre-existing unrelated "Shop" gap).
+
 ## 2026-09-14 (fix/module-request-missing-table) - Fix production crash: "Request this module" 500s when a control DB is behind on schema
 
 **Sentry:** 97fe087a894a40b38c3f295629c3db29 — `PDOException: SQLSTATE[42S02] ... 'demo_control.feature_upgrade_requests' doesn't exist`, thrown from `core/module_requests.php:138` via `api/request_module_access.php`, production, `shop.demo.bjptechnologies.co.tz`.

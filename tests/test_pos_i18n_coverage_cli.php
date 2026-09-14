@@ -94,7 +94,7 @@ $apiFiles = [
     // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
     'api/pos/save_sales_target.php',
     // POS Simple Mode.
-    'api/pos/get_simple_dashboard_chart.php', 'api/pos/save_simple_mode.php',
+    'api/pos/get_simple_dashboard_chart.php',
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
     'api/restaurant/get_floors.php', 'api/restaurant/save_floor.php',
     'api/restaurant/get_tables.php', 'api/restaurant/save_table.php', 'api/restaurant/update_table_status.php',
