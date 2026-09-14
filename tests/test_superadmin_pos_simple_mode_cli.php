@@ -20,13 +20,13 @@
  *   4. tenant_view.php shows the "More" button only for a non-deleted
  *      tenant, and never embeds the tenant's current Simple Mode value on
  *      page load itself (on-demand only, same discipline as the Users card).
- *   5. THE LOCK IS ENFORCED SERVER-SIDE, not just a hidden button: with
- *      pos_simple_mode_locked=1, a real request from inside the TENANT's own
- *      context (its own subdomain, its own admin session) to
- *      api/pos/save_simple_mode.php is refused (403) and the tenant's stored
- *      value is provably unchanged; Available Modules' "More" button and
- *      POS Settings' Simple Mode section are both genuinely absent from the
- *      rendered HTML, not merely hidden. Unlocking restores both.
+ *   5. SUPERADMIN-ONLY, PERMANENTLY: the tenant's own admin has no UI and no
+ *      endpoint that can reach this setting at all any more (the earlier
+ *      "More" button/endpoint on Available Modules/POS Settings was removed
+ *      outright, not merely gated) — proven from inside the TENANT's own
+ *      subdomain/session, and proven even with the lock column explicitly
+ *      set to 0, so this isn't "currently locked", it's "nothing left to
+ *      unlock". tenant_view.php's own dialog always submits locked=1.
  *
  * CLI ONLY. Provisions one real throwaway tenant and removes it afterwards.
  */
@@ -85,27 +85,6 @@ if (($argv[1] ?? '') === '--route') {
 //     host-based resolution (core/tenant_resolver.php explicitly documents
 //     this as the supported way a CLI test drives a specific tenant), with a
 //     real admin session in THAT tenant — not the superadmin panel at all ──
-if (($argv[1] ?? '') === '--tenant-endpoint') {
-    $file   = (string)$argv[2];
-    $post   = json_decode((string)base64_decode((string)$argv[3]), true) ?: [];
-    $host   = (string)$argv[4];
-    $userId = (int)$argv[5];
-
-    $_SERVER['REQUEST_METHOD'] = 'POST';
-    $_SERVER['HTTP_HOST']      = $host;
-    $_SERVER['REQUEST_URI']    = '/' . $file;
-
-    require_once __DIR__ . '/../roots.php';
-    $_SESSION['user_id']  = $userId;
-    $_SESSION['role_id']  = 1;
-    $_SESSION['is_admin'] = true;
-    if (!array_key_exists('_csrf', $post)) $post['_csrf'] = csrf_token();
-
-    $_POST = $post;
-    require __DIR__ . '/../' . $file;
-    exit(0);
-}
-
 if (($argv[1] ?? '') === '--tenant-route') {
     $host = (string)$argv[2];
     $uri  = (string)$argv[3];
@@ -267,58 +246,39 @@ $htmlDeleted = route(SA_HOST, '/tenants/view?id=' . $deadId);
 ok('a deleted tenant\'s page renders with no PHP fatal either', !str_contains($htmlDeleted, 'Fatal error'));
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('5. The lock is enforced SERVER-SIDE from inside the tenant\'s own context');
+section('5. Superadmin-only, permanently — no tenant path exists at all, regardless of the lock value');
 
-// 5a. Unlocked (default) — the tenant's own admin CAN self-manage.
-$post = ['enabled' => 1];
-$r = tenantEndpoint('api/pos/save_simple_mode.php', $post, $tenantHost, $ownerUserId);
-ok('unlocked: tenant-side save_simple_mode.php succeeds', str_contains($r, '"success":true'), substr($r, 0, 200));
-ok('...and it actually wrote to the tenant\'s own database', tenantSetting($tPdo, 'pos_simple_mode') === '1');
+// The tenant-facing "More" button/modal/endpoint this feature briefly had
+// (tenants.pos_simple_mode_locked=0 meaning "tenant may self-manage") has
+// been removed entirely — the tenant's own admin has NO UI and NO endpoint
+// that can reach this setting any more, full stop. Proven from inside the
+// TENANT's own subdomain/session (not just by reading source), and proven
+// even with locked explicitly set to 0 — so this isn't "currently locked",
+// it's "there is nothing left to unlock".
+$unlockedResult = setTenantPosSimpleMode($tenantId, true, false); // enabled=1, locked=0
+ok('setTenantPosSimpleMode(locked=false) still succeeds (the column/plumbing still exists)', $unlockedResult['ok'] === true);
 
-// Available Modules — "More" button present while unlocked.
+ok('the tenant-facing save endpoint file does not exist on disk at all', !is_file(dirname(__DIR__) . '/api/pos/save_simple_mode.php'));
+
 $avail = tenantRoute($tenantHost, '/available_modules', $ownerUserId);
-ok('unlocked: Available Modules renders with no PHP fatal', !str_contains($avail, 'Fatal error'));
-ok('unlocked: the "More" button IS present on the Point of Sale card', str_contains($avail, 'posSimpleModeModal'));
+ok('Available Modules renders with no PHP fatal', !str_contains($avail, 'Fatal error'));
+ok('Available Modules has no Simple Mode modal/button, even with locked=0', !str_contains($avail, 'posSimpleModeModal'));
+ok('Available Modules never mentions pos_simple_mode at all', !str_contains($avail, 'pos_simple_mode'));
 
-// POS Settings — the Simple Mode section is present while unlocked.
 $posSettings = tenantRoute($tenantHost, '/pos_config_settings', $ownerUserId);
-ok('unlocked: POS Settings renders with no PHP fatal', !str_contains($posSettings, 'Fatal error'));
-ok('unlocked: the Simple Mode checkbox IS present on POS Settings', str_contains($posSettings, 'id="pos_simple_mode"'));
+ok('POS Settings renders with no PHP fatal', !str_contains($posSettings, 'Fatal error'));
+ok('POS Settings has no Simple Mode checkbox, even with locked=0', !str_contains($posSettings, 'id="pos_simple_mode"'));
+ok('POS Settings never mentions pos_simple_mode at all', !str_contains($posSettings, 'pos_simple_mode'));
 
-// 5b. Superadmin locks it.
-$lockResult = setTenantPosSimpleMode($tenantId, true, true); // enabled=1, locked=1
-ok('superadmin locks Simple Mode for this tenant (enabled=1, locked=1)', $lockResult['ok'] === true);
+// tenant_view.php's own "More" dialog no longer offers a lock toggle either
+// — it always submits locked=1, since there is nothing left for a tenant to
+// be trusted with.
+$saveResult = endpoint('actions/superadmin_tenant_pos_simple_mode.php',
+    ['tenant_id' => $tenantId, 'action' => 'set', 'enabled' => 1, 'locked' => 1], ['auth' => true]);
+ok('superadmin can still set enabled/locked via the action endpoint directly', str_contains($saveResult['out'], '"success":true'), substr($saveResult['out'], 0, 200));
+ok('...verified by direct SQL on the tenant\'s own database', tenantSetting($tPdo, 'pos_simple_mode') === '1');
 
-// A raw POST from inside the tenant's own context must now be refused,
-// EVEN THOUGH canEdit('pos_config_settings') would otherwise pass (real
-// admin session) — proves the lock is enforced in the endpoint itself, not
-// just by hiding a button.
-$before = tenantSetting($tPdo, 'pos_simple_mode');
-$r = tenantEndpoint('api/pos/save_simple_mode.php', ['enabled' => 0], $tenantHost, $ownerUserId);
-ok('locked: tenant-side save_simple_mode.php REFUSES the write', !str_contains($r, '"success":true'), substr($r, 0, 200));
-ok('locked: refusal message names the platform administrator', str_contains($r, 'platform administrator'), substr($r, 0, 200));
-ok('locked: the tenant\'s stored value is PROVABLY unchanged after the refused attempt',
-    tenantSetting($tPdo, 'pos_simple_mode') === $before, "before=$before after=" . tenantSetting($tPdo, 'pos_simple_mode'));
-
-$availLocked = tenantRoute($tenantHost, '/available_modules', $ownerUserId);
-ok('locked: Available Modules renders with no PHP fatal', !str_contains($availLocked, 'Fatal error'));
-ok('locked: the "More" button is GENUINELY ABSENT (not merely hidden) from Available Modules',
-    !str_contains($availLocked, 'posSimpleModeModal'));
-
-$posSettingsLocked = tenantRoute($tenantHost, '/pos_config_settings', $ownerUserId);
-ok('locked: POS Settings renders with no PHP fatal', !str_contains($posSettingsLocked, 'Fatal error'));
-ok('locked: the Simple Mode checkbox is GENUINELY ABSENT (not merely hidden) from POS Settings',
-    !str_contains($posSettingsLocked, 'id="pos_simple_mode"'));
-
-// 5c. Superadmin unlocks it again — tenant admin can self-manage once more.
-$unlockResult = setTenantPosSimpleMode($tenantId, false, false);
-ok('superadmin unlocks Simple Mode for this tenant again', $unlockResult['ok'] === true);
-
-$r = tenantEndpoint('api/pos/save_simple_mode.php', ['enabled' => 1], $tenantHost, $ownerUserId);
-ok('unlocked again: tenant-side save_simple_mode.php succeeds once more', str_contains($r, '"success":true'), substr($r, 0, 200));
-ok('...verified by direct SQL', tenantSetting($tPdo, 'pos_simple_mode') === '1');
-
-setTenantPosSimpleMode($tenantId, false, false); // leave the throwaway tenant in a clean state before deletion
+setTenantPosSimpleMode($tenantId, false, true); // leave the throwaway tenant in a clean, locked state before deletion
 
 // ─────────────────────────────────────────────────────────────────────────────
 function endpoint(string $file, array $post, array $server = []): array {
@@ -339,13 +299,6 @@ function refused(array $r, string $expect = ''): bool {
 }
 function route(string $host, string $uri): string {
     $cmd = 'php ' . escapeshellarg(__FILE__) . ' --route ' . escapeshellarg($host) . ' ' . escapeshellarg($uri);
-    $out = []; exec($cmd . ' 2>&1', $out, $rc);
-    return implode("\n", $out);
-}
-function tenantEndpoint(string $file, array $post, string $host, int $userId): string {
-    $cmd = 'php ' . escapeshellarg(__FILE__) . ' --tenant-endpoint '
-         . escapeshellarg($file) . ' ' . escapeshellarg(base64_encode(json_encode($post))) . ' '
-         . escapeshellarg($host) . ' ' . escapeshellarg((string)$userId);
     $out = []; exec($cmd . ' 2>&1', $out, $rc);
     return implode("\n", $out);
 }
