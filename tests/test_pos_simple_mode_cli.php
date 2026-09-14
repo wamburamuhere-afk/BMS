@@ -11,16 +11,22 @@
  * and the dashboard's Performance Overview chart swaps to a plain Bought vs
  * Sold view sourced from pos_sales (core/pos_dashboard_metrics.php).
  *
- * ONE DELIBERATE EXCEPTION (2026-09-14, section I): 'expenses' is bundled
- * into Simple Mode as a real entitlement bypass, not just a display change —
- * core/feature_registry.php::tenantModuleAllowsPage() returns true for
- * 'expenses' whenever Simple Mode is on, regardless of whether the tenant's
- * plan actually includes the Finance or Procurement module 'expenses' is
- * normally gated behind. Found live: a tenant with neither Finance nor
- * Procurement granted had Expenses genuinely unreachable (not merely
- * hidden) — basic expense tracking is a POS baseline for a shop like that,
- * not a paid-tier feature, the same way POS itself is always there for
- * them.
+ * ONE DELIBERATE EXCEPTION (2026-09-14, sections I & J): 'expenses' is
+ * bundled into Simple Mode as a real entitlement bypass, not just a display
+ * change — TWO separate chokepoints both carry it, because neither alone
+ * was enough:
+ *   - core/feature_registry.php::tenantModuleAllowsPage() returns true for
+ *     'expenses' whenever Simple Mode is on (section I) — the gate every
+ *     canView/canCreate/canEdit/canDelete('expenses') call routes through.
+ *   - core/feature_registry.php::bmsFeatureBlockingPath() carries the same
+ *     exception for the exact 6 'finance'-owned files that are expense CRUD
+ *     (section J) — an EARLIER, router/bootstrap-level gate that 404s a
+ *     request before the page's own canView() call (section I's fix) ever
+ *     runs. Found live: patching only tenantModuleAllowsPage() still left
+ *     GET /expenses 404ing at the router on a tenant with neither Finance
+ *     nor Procurement granted.
+ * Basic expense tracking is a POS baseline for a shop like that, not a
+ * paid-tier feature, the same way POS itself is always there for them.
  *
  * SUPERADMIN-ONLY, by design: a tenant's own admin has no UI or endpoint
  * that can change this setting — see tests/test_superadmin_pos_simple_mode_cli.php
@@ -58,6 +64,12 @@
  *                while an unrelated feature-gated page (quotations) stays
  *                correctly blocked, proving this is an 'expenses'-only
  *                bundle, not a blanket entitlement bypass.
+ *   J. ROUTER-LEVEL GATE — bmsFeatureBlockingPath() carries the identical
+ *                bundle for the 6 'finance'-owned files that are expense
+ *                CRUD, proven both OFF (genuinely 404s) and ON (genuinely
+ *                allowed) with an unrelated 'finance' path (revenue.php)
+ *                staying blocked throughout — this is the EARLIER gate that
+ *                made section I's fix alone insufficient live.
  *
  * Read-only except D, which restores the setting to OFF when done.
  * Exit 0 = all pass.
@@ -437,6 +449,102 @@ PHP;
         }
         $afterBypass = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
         ok($afterBypass === $beforeBypass, 'pos_simple_mode restored to its pre-test value after the entitlement-bypass check');
+    }
+
+    // ── J. Router-level path gate — the SECOND, earlier chokepoint ──
+    section('J. bmsFeatureBlockingPath() — the earlier router-level gate must carry the same bundle');
+
+    // Live bug, found directly on shop.demo.bjptechnologies.co.tz: with
+    // Simple Mode on and Finance/Procurement both off, GET /expenses still
+    // 404'd — "Not found: the page you asked for is not available." This
+    // gate runs at the router/bootstrap layer, BEFORE core/permissions.php
+    // may even be loaded, so it 404s the request before expenses.php's own
+    // canView('expenses') call (section I's fix) ever gets a chance to run.
+    // Section I alone was not enough; this section proves the SECOND gate
+    // now defers to Simple Mode too.
+    if (!function_exists('bmsFeatureBlockingPath')) {
+        ok(true, 'bmsFeatureBlockingPath() not available in this context — router-gate check skipped');
+    } else {
+        $prevFeatures2 = $GLOBALS['__bms_features'] ?? null;
+        $GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+        $GLOBALS['__bms_features']['finance'] = false;
+        $GLOBALS['__bms_features']['procurement'] = false;
+
+        $bundlePaths = [
+            'app/constant/accounts/expenses.php',
+            'app/constant/accounts/expense_details.php',
+            'app/constant/accounts/edit_expense.php',
+            'app/constant/accounts/expense_types.php',
+            'api/export_expenses.php',
+            'api/account/export_expenses.php',
+        ];
+
+        $beforeRouter = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+
+        // Sanity — OFF: every one of these must still genuinely 404
+        // (reproduces the exact live symptom before this fix).
+        runPhp("require '$rootEsc/roots.php'; save_setting('pos_simple_mode', '0'); echo 'SAVED';");
+        $offParts = [];
+        foreach ($bundlePaths as $p) {
+            $offParts[] = "(bmsFeatureBlockingPath('$p') !== null ? '1' : '0')";
+        }
+        $offCode = "
+            require '$rootEsc/roots.php';
+            \$GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+            \$GLOBALS['__bms_features']['finance'] = false;
+            \$GLOBALS['__bms_features']['procurement'] = false;
+            echo " . implode(" . '|' . ", $offParts) . ";
+        ";
+        $offOut = runPhp($offCode);
+        ok($offOut === str_repeat('1|', count($bundlePaths) - 1) . '1',
+            "sanity (Simple Mode OFF): every bundled expense path is genuinely blocked at the router (got '$offOut')");
+
+        // The fix — ON: every one of these must now resolve to "not blocked".
+        runPhp("require '$rootEsc/roots.php'; save_setting('pos_simple_mode', '1'); echo 'SAVED';");
+        $onParts = [];
+        foreach ($bundlePaths as $p) {
+            $onParts[] = "(bmsFeatureBlockingPath('$p') === null ? '1' : '0')";
+        }
+        // Negative control in the SAME run: an unrelated 'finance' path
+        // (revenue.php — not part of the expenses bundle) must stay blocked,
+        // proving this isn't a blanket bypass of the whole feature's paths.
+        $onCode = "
+            require '$rootEsc/roots.php';
+            \$GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+            \$GLOBALS['__bms_features']['finance'] = false;
+            \$GLOBALS['__bms_features']['procurement'] = false;
+            \$bundle = " . implode(" . '|' . ", $onParts) . ";
+            \$revenue = bmsFeatureBlockingPath('app/constant/accounts/revenue.php') !== null ? 'REVENUE_STILL_BLOCKED' : 'revenue_wrongly_allowed';
+            echo \$bundle . '||' . \$revenue;
+        ";
+        $onOut = runPhp($onCode);
+        $expectedBundleOn = str_repeat('1|', count($bundlePaths) - 1) . '1';
+        ok(str_starts_with($onOut, $expectedBundleOn),
+            "Simple Mode ON: every bundled expense path now resolves as NOT blocked at the router — fixes the live /expenses 404 (got '$onOut')");
+        ok(str_contains($onOut, 'REVENUE_STILL_BLOCKED'),
+            "...but an unrelated 'finance' path (revenue.php) stays blocked — the bundle is exactly 6 named files, not the whole feature (got '$onOut')");
+
+        // Subdirectory-install form (the function's own documented edge
+        // case) must resolve identically.
+        $subdirOut = runPhp("
+            require '$rootEsc/roots.php';
+            \$GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+            \$GLOBALS['__bms_features']['finance'] = false;
+            \$GLOBALS['__bms_features']['procurement'] = false;
+            echo bmsFeatureBlockingPath('bms/app/constant/accounts/expenses.php') === null ? 'ALLOWED' : 'blocked';
+        ");
+        ok(str_contains($subdirOut, 'ALLOWED'), "a subdirectory-install-style path resolves the same way (got '$subdirOut')");
+
+        // Restore.
+        if ($beforeRouter === false) {
+            $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+        } else {
+            $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$beforeRouter]);
+        }
+        $afterRouter = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($afterRouter === $beforeRouter, 'pos_simple_mode restored to its pre-test value after the router-gate check');
+
+        $GLOBALS['__bms_features'] = $prevFeatures2;
     }
 
 } catch (Throwable $e) {

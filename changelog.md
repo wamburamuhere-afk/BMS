@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/pos-simple-mode-expenses-router-gate) - Fix the SECOND gate: /expenses still 404'd at the router after the entitlement fix
+
+**Found live, immediately after the previous fix deployed:** navigating directly to `https://shop.demo.bjptechnologies.co.tz/expenses` still gave "Not found — The page you asked for is not available," even with Simple Mode on. The previous fix (`tenantModuleAllowsPage()`) was correct but insufficient — there's a SECOND, earlier gate: `bmsFeatureBlockingPath()`, checked at the router/bootstrap layer *before* `core/permissions.php` may even be loaded, using a separate path-based lookup (`featureForPath()` against the registry's `paths` arrays) that never calls `tenantModuleAllowsPage()` at all. `app/constant/accounts/expenses.php` is explicitly listed under `'finance'`'s `paths`, so this earlier gate 404'd the request before the page's own `canView('expenses')` call (and its Simple Mode bypass) ever ran.
+
+**Fix:**
+- `core/feature_registry.php` — `bmsFeatureBlockingPath()` now carries the identical Simple Mode bundle, scoped to exactly the 6 `'finance'`-owned files that are expense CRUD: `expenses.php`, `expense_details.php`, `edit_expense.php`, `expense_types.php`, `api/export_expenses.php`, `api/account/export_expenses.php`. Everything else `'finance'` owns (`revenue.php`, `budget.php`, `journals.php`, etc.) stays correctly gated. The other expense API endpoints (`add_expense.php`, `delete_expense.php`, `get_expense(s).php`, `update_expense*.php`) were confirmed to self-gate via `canCreate`/`canEdit`/`canView('expenses')` internally and are not in the registry's `paths` at all — already fixed by the previous PR, no separate change needed for them.
+- `tests/test_pos_simple_mode_cli.php` — new section J: calls `bmsFeatureBlockingPath()` directly on all 6 bundled paths, both OFF (confirms genuine 404 — reproduces the live bug exactly) and ON (confirms genuinely allowed), plus a negative control (`revenue.php` stays blocked) and a subdirectory-install-path check.
+
+**Verified:** `tests/test_pos_simple_mode_cli.php` (90/90), `tests/test_feature_registry_cli.php` (142/142, no regression to the router-level gate this touches).
+
 ## 2026-09-14 (fix/pos-simple-mode-expenses-bypass-entitlement) - Expenses bundled into POS Simple Mode — bypasses the Finance/Procurement entitlement
 
 **Found live:** on a real tenant with neither Finance nor Procurement granted (confirmed via the live Available Modules page — both showed "Available", not "Active"), Expenses was genuinely unreachable — not just hidden from the header, `canView('expenses')` itself returned false for everyone including admins, because entitlement is checked before the admin bypass. My earlier header-promotion fix (PR #1935) correctly depended on that same `canView('expenses')`, so both the dropdown and the standalone-link fallback rendered nothing for this tenant. This explains the original "why did Finance disappear" question too: it was never granted to this tenant, unrelated to anything built this session.
