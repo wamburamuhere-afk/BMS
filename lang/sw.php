@@ -369,6 +369,7 @@ return [
     // Dashboard — performance chart
     // ------------------------------------------------------------------
     'Performance Overview' => 'Muhtasari wa Utendaji',
+    'Bought vs Sold' => 'Ununuzi na Mauzo',
     'Weekly' => 'Kila Wiki',
     'Monthly' => 'Kila Mwezi',
     'Quarterly' => 'Kila Robo Mwaka',
@@ -1636,6 +1637,7 @@ return [
     'Enter a printer IP address first.' => 'Weka anwani ya IP ya printa kwanza.',
     'Error updating POS settings: %s' => 'Hitilafu katika kusasisha mipangilio ya POS: %s',
     'Fixed Amount (Constant)' => 'Kiasi Maalum (Kisichobadilika)',
+    'Hides accounting-style menus and reports for everyone in this business. The Dashboard shows only what was bought vs what was sold, and Reports becomes a short list: Sales, Purchases, Stock, Expenses. Nothing about how sales are recorded changes — this only changes what is shown.' => 'Huficha menyu na ripoti za kihasibu kwa kila mtu katika biashara hii. Dashibodi inaonyesha tu ulichonunua dhidi ya ulichouza, na Ripoti zinakuwa orodha fupi: Mauzo, Ununuzi, Ghala, Matumizi. Hakuna kinachobadilika jinsi mauzo yanavyorekodiwa — hii inabadilisha tu kinachoonyeshwa.',
     'Leave blank to use the company header only' => 'Acha wazi kutumia kichwa cha kampuni pekee',
     'Loading...' => 'Inapakia...',
     'Location' => 'Mahali',
@@ -1669,6 +1671,8 @@ return [
     'Save' => 'Hifadhi',
     'Save POS Settings' => 'Hifadhi Mipangilio ya POS',
     'Saved' => 'Imehifadhiwa',
+    'Simple Mode' => 'Hali Rahisi',
+    'Simple mode for a small shop (no accountant)' => 'Hali rahisi kwa duka dogo (bila mhasibu)',
     'Slim (totals only)' => 'Nyembamba (jumla tu)',
     'Test Printer' => 'Jaribu Printa',
     'Testing...' => 'Inajaribu...',

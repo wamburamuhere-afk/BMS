@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-09-14 (feat/pos-simple-mode) - POS "Simple Mode" — shopkeeper-simple dashboard + Reports menu, ledger untouched
+
+**Request:** user wants POS usable by a small shop owner with no accounting background — no GL/double-entry concepts, just a plain buying-vs-selling view and a short report list, opt-in per business, off by default.
+
+**Design agreed with user:** a display-only, tenant-wide toggle (`pos_simple_mode` in `system_settings`, defaulted off). The ledger keeps posting every POS sale exactly as before (`.claude/reporting-source.md` is non-negotiable — every financial report still reads only `journal_entries`); the toggle only changes what the UI shows. Applies to every user of the tenant, no per-role exception.
+
+**Fix:**
+- `core/pos_nav.php` — new `posSimpleModeEnabled()` helper, reads the setting.
+- `app/constant/settings/pos_config_settings.php` — new "Simple Mode" checkbox (base POS, not gated by the `pos_advanced` entitlement, saved unconditionally like the other base toggles).
+- `header.php` — Reports mega-menu (Financial Reports / Business Reports / Analytics / Compliance & Operations) collapses to a short list (Sales, Purchase, Inventory, Expense reports — reusing the exact same `t()` keys as the full menu, so English/Swahili both still read correctly) when the toggle is on; Chart of Accounts and Journals hidden from the Finance menu.
+- `core/pos_dashboard_metrics.php` — new `posSimpleBuySellSeries()`: Bought (cost) vs Sold (price) per period, straight off `pos_sales`/`pos_sale_items` + `products.cost_price`, mirroring `core/sales_posting.php::posSaleCogs()`'s per-line cost formula (batch cost where FEFO consumption exists, else average cost; services and corrupt cost>selling_price rows excluded) so it's the true buy/sell pair, not an estimate — deliberately never touches `journal_entries`.
+- `api/pos/get_simple_dashboard_chart.php` — new endpoint, `canView('pos')`-gated, project+warehouse scoped (§23), response shape matches the existing ledger-based `api/get_performance_data.php` so `app/dashboard.php`'s chart code didn't need duplicating.
+- `app/dashboard.php` — Performance Overview chart swaps to "Bought vs Sold" (reusing the existing `Sales`/`Purchases` translation keys for the legend) when the toggle is on; the cash-flow summary strip below the chart (which needs real cash-in/cash-out data this view doesn't compute) is replaced by a plain Sold/Bought/Profit strip instead of showing fake zeros.
+- `lang/sw.php` — added the handful of genuinely new keys (`Simple Mode`, its checkbox help text, `Bought vs Sold`); everything else reuses existing translations.
+- `tests/test_pos_simple_mode_cli.php` — new CLI suite (59 assertions): lint, wiring, default-off, a real save→read round-trip across separate PHP processes (`get_setting()` caches per-process), and live reconciliation of `posSimpleBuySellSeries()` against two independently-derived totals (direct SQL for "sold", a per-sale loop over the existing `posSaleCogs()` for "bought") on the live database.
+
+**Verified:** `tests/test_pos_simple_mode_cli.php` (59/59), `tests/test_pos_dashboard_cli.php` (141/142 — the one failure, "Sales table has S/NO first column", is pre-existing and unrelated: `app/bms/pos/pos_dashboard.php` was never touched by this change), `tests/test_dashboard_performance_chart_cli.php` (19/19), `tests/test_pos_nav_wiring_cli.php` (62/62), `tests/test_pos_i18n_coverage_cli.php` (131/132 — the one failure, a missing Swahili translation for "Shop" in `pos_modals_new.php`, is pre-existing and unrelated).
+
 ## 2026-09-14 (fix/enum-guard-stock-intake) - Swahili translation: Stock/Inventory now "Ghala" instead of "Hisa"
 
 **Request:** user flagged that the Swahili UI used "Hisa" for Stock/Inventory labels and asked for "Ghala" instead, confirming (after being warned it would collide with "Warehouse", also "Ghala") to replace all of them anyway.

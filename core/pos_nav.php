@@ -69,6 +69,29 @@ if (!function_exists('posNavGroups')) {
     }
 }
 
+if (!function_exists('posSimpleModeEnabled')) {
+    /**
+     * "Simple Mode" — a tenant-wide, display-only preference for a POS shop
+     * with no accountant, toggled on app/constant/settings/pos_config_settings.php
+     * and stored as the plain system_settings key 'pos_simple_mode'.
+     *
+     * It NEVER touches ledger posting (core/sales_posting.php etc. keep
+     * posting every sale exactly as before — see .claude/reporting-source.md,
+     * which mandates every financial report reads only the posted ledger).
+     * It only changes what the UI *shows*: header.php collapses the Reports
+     * mega-menu to a short "Ripoti za Biashara" list and hides the
+     * GL-facing Chart of Accounts/Journals links, and app/dashboard.php
+     * swaps its Performance Overview chart for a plain Bought-vs-Sold view
+     * (core/pos_dashboard_metrics.php::posSimpleBuySellSeries()). Applies to
+     * every user of the tenant, no per-role exception — a one-person shop
+     * has no one who needs the advanced view.
+     */
+    function posSimpleModeEnabled(): bool
+    {
+        return get_setting('pos_simple_mode', '0') === '1';
+    }
+}
+
 if (!function_exists('restaurantSubHubCards')) {
     /**
      * The Restaurant sub-hub's 5 destination cards — the single source shared

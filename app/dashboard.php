@@ -5,7 +5,13 @@
 // File: dashboard.php
 require_once __DIR__ . '/../roots.php';
 require_once ROOT_DIR . '/core/financial_reports.php';   // glProfitLoss() — ledger revenue
+require_once ROOT_DIR . '/core/pos_nav.php';              // posSimpleModeEnabled()
 require_once ROOT_DIR . '/header.php';
+
+// Simple Mode (POS Settings) — swaps the Performance Overview chart below for
+// a plain Bought-vs-Sold view sourced from pos_sales, not the ledger. See
+// core/pos_nav.php::posSimpleModeEnabled() and .claude/reporting-source.md.
+$pos_simple_mode = posSimpleModeEnabled();
 
 // Enforce login
 if (!isset($_SESSION['user_id'])) {
@@ -1674,7 +1680,7 @@ function get_progress_color($percentage) {
             <?php if (hasReportsAccess()): ?>
             <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= t('Performance Overview') ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Bought vs Sold') : t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <select class="form-select form-select-sm w-auto border-0 bg-light" id="chartPeriod">
                             <option value="daily"><?= t('Daily') ?></option>
@@ -1903,6 +1909,8 @@ function get_progress_color($percentage) {
 
 <!-- JavaScript for Dashboard -->
 <script>
+const POS_SIMPLE_MODE = <?= json_encode($pos_simple_mode) ?>;
+
 $(document).ready(function() {
     // Load performance chart
     loadPerformanceChart();
@@ -1930,7 +1938,9 @@ $(document).ready(function() {
 });
 
 function loadPerformanceChart(period = 'monthly') {
-    var apiUrl = '<?= getUrl("api/get_performance_data.php") ?>';
+    var apiUrl = POS_SIMPLE_MODE
+        ? '<?= getUrl("api/pos/get_simple_dashboard_chart.php") ?>'
+        : '<?= getUrl("api/get_performance_data.php") ?>';
     console.log('[Chart] Loading from URL:', apiUrl, '| period:', period);
     $('#chartLoader').show();
     $.ajax({
@@ -1990,7 +2000,7 @@ function renderChart(data) {
         data: {
             labels: labels,
             datasets: [{
-                label: <?= json_encode(t('Revenue (Invoiced)')) ?>,
+                label: <?= json_encode($pos_simple_mode ? t('Sales') : t('Revenue (Invoiced)')) ?>,
                 data: revenueData,
                 borderColor: '#0d6efd',
                 backgroundColor: function(context) {
@@ -2011,7 +2021,7 @@ function renderChart(data) {
                 pointBorderColor: '#0d6efd',
                 pointBorderWidth: 2,
             }, {
-                label: <?= json_encode(t('Expenses')) ?>,
+                label: <?= json_encode($pos_simple_mode ? t('Purchases') : t('Expenses')) ?>,
                 data: expenseData,
                 borderColor: '#dc3545',
                 backgroundColor: function(context) {
@@ -2139,7 +2149,34 @@ function renderChart(data) {
     if (data.length > 0) {
         const last = data[data.length - 1];
         const netProfit = (last.net_profit != null) ? last.net_profit : (last.revenue - (last.expense || 0));
-        const netCash   = (last.net_cash   != null) ? last.net_cash   : ((last.collected || 0) - (last.cash_out || 0));
+
+        if (POS_SIMPLE_MODE) {
+            // No cash-in/cash-out figures in Simple Mode (that view is
+            // ledger-only and intentionally not computed here) — just
+            // Sold / Bought / Profit for the latest period.
+            $('#performanceSummary').append(`
+                <div class="mt-4 p-3 bg-light rounded shadow-sm border">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 border-end">
+                            <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
+                            <strong class="h6 mb-0 text-primary">TSh ${last.revenue.toLocaleString()}</strong>
+                            <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('Sales') ?></small>
+                        </div>
+                        <div class="col-md-4 border-end text-center py-2 py-md-0">
+                            <strong class="h6 mb-0">TSh ${(last.expense || 0).toLocaleString()}</strong>
+                            <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('Purchases') ?></small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Net Profit') ?></span>
+                            <strong class="h6 mb-0 text-${netProfit >= 0 ? 'primary' : 'danger'}">TSh ${netProfit.toLocaleString()}</strong>
+                        </div>
+                    </div>
+                </div>
+            `);
+            return;
+        }
+
+        const netCash = (last.net_cash != null) ? last.net_cash : ((last.collected || 0) - (last.cash_out || 0));
 
         $('#performanceSummary').append(`
             <div class="mt-4 p-3 bg-light rounded shadow-sm border">
