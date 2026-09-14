@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/module-request-missing-table) - Fix production crash: "Request this module" 500s when a control DB is behind on schema
+
+**Sentry:** 97fe087a894a40b38c3f295629c3db29 — `PDOException: SQLSTATE[42S02] ... 'demo_control.feature_upgrade_requests' doesn't exist`, thrown from `core/module_requests.php:138` via `api/request_module_access.php`, production, `shop.demo.bjptechnologies.co.tz`.
+
+**Root cause:** `listAvailableModulesForTenant()` (the page that lists modules) already guards itself with `moduleRequestsTableReady()` before touching `feature_upgrade_requests`, so a control database that hasn't had `scripts/setup_control_db.php` (re-)run on it still renders fine. `createModuleRequest()` (what actually runs when someone clicks "Request this module") had no such guard — a real user's click threw an uncaught `PDOException` straight to a 500, on the `demo_control` database specifically.
+
+**Fix:**
+- `core/module_requests.php` — `createModuleRequest()` now calls `moduleRequestsTableReady()` first and fails gracefully (`$fail('Module requests are not set up on this installation yet...')`) instead of ever reaching the query, matching every other early-return in the function.
+- `tests/test_module_requests_cli.php` — new section 2b: structurally proves the guard runs before the first `feature_upgrade_requests` query (can't safely flip the live guard false without dropping the table out from under every other test sharing this dev control DB).
+
+**Still needed (operational, not code):** run `php scripts/setup_control_db.php` against the `demo_control` database in production — this fix stops the crash but the underlying table still needs creating there for "Request this module" to actually work on that environment. Not something I can do without production access.
+
+**Verified:** `tests/test_module_requests_cli.php` (55/55).
+
 ## 2026-09-14 (feat/pos-simple-mode) - POS "Simple Mode" — added to the SUPERADMIN Tenant Detail page + tenant-lock
 
 **Request:** user clarified the "More" button they wanted was actually on the **superadmin** Tenant Detail page (Modules panel, where the POS switch itself lives — "once turned on"), not the tenant-facing Available Modules page I'd built it on first. Also: keep the tenant-facing one, add the superadmin one too, and let the superadmin control whether a tenant's own admin is even allowed to see/change it themselves.

@@ -206,6 +206,35 @@ try {
     foreach ($modules2 as $m) if ($m['key'] === 'projects') $projectsAfterRequest = $m;
     ok($projectsAfterRequest['pending'] === true, 'the tenant-facing list now shows projects as pending');
 
+    section('2b. createModuleRequest() fails cleanly on a control DB missing the table (Sentry 97fe087a894a40b38c3f295629c3db29)');
+    // moduleRequestsTableReady() is process-cached (static $ready), so this
+    // dev process already resolved it to true above — can't flip it live
+    // without dropping the table out from under every other test sharing
+    // this control DB, which is out of scope for a read-only regression
+    // suite. Instead prove the STRUCTURAL fix directly: createModuleRequest()
+    // must call the guard before it ever touches feature_upgrade_requests —
+    // exactly the ordering that turns a missing-table PDOException (what
+    // production actually threw) into the same graceful $fail() every other
+    // early-return in this function already uses.
+    $src = file_get_contents(dirname(__DIR__) . '/core/module_requests.php');
+    $fnStart   = strpos($src, 'function createModuleRequest');
+    // Find the ready-check CALL itself (the guard condition), not just any
+    // mention of its name — this function's own explanatory comment above
+    // the guard also contains the string "moduleRequestsTableReady()", so
+    // anchor on the executable "if (!moduleRequestsTableReady())" form.
+    $guardPos  = strpos($src, 'if (!moduleRequestsTableReady())', $fnStart);
+    // Anchor on the actual SQL touching the table (its FROM clause), not the
+    // bare table name — this function's own new comment (added alongside the
+    // guard) also contains the substring "feature_upgrade_requests" and sits
+    // BEFORE the guard, which would otherwise make this check pass for the
+    // wrong reason even if the guard were removed entirely.
+    $queryPos  = strpos($src, 'FROM feature_upgrade_requests', $fnStart);
+    ok($guardPos !== false, 'createModuleRequest() calls moduleRequestsTableReady()');
+    ok($guardPos !== false && $queryPos !== false && $guardPos < $queryPos,
+        'the ready-check runs BEFORE the first feature_upgrade_requests query, not after');
+    ok(strpos($src, "return \$fail('Module requests are not set up") !== false,
+        'the guard returns the same $fail() shape as every other early-return in this function (never throws)');
+
     section('3. decideModuleRequest() — approve');
     $dr = decideModuleRequest($reqId, 1, true, null);
     ok($dr['ok'] === true, 'approval succeeds', (string)($dr['error'] ?? ''));
