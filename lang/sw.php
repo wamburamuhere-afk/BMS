@@ -2392,6 +2392,7 @@ return [
     'Requested' => 'Imeombwa',
     'Requires:' => 'Inahitaji:',
     'Included in your plan' => 'Imejumuishwa katika mpango wako',
+    'More' => 'Zaidi',
     'Awaiting approval' => 'Inasubiri idhini',
     'Request this module' => 'Omba moduli hii',
     'Request' => 'Omba',
