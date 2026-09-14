@@ -33,6 +33,10 @@
  *                for "bought".
  *   F. NO TENANT SELF-SERVICE — the tenant-facing "More" button/endpoint
  *                this feature briefly had is genuinely gone, not just hidden.
+ *   G. CHART DEFAULT — the dashboard's period dropdown defaults to Daily
+ *                when Simple Mode is on (a small shop cares about today vs
+ *                yesterday, not a monthly trend), Monthly otherwise — proven
+ *                against the real rendered HTML, not just the PHP source.
  *
  * Read-only except D, which restores the setting to OFF when done.
  * Exit 0 = all pass.
@@ -247,6 +251,61 @@ try {
 
     $settingsPage = src($files['app/constant/settings/pos_config_settings.php']);
     ok(strpos($settingsPage, 'pos_simple_mode') === false, 'POS Settings never mentions pos_simple_mode at all — no checkbox, no save path');
+
+    // ── G. Dashboard chart defaults to Daily for Simple Mode ──
+    section('G. Dashboard chart period default (Daily for Simple Mode, Monthly otherwise)');
+
+    ok(strpos($dash, "\$defaultChartPeriod = \$pos_simple_mode ? 'daily' : 'monthly';") !== false,
+        'dashboard.php computes $defaultChartPeriod from $pos_simple_mode');
+    ok(strpos($dash, "loadPerformanceChart(\$('#chartPeriod').val())") !== false,
+        'the initial chart load reads the dropdown\'s own default, so it can never disagree with it');
+    ok(strpos($dash, "\$defaultChartPeriod === 'daily' ? 'selected' : ''") !== false
+        && strpos($dash, "\$defaultChartPeriod === 'monthly' ? 'selected' : ''") !== false,
+        'both the Daily and Monthly <option> tags key off the same $defaultChartPeriod variable');
+
+    // Live: render the real page twice (Simple Mode on, then off) and check
+    // which <option> actually carries "selected" in the real HTML output —
+    // not just that the PHP source contains the right variable name.
+    $uidRow = $pdo->query("SELECT user_id FROM users WHERE role_id=1 ORDER BY user_id LIMIT 1")->fetchColumn();
+    if (!$uidRow) {
+        ok(true, 'no admin user row available — live dashboard render check skipped');
+    } else {
+        $beforeDash = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+
+        // Save and render MUST be separate processes — get_setting()'s
+        // per-process static cache would otherwise serve dashboard.php the
+        // value that existed before this test's own save_setting() call
+        // (see section D's own note on this exact caching behaviour).
+        $renderDashboard = function (string $simpleModeValue) use ($rootEsc, $uidRow) {
+            runPhp("require '$rootEsc/roots.php'; save_setting('pos_simple_mode', " . var_export($simpleModeValue, true) . "); echo 'SAVED';");
+            return runPhp("
+                require '$rootEsc/roots.php';
+                \$_SESSION['user_id'] = $uidRow; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
+                ob_start();
+                include '$rootEsc/app/dashboard.php';
+                \$html = ob_get_clean();
+                echo (strpos(\$html, 'value=\"daily\" selected') !== false ? 'DAILY_SELECTED' : 'daily_not_selected') . '|'
+                   . (strpos(\$html, 'value=\"monthly\" selected') !== false ? 'MONTHLY_SELECTED' : 'monthly_not_selected');
+            ");
+        };
+
+        $onOut = $renderDashboard('1');
+        ok(str_contains($onOut, 'DAILY_SELECTED'), "Simple Mode ON: real rendered HTML selects Daily (got '$onOut')");
+        ok(str_contains($onOut, 'monthly_not_selected'), "Simple Mode ON: Monthly is NOT selected (got '$onOut')");
+
+        $offOut = $renderDashboard('0');
+        ok(str_contains($offOut, 'MONTHLY_SELECTED'), "Simple Mode OFF: real rendered HTML selects Monthly, unchanged default (got '$offOut')");
+        ok(str_contains($offOut, 'daily_not_selected'), "Simple Mode OFF: Daily is NOT selected (got '$offOut')");
+
+        // Restore.
+        if ($beforeDash === false) {
+            $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+        } else {
+            $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$beforeDash]);
+        }
+        $restoredDash = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($restoredDash === $beforeDash, 'pos_simple_mode restored to its pre-test value after the live dashboard render check');
+    }
 
 } catch (Throwable $e) {
     ok(false, 'threw: ' . $e->getMessage());

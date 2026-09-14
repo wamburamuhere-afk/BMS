@@ -1682,12 +1682,21 @@ function get_progress_color($percentage) {
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Bought vs Sold') : t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
+                        <?php
+                        // Simple Mode defaults this chart to Daily — a small
+                        // shop owner cares about "did today's sales go up or
+                        // down", not a monthly trend line. Still just a
+                        // default: the dropdown itself is untouched, so they
+                        // can switch to Weekly/Monthly/etc. themselves anytime.
+                        // Non-simple tenants keep the original Monthly default.
+                        $defaultChartPeriod = $pos_simple_mode ? 'daily' : 'monthly';
+                        ?>
                         <select class="form-select form-select-sm w-auto border-0 bg-light" id="chartPeriod">
-                            <option value="daily"><?= t('Daily') ?></option>
-                            <option value="weekly"><?= t('Weekly') ?></option>
-                            <option value="monthly" selected><?= t('Monthly') ?></option>
-                            <option value="quarterly"><?= t('Quarterly') ?></option>
-                            <option value="yearly"><?= t('Yearly') ?></option>
+                            <option value="daily" <?= $defaultChartPeriod === 'daily' ? 'selected' : '' ?>><?= t('Daily') ?></option>
+                            <option value="weekly" <?= $defaultChartPeriod === 'weekly' ? 'selected' : '' ?>><?= t('Weekly') ?></option>
+                            <option value="monthly" <?= $defaultChartPeriod === 'monthly' ? 'selected' : '' ?>><?= t('Monthly') ?></option>
+                            <option value="quarterly" <?= $defaultChartPeriod === 'quarterly' ? 'selected' : '' ?>><?= t('Quarterly') ?></option>
+                            <option value="yearly" <?= $defaultChartPeriod === 'yearly' ? 'selected' : '' ?>><?= t('Yearly') ?></option>
                         </select>
                         <button class="btn btn-sm btn-light border-0" onclick="loadPerformanceChart($('#chartPeriod').val())">
                             <i class="bi bi-arrow-clockwise"></i>
@@ -1912,9 +1921,11 @@ function get_progress_color($percentage) {
 const POS_SIMPLE_MODE = <?= json_encode($pos_simple_mode) ?>;
 
 $(document).ready(function() {
-    // Load performance chart
-    loadPerformanceChart();
-    
+    // Load performance chart — read the dropdown's own default (Daily for
+    // Simple Mode, Monthly otherwise; see $defaultChartPeriod) rather than
+    // hardcoding a period here, so the two can never disagree.
+    loadPerformanceChart($('#chartPeriod').val());
+
     // Auto-refresh dashboard every 5 minutes
     setTimeout(function() {
         if (document.hasFocus()) {
