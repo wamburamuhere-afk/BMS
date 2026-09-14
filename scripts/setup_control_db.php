@@ -22,7 +22,17 @@
  * Setting up multi-tenancy is already a deliberate manual process (see
  * docs/MULTI_TENANCY_CONVENTIONS.md §9: environment variables, a config.php
  * edit, DNS). This script is that process's database step. It is idempotent, so
- * running it again is always safe.
+ * running it again is always safe — this is also why it's safe to still run by
+ * hand at any time (`php scripts/setup_control_db.php` / `--check`).
+ *
+ * ALSO invoked automatically from deploy.yml since 2026-09-14 (§10's own
+ * "Wired into deploy.yml" subsection in MULTI_TENANCY_CONVENTIONS.md) — but
+ * wrapped in the same non-aborting `|| echo` guard tenant migrations already
+ * use, not the unguarded `migrations/runner.php` path that caused the
+ * 2026-08-31 incident this docblock describes. A failure here now warns
+ * loudly in the deploy log instead of silently requiring someone to remember
+ * to re-run it by hand (which is exactly what let a since-added table,
+ * feature_upgrade_requests, go missing on demo_control for two weeks).
  *
  * CLI ONLY — scripts/ is HTTP-blocked by .htaccess, and this refuses a web SAPI
  * regardless.
