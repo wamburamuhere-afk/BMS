@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-14 (chore/automate-control-db-setup) - `scripts/setup_control_db.php` now runs automatically on every deploy
+
+**Request:** user asked that every migration run automatically, not wait on a manual step — directly prompted by the demo_control incident: `feature_upgrade_requests` was added to the control-DB schema after `demo_control` was first provisioned, nobody re-ran the setup script by hand afterward, and "Request this module" broke silently for two weeks until it started throwing 500s in production.
+
+**Why this wasn't already automatic:** `docs/MULTI_TENANCY_CONVENTIONS.md` §10 documents a real prior incident (2026-08-31) — this exact script used to be an unguarded `migrations/*.php` file; it failed because the app's MySQL user lacked `CREATE DATABASE`, and `script_stop: true` correctly halted the *entire* deploy, including the second host, which never got that release. The fix at the time was to pull it out of the pipeline entirely and make it a manual "Step 0" — which traded one outage for a slower, quieter failure mode (a step nobody remembers to repeat).
+
+**This change does not reopen that incident** — it applies the exact same non-aborting pattern that safely brought tenant migrations back into the pipeline on 2026-09-02 (§11), rather than reverting to the pre-§10 unguarded shape.
+
+**Fix:**
+- `.github/workflows/deploy.yml` — `php scripts/setup_control_db.php` now runs per host, right after `migrations/runner.php` and before `core/tenant_migration_runner.php`, wrapped in the identical `|| echo "⚠️ ..."` guard already used for tenant migrations. A control-DB failure now warns loudly in the deploy log; it can never abort the release.
+- New CI check in the `test` job, "Verify control DB setup is wired in AND non-aborting" — asserts (excluding comment lines, which would otherwise produce a false pass) that `php scripts/setup_control_db.php` is both called AND immediately followed by `|| echo` in the actual script content. Mirrors the existing "Verify deploy.yml has script_stop true" guard. Caught a real bug in my own first draft (matched my own explanatory YAML comments instead of the real invocation) before it shipped.
+- `scripts/setup_control_db.php` — docblock updated to note it's now also invoked automatically (still fully safe to run by hand at any time; nothing about that changed).
+- `docs/MULTI_TENANCY_CONVENTIONS.md` — new "Wired into deploy.yml — 2026-09-14" subsection under §10, mirroring §11's own subsection, explaining why this doesn't repeat the 2026-08-31 incident.
+
+**Verified:** YAML parses cleanly (`yaml.safe_load`); the exact semicolon-joined one-line form `appleboy/ssh-action` executes (its own documented newline→`;` join quirk) passes `bash -n`; the new CI guard step runs end-to-end and correctly passes against the real file and fails against a stub with the invocation missing entirely and a stub with it present-but-unguarded; `tests/test_pos_migration_resilience_cli.php` (26/26) and `tests/test_tenant_control_db_cli.php` (59/59) unaffected.
+
 ## 2026-09-14 (fix/pos-simple-mode-remove-tenant-lock-toggle) - POS Simple Mode is now superadmin-only, permanently — removed all tenant self-service
 
 **Request:** user decided the tenant should never be able to grant themselves control of Simple Mode at all — only the superadmin. Asked to remove "This tenant's own admin may change it themselves" from the superadmin dialog and take away the tenant's ability entirely, not just default-lock it.

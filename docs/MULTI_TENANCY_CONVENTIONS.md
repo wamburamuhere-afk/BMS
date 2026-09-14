@@ -474,6 +474,36 @@ either the main application's schema or a tenant's schema belongs in
 a migration that a fresh, not-yet-configured environment could plausibly fail
 to run, ask first whether it belongs here instead.
 
+### Wired into `deploy.yml` — 2026-09-14
+
+"Run by hand" quietly became "never run again." `feature_upgrade_requests` (a
+table this same script creates) was added to the control-DB schema after
+`demo_control` was first provisioned, nobody re-ran the script by hand
+afterward, and a real tenant admin's "Request this module" click threw an
+uncaught `PDOException` straight to a 500 in production (Sentry
+`97fe087a894a40b38c3f295629c3db29`, 2026-09-14) — `createModuleRequest()`
+querying a table that had simply never been created on that host. A manual
+step with no reminder anywhere in the pipeline is a manual step nobody
+remembers to repeat.
+
+This does **not** reopen the 2026-08-31 incident. That incident's cause was an
+*unguarded* `migrations/*.php` file whose failure was allowed to abort
+`script_stop: true` for the whole deploy. `scripts/setup_control_db.php` still
+lives outside `migrations/` exactly as this section says — it is now merely
+*also* invoked from `deploy.yml`, per host, wrapped in the identical
+non-aborting `|| echo` guard §11 already uses for tenant migrations:
+
+```bash
+php migrations/runner.php; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — …"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — …"
+```
+
+Runs **before** the tenant migration runner (tenant-facing entitlement reads
+expect the control tables to already exist) and is still exactly as safe on a
+host with no multi-tenancy configured — the script's own idempotent
+CREATE-IF-NOT-EXISTS logic exits 0 there, same no-op shape §11 relies on for
+`core/tenant_migration_runner.php`. Still fully safe to run by hand too
+(`php scripts/setup_control_db.php` / `--check`) — nothing about that changed.
+
 ---
 
 ## 11. Per-tenant migrations *(Phase 8)*

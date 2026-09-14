@@ -157,6 +157,33 @@ jobs:
             exit 1
           fi
 
+      - name: Verify control DB setup is wired in AND non-aborting
+        run: |
+          # Guards against repeating either historical incident (docs/MULTI_TENANCY_CONVENTIONS.md §10):
+          # the script must run (2026-09-14 fix — a missing table silently broke a
+          # feature for weeks because nothing reminded anyone to re-run it by hand),
+          # and it must be guarded so its own failure can never take down deploy.yml's
+          # script_stop:true the way the unguarded 2026-08-31 version did.
+          #
+          # Comment lines are excluded before grepping — this file's own
+          # explanatory prose (and the guard's echoed warning text) both contain
+          # the literal string "php scripts/setup_control_db.php", which would
+          # otherwise make this check pass even if the real invocation were
+          # deleted or left unguarded.
+          NONCOMMENT=$(grep -v '^[[:space:]]*#' .github/workflows/deploy.yml)
+          if echo "$NONCOMMENT" | grep -q 'php scripts/setup_control_db.php'; then
+            echo "✓ scripts/setup_control_db.php is wired into deploy.yml."
+          else
+            echo "❌ php scripts/setup_control_db.php is not called anywhere in deploy.yml — deploy blocked."
+            exit 1
+          fi
+          if echo "$NONCOMMENT" | grep -q 'php scripts/setup_control_db.php || echo'; then
+            echo "✓ ...and guarded with || echo immediately after it — its failure cannot abort the deploy."
+          else
+            echo "❌ scripts/setup_control_db.php is called WITHOUT an || echo guard immediately after it — a control-DB failure would abort the whole deploy again (the 2026-08-31 incident). Deploy blocked."
+            exit 1
+          fi
+
   # ── JOB 2: DEPLOY ───────────────────────────────────────────────────────────
   # Only runs if test job passes. Blocked if any test step fails.
   deploy:
@@ -194,17 +221,41 @@ jobs:
           # exists) and "Generate Backup" fails with "Cannot open file for
           # writing" — reproduced on bms.bjptechnologies.co.tz on 2026-08-31.
           #
-          # TENANT MIGRATIONS RUN LAST, AND MAY NEVER ABORT THE DEPLOY.
-          # `php core/tenant_migration_runner.php` applies migrations/tenant/ to
-          # each tenant database. It is deliberately the last step per host and is
-          # guarded with `|| echo`, so a tenant-side failure warns loudly but the
-          # release still lands — including on the second host.
+          # CONTROL DB SETUP RUNS NEXT, AND MAY NEVER ABORT THE DEPLOY EITHER.
+          # `php scripts/setup_control_db.php` creates/upgrades bms_control (or
+          # demo_control, etc.) — the tenants/superadmins/features/plans/
+          # feature_upgrade_requests tables — idempotently. Guarded with `|| echo`,
+          # same shape as the tenant-migration guard directly below.
           #
-          # This is not caution for its own sake. On 2026-08-31 a migration for the
-          # optional, not-yet-live control database exited 1, `script_stop: true`
-          # correctly halted everything, and the second host never received the
-          # release. A per-tenant subsystem must never be able to veto the whole
-          # platform's deploy. See docs/MULTI_TENANCY_CONVENTIONS.md §10 and §11.
+          # THIS IS THE EXACT SUBSYSTEM THAT CAUSED THE 2026-08-31 INCIDENT
+          # (see docs/MULTI_TENANCY_CONVENTIONS.md §10): back then it ran as an
+          # ungraded `migrations/*.php` file, exited 1 because the app's MySQL
+          # user lacked CREATE DATABASE, and `script_stop: true` correctly halted
+          # the ENTIRE deploy — the second host never received that release. §10's
+          # fix at the time was to pull it out of the pipeline entirely and
+          # require an operator to run it by hand as "Step 0" — which is exactly
+          # what silently broke "Request this module" on demo_control (Sentry
+          # 97fe087a894a40b38c3f295629c3db29, 2026-09-14): nobody re-ran it after
+          # `feature_upgrade_requests` was added, because nothing in the pipeline
+          # ever reminds anyone to. Re-wiring it here does NOT repeat the
+          # incident: this time it carries the same non-aborting `|| echo` guard
+          # that safely brought tenant migrations back into the pipeline on
+          # 2026-09-02 (§11) — a platform-infrastructure failure now warns loudly
+          # in the job log instead of either silently rotting (the old "by hand"
+          # policy) or taking down both hosts (the pre-§10 policy).
+          #
+          # Runs BEFORE the tenant migration runner: tenant-facing entitlement
+          # reads (tenantFeatureEnabled() etc.) expect the control DB's tables to
+          # already exist. Safe on a host with no multi-tenancy configured at all
+          # — the script's own idempotent CREATE-IF-NOT-EXISTS logic and exit 0
+          # make that a no-op-shaped success, not a failure the guard needs to
+          # catch.
+          #
+          # TENANT MIGRATIONS RUN NEXT, AND MAY NEVER ABORT THE DEPLOY.
+          # `php core/tenant_migration_runner.php` applies migrations/tenant/ to
+          # each tenant database. It is deliberately the last migration step per
+          # host and is guarded with `|| echo`, so a tenant-side failure warns
+          # loudly but the release still lands — including on the second host.
           #
           # It is safe on a host that has no multi-tenancy at all: with no control
           # database, or no files under migrations/tenant/, the runner reports
@@ -234,7 +285,7 @@ jobs:
             set -e
             HOSTS="bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz"
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
-            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
             sudo systemctl reload apache2 || echo "⚠️  Apache reload failed — some workers may keep serving pre-deploy PHP (stale opcache) until the next manual reload or worker recycle. Run: sudo systemctl reload apache2"
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
