@@ -3,18 +3,25 @@
  * POS "Simple Mode" — CLI regression suite
  *   php tests/test_pos_simple_mode_cli.php
  *
- * Simple Mode (POS Settings > "Simple mode for a small shop") is a
- * display-only, tenant-wide preference for a shop with no accountant. It
- * must NEVER disable ledger posting (.claude/reporting-source.md mandates
- * every financial report reads only the posted journal, unconditionally) —
- * it only changes what the UI shows: the Reports mega-menu collapses to a
- * short list, Chart of Accounts/Journals hide from the Finance menu, and
- * the dashboard's Performance Overview chart swaps to a plain Bought vs
- * Sold view sourced from pos_sales (core/pos_dashboard_metrics.php).
+ * Simple Mode is a display-only, tenant-wide preference for a shop with no
+ * accountant. It must NEVER disable ledger posting
+ * (.claude/reporting-source.md mandates every financial report reads only
+ * the posted journal, unconditionally) — it only changes what the UI shows:
+ * the Reports mega-menu collapses to a short list, Chart of
+ * Accounts/Journals hide from the Finance menu, and the dashboard's
+ * Performance Overview chart swaps to a plain Bought vs Sold view sourced
+ * from pos_sales (core/pos_dashboard_metrics.php).
+ *
+ * SUPERADMIN-ONLY, by design: a tenant's own admin has no UI or endpoint
+ * that can change this setting — see tests/test_superadmin_pos_simple_mode_cli.php
+ * for the actual write path (app/superadmin/tenant_view.php > Point of Sale
+ * > More -> actions/superadmin_tenant_pos_simple_mode.php ->
+ * core/tenant_admin.php::setTenantPosSimpleMode()). Section F here proves
+ * the negative: no tenant-facing page or file offers a way to set it.
  *
  *   A. STATIC  — every touched/new file lints clean.
- *   B. WIRING  — source patterns: setting persisted unconditionally, menu
- *                gates present, chart swap wired, ledger posting untouched.
+ *   B. WIRING  — source patterns: menu gates present, chart swap wired,
+ *                ledger posting untouched.
  *   C. DEFAULT — posSimpleModeEnabled() is OFF when unset (default off,
  *                per requirement: "by default remain as is").
  *   D. ROUND-TRIP — save_setting()/posSimpleModeEnabled() really reads back
@@ -24,6 +31,8 @@
  *                derived totals: a direct-SQL "sold" total, and a per-sale
  *                loop over the existing, separately-tested posSaleCogs()
  *                for "bought".
+ *   F. NO TENANT SELF-SERVICE — the tenant-facing "More" button/endpoint
+ *                this feature briefly had is genuinely gone, not just hidden.
  *
  * Read-only except D, which restores the setting to OFF when done.
  * Exit 0 = all pass.
@@ -62,7 +71,6 @@ try {
         'app/constant/settings/pos_config_settings.php'  => "$root/app/constant/settings/pos_config_settings.php",
         'api/pos/get_simple_dashboard_chart.php'         => "$root/api/pos/get_simple_dashboard_chart.php",
         'app/constant/settings/available_modules.php'    => "$root/app/constant/settings/available_modules.php",
-        'api/pos/save_simple_mode.php'                   => "$root/api/pos/save_simple_mode.php",
     ];
 
     // ── A. Lint ────────────────────────────────────────────────
@@ -91,15 +99,6 @@ try {
     ok(strpos($fnBody, 'FROM journal_entries') === false && strpos($fnBody, 'JOIN journal_entries') === false,
         'posSimpleBuySellSeries() SQL never queries journal_entries (cash-basis, not GL)');
     ok(strpos($fnBody, 'FROM pos_sales') !== false, 'posSimpleBuySellSeries() SQL reads pos_sales directly');
-
-    $settingsPage = src($files['app/constant/settings/pos_config_settings.php']);
-    ok(strpos($settingsPage, "name=\"pos_simple_mode\"") !== false, 'Simple Mode checkbox rendered');
-    ok(strpos($settingsPage, "save_setting('pos_simple_mode'") !== false, 'Simple Mode setting is saved');
-    // Must be saved unconditionally (base POS), not gated behind the
-    // pos_advanced entitlement like the loyalty program below it.
-    $saveLine = strpos($settingsPage, "save_setting('pos_simple_mode'");
-    $gateLine = strpos($settingsPage, 'if ($pos_advanced_entitled)');
-    ok($saveLine !== false && ($gateLine === false || $saveLine < $gateLine), 'Simple Mode setting saved BEFORE (outside) the pos_advanced entitlement gate');
 
     $header = src($files['header.php']);
     ok(strpos($header, "require_once __DIR__ . '/core/pos_nav.php';") !== false, 'header.php loads core/pos_nav.php');
@@ -237,58 +236,17 @@ try {
         ok(count($fallback) === count($series), 'an unknown period string falls back to monthly grouping (' . count($fallback) . ' periods)');
     }
 
-    // ── F. Available Modules — "More" button on the Point of Sale card ─
-    section('F. Available Modules wiring');
+    // ── F. No tenant self-service — superadmin-only, genuinely ────
+    section('F. No tenant-facing way to change Simple Mode (superadmin-only)');
+
+    ok(!is_file("$root/api/pos/save_simple_mode.php"), 'the old tenant-facing save endpoint is gone, not just unreachable');
 
     $avail = src($files['app/constant/settings/available_modules.php']);
-    ok(strpos($avail, 'id="posSimpleModeModal"') !== false, 'Simple Mode modal present');
-    ok(strpos($avail, "\$m['key'] === 'pos'") !== false, '"More" button only rendered for the pos module card');
-    ok(strpos($avail, 'data-bs-target="#posSimpleModeModal"') !== false, '"More" button opens the Simple Mode modal');
-    ok(strpos($avail, 'id="posSimpleModeCheckbox"') !== false, 'Simple Mode checkbox present in the modal');
-    ok(strpos($avail, 'api/pos/save_simple_mode.php') !== false, 'modal saves via api/pos/save_simple_mode.php');
-    ok(strpos($avail, "t('Simple Mode')") !== false && strpos($avail, "t('Simple mode for a small shop (no accountant)')") !== false,
-        'modal reuses the SAME translation keys as POS Settings (not new hardcoded text)');
+    ok(strpos($avail, 'posSimpleModeModal') === false, 'Available Modules has no Simple Mode modal/button left');
+    ok(strpos($avail, 'pos_simple_mode') === false, 'Available Modules never mentions pos_simple_mode at all');
 
-    $saveApi = src($files['api/pos/save_simple_mode.php']);
-    ok(strpos($saveApi, 'isAuthenticated()') !== false, 'save_simple_mode.php checks isAuthenticated()');
-    ok(strpos($saveApi, "canEdit('pos_config_settings')") !== false, 'save_simple_mode.php gated on canEdit(pos_config_settings) — same permission POS Settings itself requires to edit');
-    ok(strpos($saveApi, 'csrf_check()') !== false, 'save_simple_mode.php enforces CSRF');
-    ok(strpos($saveApi, "save_setting('pos_simple_mode'") !== false, 'save_simple_mode.php writes the SAME pos_simple_mode key POS Settings writes (single source of truth)');
-
-    section('F2. Live — save_simple_mode.php actually persists (in-process, admin session)');
-
-    $uid = (int)$pdo->query("SELECT user_id FROM users WHERE role_id=1 ORDER BY user_id LIMIT 1")->fetchColumn();
-    if (!$uid) {
-        ok(true, 'no admin user row available — live save_simple_mode.php check skipped');
-    } else {
-        $before = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
-
-        $_SESSION['user_id'] = $uid; $_SESSION['role_id'] = 1; $_SESSION['is_admin'] = true;
-        $_SERVER['REQUEST_METHOD'] = 'POST';
-
-        $_POST = ['enabled' => 1, '_csrf' => csrf_token()];
-        ob_start(); include "$root/api/pos/save_simple_mode.php"; $json1 = ob_get_clean();
-        $res1 = json_decode($json1, true);
-        ok($res1 && !empty($res1['success']), 'save_simple_mode.php(enabled=1) succeeds in-process');
-        $stored1 = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
-        ok($stored1 === '1', "system_settings row is '1' immediately after saving (got " . var_export($stored1, true) . ')');
-
-        $_POST = ['enabled' => 0, '_csrf' => csrf_token()];
-        ob_start(); include "$root/api/pos/save_simple_mode.php"; $json2 = ob_get_clean();
-        $res2 = json_decode($json2, true);
-        ok($res2 && !empty($res2['success']), 'save_simple_mode.php(enabled=0) succeeds in-process');
-        $stored2 = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
-        ok($stored2 === '0', "system_settings row is '0' immediately after disabling (got " . var_export($stored2, true) . ')');
-
-        // Restore whatever was there before this block ran.
-        if ($before === false) {
-            $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
-        } else {
-            $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$before]);
-        }
-        $afterRestore = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
-        ok($afterRestore === $before, 'pos_simple_mode restored to its pre-test value after the live check');
-    }
+    $settingsPage = src($files['app/constant/settings/pos_config_settings.php']);
+    ok(strpos($settingsPage, 'pos_simple_mode') === false, 'POS Settings never mentions pos_simple_mode at all — no checkbox, no save path');
 
 } catch (Throwable $e) {
     ok(false, 'threw: ' . $e->getMessage());

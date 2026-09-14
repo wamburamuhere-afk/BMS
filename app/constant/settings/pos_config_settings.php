@@ -9,7 +9,6 @@ require_once __DIR__ . '/../../../core/permissions.php';
 autoEnforcePermission('pos_config_settings');
 
 require_once __DIR__ . '/../../../header.php';
-require_once __DIR__ . '/../../../core/pos_nav.php'; // posSimpleModeEnabled()
 
 $success_msg = '';
 $error_msg = '';
@@ -18,14 +17,6 @@ $error_msg = '';
 // loyalty program are the 'pos_advanced' upsell tier on top of base POS.
 $pos_advanced_entitled = canView('pos_advanced');
 
-// A superadmin can lock this tenant out of self-managing Simple Mode
-// (app/superadmin/tenant_view.php > Point of Sale > More) — checked here so
-// BOTH places a tenant admin could change it (this full form, and the
-// "More" shortcut on Available Modules / api/pos/save_simple_mode.php)
-// enforce the same rule server-side, not just hide their own UI for it.
-$tenantRowForLock = function_exists('bmsCurrentTenant') ? bmsCurrentTenant() : null;
-$pos_simple_mode_locked = $tenantRowForLock ? !empty($tenantRowForLock['pos_simple_mode_locked']) : false;
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     try {
@@ -33,14 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Phase 10 (pos_upgrade_plan.md §7) — receipt printing preferences.
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
-        // Simple Mode — display-only, base POS (no entitlement gate). Never
-        // touches ledger posting; only collapses Reports/Finance menus and
-        // swaps the dashboard chart to a plain Bought vs Sold view. Silently
-        // ignored (like the loyalty block below) when a superadmin has
-        // locked it for this tenant, so a raw POST can't bypass the lock.
-        if (!$pos_simple_mode_locked) {
-            save_setting('pos_simple_mode', isset($_POST['pos_simple_mode']) ? '1' : '0');
-        }
         // Phase 11/13 — loyalty program settings only take effect for a
         // tenant actually entitled to 'pos_advanced'; silently ignored
         // otherwise so a raw POST can't turn it on without the entitlement.
@@ -61,7 +44,6 @@ $pos_auto_print_receipt = get_setting('pos_auto_print_receipt', '0');
 $pos_loyalty_enabled          = get_setting('pos_loyalty_enabled', '0');
 $pos_loyalty_spend_per_point  = get_setting('pos_loyalty_spend_per_point', '1000');
 $pos_loyalty_redeem_value     = get_setting('pos_loyalty_redeem_value', '50');
-$pos_simple_mode = get_setting('pos_simple_mode', '0');
 $pos_currency = getSetting('currency', 'TZS');
 ?>
 
@@ -117,15 +99,6 @@ $pos_currency = getSetting('currency', 'TZS');
                             <label class="form-check-label" for="pos_auto_print_receipt"><?= t('Automatically open and print the receipt when a sale completes') ?></label>
                             <div class="form-text"><?= t('Sends the receipt straight to your browser\'s print dialog / default printer — no "Print Receipt" click needed. Requires a printer already set as your OS/browser default.') ?></div>
                         </div>
-
-                        <?php if (!$pos_simple_mode_locked): ?>
-                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Simple Mode') ?></h6>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="pos_simple_mode" name="pos_simple_mode" value="1" <?= $pos_simple_mode == '1' ? 'checked' : '' ?>>
-                            <label class="form-check-label" for="pos_simple_mode"><?= t('Simple mode for a small shop (no accountant)') ?></label>
-                            <div class="form-text"><?= t('Hides accounting-style menus and reports for everyone in this business. The Dashboard shows only what was bought vs what was sold, and Reports becomes a short list: Sales, Purchases, Stock, Expenses. Nothing about how sales are recorded changes — this only changes what is shown.') ?></div>
-                        </div>
-                        <?php endif; // !$pos_simple_mode_locked ?>
 
                         <?php if ($pos_advanced_entitled): ?>
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Loyalty Program') ?></h6>
