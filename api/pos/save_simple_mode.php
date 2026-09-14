@@ -10,6 +10,9 @@
  * core/pos_nav.php::posSimpleModeEnabled().
  */
 require_once __DIR__ . '/../../roots.php';
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 header('Content-Type: application/json');
 
@@ -30,6 +33,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 csrf_check();
+
+// Server-side enforcement, not just the "More" button being hidden client-side
+// — a superadmin can lock this tenant out of self-managing it
+// (app/superadmin/tenant_view.php > Point of Sale > More).
+$tenantRowLock = function_exists('bmsCurrentTenant') ? bmsCurrentTenant() : null;
+if ($tenantRowLock && !empty($tenantRowLock['pos_simple_mode_locked'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => t('Your platform administrator manages this setting for your account.')]);
+    exit;
+}
 
 $enabled = isset($_POST['enabled']) && (int)$_POST['enabled'] === 1;
 

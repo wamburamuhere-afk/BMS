@@ -340,9 +340,16 @@ function svBadge(string $status): string
                                            <?= $f['available'] ? '' : 'disabled' ?>>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <label class="form-check-label fw-semibold" for="f_<?= safe_output($f['key'], '') ?>">
-                                        <?= safe_output($f['label'], '') ?>
-                                    </label>
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <label class="form-check-label fw-semibold" for="f_<?= safe_output($f['key'], '') ?>">
+                                            <?= safe_output($f['label'], '') ?>
+                                        </label>
+                                        <?php if ($f['key'] === 'pos'): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem" onclick="openPosSimpleModeModal()">
+                                            More
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="text-muted" style="font-size:.78rem">
                                         <?= safe_output($f['description'] ?? '', '') ?>
                                     </div>
@@ -660,6 +667,72 @@ function loadUsers() {
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     }).always(function () {
         btn.prop('disabled', false).html(orig);
+    });
+}
+
+function openPosSimpleModeModal() {
+    // On demand, deliberately — same discipline as loadUsers(): this is the
+    // third thing on this page that briefly opens the tenant's own database,
+    // and only ever on this explicit click. See
+    // tenantPosSimpleModeStatus()'s docblock.
+    Swal.fire({ title: 'POS Simple Mode', html: 'Loading current status…', showConfirmButton: false, didOpen: () => Swal.showLoading() });
+
+    $.ajax({
+        url: '/actions/superadmin_tenant_pos_simple_mode.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
+    }).done(function (res) {
+        if (!res || !res.success) {
+            Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read Simple Mode status for this tenant.' });
+            return;
+        }
+        Swal.fire({
+            title: 'POS Simple Mode',
+            html: '<div class="text-start">'
+                + '<p class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way.</p>'
+                + '<div class="form-check mb-2">'
+                + '<input class="form-check-input" type="checkbox" id="saPosSimpleEnabled"' + (res.enabled ? ' checked' : '') + '>'
+                + '<label class="form-check-label" for="saPosSimpleEnabled">Simple Mode enabled for this tenant</label>'
+                + '</div>'
+                + '<div class="form-check">'
+                + '<input class="form-check-input" type="checkbox" id="saPosSimpleEditable"' + (res.locked ? '' : ' checked') + '>'
+                + '<label class="form-check-label" for="saPosSimpleEditable">This tenant\'s own admin may change it themselves</label>'
+                + '</div>'
+                + '</div>',
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            preConfirm: function () {
+                return {
+                    enabled: document.getElementById('saPosSimpleEnabled').checked,
+                    locked: !document.getElementById('saPosSimpleEditable').checked,
+                };
+            }
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+            $.ajax({
+                url: '/actions/superadmin_tenant_pos_simple_mode.php',
+                method: 'POST', dataType: 'json',
+                data: {
+                    _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
+                    enabled: result.value.enabled ? 1 : 0,
+                    locked: result.value.locked ? 1 : 0
+                }
+            }).done(function (res2) {
+                if (res2 && res2.success) {
+                    Swal.fire({ icon: 'success', title: 'Saved', text: res2.message, timer: 1800, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: (res2 && res2.message) || 'Could not save.' });
+                }
+            }).fail(function (xhr) {
+                let msg = 'Could not save.';
+                try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+            });
+        });
+    }).fail(function (xhr) {
+        let msg = 'Could not read Simple Mode status for this tenant.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
     });
 }
 
