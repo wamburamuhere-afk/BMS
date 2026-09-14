@@ -85,6 +85,97 @@ if (!function_exists('salesTargetAchievementBand')) {
     }
 }
 
+if (!function_exists('posSimpleBuySellSeries')) {
+    /**
+     * "Simple Mode" dashboard chart — Bought (cost) vs Sold (price) per
+     * period, straight off pos_sales/pos_sale_items + products.cost_price.
+     * Deliberately NOT the ledger — see core/pos_nav.php::posSimpleModeEnabled()
+     * and .claude/reporting-source.md. This is the one dashboard view that
+     * intentionally reads operational tables instead of journal_entries,
+     * because it exists specifically for an owner who is never shown GL
+     * language (a shopkeeper with no accountant). "Sold" mirrors the same
+     * net-revenue recognition as api/pos/get_dashboard.php (grand_total -
+     * tax_amount, originals minus returns, invoice-linked POS sales
+     * excluded). "Bought" mirrors core/sales_posting.php::posSaleCogs()'s
+     * per-line cost formula (actual batch cost where FEFO consumption
+     * exists, else average products.cost_price; services and corrupt
+     * cost>selling_price rows excluded), aggregated across all sales in one
+     * query instead of N+1 calls, so the two numbers are the true buy/sell
+     * pair for what was actually sold, not a rough estimate.
+     *
+     * @param string $period    'daily'|'weekly'|'monthly'|'quarterly'|'yearly'
+     * @param string $scopeSql  Pre-built scope clause on alias 'ps', e.g.
+     *                          scopeFilterSqlNullable('project','ps') . scopeFilterSqlNullable('warehouse','ps')
+     * @return array<int, array{period:string, sold:float, bought:float, profit:float}>
+     */
+    function posSimpleBuySellSeries(PDO $pdo, string $from, string $to, string $period, string $scopeSql): array
+    {
+        switch ($period) {
+            case 'daily':     $periodSql = "DATE_FORMAT(ps.sale_date, '%Y-%m-%d')"; break;
+            case 'weekly':    $periodSql = "DATE_FORMAT(ps.sale_date, '%x-%v')"; break;
+            case 'quarterly': $periodSql = "CONCAT(YEAR(ps.sale_date), '-Q', QUARTER(ps.sale_date))"; break;
+            case 'yearly':    $periodSql = "DATE_FORMAT(ps.sale_date, '%Y')"; break;
+            default:          $periodSql = "DATE_FORMAT(ps.sale_date, '%Y-%m')"; break;
+        }
+
+        // Recognition predicates — identical to api/pos/get_dashboard.php's
+        // $recOrig/$recRet so the "sold" totals here always reconcile to
+        // that tile's net-revenue figure for the same window.
+        $recOrig = "ps.sale_status IN ('completed','partially_refunded','refunded') AND ps.is_return_sale = 0 AND ps.invoice_id IS NULL";
+        $recRet  = "ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled') AND ps.invoice_id IS NULL";
+
+        $sql = "
+            SELECT
+                $periodSql AS period_key,
+                SUM(CASE WHEN $recOrig THEN (ps.grand_total - ps.tax_amount)
+                         WHEN $recRet  THEN -(ps.grand_total - ps.tax_amount)
+                         ELSE 0 END) AS sold,
+                SUM(CASE WHEN $recOrig THEN COALESCE(cogs.amount, 0)
+                         WHEN $recRet  THEN -COALESCE(cogs.amount, 0)
+                         ELSE 0 END) AS bought
+              FROM pos_sales ps
+              LEFT JOIN (
+                    SELECT si.sale_id,
+                           SUM(CASE WHEN bc.batch_qty > 0 THEN bc.batch_cost_total
+                                    ELSE si.quantity * COALESCE(p.cost_price, 0) END) AS amount
+                      FROM pos_sale_items si
+                      JOIN products p ON si.product_id = p.product_id
+                      LEFT JOIN (
+                            SELECT psib.sale_item_id,
+                                   SUM(psib.quantity) AS batch_qty,
+                                   SUM(psib.quantity * pb.unit_cost) AS batch_cost_total
+                              FROM pos_sale_item_batches psib
+                              JOIN product_batches pb ON pb.batch_id = psib.batch_id
+                          GROUP BY psib.sale_item_id
+                      ) bc ON bc.sale_item_id = si.sale_item_id
+                     WHERE p.is_service = 0
+                       AND (bc.batch_qty > 0 OR NOT (p.cost_price > p.selling_price AND p.selling_price > 0))
+                  GROUP BY si.sale_id
+              ) cogs ON cogs.sale_id = ps.sale_id
+             WHERE DATE(ps.sale_date) BETWEEN ? AND ? $scopeSql
+          GROUP BY period_key
+          ORDER BY period_key
+        ";
+
+        $st = $pdo->prepare($sql);
+        $st->execute([$from, $to]);
+
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if ($row['period_key'] === null || $row['period_key'] === '') continue;
+            $sold   = round((float)$row['sold'], 2);
+            $bought = round((float)$row['bought'], 2);
+            $out[] = [
+                'period' => (string)$row['period_key'],
+                'sold'   => $sold,
+                'bought' => $bought,
+                'profit' => round($sold - $bought, 2),
+            ];
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('salesTargetAchievement')) {
     /**
      * Resolves the applicable target row for the given scope + month and
