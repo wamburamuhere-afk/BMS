@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/pos-simple-mode-expenses-bypass-entitlement) - Expenses bundled into POS Simple Mode — bypasses the Finance/Procurement entitlement
+
+**Found live:** on a real tenant with neither Finance nor Procurement granted (confirmed via the live Available Modules page — both showed "Available", not "Active"), Expenses was genuinely unreachable — not just hidden from the header, `canView('expenses')` itself returned false for everyone including admins, because entitlement is checked before the admin bypass. My earlier header-promotion fix (PR #1935) correctly depended on that same `canView('expenses')`, so both the dropdown and the standalone-link fallback rendered nothing for this tenant. This explains the original "why did Finance disappear" question too: it was never granted to this tenant, unrelated to anything built this session.
+
+**Request:** user asked for Expenses to be a POS baseline for Simple Mode — available "just like the way POS at the header is" — regardless of whether the tenant's plan includes the paid Finance/Procurement module.
+
+**Fix:**
+- `core/feature_registry.php` — `tenantModuleAllowsPage()` (the single chokepoint every `canView`/`canCreate`/`canEdit`/`canDelete('expenses')` call routes through) now returns `true` for `'expenses'` whenever Simple Mode is on, before the normal Finance-or-Procurement entitlement check runs. Read via `get_setting('pos_simple_mode', ...)` directly rather than `posSimpleModeEnabled()`, since this function must work from every call site — including API endpoints that never load `core/pos_nav.php`. Unlocks the *whole* Expenses CRUD (not just the header link), since all four `canX()` functions funnel through this one gate.
+- `tests/test_pos_simple_mode_cli.php` — new section I: reproduces the exact reported scenario (Finance AND Procurement both off) as a real in-process fixture, confirms `expenses` is genuinely blocked *before* Simple Mode and genuinely allowed *with* it, and confirms an unrelated feature-gated page (`quotations`, sales-only) stays correctly blocked throughout — proving this is an `expenses`-only bundle, not a blanket entitlement bypass.
+
+**Verified:** `tests/test_pos_simple_mode_cli.php` (85/85), `tests/test_feature_registry_cli.php` (142/142, no regression to the entitlement engine this touches), `tests/test_superadmin_selfservice_cli.php` (64/64). Also ran `tests/test_tenant_module_smoke_cli.php` — 1 pre-existing, unrelated failure (a schema-drift check on `journal_entries`/`products` columns, nothing to do with this change).
+
 ## 2026-09-14 (fix/pos-simple-mode-expenses-header) - Expenses promotes to a standalone header link under Simple Mode
 
 **Request:** user pointed out that hiding the whole Finance dropdown under Simple Mode (to hide the double-entry system) also hides Expenses — but expense tracking is essential day-to-day even for a shop with no accountant. Asked for the same pattern header.php already uses for POS standing alone when Sales is closed: Finance becomes a dropdown when the double-entry system is needed ("pro business man"), or just "Expenses" appears directly in the header when Simple Mode is on — same page, same full CRUD, only where it's linked from changes.
