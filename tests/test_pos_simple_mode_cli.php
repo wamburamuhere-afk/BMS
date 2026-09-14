@@ -3,14 +3,24 @@
  * POS "Simple Mode" — CLI regression suite
  *   php tests/test_pos_simple_mode_cli.php
  *
- * Simple Mode is a display-only, tenant-wide preference for a shop with no
- * accountant. It must NEVER disable ledger posting
- * (.claude/reporting-source.md mandates every financial report reads only
- * the posted journal, unconditionally) — it only changes what the UI shows:
- * the Reports mega-menu collapses to a short list, Chart of
- * Accounts/Journals hide from the Finance menu, and the dashboard's
- * Performance Overview chart swaps to a plain Bought vs Sold view sourced
- * from pos_sales (core/pos_dashboard_metrics.php).
+ * Simple Mode is a tenant-wide preference for a shop with no accountant. It
+ * must NEVER disable ledger posting (.claude/reporting-source.md mandates
+ * every financial report reads only the posted journal, unconditionally) —
+ * it mostly only changes what the UI shows: the Reports mega-menu collapses
+ * to a short list, Chart of Accounts/Journals hide from the Finance menu,
+ * and the dashboard's Performance Overview chart swaps to a plain Bought vs
+ * Sold view sourced from pos_sales (core/pos_dashboard_metrics.php).
+ *
+ * ONE DELIBERATE EXCEPTION (2026-09-14, section I): 'expenses' is bundled
+ * into Simple Mode as a real entitlement bypass, not just a display change —
+ * core/feature_registry.php::tenantModuleAllowsPage() returns true for
+ * 'expenses' whenever Simple Mode is on, regardless of whether the tenant's
+ * plan actually includes the Finance or Procurement module 'expenses' is
+ * normally gated behind. Found live: a tenant with neither Finance nor
+ * Procurement granted had Expenses genuinely unreachable (not merely
+ * hidden) — basic expense tracking is a POS baseline for a shop like that,
+ * not a paid-tier feature, the same way POS itself is always there for
+ * them.
  *
  * SUPERADMIN-ONLY, by design: a tenant's own admin has no UI or endpoint
  * that can change this setting — see tests/test_superadmin_pos_simple_mode_cli.php
@@ -42,6 +52,12 @@
  *                Expenses promotes itself to a standalone header link — same
  *                page, same full CRUD — mirroring the existing Sales->POS
  *                pattern. Proven against real rendered HTML both ways.
+ *   I. ENTITLEMENT BYPASS — tenantModuleAllowsPage('expenses') returns true
+ *                under Simple Mode even with BOTH owning features
+ *                (finance/procurement) off — the real reported scenario —
+ *                while an unrelated feature-gated page (quotations) stays
+ *                correctly blocked, proving this is an 'expenses'-only
+ *                bundle, not a blanket entitlement bypass.
  *
  * Read-only except D, which restores the setting to OFF when done.
  * Exit 0 = all pass.
@@ -369,6 +385,58 @@ PHP;
         }
         $restoredNav = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
         ok($restoredNav === $beforeNav, 'pos_simple_mode restored to its pre-test value after the live header nav check');
+    }
+
+    // ── I. Expenses bundled into Simple Mode — real entitlement bypass ──
+    section('I. tenantModuleAllowsPage(expenses) bypasses Finance/Procurement entitlement under Simple Mode');
+
+    if (!function_exists('allFeatureKeys') || !function_exists('tenantModuleAllowsPage')) {
+        ok(true, 'feature registry not available in this context — entitlement bypass check skipped');
+    } else {
+        $prevFeatures = $GLOBALS['__bms_features'] ?? null;
+
+        // Sanity: reproduce the exact reported scenario BEFORE Simple Mode —
+        // Finance AND Procurement both off must genuinely block 'expenses'.
+        // If this ever reads true, the bypass test below would be vacuous.
+        $GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+        $GLOBALS['__bms_features']['finance'] = false;
+        $GLOBALS['__bms_features']['procurement'] = false;
+        ok(tenantModuleAllowsPage('expenses') === false,
+            'sanity: with Finance AND Procurement both off, expenses is genuinely blocked (the real reported tenant state) before Simple Mode is considered');
+        $GLOBALS['__bms_features'] = $prevFeatures;
+
+        $beforeBypass = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+
+        // Save in a separate process first — same get_setting() per-process
+        // cache reason section D documents.
+        runPhp("require '$rootEsc/roots.php'; save_setting('pos_simple_mode', '1'); echo 'SAVED';");
+
+        $bypassResult = runPhp("
+            require '$rootEsc/roots.php';
+            \$GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+            \$GLOBALS['__bms_features']['finance'] = false;
+            \$GLOBALS['__bms_features']['procurement'] = false;
+            // quotations belongs to 'sales', not finance/procurement — must
+            // be off too, or this negative control is vacuous (quotations
+            // would read allowed via 'sales' regardless of the bypass).
+            \$GLOBALS['__bms_features']['sales'] = false;
+            \$expenses = tenantModuleAllowsPage('expenses') ? 'EXPENSES_ALLOWED' : 'expenses_blocked';
+            \$quotations = tenantModuleAllowsPage('quotations') ? 'quotations_wrongly_allowed' : 'QUOTATIONS_STILL_BLOCKED';
+            echo \$expenses . '|' . \$quotations;
+        ");
+        ok(str_contains($bypassResult, 'EXPENSES_ALLOWED'),
+            "Simple Mode ON + Finance/Procurement both off: expenses is now allowed — the exact reported scenario, fixed (got '$bypassResult')");
+        ok(str_contains($bypassResult, 'QUOTATIONS_STILL_BLOCKED'),
+            "...but an unrelated feature-gated page (quotations, sales-only) stays correctly blocked — this is an expenses-only bundle, not a blanket bypass (got '$bypassResult')");
+
+        // Restore.
+        if ($beforeBypass === false) {
+            $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+        } else {
+            $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$beforeBypass]);
+        }
+        $afterBypass = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($afterBypass === $beforeBypass, 'pos_simple_mode restored to its pre-test value after the entitlement-bypass check');
     }
 
 } catch (Throwable $e) {

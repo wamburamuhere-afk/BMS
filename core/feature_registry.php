@@ -851,6 +851,22 @@ if (!function_exists('tenantModuleAllowsPage')) {
      */
     function tenantModuleAllowsPage(string $pageKey): bool
     {
+        // 'expenses' bundled into POS Simple Mode ("normal business man" —
+        // core/pos_nav.php::posSimpleModeEnabled()), 2026-09-14: basic
+        // expense tracking is a POS baseline for a shop with no accountant,
+        // the same way POS itself is always there for them — not something
+        // that should require the paid Finance/Procurement entitlement
+        // 'expenses' otherwise needs (it's normally owned by both, see the
+        // 'finance'/'procurement' entries in bmsFeatureRegistry()). Read via
+        // get_setting() directly rather than calling posSimpleModeEnabled()
+        // — this function is the single chokepoint every canView/canCreate/
+        // canEdit/canDelete('expenses') call routes through, including from
+        // API endpoints that never load core/pos_nav.php, so the check here
+        // must not depend on that file having been required first.
+        if ($pageKey === 'expenses' && function_exists('get_setting') && get_setting('pos_simple_mode', '0') === '1') {
+            return true;
+        }
+
         $owners = featureForPageKey($pageKey);
         if (!$owners) return true;
 
