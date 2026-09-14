@@ -749,10 +749,37 @@ if (!function_exists('bmsFeatureBlockingPath')) {
         // Over-matching is safe in the one direction that matters: a suffix only
         // ever blocks when its owning feature is switched OFF, so the worst case
         // is a 404 for a URL that merely looks like a disabled module's path.
+        // Same 'expenses' bundle as tenantModuleAllowsPage('expenses')
+        // (2026-09-14) — and it has to be repeated here, not just there:
+        // this is an EARLIER gate (the router/bootstrap layer, checked
+        // before core/permissions.php may even be loaded) that 404s a
+        // request before the page's own canView('expenses') call ever runs.
+        // Found live: /expenses 404'd at the router with Simple Mode already
+        // on, because only tenantModuleAllowsPage() had been patched — this
+        // layer never got a chance to defer to it. Named explicitly (not
+        // pattern-matched) so the bundle can never silently grow to cover a
+        // path nobody reviewed; kept to exactly the 'finance'-owned paths
+        // that are actually expense CRUD, not the whole feature
+        // (revenue.php, budget.php, journals.php etc. stay correctly gated).
+        $expenseBundlePaths = [
+            'app/constant/accounts/expenses.php',
+            'app/constant/accounts/expense_details.php',
+            'app/constant/accounts/edit_expense.php',
+            'app/constant/accounts/expense_types.php',
+            'api/export_expenses.php',
+            'api/account/export_expenses.php',
+        ];
+        $expenseBundleOn = function_exists('get_setting') && get_setting('pos_simple_mode', '0') === '1';
+
         $parts = explode('/', $rel);
         $limit = min(count($parts), 5);
         for ($i = 0; $i < $limit; $i++) {
             $candidate = implode('/', array_slice($parts, $i));
+
+            if ($expenseBundleOn && in_array($candidate, $expenseBundlePaths, true)) {
+                return null;
+            }
+
             $owner     = featureForPath($candidate);
             if ($owner !== null) {
                 return tenantFeatureEnabled($owner) ? null : $owner;
