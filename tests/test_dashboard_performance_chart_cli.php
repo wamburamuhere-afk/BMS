@@ -53,7 +53,11 @@ try {
     // ── A. Static — the dropdown + backend both know about 'daily' ──────────
     section('A. Static — dashboard.php offers Daily, get_performance_data.php handles it');
     $dash = file_get_contents("$root/app/dashboard.php");
-    ok(strpos($dash, "<option value=\"daily\">") !== false, "dashboard.php's #chartPeriod dropdown has a Daily option");
+    // The literal '<option value="daily">' no longer appears verbatim since
+    // Simple Mode's daily-by-default change (2026-09-14) made the "selected"
+    // attribute conditional — match the option tag itself, not one exact
+    // rendering of it.
+    ok(strpos($dash, '<option value="daily"') !== false, "dashboard.php's #chartPeriod dropdown has a Daily option");
 
     $api = file_get_contents("$root/api/get_performance_data.php");
     ok(strpos($api, "\$period === 'daily'") !== false, "get_performance_data.php has a dedicated 'daily' branch");
