@@ -37,6 +37,11 @@
  *                when Simple Mode is on (a small shop cares about today vs
  *                yesterday, not a monthly trend), Monthly otherwise — proven
  *                against the real rendered HTML, not just the PHP source.
+ *   H. EXPENSES PROMOTION — the whole double-entry Finance dropdown hides
+ *                under Simple Mode (same as Chart of Accounts/Journals), but
+ *                Expenses promotes itself to a standalone header link — same
+ *                page, same full CRUD — mirroring the existing Sales->POS
+ *                pattern. Proven against real rendered HTML both ways.
  *
  * Read-only except D, which restores the setting to OFF when done.
  * Exit 0 = all pass.
@@ -124,8 +129,18 @@ try {
         ok(t($en) === $sw, "t('$en') under Swahili == '$sw' (got '" . t($en) . "')");
     }
     loadLanguage('en');
-    ok(strpos($header, "canView('chart_of_accounts') && !posSimpleModeEnabled()") !== false, 'Chart of Accounts hidden in Simple Mode');
-    ok(strpos($header, "canView('journals') && !posSimpleModeEnabled()") !== false, 'Journals hidden in Simple Mode');
+    // Chart of Accounts / Journals no longer carry their own per-item
+    // !posSimpleModeEnabled() check (2026-09-14) — the whole Finance
+    // dropdown they live inside is gated on it instead (section H), which
+    // covers them for free and is simpler than repeating the check on every
+    // double-entry item inside. Confirm the per-item gate is genuinely gone
+    // (not just redundant) and both items are plain canView() again.
+    ok(strpos($header, "canView('chart_of_accounts') && !posSimpleModeEnabled()") === false,
+        'Chart of Accounts no longer carries its own redundant !posSimpleModeEnabled() check');
+    ok(strpos($header, "canView('journals') && !posSimpleModeEnabled()") === false,
+        'Journals no longer carries its own redundant !posSimpleModeEnabled() check');
+    ok(strpos($header, "if(canView('chart_of_accounts')): ?>") !== false, 'Chart of Accounts is a plain canView() check again');
+    ok(strpos($header, "if(canView('journals')): ?>") !== false, 'Journals is a plain canView() check again');
     // Balanced if/endif around the Reports branch — a stray endif here would
     // silently swallow every nav item rendered after it site-wide.
     ok(substr_count($header, '<?php if (posSimpleModeEnabled()):') === substr_count($header, "// posSimpleModeEnabled() ?>"), 'Reports simple/full branch if/endif balanced');
@@ -305,6 +320,55 @@ try {
         }
         $restoredDash = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
         ok($restoredDash === $beforeDash, 'pos_simple_mode restored to its pre-test value after the live dashboard render check');
+    }
+
+    // ── H. Expenses direct link when Simple Mode is on, nested in Finance otherwise ──
+    section('H. header.php — Expenses direct link when Simple Mode is on, nested in Finance dropdown otherwise');
+
+    ok(strpos($header, '$financeModuleOpen = !posSimpleModeEnabled()') !== false,
+        'header.php gates the whole Finance dropdown on !posSimpleModeEnabled(), same pattern as Sales/POS');
+    ok(strpos($header, "elseif(canView('expenses')): ?>") !== false,
+        'header.php falls back to a standalone Expenses link, mirroring the existing Sales->POS elseif pattern');
+
+    if (!$uidRow) {
+        ok(true, 'no admin user row available — live header.php nav check skipped');
+    } else {
+        $beforeNav = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+
+        $renderNav = function (string $simpleModeValue) use ($rootEsc, $uidRow) {
+            runPhp("require '$rootEsc/roots.php'; save_setting('pos_simple_mode', " . var_export($simpleModeValue, true) . "); echo 'SAVED';");
+            $tpl = <<<'PHP'
+require '__ROOT__/roots.php';
+$_SESSION['user_id'] = __UID__; $_SESSION['role_id'] = 1; $_SESSION['is_admin'] = true;
+ob_start();
+include '__ROOT__/app/dashboard.php';
+$html = ob_get_clean();
+$hasFinanceDropdown = strpos($html, 'id="financeDropdown"') !== false;
+$hasStandaloneExpenses = (bool)preg_match('/<li class="nav-item">\s*<a class="nav-link" href="[^"]*\/expenses">/', $html);
+$hasNestedExpenses = strpos($html, 'class="dropdown-item" href="') !== false && strpos($html, '/expenses"><i class="bi bi-currency-dollar"') !== false;
+echo ($hasFinanceDropdown ? 'DROPDOWN' : 'no_dropdown') . '|' . ($hasStandaloneExpenses ? 'STANDALONE' : 'no_standalone') . '|' . ($hasNestedExpenses ? 'NESTED' : 'no_nested');
+PHP;
+            $code = str_replace(['__ROOT__', '__UID__'], [$rootEsc, (string)$uidRow], $tpl);
+            return runPhp($code);
+        };
+
+        $onOut = $renderNav('1');
+        ok(str_contains($onOut, 'no_dropdown'), "Simple Mode ON: Finance dropdown is genuinely absent, not just empty (got '$onOut')");
+        ok(str_contains($onOut, 'STANDALONE'), "Simple Mode ON: Expenses renders as a direct, standalone header link (got '$onOut')");
+        ok(str_contains($onOut, 'no_nested'), "Simple Mode ON: Expenses is not also nested anywhere (got '$onOut')");
+
+        $offOut = $renderNav('0');
+        ok(str_contains($offOut, 'DROPDOWN'), "Simple Mode OFF: Finance dropdown is present, as before (got '$offOut')");
+        ok(str_contains($offOut, 'NESTED'), "Simple Mode OFF: Expenses is nested inside Finance — same page, same full CRUD (got '$offOut')");
+        ok(str_contains($offOut, 'no_standalone'), "Simple Mode OFF: Expenses is NOT a standalone link (got '$offOut')");
+
+        if ($beforeNav === false) {
+            $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+        } else {
+            $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$beforeNav]);
+        }
+        $restoredNav = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+        ok($restoredNav === $beforeNav, 'pos_simple_mode restored to its pre-test value after the live header nav check');
     }
 
 } catch (Throwable $e) {

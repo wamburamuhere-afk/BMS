@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-14 (fix/pos-simple-mode-expenses-header) - Expenses promotes to a standalone header link under Simple Mode
+
+**Request:** user pointed out that hiding the whole Finance dropdown under Simple Mode (to hide the double-entry system) also hides Expenses — but expense tracking is essential day-to-day even for a shop with no accountant. Asked for the same pattern header.php already uses for POS standing alone when Sales is closed: Finance becomes a dropdown when the double-entry system is needed ("pro business man"), or just "Expenses" appears directly in the header when Simple Mode is on — same page, same full CRUD, only where it's linked from changes.
+
+**Fix:**
+- `header.php` — the Finance dropdown's outer gate is now `!posSimpleModeEnabled() && (canView('expenses') || ...)`, mirroring the existing `$salesModuleOpen` / POS pattern exactly (`if ($financeModuleOpen): <dropdown> elseif (canView('expenses')): <standalone link>`). The now-redundant per-item `&& !posSimpleModeEnabled()` checks on Chart of Accounts and Journals (added in an earlier pass) are removed — the outer gate covers the whole dropdown, including them, for free.
+- `tests/test_pos_simple_mode_cli.php` — section H (new): static checks plus a **live** render of the real page both ways (Simple Mode on/off, via two separate processes per the established `get_setting()` cache discipline), confirming the actual HTML shows the Finance dropdown OR the standalone Expenses link — never both, never neither. Also updated section B's now-stale assertions about the removed per-item checks.
+
+**Verified:** `tests/test_pos_simple_mode_cli.php` (81/81), `tests/test_pos_nav_wiring_cli.php` (62/62, confirms the neighboring Sales/POS pattern this mirrors is unaffected).
+
 ## 2026-09-14 (fix/pos-simple-mode-remove-tenant-lock-toggle) - Dashboard chart defaults to Daily when Simple Mode is on
 
 **Request:** user asked that the Bought vs Sold chart default to Daily, not Monthly, when Simple Mode is on — "most of small business prefer to see daily sales made as increase or decrease" — while leaving the period dropdown itself untouched so they can still switch to Weekly/Monthly/etc. themselves. Non-simple tenants keep the existing Monthly default, unchanged.

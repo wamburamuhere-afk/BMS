@@ -802,7 +802,24 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
                         
                         <!-- Financial Modules -->
-                        <?php if(canView('expenses') || canView('budget') || canView('chart_of_accounts') || canView('bank_accounts') || canView('cash_register')): ?>
+                        <?php
+                        // Simple Mode ("normal business man" — core/pos_nav.php::posSimpleModeEnabled())
+                        // hides the whole double-entry Finance dropdown, same
+                        // reasoning as Chart of Accounts/Journals already being
+                        // hidden from it. But expense tracking is essential even
+                        // for a shop with no accountant, so — same pattern
+                        // header.php already uses for POS standing alone when
+                        // Sales is closed — Expenses promotes itself to a direct
+                        // header link instead of disappearing along with the
+                        // rest of Finance. Same page, same full CRUD; only where
+                        // it's linked from changes. Once Simple Mode is off
+                        // again ("pro business man" needing the double-entry
+                        // system), the full Finance dropdown is back, Expenses
+                        // included.
+                        $financeModuleOpen = !posSimpleModeEnabled()
+                            && (canView('expenses') || canView('budget') || canView('chart_of_accounts') || canView('bank_accounts') || canView('cash_register'));
+                        ?>
+                        <?php if($financeModuleOpen): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="financeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-cash-stack"></i> <?= t('Finance') ?>
@@ -818,7 +835,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('budget')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('budget') ?>"><i class="bi bi-pie-chart"></i> <?= t('Budget') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('chart_of_accounts') && !posSimpleModeEnabled()): ?>
+                                <?php if(canView('chart_of_accounts')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('chart_of_accounts') ?>"><i class="bi bi-diagram-3"></i> <?= t('Chart of Accounts') ?></a></li>
                                 <?php endif; ?>
 
@@ -839,7 +856,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_reconciliation') ?>"><i class="bi bi-check-circle"></i> <?= t('Reconciliation') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_statement') ?>"><i class="bi bi-card-list"></i> <?= t('Bank Statement') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('journals') && !posSimpleModeEnabled()): ?>
+                                <?php if(canView('journals')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('journals') ?>"><i class="bi bi-journal-text"></i> <?= t('Journals') ?></a></li>
                                 <?php endif; ?>
 
@@ -855,6 +872,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('payment_vouchers') ?>"><i class="bi bi-credit-card"></i> <?= t('Payment Vouchers') ?></a></li>
                                 <?php endif; ?>
                             </ul>
+                        </li>
+                        <?php elseif(canView('expenses')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('expenses') ?>">
+                                <i class="bi bi-currency-dollar"></i> <?= t('Expenses') ?>
+                            </a>
                         </li>
                         <?php endif; ?>
 
