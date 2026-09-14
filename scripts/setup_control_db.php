@@ -413,6 +413,14 @@ try {
     foreach ([
         'max_users'      => "ADD COLUMN `max_users` INT NULL AFTER `plan`",
         'max_storage_mb' => "ADD COLUMN `max_storage_mb` INT NULL AFTER `max_users`",
+        // Whether THIS tenant's own admin may change POS Simple Mode
+        // themselves (Available Modules > Point of Sale > More). 0 = tenant
+        // can self-manage (default — matches behaviour before this column
+        // existed); 1 = locked, the tenant's own "More" button is hidden and
+        // api/pos/save_simple_mode.php refuses the write server-side too.
+        // The setting's actual VALUE lives in the tenant's own database
+        // (system_settings.pos_simple_mode) — this is only the lock.
+        'pos_simple_mode_locked' => "ADD COLUMN `pos_simple_mode_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `max_storage_mb`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");

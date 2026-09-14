@@ -67,6 +67,8 @@ $pageFiles = [
     'app/bms/pos/customer_display.php', 'app/constant/settings/pos_config_settings.php',
     // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
     'app/bms/pos/price_groups.php',
+    // POS Simple Mode — reachable from Available Modules > Point of Sale > More.
+    'app/constant/settings/available_modules.php',
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module admin pages.
     'app/bms/restaurant/index.php', 'app/bms/restaurant/floors.php', 'app/bms/restaurant/tables.php',
     'app/bms/restaurant/kitchen.php', 'app/bms/restaurant/kitchen_dashboard.php',
@@ -91,6 +93,8 @@ $apiFiles = [
     'api/pos/get_available_serials.php',
     // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
     'api/pos/save_sales_target.php',
+    // POS Simple Mode.
+    'api/pos/get_simple_dashboard_chart.php', 'api/pos/save_simple_mode.php',
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
     'api/restaurant/get_floors.php', 'api/restaurant/save_floor.php',
     'api/restaurant/get_tables.php', 'api/restaurant/save_table.php', 'api/restaurant/update_table_status.php',

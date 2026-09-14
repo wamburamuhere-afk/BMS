@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-14 (feat/pos-simple-mode) - POS "Simple Mode" — added to the SUPERADMIN Tenant Detail page + tenant-lock
+
+**Request:** user clarified the "More" button they wanted was actually on the **superadmin** Tenant Detail page (Modules panel, where the POS switch itself lives — "once turned on"), not the tenant-facing Available Modules page I'd built it on first. Also: keep the tenant-facing one, add the superadmin one too, and let the superadmin control whether a tenant's own admin is even allowed to see/change it themselves.
+
+**Design:** the superadmin's tenant_view.php Modules panel only ever talks to the shared control database (tenant entitlements) — it deliberately never opens a tenant's own database (documented invariant, already bent exactly twice: viewing a tenant's user directory, viewing usage stats). POS Simple Mode's actual value lives in *that specific tenant's own* database (`system_settings`), so surfacing/editing it from the superadmin side is a **third** such narrow, explicit, on-demand exception — never automatic on page load, kept as its own auditable code path, same discipline as the existing two.
+
+**Fix:**
+- `scripts/setup_control_db.php` — new idempotent column `tenants.pos_simple_mode_locked` (control DB). 0 = tenant can self-manage (default, unchanged behavior); 1 = locked to superadmin-only. Applied locally via `php scripts/setup_control_db.php` — **must also be run once against production** after this deploys (it's a manual step, same as every other control-DB schema change; not wired into deploy.yml).
+- `core/tenant_admin.php` — two new functions mirroring `tenantUserDirectory()`'s exact pattern: `tenantPosSimpleModeStatus($tenantId)` (read-only, opens the tenant's DB briefly) and `setTenantPosSimpleMode($tenantId, $enabled, $locked)` (writes the tenant's own `system_settings.pos_simple_mode` AND the control DB's lock flag).
+- `actions/superadmin_tenant_pos_simple_mode.php` — new action (`action=status`/`action=set`), same guard chain as every other superadmin action (host, session, POST, CSRF).
+- `app/superadmin/tenant_view.php` — "More" button next to the POS switch in the Modules panel; opens a SweetAlert dialog (matching this page's existing style, no new modal library) showing/editing both the enabled state and the "tenant may self-manage" toggle.
+- **Lock enforced server-side, not just UI**: `api/pos/save_simple_mode.php` and `app/constant/settings/pos_config_settings.php`'s POST handler both refuse the write (403 / silently ignored) when locked, reading the lock flag via `bmsCurrentTenant()['pos_simple_mode_locked']` (the same safe, already-established tenant→control-DB read pattern `tenantFeatureEnabled()` uses). `app/constant/settings/available_modules.php`'s "More" button and modal, and `pos_config_settings.php`'s whole Simple Mode section, are genuinely absent from the rendered HTML when locked — not CSS-hidden.
+- `lang/sw.php` — added the one new tenant-facing string (the lock refusal message).
+- `tests/test_superadmin_pos_simple_mode_cli.php` — new suite (48 assertions), provisions a real throwaway tenant: cross-database read/write proven by direct SQL against both the tenant's own DB and the control DB, the action's full guard chain (mirroring `test_tenant_user_directory_cli.php`), a deleted-tenant edge case, on-demand-only page rendering, and — the important one — the lock genuinely refusing a real POST from inside the tenant's own subdomain/session even though `canEdit()` would otherwise pass, with the stored value proven unchanged afterward.
+
+**Verified:** `tests/test_superadmin_pos_simple_mode_cli.php` (48/48), `tests/test_pos_simple_mode_cli.php` (78/78, re-run after further edits), `tests/test_tenant_user_directory_cli.php` (21/21, no regression), `tests/test_tenant_admin_panel_cli.php` (51/51), `tests/test_tenant_control_db_cli.php` (59/59), `tests/test_pos_i18n_coverage_cli.php` (136/137 — same pre-existing unrelated "Shop" gap; also caught and fixed that my own new API files weren't in this test's tracked file list, and that `api/pos/save_simple_mode.php` was missing its `loadLanguage()` call).
+
 ## 2026-09-14 (feat/pos-simple-mode) - POS "Simple Mode" — reachable from the Available Modules "Point of Sale" card
 
 **Request:** user pointed at the "Point of Sale — POS terminal, POS dashboard and customer display" card on the Available Modules page and asked for a "More" button there that opens the Simple Mode switch directly, instead of it only being reachable via POS Settings.

@@ -30,6 +30,14 @@ $modules  = listAvailableModulesForTenant($tenantId);
 // underlying system_settings key either page writes to (api/pos/save_simple_mode.php),
 // so both stay in sync automatically. See core/pos_nav.php::posSimpleModeEnabled().
 $pos_simple_mode_value = get_setting('pos_simple_mode', '0');
+
+// A platform superadmin can lock this so only THEY manage it for this tenant
+// (app/superadmin/tenant_view.php > Point of Sale > More) — the tenant's own
+// "More" button is then genuinely absent here, not just disabled, and
+// api/pos/save_simple_mode.php refuses the write server-side too. Single-
+// tenant installs (bmsCurrentTenant() === null) are never locked.
+$tenantRow = function_exists('bmsCurrentTenant') ? bmsCurrentTenant() : null;
+$pos_simple_mode_locked = $tenantRow ? !empty($tenantRow['pos_simple_mode_locked']) : false;
 ?>
 
 <div class="container-fluid mt-4">
@@ -72,7 +80,7 @@ $pos_simple_mode_value = get_setting('pos_simple_mode', '0');
                             <button class="btn btn-sm btn-outline-primary flex-grow-1" disabled>
                                 <i class="bi bi-check-circle me-1"></i> <?= t('Included in your plan') ?>
                             </button>
-                            <?php if ($m['key'] === 'pos'): ?>
+                            <?php if ($m['key'] === 'pos' && !$pos_simple_mode_locked): ?>
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#posSimpleModeModal">
                                 <?= t('More') ?>
                             </button>
@@ -96,7 +104,10 @@ $pos_simple_mode_value = get_setting('pos_simple_mode', '0');
     </div>
 </div>
 
-<!-- Simple Mode — opened from the Point of Sale card's "More" button. -->
+<!-- Simple Mode — opened from the Point of Sale card's "More" button. Genuinely
+     absent (not just its trigger button) when a superadmin has locked this
+     tenant out of self-managing it — see $pos_simple_mode_locked above. -->
+<?php if (!$pos_simple_mode_locked): ?>
 <div class="modal fade" id="posSimpleModeModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -118,6 +129,7 @@ $pos_simple_mode_value = get_setting('pos_simple_mode', '0');
         </div>
     </div>
 </div>
+<?php endif; // !$pos_simple_mode_locked ?>
 
 <script>
 $(document).ready(function () {

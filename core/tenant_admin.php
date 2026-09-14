@@ -22,6 +22,8 @@
  *   deleteTenant(int $id, string $typedName): array
  *   tenantAdminLog(?int $tenantId = null, int $limit = 50): array
  *   tenantUserDirectory(int $tenantId): ?array
+ *   tenantPosSimpleModeStatus(int $tenantId): ?array
+ *   setTenantPosSimpleMode(int $tenantId, bool $enabled, bool $locked): array
  */
 
 require_once __DIR__ . '/control_db.php';
@@ -767,6 +769,99 @@ if (!function_exists('tenantUserDirectory')) {
         } catch (Throwable $e) {
             error_log('tenantUserDirectory(' . $tenantId . '): ' . $e->getMessage());
             return null;
+        }
+    }
+}
+
+if (!function_exists('tenantPosSimpleModeStatus')) {
+    /**
+     * A THIRD deliberate, narrow exception to "the superadmin panel never
+     * opens a tenant's own database" — same shape and justification as
+     * tenantUserDirectory() above and core/tenant_quotas.php::tenantUsageSnapshotFor().
+     * Reads exactly one row: that tenant's own copy of the POS Simple Mode
+     * setting (core/pos_nav.php::posSimpleModeEnabled() reads the same key,
+     * 'pos_simple_mode', from inside the tenant's own request instead).
+     *
+     * Called on demand from one explicit action
+     * (actions/superadmin_tenant_pos_simple_mode.php), never automatically on
+     * tenant_view.php's normal page load — same discipline as the Users card.
+     *
+     * @return array{enabled:bool, locked:bool}|null null if the tenant/DB can't be reached.
+     */
+    function tenantPosSimpleModeStatus(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $st2 = $tPdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+            $val = $st2 ? $st2->fetchColumn() : false;
+
+            return [
+                'enabled' => ($val === '1'),
+                'locked'  => !empty($t['pos_simple_mode_locked']),
+            ];
+        } catch (Throwable $e) {
+            error_log('tenantPosSimpleModeStatus(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('setTenantPosSimpleMode')) {
+    /**
+     * Writes 'pos_simple_mode' into ONE tenant's own database, and the
+     * "can this tenant's own admin change it themselves" lock into the
+     * control database (tenants.pos_simple_mode_locked — read tenant-side by
+     * app/constant/settings/available_modules.php via bmsCurrentTenant(),
+     * enforced server-side by api/pos/save_simple_mode.php, not just hidden
+     * client-side). Same exception class as tenantPosSimpleModeStatus()
+     * above; kept as a separate read/write pair rather than one combined
+     * helper, matching this file's existing discipline (see tenantUserDirectory()'s
+     * own docblock on why these narrow exceptions are kept small and singular).
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function setTenantPosSimpleMode(int $tenantId, bool $enabled, bool $locked): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return ['ok' => false, 'error' => 'Tenant not found.'];
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return ['ok' => false, 'error' => 'Could not decrypt tenant credentials.'];
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+            $tPdo->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                VALUES ('pos_simple_mode', ?, NOW())
+                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+            ")->execute([$enabled ? '1' : '0', $enabled ? '1' : '0']);
+
+            getControlPdo()->prepare("UPDATE tenants SET pos_simple_mode_locked = ? WHERE id = ?")
+                ->execute([$locked ? 1 : 0, $tenantId]);
+
+            return ['ok' => true, 'error' => null];
+        } catch (Throwable $e) {
+            error_log('setTenantPosSimpleMode(' . $tenantId . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not update this tenant right now.'];
         }
     }
 }
