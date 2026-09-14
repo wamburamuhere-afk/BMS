@@ -327,8 +327,25 @@ function svBadge(string $status): string
                         No other tenant is affected.
                     </p>
 
+                    <?php
+                    // POS Advanced and Restaurant POS are both POS sub-features
+                    // (depends_on: ['pos'] in core/feature_registry.php) — shown
+                    // inside Point of Sale's own "More" dialog instead of as
+                    // separate top-level rows, alongside Simple Mode. Pulled out
+                    // of the main grid here so the loop below never renders them
+                    // twice.
+                    $posAdvancedFeature = null;
+                    $restaurantPosFeature = null;
+                    $mainFeatures = [];
+                    foreach ($features as $f) {
+                        if ($f['key'] === 'pos_advanced') { $posAdvancedFeature = $f; continue; }
+                        if ($f['key'] === 'restaurant_pos') { $restaurantPosFeature = $f; continue; }
+                        $mainFeatures[] = $f;
+                    }
+                    ?>
+
                     <div class="row g-2">
-                    <?php foreach ($features as $f): ?>
+                    <?php foreach ($mainFeatures as $f): ?>
                         <div class="col-12 col-md-6">
                             <div class="feature-row d-flex align-items-start gap-2 p-2 rounded">
                                 <div class="form-check form-switch mt-1">
@@ -345,7 +362,7 @@ function svBadge(string $status): string
                                             <?= safe_output($f['label'], '') ?>
                                         </label>
                                         <?php if ($f['key'] === 'pos'): ?>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem" onclick="openPosSimpleModeModal()">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem" onclick="openPosMoreModal()">
                                             More
                                         </button>
                                         <?php endif; ?>
@@ -450,6 +467,21 @@ const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
+
+// POS Advanced / Restaurant POS — pulled from the same $features the main
+// grid already renders from (control-DB only, always fresh on page load; no
+// extra request needed), so the POS "More" dialog can show them immediately
+// while it separately waits on Simple Mode's on-demand tenant-DB fetch.
+const POS_ADVANCED = {
+    available: <?= json_encode($posAdvancedFeature['available'] ?? true) ?>,
+    enabled:   <?= json_encode($posAdvancedFeature['effective'] ?? false) ?>,
+    reason:    <?= json_encode($posAdvancedFeature['reason'] ?? '') ?>
+};
+const RESTAURANT_POS = {
+    available: <?= json_encode($restaurantPosFeature['available'] ?? true) ?>,
+    enabled:   <?= json_encode($restaurantPosFeature['effective'] ?? false) ?>,
+    reason:    <?= json_encode($restaurantPosFeature['reason'] ?? '') ?>
+};
 
 // This panel never includes footer.php (it is not a tenant page), so the
 // usual shared safeOutput() is not on this page — a local, equally minimal
@@ -670,12 +702,15 @@ function loadUsers() {
     });
 }
 
-function openPosSimpleModeModal() {
-    // On demand, deliberately — same discipline as loadUsers(): this is the
-    // third thing on this page that briefly opens the tenant's own database,
-    // and only ever on this explicit click. See
+function openPosMoreModal() {
+    // POS Advanced / Restaurant POS render from POS_ADVANCED/RESTAURANT_POS
+    // (already known — plain control-DB reads, same data the main grid
+    // itself renders from) the instant the dialog opens. Simple Mode alone
+    // waits on an on-demand fetch — same discipline as loadUsers(): this is
+    // the third thing on this page that briefly opens the tenant's own
+    // database, and only ever on this explicit click. See
     // tenantPosSimpleModeStatus()'s docblock.
-    Swal.fire({ title: 'POS Simple Mode', html: 'Loading current status…', showConfirmButton: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: 'Point of Sale — More', html: 'Loading current status…', showConfirmButton: false, didOpen: () => Swal.showLoading() });
 
     $.ajax({
         url: '/actions/superadmin_tenant_pos_simple_mode.php',
@@ -686,42 +721,75 @@ function openPosSimpleModeModal() {
             Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read Simple Mode status for this tenant.' });
             return;
         }
+        function subFeatureBlock(id, label, description, state) {
+            var badge = state.available ? '' : '<span class="badge mt-1" style="background:#6c757d;color:#fff">' + state.reason + '</span>';
+            var disabled = state.available ? '' : ' disabled';
+            return '<div class="form-check mb-3 pb-3 border-bottom text-start">'
+                + '<input class="form-check-input" type="checkbox" id="' + id + '"' + (state.enabled ? ' checked' : '') + disabled + '>'
+                + '<label class="form-check-label fw-semibold" for="' + id + '">' + label + '</label>'
+                + '<div class="text-muted small">' + description + '</div>'
+                + badge
+                + '</div>';
+        }
         Swal.fire({
-            title: 'POS Simple Mode',
+            title: 'Point of Sale — More',
             html: '<div class="text-start">'
-                + '<p class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way. Superadmin-only — the tenant\'s own admin cannot change this themselves.</p>'
+                + subFeatureBlock('saPosAdvancedEnabled', 'POS Advanced',
+                    'Multi-register/till management, selling price tiers, and the customer loyalty points program.', POS_ADVANCED)
+                + subFeatureBlock('saRestaurantPosEnabled', 'Restaurant POS',
+                    'Floors/Tables, Kitchen Display, Modifier Groups and table Reservations for a restaurant/hybrid warehouse.', RESTAURANT_POS)
                 + '<div class="form-check">'
                 + '<input class="form-check-input" type="checkbox" id="saPosSimpleEnabled"' + (res.enabled ? ' checked' : '') + '>'
-                + '<label class="form-check-label" for="saPosSimpleEnabled">Simple Mode enabled for this tenant</label>'
+                + '<label class="form-check-label fw-semibold" for="saPosSimpleEnabled">Simple Mode</label>'
+                + '<div class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way. Superadmin-only — the tenant\'s own admin cannot change this themselves.</div>'
                 + '</div>'
                 + '</div>',
             showCancelButton: true,
             confirmButtonText: 'Save',
             preConfirm: function () {
-                return { enabled: document.getElementById('saPosSimpleEnabled').checked };
+                return {
+                    posAdvanced: document.getElementById('saPosAdvancedEnabled').checked,
+                    restaurantPos: document.getElementById('saRestaurantPosEnabled').checked,
+                    simple: document.getElementById('saPosSimpleEnabled').checked
+                };
             }
         }).then(function (result) {
             if (!result.isConfirmed) return;
-            $.ajax({
-                url: '/actions/superadmin_tenant_pos_simple_mode.php',
-                method: 'POST', dataType: 'json',
-                data: {
-                    _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
-                    enabled: result.value.enabled ? 1 : 0,
-                    // Always locked — the tenant's own admin never manages
-                    // this themselves, superadmin-only by design.
-                    locked: 1
-                }
-            }).done(function (res2) {
-                if (res2 && res2.success) {
-                    Swal.fire({ icon: 'success', title: 'Saved', text: res2.message, timer: 1800, showConfirmButton: false });
+            $.when(
+                $.ajax({
+                    url: '/actions/superadmin_tenant_features.php',
+                    method: 'POST', dataType: 'json',
+                    data: {
+                        _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID,
+                        features: {
+                            pos_advanced: result.value.posAdvanced ? 1 : 0,
+                            restaurant_pos: result.value.restaurantPos ? 1 : 0
+                        }
+                    }
+                }),
+                $.ajax({
+                    url: '/actions/superadmin_tenant_pos_simple_mode.php',
+                    method: 'POST', dataType: 'json',
+                    data: {
+                        _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
+                        enabled: result.value.simple ? 1 : 0,
+                        // Always locked — the tenant's own admin never manages
+                        // this themselves, superadmin-only by design.
+                        locked: 1
+                    }
+                })
+            ).done(function (r1, r2) {
+                var res1 = r1[0], res2 = r2[0];
+                if (res1 && res1.success && res2 && res2.success) {
+                    Swal.fire({ icon: 'success', title: 'Saved', text: 'Point of Sale settings updated.', timer: 1800, showConfirmButton: false })
+                        .then(function () { window.location.reload(); });
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: (res2 && res2.message) || 'Could not save.' });
+                    var msg = [!res1 || !res1.success ? (res1 && res1.message) : null, !res2 || !res2.success ? (res2 && res2.message) : null]
+                        .filter(Boolean).join(' ') || 'Could not save.';
+                    Swal.fire({ icon: 'error', title: 'Error', text: msg });
                 }
-            }).fail(function (xhr) {
-                let msg = 'Could not save.';
-                try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
-                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+            }).fail(function () {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save.' });
             });
         });
     }).fail(function (xhr) {
