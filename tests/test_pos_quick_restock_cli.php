@@ -21,6 +21,14 @@
  *      use — not the Opening-Balance-Equity treatment a no-payment stock
  *      correction uses. Verifies the posted journal_entries row balances,
  *      hits the correct two accounts, and reverseOutflow() undoes it cleanly.
+ *   7. THE REAL ENDPOINT (2026-09-14) — api/pos/quick_restock.php itself,
+ *      not receiveProductBatch()/postOutflow() called directly: Simple Mode
+ *      ("normal business man") succeeds with NO Paid-From account submitted
+ *      at all, silently posting to the same default Cash Drawer account
+ *      cash POS sales already use; Simple Mode off is unchanged (still
+ *      refuses without one). Each scenario runs in its own subprocess (the
+ *      endpoint's own internal transaction can't be nested in this file's),
+ *      verified and cleaned up against a captured "before" snapshot.
  *
  * Exit 0 = all pass.
  */
@@ -213,4 +221,175 @@ try {
     pass('assertLedgerBalanced ok (Σ Dr = Σ Cr)');
 } catch (Throwable $e) {
     fail('ledger imbalance: ' . $e->getMessage());
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 7. THE REAL ENDPOINT, end to end — 2026-09-14.
+//
+// Everything above calls receiveProductBatch()/postOutflow() directly,
+// inside one transaction it rolls back — it never actually runs
+// api/pos/quick_restock.php itself, so it could not have caught either bug
+// found live on production:
+//
+//   (a) Simple Mode ("normal business man") should never require choosing
+//       a GL account — pos_modals_new.php now hides the Paid-From picker,
+//       and the endpoint must silently resolve the same default cash
+//       account (posReceiptAccountId()) cash POS sales already use.
+//   (b) jQuery's error() callback fires on ANY non-2xx status, even one
+//       whose body is perfectly good JSON with a real message — a caught
+//       exception in the endpoint (http_response_code(500) + a helpful
+//       message) was silently replaced client-side by the generic
+//       "Restock Failed" string, discarding the real reason.
+//
+// The endpoint runs its own beginTransaction()/commit() internally, so this
+// section cannot itself wrap the call in a transaction (nested transactions
+// are not supported) — each scenario runs in ITS OWN subprocess (its own
+// connection entirely) and is cleaned up afterward with targeted deletes,
+// verified against a captured "before" snapshot.
+// ─────────────────────────────────────────────────────────────────────────
+section('7. api/pos/quick_restock.php — the real endpoint, end to end');
+
+function _restock_run_php(string $code): string {
+    $tmp = tempnam(sys_get_temp_dir(), 'restock_');
+    file_put_contents($tmp, "<?php\n" . $code);
+    $out = shell_exec('php ' . escapeshellarg($tmp) . ' 2>&1');
+    @unlink($tmp);
+    return trim((string)$out);
+}
+
+function _restock_run_endpoint(string $root, int $uid, array $post, string $simpleMode): string {
+    // Save in its OWN, separate process first — get_setting()'s per-process
+    // static cache would otherwise still hand the endpoint the value that
+    // existed before this test's save_setting() call, inside the SAME
+    // process, because roots.php's own bootstrap already reads a setting
+    // before this code gets a chance to write the new one (the exact
+    // caching behaviour test_pos_simple_mode_cli.php's section D documents).
+    _restock_run_php("require '$root/roots.php'; save_setting('pos_simple_mode', " . var_export($simpleMode, true) . "); echo 'SAVED';");
+
+    $postExport = var_export($post, true);
+    return _restock_run_php("
+        require '$root/roots.php';
+        \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
+        \$_SESSION['csrf_token'] = 'test-token';
+        \$_SERVER['REQUEST_METHOD'] = 'POST';
+        \$_POST = $postExport;
+        \$_POST['_csrf'] = 'test-token';
+        ob_start();
+        include '$root/api/pos/quick_restock.php';
+        echo ob_get_clean();
+    ");
+}
+
+$uid = (int)$pdo->query("SELECT user_id FROM users WHERE role_id=1 ORDER BY user_id LIMIT 1")->fetchColumn();
+$prodRow2 = $pdo->query("SELECT product_id, product_name FROM products WHERE status='active' AND is_service=0 AND track_inventory=1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$whRow2   = $pdo->query("SELECT warehouse_id FROM warehouses WHERE status='active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$simpleModeBefore = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+
+if (!$uid || !$prodRow2 || !$whRow2) {
+    pass('no admin user / product / warehouse fixture available — section 7 skipped (n/a)');
+} else {
+    $pid2 = (int)$prodRow2['product_id'];
+    $wid2 = (int)$whRow2['warehouse_id'];
+
+    function _restock_cleanup(PDO $pdo, string $refNumber, int $productId, float $qty): void {
+        $mv = $pdo->prepare("SELECT movement_id FROM stock_movements WHERE reference_number = ?");
+        $mv->execute([$refNumber]);
+        $movementId = $mv->fetchColumn();
+
+        $b = $pdo->prepare("SELECT batch_id FROM product_batches WHERE product_id = ? ORDER BY batch_id DESC LIMIT 1");
+        $b->execute([$productId]);
+        $batchId = $b->fetchColumn();
+
+        if ($movementId) {
+            $pdo->prepare("DELETE FROM stock_movements WHERE movement_id = ?")->execute([$movementId]);
+        }
+        if ($batchId) {
+            $pdo->prepare("DELETE FROM product_batches WHERE batch_id = ?")->execute([$batchId]);
+        }
+        $pdo->prepare("UPDATE products SET current_stock = current_stock - ? WHERE product_id = ?")->execute([$qty, $productId]);
+    }
+
+    function _restock_cleanup_journal(PDO $pdo, string $notesFragment): void {
+        $j = $pdo->prepare("SELECT DISTINCT entry_id FROM journal_entry_items WHERE description LIKE ?");
+        $j->execute(['%' . $notesFragment . '%']);
+        foreach ($j->fetchAll(PDO::FETCH_COLUMN) as $entryId) {
+            $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id = ?")->execute([$entryId]);
+            $pdo->prepare("DELETE FROM journal_entries WHERE entry_id = ?")->execute([$entryId]);
+        }
+    }
+
+    // ── 7a. Simple Mode OFF: paid_from_account_id still required, exactly as before ──
+    $offBefore = (float)$pdo->query("SELECT current_stock FROM products WHERE product_id = $pid2")->fetchColumn();
+    $offOut = _restock_run_endpoint($root, $uid, [
+        'product_id' => $pid2, 'warehouse_id' => $wid2, 'quantity' => 3,
+        'date' => date('Y-m-d'), 'buying_price' => 1000, 'wholesale_price' => '',
+        'selling_price' => 1500,
+        // no paid_from_account_id
+    ], '0');
+    $offJson = json_decode($offOut, true);
+    ($offJson && $offJson['success'] === false && str_contains((string)($offJson['message'] ?? ''), 'paid'))
+        ? pass('Simple Mode OFF: still refuses with no Paid-From account chosen (unchanged behaviour) — ' . ($offJson['message'] ?? ''))
+        : fail('Simple Mode OFF: expected a clean refusal naming Paid-From, got: ' . $offOut);
+    $offAfter = (float)$pdo->query("SELECT current_stock FROM products WHERE product_id = $pid2")->fetchColumn();
+    (abs($offAfter - $offBefore) < 0.001)
+        ? pass('...and nothing was written (stock unchanged) for the refused attempt')
+        : fail("stock changed despite refusal: before=$offBefore after=$offAfter");
+
+    // ── 7b. Simple Mode ON: no paid_from_account_id sent at all — must succeed, auto-resolved ──
+    $onBefore = (float)$pdo->query("SELECT current_stock FROM products WHERE product_id = $pid2")->fetchColumn();
+    $onOut = _restock_run_endpoint($root, $uid, [
+        'product_id' => $pid2, 'warehouse_id' => $wid2, 'quantity' => 4,
+        'date' => date('Y-m-d'), 'buying_price' => 2000, 'wholesale_price' => '',
+        'selling_price' => 2800,
+        // no paid_from_account_id — matches the modal with the field hidden
+    ], '1');
+    $onJson = json_decode($onOut, true);
+    ($onJson && $onJson['success'] === true)
+        ? pass('Simple Mode ON: succeeds with NO Paid-From account submitted at all — ' . ($onJson['message'] ?? ''))
+        : fail('Simple Mode ON: expected success, got: ' . $onOut);
+
+    if ($onJson && $onJson['success'] === true) {
+        $ref = (string)($onJson['reference_number'] ?? '');
+        $onAfter = (float)$pdo->query("SELECT current_stock FROM products WHERE product_id = $pid2")->fetchColumn();
+        (abs($onAfter - $onBefore - 4) < 0.001)
+            ? pass('...and current_stock really increased by exactly 4')
+            : fail("current_stock: before=$onBefore after=$onAfter (expected +4)");
+
+        $mvCheck = $pdo->prepare("SELECT movement_type, reference_type FROM stock_movements WHERE reference_number = ?");
+        $mvCheck->execute([$ref]);
+        $mvRow = $mvCheck->fetch(PDO::FETCH_ASSOC);
+        ($mvRow && $mvRow['movement_type'] === 'adjustment_in')
+            ? pass('...saved in stock_movements exactly like a normal restock (adjustment_in)')
+            : fail('stock_movements row missing/wrong for the Simple Mode restock');
+
+        $notesFragment = "{$prodRow2['product_name']} x4";
+        $jChk = $pdo->prepare("SELECT jei.account_id, a.account_code, jei.type FROM journal_entry_items jei JOIN accounts a ON a.account_id = jei.account_id WHERE jei.description LIKE ?");
+        $jChk->execute(['%' . $notesFragment . '%']);
+        $legs = $jChk->fetchAll(PDO::FETCH_ASSOC);
+        $creditLeg = null;
+        foreach ($legs as $l) { if ($l['type'] === 'credit') $creditLeg = $l; }
+        ($creditLeg && $creditLeg['account_code'] === '1-1130')
+            ? pass("...posted silently to the same default Cash Drawer (1-1130) account cash POS sales already use (got '" . ($creditLeg['account_code'] ?? 'none') . "')")
+            : fail('did not post to the expected default cash account: ' . json_encode($legs));
+
+        // Cleanup 7b.
+        _restock_cleanup($pdo, $ref, $pid2, 4);
+        _restock_cleanup_journal($pdo, $notesFragment);
+    }
+
+    // Restore pos_simple_mode to its pre-test value.
+    if ($simpleModeBefore === false) {
+        $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+    } else {
+        $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$simpleModeBefore]);
+    }
+    $restored = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+    ($restored === $simpleModeBefore)
+        ? pass('pos_simple_mode restored to its pre-test value')
+        : fail("pos_simple_mode restore failed: expected " . var_export($simpleModeBefore, true) . ", got " . var_export($restored, true));
+
+    $finalStock = (float)$pdo->query("SELECT current_stock FROM products WHERE product_id = $pid2")->fetchColumn();
+    (abs($finalStock - $offBefore) < 0.001)
+        ? pass('products.current_stock back to its original value — no test data persisted from section 7')
+        : fail("stock leaked: original=$offBefore final=$finalStock");
 }

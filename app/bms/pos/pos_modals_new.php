@@ -131,6 +131,18 @@ if ($can_restock_product ?? false) {
                             <input type="number" class="form-control" id="restock_selling_price" name="selling_price" min="0" step="0.01" required>
                         </div>
                     </div>
+                    <?php
+                    // Simple Mode ("normal business man" —
+                    // core/pos_nav.php::posSimpleModeEnabled()) never shows a
+                    // GL account picker — api/pos/quick_restock.php resolves
+                    // one default cash account itself (posReceiptAccountId(),
+                    // the same "Cash Drawer" account cash POS sales already
+                    // post to) and posts the whole thing silently in the
+                    // background. A pro business (Simple Mode off) keeps
+                    // choosing exactly as before.
+                    $posSimpleRestock = function_exists('posSimpleModeEnabled') && posSimpleModeEnabled();
+                    ?>
+                    <?php if (!$posSimpleRestock): ?>
                     <div class="mb-3 mt-2">
                         <label class="form-label"><?= t('Paid From') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" id="restock_paid_from_account_id" name="paid_from_account_id" required>
@@ -139,6 +151,7 @@ if ($can_restock_product ?? false) {
                         </select>
                         <small class="text-muted"><?= t('The buying price is assumed already paid from this account.') ?></small>
                     </div>
+                    <?php endif; ?>
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                 </div>
                 <div class="modal-footer">
