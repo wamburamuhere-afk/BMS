@@ -1673,6 +1673,7 @@ return [
     'Saved' => 'Imehifadhiwa',
     'Simple Mode' => 'Hali Rahisi',
     'Simple mode for a small shop (no accountant)' => 'Hali rahisi kwa duka dogo (bila mhasibu)',
+    'Your platform administrator manages this setting for your account.' => 'Msimamizi wa jukwaa lako ndiye anayesimamia mpangilio huu kwa akaunti yako.',
     'Slim (totals only)' => 'Nyembamba (jumla tu)',
     'Test Printer' => 'Jaribu Printa',
     'Testing...' => 'Inajaribu...',
