@@ -35,11 +35,12 @@ $stmt = $pdo->prepare("
         u2.username as updated_by_name,
         u3.username as reviewed_by_name,
         u4.username as approved_by_name,
-        CASE 
+        CASE
             WHEN e.paid_to_type = 'supplier' THEN (SELECT supplier_name FROM suppliers WHERE supplier_id = e.paid_to_id)
             WHEN e.paid_to_type = 'staff' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM employees WHERE employee_id = e.paid_to_id)
             WHEN e.paid_to_type = 'sub_contractor' THEN (SELECT supplier_name FROM sub_contractors WHERE supplier_id = e.paid_to_id)
-            ELSE e.vendor 
+            WHEN e.paid_to_type = 'other' THEN e.payee_manual_name
+            ELSE e.vendor
         END as paid_to_name
     FROM expenses e 
     LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id 
@@ -198,7 +199,9 @@ global $company_name, $company_logo;
                                 <label class="text-muted small d-block mb-1"><?= t('Vendor / Payee') ?></label>
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? t('N/A')); ?></span>
-                                    <?php if (!empty($expense['paid_to_type'])): ?>
+                                    <?php if ($expense['paid_to_type'] === 'other' && !empty($expense['payee_manual_role'])): ?>
+                                        <span class="badge bg-info-soft text-info border border-info small" style="font-size: 0.65rem;"><?php echo htmlspecialchars(strtoupper($expense['payee_manual_role'])); ?></span>
+                                    <?php elseif (!empty($expense['paid_to_type'])): ?>
                                         <span class="badge bg-info-soft text-info border border-info small" style="font-size: 0.65rem;"><?php echo strtoupper(str_replace('_', ' ', $expense['paid_to_type'])); ?></span>
                                     <?php endif; ?>
                                 </div>
@@ -469,7 +472,7 @@ $(document).ready(function() {
         const voucherNo = 'PV-<?= str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT) ?>';
         const date      = '<?= date('d F Y', strtotime($expense['expense_date'])) ?>';
         const paidTo    = '<?= addslashes(htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? '-')) ?>';
-        const paidType  = '<?= addslashes(htmlspecialchars($expense['paid_to_type'] ?? '')) ?>';
+        const paidType  = '<?= addslashes(htmlspecialchars(($expense['paid_to_type'] ?? '') === 'other' ? ($expense['payee_manual_role'] ?? 'other') : ($expense['paid_to_type'] ?? ''))) ?>';
         const desc      = '<?= addslashes(htmlspecialchars($expense['description'] ?? '-')) ?>';
         const expType   = '<?= addslashes(htmlspecialchars($expense['expense_type'] ?? '-')) ?>';
         const project   = '<?= addslashes(htmlspecialchars($expense['project_name'] ?? '')) ?>';
