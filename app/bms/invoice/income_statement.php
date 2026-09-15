@@ -96,9 +96,9 @@ $is_admin_user = isAdmin();
                 </div>
                 <?php endif; ?>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select class="form-select rounded-3 border-light shadow-sm" id="warehouse_id" name="warehouse_id">
-                        <option value=""><?= $is_admin_user ? 'All Warehouses' : 'All My Warehouses' ?></option>
+                        <option value=""><?= $is_admin_user ? wLabel('All Warehouses', 'All Shops') : wLabel('All My Warehouses', 'All My Shops') ?></option>
                     </select>
                 </div>
                 <div class="col-md-2">

@@ -113,6 +113,7 @@ return [
     'Shop' => 'Duka',
     'Shops' => 'Maduka',
     'Go to Warehouses' => 'Nenda kwa Maghala',
+    'Go to Shops' => 'Nenda kwa Maduka',
     'Locations' => 'Maeneo',
 
     // ------------------------------------------------------------------
