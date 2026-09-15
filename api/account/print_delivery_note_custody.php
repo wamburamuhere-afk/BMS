@@ -266,7 +266,7 @@ $accent = getSetting('print_template_color_dn_custody', '#6b7c5e');
         <div class="field-line"><span class="flabel">Type:</span> <?= $is_inbound ? 'Inbound (Received)' : 'Outbound (Sent)' ?></div>
         <div class="field-line"><span class="flabel">Date:</span> <?= date('d M Y', strtotime($dn['delivery_date'])) ?></div>
         <div class="field-line"><span class="flabel">Status:</span> <?= strtoupper($dn['status']) ?></div>
-        <div class="field-line"><span class="flabel">Warehouse:</span> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></div>
+        <div class="field-line"><span class="flabel"><?= wLabel('Warehouse:', 'Shop:') ?></span> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></div>
         <?php if (!empty($dn['project_name'])): ?><div class="field-line"><span class="flabel">Project:</span> <?= htmlspecialchars($dn['project_name']) ?></div><?php endif; ?>
         <?php if (!empty($dn['project_contract_no'])): ?><div class="field-line"><span class="flabel">Contract:</span> <?= htmlspecialchars($dn['project_contract_no']) ?></div><?php endif; ?>
         <?php if ($linked_invoice): ?><div class="field-line"><span class="flabel">Invoice:</span> <?= htmlspecialchars($linked_invoice['invoice_number']) ?> &mdash; <?= strtoupper(htmlspecialchars($linked_invoice['status'])) ?></div><?php endif; ?>

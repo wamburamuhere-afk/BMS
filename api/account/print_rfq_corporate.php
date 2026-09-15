@@ -202,7 +202,7 @@ $accent = getSetting('print_template_color_rfq_minimal', '#1a7ea8');
         <div><strong>Response Deadline</strong><?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : 'Not specified' ?></div>
         <?php if (!empty($rfq['project_name'])): ?><div><strong>Project</strong><?= htmlspecialchars($rfq['project_name']) ?></div><?php endif; ?>
         <?php if (!empty($rfq['project_contract_no'])): ?><div><strong>Contract No</strong><?= htmlspecialchars($rfq['project_contract_no']) ?></div><?php endif; ?>
-        <?php if (!empty($rfq['warehouse_name'])): ?><div><strong>Warehouse</strong><?= htmlspecialchars($rfq['warehouse_name']) ?></div><?php endif; ?>
+        <?php if (!empty($rfq['warehouse_name'])): ?><div><strong><?= wLabel('Warehouse', 'Shop') ?></strong><?= htmlspecialchars($rfq['warehouse_name']) ?></div><?php endif; ?>
         <div><strong>Created By</strong><?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></div>
     </div>
 

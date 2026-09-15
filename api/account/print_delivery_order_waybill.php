@@ -195,7 +195,7 @@ $accent = getSetting('print_template_color_do_waybill', '#0f766e');
             <div class="band-title">Consignment</div>
             <?php if (!empty($do['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($do['project_name']) ?></p><?php endif; ?>
             <?php if (!empty($do['contract_no'])): ?><p><strong>Contract No:</strong> <?= htmlspecialchars($do['contract_no']) ?></p><?php endif; ?>
-            <?php if (!empty($do['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($do['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($do['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($do['warehouse_name']) ?></p><?php endif; ?>
         </div>
     </div>
 

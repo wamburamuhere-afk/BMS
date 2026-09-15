@@ -251,7 +251,7 @@ $statusColor  = $statusColors[$do['status']] ?? '#6c757d';
             <h3>Delivery Information</h3>
             <?php if (!empty($do['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($do['project_name']) ?></p><?php endif; ?>
             <?php if (!empty($do['contract_no'])): ?><p><strong>Contract No:</strong> <?= htmlspecialchars($do['contract_no']) ?></p><?php endif; ?>
-            <?php if (!empty($do['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($do['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($do['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($do['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Expected Date:</strong> <?= !empty($do['expected_date']) ? date('d M Y', strtotime($do['expected_date'])) : 'Not specified' ?></p>
             <p><strong>Created By:</strong> <?= htmlspecialchars($do_creator_name ?: 'N/A') ?></p>
         </div>

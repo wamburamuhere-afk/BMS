@@ -221,7 +221,7 @@ $accent = getSetting('print_template_color_dn_transit', '#1b5fa8');
             <div class="field-line"><strong>Type:</strong> <?= $is_inbound ? 'Inbound (Received)' : 'Outbound (Sent)' ?></div>
             <div class="field-line"><strong>Date:</strong> <?= date('d M Y', strtotime($dn['delivery_date'])) ?></div>
             <div class="field-line"><strong>Status:</strong> <?= strtoupper($dn['status']) ?></div>
-            <div class="field-line"><strong>Warehouse:</strong> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></div>
+            <div class="field-line"><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></div>
         </div>
     </div>
 
