@@ -39,7 +39,7 @@ if ($table_number === '') {
 $floorChk = $pdo->prepare("SELECT 1 FROM restaurant_floors WHERE floor_id = ? AND warehouse_id = ?");
 $floorChk->execute([$floor_id, $warehouse_id]);
 if (!$floorChk->fetchColumn()) {
-    echo json_encode(['success' => false, 'message' => t('The selected floor does not belong to this warehouse.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('The selected floor does not belong to this warehouse.', 'The selected floor does not belong to this shop.')]);
     exit;
 }
 

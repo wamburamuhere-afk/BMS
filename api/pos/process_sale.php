@@ -126,7 +126,7 @@ try {
         $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
         $tblChk->execute([$table_id, $warehouse_id]);
         if (!$tblChk->fetchColumn()) {
-            throw new Exception(t('The selected table does not belong to this warehouse.'));
+            throw new Exception(wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.', true));
         }
     }
 

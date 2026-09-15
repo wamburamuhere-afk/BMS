@@ -38,7 +38,7 @@ try {
     // Same gate for the optional warehouse assignment.
     if (!empty($_POST['warehouse_id']) && function_exists('userCan') && !userCan('warehouse', (int)$_POST['warehouse_id'])) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: target warehouse not in your scope.']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: target shop not in your scope.' : 'Access denied: target warehouse not in your scope.']);
         exit();
     }
 

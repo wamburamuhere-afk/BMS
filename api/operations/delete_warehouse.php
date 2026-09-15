@@ -10,7 +10,7 @@ if (!isAuthenticated()) {
 
 if (!canDelete('warehouses')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete warehouses']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access Denied: you do not have permission to delete shops' : 'Access Denied: you do not have permission to delete warehouses']);
     exit;
 }
 

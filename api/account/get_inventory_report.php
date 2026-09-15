@@ -113,8 +113,9 @@ try {
     $summary = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
     // ── Chart 1: Cost Value by Warehouse ──────────────────────────────────
+    $no_warehouse_label = $pdo->quote(wLabel('No Warehouse', 'No Shop'));
     $stmt = $pdo->prepare("
-        SELECT COALESCE(w.warehouse_name, 'No Warehouse')              AS name,
+        SELECT COALESCE(w.warehouse_name, $no_warehouse_label)         AS name,
                COALESCE(SUM(ps.stock_quantity * p.cost_price), 0)      AS total
         $base_from
          WHERE $where_sql
@@ -158,7 +159,7 @@ try {
                p.product_code,
                p.product_name,
                COALESCE(c.category_name, 'Uncategorised')          AS category,
-               COALESCE(w.warehouse_name, 'No Warehouse')           AS warehouse_name,
+               COALESCE(w.warehouse_name, $no_warehouse_label)      AS warehouse_name,
                ps.stock_quantity                                    AS current_stock,
                (ps.stock_quantity * COALESCE(p.cost_price, 0))     AS cost_value,
                (ps.stock_quantity * COALESCE(p.selling_price, 0))   AS selling_value

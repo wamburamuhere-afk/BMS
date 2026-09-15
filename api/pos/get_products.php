@@ -271,13 +271,13 @@ function generate_grn_number() {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted" id="grnWarehouseHint">Select project to filter warehouses.</small>
+                        <small class="text-muted" id="grnWarehouseHint"><?= wLabel('Select project to filter warehouses.', 'Select project to filter shops.') ?></small>
                     </div>
 
                     <div class="col-md-4 mb-3">
-                        <label for="warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"
                                     data-project="<?= $wh['project_id'] ?>"
@@ -871,7 +871,7 @@ function filterGrnWarehouses(projectId) {
     const sel   = document.getElementById('warehouse_id');
     const hint  = document.getElementById('grnWarehouseHint');
     const curVal = parseInt(sel.value) || 0;
-    sel.innerHTML = '<option value="">Select Warehouse</option>';
+    sel.innerHTML = '<option value="">' + <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?> + '</option>';
     let filtered;
     if (!projectId || projectId === '' || projectId === '0') {
         filtered = grnAllWarehouses.filter(w => w.project_id === 0);

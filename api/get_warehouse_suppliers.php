@@ -15,7 +15,7 @@ try {
     $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
 
     if ($warehouse_id <= 0) {
-        throw new Exception("Warehouse not specified");
+        throw new Exception(isShopLabel() ? "Shop not specified" : "Warehouse not specified");
     }
     // Found 2026-07-18: same gap as get_warehouse_supplier_grns.php (already
     // fixed today) — normal UI pre-scopes warehouse_id, but nothing checked

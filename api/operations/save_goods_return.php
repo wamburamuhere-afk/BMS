@@ -44,7 +44,7 @@ $notes         = trim($_POST['notes'] ?? '');
 $items_json    = $_POST['items_json'] ?? '[]';
 
 if (empty($return_number) || $supplier_id <= 0 || $warehouse_id <= 0 || empty($return_reason)) {
-    echo json_encode(['success' => false, 'message' => 'Please fill all required fields, including warehouse.']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Please fill all required fields, including shop.' : 'Please fill all required fields, including warehouse.']);
     exit;
 }
 

@@ -96,7 +96,7 @@ $infoRows = [
     [t('Cashier'), $sale['cashier_name'] ?? t('N/A')],
 ];
 if (!empty($sale['register_name']))  $infoRows[] = [t('Register'), $sale['register_name']];
-if (!empty($sale['warehouse_name'])) $infoRows[] = [t('Warehouse'), $sale['warehouse_name']];
+if (!empty($sale['warehouse_name'])) $infoRows[] = [wLabel('Warehouse', 'Shop', true), $sale['warehouse_name']];
 if (!empty($sale['customer_name']))  $infoRows[] = [t('Customer'), $sale['customer_name']];
 
 $infoHtml = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:11px;">';

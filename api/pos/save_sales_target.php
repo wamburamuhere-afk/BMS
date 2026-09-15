@@ -49,7 +49,7 @@ if ($warehouse_id > 0) {
     // warehouse_id = 0 means "company-wide" — only a caller with all-warehouse
     // access (admin or an explicit grant-all override) may set that target.
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: setting a company-wide target requires all-warehouse access.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: setting a company-wide target requires all-warehouse access.', 'Access denied: setting a company-wide target requires all-shop access.')]);
     exit;
 }
 

@@ -124,13 +124,14 @@ try {
     $by_type = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ── Detail rows ───────────────────────────────────────────────────────
+    $no_warehouse_label = $pdo->quote(wLabel('No Warehouse', 'No Shop'));
     $stmt = $pdo->prepare("
         SELECT $eff_date        AS movement_date,
                ($norm_type)      AS movement_type,
                ($direction_expr) AS direction,
                COALESCE(p.product_name, '—')                       AS product_name,
                COALESCE(p.product_code, '')                         AS product_code,
-               COALESCE(w.warehouse_name, 'No Warehouse')           AS warehouse_name,
+               COALESCE(w.warehouse_name, $no_warehouse_label)      AS warehouse_name,
                sm.quantity, COALESCE(sm.unit, '')                   AS unit,
                COALESCE(sm.total_cost, 0)                           AS value,
                sm.stock_after,

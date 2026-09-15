@@ -59,7 +59,7 @@ try {
         }
     } elseif (!hasAllWarehouseAccess()) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => t('Select a warehouse — you do not have access to view stock across all warehouses.')]);
+        echo json_encode(['success' => false, 'message' => wLabel('Select a warehouse — you do not have access to view stock across all warehouses.', 'Select a shop — you do not have access to view stock across all shops.', true)]);
         exit;
     }
 

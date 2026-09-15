@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $check_stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_code = ? AND warehouse_id != ?");
     $check_stmt->execute([$warehouse_code, $warehouse_id]);
     if ($check_stmt->fetch()) {
-        echo json_encode(['success' => false, 'message' => "Warehouse code '{$warehouse_code}' already exists."]);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? "Shop code '{$warehouse_code}' already exists." : "Warehouse code '{$warehouse_code}' already exists."]);
         exit;
     }
 

@@ -407,8 +407,8 @@ $wf = [
         </div>
         <?php endif; ?>
         <div class="box">
-            <h3>Destination / Warehouse</h3>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></p>
+            <h3><?= wLabel('Destination / Warehouse', 'Destination / Shop') ?></h3>
+            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></p>
             <?php if (!empty($dn['warehouse_location'])): ?>
             <p><?= htmlspecialchars($dn['warehouse_location']) ?></p>
             <?php endif; ?>
