@@ -182,7 +182,17 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'page_keys'   => ['pos_advanced'],
                 'depends_on'  => ['pos'],
                 'paths'       => [
-                    'api/pos/get_registers.php',
+                    // get_registers.php deliberately NOT gated here (2026-09-15):
+                    // it's a read-only lookup ('canView(pos)' only, no pos_advanced
+                    // check of its own) that the base-tier Start Shift modal also
+                    // depends on to find the tenant's one default register — see
+                    // pos_config_settings.php's own fallback copy ("You still have
+                    // one default register/till to sign in at"). Gating it here
+                    // silently broke Start Shift for every non-pos_advanced tenant:
+                    // the modal's own network-failure fallback then guessed
+                    // register_id=1, which frequently isn't the tenant's real
+                    // register. save_register.php/toggle_register_status.php stay
+                    // gated — those are genuine multi-register management.
                     'api/pos/save_register.php',
                     'api/pos/toggle_register_status.php',
                     'core/pos_loyalty.php',

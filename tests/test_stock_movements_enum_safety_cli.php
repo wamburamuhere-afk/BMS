@@ -81,7 +81,11 @@ $HELPER_CALLERS = [
     'api/create_grn.php',
     'api/update_grn_status.php',
     'api/pos/process_sale.php',
-    'api/create_product.php',
+    // api/create_product.php's own recordStockMovement() call was extracted
+    // into core/stock_intake.php's receiveProductBatch() too (Phase 1,
+    // products_simple_pos_plan.md — opening stock now writes a real batch
+    // instead of a bare stock-counter bump) — checked there instead, same as
+    // approve_grn.php above.
     'api/update_product.php',
 ];
 

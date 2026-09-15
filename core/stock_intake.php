@@ -32,6 +32,7 @@ if (!function_exists('receiveProductBatch')) {
      *                             it creates needs its own price history.
      *   batch_number     ?string
      *   expiry_date      ?string  Y-m-d
+     *   manufacturing_date ?string Y-m-d
      *   wholesale_price  ?float   this batch's wholesale price at intake
      *   selling_price    ?float   this batch's retail price at intake
      *   receipt_id       ?int     GRN link; null for a non-GRN intake
@@ -93,15 +94,17 @@ if (!function_exists('receiveProductBatch')) {
         if (!empty($line['write_batch'])) {
             $batchNumber = trim((string)($line['batch_number'] ?? ''));
             $expiryDate  = $line['expiry_date'] ?? null;
+            $mfgDate     = $line['manufacturing_date'] ?? null;
             $insertBatch = $pdo->prepare("
                 INSERT INTO product_batches
-                    (product_id, warehouse_id, batch_number, expiry_date, quantity_received, quantity_remaining, unit_cost, wholesale_price, selling_price, receipt_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    (product_id, warehouse_id, batch_number, expiry_date, manufacturing_date, quantity_received, quantity_remaining, unit_cost, wholesale_price, selling_price, receipt_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             $insertBatch->execute([
                 $productId, $warehouseId,
                 $batchNumber !== '' ? $batchNumber : null,
                 !empty($expiryDate) ? $expiryDate : null,
+                !empty($mfgDate) ? $mfgDate : null,
                 $qty, $qty,
                 $unitCost,
                 isset($line['wholesale_price']) ? (float)$line['wholesale_price'] : null,
