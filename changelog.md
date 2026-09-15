@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 7) - POS Restock modal gains Manufacturing/Expiry Date
+
+**Phase 7 of `products_simple_pos_plan.md`** — the POS Restock modal gains the same two batch-date fields Create/Quick Add already have: Manufacturing Date and Expiry Date, both optional (forcing an expiry date on every restock would break for non-perishable goods), present in every mode.
+
+**Fix:**
+- `app/bms/pos/pos_modals_new.php` — two new `<input type="date">` fields next to the existing Buying/Wholesale/Retail price row.
+- `api/pos/quick_restock.php` — reads both from `$_POST` (optional, `null` when omitted) and passes them into its existing `receiveProductBatch()` call (already had `write_batch=true`; just two new args). No JS changes needed — the form submits via `$(this).serialize()`, which already picks up any named field.
+- The already-built expiry-notification cron (`cron/run_notification_checks.php`) needs zero changes — it just starts seeing real dates in `product_batches.expiry_date` from restocks too, not only GRN/Create.
+
+**Verified:** new `tests/test_pos_restock_batch_dates_cli.php` (19/19) — source wiring, the modal rendered in both modes, and two real end-to-end calls to the actual endpoint (dates given / dates omitted) confirming the batch row gets exactly what was submitted either way. Existing `test_pos_quick_restock_cli` (36/36), `test_credit_note_restock_cli` (19/19), `test_grn_posting_cli` (17/17), `test_pos_batch_expiry_cli` (47/47), `test_pos_batch_cogs_cli` (5/5) re-run clean. `php -l` clean.
+
 ## 2026-09-15 (feat/products-simple-pos, phase 6) - Products: list page SKU column + its own Quick Add modal get the same Simple POS treatment
 
 **Phase 6 of `products_simple_pos_plan.md`** — `products.php`'s list table (hand-built `<th>`/`<td>`, not config-driven) hides its SKU column in Simple POS, and its own separate third product-creation surface — the "Quick Add Product" modal — gets the identical field treatment as the main Create form. Also closes the last remaining "Store / Warehouse Name" → `wLabel()` terminology gap, and adds Manufacturing/Expiry Date to the modal's Opening Stock section in every mode (parity with the main Create form's batch-date fields from Phase 1/3 — this modal had none before).
