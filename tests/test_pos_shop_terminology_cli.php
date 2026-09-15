@@ -37,6 +37,22 @@ function setFeatures(?bool $pos, ?bool $projects) {
     $GLOBALS['__bms_features'] = ['pos' => $pos, 'projects' => $projects];
 }
 
+// Minimal stand-in for helpers.php's real get_setting(), which this pure-logic
+// test deliberately never loads (no HTTP, no DB — see the file docblock).
+// Only isShopLabel()'s 'shop_mode' lookup is exercised here.
+if (!function_exists('get_setting')) {
+    function get_setting(string $key, $default = '') {
+        if ($key === 'shop_mode' && array_key_exists('__test_shop_mode', $GLOBALS)) {
+            return $GLOBALS['__test_shop_mode'];
+        }
+        return $default;
+    }
+}
+function setShopModeOverride(?string $val) {
+    if ($val === null) { unset($GLOBALS['__test_shop_mode']); return; }
+    $GLOBALS['__test_shop_mode'] = $val;
+}
+
 loadLanguage('en');
 
 section('POS off — always Warehouse, on every screen (unchanged behavior)');
@@ -80,6 +96,22 @@ ok(
 );
 setFeatures(false, false);
 ok(wLabel('Warehouse required', 'Shop required') === 'Ghala linahitajika', 'sw, pos off -> always Ghala wording, never Duka');
+
+section('Superadmin "Shop Mode" override — forces Shop even when Projects is on');
+loadLanguage('en');
+setFeatures(true, true); // would normally stay Warehouse outside the POS core screen
+setShopModeOverride('1');
+ok(isShopLabel(false) === true, 'shop_mode=1 overrides projects-on -> Shop, non-core screen');
+ok(isShopLabel(true) === true, 'shop_mode=1 -> still Shop on the POS core screen');
+ok(wLabel('Warehouse', 'Shop') === 'Shop', "wLabel() picks up the override off the POS core screen too");
+setShopModeOverride('0');
+ok(isShopLabel(false) === false, 'shop_mode=0 (explicitly unset) falls back to the automatic pos+projects rule -> Warehouse');
+setShopModeOverride(null);
+ok(isShopLabel(false) === false, 'shop_mode never set -> same automatic fallback -> Warehouse');
+setFeatures(false, false);
+setShopModeOverride('1');
+ok(isShopLabel(false) === false, 'shop_mode=1 cannot force Shop when POS itself is off for the tenant');
+setShopModeOverride(null);
 
 section('wLabelE() HTML-escapes its output');
 setFeatures(true, false);
