@@ -20,6 +20,11 @@ $can_edit_products = canEdit('products');
 $can_delete_products = canDelete('products');
 $can_adjust_stock = hasPermission('adjust_stock') || isAdmin();
 
+// Simple POS (products_simple_pos_plan.md §6): whatever is hidden on
+// Create/Edit is hidden here too, for the exact same reason — a Simple POS
+// shop owner never entered these values and shouldn't be shown them back.
+$simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
+
 // Get product details with comprehensive information
 try {
     $query = "
@@ -178,7 +183,7 @@ try {
 $product_batches = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT pb.batch_id, pb.batch_number, pb.expiry_date, pb.quantity_received,
+        SELECT pb.batch_id, pb.batch_number, pb.expiry_date, pb.manufacturing_date, pb.quantity_received,
                pb.quantity_remaining, pb.unit_cost, pb.created_at,
                w.warehouse_name, pr.receipt_number,
                DATEDIFF(pb.expiry_date, CURDATE()) AS days_remaining
@@ -422,7 +427,7 @@ global $company_logo, $company_name;
     <div class="d-none d-print-block text-center mb-4">
        
         <h4 class="fw-bold text-dark text-uppercase">PRODUCT DETAILS REPORT</h4>
-        <h5 class="text-muted"><?= safe_output($product['product_name']) ?> (<?= safe_output($product['sku']) ?>)</h5>
+        <h5 class="text-muted"><?= safe_output($product['product_name']) ?><?= $simpleProductForm ? '' : ' (' . safe_output($product['sku']) . ')' ?></h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
 
@@ -442,7 +447,9 @@ global $company_logo, $company_name;
                 <div>
                     <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> Product View</h2>
                     <p class="text-muted mb-0 small mt-1 d-none d-md-block">View comprehensive information about this product</p>
+                    <?php if (!$simpleProductForm): ?>
                     <p class="text-muted mb-0 small mt-1 d-md-none">Product: <?= safe_output($product['sku']) ?></p>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Desktop Actions -->
@@ -562,16 +569,18 @@ global $company_logo, $company_name;
                             <h3 class="text-dark fw-bold text-break mb-3"><?= safe_output($product['product_name']) ?></h3>
                             
                             <div class="row g-2">
+                                <?php if (!$simpleProductForm): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">SKU:</small> 
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">SKU:</small>
                                     <span class="custom-badge mt-1"><?= safe_output($product['sku']) ?></span>
                                 </div>
-                                
+
                                 <?php if (!empty($product['barcode'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Barcode:</small> 
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Barcode:</small>
                                     <span class="custom-badge mt-1"><?= safe_output($product['barcode']) ?></span>
                                 </div>
+                                <?php endif; ?>
                                 <?php endif; ?>
                                 
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
@@ -623,7 +632,7 @@ global $company_logo, $company_name;
                                         </div>
                                         <?php endif; ?>
                                         
-                                        <?php if ($product['wholesale_price'] > 0): ?>
+                                        <?php if ($product['wholesale_price'] > 0 && !$simpleProductForm): ?>
                                         <div class="col-6 col-md-12 mb-1">
                                             <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;">Wholesale:</small>
                                             <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($product['wholesale_price']) ?></h5>
@@ -650,7 +659,7 @@ global $company_logo, $company_name;
                         </div>
                     </div>
                     
-                    <?php if (!empty($product['description'])): ?>
+                    <?php if (!empty($product['description']) && !$simpleProductForm): ?>
                     <div class="mt-3">
                         <strong>Description:</strong>
                         <p class="mt-1"><?= nl2br(safe_output($product['description'])) ?></p>
@@ -700,12 +709,14 @@ global $company_logo, $company_name;
                             </button>
                         </li>
                         <?php endif; ?>
+                        <?php if (!$simpleProductForm): ?>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="details-tab" data-bs-toggle="tab" 
+                            <button class="nav-link" id="details-tab" data-bs-toggle="tab"
                                     data-bs-target="#details" type="button" role="tab">
                                 <i class="bi bi-list-check"></i> Additional Details
                             </button>
                         </li>
+                        <?php endif; ?>
                         <?php if ($can_adjust_stock && $product['is_service'] == 0): ?>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="actions-tab" data-bs-toggle="tab" 
@@ -879,6 +890,7 @@ global $company_logo, $company_name;
                                                             <th>Batch #</th>
                                                             <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                                             <th>Date Received</th>
+                                                            <th>Manufactured</th>
                                                             <th>Expiry Date</th>
                                                             <th>Received</th>
                                                             <th>Remaining</th>
@@ -907,6 +919,7 @@ global $company_logo, $company_name;
                                                             <td><?= safe_output($b['batch_number'] ?? '—') ?></td>
                                                             <td><?= safe_output($b['warehouse_name'] ?? 'N/A') ?></td>
                                                             <td><?= $b['created_at'] ? date('d M Y', strtotime($b['created_at'])) : '—' ?></td>
+                                                            <td><?= !empty($b['manufacturing_date']) ? date('d M Y', strtotime($b['manufacturing_date'])) : '—' ?></td>
                                                             <td class="<?= $expiredClass ?>">
                                                                 <?= $b['expiry_date'] ? date('d M Y', strtotime($b['expiry_date'])) : '—' ?>
                                                                 <?php if ($days !== null && $days <= 30): ?>
@@ -1150,6 +1163,7 @@ global $company_logo, $company_name;
                         <?php endif; ?>
 
                         <!-- Additional Details Tab -->
+                        <?php if (!$simpleProductForm): ?>
                         <div class="tab-pane fade" id="details" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6">
@@ -1288,6 +1302,7 @@ global $company_logo, $company_name;
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
 
                         <?php if ($can_adjust_stock): ?>
                         <!-- Quick Actions Tab -->
