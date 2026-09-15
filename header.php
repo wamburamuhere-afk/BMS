@@ -795,12 +795,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= t('Inventory Products') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Non-Inventory Products') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Service') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
-                        
+
                         <!-- Financial Modules -->
                         <?php
                         // Simple Mode ("normal business man" — core/pos_nav.php::posSimpleModeEnabled())
