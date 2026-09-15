@@ -8,11 +8,14 @@
  * Deliberately reads pos_sales/pos_sale_items + products.cost_price, never
  * the ledger — see core/pos_dashboard_metrics.php::posSimpleBuySellSeries().
  *
- * Response shape intentionally matches api/get_performance_data.php's
- * {period, revenue, expense} contract so app/dashboard.php's existing
- * renderChart() can consume either endpoint unchanged: revenue = sold,
- * expense = bought (cost). Only the on-screen labels differ (set in
- * app/dashboard.php based on posSimpleModeEnabled()).
+ * Response {period, revenue, expense, profit} still matches
+ * api/get_performance_data.php's contract (revenue = sold, expense = bought
+ * cost — unchanged meaning, only the on-screen labels differ, set in
+ * app/dashboard.php based on posSimpleModeEnabled()). 2026-09-15 adds two
+ * Simple-Mode-only fields consumed by a dedicated 3-line chart there:
+ * operating_expenses (real `expenses` table spend, warehouse-scoped) and
+ * net_profit (sold - bought - operating_expenses, the shop owner's actual
+ * bottom line, not just gross margin).
  *
  * GET: period = daily|weekly|monthly|quarterly|yearly (default monthly)
  * Permission: canView('pos')
@@ -51,7 +54,12 @@ try {
     $scope = scopeFilterSqlNullable('project', 'ps')
            . scopeFilterSqlNullable('warehouse', 'ps');
 
-    $rows = posSimpleBuySellSeries($pdo, $startDate, $endDate, $period, $scope);
+    // Expenses series (2026-09-15) — own scope clause, alias 'e', same
+    // project/warehouse discipline as the sales scope above.
+    $expenseScope = scopeFilterSqlNullable('project', 'e')
+                  . scopeFilterSqlNullable('warehouse', 'e');
+
+    $rows = posSimpleBuySellSeries($pdo, $startDate, $endDate, $period, $scope, $expenseScope);
 
     $data = [];
     foreach ($rows as $row) {
@@ -65,10 +73,12 @@ try {
             $label = (count($parts) === 2) ? "Wk {$parts[1]}, {$parts[0]}" : "Wk " . $row['period'];
         }
         $data[] = [
-            'period'  => $label,
-            'revenue' => $row['sold'],    // "Sold" — displayed label set client-side
-            'expense' => $row['bought'],  // "Bought" — displayed label set client-side
-            'profit'  => $row['profit'],
+            'period'             => $label,
+            'revenue'            => $row['sold'],       // "Sold" — displayed label set client-side
+            'expense'            => $row['bought'],     // "Bought" (COGS) — displayed label set client-side; UNCHANGED, kept for back-compat with any other consumer of this contract
+            'profit'             => $row['profit'],      // gross margin (sold - bought), unchanged meaning
+            'operating_expenses' => $row['expenses'],    // NEW — real Expenses module spend (approved/paid), warehouse-scoped
+            'net_profit'         => $row['net_profit'],  // NEW — sold - bought - operating_expenses, the shop owner's real bottom line
         ];
     }
 

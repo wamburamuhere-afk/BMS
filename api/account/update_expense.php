@@ -55,6 +55,11 @@ try {
         echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
         exit;
     }
+    if (!empty($_POST['warehouse_id']) && !userCan('warehouse', (int)$_POST['warehouse_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your scope.']);
+        exit;
+    }
 
     // Simple POS mode (expenses_simple_pos_plan.md): the Edit Expense form
     // hides Expense Type, Account, and "Paid From" — auto-resolve them.
@@ -72,6 +77,8 @@ try {
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+    // Shop (warehouse) this expense belongs to — Simple POS only; see add_expense.php.
+    $warehouse_id       = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
 
     // Simple POS hides "Paid From" — auto-resolve the tenant's cash account.
     if (!$bank_account_id && $simplePos) {
@@ -143,6 +150,7 @@ try {
         amount              = ?,
         bank_account_id     = ?,
         project_id          = ?,
+        warehouse_id        = ?,
         budget_id           = ?,
         voucher_id          = ?,
         description         = ?,
@@ -161,7 +169,7 @@ try {
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
-        $project_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
+        $project_id, $warehouse_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
         $paid_to_type, $paid_to_id, $payee_manual_role, $payee_manual_name,
         $invoice_id, $payroll_id, $expense_items, $expense_id
     ]);

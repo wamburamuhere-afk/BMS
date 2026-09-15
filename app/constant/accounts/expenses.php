@@ -59,6 +59,14 @@ $sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contr
 $posSimple             = posSimpleModeEnabled();
 $simpleHasActivePayees = !empty($suppliers) || !empty($employees);
 
+// Shop (warehouse) this expense belongs to — Simple POS only. Feeds the
+// Simple Mode dashboard chart's per-shop expense line (core/pos_dashboard_metrics.php).
+// Same "auto-pick if only one, ask if more" pattern already used for Products.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses      = warehousesForSelect($pdo);
+$showShopPicker  = count($warehouses) > 1;
+$onlyWarehouseId = (count($warehouses) === 1) ? (int)$warehouses[0]['warehouse_id'] : 0;
+
 // ?paid_to_type=&paid_to_id=[&add=1] — arriving from a payee's Expenses tab
 // (supplier / sub-contractor / staff). Locks the list to that payee and, with
 // add=1, opens the Add modal with the payee pre-selected.
@@ -527,6 +535,25 @@ if (!function_exists('renderExpenseCatRows')) {
                             <label class="form-label small fw-bold"><?= t('Expense Date') ?> <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
+
+                        <?php if ($posSimple): ?>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold"><?= wLabel('Warehouse', 'Shop') ?></label>
+                            <?php if ($showShopPicker): ?>
+                            <select class="form-select select2-static" name="warehouse_id">
+                                <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
+                                <?php foreach ($warehouses as $warehouse): ?>
+                                    <option value="<?= (int)$warehouse['warehouse_id'] ?>"><?= safe_output($warehouse['warehouse_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php else: ?>
+                            <input type="hidden" name="warehouse_id" value="<?= $onlyWarehouseId ?>">
+                            <div class="form-control-plaintext text-muted small">
+                                <?= !empty($warehouses[0]['warehouse_name']) ? safe_output($warehouses[0]['warehouse_name']) : t('—') ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
 
                         <?php if (!$posSimple): ?>
                         <div class="col-md-6">
@@ -1571,6 +1598,12 @@ function editExpense(id) {
                 $form.find('select[name="project_id"]').val(data.project_id).trigger('change');
             } else {
                 $form.find('select[name="project_id"]').val('').trigger('change');
+            }
+            // Populate Shop (Simple POS only; a single-shop tenant's hidden
+            // input already carries the right value and needs no change).
+            const $warehouseField = $form.find('[name="warehouse_id"]');
+            if ($warehouseField.is('select')) {
+                $warehouseField.val(data.warehouse_id || '').trigger('change');
             }
 
             // Populate breakdown items if available
