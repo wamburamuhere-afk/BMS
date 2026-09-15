@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-15 (fix/tenant-migration-variants-column-order) - Restock Product 500 on live tenant "shop" traced to a tenant-migration ordering bug blocking ALL tenants; modal color green -> blue
+
+**Report:** live `Restock Product` on `shop.demo.bjptechnologies.co.tz` failed with `SQLSTATE[42S22]: Column not found: 1054 Unknown column 'wholesale_price' in 'field list'` — the exact error class the previous session's changelog entry had already flagged as suspected-but-unconfirmed tenant schema drift.
+
+**Investigation:** confirmed `product_batches.wholesale_price`/`selling_price` (added by `migrations/tenant/2026_09_13_product_batches_prices.php`) were missing on that tenant's database. Ran `php core/tenant_migration_runner.php` live on the server (root SSH) to catch up all tenants — it failed identically for **all 5 live tenants** (zetatest, mufindipower, begwa, mwpt, shop), not just `shop`, at an earlier, unrelated file: `2026_09_11_pos_product_variants.php` errored `Unknown column 'kitchen_station_id' in 'products'`.
+
+**Root cause:** `migrations/tenant/2026_09_11_pos_product_variants.php` runs `ALTER TABLE products ADD COLUMN parent_product_id ... AFTER kitchen_station_id` — but `kitchen_station_id` is only added by a *different* migration, `2026_09_11_pos_restaurant_module.php`. The runner sorts `migrations/tenant/*.php` alphabetically by filename, and `pos_product_variants.php` sorts before `pos_restaurant_module.php` ("product" < "restaurant"), so the variants migration always runs first and always fails on any tenant catching up from scratch — which stops that tenant's *entire* remaining migration queue (by design: one tenant's failure halts only that tenant, but every migration behind the failure point never runs), including the unrelated `wholesale_price` fix queued behind it.
+
+**Fix:**
+- `migrations/tenant/2026_09_11_pos_product_variants.php` — dropped the `AFTER kitchen_station_id` positional clause on the `parent_product_id` ADD COLUMN. Column order is cosmetic; correctness never depended on it.
+- `app/bms/pos/pos_modals_new.php` — Restock Product modal switched from green (`bg-success` header, `btn-success` Save button) to blue (`bg-primary`/`btn-primary`) per request.
+
+**Verified live:** patched the same one-line fix directly on the server first (to unblock immediately without waiting on deploy) and re-ran `php core/tenant_migration_runner.php` — all 5 tenants now apply cleanly through `2026_09_13_product_batches_prices.php`; runner reports "SUCCESS — every tenant is up to date." PR: #1943 into `develop` carries the permanent fix so the next deploy's automatic sweep (and any future tenant) never hits this again.
+
+**Known gap flagged, not yet fixed (user deferred):** `schema/tenant_schema_template.sql` (what brand-new tenants are provisioned from) still lacks `product_batches.wholesale_price`/`selling_price` — a periodic `mysqldump --no-data` snapshot that predates the 2026-09-13 migration. A tenant provisioned before the next deploy's migration sweep runs would hit the same original error once. Self-heals automatically on the next deploy (tenant migration runner catches up any tenant not yet at current schema); not closed at the template level per user's call.
+
 ## 2026-09-14 (fix/pos-restock-simple-mode-default-account) - POS Restock: Simple Mode posts to a default account silently; fix a real error-masking bug
 
 **Request:** two things reported together — (1) under Simple Mode, restocking should post to one default account in the background instead of asking the user to pick a "Paid From" GL account, matching the existing Sales/Expenses pattern; (2) "Restock Failed" on production with no further detail.
