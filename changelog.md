@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 5) - Products: Simple POS View page hides same fields, batches show Manufacturing Date
+
+**Phase 5 of `products_simple_pos_plan.md`** — `product_view.php` hides the same fields Create/Edit hide (SKU, Barcode, Description, Wholesale Price) and the entire "Additional Details" tab, for consistency across all three product pages. Stock Information (with its Batches/Lots table) stays the default, primary tab in every mode — it's genuinely useful, "Shop"-labeled already, and not tied to any hidden field. Sales Performance and Stock Movements are generic business data (sales trend, recent sales, movement history), not advanced product fields, so they stay visible in Simple POS too.
+
+**Fix (`app/bms/product/product_view.php`):**
+- Same `$simpleProductForm` gate as Create/Edit. Hidden in Simple POS: the SKU/Barcode badges and print-only/mobile SKU subtitle, the Wholesale Price stat, the Description block, and the "Additional Details" tab (its button + pane) — the latter mostly showed dates/notes/a permanently-empty vestigial "Inventory Settings" card (columns like `allow_backorders`/`requires_serial` don't exist in the schema — pre-existing, unrelated to this phase).
+- The Batches/Lots table (already built, already "Shop"-labeled) now also selects and displays `manufacturing_date` as a "Manufactured" column — completing Phase 1's `manufacturing_date` wiring with something the user can actually see, in every mode (not gated behind Simple POS).
+
+**Verified:** new `tests/test_product_view_simple_pos_cli.php` (23/23) — source wiring, the real page rendered in three states (Simple POS, normal, Simple POS + Advanced Product override) against a real seeded product with a real batch row. Existing `test_pos_batch_expiry_cli` (47/47) and `test_view_md_standard_cli` (225/225) re-run clean. `php -l` clean.
+
 ## 2026-09-15 (feat/products-simple-pos, phase 4) - Products: Simple POS Edit form hides the same fields, never loses data
 
 **Phase 4 of `products_simple_pos_plan.md`** — `product_edit.php` hides the exact same fields Phase 3 hid on Create (SKU, Barcode, Description, Tax Configuration, Wholesale Price, Max Discount %, the whole Advanced Details tab, Physical Specifications, reorder/min/max stock thresholds) when Simple POS is on and Advanced Product is off. Unlike Create, Edit deals with an EXISTING record — `api/update_product.php` does a full-replace of every column from `$_POST`, so a hidden field that isn't resubmitted gets silently wiped. Every hidden field is instead round-tripped via a `<input type="hidden">` carrying its current value.
