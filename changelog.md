@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-15 (fix/journal-mappings-seed) - Fix "mark expense paid" crash for every tenant (unseeded journal_mappings)
+
+Diagnosed via a live production error report ("autoPostEvent: unknown event_type 'expense_paid'") when marking an approved expense as paid on a real tenant (MSAKUZI SHOP / BJP Technologies).
+
+**Root cause:** `migrations/2026_05_28_journal_mappings_schema.php` created `journal_mappings` AND seeded its 8 canonical `event_type` rows, but only ever ran against the legacy `bms` database — no tenant-side counterpart exists. Every tenant provisioned since multi-tenancy launched (2026-08-31) got the table via `schema/tenant_schema_template.sql` (DDL-only, no seed rows) but none of the seed data, so `journal_mappings` has been completely empty on every tenant. `core/auto_post_hook.php::autoPostEvent()` degrades gracefully when the *table* is missing, but throws a hard `LedgerException` when a *row* for the event_type simply isn't found — inside the same transaction as the real ledger posting (`api/account/update_expense_status.php`'s `postOutflow()` call), so the whole "mark as paid" action rolled back, including the real posting that had already succeeded.
+
+**Confirmed not a Paid-From/double-entry problem:** `postOutflow()` already posts directly to `journal_entries`/`journal_entry_items` (the one canonical ledger per `.claude/reporting-source.md`) and Paid-From auto-resolution (`expenses_simple_pos_plan.md` §2/§9) was working correctly — the crash happened *after* that real posting, in a separate, superseded "Phase 4" auto-post layer kept wired only "for the contract" (source's own comment), normally a safe no-op via `is_active=0`.
+
+**Fix:** `migrations/tenant/2026_09_15_journal_mappings_seed.php` + `migrations/2026_09_15_journal_mappings_seed_legacy_db.php` — idempotent seed of the same 8 canonical rows (`ON DUPLICATE KEY UPDATE description` only, never touching an admin's own `debit_account_id`/`credit_account_id`/`is_active`/`notes`), `is_active` left at its column default of `0` — this only stops the crash, it does not enable a second posting path.
+
+**Verified:** `php -l` clean on both files. Both migrations run for real against the live/legacy DB — confirmed idempotent no-op (all 8 rows already present, `0 inserted, 0 refreshed, 8 unchanged`). Existing `test_phase4_journal_mappings_schema_cli`, `test_phase4_journal_mappings_admin_cli`, `test_phase4_expense_paid_cli`, `test_phase4_auto_post_hook_cli`, `test_phase4_payroll_paid_cli`, `test_phase4_payment_received_cli`, `test_phase4_grn_approved_cli` re-run clean. (`test_phase4_supplier_payment_cli`'s pre-existing `rollback left 2 rows` failure is an unrelated `journal_entries` transaction-isolation issue in that test's own harness — confirmed unrelated, out of scope here.)
+
 ## 2026-09-15 (fix/pos-default-register-entitlement) - Fix POS Start Shift register bug for non-pos_advanced tenants
 
 Diagnosed via user report: a tenant without the `pos_advanced` entitlement could not reliably Start Shift, and "Register New" (Add Register) was unavailable. Two compounding bugs:
