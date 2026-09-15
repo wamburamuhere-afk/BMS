@@ -1169,6 +1169,9 @@ function get_progress_color($percentage) {
                             <?php if(canCreate('suppliers')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> <?= t('Add Supplier') ?></a></li>
                             <?php endif; ?>
+                            <?php if(canCreate('warehouses')): ?>
+                            <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>?action=add"><i class="bi bi-shop"></i> <?= wLabel('Add Warehouse', 'Add Shop') ?></a></li>
+                            <?php endif; ?>
 
                             <?php if (projectsModuleActive() && canView('projects')): ?>
                             <li><hr class="dropdown-divider"></li>
@@ -1646,7 +1649,7 @@ function get_progress_color($percentage) {
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= $wh['total_warehouses'] ?? 0 ?></h4>
-                            <p class="mb-0"><?= t('Total Warehouses') ?></p>
+                            <p class="mb-0"><?= wLabel('Total Warehouses', 'Total Shops') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-building" style="font-size: 2rem;"></i>
@@ -2392,7 +2395,7 @@ $(document).keydown(function(e) {
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label"><?= t('Warehouse') ?></label>
+                        <label class="form-label"><?= wLabel('Warehouse', 'Shop') ?></label>
                         <select class="form-select" name="warehouse_id" id="quickAddWarehouse" required onchange="fetchCurrentStock()">
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"><?= htmlspecialchars($wh['warehouse_name']) ?></option>
