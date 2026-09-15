@@ -773,6 +773,107 @@ if (!function_exists('tenantUserDirectory')) {
     }
 }
 
+if (!function_exists('tenantOperationalSnapshot')) {
+    /**
+     * A SIXTH deliberate, narrow exception to "the superadmin panel never
+     * opens a tenant's own database" — same shape as tenantUserDirectory()
+     * just above. One connection, two cheap COUNT(*) reads: how many active
+     * shops/warehouses this tenant has, and a rough "how big is this tenant"
+     * signal (products/customers/invoices row counts). Support/supervision
+     * triage only, same as the Users card — never a substitute for the
+     * tenant's own reports, and never anything from journal_entries or any
+     * other financial table (see .claude/reporting-source.md — those figures
+     * belong to the one-ledger reporting engine, not a superadmin side panel).
+     *
+     * @return array{shops:int,records:array{products:int,customers:int,invoices:int}}|null
+     *   null if the tenant/DB can't be reached.
+     */
+    function tenantOperationalSnapshot(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $shops = (int)$tPdo->query("SELECT COUNT(*) FROM warehouses WHERE status = 'active'")->fetchColumn();
+
+            return [
+                'shops'   => $shops,
+                'records' => [
+                    'products'  => (int)$tPdo->query("SELECT COUNT(*) FROM products")->fetchColumn(),
+                    'customers' => (int)$tPdo->query("SELECT COUNT(*) FROM customers")->fetchColumn(),
+                    'invoices'  => (int)$tPdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn(),
+                ],
+            ];
+        } catch (Throwable $e) {
+            error_log('tenantOperationalSnapshot(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('tenantMigrationHealth')) {
+    /**
+     * Pass/fail summary of this tenant's own rows in the control DB's
+     * `tenant_migration_log` (written by core/tenant_migration_runner.php on
+     * every deploy). Unlike tenantUserDirectory()/tenantOperationalSnapshot()
+     * above, this NEVER opens the tenant's own database — tenant_migration_log
+     * lives entirely in the control DB, so this is a plain read, safe to run
+     * on every normal page load (same as tenantAdminLog()), not gated behind
+     * an explicit on-demand click.
+     *
+     * @return array{total:int,failed:int,last_failure:?array{migration_name:string,message:?string,created_at:string}}
+     */
+    function tenantMigrationHealth(int $tenantId): array
+    {
+        $out = ['total' => 0, 'failed' => 0, 'last_failure' => null];
+        try {
+            $cpdo = getControlPdo();
+            $st = $cpdo->prepare("
+                SELECT COUNT(*) AS total, SUM(status = 'failed') AS failed
+                FROM tenant_migration_log WHERE tenant_id = ?
+            ");
+            $st->execute([$tenantId]);
+            $row = $st->fetch();
+            if ($row) {
+                $out['total']  = (int)$row['total'];
+                $out['failed'] = (int)$row['failed'];
+            }
+
+            if ($out['failed'] > 0) {
+                $st2 = $cpdo->prepare("
+                    SELECT migration_name, message, created_at
+                    FROM tenant_migration_log
+                    WHERE tenant_id = ? AND status = 'failed'
+                    ORDER BY created_at DESC LIMIT 1
+                ");
+                $st2->execute([$tenantId]);
+                $f = $st2->fetch();
+                if ($f) {
+                    $out['last_failure'] = [
+                        'migration_name' => (string)$f['migration_name'],
+                        'message'        => $f['message'] !== null ? (string)$f['message'] : null,
+                        'created_at'     => (string)$f['created_at'],
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('tenantMigrationHealth(' . $tenantId . '): ' . $e->getMessage());
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('tenantPosSimpleModeStatus')) {
     /**
      * A THIRD deliberate, narrow exception to "the superadmin panel never

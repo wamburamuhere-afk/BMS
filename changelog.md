@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-16 (feat/superadmin-tenant-usage-analytics) - Superadmin Tenant Detail page gains a tabbed Usage & Analytics view
+
+**Request:** superadmin needs to see, per tenant: how many users exist and their roles, how many shops/warehouses a company has, and (their own suggestion) database storage usage, auto-tracked. Explicitly asked for a "professional" layout — toggles/tabs, not everything piled onto one interface — and for my own recommendation on what else matters.
+
+**Investigation first:** storage tracking already existed in full (`tenantUsageSnapshotFor()`/`tenantStorageUsedBytes()`) — deliberately recomputed live on a button click, never a persisted running counter, per that function's own documented reasoning (avoids drift). User agreed to keep that design and just surface it better rather than build a background job. Recommended three additions beyond the original ask — last company-wide sign-in, deploy/migration health (reusing `tenant_migration_log`, built earlier this session), and core-module record counts — user approved all three.
+
+**Fix:**
+- `core/tenant_admin.php`: `tenantOperationalSnapshot()` (6th narrow "opens the tenant's own DB" exception — active shop count + products/customers/invoices row counts) and `tenantMigrationHealth()` (control-DB only, pass/fail summary from `tenant_migration_log`).
+- `actions/superadmin_tenant_operational_snapshot.php`: thin action wrapper, mirrors the existing sibling endpoints.
+- `app/superadmin/tenant_view.php`: restructured from one long stacked-card scroll into four tabs — Overview / Modules & Access / Usage & Analytics / Activity Log. Usage & Analytics is new: Deploy/Migration Health (server-rendered), Shops & Records (on-demand), and a role-breakdown + last-sign-in summary added to the existing Users card — both derived client-side from data already being fetched, no new backend call for those two. The whole tab auto-loads its on-demand cards the first time it's opened (guarded against re-fetching on every tab switch).
+
+**Verified:** `tests/test_tenant_admin_panel_cli.php` extended in place against a REAL provisioned throwaway tenant — shop counts change the instant a warehouse row is inserted, migration health aggregates real `tenant_migration_log` rows, new tab/card markup asserted present — 67/67 (up from 51/51). Sibling suites unaffected (`test_superadmin_pos_simple_mode_cli.php` 47/47, `test_tenant_superadmin_auth_cli.php` 55/55). `php -l` clean on all four touched files.
+
 ## 2026-09-15 (feat/warehouse-shop-terminology) - Warehouse → Shop/Duka terminology completed app-wide (Phases 2–18)
 
 **Request:** continue the Phase 1 rollout (`a58f17cc`, "POS terminal shows Shop/Duka") — a retail-only tenant should never see the word "Warehouse" anywhere in the app, not just at the POS terminal. User explicitly asked for a thorough re-scout after the first pass, then to complete whatever it found, one part at a time, verifying and committing after each — and, once a much larger-than-expected tail turned up, to complete that too rather than stop short.

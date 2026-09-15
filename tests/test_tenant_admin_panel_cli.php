@@ -269,6 +269,12 @@ try {
     ok(strpos($out, 'Fatal error') === false && strpos($out, 'Warning:') === false,
         'the detail page renders without PHP errors');
     ok(strpos($out, 'tenc:v1:') === false, 'no encrypted credential is ever emitted into the page');
+    ok(strpos($out, 'tab-btn-usage') !== false && strpos($out, 'Usage &amp; Analytics') !== false,
+        'the Usage & Analytics tab renders');
+    ok(strpos($out, 'Shops &amp; Records') !== false, 'the Shops & Records card renders');
+    ok(strpos($out, 'Deploy / Migration Health') !== false, 'the Deploy / Migration Health card renders');
+    ok(strpos($out, 'No tenant-specific migrations recorded yet') !== false,
+        'a tenant with no migration_log rows shows the empty state, not a blank/broken card');
 
     $out = renderPage('app/superadmin/tenant_view.php', $saId, 'id=999999');
     ok(strpos($out, 'No such tenant') !== false, 'an unknown id renders a clean "not found"');
@@ -279,6 +285,55 @@ try {
     ok(strpos($out, 'Panel Beta Ltd') === false, "a tenant's own subdomain cannot read the panel");
     ok(strpos($out, 'Not found') !== false, 'it returns a flat "Not found"');
     putenv('P_HOST');
+
+    section('12. tenantOperationalSnapshot() — shop count + record volume');
+    require_once "$root/core/tenant_crypto.php";
+    $bRow = $cpdo->query("SELECT * FROM tenants WHERE id = " . (int)$B['tenant_id'])->fetch();
+    $bPw  = decryptTenantSecret((string)$bRow['db_password_encrypted']);
+    $bPdo = new PDO("mysql:host={$bRow['db_host']};dbname={$bRow['db_name']};charset=utf8mb4",
+        $bRow['db_username'], $bPw, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+
+    $snap0 = tenantOperationalSnapshot($B['tenant_id']);
+    ok($snap0 !== null, 'snapshot reads successfully for a live tenant');
+    ok($snap0['shops'] === 0, 'freshly provisioned tenant starts with 0 active shops');
+    ok($snap0['records']['products'] === 0 && $snap0['records']['customers'] === 0 && $snap0['records']['invoices'] === 0,
+        'freshly provisioned tenant starts with 0 rows in every counted table');
+
+    $bPdo->exec("INSERT INTO warehouses (warehouse_name, warehouse_code, status) VALUES ('Main Shop', 'WH-TEST', 'active')");
+    $bPdo->exec("INSERT INTO warehouses (warehouse_name, warehouse_code, status) VALUES ('Closed Shop', 'WH-TEST2', 'inactive')");
+    $bPdo->exec("INSERT INTO customers (customer_name, status) VALUES ('Test Customer', 'active')");
+
+    $snap1 = tenantOperationalSnapshot($B['tenant_id']);
+    ok($snap1['shops'] === 1, 'only status=active warehouses are counted (2 inserted, 1 active)');
+    ok($snap1['records']['customers'] === 1, 'record counts reflect real rows the moment they exist');
+
+    ok(tenantOperationalSnapshot(999999) === null, 'an unknown tenant id returns null, not a crash');
+
+    section('13. tenantMigrationHealth() — deploy/migration pass-fail summary');
+    $health0 = tenantMigrationHealth($B['tenant_id']);
+    ok($health0['total'] === 0 && $health0['failed'] === 0 && $health0['last_failure'] === null,
+        'a tenant with no log rows reports a clean zero state, not an error');
+
+    $cpdo->prepare("INSERT INTO tenant_migration_log (tenant_id, subdomain, migration_name, status, message) VALUES (?, ?, 'migrations/tenant/2026_01_01_ok.php', 'ok', NULL)")
+        ->execute([$B['tenant_id'], $B['subdomain'] ?? ('paneltestb' . $sfx)]);
+    $cpdo->prepare("INSERT INTO tenant_migration_log (tenant_id, subdomain, migration_name, status, message) VALUES (?, ?, 'migrations/tenant/2026_01_02_broke.php', 'failed', 'SQLSTATE[42S22]: test failure')")
+        ->execute([$B['tenant_id'], $B['subdomain'] ?? ('paneltestb' . $sfx)]);
+
+    $health1 = tenantMigrationHealth($B['tenant_id']);
+    ok($health1['total'] === 2, 'total counts every row for this tenant, ok and failed alike');
+    ok($health1['failed'] === 1, 'failed counts only status=failed rows');
+    ok($health1['last_failure'] !== null && $health1['last_failure']['migration_name'] === 'migrations/tenant/2026_01_02_broke.php',
+        'last_failure names the most recent failed migration');
+    ok(strpos($health1['last_failure']['message'], 'test failure') !== false,
+        'last_failure carries the recorded error message');
+
+    // tenantMigrationHealth() never opens the tenant's own database — no
+    // decrypt/connect happens even for an id with no matching tenants row at
+    // all, so it degrades to the same clean zero state rather than an error.
+    $health2 = tenantMigrationHealth(999999);
+    ok($health2['total'] === 0 && $health2['failed'] === 0, 'an unrelated/unknown tenant id reports zero, not other tenants\' rows');
+
+    $cpdo->exec("DELETE FROM tenant_migration_log WHERE tenant_id = " . (int)$B['tenant_id']);
 
 } catch (Throwable $e) {
     $fail++;

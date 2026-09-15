@@ -28,9 +28,17 @@ $plans        = [];
 $plansSetup   = false;
 $currentPlan  = null;     // the plan matching this tenant's tenants.plan key, if any
 
+$migrationHealth = ['total' => 0, 'failed' => 0, 'last_failure' => null];
+
 try {
     $tenant = $id > 0 ? getTenant($id) : null;
-    if ($tenant) $log = tenantAdminLog($id, 50);
+    if ($tenant) {
+        $log = tenantAdminLog($id, 50);
+        // Control-DB only (never opens the tenant's own database — see the
+        // function's own docblock), so safe to read on every normal page
+        // load, same as the log above.
+        $migrationHealth = tenantMigrationHealth($id);
+    }
 } catch (Throwable $e) {
     error_log('superadmin tenant_view: ' . $e->getMessage());
     $error = 'The tenant registry could not be read.';
@@ -125,6 +133,31 @@ function svBadge(string $status): string
     </div>
 <?php else: ?>
 
+    <ul class="nav nav-tabs mb-3" id="tenantTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-btn-overview" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">
+                <i class="bi bi-building me-1"></i> Overview
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-btn-modules" data-bs-toggle="tab" data-bs-target="#tab-modules" type="button" role="tab">
+                <i class="bi bi-grid me-1"></i> Modules &amp; Access
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-btn-usage" data-bs-toggle="tab" data-bs-target="#tab-usage" type="button" role="tab">
+                <i class="bi bi-graph-up me-1"></i> Usage &amp; Analytics
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-btn-activity" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button" role="tab">
+                <i class="bi bi-clock-history me-1"></i> Activity Log
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="tenantTabsContent">
+    <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
     <div class="row g-3">
         <div class="col-lg-7">
             <div class="card detail-card">
@@ -246,48 +279,11 @@ function svBadge(string $status): string
             </div>
         </div>
         <?php endif; ?>
+    </div>
+    </div>
 
-        <?php if ($tenant['status'] !== 'deleted'): ?>
-        <div class="col-12">
-            <div class="card detail-card">
-                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span><i class="bi bi-speedometer text-primary me-1"></i> Usage &amp; Limits</span>
-                    <button class="btn btn-sm btn-outline-primary" onclick="checkUsage()" id="btnCheckUsage">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Check current usage
-                    </button>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        Caps how many active staff accounts and how much uploaded storage this company
-                        may use. Leave a field blank for unlimited. "Current usage" is read on demand —
-                        it is not kept on this page automatically.
-                    </p>
-
-                    <div class="row g-3">
-                        <div class="col-sm-6">
-                            <label class="form-label small fw-semibold">Max active users</label>
-                            <input type="text" inputmode="numeric" class="form-control" id="f-max-users"
-                                   placeholder="Unlimited"
-                                   value="<?= $tenant['max_users'] !== null ? (int)$tenant['max_users'] : '' ?>">
-                            <div class="form-text" id="usage-users">Current usage not checked yet.</div>
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label small fw-semibold">Max storage (MB)</label>
-                            <input type="text" inputmode="numeric" class="form-control" id="f-max-storage"
-                                   placeholder="Unlimited"
-                                   value="<?= $tenant['max_storage_mb'] !== null ? (int)$tenant['max_storage_mb'] : '' ?>">
-                            <div class="form-text" id="usage-storage">Current usage not checked yet.</div>
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary mt-3" onclick="saveQuotas()" id="btnSaveQuotas">
-                        <i class="bi bi-save me-1"></i> Save limits
-                    </button>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
+    <div class="tab-pane fade" id="tab-modules" role="tabpanel">
+    <div class="row g-3">
         <?php if ($featuresSetup): ?>
         <div class="col-12">
             <div class="card detail-card">
@@ -395,8 +391,118 @@ function svBadge(string $status): string
             </div>
         </div>
         <?php endif; ?>
+    </div>
+    </div>
 
+    <div class="tab-pane fade" id="tab-usage" role="tabpanel">
+    <div class="row g-3">
         <?php if ($tenant['status'] !== 'deleted'): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><i class="bi bi-speedometer text-primary me-1"></i> Usage &amp; Limits</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="checkUsage()" id="btnCheckUsage">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Check current usage
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Caps how many active staff accounts and how much uploaded storage this company
+                        may use. Leave a field blank for unlimited. "Current usage" is read on demand —
+                        it is not kept on this page automatically, and is refreshed the moment this tab
+                        is first opened.
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Max active users</label>
+                            <input type="text" inputmode="numeric" class="form-control" id="f-max-users"
+                                   placeholder="Unlimited"
+                                   value="<?= $tenant['max_users'] !== null ? (int)$tenant['max_users'] : '' ?>">
+                            <div class="form-text" id="usage-users">Current usage not checked yet.</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Max storage (MB)</label>
+                            <input type="text" inputmode="numeric" class="form-control" id="f-max-storage"
+                                   placeholder="Unlimited"
+                                   value="<?= $tenant['max_storage_mb'] !== null ? (int)$tenant['max_storage_mb'] : '' ?>">
+                            <div class="form-text" id="usage-storage">Current usage not checked yet.</div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary mt-3" onclick="saveQuotas()" id="btnSaveQuotas">
+                        <i class="bi bi-save me-1"></i> Save limits
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-heart-pulse text-primary me-1"></i> Deploy / Migration Health</div>
+                <div class="card-body">
+                    <?php if ($migrationHealth['total'] === 0): ?>
+                        <p class="text-muted small mb-0">No tenant-specific migrations recorded yet for this company.</p>
+                    <?php else: ?>
+                        <p class="mb-2">
+                            <?= (int)$migrationHealth['total'] ?> migration<?= $migrationHealth['total'] === 1 ? '' : 's' ?> run for this tenant —
+                            <?php if ($migrationHealth['failed'] > 0): ?>
+                                <span class="badge" style="background:#dc3545;color:#fff"><?= (int)$migrationHealth['failed'] ?> failed</span>
+                            <?php else: ?>
+                                <span class="badge" style="background:#198754;color:#fff">all succeeded</span>
+                            <?php endif; ?>
+                        </p>
+                        <?php if ($migrationHealth['last_failure']): ?>
+                        <div class="alert alert-danger small mb-0">
+                            <strong>Last failure:</strong> <code><?= safe_output($migrationHealth['last_failure']['migration_name'], '') ?></code>
+                            on <?= safe_output($migrationHealth['last_failure']['created_at'], '') ?><br>
+                            <?= safe_output($migrationHealth['last_failure']['message'] ?? '', 'No detail recorded.') ?>
+                        </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><i class="bi bi-shop text-primary me-1"></i> Shops &amp; Records</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadOperationalSnapshot()" id="btnLoadOpSnapshot">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Load
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        A rough size/activity signal for this company — active shops, and total row
+                        counts in their core modules. Loaded on demand, refreshed the moment this tab is
+                        first opened; not a report, and nothing here is kept automatically.
+                    </p>
+                    <div id="opSnapshotEmpty" class="text-muted small">Not loaded yet.</div>
+                    <div id="opSnapshotWrap" class="d-none">
+                        <div class="row g-3 text-center">
+                            <div class="col-6 col-md-3">
+                                <div class="fs-4 fw-bold text-primary" id="opShops">0</div>
+                                <div class="small text-muted">Active shops</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fs-4 fw-bold" id="opProducts">0</div>
+                                <div class="small text-muted">Products</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fs-4 fw-bold" id="opCustomers">0</div>
+                                <div class="small text-muted">Customers</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fs-4 fw-bold" id="opInvoices">0</div>
+                                <div class="small text-muted">Invoices</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12">
             <div class="card detail-card">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -412,6 +518,10 @@ function svBadge(string $status): string
                         is kept automatically. For support triage only — not a way to manage this
                         tenant's staff.
                     </p>
+                    <div id="usersSummary" class="d-none mb-3">
+                        <div class="d-flex flex-wrap gap-2 mb-2" id="usersRoleBadges"></div>
+                        <div class="small text-muted" id="usersLastActivity"></div>
+                    </div>
                     <div id="usersEmpty" class="text-muted small">Not loaded yet.</div>
                     <div id="usersTableWrap" class="table-responsive d-none">
                         <table class="table table-sm align-middle mb-0">
@@ -423,7 +533,11 @@ function svBadge(string $status): string
             </div>
         </div>
         <?php endif; ?>
+    </div>
+    </div>
 
+    <div class="tab-pane fade" id="tab-activity" role="tabpanel">
+    <div class="row g-3">
         <div class="col-12">
             <div class="card detail-card">
                 <div class="card-header"><i class="bi bi-clock-history text-primary me-1"></i> History</div>
@@ -451,6 +565,8 @@ function svBadge(string $status): string
             </div>
         </div>
     </div>
+    </div>
+    </div>
 
 <?php endif; ?>
 </div>
@@ -466,6 +582,7 @@ function svBadge(string $status): string
 const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+const TENANT_DELETED = <?= json_encode(($tenant['status'] ?? '') === 'deleted') ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
 // POS Advanced / Restaurant POS — pulled from the same $features the main
@@ -671,8 +788,28 @@ function loadUsers() {
             if (!res.users.length) {
                 $('#usersEmpty').removeClass('d-none').text('No user accounts found.');
                 $('#usersTableWrap').addClass('d-none');
+                $('#usersSummary').addClass('d-none');
                 return;
             }
+
+            // Role breakdown + last company-wide activity — both derived from
+            // this same on-demand directory fetch, no extra request needed.
+            const roleCounts = {};
+            let lastActivity = null;
+            res.users.forEach(function (u) {
+                const role = (u.role && u.role.trim()) ? u.role.trim() : 'No role set';
+                roleCounts[role] = (roleCounts[role] || 0) + 1;
+                if (u.last_login && (!lastActivity || u.last_login > lastActivity)) lastActivity = u.last_login;
+            });
+            const roleBadges = Object.keys(roleCounts).sort().map(function (role) {
+                return '<span class="badge" style="background:#e7f0ff;color:#084298;border:1px solid #b6ccfe;font-weight:600">'
+                    + safeOutput(role) + ': ' + roleCounts[role] + '</span>';
+            }).join('');
+            $('#usersRoleBadges').html(roleBadges);
+            $('#usersLastActivity').html('<i class="bi bi-clock me-1"></i>Most recent sign-in across the company: '
+                + (lastActivity ? '<strong>' + safeOutput(lastActivity) + '</strong>' : '<span class="text-muted">no one has signed in yet</span>'));
+            $('#usersSummary').removeClass('d-none');
+
             let rows = '';
             res.users.forEach(function (u) {
                 const statusBadge = u.is_active
@@ -699,6 +836,63 @@ function loadUsers() {
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     }).always(function () {
         btn.prop('disabled', false).html(orig);
+    });
+}
+
+function loadOperationalSnapshot() {
+    // On demand, deliberately — same discipline as loadUsers()/checkUsage():
+    // this is the fourth thing on this page that briefly opens the tenant's
+    // own database, and only ever on this explicit click (or the Usage &
+    // Analytics tab's own first-open below). See
+    // tenantOperationalSnapshot()'s docblock.
+    const btn  = $('#btnLoadOpSnapshot');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Loading...');
+
+    $.ajax({
+        url: '/actions/superadmin_tenant_operational_snapshot.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }
+    }).done(function (res) {
+        if (res && res.success) {
+            $('#opShops').text(res.shops);
+            $('#opProducts').text(res.records.products);
+            $('#opCustomers').text(res.records.customers);
+            $('#opInvoices').text(res.records.invoices);
+            $('#opSnapshotWrap').removeClass('d-none');
+            $('#opSnapshotEmpty').addClass('d-none');
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read shop/record counts.' });
+        }
+    }).fail(function (xhr) {
+        let msg = 'Could not read shop/record counts.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    }).always(function () {
+        btn.prop('disabled', false).html(orig);
+    });
+}
+
+// Usage & Analytics tab opens with everything still unloaded (same "on
+// demand, not kept automatically" discipline the buttons themselves
+// document) — but making a superadmin click three separate buttons just to
+// see the tab's own content the first time is friction with no safety
+// benefit, so the first tab-open fires all three for them. Guarded so
+// switching back to this tab later never silently re-fetches — the buttons
+// remain there for that.
+let usageTabLoaded = false;
+const usageTabBtn = document.getElementById('tab-btn-usage');
+// Deleted tenants render an empty Usage & Analytics tab (no database left to
+// read — same reason Usage & Limits/Users/Shops & Records don't render their
+// cards at all for one) so there is nothing to auto-load and no buttons to
+// find; TENANT_DELETED short-circuits before touching any of them.
+if (usageTabBtn && !TENANT_DELETED) {
+    usageTabBtn.addEventListener('shown.bs.tab', function () {
+        if (usageTabLoaded) return;
+        usageTabLoaded = true;
+        checkUsage();
+        loadUsers();
+        loadOperationalSnapshot();
     });
 }
 
