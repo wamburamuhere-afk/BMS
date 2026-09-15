@@ -338,7 +338,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                 </div>
                 <div class="col-6 text-end">
                     <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Details') ?></h5>
-                    <div><strong><?= t('Warehouse:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
+                    <div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
                     <?php if (!empty($grn['order_number'])): ?>
                         <div><strong><?= t('PO Ref:') ?></strong> <?= safe_output($grn['order_number']) ?></div>
                     <?php endif; ?>
@@ -527,7 +527,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     </div>
                     <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted"><?= t('Warehouse:') ?></span>
+                        <span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span>
                         <span class="fw-medium"><?= safe_output($grn['warehouse_name']) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
@@ -557,7 +557,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                 </div>
                 <div class="col-6 text-end">
                     <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Details') ?></h5>
-                    <div><strong><?= t('Warehouse:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
+                    <div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
                     <?php if (!empty($grn['order_number'])): ?>
                         <div><strong><?= t('PO Ref:') ?></strong> <?= safe_output($grn['order_number']) ?></div>
                     <?php endif; ?>

@@ -263,7 +263,7 @@ $wf = [
                         </div>
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
-                                <div class="text-muted small text-uppercase fw-bold mb-1">Warehouse</div>
+                                <div class="text-muted small text-uppercase fw-bold mb-1"><?= wLabel('Warehouse', 'Shop') ?></div>
                                 <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i><?= safe_output($dn['warehouse_name']) ?></div>
                                 <?php if (!empty($dn['warehouse_location'])): ?>
                                 <small class="text-muted"><?= safe_output($dn['warehouse_location']) ?></small>
