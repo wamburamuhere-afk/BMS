@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 1) - Products: product_batches gains manufacturing_date; product creation now writes a real batch
+
+**Request:** Products module redesign for Simple POS — full plan in `products_simple_pos_plan.md`, confirmed before starting. Phase 1 is the foundation: batches need a Manufacturing Date alongside their existing Expiry Date, and (discovered during scouting) product *creation*'s opening stock never created a real batch at all — only Restock/GRN did — so a brand-new product's first stock was invisible to the batch/expiry-notification system that already exists (`cron/run_notification_checks.php`).
+
+**Fix:**
+- `migrations/tenant/2026_09_15_product_batch_manufacturing_date.php` — adds `product_batches.manufacturing_date DATE NULL`, mirroring `expiry_date`'s own nullability.
+- `core/stock_intake.php::receiveProductBatch()` — accepts and stores `manufacturing_date` (the same shared helper GRN approval and POS Restock already use).
+- `api/create_product.php` — opening-stock handling switched from a bare `product_stocks` insert to `receiveProductBatch()` with `write_batch=true`, so a product's very first stock becomes a real, trackable batch in both normal and Simple POS mode. GL posting (Dr Inventory / Cr Take-on Equity) is preserved exactly as before, now driven off the movement id `receiveProductBatch()` returns instead of a separate `recordStockMovement()` call (avoids double-writing the movement row).
+
+**Verified:** new `tests/test_product_batch_manufacturing_date_cli.php` (22/22) — schema, source wiring, and a real end-to-end `api/create_product.php` run confirming the batch row, stock quantity, single stock-movement row, and balanced GL entry all come out correct, cleaned up after itself. Existing suites re-run clean, no regressions: `test_grn_posting_cli` 17/17, `test_pos_quick_restock_cli` 36/36, `test_pos_batch_expiry_cli` 47/47, `test_pos_batch_cogs_cli` 5/5. `php -l` clean on every touched file.
+
+**Next (phases 2-8):** superadmin "Advanced Product" toggle, then the actual Simple POS form simplification across Create/Edit/View/List, POS Restock date fields, and the "Ghala"→Shop terminology fix — tracked in `products_simple_pos_plan.md`.
+
 ## 2026-09-15 (feat/expenses-crud-improvements, update 2) - Fix: manual "More" payee (Simple POS) displayed blank everywhere
 
 **Report:** "paid is not saved as a result it show empty when choose other then write manually" — an expense saved with Paid To = "More" (the Simple POS manual payee, `paid_to_type='other'`) stored `payee_manual_role`/`payee_manual_name` correctly, but showed blank in the expenses list, the voucher/detail page, and the printed voucher.
