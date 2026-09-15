@@ -73,7 +73,7 @@ try {
     // source invoice/sales order's warehouse), not just project.
     if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     $action = "Print Sales Return";
@@ -228,7 +228,7 @@ $accent = getSetting('print_template_color_sr_meridian', '#3f8f5f');
         <div class="meta-chip"><div class="lbl">Date</div><div class="val"><?= date('d M Y', strtotime($return['return_date'])) ?></div></div>
         <?php if (!empty($return['order_number'])): ?><div class="meta-chip"><div class="lbl">Ref Order</div><div class="val"><?= htmlspecialchars($return['order_number']) ?></div></div><?php endif; ?>
         <?php if (!empty($return['invoice_number'])): ?><div class="meta-chip"><div class="lbl">Ref Invoice</div><div class="val"><?= htmlspecialchars($return['invoice_number']) ?></div></div><?php endif; ?>
-        <?php if (!empty($return['warehouse_name'])): ?><div class="meta-chip"><div class="lbl">Warehouse</div><div class="val"><?= htmlspecialchars($return['warehouse_name']) ?></div></div><?php endif; ?>
+        <?php if (!empty($return['warehouse_name'])): ?><div class="meta-chip"><div class="lbl"><?= wLabel('Warehouse', 'Shop') ?></div><div class="val"><?= htmlspecialchars($return['warehouse_name']) ?></div></div><?php endif; ?>
         <div class="meta-chip status-chip"><div class="lbl">Status</div><div class="val"><?= strtoupper($return['status']) ?></div></div>
     </div>
 

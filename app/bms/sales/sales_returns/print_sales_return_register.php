@@ -71,7 +71,7 @@ try {
     // source invoice/sales order's warehouse), not just project.
     if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     $action = "Print Sales Return";
@@ -232,7 +232,7 @@ $accent = getSetting('print_template_color_sr_register', '#2c3e5c');
             <h3>Return Information</h3>
             <?php if (!empty($return['order_number'])): ?><p><strong>Ref Order:</strong> <?= htmlspecialchars($return['order_number']) ?></p><?php endif; ?>
             <?php if (!empty($return['invoice_number'])): ?><p><strong>Ref Invoice:</strong> <?= htmlspecialchars($return['invoice_number']) ?></p><?php endif; ?>
-            <?php if (!empty($return['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($return['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_name ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
         </div>

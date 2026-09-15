@@ -434,7 +434,7 @@ try {
             <p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['warehouse_name'])): ?>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
+            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
             <?php endif; ?>
             <p><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></p>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></p>

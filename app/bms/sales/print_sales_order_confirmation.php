@@ -268,7 +268,7 @@ $accent = getSetting('print_template_color_so_confirmation', '#c8981f');
         <div><strong>Status:</strong> <?= strtoupper($order['status']) ?></div>
         <?php if (!empty($order['project_contract_no'])): ?><div><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></div><?php endif; ?>
         <?php if (!empty($order['project_name'])): ?><div><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></div><?php endif; ?>
-        <?php if (!empty($order['warehouse_name'])): ?><div><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></div><?php endif; ?>
+        <?php if (!empty($order['warehouse_name'])): ?><div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></div><?php endif; ?>
         <div><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></div>
         <div><strong>Prepared By:</strong> <?= htmlspecialchars(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></div>
     </div>
