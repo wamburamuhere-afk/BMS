@@ -78,7 +78,7 @@
                 render: function (d, t, row) {
                     var html = '<strong class="text-danger">' + money(d) + '</strong>';
                     if (row.daily_category_total && parseFloat(row.daily_category_total) !== parseFloat(d)) {
-                        html += '<br><small class="text-muted" style="font-size:0.65rem" title="Daily total for this category">Day: ' + money(row.daily_category_total) + '</small>';
+                        html += '<br><small class="text-muted" style="font-size:0.65rem" title="Daily total for this category">' + cfg.i18n.dayPrefix + ' ' + money(row.daily_category_total) + '</small>';
                     }
                     return html;
                 }
@@ -86,12 +86,12 @@
             { key: 'paid_to', col: {
                 data: 'paid_to_name', width: '12%',
                 render: function (d, t, row) {
-                    var name = esc(d || row.vendor || 'N/A');
+                    var name = esc(d || row.vendor || cfg.i18n.na);
                     if (row.paid_to_type === 'supplier') {
-                        return '<div><span class="badge bg-primary-soft text-primary border border-primary small mb-1">Supplier</span><br><strong>' + name + '</strong></div>';
+                        return '<div><span class="badge bg-primary-soft text-primary border border-primary small mb-1">' + cfg.i18n.supplier + '</span><br><strong>' + name + '</strong></div>';
                     }
                     if (row.paid_to_type === 'staff') {
-                        return '<div><span class="badge bg-info-soft text-info border border-info small mb-1">Staff</span><br><strong>' + name + '</strong></div>';
+                        return '<div><span class="badge bg-info-soft text-info border border-info small mb-1">' + cfg.i18n.staff + '</span><br><strong>' + name + '</strong></div>';
                     }
                     return '<strong>' + name + '</strong>';
                 }
@@ -99,8 +99,8 @@
             { key: 'status', col: {
                 data: 'status', width: '80px',
                 render: function (d) {
-                    if (!d) return '<span class="badge bg-secondary">Unknown</span>';
-                    return '<span class="badge bg-' + statusClass(d) + '">' + d.charAt(0).toUpperCase() + d.slice(1) + '</span>';
+                    if (!d) return '<span class="badge bg-secondary">' + cfg.i18n.unknown + '</span>';
+                    return '<span class="badge bg-' + statusClass(d) + '">' + (cfg.i18n.statusLabels[d] || (d.charAt(0).toUpperCase() + d.slice(1))) + '</span>';
                 }
             }},
             { key: 'actions', col: {
@@ -117,21 +117,21 @@
 
         if (p.canEdit && (row.status === 'pending' || row.status === 'reviewed')) {
             html += '<li><hr class="dropdown-divider opacity-50"></li>' +
-                    '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.edit(\'' + id + '\',' + eid + ');return false;"><i class="bi bi-pencil text-primary"></i> Edit Expense</a></li>';
+                    '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.edit(\'' + id + '\',' + eid + ');return false;"><i class="bi bi-pencil text-primary"></i> ' + cfg.i18n.editExpense + '</a></li>';
         }
         if (p.canEdit) {
             if (row.status === 'pending') {
-                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'reviewed\');return false;"><i class="bi bi-search text-info"></i> Mark as Reviewed</a></li>';
+                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'reviewed\');return false;"><i class="bi bi-search text-info"></i> ' + cfg.i18n.markAsReviewed + '</a></li>';
             } else if (row.status === 'reviewed') {
-                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'approved\');return false;"><i class="bi bi-check-circle text-success"></i> Approve</a></li>';
-                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'rejected\');return false;"><i class="bi bi-x-circle text-danger"></i> Reject</a></li>';
+                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'approved\');return false;"><i class="bi bi-check-circle text-success"></i> ' + cfg.i18n.approve + '</a></li>';
+                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'rejected\');return false;"><i class="bi bi-x-circle text-danger"></i> ' + cfg.i18n.reject + '</a></li>';
             } else if (row.status === 'approved') {
-                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'paid\');return false;"><i class="bi bi-cash text-success"></i> Mark as Paid</a></li>';
+                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'paid\');return false;"><i class="bi bi-cash text-success"></i> ' + cfg.i18n.markAsPaid + '</a></li>';
             }
         }
         if (p.canDelete) {
             html += '<li><hr class="dropdown-divider opacity-50"></li>' +
-                    '<li><a class="dropdown-item text-danger" href="#" onclick="BMSExpensesTable.remove(\'' + id + '\',' + eid + ');return false;"><i class="bi bi-trash"></i> Delete</a></li>';
+                    '<li><a class="dropdown-item text-danger" href="#" onclick="BMSExpensesTable.remove(\'' + id + '\',' + eid + ');return false;"><i class="bi bi-trash"></i> ' + cfg.i18n.delete + '</a></li>';
         }
         return html;
     }
@@ -141,8 +141,8 @@
         return '<div class="dropdown action-dropdown">' +
             '<button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear"></i></button>' +
             '<ul class="dropdown-menu dropdown-menu-end shadow-sm">' +
-                '<li><a class="dropdown-item" href="' + cfg.urls.view + '?id=' + eid + '"><i class="bi bi-eye text-info"></i> View Details</a></li>' +
-                '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.printVoucher(\'' + id + '\',' + eid + ');return false;"><i class="bi bi-printer text-secondary"></i> Print Voucher</a></li>' +
+                '<li><a class="dropdown-item" href="' + cfg.urls.view + '?id=' + eid + '"><i class="bi bi-eye text-info"></i> ' + cfg.i18n.viewDetails + '</a></li>' +
+                '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.printVoucher(\'' + id + '\',' + eid + ');return false;"><i class="bi bi-printer text-secondary"></i> ' + cfg.i18n.printVoucher + '</a></li>' +
                 workflowItems(cfg, row) +
             '</ul></div>';
     }
@@ -165,23 +165,24 @@
             var d = this.data();
             var actions = '<div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>' +
                 '<ul class="dropdown-menu dropdown-menu-end shadow-sm">' +
-                '<li><a class="dropdown-item" href="' + cfg.urls.view + '?id=' + d.expense_id + '"><i class="bi bi-eye text-info"></i> View Details</a></li>' +
+                '<li><a class="dropdown-item" href="' + cfg.urls.view + '?id=' + d.expense_id + '"><i class="bi bi-eye text-info"></i> ' + cfg.i18n.viewDetails + '</a></li>' +
                 workflowItems(cfg, d) + '</ul></div>';
 
+            var statusKey = String(d.status || '');
             container.append(
                 '<div class="expense-mobile-card mb-2">' +
                   '<div class="d-flex justify-content-between align-items-start mb-1"><div>' +
                     '<strong class="d-block" style="font-size:0.85rem">' + esc(d.description || '-') + '</strong>' +
                     '<small class="text-muted">' + fmtDate(d.expense_date) + '</small>' +
                   '</div><div class="d-flex align-items-center gap-2">' +
-                    '<span class="badge bg-' + statusClass(d.status) + '">' + String(d.status || '').charAt(0).toUpperCase() + String(d.status || '').slice(1) + '</span>' +
+                    '<span class="badge bg-' + statusClass(d.status) + '">' + (cfg.i18n.statusLabels[statusKey] || (statusKey.charAt(0).toUpperCase() + statusKey.slice(1))) + '</span>' +
                     actions +
                   '</div></div>' +
                   '<div class="d-flex flex-wrap gap-1" style="font-size:0.78rem">' +
                     categoryCell(d) +
                     '<span class="text-danger fw-bold">' + money(d.amount) + '</span>' +
                     ((d.daily_category_total && parseFloat(d.daily_category_total) !== parseFloat(d.amount))
-                        ? '<span class="text-muted ms-1" style="font-size:0.7rem">Day: ' + money(d.daily_category_total) + '</span>' : '') +
+                        ? '<span class="text-muted ms-1" style="font-size:0.7rem">' + cfg.i18n.dayPrefix + ' ' + money(d.daily_category_total) + '</span>' : '') +
                     ((showPaidTo && d.paid_to_name) ? '<span class="text-muted"><i class="bi bi-person"></i> ' + esc(d.paid_to_name) + '</span>' : '') +
                   '</div>' +
                 '</div>'
@@ -195,7 +196,7 @@ function buildVoucher(cfg, id) {
     logReportAction('Print Voucher', 'User printed payment voucher for expense #' + id);
 
     $.get(cfg.urls.get, { id: id }, function(response) {
-        if (!response.success) { Swal.fire('Error', response.message || 'Could not load expense', 'error'); return; }
+        if (!response.success) { Swal.fire(cfg.i18n.error, response.message || cfg.i18n.couldNotLoadExpense, 'error'); return; }
         const d = response.data;
 
         // ── Amount in words helper ──────────────────────────────────────
@@ -234,7 +235,7 @@ function buildVoucher(cfg, id) {
 
         // ── Build Voucher HTML ──────────────────────────────────────────
         const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-        <title>Payment Voucher - ${voucherNo}</title>
+        <title>${cfg.i18n.paymentVoucher} - ${voucherNo}</title>
         <style>
             * { margin:0; padding:0; box-sizing:border-box; }
             body { font-family: Arial, sans-serif; font-size: 10pt; color: #222; background:#fff; padding:15mm 15mm 20mm 15mm; }
@@ -297,56 +298,56 @@ function buildVoucher(cfg, id) {
                 <span class="pv-company">${cName}</span>
             </div>
             <div class="pv-title-area">
-                <div class="pv-title">Payment Voucher</div>
-                <div class="pv-voucher-no">Voucher No: <strong>${voucherNo}</strong></div>
-                <div class="pv-date">Date: <strong>${date}</strong></div>
+                <div class="pv-title">${cfg.i18n.paymentVoucher}</div>
+                <div class="pv-voucher-no">${cfg.i18n.voucherNo} <strong>${voucherNo}</strong></div>
+                <div class="pv-date">${cfg.i18n.dateLabel} <strong>${date}</strong></div>
             </div>
         </div>
 
         <!-- AMOUNT BOX -->
         <div class="pv-amount-box">
             <div>
-                <div class="pv-amount-label">Amount Paid</div>
+                <div class="pv-amount-label">${cfg.i18n.amountPaid}</div>
                 <div class="pv-amount-value">${fmtAmt}</div>
             </div>
             <div class="pv-amount-words">
-                <div style="font-size:7.5pt; color:#888; margin-bottom:2px;">In Words:</div>
+                <div style="font-size:7.5pt; color:#888; margin-bottom:2px;">${cfg.i18n.inWords}</div>
                 <strong>${amtWords}</strong>
             </div>
         </div>
 
         <!-- DETAILS TABLE -->
         <table class="pv-table">
-            <tr><td>Paid To</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${d.paid_to_type ? ' <span style="font-size:8pt;color:#888;">('+d.paid_to_type+')</span>' : ''}</td></tr>
-            <tr><td>Description</td><td>${d.description || '-'}</td></tr>
-            <tr><td>Expense Account</td><td>${d.expense_account_name ? ((d.expense_account_code ? d.expense_account_code + ' — ' : '') + d.expense_account_name) : '-'}</td></tr>
-            <tr><td>Paid From (Bank)</td><td>${d.bank_account_name ? ((d.bank_account_code ? d.bank_account_code + ' — ' : '') + d.bank_account_name) : '-'}</td></tr>
-            <tr><td>Reference No.</td><td>${d.reference_number || '-'}</td></tr>
-            ${d.notes ? `<tr><td>Notes</td><td>${d.notes}</td></tr>` : ''}
-            <tr><td>Status</td><td><span class="pv-status pv-status-${d.status||'pending'}">${(d.status||'pending').charAt(0).toUpperCase()+(d.status||'pending').slice(1)}</span></td></tr>
-            <tr><td>Prepared By</td><td>${d.created_by_name || '-'}</td></tr>
+            <tr><td>${cfg.i18n.paidTo}</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${d.paid_to_type ? ' <span style="font-size:8pt;color:#888;">('+d.paid_to_type+')</span>' : ''}</td></tr>
+            <tr><td>${cfg.i18n.description}</td><td>${d.description || '-'}</td></tr>
+            <tr><td>${cfg.i18n.expenseAccount}</td><td>${d.expense_account_name ? ((d.expense_account_code ? d.expense_account_code + ' — ' : '') + d.expense_account_name) : '-'}</td></tr>
+            <tr><td>${cfg.i18n.paidFromBank}</td><td>${d.bank_account_name ? ((d.bank_account_code ? d.bank_account_code + ' — ' : '') + d.bank_account_name) : '-'}</td></tr>
+            <tr><td>${cfg.i18n.referenceNo}</td><td>${d.reference_number || '-'}</td></tr>
+            ${d.notes ? `<tr><td>${cfg.i18n.notes}</td><td>${d.notes}</td></tr>` : ''}
+            <tr><td>${cfg.i18n.status}</td><td><span class="pv-status pv-status-${d.status||'pending'}">${cfg.i18n.statusLabels[d.status||'pending'] || ((d.status||'pending').charAt(0).toUpperCase()+(d.status||'pending').slice(1))}</span></td></tr>
+            <tr><td>${cfg.i18n.preparedBy}</td><td>${d.created_by_name || '-'}</td></tr>
         </table>
 
         <!-- NOTE -->
         <div class="pv-note">
-            <strong>Note:</strong> This is a computer-generated payment voucher. Please verify all details before processing payment.
+            <strong>${cfg.i18n.voucherNoteLabel}</strong> ${cfg.i18n.voucherNoteText}
         </div>
 
         <!-- SIGNATURES -->
         <div class="pv-signatures">
             <div class="pv-sig-block">
                 <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Prepared By</div>
+                <div class="pv-sig-label">${cfg.i18n.preparedBy}</div>
                 <div class="pv-sig-name">${d.created_by_name || ''}</div>
             </div>
             <div class="pv-sig-block">
                 <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Approved By</div>
+                <div class="pv-sig-label">${cfg.i18n.approvedBy}</div>
                 <div class="pv-sig-name">&nbsp;</div>
             </div>
             <div class="pv-sig-block">
                 <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Received By</div>
+                <div class="pv-sig-label">${cfg.i18n.receivedBy}</div>
                 <div class="pv-sig-name">${paidTo}</div>
             </div>
         </div>
@@ -433,10 +434,11 @@ function buildVoucher(cfg, id) {
 
     M.setStatus = function (id, eid, status) {
         var i = inst(id); if (!i) return;
+        var statusLabel = i.cfg.i18n.statusLabels[status] || status;
         window.BMSTbl.confirmPost({
-            title: 'Update Status?',
-            text: 'Are you sure you want to mark this as ' + status + '?',
-            confirmText: 'Yes, Proceed', successTitle: 'Updated!',
+            title: i.cfg.i18n.updateStatusTitle,
+            text: i.cfg.i18n.markAsConfirm + ' ' + statusLabel + '?',
+            confirmText: i.cfg.i18n.yesProceed, successTitle: i.cfg.i18n.updated,
             url: i.cfg.urls.status, data: { expense_id: eid, status: status },
             onDone: function () {
                 if (window.logReportAction) logReportAction('Updated Expense Status', 'User updated status of expense record #' + eid + ' to ' + status);
@@ -448,9 +450,9 @@ function buildVoucher(cfg, id) {
     M.remove = function (id, eid) {
         var i = inst(id); if (!i) return;
         window.BMSTbl.confirmPost({
-            title: 'Delete Expense?',
-            text: 'Permanently delete this expense? This action cannot be undone.',
-            icon: 'warning', color: '#d33', confirmText: 'Yes, Delete', successTitle: 'Deleted!',
+            title: i.cfg.i18n.deleteExpenseTitle,
+            text: i.cfg.i18n.deleteExpenseText,
+            icon: 'warning', color: '#d33', confirmText: i.cfg.i18n.yesDelete, successTitle: i.cfg.i18n.deleted,
             url: i.cfg.urls.del, data: { expense_id: eid },
             onDone: function () {
                 if (window.logReportAction) logReportAction('Deleted Expense Record', 'User deleted expense record #' + eid);
