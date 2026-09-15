@@ -54,6 +54,10 @@ $buying_price           = (float)($_POST['buying_price'] ?? 0);
 $wholesale_price_raw    = $_POST['wholesale_price'] ?? '';
 $selling_price          = (float)($_POST['selling_price'] ?? 0);
 $paid_from_account_id   = (int)($_POST['paid_from_account_id'] ?? 0);
+// Both optional (products_simple_pos_plan.md §8) — forcing an expiry date on
+// every restock would break for non-perishable goods.
+$manufacturing_date     = !empty($_POST['manufacturing_date']) ? $_POST['manufacturing_date'] : null;
+$expiry_date            = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
 
 // Simple Mode — the modal never shows an account picker for a "normal
 // business man" (pos_modals_new.php), so nothing is posted for
@@ -141,6 +145,8 @@ try {
         'write_batch'      => true,
         'wholesale_price'  => $wholesale_price,
         'selling_price'    => $selling_price,
+        'manufacturing_date' => $manufacturing_date,
+        'expiry_date'      => $expiry_date,
         'receipt_id'       => null,
         'movement_type'    => 'adjustment_in',
         'reference_type'   => 'stock_adjustment',
