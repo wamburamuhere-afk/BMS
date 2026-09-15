@@ -74,7 +74,7 @@ try {
     // source invoice/sales order's warehouse), not just project.
     if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     $action = "Print Sales Return";
@@ -247,7 +247,7 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
         <div class="field-line"><span class="flabel">Date:</span> <?= date('d M Y', strtotime($return['return_date'])) ?></div>
         <?php if (!empty($return['order_number'])): ?><div class="field-line"><span class="flabel">Ref Order:</span> <?= htmlspecialchars($return['order_number']) ?></div><?php endif; ?>
         <?php if (!empty($return['invoice_number'])): ?><div class="field-line"><span class="flabel">Ref Invoice:</span> <?= htmlspecialchars($return['invoice_number']) ?></div><?php endif; ?>
-        <?php if (!empty($return['warehouse_name'])): ?><div class="field-line"><span class="flabel">Warehouse:</span> <?= htmlspecialchars($return['warehouse_name']) ?></div><?php endif; ?>
+        <?php if (!empty($return['warehouse_name'])): ?><div class="field-line"><span class="flabel"><?= wLabel('Warehouse:', 'Shop:') ?></span> <?= htmlspecialchars($return['warehouse_name']) ?></div><?php endif; ?>
         <div class="field-line"><span class="flabel">Status:</span> <?= strtoupper($return['status']) ?></div>
         <?php if ($refund_status): ?><div class="field-line"><span class="flabel">Refund:</span> <?= htmlspecialchars($refund_status) ?></div><?php endif; ?>
         <div class="field-line"><span class="flabel">Prepared By:</span> <?= htmlspecialchars($creator_name ?: 'System') ?></div>

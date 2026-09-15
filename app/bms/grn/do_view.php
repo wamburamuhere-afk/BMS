@@ -148,7 +148,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         </div>
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
-                                <div class="text-muted small fw-bold text-uppercase mb-1">Warehouse</div>
+                                <div class="text-muted small fw-bold text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></div>
                                 <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i><?= safe_output($do['warehouse_name']) ?></div>
                             </div>
                         </div>

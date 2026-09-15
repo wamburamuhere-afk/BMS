@@ -35,15 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Validate input
     if (empty($warehouse_id)) {
-        echo json_encode(['success' => false, 'message' => 'Warehouse ID is required']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Shop ID is required' : 'Warehouse ID is required']);
         exit;
     }
     if (empty($warehouse_name)) {
-        echo json_encode(['success' => false, 'message' => 'Warehouse name is required']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Shop name is required' : 'Warehouse name is required']);
         exit;
     }
     if (empty($warehouse_code)) {
-        echo json_encode(['success' => false, 'message' => 'Warehouse code is required']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Shop code is required' : 'Warehouse code is required']);
         exit;
     }
 
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $check_stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_code = ? AND warehouse_id != ?");
     $check_stmt->execute([$warehouse_code, $warehouse_id]);
     if ($check_stmt->fetch()) {
-        echo json_encode(['success' => false, 'message' => "Warehouse code '{$warehouse_code}' already exists."]);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? "Shop code '{$warehouse_code}' already exists." : "Warehouse code '{$warehouse_code}' already exists."]);
         exit;
     }
 
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cur_proj_stmt->execute([$warehouse_id]);
     $cur_project_id = $cur_proj_stmt->fetchColumn();
     if ($cur_project_id !== false && $cur_project_id !== null && !userCan('project', (int)$cur_project_id)) {
-        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse belongs to a project not in your scope.']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop belongs to a project not in your scope.' : 'Access denied: this warehouse belongs to a project not in your scope.']);
         exit;
     }
     if ($project_id !== null && !userCan('project', (int)$project_id)) {
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($pdo, $user_id, 'Updated Warehouse (via API)', "User updated warehouse: $warehouse_name ($warehouse_code)");
         
         $pdo->commit();
-        echo json_encode(['success' => true, 'message' => 'Warehouse updated successfully!']);
+        echo json_encode(['success' => true, 'message' => isShopLabel() ? 'Shop updated successfully!' : 'Warehouse updated successfully!']);
     } catch (Exception $e) {
         $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

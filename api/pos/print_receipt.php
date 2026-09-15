@@ -66,7 +66,7 @@ if (empty($sale['customer_name'])) {
 // drawn from their assigned warehouse(s).
 $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
 if ($wid !== null && !userCan('warehouse', $wid)) {
-    die("Access denied: this warehouse is not in your assigned scope.");
+    die(isShopLabel(true) ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.");
 }
 
 // Log Activity
@@ -284,7 +284,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         <?php endif; ?>
         <?php if (!empty($sale['warehouse_name'])): ?>
         <div>
-            <span><?= t('Warehouse:') ?></span>
+            <span><?= wLabel('Warehouse:', 'Shop:', true) ?></span>
             <span><?= htmlspecialchars($sale['warehouse_name']) ?></span>
         </div>
         <?php endif; ?>

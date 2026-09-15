@@ -34,7 +34,7 @@ try {
         $warehouse_id = !empty($_GET['warehouse_id']) ? (int)$_GET['warehouse_id'] : null;
         require_once __DIR__ . '/../../core/project_scope.php';
         if (!$warehouse_id || !userCan('warehouse', $warehouse_id)) {
-            echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+            echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.', true)]);
             exit();
         }
         $stmt = $pdo->prepare("

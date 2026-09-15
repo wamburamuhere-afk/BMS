@@ -78,7 +78,7 @@ try {
 
         if ($warehouse_id <= 0) {
             $failed_count++;
-            $errors[] = "Row $processed: Invalid Warehouse ID for SKU $sku";
+            $errors[] = "Row $processed: Invalid " . (isShopLabel() ? "Shop" : "Warehouse") . " ID for SKU $sku";
             continue;
         }
 

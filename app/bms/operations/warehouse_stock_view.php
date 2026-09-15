@@ -14,7 +14,7 @@ $warehouse_id = intval($_GET['warehouse_id'] ?? 0);
 $project_id   = intval($_GET['project_id']   ?? 0);
 
 if ($warehouse_id <= 0 || $project_id <= 0) {
-    echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Invalid warehouse or project ID.</div></div>';
+    echo '<div class="container-fluid mt-4"><div class="alert alert-danger">' . htmlspecialchars(wLabel('Invalid warehouse or project ID.', 'Invalid shop or project ID.')) . '</div></div>';
     includeFooter(); exit;
 }
 
@@ -24,7 +24,7 @@ if ($warehouse_id <= 0 || $project_id <= 0) {
 require_once __DIR__ . '/../../../core/warehouse_scope.php';
 if (!userCan('warehouse', $warehouse_id)) {
     if (!headers_sent()) http_response_code(403);
-    die('Access denied: this warehouse is not in your assigned scope.');
+    die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
 }
 
 // Validate warehouse belongs to project
@@ -36,7 +36,7 @@ $wh_stmt = $pdo->prepare("
 $wh_stmt->execute([$warehouse_id, $project_id]);
 $warehouse = $wh_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$warehouse) {
-    echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Warehouse not found in this project.</div></div>';
+    echo '<div class="container-fluid mt-4"><div class="alert alert-danger">' . htmlspecialchars(wLabel('Warehouse not found in this project.', 'Shop not found in this project.')) . '</div></div>';
     includeFooter(); exit;
 }
 
@@ -276,13 +276,13 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                             <?= htmlspecialchars($project_name) ?>
                         </a>
                     </li>
-                    <li class="breadcrumb-item active">Warehouse Stock &amp; History</li>
+                    <li class="breadcrumb-item active"><?= wLabel('Warehouse Stock &amp; History', 'Shop Stock &amp; History') ?></li>
                 </ol>
             </nav>
             <h4 class="fw-bold mb-0 mt-2">
                 <i class="bi bi-building text-primary me-2"></i><?= htmlspecialchars($warehouse['warehouse_name']) ?>
             </h4>
-            <small class="text-muted"><?= htmlspecialchars($project_name) ?> &mdash; Warehouse Stock &amp; History</small>
+            <small class="text-muted"><?= htmlspecialchars($project_name) ?> &mdash; <?= wLabel('Warehouse Stock &amp; History', 'Shop Stock &amp; History') ?></small>
         </div>
         <div class="col-auto d-flex gap-2">
             <a href="<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=inventory" class="btn btn-outline-secondary btn-sm">
@@ -332,7 +332,7 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                 <?php if (empty($stock_summary)): ?>
                     <div class="p-4 text-center text-muted">
                         <i class="bi bi-box-seam d-block mb-2 fs-2 opacity-25"></i>
-                        <p>No stock found in this warehouse.</p>
+                        <p><?= wLabel('No stock found in this warehouse.', 'No stock found in this shop.') ?></p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
@@ -385,7 +385,7 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                 <?php if (empty($received)): ?>
                     <div class="p-4 text-center text-muted">
                         <i class="bi bi-truck d-block mb-2 fs-2 opacity-25"></i>
-                        <p>No materials received in this warehouse.</p>
+                        <p><?= wLabel('No materials received in this warehouse.', 'No materials received in this shop.') ?></p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
@@ -443,7 +443,7 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                 <?php if (empty($issued)): ?>
                     <div class="p-4 text-center text-muted">
                         <i class="bi bi-truck-flatbed d-block mb-2 fs-2 opacity-25"></i>
-                        <p>No materials issued from this warehouse.</p>
+                        <p><?= wLabel('No materials issued from this warehouse.', 'No materials issued from this shop.') ?></p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
@@ -501,7 +501,7 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                 <?php if (empty($adjustments)): ?>
                     <div class="p-4 text-center text-muted">
                         <i class="bi bi-arrow-left-right d-block mb-2 fs-2 opacity-25"></i>
-                        <p>No adjustments in this warehouse.</p>
+                        <p><?= wLabel('No adjustments in this warehouse.', 'No adjustments in this shop.') ?></p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
@@ -561,7 +561,7 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                 <?php if (empty($movements)): ?>
                     <div class="p-4 text-center text-muted">
                         <i class="bi bi-clock-history d-block mb-2 fs-2 opacity-25"></i>
-                        <p>No movement history in this warehouse.</p>
+                        <p><?= wLabel('No movement history in this warehouse.', 'No movement history in this shop.') ?></p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">

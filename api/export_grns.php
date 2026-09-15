@@ -31,7 +31,7 @@ try {
     $output = fopen('php://output', 'w');
 
     // CSV Headers
-    fputcsv($output, [t('DN Number'), t('GRN Number'), t('Date'), t('Supplier'), t('PO Number'), t('Warehouse'), t('Items Count'), t('Total Value'), t('Received By'), t('Status'), t('Notes')]);
+    fputcsv($output, [t('DN Number'), t('GRN Number'), t('Date'), t('Supplier'), t('PO Number'), wLabel('Warehouse', 'Shop'), t('Items Count'), t('Total Value'), t('Received By'), t('Status'), t('Notes')]);
 
     // Build query with filters
     $query = "

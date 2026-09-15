@@ -63,11 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_transfer) {
         $products = $_POST['products']; // Array of [id => qty]
         
         if ($from_wh === $to_wh) {
-            $_SESSION['error'] = "Source and destination warehouses must be different.";
+            $_SESSION['error'] = isShopLabel() ? "Source and destination shops must be different." : "Source and destination warehouses must be different.";
         } elseif (!userCan('warehouse', $from_wh)) {
-            $_SESSION['error'] = "Access denied: the source warehouse is not in your assigned scope.";
+            $_SESSION['error'] = isShopLabel() ? "Access denied: the source shop is not in your assigned scope." : "Access denied: the source warehouse is not in your assigned scope.";
         } elseif (!userCan('warehouse', $to_wh)) {
-            $_SESSION['error'] = "Access denied: the destination warehouse is not in your assigned scope.";
+            $_SESSION['error'] = isShopLabel() ? "Access denied: the destination shop is not in your assigned scope." : "Access denied: the destination warehouse is not in your assigned scope.";
         } else {
             try {
                 $pdo->beginTransaction();
@@ -309,7 +309,7 @@ foreach ($transfers as $tr) {
                             <?php endif; ?>
                             <li>
                                 <a class="dropdown-item py-2" href="<?= getUrl('warehouses') ?>">
-                                    <i class="bi bi-house-door-fill text-secondary me-2"></i> Warehouses
+                                    <i class="bi bi-house-door-fill text-secondary me-2"></i> <?= wLabel('Warehouses', 'Shops') ?>
                                 </a>
                             </li>
                         </ul>
@@ -381,11 +381,11 @@ foreach ($transfers as $tr) {
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
-                    <label for="wh_filter" class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">Warehouse</label>
+                    <label for="wh_filter" class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-house-door text-muted"></i></span>
                         <select name="warehouse_id" id="wh_filter" class="form-select border-start-0 ps-0">
-                            <option value="0">All Warehouses</option>
+                            <option value="0"><?= wLabel('All Warehouses', 'All Shops') ?></option>
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>" <?= $wh_filter == $wh['warehouse_id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($wh['warehouse_name']) ?>
@@ -605,7 +605,7 @@ foreach ($transfers as $tr) {
                                     </tr>
                                 </thead>
                                 <tbody id="productSelectionBody">
-                                    <tr><td colspan="4" class="text-center text-muted py-3">Select source warehouse first</td></tr>
+                                    <tr><td colspan="4" class="text-center text-muted py-3"><?= wLabel('Select source warehouse first', 'Select source shop first') ?></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -634,14 +634,14 @@ function filterAvailableProducts() {
     body.empty();
     
     if (!fromWh) {
-        body.append('<tr><td colspan="3" class="text-center text-muted">Select source warehouse first</td></tr>');
+        body.append('<tr><td colspan="3" class="text-center text-muted">' + <?= json_encode(wLabel('Select source warehouse first', 'Select source shop first')) ?> + '</td></tr>');
         return;
     }
     
     const filtered = productsData.filter(p => p.warehouse_id == fromWh);
     
     if (filtered.length === 0) {
-        body.append('<tr><td colspan="3" class="text-center text-danger">No products available in this warehouse</td></tr>');
+        body.append('<tr><td colspan="3" class="text-center text-danger">' + <?= json_encode(wLabel('No products available in this warehouse', 'No products available in this shop')) ?> + '</td></tr>');
         return;
     }
     

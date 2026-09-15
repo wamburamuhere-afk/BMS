@@ -70,7 +70,7 @@ try {
     // source invoice/sales order's warehouse), not just project.
     if (!empty($cn['resolved_warehouse_id']) && !userCan('warehouse', (int)$cn['resolved_warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     require_once __DIR__ . '/../../../../helpers.php';
@@ -224,7 +224,7 @@ $accent = getSetting('print_template_color_cn_horizon', '#1F5AA8');
         <div class="cell"><div class="lbl">Date</div><div class="val"><?= date('d M Y', strtotime($cn['credit_date'])) ?></div></div>
         <?php if (!empty($cn['return_number'])): ?><div class="cell"><div class="lbl">Ref Return</div><div class="val"><?= htmlspecialchars($cn['return_number']) ?></div></div><?php endif; ?>
         <?php if (!empty($cn['invoice_number'])): ?><div class="cell"><div class="lbl">Ref Invoice</div><div class="val"><?= htmlspecialchars($cn['invoice_number']) ?></div></div><?php endif; ?>
-        <?php if (!empty($cn['warehouse_name'])): ?><div class="cell"><div class="lbl">Warehouse</div><div class="val"><?= htmlspecialchars($cn['warehouse_name']) ?></div></div><?php endif; ?>
+        <?php if (!empty($cn['warehouse_name'])): ?><div class="cell"><div class="lbl"><?= wLabel('Warehouse', 'Shop') ?></div><div class="val"><?= htmlspecialchars($cn['warehouse_name']) ?></div></div><?php endif; ?>
         <div class="cell"><div class="lbl">Status</div><div class="val status"><?= strtoupper($cn['status']) ?></div></div>
     </div>
 

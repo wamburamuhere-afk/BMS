@@ -48,7 +48,7 @@ try {
 
     $party_label = $party_type === 'subcontractor' ? 'Sub-contractor' : ($party_type === 'customer' ? 'Customer' : 'Supplier');
     if ($delivery_id <= 0)  throw new Exception('DN ID is required.');
-    if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
+    if ($warehouse_id <= 0) throw new Exception(isShopLabel() ? 'Shop is required.' : 'Warehouse is required.');
     if ($party_id <= 0) {
         throw new Exception($party_label . ' is required.');
     }

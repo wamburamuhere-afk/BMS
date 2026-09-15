@@ -20,7 +20,7 @@ try {
     $project_id  = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
 
     if (!$product_id)   throw new Exception('Non-Inventory product is required.');
-    if (!$warehouse_id) throw new Exception('Warehouse is required.');
+    if (!$warehouse_id) throw new Exception(isShopLabel() ? 'Shop is required.' : 'Warehouse is required.');
 
     // Phase E — project-scope gate on the NIP product being defined
     if (function_exists('assertScopeForRecord')) {
@@ -38,7 +38,7 @@ try {
     $stmt->execute([$warehouse_id]);
     if (!$stmt->fetch()) throw new Exception('Selected warehouse not found or inactive.');
     if (!userCan('warehouse', $warehouse_id)) {
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     $components = $_POST['components'] ?? [];

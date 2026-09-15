@@ -155,9 +155,9 @@ function getMovementBadge($type) {
                 <?php endif; ?>
                 
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold">Warehouse</label>
+                    <label class="form-label small fw-bold"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select class="form-select form-select-sm select2-static" id="smWarehouseFilter" name="warehouse_id">
-                        <option value="0">All Warehouses</option>
+                        <option value="0"><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php
                         // Shared helper — also respects the user's direct warehouse
                         // grant (Phase 6, pos_upgrade_plan.md).
@@ -215,7 +215,7 @@ function getMovementBadge($type) {
                             <?php if (!$product_id): ?>
                                 <th>Product</th>
                             <?php endif; ?>
-                            <th>Warehouse</th>
+                            <th><?= wLabel('Warehouse', 'Shop') ?></th>
                             <th>Reference</th>
                             <th class="text-end">Quantity</th>
                             <th class="text-end">Stock Before</th>

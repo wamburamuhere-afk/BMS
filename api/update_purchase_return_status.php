@@ -92,7 +92,7 @@ function adjustStock($returnId, $warehouse_id, $action = 'deduct') {
     global $pdo;
     
     if (!$warehouse_id) {
-        throw new Exception("Warehouse not specified for this return. Cannot adjust stock.");
+        throw new Exception(isShopLabel() ? "Shop not specified for this return. Cannot adjust stock." : "Warehouse not specified for this return. Cannot adjust stock.");
     }
 
     // Fetch return items
@@ -120,7 +120,7 @@ function adjustStock($returnId, $warehouse_id, $action = 'deduct') {
                 $stmtPName = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ?");
                 $stmtPName->execute([$product_id]);
                 $pName = $stmtPName->fetchColumn();
-                throw new Exception("Insufficient stock for '$pName' in this warehouse. Required: $qty, Available: $currentVal.");
+                throw new Exception((isShopLabel() ? "Insufficient stock for '$pName' in this shop." : "Insufficient stock for '$pName' in this warehouse.") . " Required: $qty, Available: $currentVal.");
             }
         }
 

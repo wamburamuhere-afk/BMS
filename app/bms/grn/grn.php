@@ -578,9 +578,9 @@ function generate_grn_number() {
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted"><?= t('Warehouse') ?></label>
+                    <label class="form-label small fw-bold text-muted"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select class="form-select select2-static" id="grn_filter_warehouse" name="warehouse">
-                        <option value=""><?= t('All Warehouses') ?></option>
+                        <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>" <?= $warehouse_filter == $warehouse['warehouse_id'] ? 'selected' : '' ?>>
                                 <?= safe_output($warehouse['warehouse_name']) ?>
@@ -803,7 +803,7 @@ function generate_grn_number() {
     $(document).ready(function() {
         // Select2 on DB-backed filter selects
         $('#grn_filter_supplier').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('All Suppliers')) ?> });
-        $('#grn_filter_warehouse').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('All Warehouses')) ?> });
+        $('#grn_filter_warehouse').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(wLabel('All Warehouses', 'All Shops')) ?> });
         <?php if ($enable_projects): ?>
         $('#grn_filter_project').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('All Projects')) ?> });
         <?php endif; ?>

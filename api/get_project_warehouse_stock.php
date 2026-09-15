@@ -8,9 +8,9 @@ if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unautho
 try {
     $warehouse_id = intval($_GET['warehouse_id'] ?? 0);
     $project_id   = intval($_GET['project_id']   ?? 0);
-    if ($warehouse_id <= 0) throw new Exception('Warehouse ID required.');
+    if ($warehouse_id <= 0) throw new Exception(isShopLabel() ? 'Shop ID required.' : 'Warehouse ID required.');
     if (!userCan('warehouse', $warehouse_id)) {
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     // Validate warehouse belongs to project

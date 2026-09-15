@@ -1022,7 +1022,7 @@ function deleteSellingUnit(id) {
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <small class="text-muted"><?= t('Routes this item to a kitchen queue when sold in a restaurant/hybrid warehouse. Setting this also relabels the Combo section above to "Recipe (Ingredients)".') ?></small>
+                                <small class="text-muted"><?= wLabel('Routes this item to a kitchen queue when sold in a restaurant/hybrid warehouse. Setting this also relabels the Combo section above to "Recipe (Ingredients)".', 'Routes this item to a kitchen queue when sold in a restaurant/hybrid shop. Setting this also relabels the Combo section above to "Recipe (Ingredients)".') ?></small>
                             </div>
                             <div class="mb-2">
                                 <label class="form-label"><?= t('Modifier Groups') ?></label>
@@ -1129,9 +1129,9 @@ function deleteSellingUnit(id) {
                         <?php if (!$product['is_service'] && !empty($warehouses)): ?>
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
-                                <i class="bi bi-box-seam me-2"></i> <?= t('CURRENT STOCK (Per Warehouse)') ?>
+                                <i class="bi bi-box-seam me-2"></i> <?= wLabel('CURRENT STOCK (Per Warehouse)', 'CURRENT STOCK (Per Shop)') ?>
                             </h6>
-                            <p class="text-muted small mb-3"><?= t('Edit stock quantities per warehouse below. Changes are recorded as stock adjustments automatically.') ?></p>
+                            <p class="text-muted small mb-3"><?= wLabel('Edit stock quantities per warehouse below. Changes are recorded as stock adjustments automatically.', 'Edit stock quantities per shop below. Changes are recorded as stock adjustments automatically.') ?></p>
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover border">
                                     <thead class="table-light">

@@ -185,7 +185,7 @@ if ($method === 'GET') {
             // invoice could still fetch it directly by id.
             if (!empty($row['warehouse_id']) && !userCan('warehouse', (int)$row['warehouse_id'])) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Access denied: this invoice belongs to a warehouse not in your scope.']);
+                echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this invoice belongs to a shop not in your scope.' : 'Access denied: this invoice belongs to a warehouse not in your scope.']);
                 exit;
             }
             // Line items (supplier invoices) for edit / view / print.

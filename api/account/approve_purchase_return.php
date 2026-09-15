@@ -24,7 +24,7 @@ if (!function_exists('approve_pr_adjust_stock')) {
     function approve_pr_adjust_stock(PDO $pdo, int $returnId, int $warehouseId, string $action = 'deduct'): void
     {
         if (!$warehouseId) {
-            throw new Exception("Warehouse not specified for this return. Cannot adjust stock.");
+            throw new Exception(isShopLabel() ? "Shop not specified for this return. Cannot adjust stock." : "Warehouse not specified for this return. Cannot adjust stock.");
         }
 
         $itemStmt = $pdo->prepare("SELECT product_id, quantity FROM purchase_return_items WHERE purchase_return_id = ?");

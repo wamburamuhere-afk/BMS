@@ -266,9 +266,9 @@ function get_pagination_url($page) {
                     <input type="text" class="form-control form-control-sm" name="search" value="<?= safe_output($search) ?>" placeholder="<?= t('Ref #, SKU or Notes') ?>">
                 </div>
                 <div class="col-12 col-sm-6 col-md-2">
-                    <label class="form-label small fw-bold"><?= t('Warehouse') ?></label>
+                    <label class="form-label small fw-bold"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select class="form-select form-select-sm" name="warehouse_id">
-                        <option value=""><?= t('All Warehouses') ?></option>
+                        <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?= $w['warehouse_id'] ?>" <?= $warehouse_id==$w['warehouse_id']?'selected':'' ?>><?= safe_output($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
@@ -343,7 +343,7 @@ function get_pagination_url($page) {
                             <th class="ps-3" style="width:45px;"><?= t('S/NO') ?></th>
                             <th><?= t('Date & Time') ?></th>
                             <th><?= t('Product Details') ?></th>
-                            <th><?= t('Warehouse') ?></th>
+                            <th><?= wLabel('Warehouse', 'Shop') ?></th>
                             <?php if ($enable_projects): ?><th><?= t('Project') ?></th><?php endif; ?>
                             <th><?= t('Adjustment') ?></th>
                             <th class="text-end"><?= t('Value') ?></th>
@@ -522,15 +522,15 @@ function get_pagination_url($page) {
                                 </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="text-muted"><?= t('Choose a project to see its warehouses, or leave blank for warehouses not linked to any project') ?></small>
+                            <small class="text-muted"><?= wLabel('Choose a project to see its warehouses, or leave blank for warehouses not linked to any project', 'Choose a project to see its shops, or leave blank for shops not linked to any project') ?></small>
                         </div>
                         <?php endif; ?>
 
                         <!-- 2. WAREHOUSE -->
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjustment_warehouse_id" name="warehouse_id" required onchange="loadProductStock()">
-                                <option value=""><?= t('-- Select Warehouse --') ?></option>
+                                <option value=""><?= wLabel('-- Select Warehouse --', '-- Select Shop --') ?></option>
                             </select>
                             <small class="text-muted" id="adjWarehouseHint"></small>
                         </div>
@@ -675,7 +675,7 @@ function get_pagination_url($page) {
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label"><?= t('Default Warehouse') ?></label>
+                    <label class="form-label"><?= wLabel('Default Warehouse', 'Default Shop') ?></label>
                     <select class="form-select" id="bulkWarehouse">
                         <?php foreach ($warehouses as $wh): ?>
                         <option value="<?= $wh['warehouse_id'] ?>"><?= safe_output($wh['warehouse_name']) ?></option>
@@ -712,18 +712,18 @@ const adjAllWarehouses = <?= json_encode(array_values(array_map(function($w){
 
 // ── Translated strings (server-rendered once, reused throughout this JS) ──
 const STRINGS = {
-    selectWarehouse: <?= json_encode(t('-- Select Warehouse --')) ?>,
-    showingUnlinked: <?= json_encode(t('Showing warehouses not linked to any project.')) ?>,
-    noWarehousesForProject: <?= json_encode(t('No warehouses found for this project.')) ?>,
-    warehousesAvailable: <?= json_encode(t('warehouse(s) available for this project.')) ?>,
+    selectWarehouse: <?= json_encode(wLabel('-- Select Warehouse --', '-- Select Shop --')) ?>,
+    showingUnlinked: <?= json_encode(wLabel('Showing warehouses not linked to any project.', 'Showing shops not linked to any project.')) ?>,
+    noWarehousesForProject: <?= json_encode(wLabel('No warehouses found for this project.', 'No shops found for this project.')) ?>,
+    warehousesAvailable: <?= json_encode(wLabel('warehouse(s) available for this project.', 'shop(s) available for this project.')) ?>,
     editAdjustment: <?= json_encode(t('Edit Adjustment')) ?>,
     newStockAdjustment: <?= json_encode(t('New Stock Adjustment')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     failedToLoadData: <?= json_encode(t('Failed to load data')) ?>,
     missingProduct: <?= json_encode(t('Missing Product')) ?>,
     selectAProduct: <?= json_encode(t('Please select a product.')) ?>,
-    missingWarehouse: <?= json_encode(t('Missing Warehouse')) ?>,
-    selectAWarehouse: <?= json_encode(t('Please select a warehouse.')) ?>,
+    missingWarehouse: <?= json_encode(wLabel('Missing Warehouse', 'Missing Shop')) ?>,
+    selectAWarehouse: <?= json_encode(wLabel('Please select a warehouse.', 'Please select a shop.')) ?>,
     missingType: <?= json_encode(t('Missing Type')) ?>,
     selectAnAdjustmentType: <?= json_encode(t('Please select an adjustment type.')) ?>,
     invalidQuantity: <?= json_encode(t('Invalid Quantity')) ?>,
@@ -740,7 +740,7 @@ const STRINGS = {
     adjustmentDetails: <?= json_encode(t('Adjustment Details')) ?>,
     product: <?= json_encode(t('Product:')) ?>,
     sku: <?= json_encode(t('SKU:')) ?>,
-    warehouse: <?= json_encode(t('Warehouse:')) ?>,
+    warehouse: <?= json_encode(wLabel('Warehouse:', 'Shop:')) ?>,
     project: <?= json_encode(t('Project:')) ?>,
     type: <?= json_encode(t('Type:')) ?>,
     qty: <?= json_encode(t('Qty:')) ?>,

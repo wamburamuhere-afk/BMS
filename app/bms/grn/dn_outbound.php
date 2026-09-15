@@ -399,9 +399,9 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                             <?php endif; ?>
 
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Warehouse (Source) <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= wLabel('Warehouse (Source)', 'Shop (Source)') ?> <span class="text-danger">*</span></label>
                                 <select class="form-select" name="warehouse_id" id="dn_warehouse_id" required>
-                                    <option value="">-- Select Warehouse --</option>
+                                    <option value=""><?= wLabel('-- Select Warehouse --', '-- Select Shop --') ?></option>
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -567,8 +567,9 @@ function initS2($el, placeholder) {
 function rebuildWarehouses() {
     const $sel = $('#dn_warehouse_id');
     const current = $sel.val() || PRESET_WH;
-    initS2($sel, '-- Select Warehouse --');
-    $sel.empty().append($('<option>').val('').text('-- Select Warehouse --'));
+    var doSelectWarehouseLabel = <?= json_encode(wLabel('-- Select Warehouse --', '-- Select Shop --')) ?>;
+    initS2($sel, doSelectWarehouseLabel);
+    $sel.empty().append($('<option>').val('').text(doSelectWarehouseLabel));
     // Shared Project → Warehouse rule (assets/js/warehouse-project-filter.js):
     // no project -> only unassigned warehouses; project -> only its warehouses.
     filterWarehousesForProject(ALL_WAREHOUSES, PROJECT_ID)
@@ -933,7 +934,7 @@ function submitDN(status) {
 
     const partyNoun = partyType === 'subcontractor' ? 'sub-contractor' : (partyType === 'customer' ? 'customer' : 'supplier');
     if (!partyId)   { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select the ' + partyNoun + '.' }); return; }
-    if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select a warehouse.' }); return; }
+    if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: <?= json_encode(wLabel('Select a warehouse.', 'Select a shop.')) ?> }); return; }
     if (!date)      { Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter the DN date.' }); return; }
 
     const items = [];

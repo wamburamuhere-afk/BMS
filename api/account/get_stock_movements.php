@@ -37,7 +37,7 @@ if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
 if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
-    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']); exit;
+    http_response_code(403); echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']); exit;
 }
 
 // Canonical IN / OUT type lists. `norm_type` resolves legacy empty types.
@@ -124,13 +124,14 @@ try {
     $by_type = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ── Detail rows ───────────────────────────────────────────────────────
+    $no_warehouse_label = $pdo->quote(wLabel('No Warehouse', 'No Shop'));
     $stmt = $pdo->prepare("
         SELECT $eff_date        AS movement_date,
                ($norm_type)      AS movement_type,
                ($direction_expr) AS direction,
                COALESCE(p.product_name, '—')                       AS product_name,
                COALESCE(p.product_code, '')                         AS product_code,
-               COALESCE(w.warehouse_name, 'No Warehouse')           AS warehouse_name,
+               COALESCE(w.warehouse_name, $no_warehouse_label)      AS warehouse_name,
                sm.quantity, COALESCE(sm.unit, '')                   AS unit,
                COALESCE(sm.total_cost, 0)                           AS value,
                sm.stock_after,

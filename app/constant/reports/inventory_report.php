@@ -109,9 +109,9 @@ foreach ($warehouses as $w) {
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                         <select id="s-warehouse" class="form-select" style="width:100%">
-                            <option value="">All Warehouses</option><?= $warehouse_options ?>
+                            <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option><?= $warehouse_options ?>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -153,7 +153,7 @@ foreach ($warehouses as $w) {
         <div class="row g-3 mb-4">
             <?php
             $snap_cards = [
-                ['Total SKUs', 'stat-skus'], ['Warehouses with Stock', 'stat-wh'],
+                ['Total SKUs', 'stat-skus'], [wLabel('Warehouses with Stock', 'Shops with Stock'), 'stat-wh'],
                 ['Total Cost Value', 'stat-cost'], ['Total Selling Value', 'stat-sell'],
             ];
             foreach ($snap_cards as $c): ?>
@@ -171,7 +171,7 @@ foreach ($warehouses as $w) {
         <div class="row g-3 mb-4">
             <div class="col-12 col-md-5">
                 <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
-                    <div class="card-header bg-white fw-bold border-0"><i class="bi bi-building text-primary me-2"></i>Cost Value by Warehouse</div>
+                    <div class="card-header bg-white fw-bold border-0"><i class="bi bi-building text-primary me-2"></i><?= wLabel('Cost Value by Warehouse', 'Cost Value by Shop') ?></div>
                     <div class="card-body"><div style="height:230px;"><canvas id="snapChartWarehouse"></canvas></div></div>
                 </div>
             </div>
@@ -202,7 +202,7 @@ foreach ($warehouses as $w) {
                                 <th>Code</th>
                                 <th>Product Name</th>
                                 <th>Category</th>
-                                <th>Warehouse</th>
+                                <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                 <th class="text-end">Qty in Stock</th>
                                 <th class="text-end">Cost Value</th>
                                 <th class="text-end pe-3">Selling Value</th>
@@ -257,9 +257,9 @@ foreach ($warehouses as $w) {
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                         <select id="m-warehouse" class="form-select" style="width:100%">
-                            <option value="">All Warehouses</option><?= $warehouse_options ?>
+                            <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option><?= $warehouse_options ?>
                         </select>
                     </div>
                     <div class="col-md-3 d-flex gap-2">
@@ -320,7 +320,7 @@ foreach ($warehouses as $w) {
                                 <th class="text-center">Direction</th>
                                 <th>Type</th>
                                 <th>Product</th>
-                                <th>Warehouse</th>
+                                <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                 <th class="text-end">Qty</th>
                                 <th class="text-end">Value</th>
                                 <th class="text-end">Balance After</th>
@@ -343,13 +343,13 @@ foreach ($warehouses as $w) {
             <div class="card-body p-4">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">From Warehouse</label>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('From Warehouse', 'From Shop') ?></label>
                         <select id="t-from" class="form-select" style="width:100%">
                             <option value="">Any Source</option><?= $warehouse_options ?>
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">To Warehouse</label>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('To Warehouse', 'To Shop') ?></label>
                         <select id="t-to" class="form-select" style="width:100%">
                             <option value="">Any Destination</option><?= $warehouse_options ?>
                         </select>
@@ -470,9 +470,9 @@ foreach ($warehouses as $w) {
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                         <select id="a-warehouse" class="form-select" style="width:100%">
-                            <option value="">All Warehouses</option><?= $warehouse_options ?>
+                            <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option><?= $warehouse_options ?>
                         </select>
                     </div>
                     <div class="col-md-3 d-flex gap-2">
@@ -535,7 +535,7 @@ foreach ($warehouses as $w) {
                                 <th class="text-center">Direction</th>
                                 <th class="text-end">Qty</th>
                                 <th class="text-end">Value</th>
-                                <th>Warehouse</th>
+                                <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                 <th>Reason</th>
                                 <th class="pe-3">By</th>
                             </tr>

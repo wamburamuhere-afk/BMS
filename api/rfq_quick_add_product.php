@@ -22,7 +22,7 @@ try {
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
 
     if (!$product_name) throw new Exception(t('Product name is required'));
-    if (!$warehouse_id) throw new Exception(t('Warehouse is required'));
+    if (!$warehouse_id) throw new Exception(wLabel('Warehouse is required', 'Shop is required'));
     if (!$unit) $unit = 'pcs';
 
     // Check if product already exists (case-insensitive)

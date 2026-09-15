@@ -245,9 +245,9 @@ $return_url = $is_from_po
 
                             <!-- Warehouse -->
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                                 <select class="form-select" name="warehouse_id" id="dn_warehouse_id" required>
-                                    <option value="">-- Select Warehouse --</option>
+                                    <option value=""><?= wLabel('-- Select Warehouse --', '-- Select Shop --') ?></option>
                                 </select>
                             </div>
 
@@ -323,7 +323,7 @@ $return_url = $is_from_po
                         </div>
                         <div id="dnItemsEmpty" class="text-center py-4 text-muted">
                             <i class="bi bi-box-seam fs-3 d-block mb-2 opacity-25"></i>
-                            <p class="small">Select a warehouse first, then click "Add Item"</p>
+                            <p class="small"><?= wLabel('Select a warehouse first, then click "Add Item"', 'Select a shop first, then click "Add Item"') ?></p>
                         </div>
                         <div class="p-3 border-top">
                             <button type="button" class="btn btn-primary btn-sm" onclick="addDNItem()">
@@ -399,7 +399,7 @@ $return_url = $is_from_po
 
                 <div class="card shadow-sm border-0" id="warehouseStockCard" style="display:none;">
                     <div class="card-header bg-light py-2">
-                        <h6 class="mb-0 fw-bold small"><i class="bi bi-building me-2"></i>Current Warehouse Stock</h6>
+                        <h6 class="mb-0 fw-bold small"><i class="bi bi-building me-2"></i><?= wLabel('Current Warehouse Stock', 'Current Shop Stock') ?></h6>
                     </div>
                     <div class="card-body p-2" id="warehouseStockList">
                         <div class="text-center text-muted py-3 small">Loading...</div>
@@ -413,6 +413,12 @@ $return_url = $is_from_po
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let PROJECT_ID = <?= $project_id ?>;
+const DNC_I18N = {
+    selectWarehouse: <?= json_encode(wLabel('-- Select Warehouse --', '-- Select Shop --')) ?>,
+    noStockInWarehouse: <?= json_encode(wLabel('No stock recorded in this warehouse yet.', 'No stock recorded in this shop yet.')) ?>,
+    selectWarehouseFirst: <?= json_encode(wLabel('Please select a warehouse first', 'Please select a shop first')) ?>,
+    selectAWarehouse: <?= json_encode(wLabel('Select a warehouse.', 'Select a shop.')) ?>,
+};
 let warehouseStock = [];
 let isInitialLoad = true;
 let attachmentRowSeq = 0;
@@ -477,8 +483,8 @@ function removeAttachmentRow(id) {
 function rebuildWarehouses() {
     const $sel = $('#dn_warehouse_id');
     const current = $sel.val() || PRESET_WH;
-    initS2($sel, '-- Select Warehouse --');
-    $sel.empty().append($('<option>').val('').text('-- Select Warehouse --'));
+    initS2($sel, DNC_I18N.selectWarehouse);
+    $sel.empty().append($('<option>').val('').text(DNC_I18N.selectWarehouse));
     // Shared Project → Warehouse rule (assets/js/warehouse-project-filter.js):
     // no project -> only unassigned warehouses; project -> only its warehouses.
     filterWarehousesForProject(ALL_WAREHOUSES, PROJECT_ID)
@@ -573,7 +579,7 @@ function loadWarehouseStock(callback) {
             document.getElementById('warehouseStockList').innerHTML = html;
         } else {
             warehouseStock = [];
-            document.getElementById('warehouseStockList').innerHTML = '<div class="text-center text-muted py-2 small">No stock recorded in this warehouse yet.</div>';
+            document.getElementById('warehouseStockList').innerHTML = '<div class="text-center text-muted py-2 small">' + DNC_I18N.noStockInWarehouse + '</div>';
         }
         if (typeof callback === 'function') callback();
     }).fail(function () {
@@ -592,7 +598,7 @@ function showProductDropdown(rowId, inputEl) {
         d.className = 'dn-product-dropdown';
         const r = inputEl.getBoundingClientRect(), sY = window.pageYOffset || document.documentElement.scrollTop;
         d.style.cssText = `position:absolute;top:${r.bottom+sY+2}px;left:${r.left}px;width:${Math.max(r.width,260)}px;background:#fff8f0;border:1px solid #f0ad4e;border-radius:6px;padding:10px 14px;font-size:.85rem;color:#664d03;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.1);`;
-        d.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Please select a warehouse first';
+        d.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>' + DNC_I18N.selectWarehouseFirst;
         document.body.appendChild(d);
         setTimeout(closeAllDropdowns, 2500);
         return;
@@ -777,7 +783,7 @@ function submitDN(status) {
 
     if (!dnNumber)  { Swal.fire({ icon: 'warning', title: "DN Number Required", text: "Enter the supplier's DN number." }); return; }
     if (!partyId)   { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select the ' + (partyType === 'subcontractor' ? 'sub-contractor' : 'supplier') + '.' }); return; }
-    if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select a warehouse.' }); return; }
+    if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: DNC_I18N.selectAWarehouse }); return; }
     if (!date)      { Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter the DN date.' }); return; }
 
     const items = [];

@@ -29,7 +29,7 @@ $seats        = max(1, (int)($_POST['seats'] ?? 2));
 
 if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
 if ($table_number === '') {
@@ -39,7 +39,7 @@ if ($table_number === '') {
 $floorChk = $pdo->prepare("SELECT 1 FROM restaurant_floors WHERE floor_id = ? AND warehouse_id = ?");
 $floorChk->execute([$floor_id, $warehouse_id]);
 if (!$floorChk->fetchColumn()) {
-    echo json_encode(['success' => false, 'message' => t('The selected floor does not belong to this warehouse.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('The selected floor does not belong to this warehouse.', 'The selected floor does not belong to this shop.')]);
     exit;
 }
 

@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $uStmt->execute([$user_id]);
         $uname = $uStmt->fetchColumn() ?: "User #$user_id";
 
-        $warehouseSummary = $grant_all_warehouses ? t('ALL warehouses') : (count($warehouse_ids) . ' ' . t('warehouse(s)'));
+        $warehouseSummary = $grant_all_warehouses ? wLabel('ALL warehouses', 'ALL shops') : (count($warehouse_ids) . ' ' . wLabel('warehouse(s)', 'shop(s)'));
         if ($projectsEnabled) {
             $projectCountForResponse = count($project_ids);
             $message = sprintf(t('Saved %d project(s) and %s for %s.'), $projectCountForResponse, $warehouseSummary, $uname);
@@ -249,18 +249,21 @@ require_once 'header.php';
     <!-- Page Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="bi bi-diagram-3"></i> <?= $projectsEnabled ? t('Project & Warehouse Access') : t('Warehouse Access') ?></h2>
+            <h2><i class="bi bi-diagram-3"></i> <?= $projectsEnabled ? wLabel('Project & Warehouse Access', 'Project & Shop Access') : wLabel('Warehouse Access', 'Shop Access') ?></h2>
             <p class="text-muted">
                 <?= $projectsEnabled
-                    ? t('Assign users to projects and warehouses. Each user only sees data that belongs to their assigned projects/warehouses.')
-                    : t('Assign users to warehouses.') ?>
+                    ? wLabel('Assign users to projects and warehouses. Each user only sees data that belongs to their assigned projects/warehouses.', 'Assign users to projects and shops. Each user only sees data that belongs to their assigned projects/shops.')
+                    : wLabel('Assign users to warehouses.', 'Assign users to shops.') ?>
             </p>
             <?php if (!$projectsEnabled): ?>
             <div class="alert alert-info d-flex align-items-start gap-2 mb-0">
                 <i class="bi bi-info-circle fs-5"></i>
                 <div>
                     <strong><?= t('Projects module is off for this company.') ?></strong>
-                    <?= t("Project-scope assignment is hidden below — Warehouse Access is unaffected and works normally. Any project assignments made before Projects was switched off are kept untouched and will reappear here the moment it's switched back on.") ?>
+                    <?= wLabel(
+                        "Project-scope assignment is hidden below — Warehouse Access is unaffected and works normally. Any project assignments made before Projects was switched off are kept untouched and will reappear here the moment it's switched back on.",
+                        "Project-scope assignment is hidden below — Shop Access is unaffected and works normally. Any project assignments made before Projects was switched off are kept untouched and will reappear here the moment it's switched back on."
+                    ) ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -285,8 +288,8 @@ require_once 'header.php';
             ['total_users',       t('Active Users'),        'bi-people'],
             ['total_projects',    t('Projects'),            'bi-briefcase'],
             ['total_assignments', t('Scope Assignments'),   'bi-diagram-3'],
-            ['total_warehouses',       t('Warehouses'),         'bi-building'],
-            ['total_warehouse_grants', t('Warehouse Grants'),   'bi-key'],
+            ['total_warehouses',       wLabel('Warehouses', 'Shops'),         'bi-building'],
+            ['total_warehouse_grants', wLabel('Warehouse Grants', 'Shop Grants'),   'bi-key'],
         ] as [$key, $label, $icon]): ?>
         <div class="col-6 col-md-3 mb-3">
             <div class="card custom-stat-card h-100 shadow-sm border-0">
@@ -362,12 +365,12 @@ require_once 'header.php';
                     <div id="projectPanel" style="max-height:460px;overflow-y:auto;">
                         <div class="p-4 text-center text-muted">
                             <i class="bi bi-diagram-3 fs-4 d-block mb-2"></i>
-                            <?= t('Select a user to manage their project and warehouse access') ?>
+                            <?= wLabel('Select a user to manage their project and warehouse access', 'Select a user to manage their project and shop access') ?>
                         </div>
                     </div>
                     <!-- Save bar — hidden until a user is selected -->
                     <div id="saveBar" class="d-none border-top p-3 d-flex justify-content-between align-items-center bg-white">
-                        <small class="text-muted" id="saveHint"><?= t('Tick the projects and warehouses this user may access.') ?></small>
+                        <small class="text-muted" id="saveHint"><?= wLabel('Tick the projects and warehouses this user may access.', 'Tick the projects and shops this user may access.') ?></small>
                         <button type="button" class="btn btn-primary px-4" id="btnSave">
                             <i class="bi bi-check-circle me-1"></i> <?= t('Save Assignments') ?>
                         </button>
@@ -400,32 +403,32 @@ require_once 'header.php';
         none: <?= json_encode(t('None')) ?>,
         loading: <?= json_encode(t('Loading...')) ?>,
         isSystemAdminNotice: <?= json_encode(t('is a system administrator and has full access to')) ?>,
-        allProjectsAndWarehouses: <?= json_encode(t('all projects and all warehouses')) ?>,
+        allProjectsAndWarehouses: <?= json_encode(wLabel('all projects and all warehouses', 'all projects and all shops')) ?>,
         automaticallyIgnored: <?= json_encode(t('automatically. Assignments are ignored for admin accounts.')) ?>,
         failedToLoadAssignments: <?= json_encode(t('Failed to load assignments.')) ?>,
         projectsModuleOff: <?= json_encode(t('Projects module is off for this company.')) ?>,
         noProjectsYet: <?= json_encode(t('No projects in the system yet.')) ?>,
-        warehouseAccess: <?= json_encode(t('Warehouse Access')) ?>,
-        grantAllWarehouses: <?= json_encode(t('Grant access to ALL warehouses')) ?>,
-        grantAllOverride: <?= json_encode(t('Overrides the list(s) below — use for roles that need to see every warehouse (e.g. Managing Director).')) ?>,
-        assignProjectWarehouses: <?= json_encode(t("Assign Project & its Warehouses")) ?>,
-        tickProjectToReveal: <?= json_encode(t('Tick a project above to reveal its own warehouses here.')) ?>,
-        assignExternalWarehouse: <?= json_encode(t('Assign External Warehouse')) ?>,
-        warehousesNotTiedToProject: <?= json_encode(t('Warehouses not tied to any project.')) ?>,
-        assignWarehouse: <?= json_encode(t('Assign Warehouse')) ?>,
-        tickWhichWarehouses: <?= json_encode(t('Tick which warehouses this user may access.')) ?>,
+        warehouseAccess: <?= json_encode(wLabel('Warehouse Access', 'Shop Access')) ?>,
+        grantAllWarehouses: <?= json_encode(wLabel('Grant access to ALL warehouses', 'Grant access to ALL shops')) ?>,
+        grantAllOverride: <?= json_encode(wLabel('Overrides the list(s) below — use for roles that need to see every warehouse (e.g. Managing Director).', 'Overrides the list(s) below — use for roles that need to see every shop (e.g. Managing Director).')) ?>,
+        assignProjectWarehouses: <?= json_encode(wLabel("Assign Project & its Warehouses", "Assign Project & its Shops")) ?>,
+        tickProjectToReveal: <?= json_encode(wLabel('Tick a project above to reveal its own warehouses here.', 'Tick a project above to reveal its own shops here.')) ?>,
+        assignExternalWarehouse: <?= json_encode(wLabel('Assign External Warehouse', 'Assign External Shop')) ?>,
+        warehousesNotTiedToProject: <?= json_encode(wLabel('Warehouses not tied to any project.', 'Shops not tied to any project.')) ?>,
+        assignWarehouse: <?= json_encode(wLabel('Assign Warehouse', 'Assign Shop')) ?>,
+        tickWhichWarehouses: <?= json_encode(wLabel('Tick which warehouses this user may access.', 'Tick which shops this user may access.')) ?>,
         noProjectTickedYet: <?= json_encode(t('No project ticked yet.')) ?>,
-        tickedProjectsNoWarehouses: <?= json_encode(t('The ticked project(s) have no warehouses of their own.')) ?>,
-        noExternalWarehouses: <?= json_encode(t('No external (unassigned-to-project) warehouses exist.')) ?>,
-        noWarehousesYet: <?= json_encode(t('No warehouses exist yet.')) ?>,
-        allWarehouses: <?= json_encode(t('ALL warehouses')) ?>,
+        tickedProjectsNoWarehouses: <?= json_encode(wLabel('The ticked project(s) have no warehouses of their own.', 'The ticked project(s) have no shops of their own.')) ?>,
+        noExternalWarehouses: <?= json_encode(wLabel('No external (unassigned-to-project) warehouses exist.', 'No external (unassigned-to-project) shops exist.')) ?>,
+        noWarehousesYet: <?= json_encode(wLabel('No warehouses exist yet.', 'No shops exist yet.')) ?>,
+        allWarehouses: <?= json_encode(wLabel('ALL warehouses', 'ALL shops')) ?>,
         allShort: <?= json_encode(t('ALL')) ?>,
-        warehousesCount: <?= json_encode(t('warehouse(s)')) ?>,
+        warehousesCount: <?= json_encode(wLabel('warehouse(s)', 'shop(s)')) ?>,
         selected: <?= json_encode(t('selected.')) ?>,
         of: <?= json_encode(t('of')) ?>,
         projectsSelected: <?= json_encode(t("project(s) selected")) ?>,
         accessAssignments: <?= json_encode(t('Access Assignments')) ?>,
-        selectUserToManage: <?= json_encode(t('Select a user to manage their project and warehouse access')) ?>,
+        selectUserToManage: <?= json_encode(wLabel('Select a user to manage their project and warehouse access', 'Select a user to manage their project and shop access')) ?>,
         saving: <?= json_encode(t('Saving…')) ?>,
         saved: <?= json_encode(t('Saved!')) ?>,
         error: <?= json_encode(t('Error')) ?>,

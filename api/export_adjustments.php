@@ -30,7 +30,7 @@ try {
     $output = fopen('php://output', 'w');
 
     // CSV Headers
-    fputcsv($output, ['Date', 'Reference #', 'SKU', 'Product Name', 'Warehouse', 'Location', 'Type', 'Quantity', 'Unit', 'Unit Cost', 'Total Value', 'Reason', 'Adjusted By', 'Notes']);
+    fputcsv($output, ['Date', 'Reference #', 'SKU', 'Product Name', wLabel('Warehouse', 'Shop'), 'Location', 'Type', 'Quantity', 'Unit', 'Unit Cost', 'Total Value', 'Reason', 'Adjusted By', 'Notes']);
 
     // Build query
     $query = "

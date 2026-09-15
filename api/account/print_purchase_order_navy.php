@@ -242,7 +242,7 @@ $accent = getSetting('print_template_color_po_navy', '#0f1f3d');
             <?php if (!empty($order['supplier_quote_ref'])): ?><p><strong><?= t('Quote Ref:') ?></strong> <?= htmlspecialchars($order['supplier_quote_ref']) ?></p><?php endif; ?>
             <?php if (!empty($order['project_contract_no'])): ?><p><strong><?= t('Contract No:') ?></strong> <?= htmlspecialchars($order['project_contract_no']) ?></p><?php endif; ?>
             <?php if (!empty($order['project_name'])): ?><p><strong><?= t('Project:') ?></strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
-            <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
             <p><strong><?= t('Created By:') ?></strong> <?= htmlspecialchars($order['username'] ?? t('N/A')) ?></p>
         </div>
     </div>

@@ -66,7 +66,7 @@ try {
         throw new Exception('Missing required fields (Issue Date or Items)');
     }
     if (!$warehouse_id) {
-        throw new Exception('Warehouse is required');
+        throw new Exception(isShopLabel() ? 'Shop is required' : 'Warehouse is required');
     }
 
     $pdo->beginTransaction();

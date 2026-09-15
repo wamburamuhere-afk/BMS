@@ -273,6 +273,11 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                                     <i class="bi bi-arrow-repeat me-2"></i><?= t('Restock Product') ?>
                                 </a></li>
                                 <?php endif; ?>
+                                <?php if (canView('warehouses') && isShopLabel(true)): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>">
+                                    <i class="bi bi-shop me-2"></i><?= wLabel('Warehouses', 'Shop', true) ?>
+                                </a></li>
+                                <?php endif; ?>
                             </ul>
                             <?php endif; ?>
                         </div>

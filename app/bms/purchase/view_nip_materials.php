@@ -141,7 +141,7 @@ $sc = $status_map[$row['status']] ?? 'status-badge-draft';
         </div>
         <div class="col-md-3">
             <div class="card border shadow-sm p-3 h-100 text-center">
-                <div class="text-muted small text-uppercase fw-bold mb-1" style="font-size: 0.7rem;">Warehouse</div>
+                <div class="text-muted small text-uppercase fw-bold mb-1" style="font-size: 0.7rem;"><?= wLabel('Warehouse', 'Shop') ?></div>
                 <div class="fw-bold fs-5 text-dark"><?= htmlspecialchars($row['warehouse_name']) ?></div>
             </div>
         </div>
@@ -354,7 +354,7 @@ async function exportNIPDetailPDF() {
 
     // Stat Info
     const stats = [
-        ["Project", "Warehouse", "Selling Price", "Tax Rate"],
+        ["Project", "<?= wLabel('Warehouse', 'Shop') ?>", "Selling Price", "Tax Rate"],
         ["<?= addslashes($row['project_name']) ?>", "<?= addslashes($row['warehouse_name']) ?>", "<?= format_currency($row['selling_price']) ?>", "<?= $row['tax_name'] ?> (<?= $row['tax_rate'] ?>%)"]
     ];
 

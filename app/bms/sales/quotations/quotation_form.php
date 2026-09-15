@@ -257,9 +257,9 @@ includeHeader();
                     </div>
 
                     <div class="col-md-3 mb-3" id="warehouse_container">
-                        <label for="warehouse_id" class="form-label">Warehouse / Delivery Point <span class="text-danger">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse / Delivery Point', 'Shop / Delivery Point') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?= renderWarehouseOptions($warehouses, $quotation['warehouse_id'] ?? 0) ?>
                         </select>
                     </div>
@@ -723,7 +723,7 @@ function toggleProductInputs(warehouseId) {
     const isService = $('#is_service_order').is(':checked');
     const isEnabled = (warehouseId && warehouseId !== "") || isService;
     $('.item-name').prop('disabled', !isEnabled);
-    $('.item-name').attr('placeholder', isEnabled ? 'Type to search product/service...' : 'Select warehouse first...');
+    $('.item-name').attr('placeholder', isEnabled ? 'Type to search product/service...' : <?= json_encode(wLabel('Select warehouse first...', 'Select shop first...')) ?>);
 }
 
 let searchTimer;
@@ -732,7 +732,7 @@ function openProductSearch(index, term) {
     const warehouseId = $('#warehouse_id').val();
 
     if (!warehouseId && !isService) {
-        Swal.fire({ icon: 'warning', title: 'Select Warehouse', text: 'Please select a warehouse / delivery point before searching for products.' });
+        Swal.fire({ icon: 'warning', title: <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?>, text: <?= json_encode(wLabel('Please select a warehouse / delivery point before searching for products.', 'Please select a shop / delivery point before searching for products.')) ?> });
         return;
     }
 
