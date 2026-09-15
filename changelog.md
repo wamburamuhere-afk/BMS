@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/core-dropdown-service-label) - Core navbar dropdown: "Non-Inventory Products" -> "Service"/"Huduma"
+
+**Request:** in the "Core" navbar dropdown only, rename "Non-Inventory Products" to "Service" (English) / "Huduma" (Swahili) — explicitly scoped to that one dropdown, not a global rename.
+
+**Fix:** `header.php` line 798 (the `coreDropdown` menu) changed from `t('Non-Inventory Products')` to `t('Service')`, reusing the `'Service' => 'Huduma'` key already added during the earlier Warehouse->Shop/Duka terminology work (`services.php` itself was already renamed then). The separate `inventoryDropdown` menu's identical-looking item (line 968) was deliberately left untouched — still `t('Non-Inventory Products')` — since the user asked for only the Core dropdown.
+
+**Verified:** `php -l` clean; `tests/test_pos_i18n_coverage_cli.php` 135/135 (no regression — no new key needed, `'Service'`/`'Non-Inventory Products'` were both already translated); rendered `header.php` directly in both languages (`$_SESSION['user_lang']`) — Core dropdown shows "Service"/"Huduma", Inventory dropdown still shows "Non-Inventory Products"/"Bidhaa Zisizo za Ghala".
+
 ## 2026-09-15 (feat/expenses-simple-pos) - Simple POS: Expenses CRUD simplified (Phase 1 of Products/Services/Customers rollout)
 
 **Request:** for a Simple POS tenant, the Add Expense form (screenshot: "Expense Type" field, "Paid to" offering Supplier/Staff/Sub Contractor) is too accounting-heavy for a small shop owner with no accountant. Asked to: drop Expense Type entirely; drop Sub Contractor from Paid To (Supplier + Staff only, Supplier default); add a "More" manual-payee option (free-text role + name, e.g. "Bodaboda") even when Staff/Supplier exist, and show that manual entry directly when neither has any active record; never show an account/"Paid From" picker — the system should choose silently, while the record stays viewable later; drop "Types & Categories" from the Expenses screens; add missing language translation coverage; and do all of this without disabling double-entry — the ledger must keep posting for real, just without asking the user to pick accounts. Explicitly scoped to Expenses first; Products/Services/Customers CRUD to follow the same treatment one at a time.
