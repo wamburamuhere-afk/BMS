@@ -373,14 +373,14 @@ function generate_grn_number() {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted" id="grnWarehouseHint"><?= t('Select project to filter warehouses.') ?></small>
+                        <small class="text-muted" id="grnWarehouseHint"><?= wLabel('Select project to filter warehouses.', 'Select project to filter shops.') ?></small>
                     </div>
                     <?php endif; ?>
 
                     <div class="col-md-4 mb-3">
-                        <label for="warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
-                            <option value=""><?= t('Select Warehouse') ?></option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"
                                     data-project="<?= $wh['project_id'] ?>"
@@ -429,7 +429,7 @@ function generate_grn_number() {
                         </div>
                         <input type="hidden" id="delivery_id" name="delivery_id" value="">
                         <input type="hidden" id="delivery_note" name="delivery_note" value="">
-                        <small class="text-muted"><?= t('Select supplier + warehouse first, then choose a DN') ?></small>
+                        <small class="text-muted"><?= wLabel('Select supplier + warehouse first, then choose a DN', 'Select supplier + shop first, then choose a DN') ?></small>
                     </div>
                 </div>
                 
@@ -685,19 +685,19 @@ const GRN_I18N = {
     selectSupplier:            <?= json_encode(t('Select Supplier')) ?>,
     noProject:                 <?= json_encode(t('No Project')) ?>,
     selectPurchaseOrder:       <?= json_encode(t('Select Purchase Order')) ?>,
-    selectWarehouse:           <?= json_encode(t('Select Warehouse')) ?>,
+    selectWarehouse:           <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?>,
     selectRecordedDn:          <?= json_encode(t('— Select recorded DN —')) ?>,
     noProductsFound:           <?= json_encode(t('No products found')) ?>,
     noSku:                     <?= json_encode(t('No SKU')) ?>,
     na:                        <?= json_encode(t('N/A')) ?>,
-    selectWarehouseFirst:      <?= json_encode(t('Please select a warehouse first')) ?>,
+    selectWarehouseFirst:      <?= json_encode(wLabel('Please select a warehouse first', 'Please select a shop first')) ?>,
     exceedsRemainingQty:       <?= json_encode(t('Exceeds remaining quantity')) ?>,
     ord:                       <?= json_encode(t('Ord:')) ?>,
     rcvd:                      <?= json_encode(t('Rcvd:')) ?>,
     left:                      <?= json_encode(t('Left:')) ?>,
-    showingWarehousesNotLinked:<?= json_encode(t('Showing warehouses not linked to any project.')) ?>,
-    noWarehousesForProject:    <?= json_encode(t('No warehouses found for this project.')) ?>,
-    showingNWarehouses:        <?= json_encode(t('Showing {0} warehouse(s) for selected project.')) ?>,
+    showingWarehousesNotLinked:<?= json_encode(wLabel('Showing warehouses not linked to any project.', 'Showing shops not linked to any project.')) ?>,
+    noWarehousesForProject:    <?= json_encode(wLabel('No warehouses found for this project.', 'No shops found for this project.')) ?>,
+    showingNWarehouses:        <?= json_encode(wLabel('Showing {0} warehouse(s) for selected project.', 'Showing {0} shop(s) for selected project.')) ?>,
     productFound:              <?= json_encode(t('Product Found:')) ?>,
     productNotFound:           <?= json_encode(t('Product Not Found')) ?>,
     barcodeNotFoundTpl:        <?= json_encode(t('Barcode "{0}" not found in database.')) ?>,
