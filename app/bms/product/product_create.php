@@ -41,17 +41,6 @@ try {
     $warehouses = [];
 }
 
-// Simple POS (products_simple_pos_plan.md §3-4): a much shorter, single-
-// section form for a small shop with no accountant. A superadmin can
-// re-enable the full form per tenant via "Advanced Product"
-// (advancedProductEnabled(), core/pos_nav.php) even while Simple Mode is on.
-$simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
-// The Shop picker only appears when there's a genuine choice to make — one
-// shop in scope is auto-assigned silently, same pattern already used for
-// Expenses' Paid From/Account fields.
-$showShopPicker = count($warehouses) > 1;
-$onlyWarehouseId = (count($warehouses) === 1) ? (int)$warehouses[0]['warehouse_id'] : 0;
-
 // Get measurement units
 try {
     $units = $pdo->query("SELECT * FROM measurement_units WHERE status = 'active' ORDER BY unit_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -123,7 +112,6 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
 
     <!-- Main Navigation Tabs -->
     <div class="card border-0 shadow-sm overflow-hidden mb-4">
-        <?php if (!$simpleProductForm): ?>
         <div class="card-header bg-white p-0 border-bottom">
             <ul class="nav nav-pills custom-tabs nav-justified" id="productTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -148,134 +136,13 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                 </li>
             </ul>
         </div>
-        <?php endif; ?>
-
+        
         <div class="card-body p-4 pt-5">
             <div id="form-message" class="mb-4"></div>
-
+            
             <form id="productForm" enctype="multipart/form-data">
-                <?php if ($simpleProductForm): ?>
-                <!-- Simple POS — single-section Add Product form (products_simple_pos_plan.md §4) -->
-                <div class="row g-4">
-                    <div class="col-md-8">
-                        <div class="row g-3">
-                            <div class="col-md-12">
-                                <label for="product_name" class="form-label fw-bold"><?= t('Product Name') ?> <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control form-control-lg bg-light border-0 py-3" id="product_name" name="product_name"
-                                       placeholder="<?= t('e.g. Royco Soup Cubes') ?>" required>
-                            </div>
-
-                            <div class="col-md-12 mt-4">
-                                <label for="category_id" class="form-label fw-bold"><?= t('Category') ?></label>
-                                <div class="input-group">
-                                    <select class="form-select bg-light border-0 py-2" id="category_id" name="category_id">
-                                        <option value=""><?= t('Select Category') ?></option>
-                                        <?= build_category_tree($categories) ?>
-                                    </select>
-                                    <button type="button" class="btn btn-outline-primary border-0 bg-light-primary" onclick="showQuickCategoryModal()">
-                                        <i class="bi bi-plus-lg"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6 mt-4">
-                                <label for="cost_price" class="form-label fw-bold"><?= t('Buying Price') ?> <span class="text-danger">*</span></label>
-                                <div class="input-group input-group-lg">
-                                    <span class="input-group-text bg-white border-0">TZS</span>
-                                    <input type="number" class="form-control bg-light border-0" id="cost_price" name="cost_price"
-                                           min="0" step="0.01" value="0.00" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mt-4">
-                                <label for="selling_price" class="form-label fw-bold"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
-                                <div class="input-group input-group-lg border border-primary rounded-3 overflow-hidden shadow-sm">
-                                    <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
-                                    <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
-                                           min="0" step="0.01" value="0.00" required onkeyup="calculateMinSellingPrice()">
-                                </div>
-                                <input type="hidden" id="min_selling_price" name="min_selling_price" value="0.00">
-                            </div>
-
-                            <div class="col-md-6 mt-4">
-                                <label for="unit" class="form-label fw-bold"><?= t('Unit of Measure') ?> <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control bg-light border-0 py-2" name="unit" id="unit" list="unit_list"
-                                           placeholder="e.g. pcs, kg, Box" required value="pcs" onchange="updateUnitLabels()">
-                                    <datalist id="unit_list">
-                                        <?php foreach ($units as $u): ?>
-                                            <option value="<?= htmlspecialchars($u['unit_code']) ?>"><?= htmlspecialchars($u['unit_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </datalist>
-                                    <button class="btn btn-outline-primary border-0 bg-light" type="button" onclick="showQuickAddUnit()" title="Add to Database">
-                                        <i class="bi bi-plus-lg"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <?php if ($showShopPicker): ?>
-                            <div class="col-md-6 mt-4">
-                                <label for="simple_shop_id" class="form-label fw-bold"><?= wLabel('Warehouse', 'Shop') ?></label>
-                                <select class="form-select bg-light border-0 py-2" id="simple_shop_id">
-                                    <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
-                                    <?php foreach ($warehouses as $warehouse): ?>
-                                        <option value="<?= (int)$warehouse['warehouse_id'] ?>"><?= htmlspecialchars($warehouse['warehouse_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <?php else: ?>
-                            <input type="hidden" id="simple_shop_id" value="<?= $onlyWarehouseId ?>">
-                            <?php endif; ?>
-
-                            <div class="col-md-6 mt-4">
-                                <label for="simple_opening_stock" class="form-label fw-bold"><?= t('Opening Stock') ?></label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control bg-light border-0" id="simple_opening_stock" min="0" step="0.001" value="0">
-                                    <span class="input-group-text bg-light unit-label">pcs</span>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6 mt-4">
-                                <label for="manufacturing_date" class="form-label fw-bold small text-muted"><?= t('Manufacturing Date') ?></label>
-                                <input type="date" class="form-control bg-light border-0 py-2" id="manufacturing_date" name="manufacturing_date">
-                            </div>
-                            <div class="col-md-6 mt-4">
-                                <label for="expiry_date" class="form-label fw-bold small text-muted"><?= t('Expiry Date') ?></label>
-                                <input type="date" class="form-control bg-light border-0 py-2" id="expiry_date" name="expiry_date">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4 border-start ps-xxl-5">
-                        <div class="mb-4">
-                            <label class="form-label fw-bold"><?= t('Product Image') ?></label>
-                            <div id="imagePreview" class="border rounded-4 p-3 mb-3 d-flex align-items-center justify-content-center bg-light shadow-inner" style="height: 220px;">
-                                <div class="text-center opacity-50">
-                                    <i class="bi bi-image-fill display-3"></i>
-                                    <p class="small mt-2"><?= t('Drop here or Click to Upload') ?></p>
-                                </div>
-                            </div>
-                            <input type="file" class="form-control visually-hidden" id="product_image" name="product_image"
-                                   accept="image/*" onchange="previewImage(event)">
-                            <button type="button" class="btn btn-light border w-100 rounded-pill py-2" onclick="document.getElementById('product_image').click()">
-                                <i class="bi bi-upload me-1"></i> <?= t('Choose Image') ?>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Auto-generated, kept off-screen per the request to hide SKU/Barcode/Status in Simple POS -->
-                <input type="hidden" name="sku" value="<?= generate_sku() ?>">
-                <input type="hidden" name="barcode" value="<?= generate_barcode() ?>">
-                <input type="hidden" name="status" value="active">
-
-                <div class="d-flex justify-content-end mt-5 pt-4 border-top">
-                    <button type="submit" class="btn btn-success px-5 py-2 rounded-pill shadow-sm fw-bold">
-                        <i class="bi bi-check-circle-fill me-1"></i> <?= t('Save Product') ?>
-                    </button>
-                </div>
-                <?php else: ?>
                 <div class="tab-content" id="productTabContent">
-
+                    
                     <!-- Tab 1: General Information -->
                     <div class="tab-pane fade show active" id="general" role="tabpanel">
                         <div class="row g-4">
@@ -695,8 +562,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                     </div>
 
                 </div>
-                <?php endif; ?>
-
+                
                 <input type="hidden" name="created_by" value="<?= $user_id ?>">
             </form>
         </div>
