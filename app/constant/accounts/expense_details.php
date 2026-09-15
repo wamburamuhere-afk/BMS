@@ -55,7 +55,7 @@ $stmt->execute([$expense_id]);
 $expense = $stmt->fetch();
 
 if (!$expense) {
-    echo "<div class='container mt-5'><div class='alert alert-danger'>Expense not found. <a href='" . getUrl('expenses') . "'>Return to list</a></div></div>";
+    echo "<div class='container mt-5'><div class='alert alert-danger'>" . t('Expense not found.') . " <a href='" . getUrl('expenses') . "'>" . t('Return to list') . "</a></div></div>";
     includeFooter();
     exit;
 }
@@ -104,27 +104,27 @@ global $company_name, $company_logo;
         <div class="col">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="<?= getUrl('expenses') ?>">Expenses</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Expense Details</li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('expenses') ?>"><?= t('Expenses') ?></a></li>
+                    <li class="breadcrumb-item active" aria-current="page"><?= t('Expense Details') ?></li>
                 </ol>
             </nav>
-            <h2 class="fw-bold text-dark">Expense Voucher #<?php echo str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT); ?></h2>
+            <h2 class="fw-bold text-dark"><?= t('Expense Voucher') ?> #<?php echo str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT); ?></h2>
         </div>
         <div class="col-auto d-flex gap-2">
-            <?php 
+            <?php
             $enable_projects = projectsModuleActive() ? 1 : 0;
 
             if ($enable_projects && !empty($expense['project_id'])): ?>
                 <a href="<?= getUrl('project_view') ?>?id=<?= $expense['project_id'] ?>" class="btn btn-outline-primary">
-                    <i class="bi bi-kanban"></i> Back to Project
+                    <i class="bi bi-kanban"></i> <?= t('Back to Project') ?>
                 </a>
             <?php endif; ?>
             <a href="<?= getUrl('expenses') ?>" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back to List
+                <i class="bi bi-arrow-left"></i> <?= t('Back to List') ?>
             </a>
             <button onclick="printVoucher()" class="btn btn-light border shadow-sm">
-                <i class="bi bi-printer text-primary me-1"></i> Print Voucher
+                <i class="bi bi-printer text-primary me-1"></i> <?= t('Print Voucher') ?>
             </button>
         </div>
     </div>
@@ -134,39 +134,39 @@ global $company_name, $company_logo;
             <div class="card shadow-sm mb-4 border-0 overflow-hidden">
                 <div class="card-header bg-primary text-white py-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i>Voucher Details</h5>
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i><?= t('Voucher Details') ?></h5>
                         <span class="badge bg-white text-<?php echo $statusClass; ?> px-3 py-2 fw-bold text-uppercase">
-                            <i class="bi bi-dot me-1"></i> <?php echo $expense['status']; ?>
+                            <i class="bi bi-dot me-1"></i> <?php echo t(ucfirst($expense['status'])); ?>
                         </span>
                     </div>
                 </div>
                 <div class="card-body p-0">
                     <!-- Description Header -->
                     <div class="p-4 bg-light-subtle border-bottom">
-                        <label class="text-muted small text-uppercase fw-bold mb-1">Description / Subject</label>
+                        <label class="text-muted small text-uppercase fw-bold mb-1"><?= t('Description / Subject') ?></label>
                         <h4 class="fw-bold text-dark mb-0"><?php echo htmlspecialchars($expense['description']); ?></h4>
                     </div>
-                    
+
                     <div class="row g-0">
                         <!-- Left Side: Transaction Data -->
                         <div class="col-md-6 border-end p-4">
-                            <h6 class="fw-bold text-primary text-uppercase mb-3 small letter-spacing-1"><i class="bi bi-cash-stack me-2"></i>SUBJECT INFO</h6>
-                            
+                            <h6 class="fw-bold text-primary text-uppercase mb-3 small letter-spacing-1"><i class="bi bi-cash-stack me-2"></i><?= t('SUBJECT INFO') ?></h6>
+
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Expense Date</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Expense Date') ?></label>
                                 <span class="fw-semibold text-dark"><?php echo date('D, M d, Y', strtotime($expense['expense_date'])); ?></span>
                             </div>
 
                             <?php if (!empty($expense['expense_type'])): ?>
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Expense Type</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Expense Type') ?></label>
                                 <span class="badge bg-secondary-soft text-secondary border border-secondary text-uppercase" style="font-size: 0.7rem;"><?php echo htmlspecialchars($expense['expense_type']); ?></span>
                             </div>
                             <?php endif; ?>
 
                             <?php if (!empty($expense['categories'])): ?>
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Expense Categories</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Expense Categories') ?></label>
                                 <div class="d-flex flex-wrap gap-1">
                                     <?php foreach ($expense['categories'] as $cat): ?>
                                         <span class="badge bg-info-soft text-info border border-info" style="font-size: 0.7rem;">
@@ -179,25 +179,25 @@ global $company_name, $company_logo;
 
                             <?php if ($enable_projects && !empty($expense['project_name'])): ?>
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Linked Project</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Linked Project') ?></label>
                                 <span class="badge bg-primary-soft text-primary border border-primary"><?php echo htmlspecialchars($expense['project_name']); ?></span>
                             </div>
                             <?php endif; ?>
 
                             <div class="mb-0">
-                                <label class="text-muted small d-block mb-1">Total Amount</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Total Amount') ?></label>
                                 <h3 class="text-primary fw-bold mb-0"><?php echo number_format($expense['amount'], 2); ?> <small class="fs-6 font-monospace">TSh</small></h3>
                             </div>
                         </div>
 
                         <!-- Right Side: Payment Data -->
                         <div class="col-md-6 p-4 bg-white">
-                            <h6 class="fw-bold text-info text-uppercase mb-3 small letter-spacing-1"><i class="bi bi-credit-card me-2"></i>PAYMENT INFO</h6>
+                            <h6 class="fw-bold text-info text-uppercase mb-3 small letter-spacing-1"><i class="bi bi-credit-card me-2"></i><?= t('PAYMENT INFO') ?></h6>
 
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Vendor / Payee</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Vendor / Payee') ?></label>
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? 'N/A'); ?></span>
+                                    <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? t('N/A')); ?></span>
                                     <?php if (!empty($expense['paid_to_type'])): ?>
                                         <span class="badge bg-info-soft text-info border border-info small" style="font-size: 0.65rem;"><?php echo strtoupper(str_replace('_', ' ', $expense['paid_to_type'])); ?></span>
                                     <?php endif; ?>
@@ -208,14 +208,14 @@ global $company_name, $company_logo;
 
                             <?php if ($expense['status'] === 'paid' && !empty($expense['bank_account_name'])): ?>
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Paid From</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Paid From') ?></label>
                                 <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['bank_account_name']); ?></span>
                             </div>
                             <?php endif; ?>
 
                             <?php if (!empty($expense['reference_number'])): ?>
                             <div class="mb-0">
-                                <label class="text-muted small d-block mb-1">Reference No.</label>
+                                <label class="text-muted small d-block mb-1"><?= t('Reference No.') ?></label>
                                 <span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?php echo htmlspecialchars($expense['reference_number']); ?></span>
                             </div>
                             <?php endif; ?>
@@ -230,7 +230,7 @@ global $company_name, $company_logo;
             <?php if (!empty($expense['notes'])): ?>
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 fw-bold text-dark">Notes & Remarks</h5>
+                    <h5 class="mb-0 fw-bold text-dark"><?= t('Notes & Remarks') ?></h5>
                 </div>
                 <div class="card-body">
                     <div class="p-3 bg-light rounded border-start border-4 border-primary">
@@ -245,15 +245,15 @@ global $company_name, $company_logo;
                 <div class="card-header bg-white border-bottom py-3 d-flex align-items-center">
                     <h6 class="mb-0 fw-bold d-flex align-items-center">
                         <i class="bi bi-clock-history me-2 text-primary"></i>
-                        Action History
+                        <?= t('Action History') ?>
                     </h6>
                 </div>
                 <div class="card-body">
                     <div class="timeline-simple">
                         <div class="d-flex justify-content-between mb-3 border-start border-3 border-success ps-3">
                             <div>
-                                <div class="fw-bold text-dark">Submission</div>
-                                <div class="small text-muted">Prepared by <?php echo htmlspecialchars($expense['created_by_name'] ?? 'System'); ?></div>
+                                <div class="fw-bold text-dark"><?= t('Submission') ?></div>
+                                <div class="small text-muted"><?= t('Prepared by') ?> <?php echo htmlspecialchars($expense['created_by_name'] ?? t('System')); ?></div>
                             </div>
                             <div class="text-end small text-muted font-monospace">
                                 <?php echo date('M d, Y', strtotime($expense['created_at'])); ?><br>
@@ -263,8 +263,8 @@ global $company_name, $company_logo;
                         <?php if ($expense['updated_at'] && $expense['updated_at'] != $expense['created_at']): ?>
                         <div class="d-flex justify-content-between border-start border-3 border-primary ps-3">
                             <div>
-                                <div class="fw-bold text-dark">Last Modification</div>
-                                <div class="small text-muted">Updated by <?php echo htmlspecialchars($expense['updated_by_name'] ?? 'System'); ?></div>
+                                <div class="fw-bold text-dark"><?= t('Last Modification') ?></div>
+                                <div class="small text-muted"><?= t('Updated by') ?> <?php echo htmlspecialchars($expense['updated_by_name'] ?? t('System')); ?></div>
                             </div>
                             <div class="text-end small text-muted font-monospace">
                                 <?php echo date('M d, Y', strtotime($expense['updated_at'])); ?><br>
@@ -278,7 +278,7 @@ global $company_name, $company_logo;
 
             <!-- System Message (Print ONLY) -->
             <div class="d-none d-print-block mt-4 text-center small text-muted border-top pt-3">
-                System Generated Voucher | Printed on: <?php echo date('Y-m-d H:i:s'); ?>
+                <?= t('System Generated Voucher') ?> | <?= t('Printed on:') ?> <?php echo date('Y-m-d H:i:s'); ?>
             </div>
         </div>
 
@@ -287,36 +287,36 @@ global $company_name, $company_logo;
             <!-- Quick Actions -->
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-header bg-white border-bottom py-3">
-                    <h6 class="mb-0 fw-bold text-dark">Quick Actions</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><?= t('Quick Actions') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
                         <?php if ($expense['status'] === 'pending' && canEdit('expenses')): ?>
                             <button onclick="updateStatus('reviewed')" class="btn btn-info text-white text-start">
-                                <i class="bi bi-search me-2"></i> Mark as Reviewed
+                                <i class="bi bi-search me-2"></i> <?= t('Mark as Reviewed') ?>
                             </button>
                         <?php elseif ($expense['status'] === 'reviewed' && canEdit('expenses')): ?>
                             <button onclick="updateStatus('approved')" class="btn btn-primary text-start">
-                                <i class="bi bi-check-circle me-2"></i> Approve Expense
+                                <i class="bi bi-check-circle me-2"></i> <?= t('Approve Expense') ?>
                             </button>
                             <button onclick="updateStatus('rejected')" class="btn btn-outline-danger text-start">
-                                <i class="bi bi-x-circle me-2"></i> Reject Expense
+                                <i class="bi bi-x-circle me-2"></i> <?= t('Reject Expense') ?>
                             </button>
                         <?php elseif ($expense['status'] === 'approved' && canEdit('expenses')): ?>
                             <button onclick="updateStatus('paid')" class="btn btn-success text-start">
-                                <i class="bi bi-cash-coin me-2"></i> Mark as Paid
+                                <i class="bi bi-cash-coin me-2"></i> <?= t('Mark as Paid') ?>
                             </button>
                         <?php endif; ?>
 
                         <?php if (canEdit('expenses') && ($expense['status'] === 'pending' || $expense['status'] === 'reviewed')): ?>
                         <a href="#" onclick="editExpense(<?php echo $expense_id; ?>)" class="btn btn-light text-start border">
-                            <i class="bi bi-pencil-square me-2 text-primary"></i> Edit Details
+                            <i class="bi bi-pencil-square me-2 text-primary"></i> <?= t('Edit Details') ?>
                         </a>
                         <?php endif; ?>
-                        
+
                         <?php if (canDelete('expenses')): ?>
                         <button onclick="deleteExpense()" class="btn btn-light text-start border text-danger">
-                            <i class="bi bi-trash me-2"></i> Delete Expense
+                            <i class="bi bi-trash me-2"></i> <?= t('Delete Expense') ?>
                         </button>
                         <?php endif; ?>
                     </div>
@@ -326,18 +326,18 @@ global $company_name, $company_logo;
             <!-- Financial Impact Summary -->
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-header bg-primary text-white py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-graph-down-arrow me-2"></i>Financial Impact</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-graph-down-arrow me-2"></i><?= t('Financial Impact') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label class="text-muted small text-uppercase d-block mb-1">Account Category</label>
+                        <label class="text-muted small text-uppercase d-block mb-1"><?= t('Account Category') ?></label>
                         <span class="fw-bold text-dark"><?php echo htmlspecialchars($expense['expense_account_name'] ?? ''); ?></span>
-                        <div class="small text-muted mt-1">This will be debited as an expense.</div>
+                        <div class="small text-muted mt-1"><?= t('This will be debited as an expense.') ?></div>
                     </div>
                     <div class="mb-0">
-                        <label class="text-muted small text-uppercase d-block mb-1">Payment Source</label>
+                        <label class="text-muted small text-uppercase d-block mb-1"><?= t('Payment Source') ?></label>
                         <span class="fw-bold text-dark"><?php echo htmlspecialchars($expense['bank_account_name'] ?? ''); ?></span>
-                        <div class="small text-muted mt-1">Funds will be credited from your. <?php echo strtolower(htmlspecialchars($expense['bank_account_name'] ?? '')); ?> account.</div>
+                        <div class="small text-muted mt-1"><?= t('Funds will be credited from your') ?> <?php echo strtolower(htmlspecialchars($expense['bank_account_name'] ?? '')); ?> <?= t('account.') ?></div>
                     </div>
                 </div>
             </div>
@@ -345,17 +345,17 @@ global $company_name, $company_logo;
             <!-- System Info -->
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white border-bottom py-3">
-                    <h6 class="mb-0 fw-bold text-dark">System Metadata</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><?= t('System Metadata') ?></h6>
                 </div>
                 <div class="card-body p-0">
                     <ul class="list-group list-group-flush small">
                         <li class="list-group-item d-flex justify-content-between py-3">
-                            <span class="text-muted">Internal ID</span>
+                            <span class="text-muted"><?= t('Internal ID') ?></span>
                             <span class="font-monospace fw-bold">#EXP-<?php echo $expense['expense_id']; ?></span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between py-3">
-                            <span class="text-muted">Database Record</span>
-                            <span class="text-dark">Row #<?php echo $expense['expense_id']; ?></span>
+                            <span class="text-muted"><?= t('Database Record') ?></span>
+                            <span class="text-dark"><?= t('Row') ?> #<?php echo $expense['expense_id']; ?></span>
                         </li>
                     </ul>
                 </div>
@@ -379,55 +379,55 @@ global $company_name, $company_logo;
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
-                    <i class="bi bi-pencil-square"></i> Edit Expense Voucher
+                    <i class="bi bi-pencil-square"></i> <?= t('Edit Expense Voucher') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="editExpenseForm">
                 <input type="hidden" name="expense_id" value="<?php echo $expense_id; ?>">
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Expense Date <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Expense Date') ?> <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="expense_date" value="<?php echo $expense['expense_date']; ?>" required>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Expense Type') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" name="expense_type" required>
-                                <option value="operating" <?php echo $expense['expense_type'] == 'operating' ? 'selected' : ''; ?>>Operating</option>
-                                <option value="fixed" <?php echo $expense['expense_type'] == 'fixed' ? 'selected' : ''; ?>>Fixed</option>
-                                <option value="administrative" <?php echo $expense['expense_type'] == 'administrative' ? 'selected' : ''; ?>>Administrative</option>
+                                <option value="operating" <?php echo $expense['expense_type'] == 'operating' ? 'selected' : ''; ?>><?= t('Operating') ?></option>
+                                <option value="fixed" <?php echo $expense['expense_type'] == 'fixed' ? 'selected' : ''; ?>><?= t('Fixed') ?></option>
+                                <option value="administrative" <?php echo $expense['expense_type'] == 'administrative' ? 'selected' : ''; ?>><?= t('Administrative') ?></option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Amount') ?> <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" step="0.01" min="0" value="<?php echo $expense['amount']; ?>" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Description') ?> <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="description" value="<?php echo htmlspecialchars($expense['description']); ?>" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Notes</label>
+                            <label class="form-label small fw-bold"><?= t('Notes') ?></label>
                             <textarea class="form-control" name="notes" rows="2"><?php echo htmlspecialchars($expense['notes'] ?? ''); ?></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Status</label>
+                            <label class="form-label small fw-bold"><?= t('Status') ?></label>
                             <select class="form-select" name="status">
-                                <option value="pending" <?php echo $expense['status'] == 'pending' ? 'selected' : ''; ?>>Pending</option>
-                                <option value="reviewed" <?php echo $expense['status'] == 'reviewed' ? 'selected' : ''; ?>>Reviewed</option>
-                                <option value="approved" <?php echo $expense['status'] == 'approved' ? 'selected' : ''; ?>>Approved</option>
-                                <option value="paid" <?php echo $expense['status'] == 'paid' ? 'selected' : ''; ?>>Paid</option>
-                                <option value="rejected" <?php echo $expense['status'] == 'rejected' ? 'selected' : ''; ?>>Rejected</option>
+                                <option value="pending" <?php echo $expense['status'] == 'pending' ? 'selected' : ''; ?>><?= t('Pending') ?></option>
+                                <option value="reviewed" <?php echo $expense['status'] == 'reviewed' ? 'selected' : ''; ?>><?= t('Reviewed') ?></option>
+                                <option value="approved" <?php echo $expense['status'] == 'approved' ? 'selected' : ''; ?>><?= t('Approved') ?></option>
+                                <option value="paid" <?php echo $expense['status'] == 'paid' ? 'selected' : ''; ?>><?= t('Paid') ?></option>
+                                <option value="rejected" <?php echo $expense['status'] == 'rejected' ? 'selected' : ''; ?>><?= t('Rejected') ?></option>
                             </select>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-0">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary btn-sm px-4">
-                        <i class="bi bi-check-circle"></i> Save Changes
+                        <i class="bi bi-check-circle"></i> <?= t('Save Changes') ?>
                     </button>
                 </div>
             </form>
@@ -498,7 +498,7 @@ $(document).ready(function() {
         const [sColor, sBg, sBorder] = (statusMap[status] || '##333,#eee,#aaa').split(',');
 
         const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-        <title>Payment Voucher - ${voucherNo}</title>
+        <title><?= t('Payment Voucher') ?> - ${voucherNo}</title>
         <style>
             * { margin:0; padding:0; box-sizing:border-box; }
             body { font-family: Arial, sans-serif; font-size:10pt; color:#222; background:#fff; padding:15mm 15mm 20mm 15mm; }
@@ -533,42 +533,42 @@ $(document).ready(function() {
         <div class="pv-header">
             <div class="pv-logo-area">${logoHtml}<span class="pv-company">${cName}</span></div>
             <div class="pv-title-area">
-                <div class="pv-title">Payment Voucher</div>
-                <div class="pv-voucher-no">Voucher No: <strong>${voucherNo}</strong></div>
-                <div class="pv-date">Date: <strong>${date}</strong></div>
+                <div class="pv-title"><?= t('Payment Voucher') ?></div>
+                <div class="pv-voucher-no"><?= t('Voucher No:') ?> <strong>${voucherNo}</strong></div>
+                <div class="pv-date"><?= t('Date:') ?> <strong>${date}</strong></div>
             </div>
         </div>
         <div class="pv-amount-box">
-            <div><div class="pv-amount-label">Amount Paid</div><div class="pv-amount-value">${fmtAmt}</div></div>
-            <div class="pv-amount-words"><div style="font-size:7.5pt;color:#888;margin-bottom:2px;">In Words:</div><strong>${amtWords}</strong></div>
+            <div><div class="pv-amount-label"><?= t('Amount Paid') ?></div><div class="pv-amount-value">${fmtAmt}</div></div>
+            <div class="pv-amount-words"><div style="font-size:7.5pt;color:#888;margin-bottom:2px;"><?= t('In Words:') ?></div><strong>${amtWords}</strong></div>
         </div>
         <table class="pv-table">
-            <tr><td>Paid To</td><td><strong>${paidTo}</strong>${paidType ? ' <span style="font-size:8pt;color:#888;">('+paidType.toUpperCase()+')</span>' : ''}</td></tr>
-            <tr><td>Description</td><td>${desc}</td></tr>
-            <tr><td>Expense Account</td><td>${expAcct}</td></tr>
-            ${expType && expType !== '-' ? `<tr><td>Expense Type</td><td><span style="text-transform:capitalize;">${expType}</span></td></tr>` : ''}
-            ${categories && categories.length > 0 ? `<tr><td>Categories</td><td>${categories.map(c => c.category_name).join(', ')}</td></tr>` : ''}
-            ${project ? `<tr><td>Linked Project</td><td><strong>${project}</strong></td></tr>` : ''}
-            ${bankAcct ? `<tr><td>Paid From (Bank)</td><td>${bankAcct}</td></tr>` : ''}
-            ${refNo ? `<tr><td>Reference No.</td><td>${refNo}</td></tr>` : ''}
-            ${notes ? '<tr><td>Notes</td><td>'+notes+'</td></tr>' : ''}
-            <tr><td>Status</td><td><span class="pv-status">${status.charAt(0).toUpperCase()+status.slice(1)}</span></td></tr>
-            <tr><td>Prepared By</td><td>${preparedBy}</td></tr>
+            <tr><td><?= t('Paid To') ?></td><td><strong>${paidTo}</strong>${paidType ? ' <span style="font-size:8pt;color:#888;">('+paidType.toUpperCase()+')</span>' : ''}</td></tr>
+            <tr><td><?= t('Description') ?></td><td>${desc}</td></tr>
+            <tr><td><?= t('Expense Account') ?></td><td>${expAcct}</td></tr>
+            ${expType && expType !== '-' ? `<tr><td><?= t('Expense Type') ?></td><td><span style="text-transform:capitalize;">${expType}</span></td></tr>` : ''}
+            ${categories && categories.length > 0 ? `<tr><td><?= t('Categories') ?></td><td>${categories.map(c => c.category_name).join(', ')}</td></tr>` : ''}
+            ${project ? `<tr><td><?= t('Linked Project') ?></td><td><strong>${project}</strong></td></tr>` : ''}
+            ${bankAcct ? `<tr><td><?= t('Paid From (Bank)') ?></td><td>${bankAcct}</td></tr>` : ''}
+            ${refNo ? `<tr><td><?= t('Reference No.') ?></td><td>${refNo}</td></tr>` : ''}
+            ${notes ? '<tr><td><?= t("Notes") ?></td><td>'+notes+'</td></tr>' : ''}
+            <tr><td><?= t('Status') ?></td><td><span class="pv-status">${status.charAt(0).toUpperCase()+status.slice(1)}</span></td></tr>
+            <tr><td><?= t('Prepared By') ?></td><td>${preparedBy}</td></tr>
         </table>
 
         <!-- ITEMS BREAKDOWN TABLE -->
         ${items && items.length > 0 ? `
         <div style="margin-top:14px; margin-bottom:14px;">
-            <div style="font-size:9pt; font-weight:bold; text-transform:uppercase; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:4px;">Expense Breakdown</div>
+            <div style="font-size:9pt; font-weight:bold; text-transform:uppercase; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:4px;"><?= t('Expense Breakdown') ?></div>
             <table style="width:100%; border-collapse:collapse; font-size:9pt;">
                 <thead>
                     <tr style="background:#f8f9fa; border-bottom:2px solid #ddd;">
-                        <th style="padding:6px; text-align:left; width:40px;">S/N</th>
-                        <th style="padding:6px; text-align:left;">Description</th>
-                        <th style="padding:6px; text-align:center; width:60px;">Qty</th>
-                        <th style="padding:6px; text-align:right; width:90px;">Price</th>
-                        <th style="padding:6px; text-align:center; width:60px;">Tax %</th>
-                        <th style="padding:6px; text-align:right; width:100px;">Total</th>
+                        <th style="padding:6px; text-align:left; width:40px;"><?= t('S/N') ?></th>
+                        <th style="padding:6px; text-align:left;"><?= t('Description') ?></th>
+                        <th style="padding:6px; text-align:center; width:60px;"><?= t('Qty') ?></th>
+                        <th style="padding:6px; text-align:right; width:90px;"><?= t('Price') ?></th>
+                        <th style="padding:6px; text-align:center; width:60px;"><?= t('Tax %') ?></th>
+                        <th style="padding:6px; text-align:right; width:100px;"><?= t('Total') ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -590,28 +590,28 @@ $(document).ready(function() {
                 </tbody>
                 <tfoot>
                     <tr style="background:#f8f9fa; font-weight:bold; border-top:2px solid #ddd;">
-                        <td colspan="5" style="padding:8px; text-align:right;">Grand Total:</td>
+                        <td colspan="5" style="padding:8px; text-align:right;"><?= t('Grand Total:') ?></td>
                         <td style="padding:8px; text-align:right; color:#0d6efd; font-size:11pt;">${fmtAmt}</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
         ` : ''}
-        <div class="pv-note"><strong>Note:</strong> This is a computer-generated payment voucher. Please verify all details before processing payment.</div>
+        <div class="pv-note"><strong><?= t('Note:') ?></strong> <?= t('This is a computer-generated payment voucher. Please verify all details before processing payment.') ?></div>
         <div class="pv-signatures">
             <div class="pv-sig-block">
                 <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Created By</div>
+                <div class="pv-sig-label"><?= t('Created By') ?></div>
                 <div class="pv-sig-name">${preparedBy}</div>
             </div>
             <div class="pv-sig-block">
                 <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Reviewed By</div>
+                <div class="pv-sig-label"><?= t('Reviewed By') ?></div>
                 <div class="pv-sig-name">${reviewedBy || '&nbsp;'}</div>
             </div>
             <div class="pv-sig-block">
                 <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Approved By</div>
+                <div class="pv-sig-label"><?= t('Approved By') ?></div>
                 <div class="pv-sig-name">${approvedBy || '&nbsp;'}</div>
             </div>
         </div>
@@ -631,12 +631,12 @@ $(document).ready(function() {
 
 function updateStatus(newStatus) {
     Swal.fire({
-        title: 'Are you sure?',
-        text: 'Do you want to change the status to ' + newStatus + '?',
+        title: <?= json_encode(t('Are you sure?')) ?>,
+        text: <?= json_encode(t('Do you want to change the status to')) ?> + ' ' + newStatus + '?',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, change it!',
-        cancelButtonText: 'No, cancel'
+        confirmButtonText: <?= json_encode(t('Yes, change it!')) ?>,
+        cancelButtonText: <?= json_encode(t('No, cancel')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             const formData = new FormData();
@@ -652,19 +652,19 @@ function updateStatus(newStatus) {
                 if (data.success) {
                     logReportAction('Updated Expense Status', 'User updated status of expense voucher #<?= $expense_id ?> to ' + newStatus);
                     Swal.fire({
-                        title: 'Success!',
-                        text: 'Status has been updated to ' + newStatus + '.',
+                        title: <?= json_encode(t('Success!')) ?>,
+                        text: <?= json_encode(t('Status has been updated to')) ?> + ' ' + newStatus + '.',
                         icon: 'success'
                     }).then(() => {
                         location.reload();
                     });
                 } else {
-                    Swal.fire('Error', data.message || 'Failed to update status', 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, data.message || <?= json_encode(t('Failed to update status')) ?>, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                Swal.fire('Error', 'An error occurred while updating status.', 'error');
+                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('An error occurred while updating status.')) ?>, 'error');
             });
         }
     });
@@ -672,13 +672,13 @@ function updateStatus(newStatus) {
 
 function deleteExpense() {
     Swal.fire({
-        title: 'Are you sure?',
-        text: 'This action cannot be undone!',
+        title: <?= json_encode(t('Are you sure?')) ?>,
+        text: <?= json_encode(t('This action cannot be undone!')) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!',
-        cancelButtonText: 'No, cancel'
+        confirmButtonText: <?= json_encode(t('Yes, delete it!')) ?>,
+        cancelButtonText: <?= json_encode(t('No, cancel')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             const formData = new FormData();
@@ -693,19 +693,19 @@ function deleteExpense() {
                 if (data.success) {
                     logReportAction('Deleted Expense Voucher', 'User deleted expense voucher #<?= $expense_id ?> (<?= addslashes($expense['description']) ?>)');
                     Swal.fire({
-                        title: 'Deleted!',
-                        text: 'Expense has been deleted.',
+                        title: <?= json_encode(t('Deleted!')) ?>,
+                        text: <?= json_encode(t('Expense has been deleted.')) ?>,
                         icon: 'success'
                     }).then(() => {
                         window.location.href = '<?= getUrl('expenses') ?>';
                     });
                 } else {
-                    Swal.fire('Error', data.message || 'Failed to delete expense', 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, data.message || <?= json_encode(t('Failed to delete expense')) ?>, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                Swal.fire('Error', 'An error occurred while deleting the expense.', 'error');
+                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('An error occurred while deleting the expense.')) ?>, 'error');
             });
         }
     });
@@ -728,7 +728,7 @@ $('#editExpenseForm').on('submit', function(e) {
     const $form = $(this);
     const $btn = $form.find('button[type="submit"]');
     
-    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + <?= json_encode(t('Updating...')) ?>);
 
     $.ajax({
         url: '/api/update_expense.php',
@@ -737,20 +737,20 @@ $('#editExpenseForm').on('submit', function(e) {
         success: response => {
             if (response.success) {
                 Swal.fire({
-                    title: 'Updated!',
-                    text: response.message || 'Expense updated successfully.',
+                    title: <?= json_encode(t('Updated!')) ?>,
+                    text: response.message || <?= json_encode(t('Expense updated successfully.')) ?>,
                     icon: 'success'
                 }).then(() => {
                     location.reload();
                 });
             } else {
-                Swal.fire('Error', response.message || 'Update failed', 'error');
-                $btn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Changes');
+                Swal.fire(<?= json_encode(t('Error')) ?>, response.message || <?= json_encode(t('Update failed')) ?>, 'error');
+                $btn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Save Changes')) ?>);
             }
         },
         error: () => {
-            Swal.fire('Error', 'Server error occurred', 'error');
-            $btn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Changes');
+            Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Server error occurred')) ?>, 'error');
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Save Changes')) ?>);
         }
     });
 });
