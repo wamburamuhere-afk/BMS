@@ -23,7 +23,7 @@ try {
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
     $project_id   = intval($_POST['project_id']   ?? 0);
 
-    if ($warehouse_id <= 0) throw new Exception('Warehouse ID is required.');
+    if ($warehouse_id <= 0) throw new Exception(isShopLabel() ? 'Shop ID is required.' : 'Warehouse ID is required.');
     if ($project_id   <= 0) throw new Exception('Project ID is required.');
 
     // Found during the 2026-07-17 warehouse-scope sweep: this endpoint had no
@@ -38,7 +38,7 @@ try {
     $check->execute([$warehouse_id, $project_id]);
     $wh = $check->fetch(PDO::FETCH_ASSOC);
 
-    if (!$wh) throw new Exception('Warehouse not found in this project.');
+    if (!$wh) throw new Exception(isShopLabel() ? 'Shop not found in this project.' : 'Warehouse not found in this project.');
 
     $pdo->prepare("DELETE FROM warehouses WHERE warehouse_id = ? AND project_id = ?")
         ->execute([$warehouse_id, $project_id]);
@@ -46,7 +46,7 @@ try {
     // Phase 3c — warehouse delete affects all linked stock/movements.
     logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete warehouse", "deleted warehouse \"{$wh['warehouse_name']}\" with id $warehouse_id (project $project_id)");
 
-    echo json_encode(['success' => true, 'message' => 'Warehouse deleted successfully.']);
+    echo json_encode(['success' => true, 'message' => isShopLabel() ? 'Shop deleted successfully.' : 'Warehouse deleted successfully.']);
 
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

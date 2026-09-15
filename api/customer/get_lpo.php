@@ -53,7 +53,7 @@ try {
     // shouldn't be able to open an LPO drawn from a different one.
     if (!empty($lpo['warehouse_id']) && !userCan('warehouse', (int)$lpo['warehouse_id'])) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']);
         exit;
     }
 

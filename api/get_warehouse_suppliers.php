@@ -22,7 +22,7 @@ try {
     // it server-side.
     if (!userCan('warehouse', $warehouse_id)) {
         http_response_code(403);
-        throw new Exception('Access denied: this warehouse is not in your scope');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your scope' : 'Access denied: this warehouse is not in your scope');
     }
 
     // Found 2026-07-18: status='completed' is a legacy status from before the

@@ -37,7 +37,7 @@ if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
 if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
-    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']); exit;
+    http_response_code(403); echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']); exit;
 }
 
 // Canonical IN / OUT type lists. `norm_type` resolves legacy empty types.

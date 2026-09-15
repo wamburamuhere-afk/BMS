@@ -28,7 +28,7 @@ if ($project_id > 0 && !userCan('project', $project_id)) {
 // flow pre-scopes warehouse_id, but nothing checked it server-side.
 if (!userCan('warehouse', $warehouse_id)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your scope']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your scope' : 'Access denied: this warehouse is not in your scope']);
     exit();
 }
 

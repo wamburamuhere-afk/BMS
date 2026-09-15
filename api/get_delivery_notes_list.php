@@ -23,7 +23,7 @@ try {
 
     if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']);
         exit;
     }
 

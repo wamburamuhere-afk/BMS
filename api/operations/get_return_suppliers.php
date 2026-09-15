@@ -25,7 +25,7 @@ if (!$warehouse_id || !$project_id) {
 // Mirrors the check already in get_return_grns.php.
 if (!userCan('warehouse', $warehouse_id)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your scope']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your scope' : 'Access denied: this warehouse is not in your scope']);
     exit();
 }
 if (!userCan('project', $project_id)) {

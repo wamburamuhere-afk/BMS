@@ -46,7 +46,7 @@ if (function_exists('assertScopeForRecord')) {
 // the dropdown already only lists in-scope warehouses/projects, but a
 // hand-crafted request could still name one outside the caller's scope.
 if (function_exists('userCan') && !userCan('warehouse', $warehouse_id)) {
-    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']);
     exit;
 }
 if ($project_id && function_exists('userCan') && !userCan('project', $project_id)) {
