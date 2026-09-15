@@ -32,7 +32,14 @@ try {
             ba.account_name as bank_account_name,
             ba.account_code as bank_account_code,
             u.username as created_by_name,
-            u2.username as updated_by_name
+            u2.username as updated_by_name,
+            CASE
+                WHEN e.paid_to_type = 'supplier'        THEN (SELECT supplier_name FROM suppliers       WHERE supplier_id  = e.paid_to_id)
+                WHEN e.paid_to_type = 'sub_contractor'  THEN (SELECT supplier_name FROM sub_contractors WHERE supplier_id  = e.paid_to_id)
+                WHEN e.paid_to_type = 'staff'           THEN (SELECT CONCAT(first_name, ' ', last_name) FROM employees    WHERE employee_id = e.paid_to_id)
+                WHEN e.paid_to_type = 'other'           THEN e.payee_manual_name
+                ELSE e.vendor
+            END as paid_to_name
         FROM expenses e
         LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
         LEFT JOIN accounts ba ON e.bank_account_id = ba.account_id

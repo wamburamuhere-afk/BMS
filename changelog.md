@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/expenses-crud-improvements, update 2) - Fix: manual "More" payee (Simple POS) displayed blank everywhere
+
+**Report:** "paid is not saved as a result it show empty when choose other then write manually" — an expense saved with Paid To = "More" (the Simple POS manual payee, `paid_to_type='other'`) stored `payee_manual_role`/`payee_manual_name` correctly, but showed blank in the expenses list, the voucher/detail page, and the printed voucher.
+
+**Root cause:** three separate `paid_to_name` derivations (`api/account/get_expenses.php`'s list query, `app/constant/accounts/expense_details.php`'s detail query, and `api/account/get_expense.php`'s single-record fetch used by the Print Voucher/edit-modal flow) each had a `CASE WHEN paid_to_type = 'supplier'/'staff'/'sub_contractor' ... ELSE e.vendor` — with no `'other'` branch, so a manual payee fell through to the empty legacy `vendor` column instead of the new `payee_manual_name` column. `api/account/get_expense.php` didn't compute `paid_to_name` at all.
+
+**Fix:** all three now add `WHEN paid_to_type = 'other' THEN payee_manual_name`; `get_expense.php` gained the same computed `paid_to_name` column the other two already had. Display also now shows the manual role (e.g. "Bodaboda") as the payee-type badge/qualifier instead of a bare "OTHER", in the list table, detail page, and both voucher builders (`bms-expenses-table.js` and `expense_details.php`'s own copy) — per the request to "show whom [role] and real name".
+
+**Verified:** `tests/test_expenses_simple_pos_cli.php` extended with a direct check that the manual payee's name actually resolves through the same CASE shape, plus source-presence checks on all three files (55/55, up from 51/51). Existing suites re-run clean: `test_pos_simple_mode_cli` 90/90, `test_expense_posting_cli` 35/35, `test_expense_accrual_cli` 16/16, `test_consolidated_expenses_cli` 7/7, `test_expenses_category_filter_cli` 25/25, `test_expense_delete_reversal_cli` 18/18. `php -l` / `node --check` clean.
+
 ## 2026-09-15 (feat/expenses-crud-improvements) - Expenses: full i18n coverage, Project-module gating fix, Notes hidden in Simple POS
 
 **Request:** three follow-ups on the Simple POS Expenses work — (1) translation was only partial (only the strings the Simple-POS branch touched had been wrapped in `t()`); (2) the "Project" column still showed in `expenses.php` even when superadmin had switched the Projects module off for the tenant, and the tenant's own `system_settings.php` still let an admin flip an "Enable Projects Module" toggle that had no effect once revoked — asked why a setting for a feature that isn't granted is even reachable, and for `user_projects.php` to behave the same way (project UI fully absent, Shop-only) when the module is off; (3) hide "Notes" from the Add Expense form in Simple POS too.

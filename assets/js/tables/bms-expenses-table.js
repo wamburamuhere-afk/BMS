@@ -93,6 +93,10 @@
                     if (row.paid_to_type === 'staff') {
                         return '<div><span class="badge bg-info-soft text-info border border-info small mb-1">' + cfg.i18n.staff + '</span><br><strong>' + name + '</strong></div>';
                     }
+                    if (row.paid_to_type === 'other') {
+                        var roleLabel = esc(row.payee_manual_role || cfg.i18n.na);
+                        return '<div><span class="badge bg-secondary-soft text-secondary border border-secondary small mb-1">' + roleLabel + '</span><br><strong>' + name + '</strong></div>';
+                    }
                     return '<strong>' + name + '</strong>';
                 }
             }},
@@ -220,6 +224,7 @@ function buildVoucher(cfg, id) {
         const voucherNo = 'PV-' + String(d.expense_id).padStart(5, '0');
         const date = d.expense_date ? new Date(d.expense_date.includes('T') ? d.expense_date : d.expense_date + 'T00:00:00').toLocaleDateString('en-US', { day:'2-digit', month:'long', year:'numeric' }) : '-';
         const paidTo = d.paid_to_name || d.vendor || '-';
+        const paidTypeLabel = d.paid_to_type === 'other' ? (d.payee_manual_role || d.paid_to_type) : d.paid_to_type;
         const printedBy = cfg.voucher.printedBy;
         const printedRole = cfg.voucher.printedRole;
         const now = new Date();
@@ -318,7 +323,7 @@ function buildVoucher(cfg, id) {
 
         <!-- DETAILS TABLE -->
         <table class="pv-table">
-            <tr><td>${cfg.i18n.paidTo}</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${d.paid_to_type ? ' <span style="font-size:8pt;color:#888;">('+d.paid_to_type+')</span>' : ''}</td></tr>
+            <tr><td>${cfg.i18n.paidTo}</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${paidTypeLabel ? ' <span style="font-size:8pt;color:#888;">('+paidTypeLabel+')</span>' : ''}</td></tr>
             <tr><td>${cfg.i18n.description}</td><td>${d.description || '-'}</td></tr>
             <tr><td>${cfg.i18n.expenseAccount}</td><td>${d.expense_account_name ? ((d.expense_account_code ? d.expense_account_code + ' — ' : '') + d.expense_account_name) : '-'}</td></tr>
             <tr><td>${cfg.i18n.paidFromBank}</td><td>${d.bank_account_name ? ((d.bank_account_code ? d.bank_account_code + ' — ' : '') + d.bank_account_name) : '-'}</td></tr>
