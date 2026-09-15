@@ -820,7 +820,7 @@ global $company_logo, $company_name;
                                 <div class="col-md-6">
                                     <div class="card h-100">
                                         <div class="card-header bg-light border-bottom">
-                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-house-door"></i> Stock by Warehouse</h6>
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-house-door"></i> <?= wLabel('Stock by Warehouse', 'Stock by Shop') ?></h6>
                                         </div>
                                         <div class="card-body">
                                             <?php if (!empty($warehouse_stock)): ?>
@@ -829,7 +829,7 @@ global $company_logo, $company_name;
                                                     <thead>
                                                         <tr>
                                                             <th>S/NO</th>
-                                                            <th>Warehouse</th>
+                                                            <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                                             <th>Location</th>
                                                             <th>Total Stock</th>
                                                             <th>Available</th>
@@ -877,7 +877,7 @@ global $company_logo, $company_name;
                                                     <thead>
                                                         <tr>
                                                             <th>Batch #</th>
-                                                            <th>Warehouse</th>
+                                                            <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                                             <th>Date Received</th>
                                                             <th>Expiry Date</th>
                                                             <th>Received</th>
@@ -1093,7 +1093,7 @@ global $company_logo, $company_name;
                                                 <tr>
                                                     <th>Date</th>
                                                     <th>Type</th>
-                                                    <th>Warehouse</th>
+                                                    <th><?= wLabel('Warehouse', 'Shop') ?></th>
                                                     <th>Reference</th>
                                                     <th>Quantity</th>
                                                     <th>Previous</th>
@@ -1316,9 +1316,9 @@ global $company_logo, $company_name;
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label for="warehouse_id" class="form-label">Warehouse</label>
+                                                    <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse', 'Shop') ?></label>
                                                     <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                                                        <option value="">Select Warehouse</option>
+                                                        <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                                         <?php foreach ($warehouses as $warehouse): ?>
                                                         <option value="<?= $warehouse['warehouse_id'] ?>">
                                                             <?= htmlspecialchars($warehouse['warehouse_name']) ?>
@@ -1807,7 +1807,7 @@ function transferStock(productId) {
         Swal.fire({
             icon: 'warning',
             title: 'No Stock Available',
-            text: 'There is no stock available in any warehouse to transfer.'
+            text: <?= json_encode(wLabel('There is no stock available in any warehouse to transfer.', 'There is no stock available in any shop to transfer.')) ?>
         });
         return;
     }
@@ -1823,7 +1823,7 @@ function transferStock(productId) {
         });
         
         Swal.fire({
-            title: 'Select Source Warehouse',
+            title: <?= json_encode(wLabel('Select Source Warehouse', 'Select Source Shop')) ?>,
             text: 'Choose where to transfer stock FROM:',
             input: 'select',
             inputOptions: options,
@@ -1831,7 +1831,7 @@ function transferStock(productId) {
             confirmButtonText: 'Continue to Transfer',
             confirmButtonColor: '#0d6efd',
             inputValidator: (value) => {
-                if (!value) return 'You need to choose a warehouse!'
+                if (!value) return <?= json_encode(wLabel('You need to choose a warehouse!', 'You need to choose a shop!')) ?>
             }
         }).then((result) => {
             if (result.isConfirmed) {
