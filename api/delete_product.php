@@ -49,7 +49,7 @@ try {
     // same project (global/unwarehoused products pass through, as above).
     if (!empty($product['warehouse_id']) && function_exists('userCan') && !userCan('warehouse', (int)$product['warehouse_id'])) {
         $pdo->rollBack();
-        echo json_encode(['success' => false, 'message' => 'Access denied: this product is not in your warehouse scope.']);
+        echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this product is not in your shop scope.' : 'Access denied: this product is not in your warehouse scope.']);
         exit();
     }
 

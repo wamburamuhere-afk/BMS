@@ -13,18 +13,18 @@ try {
     $warehouse_id = intval($_GET['warehouse_id'] ?? 0);
     $project_id   = intval($_GET['project_id']   ?? 0);
 
-    if ($warehouse_id <= 0) throw new Exception('Warehouse ID is required.');
+    if ($warehouse_id <= 0) throw new Exception(isShopLabel() ? 'Shop ID is required.' : 'Warehouse ID is required.');
     if ($project_id <= 0)   throw new Exception('Project ID is required.');
 
     // Validate warehouse belongs to project
     $wh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE warehouse_id = ? AND project_id = ?");
     $wh->execute([$warehouse_id, $project_id]);
-    if (!$wh->fetch()) throw new Exception('Warehouse not found in this project.');
+    if (!$wh->fetch()) throw new Exception(isShopLabel() ? 'Shop not found in this project.' : 'Warehouse not found in this project.');
 
     // Phase 6 (pos_upgrade_plan.md): a non-admin may only view stock for a
     // warehouse in their assigned scope.
     if (!userCan('warehouse', $warehouse_id)) {
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     // ── 1. STOCK SUMMARY — from product_stocks (current real stock) ──

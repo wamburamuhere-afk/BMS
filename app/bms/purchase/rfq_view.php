@@ -205,7 +205,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                     <strong><?= safe_output($rfq['supplier_name'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Warehouse') ?></p>
+                    <p class="text-muted small text-uppercase fw-bold mb-1"><?= wLabel('Warehouse', 'Shop') ?></p>
                     <strong><?= safe_output($rfq['warehouse_name'] ?? '—') ?></strong>
                 </div>
                 <?php if (!empty($rfq['project_name'])): ?>

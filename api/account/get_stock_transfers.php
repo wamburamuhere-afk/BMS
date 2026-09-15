@@ -38,10 +38,10 @@ if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
 if ($from_wh !== null && !userCan('warehouse', $from_wh)) {
-    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: the source warehouse is not in your assigned scope.']); exit;
+    http_response_code(403); echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: the source shop is not in your assigned scope.' : 'Access denied: the source warehouse is not in your assigned scope.']); exit;
 }
 if ($to_wh !== null && !userCan('warehouse', $to_wh)) {
-    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: the destination warehouse is not in your assigned scope.']); exit;
+    http_response_code(403); echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: the destination shop is not in your assigned scope.' : 'Access denied: the destination warehouse is not in your assigned scope.']); exit;
 }
 
 try {

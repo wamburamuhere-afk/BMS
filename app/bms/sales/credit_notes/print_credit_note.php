@@ -65,7 +65,7 @@ try {
     // source invoice/sales order's warehouse), not just project.
     if (!empty($cn['resolved_warehouse_id']) && !userCan('warehouse', (int)$cn['resolved_warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     require_once __DIR__ . '/../../../../helpers.php';
@@ -193,7 +193,7 @@ $wf = [
             <p><strong>Credit Note #:</strong> <?= htmlspecialchars($cn['credit_note_number']) ?></p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($cn['credit_date'])) ?></p>
             <?php if (!empty($cn['return_number'])): ?><p><strong>Ref Return:</strong> <?= htmlspecialchars($cn['return_number']) ?></p><?php endif; ?>
-            <?php if (!empty($cn['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($cn['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($cn['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($cn['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($cn['status']) ?></p>
         </div>
     </div>

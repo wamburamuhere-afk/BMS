@@ -1122,9 +1122,9 @@ function get_quick_actions($product) {
 
                     <div class="row mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-bold"><?= t('Warehouse') ?></label>
+                            <label class="form-label small fw-bold"><?= wLabel('Warehouse', 'Shop') ?></label>
                             <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                                <option value=""><?= t('Select Warehouse') ?></option>
+                                <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                 <!-- Warehouses will be loaded via AJAX -->
                             </select>
                         </div>
@@ -1306,7 +1306,7 @@ function loadWarehouses(productId) {
         success: function(response) {
             const select = $('#warehouse_id');
             select.empty();
-            select.append('<option value="">' + <?= json_encode(t('Select Warehouse')) ?> + '</option>');
+            select.append('<option value="">' + <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?> + '</option>');
             
             if (response.success) {
                 response.data.forEach(warehouse => {
@@ -1354,7 +1354,7 @@ function submitStockAdjustment() {
         Swal.fire({
             icon: 'warning',
             title: <?= json_encode(t('Missing Information')) ?>,
-            text: <?= json_encode(t('Please select a warehouse.')) ?>
+            text: <?= json_encode(wLabel('Please select a warehouse.', 'Please select a shop.')) ?>
         });
         return;
     }
@@ -2072,7 +2072,7 @@ function generate_barcode_local() {
                                     <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
                                         <i class="bi bi-box-seam me-2"></i> <?= t('OPENING STOCK (Current Inventory)') ?>
                                     </h6>
-                                    <p class="text-muted small mb-3"><?= t('Enter the current stock quantity for each warehouse/store below:') ?></p>
+                                    <p class="text-muted small mb-3"><?= wLabel('Enter the current stock quantity for each warehouse/store below:', 'Enter the current stock quantity for each shop below:') ?></p>
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover border">
                                             <thead class="table-light">
@@ -2083,7 +2083,7 @@ function generate_barcode_local() {
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($warehouses)): ?>
-                                                    <tr><td colspan="2" class="text-center p-3"><?= t('No warehouses found. Please create one first.') ?></td></tr>
+                                                    <tr><td colspan="2" class="text-center p-3"><?= wLabel('No warehouses found. Please create one first.', 'No shops found. Please create one first.') ?></td></tr>
                                                 <?php else: ?>
                                                     <?php foreach ($warehouses as $wh): ?>
                                                     <tr>

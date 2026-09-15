@@ -435,7 +435,7 @@ $wf = [
         </div>
         <div class="box">
             <h3><?= t('Receipt Information') ?></h3>
-            <p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($grn['warehouse_name'] ?: t('N/A')) ?></p>
+            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($grn['warehouse_name'] ?: t('N/A')) ?></p>
             <?php if (!empty($grn['po_ref_number'])): ?>
             <p><strong><?= t('PO Reference:') ?></strong> <?= htmlspecialchars($grn['po_ref_number']) ?></p>
             <?php endif; ?>

@@ -306,7 +306,7 @@ $accent = getSetting('print_template_color_qt_meadow', '#2f7d4f');
             <h3>Quotation Information</h3>
             <?php if (!empty($order['project_contract_no'])): ?><p><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></p><?php endif; ?>
             <?php if (!empty($order['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
-            <?php if (!empty($order['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></p>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_label) ?></p>
         </div>

@@ -46,7 +46,7 @@ try {
     // Warehouse-scope guard: a non-admin may only see a sale drawn from their assigned warehouse(s).
     $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
     if ($wid !== null && !userCan('warehouse', $wid)) {
-        http_response_code(403); echo json_encode(['success' => false, 'message' => t('This sale is not in your assigned warehouse scope.')]); exit;
+        http_response_code(403); echo json_encode(['success' => false, 'message' => wLabel('This sale is not in your assigned warehouse scope.', 'This sale is not in your assigned shop scope.', true)]); exit;
     }
 
     $li = $pdo->prepare("SELECT sale_item_id, product_id, product_name, quantity, unit_price, tax_rate,

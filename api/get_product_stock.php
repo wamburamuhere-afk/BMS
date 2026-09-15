@@ -19,7 +19,7 @@ try {
         throw new Exception('Product ID is required');
     }
     if ($warehouse_id && !userCan('warehouse', (int)$warehouse_id)) {
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
     
     // Get product details

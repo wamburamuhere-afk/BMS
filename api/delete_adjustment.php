@@ -52,7 +52,7 @@ try {
     // Phase 6 (pos_upgrade_plan.md) — the warehouse itself must be one this
     // user is directly granted, on top of the project-level check above.
     if (!empty($warehouse_id) && !userCan('warehouse', (int)$warehouse_id)) {
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     // Determine the effect on stock to reverse

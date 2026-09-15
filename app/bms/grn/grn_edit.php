@@ -318,14 +318,14 @@ function generate_grn_number() {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted" id="grnWarehouseHint"><?= t('Select project to filter warehouses.') ?></small>
+                        <small class="text-muted" id="grnWarehouseHint"><?= wLabel('Select project to filter warehouses.', 'Select project to filter shops.') ?></small>
                     </div>
                     <?php endif; ?>
 
                     <div class="col-md-4 mb-3">
-                        <label for="warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
-                            <option value=""><?= t('Select Warehouse') ?></option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"
                                     data-project="<?= $wh['project_id'] ?>"
@@ -650,17 +650,17 @@ const GRN_I18N = {
     selectSupplier:        <?= json_encode(t('Select Supplier')) ?>,
     noProject:             <?= json_encode(t('No Project')) ?>,
     selectPurchaseOrder:   <?= json_encode(t('Select Purchase Order')) ?>,
-    selectWarehouse:       <?= json_encode(t('Select Warehouse')) ?>,
+    selectWarehouse:       <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?>,
     typeToSearchProduct:   <?= json_encode(t('Type to search product...')) ?>,
     sku:                   <?= json_encode(t('SKU')) ?>,
     batchNo:               <?= json_encode(t('Batch No.')) ?>,
     noSku:                 <?= json_encode(t('No SKU')) ?>,
     na:                    <?= json_encode(t('N/A')) ?>,
-    pleaseSelectWarehouseFirst: <?= json_encode(t('Please select a warehouse first')) ?>,
+    pleaseSelectWarehouseFirst: <?= json_encode(wLabel('Please select a warehouse first', 'Please select a shop first')) ?>,
     noProductsFound:       <?= json_encode(t('No products found')) ?>,
-    warehousesNotLinked:   <?= json_encode(t('Showing warehouses not linked to any project.')) ?>,
-    noWarehousesForProject: <?= json_encode(t('No warehouses found for this project.')) ?>,
-    showingNWarehouses:    <?= json_encode(t('Showing {0} warehouse(s) for selected project.')) ?>,
+    warehousesNotLinked:   <?= json_encode(wLabel('Showing warehouses not linked to any project.', 'Showing shops not linked to any project.')) ?>,
+    noWarehousesForProject: <?= json_encode(wLabel('No warehouses found for this project.', 'No shops found for this project.')) ?>,
+    showingNWarehouses:    <?= json_encode(wLabel('Showing {0} warehouse(s) for selected project.', 'Showing {0} shop(s) for selected project.')) ?>,
     clearAllItemsTitle:    <?= json_encode(t('Clear All Items?')) ?>,
     clearAllItemsText:     <?= json_encode(t('Are you sure you want to remove all items?')) ?>,
     yesClearAll:           <?= json_encode(t('Yes, Clear All')) ?>,

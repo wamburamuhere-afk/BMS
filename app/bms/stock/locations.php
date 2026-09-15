@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // hasn't run yet on this POST request — translation happens at
         // display time on the following GET, once the language is loaded.
         if (!empty($loc_name) && $wh_id > 0 && !userCan('warehouse', $wh_id)) {
-            $_SESSION['error'] = "Access denied: this warehouse is not in your assigned scope.";
+            $_SESSION['error'] = isShopLabel() ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.";
         } elseif (!empty($loc_name) && $wh_id > 0) {
             try {
                 $query = "INSERT INTO locations (warehouse_id, location_name, location_code, location_type, capacity, status, created_by)
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['error'] = "Error: " . $e->getMessage();
             }
         } else {
-            $_SESSION['error'] = "Location name and Warehouse are required";
+            $_SESSION['error'] = isShopLabel() ? "Location name and Shop are required" : "Location name and Warehouse are required";
         }
         $redirect_params = [];
         if ($warehouse_id) $redirect_params[] = "warehouse_id=$warehouse_id";
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = $_POST['status'];
 
         if ($wh_id > 0 && !userCan('warehouse', $wh_id)) {
-            $_SESSION['error'] = "Access denied: this warehouse is not in your assigned scope.";
+            $_SESSION['error'] = isShopLabel() ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.";
         } else {
         try {
             $query = "UPDATE locations SET warehouse_id = ?, location_name = ?, location_code = ?, location_type = ?, capacity = ?, status = ?, updated_by = ?, updated_at = NOW()
@@ -482,9 +482,9 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-center">
                 <div class="col-md-4">
-                    <label class="form-label"><?= t('Warehouse') ?></label>
+                    <label class="form-label"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select name="warehouse_id" id="filter_warehouse" class="form-select select2-static">
-                        <option value="0"><?= t('All Warehouses') ?></option>
+                        <option value="0"><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $wh): ?>
                             <option value="<?= $wh['warehouse_id'] ?>" <?= $warehouse_id == $wh['warehouse_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($wh['warehouse_name']) ?>
@@ -582,7 +582,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <th style="width:50px;"><?= t('S/NO') ?></th>
                             <th><?= t('Location Name') ?></th>
                             <th><?= t('Code') ?></th>
-                            <th><?= t('Warehouse') ?></th>
+                            <th><?= wLabel('Warehouse', 'Shop') ?></th>
                             <th><?= t('Type') ?></th>
                             <th class="text-center"><?= t('Products') ?></th>
                             <th class="text-center"><?= t('Sub-qty') ?></th>
@@ -686,9 +686,9 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             <div class="modal-body">
                 <input type="hidden" name="location_id" id="loc_id">
                 <div class="mb-3">
-                    <label class="form-label"><?= t('Warehouse') ?> *</label>
+                    <label class="form-label"><?= wLabel('Warehouse', 'Shop') ?> *</label>
                     <select name="warehouse_id" id="loc_wh" class="form-select select2-static" required>
-                        <option value=""><?= t('Select Warehouse') ?></option>
+                        <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                         <?php foreach ($warehouses as $wh): ?>
                             <option value="<?= $wh['warehouse_id'] ?>"><?= htmlspecialchars($wh['warehouse_name']) ?></option>
                         <?php endforeach; ?>
@@ -739,7 +739,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 function exportLocations() {
     logReportAction('Exported Locations List', 'User exported storage locations records to CSV');
     const table = document.getElementById('locationsTable');
-    let csv = '<?= t('Name') ?>,<?= t('Code') ?>,<?= t('Warehouse') ?>,<?= t('Type') ?>,<?= t('Products') ?>,<?= t('Qty') ?>,<?= t('Status') ?>\n';
+    let csv = '<?= t('Name') ?>,<?= t('Code') ?>,<?= wLabel('Warehouse', 'Shop') ?>,<?= t('Type') ?>,<?= t('Products') ?>,<?= t('Qty') ?>,<?= t('Status') ?>\n';
     const rows = table.querySelectorAll('tbody tr');
     rows.forEach(row => {
         const cols = row.querySelectorAll('td');

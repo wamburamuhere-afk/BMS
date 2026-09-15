@@ -73,7 +73,7 @@ if (empty($sale['customer_name'])) {
 
 $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
 if ($wid !== null && !userCan('warehouse', $wid)) {
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.', true)]);
     exit;
 }
 
@@ -96,7 +96,7 @@ $infoRows = [
     [t('Cashier'), $sale['cashier_name'] ?? t('N/A')],
 ];
 if (!empty($sale['register_name']))  $infoRows[] = [t('Register'), $sale['register_name']];
-if (!empty($sale['warehouse_name'])) $infoRows[] = [t('Warehouse'), $sale['warehouse_name']];
+if (!empty($sale['warehouse_name'])) $infoRows[] = [wLabel('Warehouse', 'Shop', true), $sale['warehouse_name']];
 if (!empty($sale['customer_name']))  $infoRows[] = [t('Customer'), $sale['customer_name']];
 
 $infoHtml = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:11px;">';

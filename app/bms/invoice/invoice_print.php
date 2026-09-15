@@ -59,7 +59,7 @@ try {
     // shouldn't be able to print an invoice drawn from a different one.
     if (!empty($invoice['warehouse_id']) && !userCan('warehouse', (int)$invoice['warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     // Fetch Invoice Items
@@ -450,7 +450,7 @@ $wf = [
             <p><strong>Invoice #:</strong> <?= htmlspecialchars($invoice['invoice_number']) ?></p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($invoice['invoice_date'])) ?></p>
             <p><strong>Due Date:</strong> <?= date('d M Y', strtotime($invoice['due_date'])) ?></p>
-            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($invoice['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($invoice['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($invoice['status']) ?></p>
         </div>
     </div>

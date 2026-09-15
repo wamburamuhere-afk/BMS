@@ -114,7 +114,7 @@ if ($lpo_id) {
                                 <p class="mb-1"><strong>Issue Date:</strong> <span id="issueDate"></span></p>
                                 <p class="mb-1" id="expiryRow" style="display:none;"><strong>Expiry Date:</strong> <span id="expiryDate"></span></p>
                                 <p class="mb-1" id="projectRow" style="display:none;"><strong>Project:</strong> <span id="projectName" class="text-primary fw-bold"></span></p>
-                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong>Warehouse:</strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
                                 <p class="mb-1"><strong>Created By:</strong> <span id="createdBy"></span></p>
                             </div>
                         </div>

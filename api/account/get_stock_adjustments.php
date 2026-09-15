@@ -38,7 +38,7 @@ if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
 if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
-    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']); exit;
+    http_response_code(403); echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']); exit;
 }
 
 // Adjustments = manual reference OR an adjustment-family movement_type.
@@ -115,6 +115,7 @@ try {
     $by_direction = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ── Detail rows ───────────────────────────────────────────────────────
+    $no_warehouse_label = $pdo->quote(wLabel('No Warehouse', 'No Shop'));
     $stmt = $pdo->prepare("
         SELECT $eff_date        AS movement_date,
                COALESCE(NULLIF(sm.reference_number, ''), '—')        AS reference_number,
@@ -123,7 +124,7 @@ try {
                ($direction_expr)                                      AS direction,
                sm.quantity, COALESCE(sm.unit, '')                     AS unit,
                (sm.quantity * COALESCE(p.cost_price, 0))             AS value,
-               COALESCE(w.warehouse_name, 'No Warehouse')             AS warehouse_name,
+               COALESCE(w.warehouse_name, $no_warehouse_label)        AS warehouse_name,
                COALESCE(NULLIF(sm.reason, ''), '—')                   AS reason,
                COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))), ''), 'System') AS recorded_by
         $base_from

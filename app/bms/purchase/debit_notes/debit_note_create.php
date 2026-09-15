@@ -102,7 +102,7 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
                                 <div class="form-text">Required — the debit note is raised from this return.</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Returned From (Warehouse)</label>
+                                <label class="form-label"><?= wLabel('Returned From (Warehouse)', 'Returned From (Shop)') ?></label>
                                 <input type="text" class="form-control" id="f_warehouse" value="" readonly placeholder="—">
                             </div>
                             <div class="col-md-6">

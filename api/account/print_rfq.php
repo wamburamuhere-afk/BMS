@@ -330,7 +330,7 @@ $wf = [
             <p><strong><?= t('Project:') ?></strong> <?= htmlspecialchars($rfq['project_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($rfq['warehouse_name'])): ?>
-            <p><strong><?= t('Warehouse:') ?></strong> <?= htmlspecialchars($rfq['warehouse_name']) ?></p>
+            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($rfq['warehouse_name']) ?></p>
             <?php endif; ?>
             <p><strong><?= t('Created By:') ?></strong> <?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></p>
         </div>

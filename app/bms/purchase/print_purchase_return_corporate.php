@@ -226,7 +226,7 @@ $accent = getSetting('print_template_color_pret_corporate', '#000000');
             <div class="section-body">
                 <p><strong>Reason:</strong> <?= htmlspecialchars(ucwords(str_replace('_', ' ', $return['reason'] ?? 'N/A'))) ?></p>
                 <?php if (!empty($return['grn_ref_number'])): ?><p><strong>Related GRN:</strong> <?= htmlspecialchars($return['grn_ref_number']) ?></p><?php endif; ?>
-                <?php if (!empty($return['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
+                <?php if (!empty($return['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
                 <p><strong>Created By:</strong> <?= htmlspecialchars($return['created_by_name'] ?? 'N/A') ?></p>
                 <p style="margin-top:8px;"><span class="status-badge"><?= strtoupper($return['status']) ?></span></p>
             </div>

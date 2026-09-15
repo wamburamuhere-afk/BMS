@@ -39,7 +39,7 @@ if (!$lpo) die("LPO not found");
 // project — a user granted only some of a project's warehouses shouldn't be
 // able to print an LPO drawn from a different one.
 if (!empty($lpo['warehouse_id']) && !userCan('warehouse', (int)$lpo['warehouse_id'])) {
-    die("Access denied: this warehouse is not in your assigned scope.");
+    die(isShopLabel() ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.");
 }
 
 $stmtItems = $pdo->prepare("SELECT * FROM customer_lpo_items WHERE lpo_id = ? ORDER BY sort_order, item_id");
@@ -193,7 +193,7 @@ try {
             <h3>LPO Information</h3>
             <p><strong>Expiry Date:</strong> <?= !empty($lpo['expiry_date']) ? date('d M Y', strtotime($lpo['expiry_date'])) : 'Not specified' ?></p>
             <?php if (!empty($lpo['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($lpo['project_name']) ?></p><?php endif; ?>
-            <?php if (!empty($lpo['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($lpo['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($lpo['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($lpo['warehouse_name']) ?></p><?php endif; ?>
             <?php if (!empty($lpo['description'])): ?><p><strong>Description:</strong> <?= htmlspecialchars($lpo['description']) ?></p><?php endif; ?>
             <p><strong>Created By:</strong> <?= htmlspecialchars($lpo['username'] ?? 'N/A') ?></p>
         </div>

@@ -37,7 +37,7 @@ try {
     $order_id         = intval($_POST['order_id'] ?? 0) ?: null;
     $user_id          = $_SESSION['user_id'];
 
-    if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
+    if ($warehouse_id <= 0) throw new Exception(isShopLabel() ? 'Shop is required.' : 'Warehouse is required.');
 
     // Phase C — when project_id is supplied, it must be in user scope.
     if ($project_id && !userCan('project', $project_id)) {
@@ -113,7 +113,7 @@ try {
     if (!$wh->fetch()) throw new Exception('Invalid or inactive warehouse.');
     if (!userCan('warehouse', $warehouse_id)) {
         http_response_code(403);
-        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     // Validate items — block non-inventory services

@@ -109,7 +109,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
             <?= t('Report Date:') ?> <?= date('d M Y, H:i') ?>
 
             <?php if ($warehouse_id > 0): ?>
-                | <?= t('Warehouse:') ?> <?php
+                | <?= wLabel('Warehouse:', 'Shop:') ?> <?php
                     $wh = array_filter($warehouses, function($w) use ($warehouse_id) {
                         return $w['warehouse_id'] == $warehouse_id;
                     });
@@ -239,9 +239,9 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
         <div class="card-body">
             <form method="GET" action="" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label"><?= t('Warehouse') ?></label>
+                    <label class="form-label"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select class="form-select" name="warehouse">
-                        <option value="0"><?= t('All Warehouses') ?></option>
+                        <option value="0"><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>" <?= $warehouse_id == $warehouse['warehouse_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($warehouse['warehouse_name']) ?>

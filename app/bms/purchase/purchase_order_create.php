@@ -235,9 +235,9 @@ if ($is_edit) {
 
                             <!-- 3. Warehouse -->
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold"><?= t('Warehouse / Delivery Point') ?> <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold"><?= wLabel('Warehouse / Delivery Point', 'Shop / Delivery Point') ?> <span class="text-danger">*</span></label>
                                 <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
-                                    <option value=""><?= t('Select Warehouse') ?></option>
+                                    <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                     <?php foreach ($warehouses as $w): ?>
                                         <option value="<?= $w['warehouse_id'] ?>"
                                             data-project="<?= $w['project_id'] ?>"
@@ -564,7 +564,7 @@ const rfqRefId  = <?= (int)$rfq_ref_id ?>;
 // Pre-translated strings used inside JS template literals / dynamic UI below.
 const POC_I18N = {
     selectRfqOptional: <?= json_encode(t('Select RFQ (Optional)')) ?>,
-    selectWarehouse:   <?= json_encode(t('Select Warehouse')) ?>,
+    selectWarehouse:   <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?>,
     selectDefault:     <?= json_encode(t('Select...')) ?>,
     noProductsFound:   <?= json_encode(t('No products found')) ?>,
     na:                <?= json_encode(t('N/A')) ?>,
@@ -1132,8 +1132,8 @@ function openProductSearch(rowId, term = '') {
     if (!$('#warehouse_id').val()) {
         Swal.fire({
             icon: 'warning',
-            title: <?= json_encode(t('Select Warehouse First')) ?>,
-            text: <?= json_encode(t('Please select a Warehouse / Delivery Point before searching for products.')) ?>,
+            title: <?= json_encode(wLabel('Select Warehouse First', 'Select Shop First')) ?>,
+            text: <?= json_encode(wLabel('Please select a Warehouse / Delivery Point before searching for products.', 'Please select a Shop / Delivery Point before searching for products.')) ?>,
             confirmButtonColor: '#0d6efd'
         });
         return;

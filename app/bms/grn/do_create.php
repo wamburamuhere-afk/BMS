@@ -100,7 +100,7 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
                     <div class="card-body p-3">
                         <div class="row g-2 small">
                             <div class="col-sm-4"><span class="text-muted">DN Number:</span> <strong><?= safe_output($dn['delivery_number']) ?></strong></div>
-                            <div class="col-sm-4"><span class="text-muted">Warehouse:</span> <strong><?= safe_output($dn['warehouse_name']) ?></strong></div>
+                            <div class="col-sm-4"><span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span> <strong><?= safe_output($dn['warehouse_name']) ?></strong></div>
                             <div class="col-sm-4"><span class="text-muted">Supplier:</span> <strong><?= safe_output($dn['supplier_name']) ?></strong></div>
                             <div class="col-sm-4"><span class="text-muted">DN Date:</span> <strong><?= format_date($dn['delivery_date']) ?></strong></div>
                             <div class="col-sm-4"><span class="text-muted">Total Items:</span> <strong><?= count($dn_items) ?></strong></div>
@@ -208,7 +208,7 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
                         </div>
                         <div class="mb-3 p-3 bg-light rounded border">
                             <div class="d-flex justify-content-between small mb-1">
-                                <span class="text-muted">Warehouse:</span>
+                                <span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span>
                                 <span class="fw-bold"><?= safe_output($dn['warehouse_name']) ?></span>
                             </div>
                             <div class="d-flex justify-content-between small mb-1">

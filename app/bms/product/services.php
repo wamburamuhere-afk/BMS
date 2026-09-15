@@ -187,7 +187,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="text-center mb-4 pb-3" style="border-bottom: 2px solid #0d6efd;">
           
 
-            <h4 class="text-dark"><?= t('Non-Inventory Products Report') ?></h4>
+            <h4 class="text-dark"><?= wLabel('Non-Inventory Products Report', 'Services Report') ?></h4>
             
         </div>
     </div>
@@ -196,7 +196,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     <div class="rounded-4 svc-header text-white p-4 mb-4 d-print-none">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-                <h4 class="fw-bold mb-1"><i class="bi bi-box-seam me-2"></i><?= t('Non-Inventory Products') ?></h4>
+                <h4 class="fw-bold mb-1"><i class="bi bi-box-seam me-2"></i><?= wLabel('Non-Inventory Products', 'Services') ?></h4>
                 <p class="mb-0 opacity-75 small"><?= t('Virtual products & services — used in Sales, Invoices and POS only') ?></p>
             </div>
             <div class="d-flex gap-2 flex-nowrap">
@@ -204,7 +204,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                 <button type="button" class="btn btn-light fw-bold shadow-sm btn-mobile-sm"
                     onclick="openAddSvcModal()">
                     <i class="bi bi-plus-circle me-1"></i>
-                    <span class="d-none d-md-inline"><?= t('Add Non-Inventory Product') ?></span>
+                    <span class="d-none d-md-inline"><?= wLabel('Add Non-Inventory Product', 'Add Service') ?></span>
                     <span class="d-md-none"><?= t('Add New') ?></span>
                 </button>
                 <?php endif; ?>
@@ -557,8 +557,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold">
-                    <i class="bi bi-plus-circle me-2"></i> <?= t('Add Non-Inventory Product') ?>
-<span class="badge bg-white bg-opacity-25 text-white ms-2 small"><?= t('Non-Inventory') ?></span>
+                    <i class="bi bi-plus-circle me-2"></i> <?= wLabel('Add Non-Inventory Product', 'Add Service') ?>
+<span class="badge bg-white bg-opacity-25 text-white ms-2 small"><?= wLabel('Non-Inventory', 'Service') ?></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -587,7 +587,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                         <div class="col-md-7 border-end pe-md-4">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label fw-bold small"><?= t('Non-Inventory Product Name') ?> <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold small"><?= wLabel('Non-Inventory Product Name', 'Service Name') ?> <span class="text-danger">*</span></label>
                                     <textarea class="form-control form-control-lg bg-light border-0 shadow-sm"
                                         name="product_name" required rows="2" placeholder="<?= t('e.g. Consulting, Delivery Charge') ?>"></textarea>
                                 </div>
@@ -624,14 +624,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                         <div class="col-md-5 ps-md-4">
                             <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
-                                <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= t('Non-Inventory Product') ?></h5>
+                                <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= wLabel('Non-Inventory Product', 'Service') ?></h5>
                                 <p class="small text-muted mb-3"><?= t('This product will be available in:') ?></p>
                                 <ul class="list-unstyled small">
                                     <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Sales Orders') ?></li>
                                     <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Invoices') ?></li>
                                     <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('POS') ?></li>
                                     <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Budget') ?></li>
-                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Warehouse / GRN') ?></li>
+                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= wLabel('Warehouse / GRN', 'Shop / GRN') ?></li>
                                     <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Delivery Notes') ?></li>
                                     <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Stock Tracking') ?></li>
                                 </ul>
@@ -681,9 +681,9 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     </div>
                                     <?php endif; ?>
                                     <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
-                                        <label class="form-label fw-bold small"><?= t('Select Warehouse') ?> <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small"><?= wLabel('Select Warehouse', 'Select Shop') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="svc_warehouse_id" onchange="refreshAllComponentCosts()">
-                                            <option value=""><?= t('Select Warehouse') ?></option>
+                                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                             <?php foreach ($warehouses as $w): ?>
                                             <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
                                             <?php endforeach; ?>
@@ -743,8 +743,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold">
-                    <i class="bi bi-pencil-square me-2"></i> <?= t('Edit Non-Inventory Product') ?>
-                    <span class="badge bg-white bg-opacity-25 text-white ms-2 small"><?= t('Non-Inventory') ?></span>
+                    <i class="bi bi-pencil-square me-2"></i> <?= wLabel('Edit Non-Inventory Product', 'Edit Service') ?>
+                    <span class="badge bg-white bg-opacity-25 text-white ms-2 small"><?= wLabel('Non-Inventory', 'Service') ?></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -774,7 +774,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="col-md-8">
                                 <div class="row g-3">
                                     <div class="col-12">
-                                        <label class="form-label fw-bold small"><?= t('Non-Inventory Product Name') ?> <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small"><?= wLabel('Non-Inventory Product Name', 'Service Name') ?> <span class="text-danger">*</span></label>
                                         <textarea class="form-control form-control-lg bg-light border-0 shadow-sm"
                                             name="product_name" id="edit_svc_name" required rows="2"></textarea>
                                     </div>
@@ -809,14 +809,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                             <div class="col-md-4">
                                 <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
-                                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= t('Non-Inventory Product') ?></h5>
+                                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= wLabel('Non-Inventory Product', 'Service') ?></h5>
                                     <p class="small text-muted mb-3"><?= t('This product will be available in:') ?></p>
                                     <ul class="list-unstyled small">
                                         <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Sales Orders') ?></li>
                                         <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Invoices') ?></li>
                                         <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('POS') ?></li>
                                         <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Budget') ?></li>
-                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Warehouse / GRN') ?></li>
+                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= wLabel('Warehouse / GRN', 'Shop / GRN') ?></li>
                                         <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Delivery Notes') ?></li>
                                         <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Stock Tracking') ?></li>
                                     </ul>
@@ -866,9 +866,9 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     </div>
                                     <?php endif; ?>
                                     <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
-                                        <label class="form-label fw-bold small"><?= t('Select Warehouse') ?> <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small"><?= wLabel('Select Warehouse', 'Select Shop') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="edit_svc_warehouse_id" onchange="refreshAllComponentCostsEdit()">
-                                            <option value=""><?= t('Select Warehouse') ?></option>
+                                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                             <?php foreach ($warehouses as $w): ?>
                                             <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
                                             <?php endforeach; ?>
@@ -993,12 +993,12 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 const SVC_APP_URL = '<?= rtrim(getUrl(''), '/') ?>';
 const ALL_WAREHOUSES = <?= json_encode($warehouses) ?>;
 const SVC_I18N = <?= json_encode([
-    'select_warehouse' => t('Select Warehouse'),
-    'please_select_warehouse_first' => t('Please select a warehouse first'),
+    'select_warehouse' => wLabel('Select Warehouse', 'Select Shop'),
+    'please_select_warehouse_first' => wLabel('Please select a warehouse first', 'Please select a shop first'),
     'searching' => t('Searching...'),
     'no_sku' => t('No SKU'),
     'stock_label' => t('Stock:'),
-    'no_products_in_warehouse' => t('No products found in this warehouse'),
+    'no_products_in_warehouse' => wLabel('No products found in this warehouse', 'No products found in this shop'),
     'enter_unit' => t('Enter unit...'),
     'job' => t('Job'), 'pieces' => t('Pieces'), 'set' => t('Set'), 'box' => t('Box'),
     'litre' => t('Litre'), 'kg' => t('Kg'), 'other_specify' => t('Other (specify)'),
@@ -1015,7 +1015,7 @@ const SVC_I18N = <?= json_encode([
     'product_updated_msg' => t('Product updated successfully.'),
     'error_updating_product' => t('Error updating product.'),
     'server_error_retry' => t('Server error. Please try again.'),
-    'delete_nip_title' => t('Delete Non-Inventory Product?'),
+    'delete_nip_title' => wLabel('Delete Non-Inventory Product?', 'Delete Service?'),
     'delete_nip_confirm' => t('Are you sure you want to delete %s?'),
     'delete_nip_warning' => t('This action cannot be undone and may affect transaction history if this product was sold.'),
     'yes_delete' => t('Yes, Delete'),

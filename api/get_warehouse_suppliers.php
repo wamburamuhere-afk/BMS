@@ -15,14 +15,14 @@ try {
     $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
 
     if ($warehouse_id <= 0) {
-        throw new Exception("Warehouse not specified");
+        throw new Exception(isShopLabel() ? "Shop not specified" : "Warehouse not specified");
     }
     // Found 2026-07-18: same gap as get_warehouse_supplier_grns.php (already
     // fixed today) — normal UI pre-scopes warehouse_id, but nothing checked
     // it server-side.
     if (!userCan('warehouse', $warehouse_id)) {
         http_response_code(403);
-        throw new Exception('Access denied: this warehouse is not in your scope');
+        throw new Exception(isShopLabel() ? 'Access denied: this shop is not in your scope' : 'Access denied: this warehouse is not in your scope');
     }
 
     // Found 2026-07-18: status='completed' is a legacy status from before the

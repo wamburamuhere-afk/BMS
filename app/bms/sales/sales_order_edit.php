@@ -320,9 +320,9 @@ $is_quote = ($sales_order['is_quote'] == 1);
                     </div>
                     
                     <div class="col-md-3 mb-3">
-                        <label for="warehouse_id" class="form-label">Warehouse / Delivery Point <span class="text-danger">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse / Delivery Point', 'Shop / Delivery Point') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?= renderWarehouseOptions($warehouses, $sales_order['warehouse_id'] ?? 0) ?>
                         </select>
                     </div>
@@ -753,7 +753,7 @@ function searchPOByWarehouse(term) {
     const resultsDiv = $('#poSearchResults');
 
     if (!warehouseId) {
-        resultsDiv.html('<a class="list-group-item list-group-item-action text-muted disabled">Select a warehouse first</a>').show();
+        resultsDiv.html('<a class="list-group-item list-group-item-action text-muted disabled">' + <?= json_encode(wLabel('Select a warehouse first', 'Select a shop first')) ?> + '</a>').show();
         return;
     }
 
@@ -781,7 +781,7 @@ function searchPOByWarehouse(term) {
                         );
                     });
                 } else {
-                    resultsDiv.html('<a class="list-group-item text-muted disabled">No POs found for this warehouse</a>');
+                    resultsDiv.html('<a class="list-group-item text-muted disabled">' + <?= json_encode(wLabel('No POs found for this warehouse', 'No POs found for this shop')) ?> + '</a>');
                 }
                 resultsDiv.show();
             },

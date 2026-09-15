@@ -51,7 +51,7 @@ try {
         if (!empty($adjustment['project_id']) && !userCan('project', (int)$adjustment['project_id'])) {
             echo json_encode(['success' => false, 'message' => 'Access denied: this record belongs to a project not in your scope.']);
         } elseif (!empty($adjustment['warehouse_id']) && !userCan('warehouse', (int)$adjustment['warehouse_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+            echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']);
         } else {
             echo json_encode(['success' => true, 'data' => $adjustment]);
         }

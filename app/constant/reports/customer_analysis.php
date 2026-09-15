@@ -62,9 +62,9 @@ $currency  = get_setting('currency', 'TZS');
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <?php endif; ?>
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
-                        <option value="">All My Warehouses</option>
+                        <option value=""><?= wLabel('All My Warehouses', 'All My Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>

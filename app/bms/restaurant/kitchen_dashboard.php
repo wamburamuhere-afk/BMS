@@ -39,7 +39,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
         </div>
         <?php if (canEdit('warehouses')): ?>
         <a href="<?= getUrl('warehouses') ?>" class="btn btn-sm btn-warning fw-bold text-nowrap">
-            <i class="bi bi-gear me-1"></i> <?= t('Go to Warehouses') ?>
+            <i class="bi bi-gear me-1"></i> <?= wLabel('Go to Warehouses', 'Go to Shops') ?>
         </a>
         <?php endif; ?>
     </div>
@@ -49,7 +49,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
         <div class="card-body py-3">
             <div class="row g-2 align-items-end">
                 <div class="col-auto">
-                    <label class="form-label small mb-1"><?= t('Warehouse') ?></label>
+                    <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select id="whSelect" class="form-select form-select-sm select2-static" style="min-width:220px;">
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>

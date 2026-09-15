@@ -15,7 +15,7 @@ $warehouse_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
 
 if ($warehouse_id <= 0) {
-    $_SESSION['error'] = "Invalid warehouse ID";
+    $_SESSION['error'] = isShopLabel() ? "Invalid shop ID" : "Invalid warehouse ID";
     header("Location: warehouses.php");
     exit();
 }
@@ -25,7 +25,7 @@ if ($warehouse_id <= 0) {
 require_once __DIR__ . '/../../../core/warehouse_scope.php';
 if (!userCan('warehouse', $warehouse_id)) {
     if (!headers_sent()) http_response_code(403);
-    die('Access denied: this warehouse is not in your assigned scope.');
+    die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
 }
 
 // Fetch warehouse details
@@ -43,7 +43,7 @@ $stmt->execute([$warehouse_id]);
 $warehouse = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$warehouse) {
-    $_SESSION['error'] = "Warehouse not found";
+    $_SESSION['error'] = isShopLabel() ? "Shop not found" : "Warehouse not found";
     header("Location: warehouses.php");
     exit();
 }
@@ -137,7 +137,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <?php if($project_id > 0): ?>
                         <li class="breadcrumb-item"><a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>">Project Details</a></li>
                     <?php else: ?>
-                        <li class="breadcrumb-item"><a href="warehouses.php">Warehouses</a></li>
+                        <li class="breadcrumb-item"><a href="warehouses.php"><?= wLabel('Warehouses', 'Shops') ?></a></li>
                     <?php endif; ?>
                     <li class="breadcrumb-item active"><?= htmlspecialchars($warehouse['warehouse_name']) ?></li>
                 </ol>
@@ -209,7 +209,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0">Warehouse Information</h5>
+                    <h5 class="mb-0"><?= wLabel('Warehouse Information', 'Shop Information') ?></h5>
                 </div>
                 <div class="card-body">
                     <ul class="list-group list-group-flush">

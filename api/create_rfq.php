@@ -25,7 +25,7 @@ try {
     $items        = json_decode($_POST['items'] ?? '[]', true);
 
     if (!$supplier_id)  throw new Exception(t('Supplier is required'));
-    if (!$warehouse_id) throw new Exception(t('Warehouse is required'));
+    if (!$warehouse_id) throw new Exception(wLabel('Warehouse is required', 'Shop is required'));
     if (empty($items))  throw new Exception(t('At least one item is required'));
 
     // Phase C — when project_id is supplied, it must be in user scope.

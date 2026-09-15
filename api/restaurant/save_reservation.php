@@ -36,13 +36,13 @@ if (!$gate) { http_response_code(403); echo json_encode(['success' => false, 'me
 
 if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
 $tableChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
 $tableChk->execute([$table_id, $warehouse_id]);
 if (!$tableChk->fetchColumn()) {
-    echo json_encode(['success' => false, 'message' => t('The selected table does not belong to this warehouse.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.')]);
     exit;
 }
 $ts = strtotime($reservation_time);

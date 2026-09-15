@@ -116,7 +116,7 @@ try {
         throw new Exception("A warehouse must be selected for the sale.");
     }
     if (!userCan('warehouse', $warehouse_id)) {
-        throw new Exception("Access denied: this warehouse is not in your assigned scope.");
+        throw new Exception(isShopLabel(true) ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.");
     }
 
     // Phase 30 — a table_id must genuinely belong to the sale's own
@@ -126,7 +126,7 @@ try {
         $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
         $tblChk->execute([$table_id, $warehouse_id]);
         if (!$tblChk->fetchColumn()) {
-            throw new Exception(t('The selected table does not belong to this warehouse.'));
+            throw new Exception(wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.', true));
         }
     }
 

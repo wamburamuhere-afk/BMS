@@ -188,7 +188,7 @@ if ($order_id) {
                                 <h6 class="text-muted text-uppercase small fw-bold"><?= t('Order Details') ?></h6>
                                 <p class="mb-1"><strong><?= t('Date:') ?></strong> <span id="orderDate"></span></p>
                                 <p class="mb-1" id="projectRow" style="display:none;"><strong><?= t('Project:') ?></strong> <span id="projectName" class="text-primary fw-bold"></span></p>
-                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= t('Warehouse:') ?></strong> <span id="warehouseName" class="text-success fw-bold"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <span id="warehouseName" class="text-success fw-bold"></span></p>
                                 <p class="mb-1"><strong><?= t('Expected Delivery:') ?></strong> <span id="expectedDate"></span></p>
                                 <p class="mb-1" id="supplierQuoteRow" style="display:none;"><strong><?= t('Quote Ref:') ?></strong> <span id="supplierQuoteRef" class="text-secondary"></span></p>
                                 <p class="mb-1"><strong><?= t('Created By:') ?></strong> <span id="createdBy"></span></p>

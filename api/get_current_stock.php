@@ -14,7 +14,7 @@ $product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 0;
 $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
 
 if (!$product_id || !$warehouse_id) {
-    echo json_encode(['success' => false, 'message' => 'Missing product or warehouse ID']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Missing product or shop ID' : 'Missing product or warehouse ID']);
     exit();
 }
 

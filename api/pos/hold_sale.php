@@ -46,12 +46,12 @@ try {
     if ($table_id) {
         require_once __DIR__ . '/../../core/project_scope.php';
         if (!$warehouse_id || !userCan('warehouse', $warehouse_id)) {
-            throw new Exception(t('Access denied: this warehouse is not in your assigned scope.'));
+            throw new Exception(wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.', true));
         }
         $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
         $tblChk->execute([$table_id, $warehouse_id]);
         if (!$tblChk->fetchColumn()) {
-            throw new Exception(t('The selected table does not belong to this warehouse.'));
+            throw new Exception(wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.', true));
         }
     }
 

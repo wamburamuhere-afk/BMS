@@ -509,9 +509,9 @@ $initial_stats = [
 
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label for="warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
+                            <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'supplier_id')">
-                                <option value=""><?= t('Select Warehouse') ?></option>
+                                <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                 <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>">
                                     <?= safe_output($wh['warehouse_name']) ?>
@@ -675,9 +675,9 @@ $initial_stats = [
 
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label for="edit_warehouse_id" class="form-label"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
+                            <label for="edit_warehouse_id" class="form-label"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" id="edit_warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'edit_supplier_id')">
-                                <option value=""><?= t('Select Warehouse') ?></option>
+                                <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                 <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>">
                                     <?= safe_output($wh['warehouse_name']) ?>
@@ -835,11 +835,11 @@ $(document).ready(function() {
     // Select2 on warehouse selects in modals
     $('#addReturnModal').on('shown.bs.modal', function() {
         if (!$('#warehouse_id').hasClass('select2-hidden-accessible'))
-            $('#warehouse_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#addReturnModal'), width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
+            $('#warehouse_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#addReturnModal'), width: '100%', allowClear: true, placeholder: <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?> });
     });
     $('#editReturnModal').on('shown.bs.modal', function() {
         if (!$('#edit_warehouse_id').hasClass('select2-hidden-accessible'))
-            $('#edit_warehouse_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#editReturnModal'), width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
+            $('#edit_warehouse_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#editReturnModal'), width: '100%', allowClear: true, placeholder: <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?> });
     });
 
     // Initial view

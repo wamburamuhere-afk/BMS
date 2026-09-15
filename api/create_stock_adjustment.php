@@ -43,7 +43,7 @@ if (function_exists('assertScopeForRecord')) {
 // lists in-scope warehouses, but this endpoint must not trust that client-side
 // narrowing against a hand-crafted request.
 if (function_exists('userCan') && !userCan('warehouse', (int)$_POST['warehouse_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    echo json_encode(['success' => false, 'message' => isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.']);
     exit();
 }
 

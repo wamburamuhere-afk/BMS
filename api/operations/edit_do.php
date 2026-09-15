@@ -41,7 +41,7 @@ try {
     $remove_ids     = json_decode($_POST['remove_attachment_ids'] ?? '[]', true) ?: [];
 
     if ($supplier_id <= 0)  throw new Exception('Supplier is required.');
-    if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
+    if ($warehouse_id <= 0) throw new Exception(isShopLabel() ? 'Shop is required.' : 'Warehouse is required.');
     if (!$do_date)           throw new Exception('DO date is required.');
     if (empty($items))       throw new Exception('At least one delivered item is required.');
 

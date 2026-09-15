@@ -84,7 +84,7 @@ try {
     // source invoice/sales order's warehouse), not just project.
     if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
         http_response_code(403);
-        die('Access denied: this warehouse is not in your assigned scope.');
+        die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
     }
 
     // Log Activity
@@ -413,7 +413,7 @@ $wf = [
             <p><strong><?= $doc_label ?></strong> <?= htmlspecialchars($return['return_number']) ?></p>
             <p><strong><?= $date_label ?></strong> <?= date('d M Y', strtotime($return['return_date'])) ?></p>
             <p><strong>Ref Order:</strong> <?= htmlspecialchars($return['order_number'] ?? 'N/A') ?></p>
-            <?php if (!empty($return['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($return['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($return['status']) ?></p>
         </div>
     </div>

@@ -20,7 +20,7 @@ try {
     $date_to      = $_GET['date_to']      ?? '';
 
     if ($warehouse && !userCan('warehouse', $warehouse)) {
-        throw new Exception(t('Access denied: this warehouse is not in your assigned scope.'));
+        throw new Exception(wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.'));
     }
 
     $where  = ['1=1'];

@@ -293,7 +293,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
 
                         <!-- 3. Warehouse (supplier only) — filtered by project -->
                         <div class="col-md-6 both-types" id="warehouse-wrap">
-                            <label class="form-label fw-bold">Warehouse <small class="text-muted fw-normal">(optional)</small></label>
+                            <label class="form-label fw-bold"><?= wLabel('Warehouse', 'Shop') ?> <small class="text-muted fw-normal">(optional)</small></label>
                             <select name="warehouse_id" id="f-warehouse" class="form-select select2-static">
                                 <option value="">— All / None —</option>
                             </select>

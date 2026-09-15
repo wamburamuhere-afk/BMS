@@ -100,7 +100,7 @@ try {
     // Required on creation only — existing invoices may predate this field
     // (invoice_edit.php has no Service-Invoice toggle to know their intent).
     if (!$is_update && !$is_service_invoice && !$warehouse_id) {
-        throw new Exception("Warehouse is required for inventory invoices");
+        throw new Exception(isShopLabel() ? "Shop is required for inventory invoices" : "Warehouse is required for inventory invoices");
     }
 
     // Calculate totals

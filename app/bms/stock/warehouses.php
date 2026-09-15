@@ -51,16 +51,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Validate input
         $errors = [];
         if (empty($warehouse_name)) {
-            $errors[] = "Warehouse name is required";
+            $errors[] = isShopLabel() ? "Shop name is required" : "Warehouse name is required";
         }
         if (empty($warehouse_code)) {
-            $errors[] = "Warehouse code is required";
+            $errors[] = isShopLabel() ? "Shop code is required" : "Warehouse code is required";
         } else {
             // Check if warehouse code already exists
             $check_stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_code = ?");
             $check_stmt->execute([$warehouse_code]);
             if ($check_stmt->fetch()) {
-                $errors[] = "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
+                $errors[] = isShopLabel()
+                    ? "Shop code '{$warehouse_code}' already exists. Please use a different code."
+                    : "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
             }
         }
         // Hiding the option in the dropdown is not a control — a tampered POST
@@ -129,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
 
                 logActivity($pdo, $user_id, 'Create warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
-                $_SESSION['success'] = ['Warehouse added successfully!'];
+                $_SESSION['success'] = [isShopLabel() ? 'Shop added successfully!' : 'Warehouse added successfully!'];
                 header("Location: warehouses.php");
                 exit();
             } catch (PDOException $e) {
@@ -172,16 +174,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Validate input
         $errors = [];
         if (empty($warehouse_name)) {
-            $errors[] = "Warehouse name is required";
+            $errors[] = isShopLabel() ? "Shop name is required" : "Warehouse name is required";
         }
         if (empty($warehouse_code)) {
-            $errors[] = "Warehouse code is required";
+            $errors[] = isShopLabel() ? "Shop code is required" : "Warehouse code is required";
         } else {
             // Check if warehouse code already exists (excluding current warehouse)
             $check_stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_code = ? AND warehouse_id != ?");
             $check_stmt->execute([$warehouse_code, $warehouse_id]);
             if ($check_stmt->fetch()) {
-                $errors[] = "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
+                $errors[] = isShopLabel()
+                    ? "Shop code '{$warehouse_code}' already exists. Please use a different code."
+                    : "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
             }
         }
         // Gate the record being edited: a warehouse on someone else's project is
@@ -191,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $current_project_id = $cur_stmt->fetchColumn();
         if ($current_project_id !== false && $current_project_id !== null
             && !userCan('project', (int)$current_project_id)) {
-            $errors[] = "Access denied: this warehouse belongs to a project not in your scope.";
+            $errors[] = isShopLabel() ? "Access denied: this shop belongs to a project not in your scope." : "Access denied: this warehouse belongs to a project not in your scope.";
         }
         // Gate the project being assigned — hiding the option is not a control.
         if ($project_id !== null && !userCan('project', (int)$project_id)) {
@@ -235,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 logActivity($pdo, $user_id, 'Edit warehouse', "User edited warehouse: $warehouse_name ($warehouse_code)");
-                $_SESSION['success'] = ['Warehouse updated successfully!'];
+                $_SESSION['success'] = [isShopLabel() ? 'Shop updated successfully!' : 'Warehouse updated successfully!'];
                 header("Location: warehouses.php");
                 exit();
             } catch (PDOException $e) {
@@ -264,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $del_current_project = $del_project_id->fetchColumn();
         if ($del_current_project !== false && $del_current_project !== null
             && !userCan('project', (int)$del_current_project)) {
-            $_SESSION['error'] = ['Access denied: this warehouse belongs to a project not in your scope.'];
+            $_SESSION['error'] = [isShopLabel() ? 'Access denied: this shop belongs to a project not in your scope.' : 'Access denied: this warehouse belongs to a project not in your scope.'];
             header("Location: warehouses.php");
             exit();
         }
@@ -286,7 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             logActivity($pdo, $user_id, 'Deleted Warehouse', "User deleted warehouse ID: $warehouse_id (movement history preserved)");
-            $_SESSION['success'] = ['Warehouse deleted successfully!'];
+            $_SESSION['success'] = [isShopLabel() ? 'Shop deleted successfully!' : 'Warehouse deleted successfully!'];
             header("Location: warehouses.php");
             exit();
         } catch (PDOException $e) {
@@ -306,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ts_current_project = $ts_project_id->fetchColumn();
         if ($ts_current_project !== false && $ts_current_project !== null
             && !userCan('project', (int)$ts_current_project)) {
-            $_SESSION['error'] = ['Access denied: this warehouse belongs to a project not in your scope.'];
+            $_SESSION['error'] = [isShopLabel() ? 'Access denied: this shop belongs to a project not in your scope.' : 'Access denied: this warehouse belongs to a project not in your scope.'];
             header("Location: warehouses.php");
             exit();
         }
@@ -317,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$new_status, $user_id, $warehouse_id]);
 
             logActivity($pdo, $user_id, 'Updated Warehouse Status', "User changed warehouse ID $warehouse_id status to $new_status");
-            $_SESSION['success'] = ['Warehouse status updated!'];
+            $_SESSION['success'] = [isShopLabel() ? 'Shop status updated!' : 'Warehouse status updated!'];
             header("Location: warehouses.php");
             exit();
         } catch (PDOException $e) {
@@ -495,7 +499,7 @@ function get_primary_badge($is_primary) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= t('Warehouses Management') ?></title>
+    <title><?= wLabel('Warehouses Management', 'Shops Management') ?></title>
     
    
     <style>
@@ -696,7 +700,7 @@ function get_primary_badge($is_primary) {
        
 
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">
-            <?= t('Warehouse Management Report') ?>
+            <?= wLabel('Warehouse Management Report', 'Shop Management Report') ?>
         </h2>
 
         <p style="color: #000; margin: 0; font-size: 10pt;">
@@ -711,13 +715,13 @@ function get_primary_badge($is_primary) {
             <div class="row g-3">
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Total Warehouses') ?></p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= wLabel('Total Warehouses', 'Total Shops') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['total_warehouses'] ?></h3>
                     </div>
                 </div>
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Active Warehouses') ?></p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= wLabel('Active Warehouses', 'Active Shops') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['active_warehouses'] ?></h3>
                     </div>
                 </div>
@@ -729,7 +733,7 @@ function get_primary_badge($is_primary) {
                 </div>
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Primary Warehouses') ?></p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= wLabel('Primary Warehouses', 'Primary Shops') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['primary_warehouses'] ?></h3>
                     </div>
                 </div>
@@ -741,7 +745,7 @@ function get_primary_badge($is_primary) {
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
                 <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>"><?= t('Inventory') ?></a></li>
-                <li class="breadcrumb-item active"><?= t('Warehouses') ?></li>
+                <li class="breadcrumb-item active"><?= wLabel('Warehouses', 'Shops') ?></li>
             </ol>
         </nav>
 
@@ -750,13 +754,13 @@ function get_primary_badge($is_primary) {
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h2 class="fw-bold text-dark mb-1"><i class="bi bi-house-door-fill text-primary"></i> <?= t('Warehouse Management') ?></h2>
-                        <p class="text-muted mb-0"><?= t('Manage warehouses, locations and stock distribution') ?></p>
+                        <h2 class="fw-bold text-dark mb-1"><i class="bi bi-house-door-fill text-primary"></i> <?= wLabel('Warehouse Management', 'Shop Management') ?></h2>
+                        <p class="text-muted mb-0"><?= wLabel('Manage warehouses, locations and stock distribution', 'Manage shops, locations and stock distribution') ?></p>
                     </div>
                     <div>
                         <?php if ($can_add_warehouses): ?>
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addWarehouseModal">
-                            <i class="bi bi-plus-circle"></i> <?= t('Add New Warehouse') ?>
+                            <i class="bi bi-plus-circle"></i> <?= wLabel('Add New Warehouse', 'Add New Shop') ?>
                         </button>
                         <?php endif; ?>
                     </div>
@@ -772,7 +776,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['total_warehouses'] ?></h4>
-                                <p class="mb-0"><?= t('Total Warehouses') ?></p>
+                                <p class="mb-0"><?= wLabel('Total Warehouses', 'Total Shops') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-house-door" style="font-size: 2rem;"></i>
@@ -788,7 +792,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['active_warehouses'] ?></h4>
-                                <p class="mb-0"><?= t('Active Warehouses') ?></p>
+                                <p class="mb-0"><?= wLabel('Active Warehouses', 'Active Shops') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
@@ -820,7 +824,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['primary_warehouses'] ?></h4>
-                                <p class="mb-0"><?= t('Primary Warehouses') ?></p>
+                                <p class="mb-0"><?= wLabel('Primary Warehouses', 'Primary Shops') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-star-fill" style="font-size: 2rem;"></i>
@@ -866,7 +870,7 @@ function get_primary_badge($is_primary) {
             <div class="card-body">
                 <form method="GET" action="" class="row g-3">
                     <div class="col-md-5">
-                        <label class="form-label"><?= t('Search Warehouse') ?></label>
+                        <label class="form-label"><?= wLabel('Search Warehouse', 'Search Shop') ?></label>
                         <div class="input-group">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
                             <input type="text" name="search" class="form-control border-start-0"
@@ -877,8 +881,8 @@ function get_primary_badge($is_primary) {
                         <label class="form-label"><?= t('Filter by Status') ?></label>
                         <select name="status" class="form-select">
                             <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
-                            <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= t('Active Warehouses') ?></option>
-                            <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= t('Inactive Warehouses') ?></option>
+                            <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= wLabel('Active Warehouses', 'Active Shops') ?></option>
+                            <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= wLabel('Inactive Warehouses', 'Inactive Shops') ?></option>
                             <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= t('Maintenance') ?></option>
                         </select>
                     </div>
@@ -920,7 +924,7 @@ function get_primary_badge($is_primary) {
             </div>
             <div>
                 <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
-                    <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> <?= t('warehouses') ?>
+                    <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> <?= wLabel('warehouses', 'shops') ?>
                 </span>
             </div>
         </div>
@@ -929,7 +933,7 @@ function get_primary_badge($is_primary) {
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom py-3">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> <?= t('Warehouses List') ?></h5>
+                    <h5 class="mb-0"><i class="bi bi-table"></i> <?= wLabel('Warehouses List', 'Shops List') ?></h5>
                     <span class="badge bg-light text-dark border">
                         <?= t('Showing') ?> <?= count($warehouses) ?> <?= t('of') ?> <?= $total_count ?> <?= t('results') ?>
                     </span>
@@ -942,8 +946,8 @@ function get_primary_badge($is_primary) {
                             <thead class="table-light">
                                 <tr>
                                     <th><?= t('S/NO') ?></th>
-                                    <th><?= t('Warehouse Code') ?></th>
-                                    <th><?= t('Warehouse Name') ?></th>
+                                    <th><?= wLabel('Warehouse Code', 'Shop Code') ?></th>
+                                    <th><?= wLabel('Warehouse Name', 'Shop Name') ?></th>
                                     <th><?= t('Location') ?></th>
                                     <th><?= t('Contact') ?></th>
                                     <th class="text-center"><?= t('Locations') ?></th>
@@ -1095,11 +1099,11 @@ function get_primary_badge($is_primary) {
                 <?php else: ?>
                     <div class="text-center py-5">
                         <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
-                        <h4 class="mt-3"><?= t('No Warehouses Found') ?></h4>
-                        <p class="text-muted"><?= t('Start by adding your first warehouse.') ?></p>
+                        <h4 class="mt-3"><?= wLabel('No Warehouses Found', 'No Shops Found') ?></h4>
+                        <p class="text-muted"><?= wLabel('Start by adding your first warehouse.', 'Start by adding your first shop.') ?></p>
                         <?php if ($can_add_warehouses): ?>
                         <button type="button" class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#addWarehouseModal">
-                            <i class="bi bi-plus-circle"></i> <?= t('Add New Warehouse') ?>
+                            <i class="bi bi-plus-circle"></i> <?= wLabel('Add New Warehouse', 'Add New Shop') ?>
                         </button>
                         <?php endif; ?>
                     </div>
@@ -1117,18 +1121,18 @@ function get_primary_badge($is_primary) {
                     <input type="hidden" name="add_warehouse" value="1">
                     
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> <?= t('Add New Warehouse') ?></h5>
+                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> <?= wLabel('Add New Warehouse', 'Add New Shop') ?></h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
 
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="warehouse_name" class="form-label"><?= t('Warehouse Name') ?> *</label>
+                                <label for="warehouse_name" class="form-label"><?= wLabel('Warehouse Name', 'Shop Name') ?> *</label>
                                 <input type="text" class="form-control" id="warehouse_name" name="warehouse_name" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="warehouse_code" class="form-label"><?= t('Warehouse Code') ?> <span class="text-muted">(<?= t('Auto-generated') ?>)</span></label>
+                                <label for="warehouse_code" class="form-label"><?= wLabel('Warehouse Code', 'Shop Code') ?> <span class="text-muted">(<?= t('Auto-generated') ?>)</span></label>
                                 <input type="text" class="form-control bg-light" id="warehouse_code" name="warehouse_code" value="<?= $next_warehouse_code ?>" readonly required>
                                 <small class="text-muted"><?= t('Unique code automatically assigned by system') ?></small>
                             </div>
@@ -1144,7 +1148,7 @@ function get_primary_badge($is_primary) {
                                         <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <small class="text-muted"><?= t('Link this warehouse to a specific project') ?></small>
+                                <small class="text-muted"><?= wLabel('Link this warehouse to a specific project', 'Link this shop to a specific project') ?></small>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -1216,7 +1220,7 @@ function get_primary_badge($is_primary) {
                                 <div class="form-check mt-4">
                                     <input class="form-check-input" type="checkbox" id="is_primary" name="is_primary">
                                     <label class="form-check-label" for="is_primary">
-                                        <?= t('Set as Primary Warehouse') ?>
+                                        <?= wLabel('Set as Primary Warehouse', 'Set as Primary Shop') ?>
                                     </label>
                                 </div>
                             </div>
@@ -1230,7 +1234,7 @@ function get_primary_badge($is_primary) {
                                     <option value="restaurant"><?= t('Restaurant') ?></option>
                                     <option value="hybrid"><?= t('Hybrid (Retail + Restaurant)') ?></option>
                                 </select>
-                                <small class="text-muted"><?= t('Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.') ?></small>
+                                <small class="text-muted"><?= wLabel('Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.', 'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this shop in POS.') ?></small>
                             </div>
                         </div>
 
@@ -1242,7 +1246,7 @@ function get_primary_badge($is_primary) {
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                        <button type="submit" class="btn btn-primary"><?= t('Save Warehouse') ?></button>
+                        <button type="submit" class="btn btn-primary"><?= wLabel('Save Warehouse', 'Save Shop') ?></button>
                     </div>
                 </form>
             </div>
@@ -1259,7 +1263,7 @@ function get_primary_badge($is_primary) {
                     <input type="hidden" id="edit_warehouse_id" name="warehouse_id">
                     
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="bi bi-pencil"></i> <?= t('Edit Warehouse') ?></h5>
+                        <h5 class="modal-title"><i class="bi bi-pencil"></i> <?= wLabel('Edit Warehouse', 'Edit Shop') ?></h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
 
@@ -1271,7 +1275,7 @@ function get_primary_badge($is_primary) {
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                        <button type="submit" class="btn btn-primary"><?= t('Update Warehouse') ?></button>
+                        <button type="submit" class="btn btn-primary"><?= wLabel('Update Warehouse', 'Update Shop') ?></button>
                     </div>
                 </form>
             </div>
@@ -1335,7 +1339,7 @@ function get_primary_badge($is_primary) {
                 Swal.fire({
                     icon: 'error',
                     title: <?= json_encode(t('Load Error')) ?>,
-                    text: <?= json_encode(t('Error loading warehouse data. Please try again.')) ?>
+                    text: <?= json_encode(wLabel('Error loading warehouse data. Please try again.', 'Error loading shop data. Please try again.')) ?>
                 });
             }
         });
@@ -1376,7 +1380,7 @@ function get_primary_badge($is_primary) {
 
             // Step 2 — confirm with full details
             Swal.fire({
-                title: <?= json_encode(t('Delete Warehouse?')) ?>,
+                title: <?= json_encode(wLabel('Delete Warehouse?', 'Delete Shop?')) ?>,
                 text: detail + <?= json_encode(t('This action cannot be undone.')) ?>,
                 icon: 'warning',
                 showCancelButton: true,
@@ -1401,7 +1405,7 @@ function get_primary_badge($is_primary) {
                             Swal.fire({
                                 icon: 'success',
                                 title: <?= json_encode(t('Deleted!')) ?>,
-                                text: <?= json_encode(t('Warehouse has been deleted successfully.')) ?>,
+                                text: <?= json_encode(wLabel('Warehouse has been deleted successfully.', 'Shop has been deleted successfully.')) ?>,
                                 timer: 2000,
                                 showConfirmButton: false
                             }).then(() => {
@@ -1420,7 +1424,7 @@ function get_primary_badge($is_primary) {
                         Swal.fire({
                             icon: 'error',
                             title: <?= json_encode(t('Server Error')) ?>,
-                            text: <?= json_encode(t('Error deleting warehouse. Please try again.')) ?>
+                            text: <?= json_encode(wLabel('Error deleting warehouse. Please try again.', 'Error deleting shop. Please try again.')) ?>
                         });
                     }
                 });
@@ -1435,7 +1439,7 @@ function get_primary_badge($is_primary) {
 
         Swal.fire({
             title: <?= json_encode(t('Confirm Action')) ?>,
-            text: <?= json_encode(t('Are you sure you want to %s this warehouse?')) ?>.replace('%s', actionLabel),
+            text: <?= json_encode(wLabel('Are you sure you want to %s this warehouse?', 'Are you sure you want to %s this shop?')) ?>.replace('%s', actionLabel),
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
@@ -1458,7 +1462,7 @@ function get_primary_badge($is_primary) {
                             Swal.fire({
                                 icon: 'success',
                                 title: <?= json_encode(t('Status Updated')) ?>,
-                                text: `<?= t('Warehouse') ?> ${doneLabel} <?= t('successfully!') ?>`,
+                                text: `<?= wLabel('Warehouse', 'Shop') ?> ${doneLabel} <?= t('successfully!') ?>`,
                                 timer: 1500,
                                 showConfirmButton: false
                             }).then(() => {
@@ -1477,7 +1481,7 @@ function get_primary_badge($is_primary) {
                         Swal.fire({
                             icon: 'error',
                             title: <?= json_encode(t('Server Error')) ?>,
-                            text: <?= json_encode(t('Error updating warehouse status. Please try again.')) ?>
+                            text: <?= json_encode(wLabel('Error updating warehouse status. Please try again.', 'Error updating shop status. Please try again.')) ?>
                         });
                     }
                 });
@@ -1488,7 +1492,7 @@ function get_primary_badge($is_primary) {
     function setPrimaryWarehouse(warehouseId) {
         Swal.fire({
             title: <?= json_encode(t('Set as Primary?')) ?>,
-            text: <?= json_encode(t('Are you sure you want to set this warehouse as primary? All other warehouses will be set as non-primary.')) ?>,
+            text: <?= json_encode(wLabel('Are you sure you want to set this warehouse as primary? All other warehouses will be set as non-primary.', 'Are you sure you want to set this shop as primary? All other shops will be set as non-primary.')) ?>,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
@@ -1509,7 +1513,7 @@ function get_primary_badge($is_primary) {
                             Swal.fire({
                                 icon: 'success',
                                 title: <?= json_encode(t('Primary Updated')) ?>,
-                                text: <?= json_encode(t('Primary warehouse updated successfully!')) ?>,
+                                text: <?= json_encode(wLabel('Primary warehouse updated successfully!', 'Primary shop updated successfully!')) ?>,
                                 timer: 2000,
                                 showConfirmButton: false
                             }).then(() => {
@@ -1528,7 +1532,7 @@ function get_primary_badge($is_primary) {
                         Swal.fire({
                             icon: 'error',
                             title: <?= json_encode(t('Server Error')) ?>,
-                            text: <?= json_encode(t('Error updating primary warehouse. Please try again.')) ?>
+                            text: <?= json_encode(wLabel('Error updating primary warehouse. Please try again.', 'Error updating primary shop. Please try again.')) ?>
                         });
                     }
                 });
@@ -1570,6 +1574,12 @@ function get_primary_badge($is_primary) {
 
     // Initialize DataTable
     $(document).ready(function() {
+        // Quick action from dashboard/POS: ?action=add opens the create modal directly
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('action') === 'add') {
+            new bootstrap.Modal(document.getElementById('addWarehouseModal')).show();
+        }
+
         $('#warehousesTable').DataTable({
             pageLength: 25,
             lengthChange: false, // Disable built-in length menu (we have custom one in actions bar)
@@ -1594,8 +1604,7 @@ function get_primary_badge($is_primary) {
         });
 
         logReportAction('Viewed Warehouses Page', 'User viewed the warehouse management page');
-        
-        const urlParams = new URLSearchParams(window.location.search);
+
         if (urlParams.has('search') && urlParams.get('search').trim() !== '') {
             logReportAction('Searched Warehouses', 'User searched warehouses for: ' + urlParams.get('search'));
         }

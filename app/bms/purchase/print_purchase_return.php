@@ -400,7 +400,7 @@ $wf = [
             <p><strong>Related GRN:</strong> <?= htmlspecialchars($return['grn_ref_number']) ?></p>
             <?php endif; ?>
             <?php if (!empty($return['warehouse_name'])): ?>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($return['warehouse_name']) ?></p>
+            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($return['warehouse_name']) ?></p>
             <?php endif; ?>
             <p><strong>Created By:</strong> <?= htmlspecialchars($return['created_by_name'] ?? 'N/A') ?></p>
         </div>

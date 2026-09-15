@@ -285,12 +285,12 @@ $comp = [
     <!-- FROM / TO WAREHOUSE DETAILS -->
     <div class="details-grid">
         <div class="box">
-            <h3>From (Source Warehouse)</h3>
+            <h3><?= wLabel('From (Source Warehouse)', 'From (Source Shop)') ?></h3>
             <p><strong><?= htmlspecialchars($transfer['from_warehouse']) ?></strong></p>
             <p>Code: <?= htmlspecialchars($transfer['from_code']) ?></p>
         </div>
         <div class="box">
-            <h3>To (Destination Warehouse)</h3>
+            <h3><?= wLabel('To (Destination Warehouse)', 'To (Destination Shop)') ?></h3>
             <p><strong><?= htmlspecialchars($transfer['to_warehouse']) ?></strong></p>
             <p>Code: <?= htmlspecialchars($transfer['to_code']) ?></p>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($transfer['created_by_name']) ?></p>
