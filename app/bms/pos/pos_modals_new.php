@@ -88,7 +88,7 @@ if ($can_restock_product ?? false) {
 <div class="modal fade" id="restockProductModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-arrow-repeat me-1"></i> <?= t('Restock Product') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -156,7 +156,7 @@ if ($can_restock_product ?? false) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i> <?= t('Save Restock') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save Restock') ?></button>
                 </div>
             </form>
         </div>
