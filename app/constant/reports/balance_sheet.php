@@ -323,7 +323,7 @@ try {
                         <?php endif; ?>
                         <?php if (!empty($bs_warehouses)): ?>
                         <select name="warehouse_id" id="bs-warehouse" class="form-select form-select-sm" style="width: 170px;">
-                            <option value="">All Warehouses</option>
+                            <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                             <?php foreach ($bs_warehouses as $w): ?>
                             <option value="<?= (int)$w['warehouse_id'] ?>" data-project="<?= (int)($w['project_id'] ?? 0) ?>" <?= $warehouse_id === (int)$w['warehouse_id'] ? 'selected' : '' ?>><?= safe_output($w['warehouse_name']) ?></option>
                             <?php endforeach; ?>
