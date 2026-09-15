@@ -718,17 +718,20 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 </div>
                                 <?php endif; ?>
                                 <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?> mb-3">
-                                    <label for="warehouse_id" class="form-label">Assign to Warehouse</label>
+                                    <label for="warehouse_id" class="form-label"><?= wLabel('Assign to Warehouse', 'Assign to Shop') ?></label>
                                     <!-- Plain <select>, NOT select2 — every other Project+Warehouse pair in
                                          BMS keeps Warehouse native so bindWarehouseToProject()'s show/hide +
                                          val('') can update it directly (Select2 needs an extra
                                          .trigger('change') to stay in sync, which this shared helper
                                          intentionally does not add — see assets/js/warehouse-project-filter.js). -->
                                     <select class="form-select" id="warehouse_id" name="warehouse_id">
-                                        <option value="">No Warehouse</option>
+                                        <option value=""><?= wLabel('No Warehouse', 'No Shop') ?></option>
                                         <?= renderWarehouseOptions($emp_warehouses) ?>
                                     </select>
-                                    <small class="text-muted">Optional: the employee's physical work location. Shows warehouses for the selected project, or unassigned warehouses when no project is chosen.</small>
+                                    <small class="text-muted"><?= wLabel(
+                                        "Optional: the employee's physical work location. Shows warehouses for the selected project, or unassigned warehouses when no project is chosen.",
+                                        "Optional: the employee's physical work location. Shows shops for the selected project, or unassigned shops when no project is chosen."
+                                    ) ?></small>
                                 </div>
                             </div>
                         </div>
