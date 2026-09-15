@@ -400,12 +400,12 @@ function generate_invoice_number() {
                     <?php endif; ?>
 
                     <div class="col-md-4 mb-3" id="warehouse_container">
-                        <label class="form-label small fw-bold">Warehouse <span class="text-danger" id="warehouse_required_mark">*</span></label>
+                        <label class="form-label small fw-bold"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger" id="warehouse_required_mark">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?= renderWarehouseOptions($warehouses, $prefill_warehouse_id) ?>
                         </select>
-                        <div class="form-text">Stock for inventory items is checked against this warehouse. Not needed for Service Invoices.</div>
+                        <div class="form-text"><?= wLabel('Stock for inventory items is checked against this warehouse. Not needed for Service Invoices.', 'Stock for inventory items is checked against this shop. Not needed for Service Invoices.') ?></div>
                     </div>
 
                     <?php if (!empty($approved_ipcs)): ?>

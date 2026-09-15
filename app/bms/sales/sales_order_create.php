@@ -327,9 +327,9 @@ $is_quote = isset($_GET['quote']) ? true : false;
                     </div>
                     
                     <div class="col-md-3 mb-3" id="warehouse_container">
-                        <label for="warehouse_id" class="form-label">Warehouse / Delivery Point <span class="text-dark">*</span></label>
+                        <label for="warehouse_id" class="form-label"><?= wLabel('Warehouse / Delivery Point', 'Shop / Delivery Point') ?> <span class="text-dark">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse</option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?= renderWarehouseOptions($warehouses, $sales_order['warehouse_id'] ?? 0) ?>
                         </select>
                     </div>
@@ -617,6 +617,15 @@ $is_quote = isset($_GET['quote']) ? true : false;
 
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
+const SOC_I18N = {
+    warehouseChanged: <?= json_encode(wLabel('Warehouse Changed', 'Shop Changed')) ?>,
+    itemsMayNotBeAvailable: <?= json_encode(wLabel('Please note that already added items might not be available in the new warehouse. You should verify your items.', 'Please note that already added items might not be available in the new shop. You should verify your items.')) ?>,
+    selectWarehouseFirst: <?= json_encode(wLabel('Select a warehouse first', 'Select a shop first')) ?>,
+    noPosForWarehouse: <?= json_encode(wLabel('No POs found for this warehouse', 'No POs found for this shop')) ?>,
+    selectWarehouseFirstPlaceholder: <?= json_encode(wLabel('Select warehouse first...', 'Select shop first...')) ?>,
+    selectWarehouse: <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?>,
+    selectWarehouseBeforeSearch: <?= json_encode(wLabel('Please select a warehouse / delivery point before searching for products.', 'Please select a shop / delivery point before searching for products.')) ?>,
+};
 let currentItemIndex = null;
 let itemCount = 0;
 let productsCache = [];
@@ -718,8 +727,8 @@ $(document).ready(function() {
         if ($('#itemsBody tr').length > 0 && $('.item-product-id').filter(function() { return $(this).val() !== ""; }).length > 0) {
              Swal.fire({
                 icon: 'warning',
-                title: 'Warehouse Changed',
-                text: 'Please note that already added items might not be available in the new warehouse. You should verify your items.',
+                title: SOC_I18N.warehouseChanged,
+                text: SOC_I18N.itemsMayNotBeAvailable,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
@@ -783,7 +792,7 @@ function searchPOByWarehouse(term) {
     const resultsDiv = $('#poSearchResults');
 
     if (!warehouseId) {
-        resultsDiv.html('<a class="list-group-item list-group-item-action text-muted disabled">Select a warehouse first</a>').show();
+        resultsDiv.html('<a class="list-group-item list-group-item-action text-muted disabled">' + SOC_I18N.selectWarehouseFirst + '</a>').show();
         return;
     }
 
@@ -811,7 +820,7 @@ function searchPOByWarehouse(term) {
                         );
                     });
                 } else {
-                    resultsDiv.html('<a class="list-group-item text-muted disabled">No POs found for this warehouse</a>');
+                    resultsDiv.html('<a class="list-group-item text-muted disabled">' + SOC_I18N.noPosForWarehouse + '</a>');
                 }
                 resultsDiv.show();
             },
@@ -1048,7 +1057,7 @@ function toggleProductInputs(warehouseId) {
     const isEnabled = (warehouseId && warehouseId !== "") || isService;
     $('.item-name').prop('disabled', !isEnabled);
     if (!isEnabled) {
-        $('.item-name').attr('placeholder', 'Select warehouse first...');
+        $('.item-name').attr('placeholder', SOC_I18N.selectWarehouseFirstPlaceholder);
     } else {
         $('.item-name').attr('placeholder', 'Type to search product...');
     }
@@ -1062,8 +1071,8 @@ function openProductSearch(index, term) {
     if (!warehouseId && !isService) {
         Swal.fire({
             icon: 'warning',
-            title: 'Select Warehouse',
-            text: 'Please select a warehouse / delivery point before searching for products.'
+            title: SOC_I18N.selectWarehouse,
+            text: SOC_I18N.selectWarehouseBeforeSearch
         });
         return;
     }
