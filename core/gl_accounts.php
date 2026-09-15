@@ -331,3 +331,45 @@ if (!function_exists('bankAccountResolve')) {
         return $v ?: null;
     }
 }
+
+if (!function_exists('miscExpenseAccountId')) {
+    /**
+     * Simple POS Expenses (expenses_simple_pos_plan.md): the expense account a
+     * simple-mode expense debits when the UI never asks which account to use.
+     * Setting → code 9-1000 (Sundry Expenses — the standard chart's own
+     * catch-all, also disposalLossAccountId()'s fallback) → first active
+     * expense-category leaf as a last resort (mirrors the old ad-hoc fallback
+     * that add_expense.php/update_expense.php used before this resolver existed).
+     */
+    function miscExpenseAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_expense_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '9-1000');                     if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'expense');             return $v ?: null;
+    }
+}
+
+if (!function_exists('defaultCashAccountId')) {
+    /**
+     * Simple POS Expenses: the "Paid From" account when that field is hidden
+     * from the form. A small shop pays most expenses straight out of the till,
+     * so this prefers a true Cash sub-type leaf (Petty Cash / Cash Drawer) over
+     * a bank account. Setting → Cash sub-type leaf → Bank sub-type leaf → any
+     * active cash/bank leaf (bankAccountResolve's own criteria) as a last resort.
+     */
+    function defaultCashAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_cash_account_id'); if ($v) return $v;
+        $v = gl_first_leaf_by_subtype($pdo, 'cash');               if ($v) return $v;
+        $v = gl_first_leaf_by_subtype($pdo, 'bank');               if ($v) return $v;
+        $s = $pdo->query("SELECT a.account_id
+                             FROM accounts a
+                             LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
+                            WHERE a.status = 'active' AND a.account_type = 'asset'
+                              AND (st.is_bank = 1 OR a.cash_flow_category = 'cash')
+                              AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+                            ORDER BY a.account_code LIMIT 1");
+        $v = (int)($s->fetchColumn() ?: 0);
+        return $v ?: null;
+    }
+}
