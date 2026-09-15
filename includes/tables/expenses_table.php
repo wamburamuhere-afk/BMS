@@ -31,7 +31,13 @@ $tbl = array_merge([
     'defer_pane'   => null,
 ], $tbl ?? []);
 
-if (getSetting('enable_projects', 0) != '1') {
+// projectsModuleActive() (core/project_scope.php) — NOT the raw
+// 'enable_projects' setting alone: that only reflects the tenant's own
+// toggle, not the superadmin's platform grant, so a tenant whose Projects
+// module was revoked (but who still had the toggle on beforehand) would
+// keep seeing this column. projectsModuleActive() is the same AND of both
+// checks the Add Expense modal's own Project field already uses.
+if (!projectsModuleActive()) {
     $tbl['hide'][] = 'project';
 }
 $exp_tbl_hide = array_values(array_unique($tbl['hide']));
@@ -60,15 +66,15 @@ $exp_logo_html = !empty($exp_logo_url)
 
 // Keys MUST stay in the same order as columns() in the JS module.
 $exp_tbl_columns = [
-    'sno'          => ['label' => 'S/NO',        'attrs' => 'style="width:70px;"'],
-    'expense_date' => ['label' => 'Date',        'attrs' => ''],
-    'description'  => ['label' => 'Description', 'attrs' => ''],
-    'categories'   => ['label' => 'Category',    'attrs' => ''],
-    'project'      => ['label' => 'Project',     'attrs' => ''],
-    'amount'       => ['label' => 'Amount',      'attrs' => ''],
-    'paid_to'      => ['label' => 'Paid To',     'attrs' => ''],
-    'status'       => ['label' => 'Status',      'attrs' => ''],
-    'actions'      => ['label' => 'Actions',     'attrs' => 'class="text-end d-print-none"'],
+    'sno'          => ['label' => t('S/NO'),        'attrs' => 'style="width:70px;"'],
+    'expense_date' => ['label' => t('Date'),        'attrs' => ''],
+    'description'  => ['label' => t('Description'), 'attrs' => ''],
+    'categories'   => ['label' => t('Category'),    'attrs' => ''],
+    'project'      => ['label' => t('Project'),     'attrs' => ''],
+    'amount'       => ['label' => t('Amount'),      'attrs' => ''],
+    'paid_to'      => ['label' => t('Paid To'),     'attrs' => ''],
+    'status'       => ['label' => t('Status'),      'attrs' => ''],
+    'actions'      => ['label' => t('Actions'),     'attrs' => 'class="text-end d-print-none"'],
 ];
 ?>
 <div class="table-responsive">
@@ -106,6 +112,58 @@ $(function () {
             printedRole: <?= json_encode($_SESSION['user_role'] ?? 'User') ?>,
             logoHtml:    <?= json_encode($exp_logo_html) ?>,
             companyName: <?= json_encode($exp_c_name) ?>
+        },
+        // JS-side translated strings — bms-expenses-table.js is a plain .js
+        // file (no PHP), so it cannot call t() itself; every string it renders
+        // is resolved here, once, and read off cfg.i18n.*.
+        i18n: {
+            editExpense:      <?= json_encode(t('Edit Expense')) ?>,
+            markAsReviewed:   <?= json_encode(t('Mark as Reviewed')) ?>,
+            approve:          <?= json_encode(t('Approve')) ?>,
+            reject:           <?= json_encode(t('Reject')) ?>,
+            markAsPaid:       <?= json_encode(t('Mark as Paid')) ?>,
+            delete:           <?= json_encode(t('Delete')) ?>,
+            viewDetails:      <?= json_encode(t('View Details')) ?>,
+            printVoucher:     <?= json_encode(t('Print Voucher')) ?>,
+            unknown:          <?= json_encode(t('Unknown')) ?>,
+            dayPrefix:        <?= json_encode(t('Day:')) ?>,
+            supplier:         <?= json_encode(t('Supplier')) ?>,
+            staff:            <?= json_encode(t('Staff')) ?>,
+            na:               <?= json_encode(t('N/A')) ?>,
+            updateStatusTitle:<?= json_encode(t('Update Status?')) ?>,
+            markAsConfirm:    <?= json_encode(t('Are you sure you want to mark this as')) ?>,
+            yesProceed:       <?= json_encode(t('Yes, Proceed')) ?>,
+            updated:          <?= json_encode(t('Updated!')) ?>,
+            deleteExpenseTitle: <?= json_encode(t('Delete Expense?')) ?>,
+            deleteExpenseText: <?= json_encode(t('Permanently delete this expense? This action cannot be undone.')) ?>,
+            yesDelete:        <?= json_encode(t('Yes, Delete')) ?>,
+            deleted:          <?= json_encode(t('Deleted!')) ?>,
+            couldNotLoadExpense: <?= json_encode(t('Could not load expense')) ?>,
+            error:            <?= json_encode(t('Error')) ?>,
+            paymentVoucher:   <?= json_encode(t('Payment Voucher')) ?>,
+            voucherNo:        <?= json_encode(t('Voucher No:')) ?>,
+            dateLabel:        <?= json_encode(t('Date:')) ?>,
+            amountPaid:       <?= json_encode(t('Amount Paid')) ?>,
+            inWords:          <?= json_encode(t('In Words:')) ?>,
+            paidTo:           <?= json_encode(t('Paid To')) ?>,
+            description:      <?= json_encode(t('Description')) ?>,
+            expenseAccount:   <?= json_encode(t('Expense Account')) ?>,
+            paidFromBank:     <?= json_encode(t('Paid From (Bank)')) ?>,
+            referenceNo:      <?= json_encode(t('Reference No.')) ?>,
+            notes:            <?= json_encode(t('Notes')) ?>,
+            status:           <?= json_encode(t('Status')) ?>,
+            preparedBy:       <?= json_encode(t('Prepared By')) ?>,
+            approvedBy:       <?= json_encode(t('Approved By')) ?>,
+            receivedBy:       <?= json_encode(t('Received By')) ?>,
+            voucherNoteLabel: <?= json_encode(t('Note:')) ?>,
+            voucherNoteText:  <?= json_encode(t('This is a computer-generated payment voucher. Please verify all details before processing payment.')) ?>,
+            statusLabels: {
+                pending:  <?= json_encode(t('Pending')) ?>,
+                reviewed: <?= json_encode(t('Reviewed')) ?>,
+                approved: <?= json_encode(t('Approved')) ?>,
+                rejected: <?= json_encode(t('Rejected')) ?>,
+                paid:     <?= json_encode(t('Paid')) ?>,
+            },
         },
         hide:  <?= json_encode($exp_tbl_hide) ?>,
         fixed: <?= json_encode(($tbl['paid_to_type'] !== '' && $tbl['paid_to_id'] > 0)

@@ -432,6 +432,7 @@ if ($_POST) {
                                                    value="<?= get_setting('company_name', 'Microfinance Institution') ?>" required>
                                         </div>
 
+                                        <?php if (tenantFeatureEnabled('projects')): ?>
                                         <div class="mb-3">
                                             <label class="form-label d-block fw-bold"><?= t('Module Settings') ?></label>
                                             <div class="form-check form-switch p-2 bg-light rounded border">
@@ -440,6 +441,7 @@ if ($_POST) {
                                                 <div class="small text-muted mt-1"><?= t('Manage projects and link finances (expenses, invoices, etc.) to specific projects.') ?></div>
                                             </div>
                                         </div>
+                                        <?php endif; ?>
 
                                         <div class="mb-0">
                                             <label for="company_type" class="form-label"><?= t('Business Type') ?> *</label>

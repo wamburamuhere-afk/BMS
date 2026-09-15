@@ -175,8 +175,8 @@ if (!function_exists('renderExpenseCatRows')) {
             </div>
         <?php endif; ?>
         <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= htmlspecialchars($c_name) ?></h1>
-        <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Expense Management Report</h2>
-        <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: <?= date('F j, Y, g:i a') ?></p>
+        <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('Expense Management Report') ?></h2>
+        <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> <?= date('F j, Y, g:i a') ?></p>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
@@ -187,18 +187,18 @@ if (!function_exists('renderExpenseCatRows')) {
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> Expenses Management</h2>
-                            <p class="mb-0 text-muted">Track and manage all expenses</p>
+                            <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> <?= t('Expenses Management') ?></h2>
+                            <p class="mb-0 text-muted"><?= t('Track and manage all expenses') ?></p>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
                             <?php if (!$posSimple): ?>
                             <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
-                                <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
+                                <i class="bi bi-diagram-3-fill"></i> <?= t('Expense Types & Categories') ?>
                             </a>
                             <?php endif; ?>
                             <?php if (canCreate('expenses')): ?>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
-                                <i class="bi bi-plus-circle"></i> Add New Expense
+                                <i class="bi bi-plus-circle"></i> <?= t('Add New Expense') ?>
                             </button>
                             <?php endif; ?>
                         </div>
@@ -239,7 +239,7 @@ if (!function_exists('renderExpenseCatRows')) {
                             <i class="bi bi-cash-stack"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">TOTAL EXPENSES</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('TOTAL EXPENSES') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" id="stat-total-expenses" style="font-size: 1.1rem;">0.00</h4>
                         </div>
                     </div>
@@ -254,7 +254,7 @@ if (!function_exists('renderExpenseCatRows')) {
                             <i class="bi bi-calendar-month"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">THIS MONTH</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('THIS MONTH') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" id="stat-month-total" style="font-size: 1.1rem;">0.00</h4>
                         </div>
                     </div>
@@ -269,7 +269,7 @@ if (!function_exists('renderExpenseCatRows')) {
                             <i class="bi bi-calendar-event"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">THIS YEAR</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('THIS YEAR') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" id="stat-year-total" style="font-size: 1.1rem;">0.00</h4>
                         </div>
                     </div>
@@ -284,7 +284,7 @@ if (!function_exists('renderExpenseCatRows')) {
                             <i class="bi bi-receipt"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">RECORDS</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('RECORDS') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" id="stat-total-records" style="font-size: 1.1rem;">0</h4>
                         </div>
                     </div>
@@ -299,17 +299,17 @@ if (!function_exists('renderExpenseCatRows')) {
     <div class="col-lg-3">
         <div class="card border-0 shadow-sm" style="position:sticky; top:12px;">
             <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                <span class="fw-bold small text-uppercase text-muted"><i class="bi bi-diagram-3-fill me-1"></i>Types &amp; Categories</span>
+                <span class="fw-bold small text-uppercase text-muted"><i class="bi bi-diagram-3-fill me-1"></i><?= t('Types & Categories') ?></span>
                 <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary border-0 px-1" title="Expand all" onclick="expAllNodes(true)"><i class="bi bi-arrows-expand"></i></button>
-                    <button type="button" class="btn btn-outline-secondary border-0 px-1" title="Collapse all" onclick="expAllNodes(false)"><i class="bi bi-arrows-collapse"></i></button>
+                    <button type="button" class="btn btn-outline-secondary border-0 px-1" title="<?= t('Expand all') ?>" onclick="expAllNodes(true)"><i class="bi bi-arrows-expand"></i></button>
+                    <button type="button" class="btn btn-outline-secondary border-0 px-1" title="<?= t('Collapse all') ?>" onclick="expAllNodes(false)"><i class="bi bi-arrows-collapse"></i></button>
                 </div>
             </div>
             <div class="card-body p-2" id="expTreePanel" style="max-height:72vh; overflow-y:auto;">
-                <div class="exp-tree-row exp-active d-flex align-items-center py-1 px-2 rounded" data-key="all" role="button" onclick="pickExpNode(this,0,0,'All Expenses')">
+                <div class="exp-tree-row exp-active d-flex align-items-center py-1 px-2 rounded" data-key="all" role="button" onclick="pickExpNode(this,0,0,<?= htmlspecialchars(json_encode(t('All Expenses')), ENT_QUOTES) ?>)">
                     <span style="display:inline-block;width:14px;"></span>
                     <i class="bi bi-list-ul text-primary mx-1"></i>
-                    <span class="flex-grow-1 small fw-bold">All Expenses</span>
+                    <span class="flex-grow-1 small fw-bold"><?= t('All Expenses') ?></span>
                 </div>
                 <?php foreach ($expenseTree as $t): $tkey = 't' . $t['type_id']; $hasCats = !empty($t['categories']); ?>
                 <div class="exp-tree-row d-flex align-items-center py-1 px-2 rounded mt-1" data-key="<?= $tkey ?>" data-type="<?= $t['type_id'] ?>" role="button"
@@ -326,10 +326,10 @@ if (!function_exists('renderExpenseCatRows')) {
                 <?php endif; ?>
                 <?php endforeach; ?>
                 <?php if ($uncatNode['count'] > 0): ?>
-                <div class="exp-tree-row d-flex align-items-center py-1 px-2 rounded mt-1" data-key="uncat" data-uncat="1" role="button" onclick="pickExpNode(this,0,0,'Uncategorised',true)" style="padding-left:6px;">
+                <div class="exp-tree-row d-flex align-items-center py-1 px-2 rounded mt-1" data-key="uncat" data-uncat="1" role="button" onclick="pickExpNode(this,0,0,<?= htmlspecialchars(json_encode(t('Uncategorised')), ENT_QUOTES) ?>,true)" style="padding-left:6px;">
                     <span style="display:inline-block;width:14px;"></span>
                     <i class="bi bi-question-circle text-secondary mx-1"></i>
-                    <span class="flex-grow-1 small text-truncate text-muted">Uncategorised</span>
+                    <span class="flex-grow-1 small text-truncate text-muted"><?= t('Uncategorised') ?></span>
                     <span class="badge bg-light text-muted border ms-1" style="font-size:.6rem;"><?= (int)$uncatNode['count'] ?></span>
                 </div>
                 <?php endif; ?>
@@ -343,15 +343,15 @@ if (!function_exists('renderExpenseCatRows')) {
     <!-- Filters Card -->
     <div class="card mb-4">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters & Search</h6>
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters & Search') ?></h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
                 <?php if (!$posSimple): ?>
                 <div class="col-md-3">
-                    <label class="form-label">Expense Account</label>
+                    <label class="form-label"><?= t('Expense Account') ?></label>
                     <select class="form-select select2-static" id="categoryFilter" style="width: 100%;">
-                        <option value="">All Accounts</option>
+                        <option value=""><?= t('All Accounts') ?></option>
                         <?php foreach ($expense_accounts as $acc): ?>
                             <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                         <?php endforeach; ?>
@@ -359,30 +359,30 @@ if (!function_exists('renderExpenseCatRows')) {
                 </div>
                 <?php endif; ?>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
-                    <label class="form-label">Status</label>
+                    <label class="form-label"><?= t('Status') ?></label>
                     <select class="form-select" id="statusFilter">
-                        <option value="">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="reviewed">Reviewed</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="paid">Paid</option>
+                        <option value=""><?= t('All Status') ?></option>
+                        <option value="pending"><?= t('Pending') ?></option>
+                        <option value="reviewed"><?= t('Reviewed') ?></option>
+                        <option value="approved"><?= t('Approved') ?></option>
+                        <option value="rejected"><?= t('Rejected') ?></option>
+                        <option value="paid"><?= t('Paid') ?></option>
                     </select>
                 </div>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
-                    <label class="form-label">Date From</label>
+                    <label class="form-label"><?= t('Date From') ?></label>
                     <input type="date" class="form-control" id="dateFromFilter">
                 </div>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
-                    <label class="form-label">Date To</label>
+                    <label class="form-label"><?= t('Date To') ?></label>
                     <input type="date" class="form-control" id="dateToFilter">
                 </div>
                 <div class="col-md-12 d-flex justify-content-end">
                     <button type="button" class="btn btn-primary me-2" onclick="applyFilters()">
-                        <i class="bi bi-filter"></i> Apply Filters
+                        <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                     </button>
                     <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
-                        <i class="bi bi-arrow-clockwise"></i> Clear
+                        <i class="bi bi-arrow-clockwise"></i> <?= t('Clear') ?>
                     </button>
                 </div>
             </div>
@@ -422,35 +422,35 @@ if (!function_exists('renderExpenseCatRows')) {
         
         <div class="d-flex align-items-center gap-1 flex-nowrap">
             <button type="button" class="btn btn-action-compact" onclick="copyTable()">
-                <i class="bi bi-clipboard text-info me-1"></i> Copy
+                <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
             </button>
             <button type="button" class="btn btn-action-compact" onclick="exportExpenses()">
                 <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> CSV
             </button>
             <button type="button" class="btn btn-action-compact" onclick="printTable()">
-                <i class="bi bi-printer text-primary me-1"></i> Print
+                <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
             </button>
         </div>
 
         <div class="d-flex align-items-center bg-white px-2 rounded border shadow-sm" style="height: 32px;">
-            <span class="action-label-compact me-2">Show:</span>
+            <span class="action-label-compact me-2"><?= t('Show:') ?></span>
             <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; font-size: 0.8rem; background: transparent; box-shadow: none;" onchange="$('#expensesTable').DataTable().page.len(this.value).draw();">
                 <option value="10">10</option>
                 <option value="25" selected>25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
-                <option value="-1">All</option>
+                <option value="-1"><?= t('All') ?></option>
             </select>
         </div>
 
         <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted" style="font-size: 0.8rem;"></i></span>
-            <input type="text" class="form-control border-start-0 search-input-compact" placeholder="Search..." onkeyup="$('#expensesTable').DataTable().search(this.value).draw();">
+            <input type="text" class="form-control border-start-0 search-input-compact" placeholder="<?= t('Search...') ?>" onkeyup="$('#expensesTable').DataTable().search(this.value).draw();">
         </div>
 
         <div class="ms-auto d-none d-lg-block">
             <span class="badge bg-success-soft text-success border border-success px-2 py-1 rounded-pill" id="stat-total-records-badge" style="font-size: 0.7rem;">
-                <i class="bi bi-check-circle-fill me-1"></i> 0 records
+                <i class="bi bi-check-circle-fill me-1"></i> 0 <?= t('records') ?>
             </span>
         </div>
     </div>
@@ -458,7 +458,7 @@ if (!function_exists('renderExpenseCatRows')) {
     <!-- Expenses Table Card -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-bottom">
-            <h5 class="mb-0 fw-bold">Expense Records</h5>
+            <h5 class="mb-0 fw-bold"><?= t('Expense Records') ?></h5>
         </div>
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
@@ -514,17 +514,17 @@ if (!function_exists('renderExpenseCatRows')) {
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="addExpenseModalLabel">
-                    <i class="bi bi-plus-circle"></i> Add New Expense
+                    <i class="bi bi-plus-circle"></i> <?= t('Add New Expense') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" aria-label="Close" onclick="closeAddExpenseModal()"></button>
+                <button type="button" class="btn-close btn-close-white" aria-label="<?= t('Close') ?>" onclick="closeAddExpenseModal()"></button>
             </div>
             <form id="addExpenseForm">
                 <div class="modal-body p-4">
                     <div id="add-expense-message" class="mb-3"></div>
-                    
+
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Expense Date <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Expense Date') ?> <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
 
@@ -532,12 +532,12 @@ if (!function_exists('renderExpenseCatRows')) {
                         <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center">
                                 <label class="form-label small fw-bold mb-0"><?= t('Expense Type') ?> <span class="text-danger">*</span></label>
-                                <a href="<?= getUrl('expense_types') ?>" target="_blank" class="small text-decoration-none" title="Open the Expense Types & Categories page in a new tab">
+                                <a href="<?= getUrl('expense_types') ?>" target="_blank" class="small text-decoration-none" title="<?= t('Open the Expense Types & Categories page in a new tab') ?>">
                                     <i class="bi bi-gear-wide-connected me-1"></i><?= t('Manage types & categories') ?>
                                 </a>
                             </div>
                             <select class="form-select expense-type-sel mt-1" name="expense_type" id="ex_type_id" required>
-                                <option value="">Select Type</option>
+                                <option value=""><?= t('Select Type') ?></option>
                             </select>
                         </div>
 
@@ -565,17 +565,17 @@ if (!function_exists('renderExpenseCatRows')) {
                                 </select>
                             <?php else: ?>
                                 <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
-                                    <option value="">Select Type</option>
-                                    <option value="supplier">Supplier</option>
-                                    <option value="staff">Staff (Employee)</option>
-                                    <option value="sub_contractor">Sub Contractor</option>
+                                    <option value=""><?= t('Select Type') ?></option>
+                                    <option value="supplier"><?= t('Supplier') ?></option>
+                                    <option value="staff"><?= t('Staff (Employee)') ?></option>
+                                    <option value="sub_contractor"><?= t('Sub Contractor') ?></option>
                                 </select>
                             <?php endif; ?>
                         </div>
                         <div class="col-md-6 d-none" id="paid_to_id_block">
-                            <label class="form-label small fw-bold" id="paid_to_id_label">Payee</label>
+                            <label class="form-label small fw-bold" id="paid_to_id_label"><?= t('Payee') ?></label>
                             <select class="form-select" name="paid_to_id" id="paid_to_id_select">
-                                <option value="">Select...</option>
+                                <option value=""><?= t('Select...') ?></option>
                             </select>
                         </div>
                         <?php if ($posSimple): ?>
@@ -587,26 +587,26 @@ if (!function_exists('renderExpenseCatRows')) {
                         </div>
                         <?php endif; ?>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Amount') ?> <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
                         </div>
                         <?php if (!$posSimple): ?>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Paid From <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold"><?= t('Paid From') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
-                                <option value="">Select account…</option>
+                                <option value=""><?= t('Select account…') ?></option>
                                 <?php foreach ($bank_accounts as $acc): ?>
                                     <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
+                            <div class="form-text text-muted"><?= t('The cash/bank account the money is paid from.') ?></div>
                         </div>
                         <?php endif; ?>
                         <?php if ($enable_projects == '1'): ?>
                         <div class="col-md-6" id="project_field_block">
-                            <label class="form-label small fw-bold">Project</label>
+                            <label class="form-label small fw-bold"><?= t('Project') ?></label>
                             <select class="form-select select2-static" name="project_id">
-                                <option value="">Select Project</option>
+                                <option value=""><?= t('Select Project') ?></option>
                                 <?php foreach ($projects as $proj): ?>
                                     <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
                                 <?php endforeach; ?>
@@ -616,21 +616,23 @@ if (!function_exists('renderExpenseCatRows')) {
                         <!-- Description / Context -->
                         <div class="col-12">
                             <div class="d-flex justify-content-between align-items-center">
-                                <label class="form-label small fw-bold mb-0">Description <span class="text-danger">*</span></label>
+                                <label class="form-label small fw-bold mb-0"><?= t('Description') ?> <span class="text-danger">*</span></label>
                                 <?php require_once __DIR__ . '/../../../app/includes/ai_generate.php'; echo aiButton('expense_description_ai', 'expense_description'); ?>
                             </div>
-                            <textarea class="form-control" id="expense_description_ai" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
+                            <textarea class="form-control" id="expense_description_ai" name="description" rows="3" required placeholder="<?= t('Explain why this expense happened (e.g. Fuel for Truck T102-ABC)') ?>"></textarea>
                         </div>
+                        <?php if (!$posSimple): ?>
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Notes</label>
-                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional details..."></textarea>
+                            <label class="form-label small fw-bold"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Additional details...') ?>"></textarea>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-0">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeAddExpenseModal()">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeAddExpenseModal()"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary btn-sm px-4">
-                        <i class="bi bi-check-circle"></i> <span id="btnText">Save Expense</span>
+                        <i class="bi bi-check-circle"></i> <span id="btnText"><?= t('Save Expense') ?></span>
                     </button>
                 </div>
             </form>
@@ -666,6 +668,51 @@ if (!function_exists('renderExpenseCatRows')) {
 // $(document).ready() block and function in this file can see it.
 const EXP_SIMPLE_POS = <?= json_encode($posSimple) ?>;
 
+// JS-side translated strings — t() only runs in PHP, so anything this page's
+// JS renders (Swal dialogs, dynamic labels, reset states) needs its own copy
+// resolved server-side once, up front. Keys map 1:1 to lang/*.php entries.
+const EXP_I18N = {
+    addNewExpense:     <?= json_encode(t('Add New Expense')) ?>,
+    editExpense:       <?= json_encode(t('Edit Expense')) ?>,
+    saveExpense:       <?= json_encode(t('Save Expense')) ?>,
+    updateExpense:     <?= json_encode(t('Update Expense')) ?>,
+    success:           <?= json_encode(t('Success!')) ?>,
+    ok:                <?= json_encode(t('OK')) ?>,
+    error:             <?= json_encode(t('Error')) ?>,
+    serverErrorOccurred: <?= json_encode(t('Server error occurred')) ?>,
+    copied:            <?= json_encode(t('Copied!')) ?>,
+    tableCopied:       <?= json_encode(t('Table copied to clipboard')) ?>,
+    failedToCopyTable: <?= json_encode(t('Failed to copy table')) ?>,
+    selectEllipsis:    <?= json_encode(t('Select...')) ?>,
+    selectType:        <?= json_encode(t('Select Type')) ?>,
+    otherAddNew:       <?= json_encode(t('Other (add new…)')) ?>,
+    payee:             <?= json_encode(t('Payee')) ?>,
+    staffMember:       <?= json_encode(t('Staff Member')) ?>,
+    newExpenseType:    <?= json_encode(t('New Expense Type')) ?>,
+    typeName:          <?= json_encode(t('Type name')) ?>,
+    add:               <?= json_encode(t('Add')) ?>,
+    couldNotAddType:   <?= json_encode(t('Could not add type.')) ?>,
+    couldNotAddCategory: <?= json_encode(t('Could not add category.')) ?>,
+    couldNotLoadData:  <?= json_encode(t('Could not load data.')) ?>,
+    deleteConfirmTitle:<?= json_encode(t('Delete?')) ?>,
+    deleteConfirmText: <?= json_encode(t('This action cannot be undone.')) ?>,
+    yesDelete:         <?= json_encode(t('Yes, Delete')) ?>,
+    deleted:           <?= json_encode(t('Deleted!')) ?>,
+    selectCategory:    <?= json_encode(t('Select Category')) ?>,
+    selectSubCategory: <?= json_encode(t('Select Sub-category')) ?>,
+    typeNamePlaceholder: <?= json_encode(t('e.g. Utilities')) ?>,
+    pleaseEnterName:   <?= json_encode(t('Please enter a name.')) ?>,
+    expenseTypeAdded:  <?= json_encode(t('Expense type added.')) ?>,
+    newSubCategory:    <?= json_encode(t('New Sub-category')) ?>,
+    newCategory:       <?= json_encode(t('New Category')) ?>,
+    subCategoryName:   <?= json_encode(t('Sub-category name')) ?>,
+    categoryName:      <?= json_encode(t('Category name')) ?>,
+    subCategoryAdded:  <?= json_encode(t('Sub-category added.')) ?>,
+    categoryAdded:     <?= json_encode(t('Category added.')) ?>,
+    itemDescription:   <?= json_encode(t('Item description')) ?>,
+    egLitres:          <?= json_encode(t('e.g. Litres')) ?>,
+};
+
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Expenses List', 'User viewed the expenses management list');
@@ -688,7 +735,7 @@ $(document).ready(function() {
             $this.select2({
                 theme: 'bootstrap-5',
                 dropdownParent: isFilter ? null : $('#addExpenseModal'),
-                placeholder: 'Select...',
+                placeholder: EXP_I18N.selectEllipsis,
                 allowClear: true,
                 width: '100%'
             });
@@ -754,8 +801,8 @@ $(document).ready(function() {
                             </div>
                         <?php endif; ?>
                         <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= htmlspecialchars($c_name) ?></h1>
-                        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Expense Management Report</h2>
-                        <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: ${new Date().toLocaleString()}</p>
+                        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('Expense Management Report') ?></h2>
+                        <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> ${new Date().toLocaleString()}</p>
                         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
                     </div>`,
                 exportOptions: { 
@@ -792,7 +839,7 @@ $(document).ready(function() {
                     $(win.document.body).find('tbody tr:odd').css('background-color', '#f8f9fa');
 
                     // Rebuild stats cards for print: label on top, value below — no overflow/clipping
-                    var labels = ['TOTAL EXPENSES', 'THIS MONTH', 'THIS YEAR', 'RECORDS'];
+                    var labels = [<?= json_encode(t('TOTAL EXPENSES')) ?>, <?= json_encode(t('THIS MONTH')) ?>, <?= json_encode(t('THIS YEAR')) ?>, <?= json_encode(t('RECORDS')) ?>];
                     var ids    = ['stat-total-expenses', 'stat-month-total', 'stat-year-total', 'stat-total-records'];
                     var printCardsHtml = '<div style="display:flex; flex-direction:row; flex-wrap:nowrap; width:100%; gap:10px; margin-bottom:16px;">';
                     labels.forEach(function(label, i) {
@@ -911,30 +958,30 @@ $(document).ready(function() {
             type: 'POST',
             data: $form.serialize(),
             success: response => {
-                $btn.prop('disabled', false).html(expenseId ? '<i class="bi bi-check-circle"></i> Update Expense' : '<i class="bi bi-check-circle"></i> Save Expense');
+                $btn.prop('disabled', false).html(expenseId ? '<i class="bi bi-check-circle"></i> ' + EXP_I18N.updateExpense : '<i class="bi bi-check-circle"></i> ' + EXP_I18N.saveExpense);
                 if (response.success) {
                     const actionType = expenseId ? 'Updated Expense' : 'Created Expense';
                     const actionDesc = expenseId ? 'User updated expense #' + expenseId : 'User created a new expense record';
                     logReportAction(actionType, actionDesc);
-                    
+
                     Swal.fire({
                         icon: 'success',
-                        title: 'Success!',
+                        title: EXP_I18N.success,
                         text: response.message,
                         confirmButtonColor: '#28a745',
-                        confirmButtonText: 'OK',
+                        confirmButtonText: EXP_I18N.ok,
                         timer: 3000
                     }).then(() => {
                         closeAddExpenseModal();
                         BMSExpensesTable.reload('expensesTable');
                     });
                 } else {
-                    Swal.fire('Error', response.message, 'error');
+                    Swal.fire(EXP_I18N.error, response.message, 'error');
                 }
             },
             error: () => {
-                Swal.fire('Error', 'Server error occurred', 'error');
-                $btn.prop('disabled', false).html(expenseId ? '<i class="bi bi-check-circle"></i> Update Expense' : '<i class="bi bi-check-circle"></i> Save Expense');
+                Swal.fire(EXP_I18N.error, EXP_I18N.serverErrorOccurred, 'error');
+                $btn.prop('disabled', false).html(expenseId ? '<i class="bi bi-check-circle"></i> ' + EXP_I18N.updateExpense : '<i class="bi bi-check-circle"></i> ' + EXP_I18N.saveExpense);
             }
         });
     });
@@ -944,9 +991,9 @@ $(document).ready(function() {
         $form[0].reset();
         $form.find('input[name="expense_id"]').remove();
         $form.find('.select2-static').val(null).trigger('change');
-        $('#addExpenseModalLabel').html('<i class="bi bi-plus-circle"></i> Add New Expense');
-        $('#btnText').text('Save Expense');
-        $form.find('button[type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> <span id="btnText">Save Expense</span>');
+        $('#addExpenseModalLabel').html('<i class="bi bi-plus-circle"></i> ' + EXP_I18N.addNewExpense);
+        $('#btnText').text(EXP_I18N.saveExpense);
+        $form.find('button[type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> <span id="btnText">' + EXP_I18N.saveExpense + '</span>');
         $('#add-expense-message').html('');
         // Reset breakdown
         $('#breakdown-body').empty();
@@ -962,7 +1009,7 @@ $(document).ready(function() {
         $('#paid_to_id_block').addClass('d-none');
         const $payeeSelect = $('#paid_to_id_select');
         if ($payeeSelect.data('select2')) $payeeSelect.select2('destroy');
-        $payeeSelect.empty().append('<option value="">Select...</option>');
+        $payeeSelect.empty().append('<option value="">' + EXP_I18N.selectEllipsis + '</option>');
 
         // Reset categorization fields — also restore project block visibility
         $('#project_field_block').removeClass('d-none');
@@ -1022,13 +1069,13 @@ $(document).ready(function() {
         const $block   = $('#paid_to_id_block');
         const $manual  = $('#paid_to_manual_block');
         const $select  = $('#paid_to_id_select');
-        const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
+        const labelMap = { supplier: <?= json_encode(t('Supplier')) ?>, staff: EXP_I18N.staffMember, sub_contractor: <?= json_encode(t('Sub Contractor')) ?> };
         const dataMap  = { supplier: suppliersData, staff: staffData, sub_contractor: subContractorsData };
 
         // Simple POS "More" — a manually-typed payee, no id to pick from.
         if (type === 'other') {
             if ($select.data('select2')) $select.select2('destroy');
-            $select.empty().append('<option value="">Select...</option>');
+            $select.empty().append('<option value="">' + EXP_I18N.selectEllipsis + '</option>');
             $block.addClass('d-none');
             $manual.removeClass('d-none');
             return;
@@ -1036,16 +1083,16 @@ $(document).ready(function() {
         $manual.addClass('d-none');
 
         if ($select.data('select2')) $select.select2('destroy');
-        $select.empty().append('<option value="">Select...</option>');
+        $select.empty().append('<option value="">' + EXP_I18N.selectEllipsis + '</option>');
 
         if (type && dataMap[type]) {
             dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
-            $('#paid_to_id_label').text(labelMap[type] || 'Payee');
+            $('#paid_to_id_label').text(labelMap[type] || EXP_I18N.payee);
             $block.removeClass('d-none');
             $select.select2({
                 theme: 'bootstrap-5',
                 dropdownParent: $('#addExpenseModal'),
-                placeholder: 'Select...',
+                placeholder: EXP_I18N.selectEllipsis,
                 allowClear: true,
                 width: '100%'
             });
@@ -1076,7 +1123,7 @@ const EXPENSE_CAN_MANAGE_SCHEMA = <?= (canEdit('expenses') || canEdit('categorie
 const OTHER_VALUE = '__other__';
 function otherOption() {
     return EXPENSE_CAN_MANAGE_SCHEMA
-        ? `<option value="${OTHER_VALUE}">➕ Other (add new…)</option>`
+        ? `<option value="${OTHER_VALUE}">➕ ${EXP_I18N.otherAddNew}</option>`
         : '';
 }
 
@@ -1092,7 +1139,7 @@ function loadExpenseSchema(callback) {
 
 function populateExpenseTypeDropdowns() {
     const $types = $('.expense-type-sel');
-    let options = '<option value="">Select Type</option>';
+    let options = '<option value="">' + EXP_I18N.selectType + '</option>';
 
     expenseSchema.forEach(type => {
         options += `<option value="${type.id}">${type.name}</option>`;
@@ -1107,7 +1154,7 @@ function populateExpenseTypeDropdowns() {
         $t.select2({
             theme: 'bootstrap-5',
             dropdownParent: $t.closest('.modal').length ? $t.closest('.modal') : null,
-            placeholder: 'Select Type',
+            placeholder: EXP_I18N.selectType,
             allowClear: true,
             width: '100%'
         });
@@ -1172,7 +1219,7 @@ function renderCascadeDropdown(categories, level) {
     });
 
     const isRoot = level === 0;
-    const label = isRoot ? 'Select Category' : 'Select Sub-category';
+    const label = isRoot ? EXP_I18N.selectCategory : EXP_I18N.selectSubCategory;
 
     let opts = `<option value="">— ${label} —</option>`;
     categories.forEach(cat => {
@@ -1253,13 +1300,13 @@ function defineNewType($sel) {
     const prevType = $sel.data('prevValue') || '';
     const prevCat  = $('#selected_category_id').val() || '';
     Swal.fire({
-        title: 'New Expense Type', input: 'text', inputLabel: 'Type name',
-        inputPlaceholder: 'e.g. Utilities', inputAttributes: { autocomplete: 'off' },
-        showCancelButton: true, confirmButtonText: 'Add', confirmButtonColor: '#0d6efd',
+        title: EXP_I18N.newExpenseType, input: 'text', inputLabel: EXP_I18N.typeName,
+        inputPlaceholder: EXP_I18N.typeNamePlaceholder, inputAttributes: { autocomplete: 'off' },
+        showCancelButton: true, confirmButtonText: EXP_I18N.add, confirmButtonColor: '#0d6efd',
         // Render inside the expense modal so its focus trap does not block typing.
         target: document.getElementById('addExpenseModal') || undefined, heightAuto: false,
         didOpen: () => { const i = Swal.getInput(); if (i) i.focus(); },
-        inputValidator: v => { if (!v || !v.trim()) return 'Please enter a name.'; }
+        inputValidator: v => { if (!v || !v.trim()) return EXP_I18N.pleaseEnterName; }
     }).then(r => {
         if (!r.isConfirmed) {
             // Revert: restore the previous type (and its category path) — nothing else touched.
@@ -1270,9 +1317,9 @@ function defineNewType($sel) {
         const name = r.value.trim();
         $.post(MANAGE_SCHEMA_URL, { action: 'add_type', name: name, show_project: 1 }, function (res) {
             if (res && res.success) {
-                loadExpenseSchema(() => { $('#ex_type_id').val(res.id).trigger('change'); showToast('success', 'Expense type added.'); });
-            } else { Swal.fire('Error', (res && res.message) || 'Could not add type.', 'error'); $sel.val(prevType || '').trigger('change'); }
-        }, 'json').fail(() => { Swal.fire('Error', 'Could not add type.', 'error'); $sel.val(prevType || '').trigger('change'); });
+                loadExpenseSchema(() => { $('#ex_type_id').val(res.id).trigger('change'); showToast('success', EXP_I18N.expenseTypeAdded); });
+            } else { Swal.fire(EXP_I18N.error, (res && res.message) || EXP_I18N.couldNotAddType, 'error'); $sel.val(prevType || '').trigger('change'); }
+        }, 'json').fail(() => { Swal.fire(EXP_I18N.error, EXP_I18N.couldNotAddType, 'error'); $sel.val(prevType || '').trigger('change'); });
     });
 }
 
@@ -1286,12 +1333,12 @@ function defineNewCategory($sel, level) {
     }
     const isSub = level > 0;
     Swal.fire({
-        title: isSub ? 'New Sub-category' : 'New Category', input: 'text',
-        inputLabel: isSub ? 'Sub-category name' : 'Category name', inputAttributes: { autocomplete: 'off' },
-        showCancelButton: true, confirmButtonText: 'Add', confirmButtonColor: '#0d6efd',
+        title: isSub ? EXP_I18N.newSubCategory : EXP_I18N.newCategory, input: 'text',
+        inputLabel: isSub ? EXP_I18N.subCategoryName : EXP_I18N.categoryName, inputAttributes: { autocomplete: 'off' },
+        showCancelButton: true, confirmButtonText: EXP_I18N.add, confirmButtonColor: '#0d6efd',
         target: document.getElementById('addExpenseModal') || undefined, heightAuto: false,
         didOpen: () => { const i = Swal.getInput(); if (i) i.focus(); },
-        inputValidator: v => { if (!v || !v.trim()) return 'Please enter a name.'; }
+        inputValidator: v => { if (!v || !v.trim()) return EXP_I18N.pleaseEnterName; }
     }).then(r => {
         if (!r.isConfirmed) { $sel.val('').trigger('change.select2'); return; }
         const name = r.value.trim();
@@ -1303,10 +1350,10 @@ function defineNewCategory($sel, level) {
                     $('#ex_type_id').val(typeId).trigger('change.select2');
                     $('.add-expense-category-block').show();
                     populateCascadeForCategory(parseInt(res.id));
-                    showToast('success', isSub ? 'Sub-category added.' : 'Category added.');
+                    showToast('success', isSub ? EXP_I18N.subCategoryAdded : EXP_I18N.categoryAdded);
                 });
-            } else { Swal.fire('Error', (res && res.message) || 'Could not add category.', 'error'); $sel.val('').trigger('change.select2'); }
-        }, 'json').fail(() => { Swal.fire('Error', 'Could not add category.', 'error'); $sel.val('').trigger('change.select2'); });
+            } else { Swal.fire(EXP_I18N.error, (res && res.message) || EXP_I18N.couldNotAddCategory, 'error'); $sel.val('').trigger('change.select2'); }
+        }, 'json').fail(() => { Swal.fire(EXP_I18N.error, EXP_I18N.couldNotAddCategory, 'error'); $sel.val('').trigger('change.select2'); });
     });
 }
 
@@ -1336,7 +1383,7 @@ function populateCascadeForCategory(catId) {
     var currentCats = typeData.categories;
     path.forEach(function(node, idx) {
         var isRoot = idx === 0;
-        var label = isRoot ? 'Select Category' : 'Select Sub-category';
+        var label = isRoot ? EXP_I18N.selectCategory : EXP_I18N.selectSubCategory;
         var opts = '<option value="">— ' + label + ' —</option>';
         currentCats.forEach(function(cat) {
             var hasKids = (cat.children && cat.children.length > 0) ? '1' : '0';
@@ -1398,8 +1445,8 @@ function addBreakdownRow() {
     const idx = $('#breakdown-body tr').length + 1;
     const row = `<tr>
         <td class="text-center align-middle small fw-bold">${idx}</td>
-        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Item description"></td>
-        <td><input type="text" class="form-control form-control-sm item-units" placeholder="e.g. Litres"></td>
+        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="${EXP_I18N.itemDescription}"></td>
+        <td><input type="text" class="form-control form-control-sm item-units" placeholder="${EXP_I18N.egLitres}"></td>
         <td><input type="number" class="form-control form-control-sm item-qty" step="0.01" min="0" value="1" placeholder="1"></td>
         <td><input type="number" class="form-control form-control-sm item-price" step="0.01" min="0" placeholder="0.00"></td>
         <td><input type="number" class="form-control form-control-sm item-tax" step="0.01" min="0" max="100" value="0" placeholder="0"></td>
@@ -1543,11 +1590,11 @@ function editExpense(id) {
                 });
             }
             
-            $('#addExpenseModalLabel').html('<i class="bi bi-pencil"></i> Edit Expense');
-            $('#btnText').text('Update Expense');
+            $('#addExpenseModalLabel').html('<i class="bi bi-pencil"></i> ' + EXP_I18N.editExpense);
+            $('#btnText').text(EXP_I18N.updateExpense);
             $('#addExpenseModal').modal('show');
         } else {
-            Swal.fire('Error', response.message, 'error');
+            Swal.fire(EXP_I18N.error, response.message, 'error');
         }
     });
 }
@@ -1585,14 +1632,14 @@ function copyTable() {
         logReportAction('Copied Expenses Table', 'User copied expenses table to clipboard');
         Swal.fire({
             icon: 'success',
-            title: 'Copied!',
-            text: 'Table copied to clipboard',
+            title: EXP_I18N.copied,
+            text: EXP_I18N.tableCopied,
             confirmButtonColor: '#28a745',
-            confirmButtonText: 'OK',
+            confirmButtonText: EXP_I18N.ok,
             timer: 3000
         });
     } catch(err) {
-        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to copy table' });
+        Swal.fire({ icon: 'error', title: EXP_I18N.error, text: EXP_I18N.failedToCopyTable });
     }
     window.getSelection().removeAllRanges();
 }
