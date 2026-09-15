@@ -253,6 +253,23 @@ if (!$uid || !$supplier) {
         $e = $row->fetch(PDO::FETCH_ASSOC);
         ($e['paid_to_type'] === 'other' && $e['paid_to_id'] === null) ? pass('paid_to_type=other, no paid_to_id') : fail('other-payee paid_to fields wrong');
         ($e['payee_manual_role'] === 'Bodaboda' && $e['payee_manual_name'] === 'Juma Test') ? pass('manual role/name stored correctly') : fail('manual role/name mismatch');
+
+        // Display layer — a manual payee must actually show up, not render blank
+        // (bug: the paid_to_name CASE in these 3 files only covered
+        // supplier/staff/sub_contractor, so 'other' fell through to the empty
+        // legacy `vendor` column instead of payee_manual_name).
+        $displayName = $pdo->query("SELECT CASE
+            WHEN paid_to_type = 'other' THEN payee_manual_name
+            ELSE vendor END FROM expenses WHERE expense_id = " . (int)$res2['id'])->fetchColumn();
+        ($displayName === 'Juma Test') ? pass('get_expenses.php-style paid_to_name resolves for a manual payee') : fail('paid_to_name still blank for manual payee: ' . var_export($displayName, true));
+
+        $geSrc = src($root, 'api/account/get_expenses.php');
+        has($geSrc, "WHEN e.paid_to_type = 'other'", "get_expenses.php's paid_to_name CASE covers 'other'");
+        $ge1Src = src($root, 'api/account/get_expense.php');
+        has($ge1Src, "WHEN e.paid_to_type = 'other'", "get_expense.php computes paid_to_name (incl. 'other') for the voucher/edit fetch");
+        $edSrc = src($root, 'app/constant/accounts/expense_details.php');
+        has($edSrc, "WHEN e.paid_to_type = 'other'", "expense_details.php's paid_to_name CASE covers 'other'");
+
         $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$res2['id']]);
     } else {
         fail('Simple POS manual-payee expense failed: ' . ($res2['message'] ?? 'unknown'));
