@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 3) - Products: Simple POS Create form collapses to one section
+
+**Phase 3 of `products_simple_pos_plan.md`** — the Add Product form now collapses from 4 tabs to one simple, single-section screen when Simple POS is on and "Advanced Product" (Phase 2) is off. Normal tenants, and any Simple POS tenant with Advanced Product switched on, see the exact same full form as before.
+
+**Fix (`app/bms/product/product_create.php` + `product_create_footer.php`):**
+- Hidden but still working: SKU and Barcode (still auto-generated, now via hidden inputs) — hiding the field never means an empty value in the database.
+- Removed for Simple POS: Description, Tax Configuration (defaults to no tax), Wholesale Price, Max Discount %, and the entire "Advanced Details" tab (Brand, Manufacturer, Model, Serial Number, Warranty, the old day-count Shelf Life field, Is Service, Is Taxable), plus Weight/Dimensions and the reorder/min/max stock thresholds. Every one of these still has a safe, already-existing server-side default (verified, not assumed) — nothing silently breaks downstream.
+- Relabeled: "Cost Price / Purchase Price" → "Buying Price".
+- New: **Manufacturing Date** and **Expiry Date**, wired straight into the real batch Phase 1 built (`receiveProductBatch()`).
+- Shop (Warehouse) picker only appears when the user actually has more than one shop in scope; with exactly one, it's silently auto-assigned via a hidden input — same pattern as Expenses' Paid From/Account.
+- Opening Stock simplifies from a per-warehouse grid to one Shop picker + one quantity field; the footer JS translates that into the same `initial_stock_data` payload the backend already expects, so `api/create_product.php` needed no changes.
+
+**Verified:** new `tests/test_product_create_simple_pos_cli.php` (40/40) — source wiring, the real page rendered in three states (Simple POS, normal, Simple POS + Advanced Product override), and a full end-to-end product creation through the exact payload shape the simplified form's JS produces, confirming every hidden field's default AND that Manufacturing/Expiry Date really reach the batch row. Existing `test_product_batch_manufacturing_date_cli` (22/22), `test_grn_posting_cli` (17/17), `test_pos_quick_restock_cli` (36/36) re-run clean, no regressions. `php -l` clean on both touched files.
+
 ## 2026-09-15 (feat/products-simple-pos, phase 2) - Products: superadmin "Advanced Product" override
 
 **Phase 2 of `products_simple_pos_plan.md`** — the switch that will gate every upcoming Simple POS product-form simplification: a superadmin-only override, same shape as the existing "Simple Mode" toggle, that re-enables the full Add/Edit Product form on a Simple POS tenant when a superadmin explicitly turns it on.
