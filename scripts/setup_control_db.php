@@ -431,13 +431,6 @@ try {
         // The setting's actual VALUE lives in the tenant's own database
         // (system_settings.pos_simple_mode) — this is only the lock.
         'pos_simple_mode_locked' => "ADD COLUMN `pos_simple_mode_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `max_storage_mb`",
-        // Superadmin-only override: shows the full (non-simplified) Product
-        // form even on a tenant running Simple POS mode. Same shape as
-        // pos_simple_mode_locked — the setting's VALUE lives in the tenant's
-        // own database (system_settings.pos_advanced_product); this is only
-        // the lock, and it's always 1 once set (the tenant admin never
-        // self-manages this — products_simple_pos_plan.md §3).
-        'pos_advanced_product_locked' => "ADD COLUMN `pos_advanced_product_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_simple_mode_locked`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");

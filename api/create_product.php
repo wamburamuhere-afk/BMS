@@ -5,7 +5,6 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
 require_once __DIR__ . '/../core/stock_posting.php';
-require_once __DIR__ . '/../core/stock_intake.php';
 global $pdo;
 
 // Check if user is logged in and has permission
@@ -226,38 +225,32 @@ try {
         $initial_stock = $_POST['initial_stock'];
     }
 
-    // Manufacturing/Expiry dates for the opening batch (products_simple_pos_plan.md
-    // §2/§4) — one date pair for the product's very first stock, same as a single
-    // GRN line. Optional: not every product expires.
-    $initial_mfg_date = !empty($_POST['manufacturing_date']) ? $_POST['manufacturing_date'] : null;
-    $initial_expiry_date = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
-
     if ($initial_stock) {
         foreach ($initial_stock as $warehouse_id => $quantity) {
             if ($quantity > 0) {
-                // Every stock intake becomes a real, trackable batch — the same
-                // helper the POS Restock flow and GRN approval already use — so a
-                // product's very first stock is never invisible to the batch/
-                // expiry system (products_simple_pos_plan.md §1-2).
-                $intake = receiveProductBatch($pdo, [
-                    'product_id'         => $product_id,
-                    'warehouse_id'       => $warehouse_id,
-                    'quantity'           => $quantity,
-                    'unit_cost'          => (float)$product_data['cost_price'],
-                    'write_batch'        => true,
-                    'expiry_date'        => $initial_expiry_date,
-                    'manufacturing_date' => $initial_mfg_date,
-                    'selling_price'      => $product_data['selling_price'] ?? null,
-                    'wholesale_price'    => $product_data['wholesale_price'] ?? null,
-                    'movement_type'      => 'adjustment_in',
-                    'reference_type'     => 'manual',
-                    'reference_id'       => $product_id,
-                    'reference_number'   => $product_data['sku'] ?? null,
-                    'movement_date'      => date('Y-m-d'),
-                    'created_by'         => $user_id,
-                    'notes'              => 'Initial product stock',
+                // Insert into product_stocks
+                $stock_stmt = $pdo->prepare("
+                    INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity) 
+                    VALUES (?, ?, ?, 0)
+                    ON DUPLICATE KEY UPDATE stock_quantity = stock_quantity + VALUES(stock_quantity)
+                ");
+                $stock_stmt->execute([$product_id, $warehouse_id, $quantity]);
+
+                // Record stock movement
+                $movement_id = recordStockMovement($pdo, [
+                    'product_id'     => $product_id,
+                    'movement_type'  => 'adjustment_in',
+                    'quantity'       => $quantity,
+                    'unit'           => $product_data['unit'],
+                    'reference_type' => 'manual',
+                    'reference_id'   => $product_id,
+                    'warehouse_id'   => $warehouse_id,
+                    'stock_before'   => 0,
+                    'stock_after'    => $quantity,
+                    'reason'         => 'Initial stock',
+                    'notes'          => 'Initial product stock',
+                    'created_by'     => $user_id,
                 ]);
-                $movement_id = $intake['movement_id'];
 
                 // GL posting: Dr Inventory / Cr Opening Balance (take-on equity) —
                 // same pattern as manual stock adjustments (core/stock_posting.php).

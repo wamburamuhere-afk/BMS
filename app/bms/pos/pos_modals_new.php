@@ -131,21 +131,6 @@ if ($can_restock_product ?? false) {
                             <input type="number" class="form-control" id="restock_selling_price" name="selling_price" min="0" step="0.01" required>
                         </div>
                     </div>
-                    <!-- Both optional (products_simple_pos_plan.md §8) — forcing an
-                         expiry date on every restock would break for non-perishable
-                         goods. Feeds straight into receiveProductBatch(); the
-                         already-built expiry-notification cron picks it up with no
-                         further changes. -->
-                    <div class="row g-2 mt-1">
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Manufacturing Date') ?></label>
-                            <input type="date" class="form-control" id="restock_manufacturing_date" name="manufacturing_date">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Expiry Date') ?></label>
-                            <input type="date" class="form-control" id="restock_expiry_date" name="expiry_date">
-                        </div>
-                    </div>
                     <?php
                     // Simple Mode ("normal business man" —
                     // core/pos_nav.php::posSimpleModeEnabled()) never shows a

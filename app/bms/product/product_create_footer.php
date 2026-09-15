@@ -346,17 +346,6 @@ function createProduct(status = 'active') {
                 if (val > 0) initialStock[idMatch[1]] = val;
             }
         });
-        // Simple POS — a single Shop picker (or an auto-assigned hidden shop
-        // when there's only one) + one quantity field, instead of the normal
-        // per-warehouse grid (products_simple_pos_plan.md §4). Works for both
-        // the <select> and the <input type="hidden"> case — both answer .val().
-        const $simpleShop = $('#simple_shop_id');
-        const $simpleQty  = $('#simple_opening_stock');
-        if ($simpleShop.length && $simpleQty.length) {
-            const shopId = $simpleShop.val();
-            const qty = parseFloat($simpleQty.val()) || 0;
-            if (shopId && qty > 0) initialStock[shopId] = qty;
-        }
         if (Object.keys(initialStock).length > 0) {
             formData.append('initial_stock_data', JSON.stringify(initialStock));
         }

@@ -71,13 +71,6 @@ try {
     $warehouses = [];
 }
 
-// Simple POS (products_simple_pos_plan.md §5): the same fields hidden on
-// Create are hidden here too — but since Edit deals with an EXISTING record,
-// every hidden field round-trips its current value via a hidden input
-// instead of being omitted, so saving never silently clears real data.
-$simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
-$showShopPicker = count($warehouses) > 1;
-
 // Phase 30 (pos_upgrade_plan.md §9) — Kitchen station + Modifier Groups,
 // only relevant behind the restaurant_pos entitlement. Kitchen stations are
 // warehouse-scoped but products are a company-wide catalog, so every
@@ -579,13 +572,11 @@ function deleteSellingUnit(id) {
                         <i class="bi bi-boxes me-2"></i> <?= t('Inventory & Stock') ?>
                     </button>
                 </li>
-                <?php if (!$simpleProductForm): ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link py-3 rounded-0" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab">
                         <i class="bi bi-gear me-2"></i> <?= t('Advanced Details') ?>
                     </button>
                 </li>
-                <?php endif; ?>
             </ul>
         </div>
         
@@ -610,7 +601,6 @@ function deleteSellingUnit(id) {
                                                placeholder="<?= t('e.g. Samsung Galaxy S21') ?>" value="<?= safe_output($product['product_name']) ?>" required>
                                     </div>
 
-                                    <?php if (!$simpleProductForm): ?>
                                     <div class="col-md-6 mt-4">
                                         <label for="sku" class="form-label fw-bold text-muted small uppercase"><?= t('SKU (Internal Code)') ?></label>
                                         <div class="input-group">
@@ -646,14 +636,6 @@ function deleteSellingUnit(id) {
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <?php else: ?>
-                                    <!-- Simple POS: SKU/Barcode hidden from the form, but the existing value
-                                         still round-trips on save — hiding a field must never silently wipe
-                                         data update_product.php would otherwise null out (products_simple_pos_plan.md §5). -->
-                                    <input type="hidden" name="sku" value="<?= safe_output($product['sku']) ?>">
-                                    <input type="hidden" name="barcode" value="<?= safe_output($product['barcode']) ?>">
-                                    <input type="hidden" name="barcode_symbology" value="<?= safe_output($product['barcode_symbology'] ?: 'CODE128') ?>">
-                                    <?php endif; ?>
 
                                     <div class="col-md-12 mt-4">
                                         <label for="category_id" class="form-label fw-bold"><?= t('Category') ?></label>
@@ -668,15 +650,11 @@ function deleteSellingUnit(id) {
                                         </div>
                                     </div>
 
-                                    <?php if (!$simpleProductForm): ?>
                                     <div class="col-md-12 mt-4">
                                         <label for="description" class="form-label fw-bold"><?= t('Detailed Description') ?></label>
                                         <textarea class="form-control bg-light border-0" id="description" name="description"
                                                   rows="4" placeholder="<?= t('Mention key features, specifications or other details...') ?>"><?= safe_output($product['description']) ?></textarea>
                                     </div>
-                                    <?php else: ?>
-                                    <input type="hidden" name="description" value="<?= safe_output($product['description']) ?>">
-                                    <?php endif; ?>
                                 </div>
                             </div>
 
@@ -754,7 +732,6 @@ function deleteSellingUnit(id) {
                                         </div>
                                     </div>
 
-                                    <?php if (!$simpleProductForm): ?>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="wholesale_price" class="form-label fw-bold small text-muted"><?= t('Wholesale Price') ?></label>
@@ -767,20 +744,12 @@ function deleteSellingUnit(id) {
                                         <div class="col-md-6 mb-3">
                                             <label for="discount_rate" class="form-label fw-bold small text-muted"><?= t('Max Discount %') ?></label>
                                             <div class="input-group">
-                                                <input type="number" class="form-control bg-white border-0" id="discount_rate" name="discount_rate"
+                                                <input type="number" class="form-control bg-white border-0" id="discount_rate" name="discount_rate" 
                                                        min="0" max="100" step="0.01" value="<?= $product['discount_rate'] ?>" onkeyup="calculateMinSellingPrice()">
                                                 <span class="input-group-text border-0 bg-white">%</span>
                                             </div>
                                         </div>
                                     </div>
-                                    <?php else: ?>
-                                    <input type="hidden" name="wholesale_price" value="<?= $product['wholesale_price'] ?>">
-                                    <!-- id kept so calculateMinSellingPrice() (fired by the still-visible
-                                         selling_price field's onkeyup) recomputes from the real stored
-                                         discount rate instead of treating it as 0 — same formula normal
-                                         mode already uses, just with no UI to change the rate. -->
-                                    <input type="hidden" id="discount_rate" name="discount_rate" value="<?= $product['discount_rate'] ?>">
-                                    <?php endif; ?>
                                 </div>
                             </div>
 
@@ -809,7 +778,6 @@ function deleteSellingUnit(id) {
                                         </div>
                                     </div>
 
-                                    <?php if (!$simpleProductForm): ?>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small text-muted"><?= t('Tax Configuration') ?></label>
                                         <select class="form-select border-0 bg-white py-2 shadow-sm select2-static" id="tax_id" name="tax_id">
@@ -835,16 +803,6 @@ function deleteSellingUnit(id) {
                                         </div>
                                         <small class="text-muted"><?= t('Auto-calculated but can be overridden') ?></small>
                                     </div>
-                                    <?php else: ?>
-                                    <input type="hidden" name="tax_id" value="<?= safe_output($product['tax_id']) ?>">
-                                    <?php if ($product['is_taxable']): ?>
-                                    <!-- update_product.php reads is_taxable by PRESENCE (isset), same as an
-                                         HTML checkbox — only emit this hidden input when it was actually on,
-                                         or a false-valued hidden input would incorrectly still count as "on". -->
-                                    <input type="hidden" name="is_taxable" value="1">
-                                    <?php endif; ?>
-                                    <input type="hidden" id="min_selling_price" name="min_selling_price" value="<?= $product['min_selling_price'] ?>">
-                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -886,7 +844,6 @@ function deleteSellingUnit(id) {
                                                 </div>
                                             </div>
                                         </div><!-- end row -->
-                                        <?php if (!$simpleProductForm): ?>
                                         <div class="row g-3 mt-1" id="inventoryOnlySection">
                                             <div class="col-md-4 mt-4">
                                                 <label for="reorder_level" class="form-label fw-bold small text-muted"><?= t('Reorder Alert Level') ?></label>
@@ -902,20 +859,14 @@ function deleteSellingUnit(id) {
 
                                             <div class="col-md-4 mt-4">
                                                 <label for="max_stock_level" class="form-label fw-bold small text-muted"><?= t('Max Stock Level') ?></label>
-                                                <input type="number" class="form-control bg-light border-0 py-2" id="max_stock_level" name="max_stock_level"
+                                                <input type="number" class="form-control bg-light border-0 py-2" id="max_stock_level" name="max_stock_level" 
                                                        min="0" step="0.001" value="<?= $product['max_stock_level'] ?>">
                                             </div>
                                         </div>
-                                        <?php else: ?>
-                                        <input type="hidden" name="reorder_level" value="<?= $product['reorder_level'] ?>">
-                                        <input type="hidden" name="min_stock_level" value="<?= $product['min_stock_level'] ?>">
-                                        <input type="hidden" name="max_stock_level" value="<?= $product['max_stock_level'] ?>">
-                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
 
-                            <?php if (!$simpleProductForm): ?>
                             <div class="col-md-5">
                                 <div class="p-4 bg-light rounded-4 h-100">
                                     <h6 class="fw-bold mb-4"><i class="bi bi-rulers me-2 text-secondary"></i> <?= t('Physical Specifications') ?></h6>
@@ -958,15 +909,9 @@ function deleteSellingUnit(id) {
                                     </div>
                                 </div>
                             </div>
-                            <?php else: ?>
-                            <input type="hidden" id="weight" name="weight" value="<?= $product['weight'] ?>">
-                            <input type="hidden" id="dim_length" name="dim_length" value="<?= $dim_length ?>">
-                            <input type="hidden" id="dim_width" name="dim_width" value="<?= $dim_width ?>">
-                            <input type="hidden" id="dim_height" name="dim_height" value="<?= $dim_height ?>">
-                            <?php endif; ?>
                         </div>
 
-                        <?php if (!$product['is_service'] && !$simpleProductForm): ?>
+                        <?php if (!$product['is_service']): ?>
                         <!-- Phase 15 (pos_upgrade_plan.md §8) — Selling Units (unit conversion at the register) -->
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
@@ -998,7 +943,7 @@ function deleteSellingUnit(id) {
                         </div>
                         <?php endif; ?>
 
-                        <?php if (!$product['is_service'] && !$simpleProductForm): ?>
+                        <?php if (!$product['is_service']): ?>
                         <!-- Phase 23 (pos_upgrade_plan.md §8) — Combo/Bundle Product.
                              Phase 30 (§9) relabels this "Recipe (Ingredients)" when the
                              product also has a kitchen_station_id — purely cosmetic;
@@ -1041,11 +986,6 @@ function deleteSellingUnit(id) {
                                 </div>
                             </div>
                         </div>
-                        <?php elseif ($simpleProductForm && !empty($product['is_combo'])): ?>
-                        <!-- update_product.php reads is_combo by PRESENCE (isset), same as an
-                             HTML checkbox — only emit this when it was actually on, matching
-                             the is_taxable fix above. -->
-                        <input type="hidden" name="is_combo" value="1">
                         <?php endif; ?>
 
                         <?php if (!$product['is_service'] && canView('pos_advanced')): ?>
@@ -1186,21 +1126,7 @@ function deleteSellingUnit(id) {
                         </div>
                         <?php endif; ?>
 
-                        <?php if (!$product['is_service'] && !empty($warehouses) && $simpleProductForm && !$showShopPicker): ?>
-                        <!-- Simple POS, exactly one shop in scope: one quantity field, no table chrome.
-                             Gated on $simpleProductForm too — a normal tenant that merely happens to
-                             have one warehouse still gets the full table, unchanged. -->
-                        <div class="col-md-6 mt-4">
-                            <label class="form-label fw-bold"><?= t('Stock Quantity') ?></label>
-                            <div class="input-group">
-                                <input type="number" class="form-control bg-light border-0"
-                                       name="stock[<?= (int)$warehouses[0]['warehouse_id'] ?>]"
-                                       value="<?= $stock_per_warehouse[$warehouses[0]['warehouse_id']] ?? 0 ?>"
-                                       placeholder="0" min="0">
-                                <span class="input-group-text unit-label"><?= htmlspecialchars($product['unit']) ?></span>
-                            </div>
-                        </div>
-                        <?php elseif (!$product['is_service'] && !empty($warehouses)): ?>
+                        <?php if (!$product['is_service'] && !empty($warehouses)): ?>
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
                                 <i class="bi bi-box-seam me-2"></i> <?= wLabel('CURRENT STOCK (Per Warehouse)', 'CURRENT STOCK (Per Shop)') ?>
@@ -1210,7 +1136,7 @@ function deleteSellingUnit(id) {
                                 <table class="table table-sm table-hover border">
                                     <thead class="table-light">
                                         <tr>
-                                            <th><?= wLabel('Store / Warehouse Name', 'Shop Name') ?></th>
+                                            <th><?= t('Store / Warehouse Name') ?></th>
                                             <th style="width:200px;" class="text-center"><?= t('Available Quantity') ?></th>
                                         </tr>
                                     </thead>
@@ -1240,23 +1166,14 @@ function deleteSellingUnit(id) {
                             <button type="button" class="btn btn-light px-4 py-2 rounded-pill border" onclick="$('#pricing-tab').tab('show')">
                                 <i class="bi bi-arrow-left me-2"></i> <?= t('Previous') ?>
                             </button>
-                            <?php if ($simpleProductForm): ?>
-                            <!-- Simple POS: this is the last visible tab (Advanced Details is
-                                 hidden), so this is where the Update button lives, not "Next". -->
-                            <button type="submit" class="btn btn-success px-5 py-2 rounded-pill shadow-sm fw-bold">
-                                <i class="bi bi-check-circle-fill me-1"></i> <?= $product['is_service'] == 1 ? t('Update Service') : t('Update Product') ?>
-                            </button>
-                            <?php else: ?>
                             <button type="button" class="btn btn-primary px-5 py-2 rounded-pill shadow-sm" onclick="$('#advanced-tab').tab('show')">
                                 <?= t('Next: Additional') ?> <i class="bi bi-arrow-right ms-2"></i>
                             </button>
-                            <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- Tab 4: Advanced Details -->
                     <div class="tab-pane fade" id="advanced" role="tabpanel">
-                        <?php if (!$simpleProductForm): ?>
                         <div class="row g-4">
                             <div class="col-md-6 mb-4">
                                 <div class="p-4 bg-light rounded-4 h-100 border border-light">
@@ -1359,24 +1276,7 @@ function deleteSellingUnit(id) {
                                 </div>
                             </div>
                         </div>
-                        <?php else: ?>
-                        <!-- Simple POS: the whole Advanced Details tab is hidden, but every field
-                             here round-trips its existing value so saving never wipes it
-                             (products_simple_pos_plan.md §5). Promotional Pricing rows are saved
-                             through their own AJAX endpoint, not this form, so there's nothing to
-                             preserve there — hiding the manager UI alone is safe. -->
-                        <input type="hidden" name="brand_id" value="<?= safe_output($product['brand_id']) ?>">
-                        <input type="hidden" name="manufacturer" value="<?= safe_output($product['manufacturer']) ?>">
-                        <input type="hidden" name="model" value="<?= safe_output($product['model']) ?>">
-                        <input type="hidden" name="serial_number" value="<?= safe_output($product['serial_number']) ?>">
-                        <input type="hidden" name="warranty_period" value="<?= $product['warranty_period'] ?>">
-                        <input type="hidden" name="warranty_unit" value="<?= safe_output($product['warranty_unit'] ?? '') ?>">
-                        <input type="hidden" name="guarantee_period" value="<?= safe_output($product['guarantee_period'] ?? '', '') ?>">
-                        <input type="hidden" name="guarantee_unit" value="<?= safe_output($product['guarantee_unit'] ?? '') ?>">
-                        <input type="hidden" name="expiry_days" value="<?= $product['expiry_days'] ?>">
-                        <?php endif; ?>
 
-                        <?php if (!$simpleProductForm): ?>
                         <!-- Tab Footer -->
                         <div class="d-flex justify-content-between mt-5 pt-4 border-top">
                             <button type="button" class="btn btn-light px-4 py-2 rounded-pill border" onclick="$('#inventory-tab').tab('show')">
@@ -1388,11 +1288,10 @@ function deleteSellingUnit(id) {
                                 </button>
                             </div>
                         </div>
-                        <?php endif; ?>
                     </div>
 
                 </div>
-
+                
                 <input type="hidden" name="updated_by" value="<?= $user_id ?>">
             </form>
         </div>

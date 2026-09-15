@@ -14,11 +14,6 @@ $can_edit_products = canEdit('products');
 $can_delete_products = canDelete('products');
 $can_adjust_stock = hasPermission('adjust_stock') || isAdmin(); // Assuming adjust_stock key exists or fallback to Admin
 
-// Simple POS (products_simple_pos_plan.md §7): the same fields hidden on
-// Create/Edit/View are hidden here too — the list's SKU column and the
-// Quick Add modal's SKU/Barcode fields.
-$simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
-
 // Use global company name
 $display_company_name = $GLOBALS['DISPLAY_COMPANY_NAME'] ?? 'BUSINESS MANAGEMENT SYSTEM';
 
@@ -811,9 +806,7 @@ function get_quick_actions($product) {
                             <tr>
                                 <th class="px-2 px-md-3" width="5%">S/NO:</th>
                                 <th width="30%"><?= t('Product') ?></th>
-                                <?php if (!$simpleProductForm): ?>
                                 <th width="12%">SKU</th>
-                                <?php endif; ?>
                                 <th width="15%"><?= t('Category') ?></th>
                                 <th width="12%"><?= t('Stock') ?></th>
                                 <th width="13%"><?= t('Price') ?></th>
@@ -845,11 +838,9 @@ function get_quick_actions($product) {
                                         </div>
                                     </div>
                                 </td>
-                                <?php if (!$simpleProductForm): ?>
                                 <td>
                                     <code class="custom-code"><?= safe_output($product['sku']) ?></code>
                                 </td>
-                                <?php endif; ?>
                                 <td>
                                     <?php if (!empty($product['category_name'])): ?>
                                     <span class="badge bg-light text-dark border"><?= safe_output($product['category_name']) ?></span>
@@ -1899,11 +1890,9 @@ function generate_barcode_local() {
                         <li class="nav-item flex-fill modal-inventory-only" id="tab3-nav-item">
                             <button class="nav-link fw-bold w-100" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button" role="tab"><i class="bi bi-box-seam d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;"><?= t('Inventory') ?></span></button>
                         </li>
-                        <?php if (!$simpleProductForm): ?>
                         <li class="nav-item flex-fill">
                             <button class="nav-link fw-bold w-100" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button" role="tab"><i class="bi bi-card-list d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;"><?= t('Details') ?></span></button>
                         </li>
-                        <?php endif; ?>
                     </ul>
                     
                     <div class="tab-content" id="productFormContent">
@@ -1916,7 +1905,6 @@ function generate_barcode_local() {
                                             <label class="form-label fw-bold"><?= t('Product Name') ?> <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control" name="product_name" required placeholder="e.g. iPhone 13 Pro">
                                         </div>
-                                        <?php if (!$simpleProductForm): ?>
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label fw-bold">SKU</label>
                                             <div class="input-group">
@@ -1931,23 +1919,14 @@ function generate_barcode_local() {
                                                 <button class="btn btn-outline-secondary" type="button" onclick="refreshBarcode()"><i class="bi bi-upc"></i></button>
                                             </div>
                                         </div>
-                                        <?php else: ?>
-                                        <!-- Simple POS: SKU/Barcode still auto-generate, just not shown
-                                             (products_simple_pos_plan.md §7 — identical treatment to the
-                                             main Create form). -->
-                                        <input type="hidden" name="sku" id="modal_sku" value="<?= generate_sku_local() ?>">
-                                        <input type="hidden" name="barcode" id="modal_barcode" value="<?= generate_barcode_local() ?>">
-                                        <?php endif; ?>
                                         <div class="col-md-12 mb-3">
                                             <label class="form-label fw-bold"><?= t('Category') ?></label>
                                             <?= renderOtherSelect('modal_category_id', 'category_id', $lk_product_categories, '', 'category_other', t('Select Category')) ?>
                                         </div>
-                                        <?php if (!$simpleProductForm): ?>
                                         <div class="col-md-12 mb-3">
                                             <label class="form-label fw-bold"><?= t('Description') ?></label>
                                             <textarea class="form-control" name="description" rows="3" placeholder="<?= t('Detailed product description...') ?>"></textarea>
                                         </div>
-                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -2003,7 +1982,6 @@ function generate_barcode_local() {
                                     </div>
                                     <small class="text-muted"><?= t('Final price at which you sell to customers') ?></small>
                                 </div>
-                                <?php if (!$simpleProductForm): ?>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
                                     <div class="input-group">
@@ -2041,15 +2019,6 @@ function generate_barcode_local() {
                                         <label class="form-check-label small" for="modal_taxable"><?= t('Calculate tax for this item') ?></label>
                                     </div>
                                 </div>
-                                <?php else: ?>
-                                <!-- Simple POS: no tax/wholesale/discount concept on the form — same
-                                     safe server-side defaults as the main Create form's simple branch.
-                                     modal_discount_rate/modal_min_selling_price ids kept (as hidden
-                                     inputs) purely so modalCalcMinPrice() has something to write to
-                                     without erroring; they're never shown or read back by the user. -->
-                                <input type="hidden" name="discount_rate" id="modal_discount_rate" value="0.00">
-                                <input type="hidden" name="min_selling_price" id="modal_min_selling_price" value="0.00">
-                                <?php endif; ?>
                                 <div class="col-md-6 mb-3">
                                     <div class="p-3 bg-light rounded text-center h-100 d-flex flex-column justify-content-center">
                                         <small class="text-muted text-uppercase fw-bold d-block mb-1"><?= t('Estimated Profit') ?></small>
@@ -2082,7 +2051,6 @@ function generate_barcode_local() {
                                         </button>
                                     </div>
                                 </div>
-                                <?php if (!$simpleProductForm): ?>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
                                     <label class="form-label fw-bold"><?= t('Reorder Level') ?></label>
                                     <div class="input-group">
@@ -2099,7 +2067,6 @@ function generate_barcode_local() {
                                     <label class="form-label fw-bold"><?= t('Max Stock Level') ?></label>
                                     <input type="number" class="form-control" name="max_stock_level" value="0">
                                 </div>
-                                <?php endif; ?>
 
                                 <div class="col-md-12 mt-3 p-3 bg-white border rounded modal-inventory-only">
                                     <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
@@ -2110,7 +2077,7 @@ function generate_barcode_local() {
                                         <table class="table table-sm table-hover border">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th><?= wLabel('Store / Warehouse Name', 'Shop Name') ?></th>
+                                                    <th><?= t('Store / Warehouse Name') ?></th>
                                                     <th style="width: 200px;" class="text-center"><?= t('Available Quantity') ?></th>
                                                 </tr>
                                             </thead>
@@ -2134,26 +2101,11 @@ function generate_barcode_local() {
                                             </tbody>
                                         </table>
                                     </div>
-                                    <!-- Batch dates for this opening stock (products_simple_pos_plan.md §1) —
-                                         present in every mode, same as product_create.php's main form;
-                                         optional, feeds straight into receiveProductBatch() via the same
-                                         api/create_product.php endpoint. -->
-                                    <div class="row g-3 mt-1">
-                                        <div class="col-md-6">
-                                            <label for="modal_manufacturing_date" class="form-label fw-bold small text-muted"><?= t('Manufacturing Date') ?></label>
-                                            <input type="date" class="form-control" id="modal_manufacturing_date" name="manufacturing_date">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="modal_expiry_date" class="form-label fw-bold small text-muted"><?= t('Expiry Date') ?></label>
-                                            <input type="date" class="form-control" id="modal_expiry_date" name="expiry_date">
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
-
+                        
                         <!-- Tab 4: Additional Details -->
-                        <?php if (!$simpleProductForm): ?>
                         <div class="tab-pane fade" id="tab4" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -2200,7 +2152,6 @@ function generate_barcode_local() {
 
                             </div>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">

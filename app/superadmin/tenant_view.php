@@ -917,24 +917,15 @@ function openPosMoreModal() {
             url: '/actions/superadmin_tenant_shop_mode.php',
             method: 'POST', dataType: 'json',
             data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
-        }),
-        $.ajax({
-            url: '/actions/superadmin_tenant_advanced_product.php',
-            method: 'POST', dataType: 'json',
-            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
         })
-    ).done(function (r1, r2, r3) {
-        const res = r1[0], shopRes = r2[0], advProdRes = r3[0];
+    ).done(function (r1, r2) {
+        const res = r1[0], shopRes = r2[0];
         if (!res || !res.success) {
             Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read Simple Mode status for this tenant.' });
             return;
         }
         if (!shopRes || !shopRes.success) {
             Swal.fire({ icon: 'error', title: 'Error', text: (shopRes && shopRes.message) || 'Could not read Shop Mode status for this tenant.' });
-            return;
-        }
-        if (!advProdRes || !advProdRes.success) {
-            Swal.fire({ icon: 'error', title: 'Error', text: (advProdRes && advProdRes.message) || 'Could not read Advanced Product status for this tenant.' });
             return;
         }
         function subFeatureBlock(id, label, description, state) {
@@ -959,15 +950,10 @@ function openPosMoreModal() {
                 + '<label class="form-check-label fw-semibold" for="saPosSimpleEnabled">Simple Mode</label>'
                 + '<div class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way. Superadmin-only — the tenant\'s own admin cannot change this themselves.</div>'
                 + '</div>'
-                + '<div class="form-check mb-3 pb-3 border-bottom">'
+                + '<div class="form-check">'
                 + '<input class="form-check-input" type="checkbox" id="saShopModeEnabled"' + (shopRes.enabled ? ' checked' : '') + '>'
                 + '<label class="form-check-label fw-semibold" for="saShopModeEnabled">Shop Mode</label>'
                 + '<div class="text-muted small">Forces every screen to say "Shop"/"Duka" instead of "Warehouse"/"Ghala", even if this tenant also has Projects on (which would otherwise keep Warehouse wording outside the POS terminal itself). Leave unchecked to use the automatic default: Shop wording everywhere once Projects is off for this tenant, Warehouse wording otherwise. Superadmin-only — the tenant\'s own admin cannot change this themselves.</div>'
-                + '</div>'
-                + '<div class="form-check">'
-                + '<input class="form-check-input" type="checkbox" id="saAdvancedProductEnabled"' + (advProdRes.enabled ? ' checked' : '') + '>'
-                + '<label class="form-check-label fw-semibold" for="saAdvancedProductEnabled">Advanced Product</label>'
-                + '<div class="text-muted small">Shows the full Add/Edit Product form (SKU, Barcode, Tax, Wholesale Price, Brand/Manufacturer/Warranty, per-warehouse stock grid, etc.) even while this tenant is on Simple Mode, which normally trims the form down to the essentials for a small shop. Has no effect unless Simple Mode is also on. Superadmin-only — the tenant\'s own admin cannot change this themselves.</div>'
                 + '</div>'
                 + '</div>',
             showCancelButton: true,
@@ -977,8 +963,7 @@ function openPosMoreModal() {
                     posAdvanced: document.getElementById('saPosAdvancedEnabled').checked,
                     restaurantPos: document.getElementById('saRestaurantPosEnabled').checked,
                     simple: document.getElementById('saPosSimpleEnabled').checked,
-                    shopMode: document.getElementById('saShopModeEnabled').checked,
-                    advancedProduct: document.getElementById('saAdvancedProductEnabled').checked
+                    shopMode: document.getElementById('saShopModeEnabled').checked
                 };
             }
         }).then(function (result) {
@@ -1013,28 +998,17 @@ function openPosMoreModal() {
                         _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
                         enabled: result.value.shopMode ? 1 : 0
                     }
-                }),
-                $.ajax({
-                    url: '/actions/superadmin_tenant_advanced_product.php',
-                    method: 'POST', dataType: 'json',
-                    data: {
-                        _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
-                        enabled: result.value.advancedProduct ? 1 : 0,
-                        // Always locked — same superadmin-only discipline as Simple Mode.
-                        locked: 1
-                    }
                 })
-            ).done(function (r1, r2, r3, r4) {
-                var res1 = r1[0], res2 = r2[0], res3 = r3[0], res4 = r4[0];
-                if (res1 && res1.success && res2 && res2.success && res3 && res3.success && res4 && res4.success) {
+            ).done(function (r1, r2, r3) {
+                var res1 = r1[0], res2 = r2[0], res3 = r3[0];
+                if (res1 && res1.success && res2 && res2.success && res3 && res3.success) {
                     Swal.fire({ icon: 'success', title: 'Saved', text: 'Point of Sale settings updated.', timer: 1800, showConfirmButton: false })
                         .then(function () { window.location.reload(); });
                 } else {
                     var msg = [
                         !res1 || !res1.success ? (res1 && res1.message) : null,
                         !res2 || !res2.success ? (res2 && res2.message) : null,
-                        !res3 || !res3.success ? (res3 && res3.message) : null,
-                        !res4 || !res4.success ? (res4 && res4.message) : null
+                        !res3 || !res3.success ? (res3 && res3.message) : null
                     ].filter(Boolean).join(' ') || 'Could not save.';
                     Swal.fire({ icon: 'error', title: 'Error', text: msg });
                 }

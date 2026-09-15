@@ -92,22 +92,6 @@ if (!function_exists('posSimpleModeEnabled')) {
     }
 }
 
-if (!function_exists('advancedProductEnabled')) {
-    /**
-     * Superadmin-only override (products_simple_pos_plan.md §3): shows the
-     * full, non-simplified Add/Edit Product form even on a tenant running
-     * Simple POS mode. Same storage shape as posSimpleModeEnabled() — a
-     * plain system_settings key, set only via
-     * actions/superadmin_tenant_advanced_product.php (Tenant > Point of
-     * Sale > More). Meaningless on its own; every product-page check is
-     * `posSimpleModeEnabled() && !advancedProductEnabled()`.
-     */
-    function advancedProductEnabled(): bool
-    {
-        return get_setting('pos_advanced_product', '0') === '1';
-    }
-}
-
 if (!function_exists('restaurantSubHubCards')) {
     /**
      * The Restaurant sub-hub's 5 destination cards — the single source shared
