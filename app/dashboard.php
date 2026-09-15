@@ -1994,27 +1994,60 @@ function loadPerformanceChart(period = 'monthly') {
 }
 
 let dashboardChart = null;
+
+// Shared abbreviated-currency formatter — TSh 6.00M / 3.0K / 500 — used by
+// both chart modes' tooltips and summary cards, so the two never disagree.
+function fmtAbbrev(n) {
+    const v = Number(n) || 0;
+    const sign = v < 0 ? '-' : '';
+    const av = Math.abs(v);
+    if (av >= 1000000) return sign + 'TSh ' + (av / 1000000).toFixed(2) + 'M';
+    if (av >= 1000) return sign + 'TSh ' + (av / 1000).toFixed(1) + 'K';
+    return sign + 'TSh ' + av.toLocaleString();
+}
+
+// % change vs the previous data point — null when there's nothing to compare
+// against (first period, or previous value was exactly zero: a % off zero is
+// undefined, not "infinite", so the caller shows no chip rather than lying).
+function pctDelta(curr, prev) {
+    if (prev === undefined || prev === null || prev === 0) return null;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+}
+
+function deltaChipHtml(pct) {
+    if (pct === null) return '';
+    const up = pct >= 0;
+    const cls = up ? 'text-success' : 'text-danger';
+    const arrow = up ? '▲' : '▼';
+    return `<span class="${cls} small fw-bold ms-1">${arrow}${Math.abs(pct).toFixed(0)}%</span>`;
+}
+
 function renderChart(data) {
+    if (POS_SIMPLE_MODE) { renderSimpleChart(data); return; }
+    renderNormalChart(data);
+}
+
+function renderNormalChart(data) {
     const ctx = document.getElementById('performanceChart').getContext('2d');
-    
+
     if (dashboardChart) {
         dashboardChart.destroy();
         dashboardChart = null;
     }
-    
+
     $('#performanceSummary').empty();
 
     // If no data, show empty chart frame
     const labels = data.length > 0 ? data.map(row => row.period) : [];
     const revenueData = data.length > 0 ? data.map(row => parseFloat(row.revenue) || 0) : [];
     const expenseData = data.length > 0 ? data.map(row => parseFloat(row.expense) || 0) : [];
-    
+
     dashboardChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
-                label: <?= json_encode($pos_simple_mode ? t('Sales') : t('Revenue (Invoiced)')) ?>,
+                label: <?= json_encode(t('Revenue (Invoiced)')) ?>,
                 data: revenueData,
                 borderColor: '#0d6efd',
                 backgroundColor: function(context) {
@@ -2035,7 +2068,7 @@ function renderChart(data) {
                 pointBorderColor: '#0d6efd',
                 pointBorderWidth: 2,
             }, {
-                label: <?= json_encode($pos_simple_mode ? t('Purchases') : t('Expenses')) ?>,
+                label: <?= json_encode(t('Expenses')) ?>,
                 data: expenseData,
                 borderColor: '#dc3545',
                 backgroundColor: function(context) {
@@ -2164,32 +2197,6 @@ function renderChart(data) {
         const last = data[data.length - 1];
         const netProfit = (last.net_profit != null) ? last.net_profit : (last.revenue - (last.expense || 0));
 
-        if (POS_SIMPLE_MODE) {
-            // No cash-in/cash-out figures in Simple Mode (that view is
-            // ledger-only and intentionally not computed here) — just
-            // Sold / Bought / Profit for the latest period.
-            $('#performanceSummary').append(`
-                <div class="mt-4 p-3 bg-light rounded shadow-sm border">
-                    <div class="row align-items-center">
-                        <div class="col-md-4 border-end">
-                            <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
-                            <strong class="h6 mb-0 text-primary">TSh ${last.revenue.toLocaleString()}</strong>
-                            <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('Sales') ?></small>
-                        </div>
-                        <div class="col-md-4 border-end text-center py-2 py-md-0">
-                            <strong class="h6 mb-0">TSh ${(last.expense || 0).toLocaleString()}</strong>
-                            <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('Purchases') ?></small>
-                        </div>
-                        <div class="col-md-4 text-end">
-                            <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Net Profit') ?></span>
-                            <strong class="h6 mb-0 text-${netProfit >= 0 ? 'primary' : 'danger'}">TSh ${netProfit.toLocaleString()}</strong>
-                        </div>
-                    </div>
-                </div>
-            `);
-            return;
-        }
-
         const netCash = (last.net_cash != null) ? last.net_cash : ((last.collected || 0) - (last.cash_out || 0));
 
         $('#performanceSummary').append(`
@@ -2220,6 +2227,158 @@ function renderChart(data) {
             </div>
         `);
     }
+}
+
+// Simple POS mode (2026-09-15): a shop owner's actual bottom line — Sales
+// minus Cost of Goods minus real operating Expenses — not just gross margin.
+// Deliberately its own function, not a branch inside renderNormalChart(),
+// so the accrual/cash ledger-based normal-mode chart above is never touched
+// by this: this whole function only ever runs when POS_SIMPLE_MODE is true
+// (superadmin-granted per tenant, core/pos_nav.php::posSimpleModeEnabled()).
+function renderSimpleChart(data) {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+
+    if (dashboardChart) {
+        dashboardChart.destroy();
+        dashboardChart = null;
+    }
+
+    $('#performanceSummary').empty();
+
+    const labels       = data.length > 0 ? data.map(row => row.period) : [];
+    const salesData     = data.length > 0 ? data.map(row => parseFloat(row.revenue) || 0) : [];
+    const cogsData      = data.length > 0 ? data.map(row => parseFloat(row.expense) || 0) : [];
+    const opExpenseData = data.length > 0 ? data.map(row => parseFloat(row.operating_expenses) || 0) : [];
+
+    function lineDataset(label, data, color, dash) {
+        return {
+            label: label,
+            data: data,
+            borderColor: color,
+            backgroundColor: function(context) {
+                const chart = context.chart;
+                const { chartArea } = chart;
+                if (!chartArea) return color + '14';
+                const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                gradient.addColorStop(0, color + '2E');
+                gradient.addColorStop(1, color + '03');
+                return gradient;
+            },
+            fill: true,
+            tension: 0.4,
+            borderWidth: dash ? 2 : 2.5,
+            borderDash: dash || [],
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: color,
+            pointBorderWidth: 2,
+        };
+    }
+
+    dashboardChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                lineDataset(<?= json_encode(t('Sales')) ?>, salesData, '#0d6efd', null),
+                lineDataset(<?= json_encode(t('Cost of Goods')) ?>, cogsData, '#dc3545', [6, 3]),
+                lineDataset(<?= json_encode(t('Expenses')) ?>, opExpenseData, '#fd7e14', [2, 2]),
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: {
+                    display: true, position: 'top', align: 'end',
+                    labels: { usePointStyle: true, pointStyleWidth: 12, boxHeight: 8, font: { size: 12 }, padding: 20 }
+                },
+                tooltip: {
+                    padding: 14,
+                    backgroundColor: 'rgba(17,24,39,0.9)',
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            return label + fmtAbbrev(context.parsed.y);
+                        },
+                        afterBody: function(items) {
+                            const sales = items.find(i => i.datasetIndex === 0);
+                            const cogs  = items.find(i => i.datasetIndex === 1);
+                            const opex  = items.find(i => i.datasetIndex === 2);
+                            if (sales && cogs && opex) {
+                                const netProfit = sales.parsed.y - cogs.parsed.y - opex.parsed.y;
+                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + ': ' + fmtAbbrev(netProfit)];
+                            }
+                            return [];
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true, position: 'left',
+                    ticks: { color: '#6b7280', font: { size: 11 }, callback: v => fmtAbbrev(v), maxTicksLimit: 7 },
+                    grid: { color: 'rgba(107,114,128,0.15)', lineWidth: 1, drawBorder: false },
+                    border: { dash: [4, 4], display: false }
+                },
+                x: {
+                    ticks: { color: '#6b7280', font: { size: 11 }, maxRotation: 0 },
+                    grid: { color: 'rgba(107,114,128,0.08)', lineWidth: 1, drawBorder: false },
+                    border: { display: false }
+                }
+            }
+        }
+    });
+
+    if (data.length === 0) return;
+
+    const last = data[data.length - 1];
+    const prev = data.length > 1 ? data[data.length - 2] : null;
+
+    const sales    = parseFloat(last.revenue) || 0;
+    const cogs     = parseFloat(last.expense) || 0;
+    const opex     = parseFloat(last.operating_expenses) || 0;
+    const netProfit = (last.net_profit != null) ? parseFloat(last.net_profit) : (sales - cogs - opex);
+    const margin   = sales > 0 ? (netProfit / sales) * 100 : null;
+
+    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0)) : '';
+    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0)) : '';
+    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0)) : '';
+    const profitPrev = prev ? ((prev.net_profit != null) ? parseFloat(prev.net_profit) : ((parseFloat(prev.revenue) || 0) - (parseFloat(prev.expense) || 0) - (parseFloat(prev.operating_expenses) || 0))) : null;
+    const profitDelta = prev ? deltaChipHtml(pctDelta(netProfit, profitPrev)) : '';
+
+    $('#performanceSummary').append(`
+        <div class="mt-4 p-3 bg-light rounded shadow-sm border">
+            <span class="text-muted small d-block uppercase fw-bold mb-2" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
+            <div class="row g-3 text-center">
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Sales') ?></div>
+                    <div class="h6 mb-0 text-primary">${fmtAbbrev(sales)}${salesDelta}</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Cost of Goods') ?></div>
+                    <div class="h6 mb-0 text-danger">${fmtAbbrev(cogs)}${cogsDelta}</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Expenses') ?></div>
+                    <div class="h6 mb-0" style="color:#fd7e14;">${fmtAbbrev(opex)}${opexDelta}</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Net Profit') ?></div>
+                    <div class="h6 mb-0 text-${netProfit >= 0 ? 'success' : 'danger'}">${fmtAbbrev(netProfit)}${profitDelta}</div>
+                    ${margin !== null ? `<small class="d-block text-muted" style="font-size: 0.7rem;">${margin.toFixed(0)}% <?= t('margin') ?></small>` : ''}
+                </div>
+            </div>
+        </div>
+    `);
 }
 
 function updateDashboardMetrics(data) {

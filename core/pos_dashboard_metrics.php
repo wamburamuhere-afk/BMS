@@ -103,12 +103,24 @@ if (!function_exists('posSimpleBuySellSeries')) {
      * query instead of N+1 calls, so the two numbers are the true buy/sell
      * pair for what was actually sold, not a rough estimate.
      *
-     * @param string $period    'daily'|'weekly'|'monthly'|'quarterly'|'yearly'
-     * @param string $scopeSql  Pre-built scope clause on alias 'ps', e.g.
-     *                          scopeFilterSqlNullable('project','ps') . scopeFilterSqlNullable('warehouse','ps')
-     * @return array<int, array{period:string, sold:float, bought:float, profit:float}>
+     * 2026-09-15: also folds in real operating Expenses (the `expenses` table,
+     * status 'approved' or 'paid' — the same accrual-recognition moment
+     * core/expense_posting.php's postExpenseAccrual() uses, so this matches
+     * the real ledger's P&L timing rather than only counting once cash moves)
+     * so `net_profit` here is Sold − Bought − Expenses, a shop owner's actual
+     * bottom line — not just gross margin. Requires `expenses.warehouse_id`
+     * (2026-09-15 migration); a company-wide expense (NULL) is scoped exactly
+     * like a company-wide sale already is via $expenseScopeSql.
+     *
+     * @param string $period           'daily'|'weekly'|'monthly'|'quarterly'|'yearly'
+     * @param string $scopeSql         Pre-built scope clause on alias 'ps', e.g.
+     *                                 scopeFilterSqlNullable('project','ps') . scopeFilterSqlNullable('warehouse','ps')
+     * @param string $expenseScopeSql  Same idea, pre-built on alias 'e' for the
+     *                                 `expenses` table, e.g. scopeFilterSqlNullable('project','e') . scopeFilterSqlNullable('warehouse','e').
+     *                                 Empty string = no expenses series (caller opts in).
+     * @return array<int, array{period:string, sold:float, bought:float, expenses:float, profit:float, net_profit:float}>
      */
-    function posSimpleBuySellSeries(PDO $pdo, string $from, string $to, string $period, string $scopeSql): array
+    function posSimpleBuySellSeries(PDO $pdo, string $from, string $to, string $period, string $scopeSql, string $expenseScopeSql = ''): array
     {
         switch ($period) {
             case 'daily':     $periodSql = "DATE_FORMAT(ps.sale_date, '%Y-%m-%d')"; break;
@@ -160,16 +172,57 @@ if (!function_exists('posSimpleBuySellSeries')) {
         $st = $pdo->prepare($sql);
         $st->execute([$from, $to]);
 
-        $out = [];
+        $byPeriod = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
             if ($row['period_key'] === null || $row['period_key'] === '') continue;
-            $sold   = round((float)$row['sold'], 2);
-            $bought = round((float)$row['bought'], 2);
+            $byPeriod[(string)$row['period_key']] = [
+                'sold'   => round((float)$row['sold'], 2),
+                'bought' => round((float)$row['bought'], 2),
+            ];
+        }
+
+        // Expenses series — same period bucketing, own scope clause (different
+        // table/alias, so it can't share $scopeSql's pre-built 'ps.' clause).
+        if ($expenseScopeSql !== '') {
+            switch ($period) {
+                case 'daily':     $expPeriodSql = "DATE_FORMAT(e.expense_date, '%Y-%m-%d')"; break;
+                case 'weekly':    $expPeriodSql = "DATE_FORMAT(e.expense_date, '%x-%v')"; break;
+                case 'quarterly': $expPeriodSql = "CONCAT(YEAR(e.expense_date), '-Q', QUARTER(e.expense_date))"; break;
+                case 'yearly':    $expPeriodSql = "DATE_FORMAT(e.expense_date, '%Y')"; break;
+                default:          $expPeriodSql = "DATE_FORMAT(e.expense_date, '%Y-%m')"; break;
+            }
+            $expSql = "
+                SELECT $expPeriodSql AS period_key, SUM(e.amount) AS spent
+                  FROM expenses e
+                 WHERE e.expense_date BETWEEN ? AND ?
+                   AND e.status IN ('approved','paid')
+                   $expenseScopeSql
+              GROUP BY period_key
+            ";
+            $est = $pdo->prepare($expSql);
+            $est->execute([$from, $to]);
+            foreach ($est->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if ($row['period_key'] === null || $row['period_key'] === '') continue;
+                $key = (string)$row['period_key'];
+                if (!isset($byPeriod[$key])) $byPeriod[$key] = ['sold' => 0.0, 'bought' => 0.0];
+                $byPeriod[$key]['spent'] = round((float)$row['spent'], 2);
+            }
+        }
+
+        ksort($byPeriod);
+
+        $out = [];
+        foreach ($byPeriod as $key => $vals) {
+            $sold     = $vals['sold'];
+            $bought   = $vals['bought'];
+            $expenses = $vals['spent'] ?? 0.0;
             $out[] = [
-                'period' => (string)$row['period_key'],
-                'sold'   => $sold,
-                'bought' => $bought,
-                'profit' => round($sold - $bought, 2),
+                'period'     => $key,
+                'sold'       => $sold,
+                'bought'     => $bought,
+                'expenses'   => $expenses,
+                'profit'     => round($sold - $bought, 2),
+                'net_profit' => round($sold - $bought - $expenses, 2),
             ];
         }
         return $out;
