@@ -16,6 +16,14 @@
 
 **Known gap flagged, not yet fixed (user deferred):** `schema/tenant_schema_template.sql` (what brand-new tenants are provisioned from) still lacks `product_batches.wholesale_price`/`selling_price` — a periodic `mysqldump --no-data` snapshot that predates the 2026-09-13 migration. A tenant provisioned before the next deploy's migration sweep runs would hit the same original error once. Self-heals automatically on the next deploy (tenant migration runner catches up any tenant not yet at current schema); not closed at the template level per user's call.
 
+**Follow-up, same day — second live bug found immediately after the above unblocked it:** with the `wholesale_price` fix live, Restock Product failed again with a new error, `Could not post the payment to the ledger — please check your Chart of Accounts setup.` Traced via the server's Apache error log (`sudo grep -rE "recordGlobalTransaction|postLedgerEntry|quick_restock" /var/log/apache2/*.log`) to the real underlying error, which the generic message had swallowed: `SQLSTATE[01000]: Warning: 1265 Data truncated for column 'transaction_type'`.
+
+**Root cause:** `api/pos/quick_restock.php` calls `postOutflow($pdo, 'stock_restock', ...)`, which inserts `'stock_restock'` into `transactions.transaction_type` — a fixed MySQL `ENUM` that never had `'stock_restock'` added to it when Restock Product shipped. Established bug class in this codebase (precedent: `migrations/2026_07_22_transactions_type_trip.php` fixed the identical issue for `'trip'`); simply missed for this feature.
+
+**Fix:** `migrations/tenant/2026_09_15_transactions_type_stock_restock.php` (+ `migrations/2026_09_15_transactions_type_stock_restock_legacy_db.php` for the non-tenant legacy database) — read-then-append the ENUM, adding `'stock_restock'`. Never a hardcoded literal list, matching the existing precedent's own documented reasoning (a hardcoded MODIFY has silently dropped production enum values before).
+
+**Verified live:** wrote the tenant migration file directly on the server and ran `php core/tenant_migration_runner.php` — all 5 tenants applied it successfully. Both commits pushed to the same PR #1943 (same live-debugging session).
+
 ## 2026-09-14 (fix/pos-restock-simple-mode-default-account) - POS Restock: Simple Mode posts to a default account silently; fix a real error-masking bug
 
 **Request:** two things reported together — (1) under Simple Mode, restocking should post to one default account in the background instead of asking the user to pick a "Paid From" GL account, matching the existing Sales/Expenses pattern; (2) "Restock Failed" on production with no further detail.
