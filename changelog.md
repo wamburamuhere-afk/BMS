@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 6) - Products: list page SKU column + its own Quick Add modal get the same Simple POS treatment
+
+**Phase 6 of `products_simple_pos_plan.md`** — `products.php`'s list table (hand-built `<th>`/`<td>`, not config-driven) hides its SKU column in Simple POS, and its own separate third product-creation surface — the "Quick Add Product" modal — gets the identical field treatment as the main Create form. Also closes the last remaining "Store / Warehouse Name" → `wLabel()` terminology gap, and adds Manufacturing/Expiry Date to the modal's Opening Stock section in every mode (parity with the main Create form's batch-date fields from Phase 1/3 — this modal had none before).
+
+**Fix (`app/bms/product/products.php`):**
+- Same `$simpleProductForm` gate. SKU column (header + cell) removed from the list table in Simple POS — no DataTables `columnDefs`/hardcoded indices in this page, so dropping both together is safe.
+- Quick Add modal: SKU/Barcode still auto-generate (as hidden inputs, same as Create), Description/Wholesale/Discount/Tax Rate+is_taxable/reorder-min-max stock levels hidden, the whole "Additional Details" tab (Brand, Weight/Dimensions, Warranty, Manufacturer, Model, Serial Number, Expiry Days) hidden — button + pane both, since the Create/Update button lives in the modal footer (outside the tab content), not trapped inside any hidden tab.
+- Quick Add modal gains Manufacturing Date + Expiry Date fields next to its existing Opening Stock table, unconditionally (every mode) — it posts to the same `api/create_product.php` endpoint the main Create form already wired into `receiveProductBatch()`.
+
+**Verified:** new `tests/test_products_list_simple_pos_cli.php` (34/34) — source wiring, the real page rendered in three states, and a full end-to-end product creation through the exact Quick Add modal payload shape confirming safe defaults and that the new batch dates land on a real `product_batches` row. Existing `test_pos_i18n_coverage_cli` (135/135) and `test_product_preferred_supplier_removed_cli` (14/14) re-run clean. `php -l` clean.
+
 ## 2026-09-15 (feat/products-simple-pos, phase 5) - Products: Simple POS View page hides same fields, batches show Manufacturing Date
 
 **Phase 5 of `products_simple_pos_plan.md`** — `product_view.php` hides the same fields Create/Edit hide (SKU, Barcode, Description, Wholesale Price) and the entire "Additional Details" tab, for consistency across all three product pages. Stock Information (with its Batches/Lots table) stays the default, primary tab in every mode — it's genuinely useful, "Shop"-labeled already, and not tied to any hidden field. Sales Performance and Stock Movements are generic business data (sales trend, recent sales, movement history), not advanced product fields, so they stay visible in Simple POS too.
