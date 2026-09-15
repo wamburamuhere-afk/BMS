@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-15 (fix/pos-default-register-entitlement) - Fix POS Start Shift register bug for non-pos_advanced tenants
+
+Diagnosed via user report: a tenant without the `pos_advanced` entitlement could not reliably Start Shift, and "Register New" (Add Register) was unavailable. Two compounding bugs:
+
+1. **`api/pos/get_registers.php` was entitlement-gated under `pos_advanced`** even though it only ever required `canView('pos')` internally and is what the base-tier Start Shift modal depends on to find the tenant's one default register (as promised in `pos_config_settings.php`'s own fallback copy: "You still have one default register/till to sign in at"). Blocked, the modal's client-side network-failure fallback guessed `register_id=1`.
+2. **No tenant ever gets a seeded default register.** `schema/tenant_schema_template.sql` is DDL-only (its `pos_registers` AUTO_INCREMENT=2 shows the source DB it was captured from once had a row #1 that was never carried into the template) — every tenant since has provisioned with a genuinely empty `pos_registers` table, so even a manually-created first register lands on id 2, not 1.
+
+**Fix:**
+- `core/feature_registry.php` — removed `api/pos/get_registers.php` from the `pos_advanced` feature's gated `paths` (kept `save_register.php`/`toggle_register_status.php` gated — genuine multi-register management stays upsell-tier).
+- `migrations/tenant/2026_09_15_pos_default_register.php` + `migrations/2026_09_15_pos_default_register_legacy_db.php` — idempotent, criteria-based (only when `pos_registers` has zero rows) seed of one default `'Main Counter'` / `MAIN-01` active register, for every tenant DB, the legacy DB, and any future tenant (replayed via each tenant's own `schema_migrations` ledger).
+
+**Verified:** `php -l` clean on all three files. Existing `test_pos_phase8_registers_cli` (46/46), `test_pos_phase13_entitlement_cli` (20/20), `test_feature_registry_cli` (142/142) re-run clean. Both migrations run for real against the live/legacy DB — confirmed idempotent no-op (that DB already has its own register #1).
+
 ## 2026-09-15 (feat/products-simple-pos, phase 7) - POS Restock modal gains Manufacturing/Expiry Date
 
 **Phase 7 of `products_simple_pos_plan.md`** — the POS Restock modal gains the same two batch-date fields Create/Quick Add already have: Manufacturing Date and Expiry Date, both optional (forcing an expiry date on every restock would break for non-perishable goods), present in every mode.
