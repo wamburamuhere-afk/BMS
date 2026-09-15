@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/simple-pos-expenses-chart) - Simple POS dashboard chart gains real Expenses per shop; net_profit is now the actual bottom line
+
+**Request:** "the chart must also having expenses incurred per shop a user hold... this will help to get the actual net profit made by taking sales price minus purchasing price minus expenses incurred" — the Simple Mode dashboard chart only ever plotted Sales vs Cost of Goods ("Faida Halisi" = gross margin), with no real operating Expenses at all, and no way to scope an expense to a specific shop. Confirmed with the user this stays strictly behind Simple Mode (superadmin-granted per tenant) and never touches the normal-mode ledger-based chart.
+
+**Root gap found while scouting:** `expenses` had no `warehouse_id` column — only `project_id` — so "expenses per shop" was a data-model gap, not a chart-design one.
+
+**Design (confirmed with user before building):** a 3-line chart (Sales / Cost of Goods / Expenses — not a stacked bar) plus a 4-card summary (Sales, Cost of Goods, Expenses, Net Profit) with a ▲/▼ % change chip vs the previous period on each card, and a margin % under Net Profit.
+
+**Fix:**
+- `migrations/tenant/2026_09_15_expenses_warehouse_id.php` + `migrations/2026_09_15_expenses_warehouse_id_legacy_db.php` — `expenses.warehouse_id INT NULL` (mirrors `pos_sales.warehouse_id` exactly; NULL stays correct for a company-wide expense, same discipline `project_id` already follows).
+- `app/constant/accounts/expenses.php` — Simple POS Add/Edit Expense form gains a Shop field, same auto-pick-if-one-shop/ask-if-several pattern already used for Products (`$showShopPicker`/`$onlyWarehouseId`). Plain `name="warehouse_id"` so it rides along with the form's existing `$form.serialize()` — no extra JS payload wiring needed. `editExpense()` populates it from the loaded record.
+- `api/account/add_expense.php` / `update_expense.php` — read, scope-check (`userCan('warehouse', ...)`, same discipline as `project_id`), and persist `warehouse_id`. **Caught by the test suite before commit:** `update_expense.php` initially read and validated `warehouse_id` but never actually wrote it to the `UPDATE` statement's SET clause or params array — fixed; the new test's static SET-clause/params-array check would fail loudly if this regresses.
+- `core/pos_dashboard_metrics.php::posSimpleBuySellSeries()` — new optional `$expenseScopeSql` param (empty = old behavior, fully backward-compatible for any other caller); when supplied, sums real Expenses (`status IN ('approved','paid')` — the same accrual-recognition moment `postExpenseAccrual()` uses, matching the real ledger's P&L timing) per period, warehouse-scoped, and returns `net_profit = sold - bought - expenses`.
+- `api/pos/get_simple_dashboard_chart.php` — builds the expense scope clause (alias `e`), passes it through, response gains `operating_expenses`/`net_profit` (existing `revenue`/`expense`/`profit` fields untouched, so no other consumer of this contract breaks).
+- `app/dashboard.php` — chart rendering split into `renderNormalChart()` (untouched ledger/cash logic, exactly as before) and a new `renderSimpleChart()` (3 lines, 4-card summary, % deltas), dispatched by `POS_SIMPLE_MODE` so the two code paths can never cross. Shared `fmtAbbrev()`/`pctDelta()`/`deltaChipHtml()` helpers.
+- `lang/sw.php` — 2 new translations (`Cost of Goods`, `margin`); everything else reused existing entries.
+
+**Verified:** new `tests/test_simple_pos_expenses_chart_cli.php` (37/37) — lint, schema, source-wiring (including the SET-clause/params-array check that caught the bug above), a live-DB test proving the exact numbers (62,000 = 50,000 approved + 12,000 paid; a pending expense, another shop's expense, and a company-wide expense all correctly excluded from shop A's total), `net_profit` arithmetic, and a regression check that the old 2-argument call signature still returns the original shape unchanged. Existing `test_expenses_simple_pos_cli` (55/55), `test_expense_posting_cli` (35/35), `test_expense_accrual_cli` (16/16), `test_expense_delete_reversal_cli` (18/18), `test_dashboard_time_range_cli` (16/16) re-run clean. `php -l` clean on every touched file. JS syntax-checked via `node --check` on the extracted script block.
+
 ## 2026-09-15 (feat/business-reports-i18n) - Full language translation for the 5 Business Reports pages
 
 **Request:** "in reports, here in business reports i need all these through should have language translation" — the 5 pages under Reports > Business Reports (Sales, Purchase, PO vs Invoice, Inventory, Expense) had almost no translation coverage (7/6/1/5/6 `t()`/`te()` calls across 2,100+ lines — headers, filter labels, table columns, chart titles, buttons and JS-side alert/empty-state text were all hardcoded English), unlike the rest of the app which already speaks Swahili via `core/i18n.php`.

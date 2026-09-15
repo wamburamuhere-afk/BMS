@@ -4027,4 +4027,8 @@ return [
     'Account' => 'Akaunti',
     'No expense entries found.' => 'Hakuna kumbukumbu za matumizi zilizopatikana.',
     'Unclassified' => 'Haijaainishwa',
+
+    // Simple POS dashboard chart — Sales/COGS/Expenses (2026-09-15)
+    'Cost of Goods' => 'Gharama za Bidhaa',
+    'margin' => 'faida',
 ];

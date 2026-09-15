@@ -63,6 +63,11 @@ try {
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+    // Shop (warehouse) this expense belongs to — Simple POS only (the field is
+    // only rendered on that form; a normal-mode expense stays company-wide,
+    // warehouse_id NULL, same as project_id above). Feeds the Simple Mode
+    // dashboard chart's per-shop expense line — see core/pos_dashboard_metrics.php.
+    $warehouse_id       = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
 
     // Every expense must name the cash/bank account it is paid from, so the
     // money actually leaves that account (consistent with all other payments).
@@ -83,6 +88,14 @@ try {
     if ($project_id && !userCan('project', $project_id)) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
+    // Same discipline for warehouse_id — a hand-crafted request can't post an
+    // expense against a shop outside the user's scope.
+    if ($warehouse_id && !userCan('warehouse', $warehouse_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your scope.']);
         exit;
     }
 
@@ -125,15 +138,15 @@ try {
     // Insert into database
     $sql = "INSERT INTO expenses (
         expense_date, expense_account_id, type_id, amount, bank_account_id,
-        project_id, budget_id, voucher_id, description, notes, status,
+        project_id, warehouse_id, budget_id, voucher_id, description, notes, status,
         created_by, paid_to_type, paid_to_id, payee_manual_role, payee_manual_name,
         invoice_id, payroll_id, expense_items
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
-        $project_id, $budget_id, $voucher_id, $description, $notes, $status,
+        $project_id, $warehouse_id, $budget_id, $voucher_id, $description, $notes, $status,
         $created_by, $paid_to_type, $paid_to_id, $payee_manual_role, $payee_manual_name,
         $invoice_id, $payroll_id, $expense_items
     ]);
