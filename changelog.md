@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 4) - Products: Simple POS Edit form hides the same fields, never loses data
+
+**Phase 4 of `products_simple_pos_plan.md`** — `product_edit.php` hides the exact same fields Phase 3 hid on Create (SKU, Barcode, Description, Tax Configuration, Wholesale Price, Max Discount %, the whole Advanced Details tab, Physical Specifications, reorder/min/max stock thresholds) when Simple POS is on and Advanced Product is off. Unlike Create, Edit deals with an EXISTING record — `api/update_product.php` does a full-replace of every column from `$_POST`, so a hidden field that isn't resubmitted gets silently wiped. Every hidden field is instead round-tripped via a `<input type="hidden">` carrying its current value.
+
+**Fix (`app/bms/product/product_edit.php`):**
+- Same `$simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled()` gate as Create; `$showShopPicker`/`$onlyWarehouseId` reused for the Current Stock table, which collapses to one quantity field only when Simple POS AND exactly one shop are both true (a normal tenant with one warehouse is unaffected).
+- Two fields are read by PRESENCE, not value (`is_taxable`, `is_combo` — `isset($_POST[...]) ? 1 : 0` in `update_product.php`): their hidden-preserve inputs are only rendered when the stored value is truthy, matching real HTML checkbox semantics — a value="0" hidden input would otherwise still count as "on".
+- `discount_rate`'s hidden input keeps its `id` so `calculateMinSellingPrice()` (fired by the still-visible Selling Price field) recomputes from the real stored rate instead of treating it as 0.
+- The Advanced Details tab BUTTON is hidden entirely in Simple POS (its content is 100% hidden-preserved, nothing left to show); its own footer Update button is consequently unreachable (a `tab-pane` without `.active` never displays), so the Inventory tab's "Next: Additional" link is replaced with a real Update button in Simple POS. The page's existing header-level Update button (`form="productForm"`, submits regardless of active tab) was already a safety net either way.
+- Opportunistically fixed one terminology gap found while touching the Current Stock table: `t('Store / Warehouse Name')` → `wLabel(...)`.
+
+**Verified:** new `tests/test_product_edit_simple_pos_cli.php` (93/93) — source wiring, the real page rendered in three states against a real seeded product, and two full end-to-end edits through `api/update_product.php` using the exact hidden-input payload the Simple POS render itself produces: one product with every "advanced" flag ON (confirms `is_taxable`/`is_combo` stay 1, `discount_rate`/`min_selling_price` stay correct, all Advanced Details fields survive), one with them OFF (confirms the presence-based fields stay 0, never false-positive flip to 1). Existing suites re-run clean: `test_product_batch_manufacturing_date_cli` 22/22, `test_superadmin_advanced_product_cli` 38/38, `test_product_create_simple_pos_cli` 40/40, `test_pos_combo_products_cli` 28/28, `test_product_preferred_supplier_removed_cli` 14/14. `php -l` clean. (`test_pos_serial_tracking_cli`'s `approve_grn.php` wiring check and `test_products_scope_visibility_cli`'s row-count checks were already failing before this phase's changes — confirmed via `git stash`, unrelated to this file.)
+
 ## 2026-09-15 (feat/products-simple-pos, phase 3) - Products: Simple POS Create form collapses to one section
 
 **Phase 3 of `products_simple_pos_plan.md`** — the Add Product form now collapses from 4 tabs to one simple, single-section screen when Simple POS is on and "Advanced Product" (Phase 2) is off. Normal tenants, and any Simple POS tenant with Advanced Product switched on, see the exact same full form as before.
