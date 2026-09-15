@@ -179,12 +179,12 @@ $back_url = getUrl('lpos');
                         <?php endif; ?>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                                <option value="">Select Warehouse</option>
+                                <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                 <?= renderWarehouseOptions($warehouses, $warehouse_id) ?>
                             </select>
-                            <div class="form-text">Stock for the items below will be checked against this warehouse.</div>
+                            <div class="form-text"><?= wLabel('Stock for the items below will be checked against this warehouse.', 'Stock for the items below will be checked against this shop.') ?></div>
                         </div>
 
                         <div class="col-md-4">
