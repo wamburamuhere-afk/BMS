@@ -866,6 +866,87 @@ if (!function_exists('setTenantPosSimpleMode')) {
     }
 }
 
+if (!function_exists('tenantShopModeStatus')) {
+    /**
+     * A FOURTH deliberate, narrow exception to "the superadmin panel never
+     * opens a tenant's own database" — same shape as tenantPosSimpleModeStatus()
+     * just above. Reads that tenant's own copy of the 'shop_mode' setting
+     * (core/terminology.php::isShopLabel() reads the same key from inside the
+     * tenant's own request). No lock column: unlike Simple Mode, this has no
+     * tenant-side self-service UI to lock against — superadmin is the only
+     * writer there is.
+     *
+     * @return bool|null null if the tenant/DB can't be reached.
+     */
+    function tenantShopModeStatus(int $tenantId): ?bool
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $st2 = $tPdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'shop_mode'");
+            $val = $st2 ? $st2->fetchColumn() : false;
+
+            return ($val === '1');
+        } catch (Throwable $e) {
+            error_log('tenantShopModeStatus(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('setTenantShopMode')) {
+    /**
+     * Writes 'shop_mode' into ONE tenant's own database — an explicit
+     * override that forces core/terminology.php::isShopLabel() to show
+     * Shop/Duka wording everywhere, independent of the automatic pos+projects
+     * inference it otherwise falls back to (see that function's docblock).
+     * Same exception class and read/write-pair shape as
+     * tenantPosSimpleModeStatus()/setTenantPosSimpleMode() above.
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function setTenantShopMode(int $tenantId, bool $enabled): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return ['ok' => false, 'error' => 'Tenant not found.'];
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return ['ok' => false, 'error' => 'Could not decrypt tenant credentials.'];
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+            $tPdo->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                VALUES ('shop_mode', ?, NOW())
+                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+            ")->execute([$enabled ? '1' : '0', $enabled ? '1' : '0']);
+
+            return ['ok' => true, 'error' => null];
+        } catch (Throwable $e) {
+            error_log('setTenantShopMode(' . $tenantId . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not update this tenant right now.'];
+        }
+    }
+}
+
 // ── Shared display helpers for tenant_admin_log ─────────────────────────────
 // Used by both the dashboard's Recent Platform Activity panel (last 12) and
 // the full Activity log page (up to 500) — one place, so the icon/color/label

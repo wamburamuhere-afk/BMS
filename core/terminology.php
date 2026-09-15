@@ -13,6 +13,17 @@
  * the shop wording whenever POS is on - everywhere else, the shop wording
  * only appears when Projects is off too, since a tenant that also runs
  * project-based work still needs "Warehouse" for its project stock.
+ *
+ * Superadmin override (2026-09-16): the automatic pos+projects inference
+ * above is a *default*, not the only lever - a tenant that also has
+ * Projects on (so the automatic rule alone would never show Shop wording
+ * outside pos.php) can still be forced into Shop/Duka everywhere via the
+ * "Shop Mode" checkbox on the superadmin Point of Sale panel (same UX
+ * pattern as the adjacent "Simple Mode" checkbox: a plain tenant-side
+ * system_settings flag, superadmin-only, the tenant's own admin has no
+ * self-service control over it). Checking it simply skips the Projects
+ * check below; it never forces "Warehouse" wording back on for a tenant
+ * the automatic rule would already call Shop - there is no "force off".
  */
 
 if (!function_exists('isShopLabel')) {
@@ -27,6 +38,9 @@ if (!function_exists('isShopLabel')) {
     {
         if (!tenantFeatureEnabled('pos')) {
             return false;
+        }
+        if (function_exists('get_setting') && get_setting('shop_mode', '0') === '1') {
+            return true;
         }
         if ($isPosCoreScreen) {
             return true;

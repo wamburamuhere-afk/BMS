@@ -705,20 +705,33 @@ function loadUsers() {
 function openPosMoreModal() {
     // POS Advanced / Restaurant POS render from POS_ADVANCED/RESTAURANT_POS
     // (already known — plain control-DB reads, same data the main grid
-    // itself renders from) the instant the dialog opens. Simple Mode alone
-    // waits on an on-demand fetch — same discipline as loadUsers(): this is
-    // the third thing on this page that briefly opens the tenant's own
-    // database, and only ever on this explicit click. See
-    // tenantPosSimpleModeStatus()'s docblock.
+    // itself renders from) the instant the dialog opens. Simple Mode and
+    // Shop Mode each wait on an on-demand fetch — same discipline as
+    // loadUsers(): these are the third and fifth things on this page that
+    // briefly open the tenant's own database, and only ever on this
+    // explicit click. See tenantPosSimpleModeStatus()'s and
+    // tenantShopModeStatus()'s docblocks.
     Swal.fire({ title: 'Point of Sale — More', html: 'Loading current status…', showConfirmButton: false, didOpen: () => Swal.showLoading() });
 
-    $.ajax({
-        url: '/actions/superadmin_tenant_pos_simple_mode.php',
-        method: 'POST', dataType: 'json',
-        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
-    }).done(function (res) {
+    $.when(
+        $.ajax({
+            url: '/actions/superadmin_tenant_pos_simple_mode.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
+        }),
+        $.ajax({
+            url: '/actions/superadmin_tenant_shop_mode.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
+        })
+    ).done(function (r1, r2) {
+        const res = r1[0], shopRes = r2[0];
         if (!res || !res.success) {
             Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read Simple Mode status for this tenant.' });
+            return;
+        }
+        if (!shopRes || !shopRes.success) {
+            Swal.fire({ icon: 'error', title: 'Error', text: (shopRes && shopRes.message) || 'Could not read Shop Mode status for this tenant.' });
             return;
         }
         function subFeatureBlock(id, label, description, state) {
@@ -738,10 +751,15 @@ function openPosMoreModal() {
                     'Multi-register/till management, selling price tiers, and the customer loyalty points program.', POS_ADVANCED)
                 + subFeatureBlock('saRestaurantPosEnabled', 'Restaurant POS',
                     'Floors/Tables, Kitchen Display, Modifier Groups and table Reservations for a restaurant/hybrid warehouse.', RESTAURANT_POS)
-                + '<div class="form-check">'
+                + '<div class="form-check mb-3 pb-3 border-bottom">'
                 + '<input class="form-check-input" type="checkbox" id="saPosSimpleEnabled"' + (res.enabled ? ' checked' : '') + '>'
                 + '<label class="form-check-label fw-semibold" for="saPosSimpleEnabled">Simple Mode</label>'
                 + '<div class="text-muted small">Display-only preference for a small shop with no accountant — hides the accounting-style menus/reports and swaps the dashboard chart to a plain Bought vs Sold view. The ledger keeps posting normally either way. Superadmin-only — the tenant\'s own admin cannot change this themselves.</div>'
+                + '</div>'
+                + '<div class="form-check">'
+                + '<input class="form-check-input" type="checkbox" id="saShopModeEnabled"' + (shopRes.enabled ? ' checked' : '') + '>'
+                + '<label class="form-check-label fw-semibold" for="saShopModeEnabled">Shop Mode</label>'
+                + '<div class="text-muted small">Forces every screen to say "Shop"/"Duka" instead of "Warehouse"/"Ghala", even if this tenant also has Projects on (which would otherwise keep Warehouse wording outside the POS terminal itself). Leave unchecked to use the automatic default: Shop wording everywhere once Projects is off for this tenant, Warehouse wording otherwise. Superadmin-only — the tenant\'s own admin cannot change this themselves.</div>'
                 + '</div>'
                 + '</div>',
             showCancelButton: true,
@@ -750,7 +768,8 @@ function openPosMoreModal() {
                 return {
                     posAdvanced: document.getElementById('saPosAdvancedEnabled').checked,
                     restaurantPos: document.getElementById('saRestaurantPosEnabled').checked,
-                    simple: document.getElementById('saPosSimpleEnabled').checked
+                    simple: document.getElementById('saPosSimpleEnabled').checked,
+                    shopMode: document.getElementById('saShopModeEnabled').checked
                 };
             }
         }).then(function (result) {
@@ -777,15 +796,26 @@ function openPosMoreModal() {
                         // this themselves, superadmin-only by design.
                         locked: 1
                     }
+                }),
+                $.ajax({
+                    url: '/actions/superadmin_tenant_shop_mode.php',
+                    method: 'POST', dataType: 'json',
+                    data: {
+                        _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
+                        enabled: result.value.shopMode ? 1 : 0
+                    }
                 })
-            ).done(function (r1, r2) {
-                var res1 = r1[0], res2 = r2[0];
-                if (res1 && res1.success && res2 && res2.success) {
+            ).done(function (r1, r2, r3) {
+                var res1 = r1[0], res2 = r2[0], res3 = r3[0];
+                if (res1 && res1.success && res2 && res2.success && res3 && res3.success) {
                     Swal.fire({ icon: 'success', title: 'Saved', text: 'Point of Sale settings updated.', timer: 1800, showConfirmButton: false })
                         .then(function () { window.location.reload(); });
                 } else {
-                    var msg = [!res1 || !res1.success ? (res1 && res1.message) : null, !res2 || !res2.success ? (res2 && res2.message) : null]
-                        .filter(Boolean).join(' ') || 'Could not save.';
+                    var msg = [
+                        !res1 || !res1.success ? (res1 && res1.message) : null,
+                        !res2 || !res2.success ? (res2 && res2.message) : null,
+                        !res3 || !res3.success ? (res3 && res3.message) : null
+                    ].filter(Boolean).join(' ') || 'Could not save.';
                     Swal.fire({ icon: 'error', title: 'Error', text: msg });
                 }
             }).fail(function () {
