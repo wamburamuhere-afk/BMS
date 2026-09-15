@@ -30,21 +30,21 @@ $currency  = get_setting('currency', 'TZS');
 <div class="container-fluid py-4">
     <!-- Print Header (title only — borders/footer come from i_e_print.md) -->
     <div class="print-header d-none d-print-block text-center mb-2">
-        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">PROCUREMENT & PURCHASE REPORT</h2>
-        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
-        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;"><?= t('PROCUREMENT & PURCHASE REPORT') ?></h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;"><?= t('Period:') ?> <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;"><?= t('Generated:') ?> <?= date('d M Y, h:i A') ?></p>
         <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
     <!-- Screen header + actions -->
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
-            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-basket me-2"></i>Purchase Report</h2>
-            <p class="text-muted mb-0">Procurement spend and supplier insights</p>
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-basket me-2"></i><?= t('Purchase Report') ?></h2>
+            <p class="text-muted mb-0"><?= t('Procurement spend and supplier insights') ?></p>
         </div>
         <div class="col-md-6 text-end">
             <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()">
-                <i class="bi bi-printer me-2"></i> Print
+                <i class="bi bi-printer me-2"></i> <?= t('Print') ?>
             </button>
         </div>
     </div>
@@ -54,18 +54,18 @@ $currency  = get_setting('currency', 'TZS');
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('From') ?></label>
                     <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('To') ?></label>
                     <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
                 <?php if (projectsModuleActive()): ?>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Project') ?></label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
-                        <option value="">All My Projects</option>
+                        <option value=""><?= t('All My Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
                             <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
                         <?php endforeach; ?>
@@ -82,19 +82,19 @@ $currency  = get_setting('currency', 'TZS');
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Supplier') ?></label>
                     <select name="supplier_id" id="f-supplier" class="form-select" style="width:100%"></select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Status</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Status') ?></label>
                     <select name="status" id="f-status" class="form-select" style="width:100%">
-                        <option value="">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="ordered">Ordered</option>
-                        <option value="partially_received">Partially Received</option>
-                        <option value="received">Received</option>
-                        <option value="completed">Completed</option>
+                        <option value=""><?= t('All Statuses') ?></option>
+                        <option value="pending"><?= t('Pending') ?></option>
+                        <option value="approved"><?= t('Approved') ?></option>
+                        <option value="ordered"><?= t('Ordered') ?></option>
+                        <option value="partially_received"><?= t('Partially Received') ?></option>
+                        <option value="received"><?= t('Received') ?></option>
+                        <option value="completed"><?= t('Completed') ?></option>
                     </select>
                 </div>
             </form>
@@ -105,10 +105,10 @@ $currency  = get_setting('currency', 'TZS');
     <div class="row g-3 mb-4" id="summaryCards">
         <?php
         $cards = [
-            ['Order Count',  'stat-orders'],
-            ['Total Spend',  'stat-spend'],
-            ['Total Paid',   'stat-paid'],
-            ['Balance Due',  'stat-due'],
+            [t('Order Count'),  'stat-orders'],
+            [t('Total Spend'),  'stat-spend'],
+            [t('Total Paid'),   'stat-paid'],
+            [t('Balance Due'),  'stat-due'],
         ];
         foreach ($cards as $c): ?>
             <div class="col-6 col-md-3">
@@ -126,19 +126,19 @@ $currency  = get_setting('currency', 'TZS');
     <div class="row g-3 mb-4" id="chartRow">
         <div class="col-12 col-md-5">
             <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
-                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart-line text-primary me-2"></i>Spend Trend</div>
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart-line text-primary me-2"></i><?= t('Spend Trend') ?></div>
                 <div class="card-body"><div style="height:230px;"><canvas id="chartTrend"></canvas></div></div>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
-                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-truck text-primary me-2"></i>Top Suppliers</div>
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-truck text-primary me-2"></i><?= t('Top Suppliers') ?></div>
                 <div class="card-body"><div style="height:230px;"><canvas id="chartSuppliers"></canvas></div></div>
             </div>
         </div>
         <div class="col-12 col-md-3">
             <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
-                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>By Status</div>
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i><?= t('By Status') ?></div>
                 <div class="card-body"><div style="height:230px;"><canvas id="chartStatus"></canvas></div></div>
             </div>
         </div>
@@ -147,21 +147,21 @@ $currency  = get_setting('currency', 'TZS');
     <!-- Detail table -->
     <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
         <div class="card-header bg-white border-0">
-            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i>Purchase Orders</h6>
+            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i><?= t('Purchase Orders') ?></h6>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0 w-100" id="poTable">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">S/No</th>
-                            <th>PO Number</th>
-                            <th>Date</th>
-                            <th>Supplier</th>
-                            <th class="text-end">Amount</th>
-                            <th class="text-end">Paid</th>
-                            <th class="text-center">Status</th>
-                            <th class="pe-3 text-center">Payment</th>
+                            <th class="ps-3"><?= t('S/No') ?></th>
+                            <th><?= t('PO Number') ?></th>
+                            <th><?= t('Date') ?></th>
+                            <th><?= t('Supplier') ?></th>
+                            <th class="text-end"><?= t('Amount') ?></th>
+                            <th class="text-end"><?= t('Paid') ?></th>
+                            <th class="text-center"><?= t('Status') ?></th>
+                            <th class="pe-3 text-center"><?= t('Payment') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -197,6 +197,16 @@ $currency  = get_setting('currency', 'TZS');
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 $(function () {
+    const PT = {
+        allSuppliers: <?= json_encode(t('All Suppliers')) ?>,
+        noPurchaseOrdersFound: <?= json_encode(t('No purchase orders found.')) ?>,
+        noMatchingRecords: <?= json_encode(t('No matching records.')) ?>,
+        spend: <?= json_encode(t('Spend')) ?>,
+        error: <?= json_encode(t('Error')) ?>,
+        couldNotLoadReport: <?= json_encode(t('Could not load the report.')) ?>,
+        unknown: <?= json_encode(t('Unknown')) ?>,
+        serverErrorLoadingReport: <?= json_encode(t('Server error loading the report.')) ?>,
+    };
     const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
     const DATA_URL = '<?= buildUrl('api/account/get_purchase_report.php') ?>';
     const SUP_URL  = '<?= buildUrl('api/account/search_suppliers.php') ?>';
@@ -214,7 +224,7 @@ $(function () {
 
     // ── Select2 filters ───────────────────────────────────────────────────
     $('#f-supplier').select2({
-        theme: 'bootstrap-5', placeholder: 'All Suppliers', allowClear: true, width: '100%',
+        theme: 'bootstrap-5', placeholder: PT.allSuppliers, allowClear: true, width: '100%',
         ajax: { url: SUP_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
     $('#f-project, #f-warehouse, #f-status').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
@@ -223,7 +233,7 @@ $(function () {
     const table = $('#poTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
         dom: 'rtip', columnDefs: [{ targets: [4, 5], className: 'text-end' }, { targets: [6, 7], className: 'text-center' }],
-        language: { emptyTable: 'No purchase orders found.', zeroRecords: 'No matching records.' }
+        language: { emptyTable: PT.noPurchaseOrdersFound, zeroRecords: PT.noMatchingRecords }
     });
 
     // ── Charts ────────────────────────────────────────────────────────────
@@ -236,14 +246,14 @@ $(function () {
         cTrend = new Chart(document.getElementById('chartTrend'), {
             type: 'line',
             data: { labels: charts.spend_trend.map(r => r.label),
-                    datasets: [{ label: 'Spend', data: charts.spend_trend.map(r => +r.value), borderColor: BLUE, backgroundColor: 'rgba(13,110,253,.12)', fill: true, tension: .3, pointRadius: 2 }] },
+                    datasets: [{ label: PT.spend, data: charts.spend_trend.map(r => +r.value), borderColor: BLUE, backgroundColor: 'rgba(13,110,253,.12)', fill: true, tension: .3, pointRadius: 2 }] },
             options: { ...baseOpts, plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
         });
 
         cSuppliers = new Chart(document.getElementById('chartSuppliers'), {
             type: 'bar',
             data: { labels: charts.by_supplier.map(r => r.name),
-                    datasets: [{ label: 'Spend', data: charts.by_supplier.map(r => +r.total), backgroundColor: BLUE }] },
+                    datasets: [{ label: PT.spend, data: charts.by_supplier.map(r => +r.total), backgroundColor: BLUE }] },
             options: { ...baseOpts, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } }
         });
 
@@ -267,7 +277,7 @@ $(function () {
         $.getJSON(DATA_URL, params)
             .done(function (res) {
                 if (!res || !res.success) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not load the report.' });
+                    Swal.fire({ icon: 'error', title: PT.error, text: (res && res.message) || PT.couldNotLoadReport });
                     return;
                 }
                 $('#stat-orders').text(Number(res.summary.total_orders).toLocaleString());
@@ -282,7 +292,7 @@ $(function () {
                     i + 1,
                     r.order_number || '',
                     r.order_date ? new Date(r.order_date).toLocaleDateString() : '',
-                    r.supplier_name || 'Unknown',
+                    r.supplier_name || PT.unknown,
                     fmt(r.grand_total),
                     fmt(r.paid_amount),
                     badge(r.status),
@@ -290,7 +300,7 @@ $(function () {
                 ]));
                 table.draw();
             })
-            .fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error loading the report.' }));
+            .fail(() => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverErrorLoadingReport }));
     }
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });

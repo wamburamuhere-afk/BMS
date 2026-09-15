@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/business-reports-i18n) - Full language translation for the 5 Business Reports pages
+
+**Request:** "in reports, here in business reports i need all these through should have language translation" — the 5 pages under Reports > Business Reports (Sales, Purchase, PO vs Invoice, Inventory, Expense) had almost no translation coverage (7/6/1/5/6 `t()`/`te()` calls across 2,100+ lines — headers, filter labels, table columns, chart titles, buttons and JS-side alert/empty-state text were all hardcoded English), unlike the rest of the app which already speaks Swahili via `core/i18n.php`.
+
+**Fix — one page at a time, same proven pattern already used for POS/Expenses:**
+- Every static PHP-rendered string wrapped in `t()` (labels, headers, table columns, chart titles, filter option text, buttons).
+- Every JS-side string moved into a page-local `const PT = { key: <?= json_encode(t('...')) ?>, ... }` object and referenced as `PT.key` (Swal alerts, DataTable empty-state messages, chart dataset labels, fallback text like "Walk-in"/"Unclassified"/"Unknown").
+- Composed sentences (e.g. `po_invoice_report.php`'s filter summary and HTTP-status error messages) use a single `{0}`/`{1}` placeholder template via a `tFormat()` helper, never concatenated translated fragments — the exact anti-pattern already fixed once in the POS module (`test_pos_i18n_coverage_cli.php` §5), applied here from the start.
+- `app/constant/reports/sales_report.php`, `purchase_report.php`, `expense_report.php`, `inventory_report.php` (4 sub-views: Snapshot/Movements/Transfers/Adjustments — the largest at 783 lines), `app/bms/invoice/po_invoice_report.php`.
+- `lang/sw.php` — 133 new Swahili translations added (only for keys genuinely missing or empty; existing correct translations — e.g. "Date", "Customer", "Paid" — were reused as-is, never duplicated).
+
+**Verified:** new `tests/test_business_reports_i18n_cli.php` — lint-clean on all 5 files, a completeness guard confirming all 217 distinct `t()`/`te()` keys used across the 5 files have a real non-empty `lang/sw.php` translation (zero gaps), a live `loadLanguage('sw')`/`loadLanguage('en')` round-trip on one representative key per file, and a regression guard for the fragment-concatenation anti-pattern. Existing `tests/test_po_invoice_report_cli.php` (35/35) and `tests/test_financial_reports_print_standard_cli.php` (213/213) re-run clean — translation wrapping didn't touch any of the structural/logic patterns those suites check. `tests/test_warehouse_scope_cli.php`'s one failure (dashboard pending-approvals widget) is a confirmed pre-existing, unrelated issue (already flagged in PR #1961's own test notes). `php -l` clean on every touched file. Checked for accidental duplicate `lang/sw.php` keys — the 29 found are all pre-existing (predate this work, verified by file position), none introduced here.
+
 ## 2026-09-15 (fix/journal-mappings-seed) - Fix "mark expense paid" crash for every tenant (unseeded journal_mappings)
 
 Diagnosed via a live production error report ("autoPostEvent: unknown event_type 'expense_paid'") when marking an approved expense as paid on a real tenant (MSAKUZI SHOP / BJP Technologies).
