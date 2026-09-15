@@ -36,7 +36,7 @@ if (!$gate) { http_response_code(403); echo json_encode(['success' => false, 'me
 
 if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
 $tableChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");

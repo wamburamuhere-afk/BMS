@@ -33,7 +33,7 @@ if ($product_id <= 0 || $warehouse_id <= 0) {
 }
 if (!userCan('warehouse', $warehouse_id)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
 

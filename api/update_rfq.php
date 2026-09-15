@@ -27,7 +27,7 @@ try {
 
     if (!$rfq_id)       throw new Exception(t('Invalid RFQ'));
     if (!$supplier_id)  throw new Exception(t('Supplier is required'));
-    if (!$warehouse_id) throw new Exception(t('Warehouse is required'));
+    if (!$warehouse_id) throw new Exception(wLabel('Warehouse is required', 'Shop is required'));
     if (empty($items))  throw new Exception(t('At least one item is required'));
 
     // Phase C — block edits against RFQs on projects not in user scope,

@@ -73,7 +73,7 @@ if (empty($sale['customer_name'])) {
 
 $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
 if ($wid !== null && !userCan('warehouse', $wid)) {
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.', true)]);
     exit;
 }
 

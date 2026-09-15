@@ -26,7 +26,7 @@ try {
     // any warehouse_id from returning that warehouse's GRNs regardless.
     if (!userCan('warehouse', $warehouse_id)) {
         http_response_code(403);
-        throw new Exception(t('Access denied: this warehouse is not in your scope'));
+        throw new Exception(wLabel('Access denied: this warehouse is not in your scope', 'Access denied: this shop is not in your scope'));
     }
 
     // Found 2026-07-18: status='completed' is a legacy status from before the
