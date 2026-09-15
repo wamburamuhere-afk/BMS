@@ -4,6 +4,8 @@ require_once __DIR__ . '/../helpers/transaction_helper.php';
 require_once __DIR__ . '/../../core/payment_source.php';
 require_once __DIR__ . '/../../core/bank_register.php';
 require_once __DIR__ . '/../../core/expense_posting.php';
+require_once __DIR__ . '/../../core/gl_accounts.php';
+require_once __DIR__ . '/../../core/pos_nav.php';
 
 header('Content-Type: application/json');
 
@@ -37,14 +39,21 @@ try {
         }
     }
 
+    // Simple POS mode (expenses_simple_pos_plan.md): the Add Expense form hides
+    // the Expense Type, Account, and "Paid From" fields entirely, so they never
+    // arrive in $_POST for a simple-mode tenant — auto-resolve them instead of
+    // erroring. Real double-entry posting below is unchanged either way.
+    $simplePos = posSimpleModeEnabled();
+
     // Sanitize and prepare data
     $expense_date       = $_POST['expense_date'];
     $expense_account_id = !empty($_POST['expense_account_id']) ? intval($_POST['expense_account_id']) : null;
-    
-    // Fallback: If no account ID provided, pick the first active expense account
+
+    // Fallback: no account chosen (always the case in Simple POS; also covers
+    // the normal form when nothing was picked) — the canonical catch-all
+    // expense account, not just whichever one sorts first alphabetically.
     if (!$expense_account_id) {
-        $stmtAcc = $pdo->query("SELECT account_id FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') LIMIT 1");
-        $expense_account_id = $stmtAcc->fetchColumn();
+        $expense_account_id = miscExpenseAccountId($pdo);
         if (!$expense_account_id) {
             throw new Exception("No valid Expense Account found in the system. Please create one in the Chart of Accounts.");
         }
@@ -57,9 +66,16 @@ try {
 
     // Every expense must name the cash/bank account it is paid from, so the
     // money actually leaves that account (consistent with all other payments).
+    // Simple POS hides this field — auto-resolve the tenant's cash account
+    // instead of asking; the normal form still requires an explicit choice.
+    if (!$bank_account_id && $simplePos) {
+        $bank_account_id = defaultCashAccountId($pdo);
+    }
     if (!$bank_account_id) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Please choose the account the expense is paid from (Paid From).']);
+        echo json_encode(['success' => false, 'message' => $simplePos
+            ? 'No cash/bank account is configured for this business yet. Please set one up first.'
+            : 'Please choose the account the expense is paid from (Paid From).']);
         exit;
     }
 
@@ -84,9 +100,22 @@ try {
     $created_by         = getCurrentUserId();
     $expense_items      = isset($_POST['expense_items']) ? $_POST['expense_items'] : null;
 
-    // Paid To Logic — unified paid_to_id from form
+    // Paid To Logic — unified paid_to_id from form. 'other' (Simple POS "More")
+    // is a manually-typed payee with no Staff/Supplier record at all.
     $paid_to_type = !empty($_POST['paid_to_type']) ? $_POST['paid_to_type'] : null;
     $paid_to_id   = !empty($_POST['paid_to_id']) ? intval($_POST['paid_to_id']) : null;
+    $payee_manual_role = null;
+    $payee_manual_name = null;
+    if ($paid_to_type === 'other') {
+        $paid_to_id        = null;
+        $payee_manual_role = trim($_POST['payee_manual_role'] ?? '');
+        $payee_manual_name = trim($_POST['payee_manual_name'] ?? '');
+        if ($payee_manual_role === '' || $payee_manual_name === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Please enter who this expense was paid to (both role and name).']);
+            exit;
+        }
+    }
     $invoice_id   = !empty($_POST['invoice_id']) ? intval($_POST['invoice_id']) : null;
     $payroll_id   = !empty($_POST['payroll_id']) ? intval($_POST['payroll_id']) : null;
 
@@ -97,14 +126,16 @@ try {
     $sql = "INSERT INTO expenses (
         expense_date, expense_account_id, type_id, amount, bank_account_id,
         project_id, budget_id, voucher_id, description, notes, status,
-        created_by, paid_to_type, paid_to_id, invoice_id, payroll_id, expense_items
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        created_by, paid_to_type, paid_to_id, payee_manual_role, payee_manual_name,
+        invoice_id, payroll_id, expense_items
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
         $project_id, $budget_id, $voucher_id, $description, $notes, $status,
-        $created_by, $paid_to_type, $paid_to_id, $invoice_id, $payroll_id, $expense_items
+        $created_by, $paid_to_type, $paid_to_id, $payee_manual_role, $payee_manual_name,
+        $invoice_id, $payroll_id, $expense_items
     ]);
 
     if ($result) {
