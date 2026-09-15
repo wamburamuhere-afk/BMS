@@ -934,7 +934,7 @@ function submitDN(status) {
 
     const partyNoun = partyType === 'subcontractor' ? 'sub-contractor' : (partyType === 'customer' ? 'customer' : 'supplier');
     if (!partyId)   { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select the ' + partyNoun + '.' }); return; }
-    if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select a warehouse.' }); return; }
+    if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: <?= json_encode(wLabel('Select a warehouse.', 'Select a shop.')) ?> }); return; }
     if (!date)      { Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter the DN date.' }); return; }
 
     const items = [];

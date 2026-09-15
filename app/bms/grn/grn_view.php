@@ -71,7 +71,7 @@ if (!$grn) {
 // able to open a GRN drawn from a different one.
 if (!empty($grn['warehouse_id']) && !userCan('warehouse', (int)$grn['warehouse_id'])) {
     if (!headers_sent()) http_response_code(403);
-    die(t('Access denied: this warehouse is not in your assigned scope.'));
+    die(wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.'));
 }
 
 // Fetch GRN Items

@@ -427,7 +427,7 @@ function sendForReview() {
 function approveReturn() {
     Swal.fire({
         title: <?= json_encode(t('Approve Purchase Return?')) ?>,
-        text: <?= json_encode(t('This will deduct stock from the warehouse and capture your e-signature.')) ?>,
+        text: <?= json_encode(wLabel('This will deduct stock from the warehouse and capture your e-signature.', 'This will deduct stock from the shop and capture your e-signature.')) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: <?= json_encode(t('Yes, approve')) ?>,

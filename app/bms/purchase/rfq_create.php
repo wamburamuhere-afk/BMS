@@ -181,9 +181,9 @@ if ($selected_project > 0) {
                         </select>
                         <div class="form-text text-muted" id="warehouseHint">
                             <?php if ($enable_projects): ?>
-                            <?= t('Select a project first to filter warehouses, or leave project empty to see unlinked warehouses.') ?>
+                            <?= wLabel('Select a project first to filter warehouses, or leave project empty to see unlinked warehouses.', 'Select a project first to filter shops, or leave project empty to see unlinked shops.') ?>
                             <?php else: ?>
-                            <?= t('Select the destination warehouse.') ?>
+                            <?= wLabel('Select the destination warehouse.', 'Select the destination shop.') ?>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -519,13 +519,13 @@ function filterRfqWarehouses(projectId) {
     const filtered = filterWarehousesForProject(rfqAllWarehouses, projectId);
     if (hint) {
         if (projectId === undefined) {
-            hint.textContent = <?= json_encode(t('Showing every warehouse.')) ?>;
+            hint.textContent = <?= json_encode(wLabel('Showing every warehouse.', 'Showing every shop.')) ?>;
         } else if (!projectId || projectId === '' || projectId === '0') {
-            hint.textContent = <?= json_encode(t('Showing warehouses not linked to any project.')) ?>;
+            hint.textContent = <?= json_encode(wLabel('Showing warehouses not linked to any project.', 'Showing shops not linked to any project.')) ?>;
         } else {
             hint.textContent = filtered.length === 0
-                ? <?= json_encode(t('No warehouses found for this project.')) ?>
-                : <?= json_encode(t('Showing')) ?> + ' ' + filtered.length + ' ' + <?= json_encode(t('warehouse(s) for the selected project.')) ?>;
+                ? <?= json_encode(wLabel('No warehouses found for this project.', 'No shops found for this project.')) ?>
+                : <?= json_encode(t('Showing')) ?> + ' ' + filtered.length + ' ' + <?= json_encode(wLabel('warehouse(s) for the selected project.', 'shop(s) for the selected project.')) ?>;
         }
     }
 
