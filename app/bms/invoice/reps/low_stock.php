@@ -189,17 +189,17 @@ try {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-uppercase text-muted">Current Total</label>
-                            <input type="text" class="form-control bg-light border-0 fw-bold text-primary" id="current_stock_display" readonly title="Total stock across all warehouses">
+                            <input type="text" class="form-control bg-light border-0 fw-bold text-primary" id="current_stock_display" readonly title="<?= wLabel('Total stock across all warehouses', 'Total stock across all shops') ?>">
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-uppercase text-muted">Warehouse</label>
+                        <label class="form-label small fw-bold text-uppercase text-muted"><?= wLabel('Warehouse', 'Shop') ?></label>
                         <select class="form-select border-0 bg-light shadow-sm" id="warehouse_id" name="warehouse_id" required>
-                            <option value="">Select Warehouse...</option>
+                            <option value=""><?= wLabel('Select Warehouse...', 'Select Shop...') ?></option>
                         </select>
                         <div id="warehouse_stock_info" class="small mt-1 text-muted" style="display:none">
-                            Current in this warehouse: <span id="wh_current_qty" class="fw-bold">0</span>
+                            <?= wLabel('Current in this warehouse:', 'Current in this shop:') ?> <span id="wh_current_qty" class="fw-bold">0</span>
                         </div>
                     </div>
 
@@ -283,7 +283,7 @@ function loadWarehouses(productId) {
         success: function(response) {
             const select = $('#warehouse_id');
             select.empty();
-            select.append('<option value="">Select Warehouse...</option>');
+            select.append('<option value="">' + <?= json_encode(wLabel('Select Warehouse...', 'Select Shop...')) ?> + '</option>');
             
             if (response.success && response.data.length > 0) {
                 response.data.forEach(warehouse => {
