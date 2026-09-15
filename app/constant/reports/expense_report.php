@@ -30,6 +30,18 @@ $expense_accounts = $pdo->query("
      ORDER BY account_name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
+// Simple POS (2026-09-15): every expense auto-resolves to the same generic
+// account, so the Account filter (and its chart/column) are meaningless
+// there — swapped for Shop, now that expenses.warehouse_id exists. Same
+// scoped-warehouse query the sibling Business Reports already use
+// (sales_report.php/purchase_report.php/inventory_report.php).
+$posSimple  = posSimpleModeEnabled();
+$warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
+    "SELECT warehouse_id, warehouse_name FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC) : [];
+
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
 $currency  = get_setting('currency', 'TZS');
@@ -48,7 +60,7 @@ $currency  = get_setting('currency', 'TZS');
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-cash-stack me-2"></i><?= t('Expense Report') ?></h2>
-            <p class="text-muted mb-0"><?= t('Expenditure analysis by account, period and status') ?></p>
+            <p class="text-muted mb-0"><?= $posSimple ? t('Expenditure analysis by shop, period and status') : t('Expenditure analysis by account, period and status') ?></p>
         </div>
         <div class="col-md-6 text-end">
             <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()">
@@ -80,6 +92,17 @@ $currency  = get_setting('currency', 'TZS');
                     </select>
                 </div>
                 <?php endif; ?>
+                <?php if ($posSimple): ?>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
+                    <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
+                        <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
+                        <?php foreach ($warehouses as $w): ?>
+                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php else: ?>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Expense Account') ?></label>
                     <select name="expense_account_id" id="f-account" class="form-select" style="width:100%">
@@ -89,6 +112,7 @@ $currency  = get_setting('currency', 'TZS');
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Status') ?></label>
                     <select name="status" id="f-status" class="form-select" style="width:100%">
@@ -135,7 +159,7 @@ $currency  = get_setting('currency', 'TZS');
         </div>
         <div class="col-12 col-md-4">
             <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
-                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i><?= t('By Account') ?></div>
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i><?= wLabel('By Account', 'By Shop') ?></div>
                 <div class="card-body"><div style="height:230px;"><canvas id="chartAccount"></canvas></div></div>
             </div>
         </div>
@@ -160,7 +184,7 @@ $currency  = get_setting('currency', 'TZS');
                             <th class="ps-3"><?= t('S/No') ?></th>
                             <th><?= t('Date') ?></th>
                             <th><?= t('Reference') ?></th>
-                            <th><?= t('Account') ?></th>
+                            <th><?= wLabel('Account', 'Shop') ?></th>
                             <th><?= t('Paid To') ?></th>
                             <th><?= t('Description') ?></th>
                             <th class="text-end"><?= t('Amount') ?></th>
@@ -200,6 +224,7 @@ $currency  = get_setting('currency', 'TZS');
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 $(function () {
+    const POS_SIMPLE = <?= json_encode($posSimple) ?>;
     const PT = {
         noExpenseEntriesFound: <?= json_encode(t('No expense entries found.')) ?>,
         noMatchingRecords: <?= json_encode(t('No matching records.')) ?>,
@@ -225,7 +250,7 @@ $(function () {
     function esc(t) { return $('<div>').text(t == null ? '' : t).html(); }
 
     // ── Select2 filters ───────────────────────────────────────────────────
-    $('#f-project, #f-account, #f-status').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+    $('#f-project, #f-account, #f-warehouse, #f-status').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     // ── DataTable (per §UI-2) ─────────────────────────────────────────────
     const table = $('#expTable').DataTable({
@@ -268,7 +293,9 @@ $(function () {
     function loadReport() {
         const params = {
             date_from: $('#f-from').val(), date_to: $('#f-to').val(),
-            project_id: $('#f-project').val() || '', expense_account_id: $('#f-account').val() || '',
+            project_id: $('#f-project').val() || '',
+            expense_account_id: $('#f-account').val() || '',
+            warehouse_id: $('#f-warehouse').val() || '',
             status: $('#f-status').val() || ''
         };
         $.getJSON(DATA_URL, params)
@@ -289,7 +316,7 @@ $(function () {
                     i + 1,
                     r.expense_date ? new Date(r.expense_date).toLocaleDateString() : '',
                     esc(r.reference_number || ''),
-                    esc(r.expense_account_name || PT.unclassified),
+                    esc((POS_SIMPLE ? r.warehouse_name : r.expense_account_name) || PT.unclassified),
                     esc(r.paid_to_name || '—'),
                     esc(r.description || ''),
                     fmt(r.amount),
@@ -301,7 +328,7 @@ $(function () {
     }
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
-    $('#f-project, #f-account, #f-status').on('change', loadReport);
+    $('#f-project, #f-account, #f-warehouse, #f-status').on('change', loadReport);
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Expense Report', 'Loaded expense report');

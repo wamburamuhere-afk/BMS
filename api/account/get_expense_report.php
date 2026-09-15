@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/pos_nav.php';
 
 if (!headers_sent()) {
     header('Content-Type: application/json');
@@ -27,11 +28,17 @@ if (!canView('expense_report')) {
     exit;
 }
 
-$date_from   = $_GET['date_from']          ?? date('Y-01-01');
-$date_to     = $_GET['date_to']            ?? date('Y-12-31');
-$account_id  = $_GET['expense_account_id'] ?? '';
-$status      = $_GET['status']             ?? '';
-$project_id  = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+$date_from     = $_GET['date_from']          ?? date('Y-01-01');
+$date_to       = $_GET['date_to']            ?? date('Y-12-31');
+$account_id    = $_GET['expense_account_id'] ?? '';
+$status        = $_GET['status']             ?? '';
+$project_id    = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+// Simple POS (2026-09-15): every expense auto-resolves to the same generic
+// account, so filtering/charting by Account is meaningless there — the
+// page swaps that filter and the account breakdown chart for Shop instead,
+// now that expenses.warehouse_id exists.
+$posSimple     = posSimpleModeEnabled();
+$warehouse_id  = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ? (int)$_GET['warehouse_id'] : null;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success' => false, 'message' => 'Invalid date range']);
@@ -41,6 +48,12 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
+    exit;
+}
+
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
     exit;
 }
 
@@ -63,6 +76,12 @@ try {
         $params[] = $project_id;
     } else {
         $scope_sql = scopeFilterSqlNullable('project', 'e');
+    }
+    if ($warehouse_id !== null) {
+        $where[]  = "e.warehouse_id = ?";
+        $params[] = $warehouse_id;
+    } else {
+        $scope_sql .= scopeFilterSqlNullable('warehouse', 'e');
     }
     $where_sql = implode(' AND ', $where) . $scope_sql;
 
@@ -89,16 +108,28 @@ try {
     $stmt->execute($params);
     $monthly_trend = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // ── Chart 2: by expense account ───────────────────────────────────────
-    $stmt = $pdo->prepare("
-        SELECT COALESCE(ea.account_name, 'Unclassified') AS name,
-               COALESCE(SUM(e.amount), 0)                AS total
-          FROM expenses e
-          LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
-         WHERE $where_sql
-      GROUP BY e.expense_account_id, ea.account_name
-      ORDER BY total DESC LIMIT 10
-    ");
+    // ── Chart 2: by expense account (normal) or by shop (Simple POS) ───────
+    if ($posSimple) {
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(w.warehouse_name, 'Company-wide') AS name,
+                   COALESCE(SUM(e.amount), 0)                 AS total
+              FROM expenses e
+              LEFT JOIN warehouses w ON e.warehouse_id = w.warehouse_id
+             WHERE $where_sql
+          GROUP BY e.warehouse_id, w.warehouse_name
+          ORDER BY total DESC LIMIT 10
+        ");
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(ea.account_name, 'Unclassified') AS name,
+                   COALESCE(SUM(e.amount), 0)                AS total
+              FROM expenses e
+              LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
+             WHERE $where_sql
+          GROUP BY e.expense_account_id, ea.account_name
+          ORDER BY total DESC LIMIT 10
+        ");
+    }
     $stmt->execute($params);
     $by_account = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -115,7 +146,8 @@ try {
     // ── Detail rows ───────────────────────────────────────────────────────
     $stmt = $pdo->prepare("
         SELECT e.expense_date, e.reference_number, e.description, e.amount, e.status,
-               COALESCE(ea.account_name, 'Unclassified') AS expense_account_name,
+               COALESCE(ea.account_name, 'Unclassified')   AS expense_account_name,
+               COALESCE(w.warehouse_name, 'Company-wide')  AS warehouse_name,
                CASE
                    WHEN e.paid_to_type = 'supplier'       THEN (SELECT supplier_name FROM suppliers       WHERE supplier_id  = e.paid_to_id)
                    WHEN e.paid_to_type = 'sub_contractor' THEN (SELECT supplier_name FROM sub_contractors WHERE supplier_id  = e.paid_to_id)
@@ -124,6 +156,7 @@ try {
                END AS paid_to_name
           FROM expenses e
           LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
+          LEFT JOIN warehouses w ON e.warehouse_id = w.warehouse_id
          WHERE $where_sql
       ORDER BY e.expense_date DESC, e.expense_id DESC
     ");

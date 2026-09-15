@@ -4031,4 +4031,7 @@ return [
     // Simple POS dashboard chart — Sales/COGS/Expenses (2026-09-15)
     'Cost of Goods' => 'Gharama za Bidhaa',
     'margin' => 'faida',
+
+    // Expense Report — Shop filter/breakdown for Simple POS (2026-09-15)
+    'Expenditure analysis by shop, period and status' => 'Uchambuzi wa matumizi kwa duka, kipindi na hali',
 ];

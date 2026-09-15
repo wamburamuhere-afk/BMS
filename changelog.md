@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-15 (fix/expense-report-shop-filter) - Expense Report: Account filter/chart/column swapped for Shop under Simple POS
+
+**Request:** "in expenses report page do you have removed to filter by account? If is simple pos? Just i need replace that section with shop." Confirmed the earlier Business Reports i18n pass had only translated this page, not added Simple POS branching — the "Expense Account" filter, the "By Account" chart, and the Account table column all still showed unconditionally, even though every Simple POS expense auto-resolves to the same generic account (filtering/charting by it is meaningless there). Now that `expenses.warehouse_id` exists (previous phase), swapped all three for Shop under Simple Mode.
+
+**Fix:**
+- `api/account/get_expense_report.php` — reads + scope-checks `warehouse_id` (`userCan('warehouse', ...)`, same discipline as `project_id`); applies `scopeFilterSqlNullable('warehouse', 'e')` by default; the "by account" chart query branches to group by `warehouse_name` instead when `posSimpleModeEnabled()`; detail rows gain `warehouse_name` alongside the existing `expense_account_name` (both always returned — the page picks whichever matches the active mode, existing normal-mode consumers unaffected).
+- `app/constant/reports/expense_report.php` — Account filter wrapped in `!$posSimple`, a new Shop filter (same `wLabel('Warehouse','Shop')` pattern as the other Business Reports) wrapped in `$posSimple`; chart header and table column wording swap via `wLabel()`; JS reads `warehouse_id` alongside `expense_account_id` and renders whichever column matches the mode.
+- `lang/sw.php` — 1 new translation.
+
+**Verified:** new `tests/test_expense_report_shop_filter_cli.php` (19/19) — lint, source wiring, and a real in-process live test (admin session, actual API call, `pos_simple_mode` toggled and restored) proving: normal mode is completely unaffected, Simple Mode groups by shop, and a `warehouse_id`-scoped request returns exactly that shop's total (41,000) with no leakage from a synthetic expense in another shop (62,000) — confirmed zero residue after rollback. Existing `test_expenses_simple_pos_cli` (55/55), `test_simple_pos_expenses_chart_cli` (37/37), `test_business_reports_i18n_cli` (19/19) re-run clean. `php -l` clean on both touched files.
+
 ## 2026-09-15 (feat/simple-pos-expenses-chart) - Simple POS dashboard chart gains real Expenses per shop; net_profit is now the actual bottom line
 
 **Request:** "the chart must also having expenses incurred per shop a user hold... this will help to get the actual net profit made by taking sales price minus purchasing price minus expenses incurred" — the Simple Mode dashboard chart only ever plotted Sales vs Cost of Goods ("Faida Halisi" = gross margin), with no real operating Expenses at all, and no way to scope an expense to a specific shop. Confirmed with the user this stays strictly behind Simple Mode (superadmin-granted per tenant) and never touches the normal-mode ledger-based chart.
