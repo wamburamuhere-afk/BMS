@@ -50,6 +50,15 @@ $suppliers       = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers
 $employees       = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// Simple POS mode (expenses_simple_pos_plan.md): a simplified Add/Edit Expense
+// form for a shop with no accountant — Expense Type, Account, and "Paid From"
+// are hidden and auto-resolved server-side (api/account/add_expense.php,
+// core/gl_accounts.php); Paid To drops Sub Contractor (project-linked, and
+// Simple POS has no projects) and gains a "More" manual-payee option. Never
+// touches ledger posting — see .claude/reporting-source.md.
+$posSimple             = posSimpleModeEnabled();
+$simpleHasActivePayees = !empty($suppliers) || !empty($employees);
+
 // ?paid_to_type=&paid_to_id=[&add=1] — arriving from a payee's Expenses tab
 // (supplier / sub-contractor / staff). Locks the list to that payee and, with
 // add=1, opens the Add modal with the payee pre-selected.
@@ -182,9 +191,11 @@ if (!function_exists('renderExpenseCatRows')) {
                             <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
+                            <?php if (!$posSimple): ?>
                             <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
                                 <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
                             </a>
+                            <?php endif; ?>
                             <?php if (canCreate('expenses')): ?>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add New Expense
@@ -283,6 +294,7 @@ if (!function_exists('renderExpenseCatRows')) {
     </div>
 
     <div class="row g-3">
+    <?php if (!$posSimple): ?>
     <!-- LEFT: Expense Types & Categories tree (click a Type → its expenses; a Category → only that one) -->
     <div class="col-lg-3">
         <div class="card border-0 shadow-sm" style="position:sticky; top:12px;">
@@ -324,9 +336,10 @@ if (!function_exists('renderExpenseCatRows')) {
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- RIGHT: filters + table -->
-    <div class="col-lg-9">
+    <div class="<?= $posSimple ? 'col-lg-12' : 'col-lg-9' ?>">
     <!-- Filters Card -->
     <div class="card mb-4">
         <div class="card-header bg-light">
@@ -334,6 +347,7 @@ if (!function_exists('renderExpenseCatRows')) {
         </div>
         <div class="card-body">
             <div class="row g-3">
+                <?php if (!$posSimple): ?>
                 <div class="col-md-3">
                     <label class="form-label">Expense Account</label>
                     <select class="form-select select2-static" id="categoryFilter" style="width: 100%;">
@@ -343,7 +357,8 @@ if (!function_exists('renderExpenseCatRows')) {
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <?php endif; ?>
+                <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label">Status</label>
                     <select class="form-select" id="statusFilter">
                         <option value="">All Status</option>
@@ -354,11 +369,11 @@ if (!function_exists('renderExpenseCatRows')) {
                         <option value="paid">Paid</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label">Date From</label>
                     <input type="date" class="form-control" id="dateFromFilter">
                 </div>
-                <div class="col-md-3">
+                <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label">Date To</label>
                     <input type="date" class="form-control" id="dateToFilter">
                 </div>
@@ -456,6 +471,8 @@ if (!function_exists('renderExpenseCatRows')) {
                 'id'           => 'expensesTable',
                 'card'         => '#mobile-expense-cards',
                 'page_length'  => 25,
+                // Simple POS doesn't use Expense Categories at all.
+                'hide'         => $posSimple ? ['categories'] : [],
                 // Set only when arriving from a payee's Expenses tab
                 'paid_to_type' => $exp_payee_type,
                 'paid_to_id'   => $exp_payee_id,
@@ -511,11 +528,12 @@ if (!function_exists('renderExpenseCatRows')) {
                             <input type="date" class="form-control" name="expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
 
+                        <?php if (!$posSimple): ?>
                         <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center">
-                                <label class="form-label small fw-bold mb-0">Expense Type <span class="text-danger">*</span></label>
+                                <label class="form-label small fw-bold mb-0"><?= t('Expense Type') ?> <span class="text-danger">*</span></label>
                                 <a href="<?= getUrl('expense_types') ?>" target="_blank" class="small text-decoration-none" title="Open the Expense Types & Categories page in a new tab">
-                                    <i class="bi bi-gear-wide-connected me-1"></i>Manage types &amp; categories
+                                    <i class="bi bi-gear-wide-connected me-1"></i><?= t('Manage types & categories') ?>
                                 </a>
                             </div>
                             <select class="form-select expense-type-sel mt-1" name="expense_type" id="ex_type_id" required>
@@ -525,21 +543,34 @@ if (!function_exists('renderExpenseCatRows')) {
 
                         <div class="col-md-12 add-expense-category-block" style="display:none;">
                             <label class="form-label small fw-bold text-primary">
-                                <i class="bi bi-tags-fill me-1"></i> Expense Category <span class="text-danger">*</span>
+                                <i class="bi bi-tags-fill me-1"></i> <?= t('Expense Category') ?> <span class="text-danger">*</span>
                             </label>
                             <div id="category_cascade_container">
                                 <!-- Cascade dropdowns injected here -->
                             </div>
                             <input type="hidden" name="category_id" id="selected_category_id" value="">
                         </div>
+                        <?php endif; ?>
+
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Paid to</label>
-                            <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
-                                <option value="">Select Type</option>
-                                <option value="supplier">Supplier</option>
-                                <option value="staff">Staff (Employee)</option>
-                                <option value="sub_contractor">Sub Contractor</option>
-                            </select>
+                            <label class="form-label small fw-bold"><?= t('Paid to') ?></label>
+                            <?php if ($posSimple && !$simpleHasActivePayees): ?>
+                                <input type="hidden" name="paid_to_type" id="paid_to_type" value="other">
+                                <div class="form-text text-muted mb-1"><?= t('No active Supplier or Staff yet — enter who this was paid to below.') ?></div>
+                            <?php elseif ($posSimple): ?>
+                                <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
+                                    <option value="supplier" selected><?= t('Supplier') ?></option>
+                                    <option value="staff"><?= t('Staff (Employee)') ?></option>
+                                    <option value="other"><?= t('More…') ?></option>
+                                </select>
+                            <?php else: ?>
+                                <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
+                                    <option value="">Select Type</option>
+                                    <option value="supplier">Supplier</option>
+                                    <option value="staff">Staff (Employee)</option>
+                                    <option value="sub_contractor">Sub Contractor</option>
+                                </select>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-6 d-none" id="paid_to_id_block">
                             <label class="form-label small fw-bold" id="paid_to_id_label">Payee</label>
@@ -547,10 +578,19 @@ if (!function_exists('renderExpenseCatRows')) {
                                 <option value="">Select...</option>
                             </select>
                         </div>
+                        <?php if ($posSimple): ?>
+                        <div class="col-md-6<?= !$simpleHasActivePayees ? '' : ' d-none' ?>" id="paid_to_manual_block">
+                            <label class="form-label small fw-bold"><?= t('Pay to whom (e.g. Bodaboda)') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control mb-2" name="payee_manual_role" id="payee_manual_role" placeholder="<?= t('e.g. Bodaboda, Mjengo, Fundi') ?>">
+                            <label class="form-label small fw-bold"><?= t('Name') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="payee_manual_name" id="payee_manual_name" placeholder="<?= t('Full name') ?>">
+                        </div>
+                        <?php endif; ?>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
                         </div>
+                        <?php if (!$posSimple): ?>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Paid From <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
@@ -561,6 +601,7 @@ if (!function_exists('renderExpenseCatRows')) {
                             </select>
                             <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
                         </div>
+                        <?php endif; ?>
                         <?php if ($enable_projects == '1'): ?>
                         <div class="col-md-6" id="project_field_block">
                             <label class="form-label small fw-bold">Project</label>
@@ -621,6 +662,10 @@ if (!function_exists('renderExpenseCatRows')) {
 <script src="/assets/js/select2.min.js"></script>
 
 <script>
+// Simple POS mode (expenses_simple_pos_plan.md) — top-level so every
+// $(document).ready() block and function in this file can see it.
+const EXP_SIMPLE_POS = <?= json_encode($posSimple) ?>;
+
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Expenses List', 'User viewed the expenses management list');
@@ -650,6 +695,13 @@ $(document).ready(function() {
         });
     }
     initSelect2();
+
+    // Simple POS — Supplier is the default Paid To, so populate its payee list
+    // up front. A later deep link or editExpense() call (both below) overrides
+    // this synchronously before the modal is ever shown.
+    if (EXP_SIMPLE_POS && $('#paid_to_type').is('select')) {
+        $('#paid_to_type').trigger('change');
+    }
 
     // Deep links from a payee's Expenses tab (supplier / sub-contractor / staff).
     <?php $exp_edit_id = intval($_GET['edit'] ?? 0); ?>
@@ -900,8 +952,13 @@ $(document).ready(function() {
         $('#breakdown-body').empty();
         $('#breakdown-grand-total').text('0.00');
         $('#expense_items_json').val('');
-        // Reset paid-to unified dropdown
-        $('#paid_to_type').val(null).trigger('change');
+        // Reset paid-to unified dropdown — Simple POS defaults back to Supplier
+        // (per expenses_simple_pos_plan.md); the normal form clears to blank.
+        if (EXP_SIMPLE_POS && $('#paid_to_type').is('select')) {
+            $('#paid_to_type').val('supplier').trigger('change');
+        } else if (!EXP_SIMPLE_POS) {
+            $('#paid_to_type').val(null).trigger('change');
+        }
         $('#paid_to_id_block').addClass('d-none');
         const $payeeSelect = $('#paid_to_id_select');
         if ($payeeSelect.data('select2')) $payeeSelect.select2('destroy');
@@ -963,9 +1020,20 @@ $(document).ready(function() {
     $('#paid_to_type').on('change', function() {
         const type     = $(this).val();
         const $block   = $('#paid_to_id_block');
+        const $manual  = $('#paid_to_manual_block');
         const $select  = $('#paid_to_id_select');
         const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
         const dataMap  = { supplier: suppliersData, staff: staffData, sub_contractor: subContractorsData };
+
+        // Simple POS "More" — a manually-typed payee, no id to pick from.
+        if (type === 'other') {
+            if ($select.data('select2')) $select.select2('destroy');
+            $select.empty().append('<option value="">Select...</option>');
+            $block.addClass('d-none');
+            $manual.removeClass('d-none');
+            return;
+        }
+        $manual.addClass('d-none');
 
         if ($select.data('select2')) $select.select2('destroy');
         $select.empty().append('<option value="">Select...</option>');
@@ -1320,9 +1388,9 @@ function findCatInTree(cats, id) {
     return null;
 }
 
-// Initial Load
+// Initial Load — Simple POS has no Expense Type field, so skip the fetch.
 $(document).ready(function() {
-    loadExpenseSchema();
+    if (!EXP_SIMPLE_POS) loadExpenseSchema();
 });
 
 // ── Expense Breakdown (global — called from onclick and editExpense) ──────────
@@ -1426,14 +1494,22 @@ function editExpense(id) {
                 }, 150);
             }
 
-            // Populate Paid To (unified dropdown)
-            if (data.paid_to_type) {
-                $form.find('select[name="paid_to_type"]').val(data.paid_to_type).trigger('change');
-                setTimeout(() => {
-                    $('#paid_to_id_select').val(data.paid_to_id).trigger('change');
-                }, 150);
-            } else {
-                $form.find('select[name="paid_to_type"]').val(null).trigger('change');
+            // Populate Paid To (unified dropdown, or the hidden 'other'-only
+            // input when this tenant has no active Staff/Supplier at all).
+            const $paidToType = $form.find('[name="paid_to_type"]');
+            if (data.paid_to_type === 'other') {
+                if ($paidToType.is('select')) $paidToType.val('other').trigger('change');
+                $form.find('[name="payee_manual_role"]').val(data.payee_manual_role || '');
+                $form.find('[name="payee_manual_name"]').val(data.payee_manual_name || '');
+            } else if (data.paid_to_type) {
+                if ($paidToType.is('select')) {
+                    $paidToType.val(data.paid_to_type).trigger('change');
+                    setTimeout(() => {
+                        $('#paid_to_id_select').val(data.paid_to_id).trigger('change');
+                    }, 150);
+                }
+            } else if ($paidToType.is('select')) {
+                $paidToType.val(null).trigger('change');
             }
 
             if (data.expense_account_id) {

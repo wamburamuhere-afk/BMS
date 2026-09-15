@@ -3750,4 +3750,18 @@ return [
     // POS terminal — "Workspace" link back to the stats/shift-history hub
     'Workspace' => 'Sehemu ya Kazi',
     'POS Workspace — stats, shift history, catalog setup' => 'Sehemu ya Kazi ya POS — takwimu, historia ya zamu, usanidi wa katalogi',
+
+    // ------------------------------------------------------------------
+    // Expenses — Simple POS mode (app/constant/accounts/expenses.php)
+    // ------------------------------------------------------------------
+    'Expense Type' => 'Aina ya Matumizi',
+    'Expense Category' => 'Kundi la Matumizi',
+    'Manage types & categories' => 'Simamia aina na makundi',
+    'Paid to' => 'Imelipwa kwa',
+    'Staff (Employee)' => 'Mfanyakazi',
+    'More…' => 'Zaidi…',
+    'No active Supplier or Staff yet — enter who this was paid to below.' => 'Bado hakuna Msambazaji au Mfanyakazi aliyeko hai — andika hapa chini aliyelipwa.',
+    'Pay to whom (e.g. Bodaboda)' => 'Amelipwa nani (mf. Bodaboda)',
+    'e.g. Bodaboda, Mjengo, Fundi' => 'mf. Bodaboda, Mjengo, Fundi',
+    'Full name' => 'Jina kamili',
 ];

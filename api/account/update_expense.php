@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/gl_accounts.php';
+require_once __DIR__ . '/../../core/pos_nav.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -54,13 +56,16 @@ try {
         exit;
     }
 
+    // Simple POS mode (expenses_simple_pos_plan.md): the Edit Expense form
+    // hides Expense Type, Account, and "Paid From" — auto-resolve them.
+    $simplePos = posSimpleModeEnabled();
+
     $expense_date       = $_POST['expense_date'];
     $expense_account_id = !empty($_POST['expense_account_id']) ? intval($_POST['expense_account_id']) : null;
 
-    // Fallback if missing
+    // Fallback if missing: the canonical catch-all expense account.
     if (!$expense_account_id) {
-        $stmtAcc = $pdo->query("SELECT account_id FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') LIMIT 1");
-        $expense_account_id = $stmtAcc->fetchColumn();
+        $expense_account_id = miscExpenseAccountId($pdo);
     }
     $type_id            = !empty($_POST['expense_type']) ? intval($_POST['expense_type']) : null;
     $category_id        = !empty($_POST['category_id']) ? intval($_POST['category_id']) : null;
@@ -68,10 +73,16 @@ try {
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
 
+    // Simple POS hides "Paid From" — auto-resolve the tenant's cash account.
+    if (!$bank_account_id && $simplePos) {
+        $bank_account_id = defaultCashAccountId($pdo);
+    }
     // Source account is mandatory so the balance re-sync below always has a target.
     if (!$bank_account_id) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Please choose the account the expense is paid from (Paid From).']);
+        echo json_encode(['success' => false, 'message' => $simplePos
+            ? 'No cash/bank account is configured for this business yet. Please set one up first.'
+            : 'Please choose the account the expense is paid from (Paid From).']);
         exit;
     }
     $description        = trim($_POST['description']);
@@ -82,9 +93,22 @@ try {
     $updated_by         = getCurrentUserId();
     $expense_items      = isset($_POST['expense_items']) ? $_POST['expense_items'] : null;
 
-    // Paid To Logic — unified paid_to_id from form
+    // Paid To Logic — unified paid_to_id from form. 'other' (Simple POS "More")
+    // is a manually-typed payee with no Staff/Supplier record at all.
     $paid_to_type = !empty($_POST['paid_to_type']) ? $_POST['paid_to_type'] : null;
     $paid_to_id   = !empty($_POST['paid_to_id']) ? intval($_POST['paid_to_id']) : null;
+    $payee_manual_role = null;
+    $payee_manual_name = null;
+    if ($paid_to_type === 'other') {
+        $paid_to_id        = null;
+        $payee_manual_role = trim($_POST['payee_manual_role'] ?? '');
+        $payee_manual_name = trim($_POST['payee_manual_name'] ?? '');
+        if ($payee_manual_role === '' || $payee_manual_name === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Please enter who this expense was paid to (both role and name).']);
+            exit;
+        }
+    }
     $invoice_id   = !empty($_POST['invoice_id']) ? intval($_POST['invoice_id']) : null;
     $payroll_id   = !empty($_POST['payroll_id']) ? intval($_POST['payroll_id']) : null;
 
@@ -127,6 +151,8 @@ try {
         updated_by          = ?,
         paid_to_type        = ?,
         paid_to_id          = ?,
+        payee_manual_role   = ?,
+        payee_manual_name   = ?,
         invoice_id          = ?,
         payroll_id          = ?,
         expense_items       = ?
@@ -136,7 +162,8 @@ try {
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
         $project_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
-        $paid_to_type, $paid_to_id, $invoice_id, $payroll_id, $expense_items, $expense_id
+        $paid_to_type, $paid_to_id, $payee_manual_role, $payee_manual_name,
+        $invoice_id, $payroll_id, $expense_items, $expense_id
     ]);
 
     if ($result) {
