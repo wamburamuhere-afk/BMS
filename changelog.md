@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/products-simple-pos, phase 2) - Products: superadmin "Advanced Product" override
+
+**Phase 2 of `products_simple_pos_plan.md`** — the switch that will gate every upcoming Simple POS product-form simplification: a superadmin-only override, same shape as the existing "Simple Mode" toggle, that re-enables the full Add/Edit Product form on a Simple POS tenant when a superadmin explicitly turns it on.
+
+**Fix:**
+- `scripts/setup_control_db.php` — new idempotent control-DB column `tenants.pos_advanced_product_locked`.
+- `core/tenant_admin.php` — `tenantAdvancedProductStatus()`/`setTenantAdvancedProduct()`, direct copies of the existing Simple Mode pair (tenant `system_settings.pos_advanced_product` for the value, control-DB column for the superadmin-only lock).
+- `actions/superadmin_tenant_advanced_product.php` — new thin action wrapper (`status`/`set`), same guard chain as every other superadmin action.
+- `core/pos_nav.php` — new `advancedProductEnabled()` page helper, mirroring `posSimpleModeEnabled()`. Every upcoming product-page check is `posSimpleModeEnabled() && !advancedProductEnabled()`.
+- `app/superadmin/tenant_view.php`'s `openPosMoreModal()` — 5th toggle row, wired into the same parallel status-fetch and save as Simple Mode/Shop Mode/POS Advanced.
+
+**Verified:** new `tests/test_superadmin_advanced_product_cli.php` (38/38) — a full mirror of the existing Simple Mode test harness, run against a real throwaway provisioned tenant: cross-DB read/write, endpoint guards with positive controls, deleted-tenant handling, the More dialog's on-demand-only rendering, and confirmation no tenant-facing UI exposes the setting anywhere. Existing `test_superadmin_pos_simple_mode_cli.php` (47/47) and `test_tenant_admin_panel_cli.php` (67/67) re-run clean, no regressions. `php -l` clean on every PHP file; the modal's JS block syntax-checked directly.
+
 ## 2026-09-15 (feat/products-simple-pos, phase 1) - Products: product_batches gains manufacturing_date; product creation now writes a real batch
 
 **Request:** Products module redesign for Simple POS — full plan in `products_simple_pos_plan.md`, confirmed before starting. Phase 1 is the foundation: batches need a Manufacturing Date alongside their existing Expiry Date, and (discovered during scouting) product *creation*'s opening stock never created a real batch at all — only Restock/GRN did — so a brand-new product's first stock was invisible to the batch/expiry-notification system that already exists (`cron/run_notification_checks.php`).
