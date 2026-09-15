@@ -246,7 +246,7 @@ $nip_for_form = $pdo->query("
                             <th style="width:30%">Materials List Name</th>
                             <th class="text-center" style="width:14%">Materials List No</th>
                             <th class="text-center" style="width:16%">Project</th>
-                            <th class="text-center" style="width:16%">Warehouse</th>
+                            <th class="text-center" style="width:16%"><?= wLabel('Warehouse', 'Shop') ?></th>
                             <th class="text-center d-print-none" style="width:19%">Actions</th>
                         </tr>
                     </thead>
@@ -367,11 +367,11 @@ $nip_for_form = $pdo->query("
                         </div>
                         <?php endif; ?>
                         <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
-                            <label class="form-label fw-bold small">Select Warehouse</label>
+                            <label class="form-label fw-bold small"><?= wLabel('Select Warehouse', 'Select Shop') ?></label>
                             <select class="form-select" name="warehouse_id" id="mlAddWarehouseId" onchange="mlAddWarehouseChanged()">
-                                <option value="">Select Warehouse</option>
+                                <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             </select>
-                            <div class="form-text" id="mlAddWhHelp">Select a project first, or all general warehouses will appear.</div>
+                            <div class="form-text" id="mlAddWhHelp"><?= wLabel('Select a project first, or all general warehouses will appear.', 'Select a project first, or all general shops will appear.') ?></div>
                         </div>
                     </div>
 
@@ -458,7 +458,7 @@ function mlGetWarehouses(projId) {
 }
 
 function mlBuildWarehouseOptions(selectedId, projId) {
-    var html = '<option value="">— Select Warehouse —</option>';
+    var html = '<option value="">' + <?= json_encode(wLabel('— Select Warehouse —', '— Select Shop —')) ?> + '</option>';
     mlGetWarehouses(projId).forEach(function(w) {
         var sel = String(w.warehouse_id) === String(selectedId) ? 'selected' : '';
         html += '<option value="' + w.warehouse_id + '" ' + sel + '>' + w.warehouse_name + '</option>';
@@ -571,7 +571,7 @@ function mlOpenEdit(id, name) {
             + '<input type="text" class="form-control bg-light text-muted" value="' + l.list_no + '" readonly></div>'
             + '<div class="row g-3 mb-4">'
             + projFieldHtml
-            + '<div class="col-md-' + (NIP_PROJECTS_ACTIVE ? 6 : 12) + '"><label class="form-label fw-bold small">Select Warehouse</label>'
+            + '<div class="col-md-' + (NIP_PROJECTS_ACTIVE ? 6 : 12) + '"><label class="form-label fw-bold small">' + <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?> + '</label>'
             + '<select class="form-select" name="warehouse_id" id="mlEditWarehouseId" onchange="mlEditWarehouseChanged()">'
             + mlBuildWarehouseOptions(whId, projId) + '</select></div></div>'
             + '<h6 class="fw-bold small text-uppercase text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Non-Inventory Products</h6>'

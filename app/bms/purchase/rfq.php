@@ -161,9 +161,9 @@ $c_vrn   = getSetting('company_vrn', '');
                 </div>
                 <?php endif; ?>
                 <div class="col-12 col-sm-6 col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Warehouse') ?></label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select class="form-select" name="warehouse">
-                        <option value=""><?= t('All Warehouses') ?></option>
+                        <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>

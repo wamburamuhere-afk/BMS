@@ -95,7 +95,7 @@ $sup_label = $dn['supplier_name'] . (!empty($dn['company_name']) ? ' — ' . $dn
                                 <input type="text" class="form-control" value="<?= htmlspecialchars($dn['return_number'] ?: ('—')) ?>" readonly>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Returned From (Warehouse)</label>
+                                <label class="form-label"><?= wLabel('Returned From (Warehouse)', 'Returned From (Shop)') ?></label>
                                 <input type="text" class="form-control" value="<?= htmlspecialchars($dn['warehouse_name'] ?: '—') ?>" readonly>
                             </div>
                             <div class="col-md-6">

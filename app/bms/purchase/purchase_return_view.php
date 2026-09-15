@@ -123,7 +123,7 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                                 <h6 class="text-muted text-uppercase small fw-bold mb-3"><?= t('Return Details') ?></h6>
                                 <p class="mb-1"><strong id="referenceLabel"><?= t('Reference:') ?></strong> <span id="orderReference"></span></p>
                                 <p class="mb-1"><strong><?= t('Return Reason:') ?></strong> <span id="returnReason" class="text-capitalize"></span></p>
-                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= t('Warehouse:') ?></strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
                                 <p class="mb-1"><strong><?= t('Prepared By:') ?></strong> <span id="createdBy"></span></p>
                                 <p class="mb-1"><strong><?= t('Last Updated:') ?></strong> <span id="updatedAt"></span></p>
                             </div>

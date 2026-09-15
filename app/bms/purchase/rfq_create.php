@@ -168,9 +168,9 @@ if ($selected_project > 0) {
 
                     <!-- Warehouse -->
                     <div class="col-12 col-md-4">
-                        <label class="form-label fw-semibold"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold"><?= wLabel('Warehouse', 'Shop') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" name="warehouse_id" id="warehouse_id" required>
-                            <option value=""><?= t('Select Warehouse') ?></option>
+                            <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                             <?php foreach ($all_warehouses as $w): ?>
                             <option value="<?= $w['warehouse_id'] ?>"
                                 data-project="<?= $w['project_id'] ?>"
@@ -514,7 +514,7 @@ function filterRfqWarehouses(projectId) {
     const curVal = sel.value;
 
     // Clear options
-    sel.innerHTML = '<option value="">' + <?= json_encode(t('Select Warehouse')) ?> + '</option>';
+    sel.innerHTML = '<option value="">' + <?= json_encode(wLabel('Select Warehouse', 'Select Shop')) ?> + '</option>';
 
     const filtered = filterWarehousesForProject(rfqAllWarehouses, projectId);
     if (hint) {
