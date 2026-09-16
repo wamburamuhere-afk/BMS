@@ -1674,24 +1674,27 @@ global $company_name, $company_logo;
                         <div class="spinner-border text-primary"></div>
                     </div>
                     <div class="table-responsive d-none" id="madeniAgingTableWrap">
-                        <table class="table table-hover align-middle mb-0 w-100">
+                        <table class="table table-hover align-middle mb-0 w-100" id="madeniAgingTable">
                             <thead class="bg-light text-muted small text-uppercase">
                                 <tr>
-                                    <th>Customer</th>
-                                    <th>Phone</th>
-                                    <th class="text-end">Owed</th>
-                                    <th>Sale Date</th>
-                                    <th>Due Date</th>
-                                    <th>Status</th>
-                                    <th class="text-center">Actions</th>
+                                    <th style="width:50px;"><?= t('S/NO') ?></th>
+                                    <th><?= t('Customer') ?></th>
+                                    <th><?= t('Phone') ?></th>
+                                    <th class="text-end"><?= t('Owed') ?></th>
+                                    <th><?= t('Sale Date') ?></th>
+                                    <th><?= t('Due Date') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-center"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody id="madeniAgingBody"></tbody>
                         </table>
                     </div>
+                    <!-- Mobile card view (populated by pos-credit-aging.js's drawCallback) -->
+                    <div id="madeniAgingCards" class="px-2 d-none"></div>
                     <div class="text-center py-4 d-none" id="madeniAgingEmpty">
                         <i class="bi bi-emoji-smile" style="font-size:2.5rem;color:#ccc;"></i>
-                        <p class="mt-2 mb-0 text-muted">Hakuna deni lililo wazi kwa sasa.</p>
+                        <p class="mt-2 mb-0 text-muted"><?= t('Nobody owes you anything right now') ?></p>
                     </div>
                 </div>
             </div>
@@ -1702,7 +1705,7 @@ global $company_name, $company_logo;
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="bi bi-eye me-1"></i> Credit Sale Details</h5>
+                            <h5 class="modal-title"><i class="bi bi-eye me-1"></i> <?= t('Credit Sale Details') ?></h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body" id="creditViewBody">
@@ -1717,34 +1720,34 @@ global $company_name, $company_logo;
                     <div class="modal-content">
                         <form id="creditRepayForm">
                             <div class="modal-header bg-success text-white">
-                                <h5 class="modal-title"><i class="bi bi-cash me-1"></i> Record Repayment</h5>
+                                <h5 class="modal-title"><i class="bi bi-cash me-1"></i> <?= t('Record Repayment') ?></h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <input type="hidden" name="sale_id" id="repay_sale_id">
-                                <p class="mb-2">Customer: <strong id="repay_customer_name"></strong></p>
-                                <p class="mb-3">Balance Due: <strong class="text-danger" id="repay_balance_due"></strong></p>
+                                <p class="mb-2"><?= t('Customer:') ?> <strong id="repay_customer_name"></strong></p>
+                                <p class="mb-3"><?= t('Balance Due:') ?> <strong class="text-danger" id="repay_balance_due"></strong></p>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                                    <label class="form-label small fw-bold"><?= t('Amount') ?> <span class="text-danger">*</span></label>
                                     <input type="number" class="form-control" name="amount" id="repay_amount" step="0.01" min="0.01" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">Payment Method</label>
+                                    <label class="form-label small fw-bold"><?= t('Payment Method') ?></label>
                                     <select class="form-select" name="payment_method" id="repay_method">
-                                        <option value="cash">Cash</option>
-                                        <option value="mobile_money">Mobile Money</option>
-                                        <option value="bank_transfer">Bank Transfer</option>
-                                        <option value="card">Card</option>
+                                        <option value="cash"><?= t('Cash') ?></option>
+                                        <option value="mobile_money"><?= t('Mobile Money') ?></option>
+                                        <option value="bank_transfer"><?= t('Bank Transfer') ?></option>
+                                        <option value="card"><?= t('Card') ?></option>
                                     </select>
                                 </div>
                                 <div class="mb-1">
-                                    <label class="form-label small fw-bold">Reference <span class="text-muted">(Optional)</span></label>
+                                    <label class="form-label small fw-bold"><?= t('Reference') ?> <span class="text-muted">(<?= t('Optional') ?>)</span></label>
                                     <input type="text" class="form-control" name="reference" id="repay_reference">
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Record Payment</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> <?= t('Record Payment') ?></button>
                             </div>
                         </form>
                     </div>
@@ -1755,23 +1758,23 @@ global $company_name, $company_logo;
                     <div class="modal-content">
                         <form id="creditEditForm">
                             <div class="modal-header bg-warning text-dark">
-                                <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Due Date</h5>
+                                <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> <?= t('Edit Due Date') ?></h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <input type="hidden" name="sale_id" id="edit_sale_id">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">Due Date <span class="text-danger">*</span></label>
+                                    <label class="form-label small fw-bold"><?= t('Due Date') ?> <span class="text-danger">*</span></label>
                                     <input type="date" class="form-control" name="due_date" id="edit_due_date" required>
                                 </div>
                                 <div class="mb-1">
-                                    <label class="form-label small fw-bold">Notes</label>
+                                    <label class="form-label small fw-bold"><?= t('Notes') ?></label>
                                     <textarea class="form-control" name="notes" id="edit_notes" rows="2"></textarea>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle"></i> Save</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                                <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle"></i> <?= t('Save') ?></button>
                             </div>
                         </form>
                     </div>
@@ -1779,15 +1782,21 @@ global $company_name, $company_logo;
             </div>
             <?php endif; ?>
 
+            <script src="<?= getUrl('assets/js/tables/bms-table-utils.js') ?>?v=<?= @filemtime(ROOT_DIR . '/assets/js/tables/bms-table-utils.js') ?>"></script>
             <script src="<?= getUrl('assets/js/pos-credit-aging.js') ?>?v=<?= @filemtime(ROOT_DIR . '/assets/js/pos-credit-aging.js') ?>"></script>
             <script>
             $(function () {
                 PosCreditAging.init({
                     id: 'madeni',
+                    tableSel: '#madeniAgingTable',
                     listContainer: '#madeniAgingTableWrap',
+                    cardContainer: '#madeniAgingCards',
                     loadingEl: '#madeniAgingLoading',
                     emptyEl: '#madeniAgingEmpty',
-                    bodyEl: '#madeniAgingBody',
+                    // Madeni is a Bootstrap tab-pane, not the default active tab —
+                    // a DataTable built inside a display:none container measures
+                    // every column at zero width, so hold init until it's shown.
+                    deferPane: '#pane-madeni',
                     customerId: <?= (int)$customer_id ?>,
                     canEdit: <?= json_encode($can_edit_credit) ?>,
                     canDelete: <?= json_encode($can_delete_credit) ?>,
@@ -1799,34 +1808,49 @@ global $company_name, $company_logo;
                         void:   <?= json_encode(buildUrl('api/pos/void_sale.php')) ?>,
                     },
                     i18n: {
-                        overdueBy: 'Overdue by %d day(s)',
-                        dueInDays: 'Due in %d day(s)',
-                        dueToday: 'Due today',
-                        noDueDate: 'No due date',
-                        partial: 'Partial',
-                        unpaid: 'Unpaid',
-                        paidInFull: 'Paid in full',
-                        confirmVoidTitle: 'Void this credit sale?',
-                        confirmVoidText: 'This reverses the stock and cash. Cannot be undone.',
-                        voidReasonPlaceholder: 'Reason for voiding (required)',
-                        yesVoid: 'Yes, void it',
-                        cancel: 'Cancel',
-                        success: 'Success!',
-                        error: 'Error',
-                        view: 'View',
-                        repay: 'Repay',
-                        edit: 'Edit',
-                        delete: 'Delete',
-                        paymentHistory: 'Payment History',
-                        noPaymentsYet: 'No payments recorded yet.',
-                        balanceDue: 'Balance Due:',
-                        saleAmount: 'Sale Amount:',
-                        saleDate: 'Sale Date:',
-                        dueDate: 'Due Date:',
+                        overdueBy: <?= json_encode(t('Overdue by %d day(s)')) ?>,
+                        dueInDays: <?= json_encode(t('Due in %d day(s)')) ?>,
+                        dueToday: <?= json_encode(t('Due today')) ?>,
+                        noDueDate: <?= json_encode(t('No due date')) ?>,
+                        partial: <?= json_encode(t('Partial')) ?>,
+                        unpaid: <?= json_encode(t('Unpaid')) ?>,
+                        paidInFull: <?= json_encode(t('Paid in full')) ?>,
+                        confirmVoidTitle: <?= json_encode(t('Void this credit sale?')) ?>,
+                        confirmVoidText: <?= json_encode(t('This reverses the stock and cash. Cannot be undone.')) ?>,
+                        voidReasonPlaceholder: <?= json_encode(t('Reason for voiding (required)')) ?>,
+                        yesVoid: <?= json_encode(t('Yes, void it')) ?>,
+                        cancel: <?= json_encode(t('Cancel')) ?>,
+                        success: <?= json_encode(t('Success!')) ?>,
+                        error: <?= json_encode(t('Error')) ?>,
+                        view: <?= json_encode(t('View')) ?>,
+                        repay: <?= json_encode(t('Repay')) ?>,
+                        edit: <?= json_encode(t('Edit')) ?>,
+                        delete: <?= json_encode(t('Delete')) ?>,
+                        paymentHistory: <?= json_encode(t('Payment History')) ?>,
+                        noPaymentsYet: <?= json_encode(t('No payments recorded yet.')) ?>,
+                        balanceDue: <?= json_encode(t('Balance Due:')) ?>,
+                        saleAmount: <?= json_encode(t('Sale Amount:')) ?>,
+                        saleDate: <?= json_encode(t('Sale Date:')) ?>,
+                        dueDate: <?= json_encode(t('Due Date:')) ?>,
+                        amountHeader: <?= json_encode(t('Amount')) ?>,
+                        methodHeader: <?= json_encode(t('Method')) ?>,
+                        byHeader: <?= json_encode(t('By')) ?>,
                     }
                 });
             });
             </script>
+            <style>
+            /* ── Mobile custom card view — mirrors expenses.php's .expense-mobile-card ── */
+            @media (max-width: 768px) {
+                .credit-aging-mobile-card {
+                    background: #fff;
+                    border: 1px solid #e9ecef;
+                    border-radius: 8px;
+                    padding: 8px 10px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                }
+            }
+            </style>
             <?php endif; ?>
 
             <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
