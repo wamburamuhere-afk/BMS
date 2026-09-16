@@ -970,17 +970,17 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('categories')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Categories') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('stock_adjustments')): ?>
+                                <?php if(canView('stock_adjustments') && !posSimpleModeEnabled()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('stock_adjustments') ?>"><i class="bi bi-arrow-left-right"></i> <?= t('Adjustments') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('inventory_valuation')): ?>
+                                <?php if(canView('inventory_valuation') && !posSimpleModeEnabled()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('inventory_valuation') ?>"><i class="bi bi-calculator"></i> <?= t('Valuation') ?></a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header"><?= wLabel('Warehouse', 'Shop') ?></h6></li>
                                 <?php if(canView('warehouses')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i> <?= wLabel('Warehouses', 'Shops') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('locations')): ?>
+                                <?php if(canView('locations') && !posSimpleModeEnabled()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('locations') ?>"><i class="bi bi-geo-alt"></i> <?= t('Locations') ?></a></li>
                                 <?php endif; ?>
                             </ul>

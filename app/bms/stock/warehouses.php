@@ -1129,11 +1129,13 @@ function get_primary_badge($is_primary) {
                                                 </li>
                                                 <?php endif; ?>
                                                 <li><hr class="dropdown-divider"></li>
+                                                <?php if (!posSimpleModeEnabled()): ?>
                                                 <li>
                                                     <a class="dropdown-item" href="#" onclick="manageLocations(<?= $warehouse['warehouse_id'] ?>)">
                                                         <i class="bi bi-map text-info"></i> <?= t('Manage Locations') ?>
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
                                                 <li>
                                                     <a class="dropdown-item" href="#" onclick="transferStock(<?= $warehouse['warehouse_id'] ?>)">
                                                         <i class="bi bi-truck text-success"></i> <?= t('Transfer Stock') ?>
