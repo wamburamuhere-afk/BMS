@@ -1,8 +1,10 @@
 <?php
 // scope-audit: skip — reads pos_sales/cash_register_shifts for one shift_id the
-// caller is authorised for (own shift, or any shift with canEdit('pos')); no
-// project/warehouse dimension at the shift level (see shift_history.php for the
-// same reasoning), consistent with print_receipt.php's own skip marker.
+// caller is authorised for (own shift, or any shift with canEdit('pos')). A
+// cashier's own shift is already guaranteed to be within their warehouse grant
+// (enforced at Open Shift, api/pos/open_shift.php) so no separate warehouse
+// filter is needed here; canEdit('pos') supervisors/admins can view any shift
+// regardless of shop, matching shift_history.php's own reasoning.
 /**
  * Z-Report — End-of-shift reconciliation (Phase 9, pos_upgrade_plan.md §7)
  * Printable summary of one closed (or still-active) cash-register shift:
@@ -27,10 +29,12 @@ $shift_id = isset($_GET['shift_id']) ? (int)$_GET['shift_id'] : 0;
 if ($shift_id <= 0) { die('Invalid shift ID'); }
 
 $stmt = $pdo->prepare("
-    SELECT sh.*, u.username AS cashier_name, r.register_name, r.register_code
+    SELECT sh.*, u.username AS cashier_name, r.register_name, r.register_code,
+           w.warehouse_name
       FROM cash_register_shifts sh
       LEFT JOIN users u ON sh.user_id = u.user_id
       LEFT JOIN pos_registers r ON sh.register_id = r.register_id
+      LEFT JOIN warehouses w ON w.warehouse_id = sh.warehouse_id
      WHERE sh.shift_id = ?
 ");
 $stmt->execute([$shift_id]);
@@ -114,7 +118,8 @@ $currency     = getSetting('currency', 'TZS');
     <h1><?= htmlspecialchars($company_name) ?> — <?= t('Z-Report') ?></h1>
     <div class="sub">
         <?= t('Shift') ?> <?= htmlspecialchars($shift['shift_code']) ?> ·
-        <?= t('Register:') ?> <?= htmlspecialchars($shift['register_name'] ?: t('N/A')) ?> (<?= htmlspecialchars($shift['register_code'] ?: '—') ?>) ·
+        <?= t('Register:') ?> <?= htmlspecialchars($shift['register_name'] ?: t('N/A')) ?> (<?= htmlspecialchars($shift['register_code'] ?: '—') ?>)
+        <?php if ($shift['warehouse_name']): ?> · <?= wLabel('Warehouse:', 'Shop:') ?> <?= htmlspecialchars($shift['warehouse_name']) ?><?php endif; ?> ·
         <?= t('Cashier:') ?> <?= htmlspecialchars($shift['cashier_name'] ?: t('N/A')) ?><br>
         <?= t('Opened:') ?> <?= date('d/m/Y H:i', strtotime($shift['start_time'])) ?>
         <?php if ($shift['end_time']): ?> · <?= t('Closed:') ?> <?= date('d/m/Y H:i', strtotime($shift['end_time'])) ?><?php endif; ?>

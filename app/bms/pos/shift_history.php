@@ -1,7 +1,10 @@
 <?php
-// scope-audit: skip — cash_register_shifts has no project/warehouse dimension;
-// visibility is restricted by cashier ownership instead (see the WHERE clause
-// below), same reasoning as zreport.php's own skip marker.
+// scope-audit: skip — cash_register_shifts.warehouse_id (2026-09-16) is only
+// ever a shop this shift's own cashier was already granted (enforced at
+// Open Shift, api/pos/open_shift.php), so a non-supervisor's own-shifts-only
+// WHERE clause below is already narrower than any warehouse scope filter
+// would be. canEdit('pos') supervisors/admins seeing every cashier's shifts
+// (across every shop) is the existing, deliberate behaviour — unchanged.
 /**
  * Shift History — Phase 9 (pos_upgrade_plan.md §7)
  * Lists past (and active) cash-register shifts with their reconciliation
@@ -21,10 +24,12 @@ $where  = $can_view_all ? "1=1" : "sh.user_id = :uid";
 $params = $can_view_all ? [] : ['uid' => $user_id];
 
 $stmt = $pdo->prepare("
-    SELECT sh.*, u.username AS cashier_name, r.register_name, r.register_code
+    SELECT sh.*, u.username AS cashier_name, r.register_name, r.register_code,
+           w.warehouse_name
       FROM cash_register_shifts sh
       LEFT JOIN users u ON sh.user_id = u.user_id
       LEFT JOIN pos_registers r ON sh.register_id = r.register_id
+      LEFT JOIN warehouses w ON w.warehouse_id = sh.warehouse_id
      WHERE $where
      ORDER BY sh.start_time DESC
      LIMIT 200
@@ -83,7 +88,7 @@ foreach ($shifts as $s) {
             <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;">
                 <tr>
                     <th class="text-center no-sort" style="width:56px;">S/No</th>
-                    <th><?= t('Shift') ?></th><th><?= t('Register') ?></th><?php if ($can_view_all): ?><th><?= t('Cashier') ?></th><?php endif; ?>
+                    <th><?= t('Shift') ?></th><th><?= t('Register') ?></th><th><?= wLabel('Warehouse', 'Shop') ?></th><?php if ($can_view_all): ?><th><?= t('Cashier') ?></th><?php endif; ?>
                     <th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Total Sales') ?></th><th class="text-end"><?= t('Difference') ?></th><th><?= t('Status') ?></th><th class="text-end no-sort no-export"><?= t('Actions') ?></th>
                 </tr>
             </thead>
@@ -93,6 +98,7 @@ foreach ($shifts as $s) {
                     <td class="text-center"><?= $sno ?></td>
                     <td><?= safe_output($s['shift_code']) ?></td>
                     <td><?= safe_output($s['register_name'], '—') ?></td>
+                    <td><?= safe_output($s['warehouse_name'], '—') ?></td>
                     <?php if ($can_view_all): ?><td><?= safe_output($s['cashier_name']) ?></td><?php endif; ?>
                     <td><?= date('d/m/Y H:i', strtotime($s['start_time'])) ?></td>
                     <td><?= $s['end_time'] ? date('d/m/Y H:i', strtotime($s['end_time'])) : '—' ?></td>
@@ -159,7 +165,7 @@ function renderShiftCards(rows) {
     rows.forEach(r => {
         html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
             <div class="d-flex justify-content-between"><span class="fw-bold">${r.code}</span><span class="badge bg-${r.status === 'active' ? 'success' : 'secondary'}">${r.status}</span></div>
-            <small class="text-muted">${r.register || '—'} · ${r.opened}</small>
+            <small class="text-muted">${r.register || '—'}${r.warehouse ? ' · ' + r.warehouse : ''} · ${r.opened}</small>
             <div class="mt-2 small">${T_TOTAL_LABEL} ${r.total} ${r.diff ? '· ' + T_DIFF_LABEL + ' ' + r.diff : ''}</div>
             <a href="${r.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-file-earmark-text"></i> ${T_ZREPORT_LABEL}</a>
         </div></div></div>`;
@@ -191,7 +197,7 @@ $(document).ready(function () {
     const zreportBaseUrl = '<?= getUrl('pos/zreport') ?>';
     const rows = <?= json_encode(array_map(function ($s) use ($currency) {
         return [
-            'code' => $s['shift_code'], 'register' => $s['register_name'], 'status' => $s['status'],
+            'code' => $s['shift_code'], 'register' => $s['register_name'], 'warehouse' => $s['warehouse_name'], 'status' => $s['status'],
             'opened' => date('d/m/Y H:i', strtotime($s['start_time'])),
             'total' => $currency . ' ' . number_format((float)$s['total_sales'], 2),
             'diff' => $s['status'] === 'closed' ? number_format((float)$s['cash_difference'], 2) : '',

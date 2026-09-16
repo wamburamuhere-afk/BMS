@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-16 (feat/pos-shift-warehouse-scope) - POS Shift ↔ Shop (Warehouse) scoping — tills now obey the same shop-access grants as Project & Warehouse Access
+
+**Request:** user asked whether Open/Close Shift depends on a specific shop or all shops for a real multi-shop business, and — after being told the honest answer was "not professional as-is" (a shift could silently span multiple shops with no per-shop cash reconciliation, and any cashier with POS create permission could sign into ANY till regardless of which shop(s) they were actually granted via Settings > Admin > Project & Warehouse Access) — asked for it to be fixed, explicitly pointing at that Project Assignment page as the source of truth for who may touch which shop.
+
+**Root cause:** `pos_registers` (the till list) and `cash_register_shifts` had no warehouse/shop dimension at all — both were documented in-code as "a small global lookup table (no project/warehouse scope)". The Shop dropdown on the POS terminal (`posWarehouseId`) was a free, independent per-sale choice, completely disconnected from which till/shift the cashier had actually opened. The shop-access grants configured on `app/constant/settings/user_projects.php` (`user_scope_overrides`, resource_type='warehouse') were therefore never consulted anywhere in the till/shift flow.
+
+**Fix — new optional `warehouse_id` on both tables (nullable = legacy/shared till, unaffected):**
+- `migrations/tenant/2026_09_16_pos_registers_warehouse_id.php` + legacy-DB pair — `pos_registers.warehouse_id` + index.
+- `migrations/tenant/2026_09_16_cash_register_shifts_warehouse_id.php` + legacy-DB pair — `cash_register_shifts.warehouse_id` + index.
+- `app/constant/settings/pos_config_settings.php` — Registers/Tills admin screen gets a Shop select (via the shared `warehousesForSelect()`/`renderWarehouseOptions()`), validated against the saving admin's own grant; the management table shows each register's shop.
+- `api/pos/save_register.php` — persists `warehouse_id`, rejects assigning a shop the saving admin can't themselves see (`userCan('warehouse', ...)`).
+- `api/pos/get_registers.php` — the Open Shift dropdown (`active_only=1`) now hides a shop-assigned register from any cashier not granted that shop (`warehouseIdsForUser()`), while a still-unassigned register stays visible to everyone; the unrestricted admin management list is untouched.
+- `api/pos/open_shift.php` — server-side backstop rejecting a cashier not granted the register's shop even if they hand-craft the request; stamps the new shift's `warehouse_id` from the register at creation.
+- `app/bms/pos/pos.php` / `pos_scripts_new.php` — a shift opened on a shop-assigned register locks the terminal's Shop dropdown (disabled, pre-selected) for the whole shift, takes priority over the pre-existing single-warehouse auto-lock, and is exempted from the Project→Warehouse cascade's show/hide logic (which would otherwise fight the lock) while still refreshing the product grid on a Project change.
+- `api/pos/process_sale.php` — re-enforces the lock server-side: a sale's `warehouse_id` must match the active shift's `warehouse_id` when the shift has one, closing the gap where a cashier granted several shops (or a supervisor) could otherwise sell against a different shop than the till they signed into.
+- `app/bms/pos/shift_history.php` / `zreport.php` — both now show/print the shift's shop, so cash reconciliation is legible per shop, not just per till.
+
+**Tested:** new `tests/test_pos_shift_warehouse_scope_cli.php` — migration lint + idempotency (re-run twice), live-DB column/index checks, source wiring, and live behavioural runs proving: a cashier granted only Shop B cannot see or open a shift on Shop A's register (both via the dropdown filter and the server-side backstop), a cashier granted Shop A can, the new shift is stamped with the register's shop, and any cashier can still open a shift on a legacy (no-shop) register. 26/26 passing. Confirmed no regression: `test_pos_phase13_entitlement_cli.php` (20/20), `test_warehouse_project_filter_cli.php` (84/84); `test_warehouse_scope_cli.php`'s one failing assertion (dashboard.php purchase-order widget, unrelated to POS) reproduces identically with these changes stashed out — pre-existing, not a regression.
+
 ## 2026-09-16 (feat/pos-shift-warehouse-scope) - Add Warehouse modal: stray closing `</div>` broke padding on every field below Project
 
 **Request:** user noticed the Edit Warehouse form has proper margin/padding on its fields but the Add Warehouse form doesn't, and asked why.

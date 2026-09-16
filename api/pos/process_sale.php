@@ -132,12 +132,24 @@ try {
 
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
     // validated before the insert, not silently passed through as null.
-    $stmt = $pdo->prepare("SELECT shift_id, register_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT shift_id, register_id, warehouse_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
     $stmt->execute([$user_id]);
     $shift = $stmt->fetch(PDO::FETCH_ASSOC);
     $shift_id = $shift['shift_id'] ?? null;
     if (!$shift_id) {
         throw new Exception("Please start a cash register shift before completing a sale.");
+    }
+
+    // Shop scope (2026-09-16): a shift opened on a shop-assigned register is
+    // locked to that one shop (pos.php disables the Warehouse dropdown for the
+    // duration) — enforce it here too, since userCan('warehouse', ...) above
+    // only proves the CASHIER may see that warehouse, not that it's the one
+    // THIS shift is actually staffing. Without this, a cashier granted several
+    // shops (or a supervisor) could still sell against a different shop than
+    // the till they signed into, defeating the whole point of the lock. A
+    // shift on a still-unassigned ("legacy") register has no such constraint.
+    if (!empty($shift['warehouse_id']) && (int)$shift['warehouse_id'] !== (int)$warehouse_id) {
+        throw new Exception(wLabel('This sale\'s warehouse does not match the warehouse your current shift is locked to.', 'This sale\'s shop does not match the shop your current shift is locked to.', true));
     }
 
     // Phase 8 (pos_upgrade_plan.md §7) — denormalise the register onto the sale
