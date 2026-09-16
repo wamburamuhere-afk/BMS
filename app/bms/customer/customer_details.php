@@ -258,6 +258,21 @@ try {
     // table may not exist yet
 }
 
+// "Madeni" tab (pos_credit_receivables_plan.md Phase 2b) — Simple POS only,
+// same gate as the dedicated "Who Owes Me" page and the same shared helper
+// (core/pos_credit_aging.php) so this customer's numbers can never disagree
+// with that page or the dashboard.php Credit card.
+require_once __DIR__ . '/../../../core/pos_nav.php';
+$show_credit_tab = posSimpleModeEnabled();
+$credit_counters = ['times_borrowed' => 0, 'times_repaid_on_time' => 0, 'times_repaid_late' => 0, 'currently_owed' => 0.0];
+if ($show_credit_tab) {
+    require_once __DIR__ . '/../../../core/pos_credit_limit.php';
+    require_once __DIR__ . '/../../../core/pos_credit_aging.php';
+    $credit_counters = posCreditCustomerCounters($pdo, $customer_id);
+}
+$can_edit_credit   = $show_credit_tab && canEdit('pos');
+$can_delete_credit = $show_credit_tab && canDelete('pos');
+
 global $company_name, $company_logo;
 ?>
 
@@ -951,6 +966,13 @@ global $company_name, $company_logo;
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-creditnotes" type="button" role="tab"><i class="bi bi-arrow-counterclockwise me-1"></i> Credit Notes &amp; Advances</button>
                 </li>
+                <?php if ($show_credit_tab): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-madeni" type="button" role="tab"><i class="bi bi-cash-coin me-1"></i> Madeni
+                        <?php if ($credit_counters['currently_owed'] > 0): ?><span class="badge bg-danger ms-1"><?= number_format($credit_counters['currently_owed']) ?></span><?php endif; ?>
+                    </button>
+                </li>
+                <?php endif; ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> System Info</button>
                 </li>
@@ -1605,6 +1627,207 @@ global $company_name, $company_logo;
                 </div>
             </div>
             </div><!-- #pane-creditnotes -->
+
+            <?php if ($show_credit_tab): ?>
+            <div class="tab-pane fade" id="pane-madeni" role="tabpanel">
+            <!-- Madeni (POS Credit Sales) — pos_credit_receivables_plan.md Phase 2b -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-coin me-2"></i> Historia ya Madeni (Credit History)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-primary"><?= (int)$credit_counters['times_borrowed'] ?></div>
+                                <div class="small text-muted">Amekopa Mara</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-success"><?= (int)$credit_counters['times_repaid_on_time'] ?></div>
+                                <div class="small text-muted">Amerejesha kwa Wakati</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-warning"><?= (int)$credit_counters['times_repaid_late'] ?></div>
+                                <div class="small text-muted">Amerejesha Kuchelewa</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-danger"><?= number_format($credit_counters['currently_owed'], 2) ?></div>
+                                <div class="small text-muted">Anadaiwa Sasa</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i> Mauzo ya Mkopo Yaliyo Wazi (Open Credit Sales)</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div id="madeniAgingLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
+                    <div class="table-responsive d-none" id="madeniAgingTableWrap">
+                        <table class="table table-hover align-middle mb-0 w-100">
+                            <thead class="bg-light text-muted small text-uppercase">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th class="text-end">Owed</th>
+                                    <th>Sale Date</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="madeniAgingBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center py-4 d-none" id="madeniAgingEmpty">
+                        <i class="bi bi-emoji-smile" style="font-size:2.5rem;color:#ccc;"></i>
+                        <p class="mt-2 mb-0 text-muted">Hakuna deni lililo wazi kwa sasa.</p>
+                    </div>
+                </div>
+            </div>
+            </div><!-- #pane-madeni -->
+
+            <!-- Madeni action modals (View/Repay/Edit) — shared IDs with pos-credit-aging.js -->
+            <div class="modal fade" id="creditViewModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-eye me-1"></i> Credit Sale Details</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="creditViewBody">
+                            <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php if ($can_edit_credit): ?>
+            <div class="modal fade" id="creditRepayModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form id="creditRepayForm">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title"><i class="bi bi-cash me-1"></i> Record Repayment</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="sale_id" id="repay_sale_id">
+                                <p class="mb-2">Customer: <strong id="repay_customer_name"></strong></p>
+                                <p class="mb-3">Balance Due: <strong class="text-danger" id="repay_balance_due"></strong></p>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" name="amount" id="repay_amount" step="0.01" min="0.01" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Payment Method</label>
+                                    <select class="form-select" name="payment_method" id="repay_method">
+                                        <option value="cash">Cash</option>
+                                        <option value="mobile_money">Mobile Money</option>
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                        <option value="card">Card</option>
+                                    </select>
+                                </div>
+                                <div class="mb-1">
+                                    <label class="form-label small fw-bold">Reference <span class="text-muted">(Optional)</span></label>
+                                    <input type="text" class="form-control" name="reference" id="repay_reference">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Record Payment</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="modal fade" id="creditEditModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form id="creditEditForm">
+                            <div class="modal-header bg-warning text-dark">
+                                <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Due Date</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="sale_id" id="edit_sale_id">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Due Date <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" name="due_date" id="edit_due_date" required>
+                                </div>
+                                <div class="mb-1">
+                                    <label class="form-label small fw-bold">Notes</label>
+                                    <textarea class="form-control" name="notes" id="edit_notes" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle"></i> Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <script src="<?= getUrl('assets/js/pos-credit-aging.js') ?>?v=<?= @filemtime(ROOT_DIR . '/assets/js/pos-credit-aging.js') ?>"></script>
+            <script>
+            $(function () {
+                PosCreditAging.init({
+                    id: 'madeni',
+                    listContainer: '#madeniAgingTableWrap',
+                    loadingEl: '#madeniAgingLoading',
+                    emptyEl: '#madeniAgingEmpty',
+                    bodyEl: '#madeniAgingBody',
+                    customerId: <?= (int)$customer_id ?>,
+                    canEdit: <?= json_encode($can_edit_credit) ?>,
+                    canDelete: <?= json_encode($can_delete_credit) ?>,
+                    urls: {
+                        list:   <?= json_encode(buildUrl('api/pos/get_credit_aging.php')) ?>,
+                        detail: <?= json_encode(buildUrl('api/pos/get_credit_sale_detail.php')) ?>,
+                        repay:  <?= json_encode(buildUrl('api/pos/receive_payment.php')) ?>,
+                        edit:   <?= json_encode(buildUrl('api/pos/update_credit_due_date.php')) ?>,
+                        void:   <?= json_encode(buildUrl('api/pos/void_sale.php')) ?>,
+                    },
+                    i18n: {
+                        overdueBy: 'Overdue by %d day(s)',
+                        dueInDays: 'Due in %d day(s)',
+                        dueToday: 'Due today',
+                        noDueDate: 'No due date',
+                        partial: 'Partial',
+                        unpaid: 'Unpaid',
+                        paidInFull: 'Paid in full',
+                        confirmVoidTitle: 'Void this credit sale?',
+                        confirmVoidText: 'This reverses the stock and cash. Cannot be undone.',
+                        voidReasonPlaceholder: 'Reason for voiding (required)',
+                        yesVoid: 'Yes, void it',
+                        cancel: 'Cancel',
+                        success: 'Success!',
+                        error: 'Error',
+                        view: 'View',
+                        repay: 'Repay',
+                        edit: 'Edit',
+                        delete: 'Delete',
+                        paymentHistory: 'Payment History',
+                        noPaymentsYet: 'No payments recorded yet.',
+                        balanceDue: 'Balance Due:',
+                        saleAmount: 'Sale Amount:',
+                        saleDate: 'Sale Date:',
+                        dueDate: 'Due Date:',
+                    }
+                });
+            });
+            </script>
+            <?php endif; ?>
 
             <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
             <!-- System Information -->
