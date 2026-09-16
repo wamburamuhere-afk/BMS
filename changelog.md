@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-09-16 (fix/hide-simple-pos-warehouse-features) - Hide Adjustments/Valuation/Locations nav, Inventory Report's Stock Adjustments tab, and warehouses.php's Manage Locations for Simple POS tenants
+
+**Request:** user asked to hide five warehouse/multi-location-only UI entry points — the "Adjustments", "Valuation" and "Locations" nav links, the Inventory Report's "Stock Adjustments" tab, and the "Manage Locations" row action on `warehouses.php` — but only for tenants running Simple POS (the Superadmin > Tenant > Point of Sale > More > Simple POS toggle), asking explicitly to scout thoroughly first and not rush.
+
+**Scouting:** confirmed `posSimpleModeEnabled()` (`core/pos_nav.php`, reads `system_settings.pos_simple_mode`) is the exact flag behind that toggle — already used identically by `services.php`/`service_view.php`. Traced each target to rule out hidden index/positional dependencies before touching anything:
+- `header.php`'s three nav links are plain `canView(...)` guards with no such dependency.
+- `inventory_report.php`'s tabs are switched by a `data-view` string attribute (`$('.inv-tab').on('click', ...)`), not by position — safe to remove the button outright; its `#view-adjustments` content div simply never gets un-hidden.
+- `warehouses.php`'s row-action dropdown has no column-index or DataTables `columnDefs` constraint (unlike the `services.php` Project-column fix from earlier today) — safe to remove the `<li>` outright.
+
+**Fix:**
+- `header.php`: `canView('stock_adjustments')`, `canView('inventory_valuation')`, `canView('locations')` each gained `&& !posSimpleModeEnabled()`.
+- `app/constant/reports/inventory_report.php`: the "Stock Adjustments" tab button wrapped in `<?php if (!posSimpleModeEnabled()): ?>`.
+- `app/bms/stock/warehouses.php`: the "Manage Locations" `<li>` in the row-action dropdown wrapped the same way; "Transfer Stock" and the rest of the menu are untouched.
+
+**Tested — `tests/test_pos_simple_mode_nav_hide_cli.php` (new, 23/23 passing), live HTTP against the real tenant on `dev.bms.local`:** establishes a real admin session, then for both `pos_simple_mode = '1'` and `'0'` (the real tenant row, temporarily toggled via `save_setting()` and unconditionally restored to its original value in a shutdown handler even on failure) fetches `warehouses.php` and `inventory_report.php` fresh over HTTP and asserts all five items are absent when Simple POS is on and present when it's off, plus regression checks that "Transfer Stock" and the other three report tabs are unaffected either way. Confirmed the tenant's setting was correctly restored to its original value (`'1'`) after every run, including an initial run that had one unrelated test-script-only failure (see below). Also re-ran `tests/test_warehouse_create_visibility_cli.php` (17/17), `tests/test_warehouse_scope_cli.php` (171/172, same pre-existing unrelated failure), and `tests/test_session_guard_cli.php` (24/24) — no regressions from touching `header.php`/`warehouses.php` again. `php -l` clean on all four files.
+
+**Aside, not a real bug:** the test's first draft also asserted `get_setting('pos_simple_mode', '0')` reflected each new value immediately after `save_setting()` — failed only for the second (OFF) toggle within the same process, because `get_setting()` caches all settings in a `static` array for the life of a PHP process (`helpers.php`). Real HTTP requests are each a fresh process, so this never affects actual behavior; removed the flawed in-process assertion and kept the real proof (the fetched pages, each a genuine fresh request).
+
 ## 2026-09-16 (fix/shop-warehouse-service-terminology) - Nav menu: Shop/Warehouse terminology wasn't switching, and Services was mislabeled "Non-Inventory Products"
 
 **Request:** user pointed at the "Ghala" (Inventory) nav dropdown — screenshotted "Bidhaa za Ghala" and "Maghala" — and said these should follow the same Warehouse↔Shop convention already agreed/used elsewhere in the app, and that non-inventory items must always be called "Huduma" (Service), not a warehouse-flavored phrase.

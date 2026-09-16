@@ -90,9 +90,11 @@ foreach ($warehouses as $w) {
         <button type="button" class="btn inv-tab" data-view="transfers">
             <i class="bi bi-truck me-1"></i> <?= t('Stock Transfers') ?>
         </button>
+        <?php if (!posSimpleModeEnabled()): ?>
         <button type="button" class="btn inv-tab" data-view="adjustments">
             <i class="bi bi-sliders me-1"></i> <?= t('Stock Adjustments') ?>
         </button>
+        <?php endif; ?>
     </div>
 
     <!-- ============================================================= -->
