@@ -45,6 +45,12 @@ $pos_loyalty_enabled          = get_setting('pos_loyalty_enabled', '0');
 $pos_loyalty_spend_per_point  = get_setting('pos_loyalty_spend_per_point', '1000');
 $pos_loyalty_redeem_value     = get_setting('pos_loyalty_redeem_value', '50');
 $pos_currency = getSetting('currency', 'TZS');
+
+// Registers / Tills — Shop assignment (2026-09-16). Same scoped list every
+// other Project+Warehouse dropdown in the app uses (core/warehouse_scope.php)
+// — an admin only assigns a register to a shop they themselves can see.
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
+$reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
 ?>
 
 <div class="container-fluid mt-4">
@@ -159,10 +165,10 @@ $pos_currency = getSetting('currency', 'TZS');
                     <div id="registersTableWrap" class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead>
-                                <tr><th><?= t('Name') ?></th><th><?= t('Code') ?></th><th><?= t('Location') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr>
+                                <tr><th><?= t('Name') ?></th><th><?= t('Code') ?></th><th><?= wLabel('Warehouse', 'Shop') ?></th><th><?= t('Location') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr>
                             </thead>
                             <tbody id="registersTableBody">
-                                <tr><td colspan="5" class="text-center text-muted py-3"><?= t('Loading...') ?></td></tr>
+                                <tr><td colspan="6" class="text-center text-muted py-3"><?= t('Loading...') ?></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -204,6 +210,14 @@ $pos_currency = getSetting('currency', 'TZS');
                 <div class="mb-3">
                     <label class="form-label"><?= t('Register Code') ?> <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="reg_register_code" placeholder="<?= t('e.g. REG-002') ?>">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><?= wLabel('Warehouse', 'Shop') ?></label>
+                    <select class="form-select" id="reg_warehouse_id">
+                        <option value=""><?= wLabel('— No warehouse (legacy, visible to everyone) —', '— No shop (legacy, visible to everyone) —') ?></option>
+                        <?= renderWarehouseOptions($reg_warehouses) ?>
+                    </select>
+                    <small class="text-muted"><?= wLabel('Which warehouse this till belongs to — only cashiers granted that warehouse can sign in here. Leave blank for a shared/legacy till visible to everyone.', 'Which shop this till belongs to — only cashiers granted that shop can sign in here. Leave blank for a shared/legacy till visible to everyone.') ?></small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><?= t('Location') ?></label>
@@ -297,11 +311,13 @@ const T_REG_DEACTIVATE   = <?= json_encode(t('Deactivate')) ?>;
 const T_REG_ACTIVATE     = <?= json_encode(t('Activate')) ?>;
 const T_REG_EDIT         = <?= json_encode(t('Edit')) ?>;
 
+const T_REG_NO_SHOP = <?= json_encode(wLabel('— No warehouse (legacy) —', '— No shop (legacy) —')) ?>;
+
 function loadRegisters() {
     $.getJSON('<?= buildUrl('api/pos/get_registers.php') ?>', function (res) {
         const tbody = $('#registersTableBody');
         if (!res.success || !res.data.length) {
-            tbody.html('<tr><td colspan="5" class="text-center text-muted py-3">' + T_REG_NO_REGISTERS + '</td></tr>');
+            tbody.html('<tr><td colspan="6" class="text-center text-muted py-3">' + T_REG_NO_REGISTERS + '</td></tr>');
             return;
         }
         registersCache = res.data;
@@ -310,9 +326,11 @@ function loadRegisters() {
             const badge = r.status === 'active' ? 'success' : 'secondary';
             const toggleLabel = r.status === 'active' ? T_REG_DEACTIVATE : T_REG_ACTIVATE;
             const toggleIcon = r.status === 'active' ? 'bi-x-circle' : 'bi-check-circle';
+            const shopLabel = r.warehouse_name ? safeOutput(r.warehouse_name) : `<span class="text-muted fst-italic">${T_REG_NO_SHOP}</span>`;
             html += `<tr>
                 <td>${safeOutput(r.register_name)}</td>
                 <td>${safeOutput(r.register_code)}</td>
+                <td>${shopLabel}</td>
                 <td>${safeOutput(r.location)}</td>
                 <td><span class="badge bg-${badge}">${safeOutput(r.status)}</span></td>
                 <td class="text-end">
@@ -329,6 +347,7 @@ function openRegisterModal() {
     $('#registerModalTitle').html('<i class="bi bi-shop me-1"></i> ' + <?= json_encode(t('Add Register')) ?>);
     $('#reg_register_id').val(0);
     $('#reg_register_name, #reg_register_code, #reg_location, #reg_receipt_header, #reg_receipt_footer').val('');
+    $('#reg_warehouse_id').val('');
     $('#reg_opening_cash').val(0);
     $('#reg_barcode_scanner, #reg_cash_drawer').prop('checked', true);
     $('#reg_card_reader').prop('checked', false);
@@ -347,6 +366,7 @@ function editRegister(id) {
     $('#reg_register_id').val(r.register_id);
     $('#reg_register_name').val(r.register_name);
     $('#reg_register_code').val(r.register_code);
+    $('#reg_warehouse_id').val(r.warehouse_id || '');
     $('#reg_location').val(r.location || '');
     $('#reg_opening_cash').val(r.opening_cash || 0);
     $('#reg_barcode_scanner').prop('checked', !!parseInt(r.barcode_scanner));
@@ -388,6 +408,7 @@ function saveRegister() {
         register_id: $('#reg_register_id').val(),
         register_name: name,
         register_code: code,
+        warehouse_id: $('#reg_warehouse_id').val(),
         location: $('#reg_location').val(),
         opening_cash: $('#reg_opening_cash').val(),
         barcode_scanner: $('#reg_barcode_scanner').is(':checked') ? 1 : 0,

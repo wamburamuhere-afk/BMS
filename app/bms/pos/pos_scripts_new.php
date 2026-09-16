@@ -388,7 +388,17 @@ $(document).ready(function() {
     // that leaves exactly one choice, lock it — no illusion of a choice that
     // isn't really there. More than one (e.g. a supervisor covering several
     // warehouses) stays a real dropdown, just constrained to their set.
+    //
+    // Shop scope (2026-09-16): a shift opened on a shop-assigned register
+    // takes priority over both of the above — the shop is a fact of the
+    // shift itself (stamped at Open Shift, cash_register_shifts.warehouse_id),
+    // not a per-sale choice, so it's always locked regardless of how many
+    // warehouses this cashier could otherwise pick from.
     (function () {
+        if (POS_SHIFT_WAREHOUSE_ID) {
+            $('#posWarehouseId').val(String(POS_SHIFT_WAREHOUSE_ID)).prop('disabled', true);
+            return;
+        }
         const $realOptions = $('#posWarehouseId option').filter(function () { return $(this).val() !== ''; });
         if ($realOptions.length === 1) {
             $('#posWarehouseId').val($realOptions.first().val()).prop('disabled', true);
@@ -417,11 +427,25 @@ $(document).ready(function() {
     // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js):
     // no project -> only warehouses not assigned to any project;
     // project selected -> only that project's warehouses.
-    bindWarehouseToProject({
-        project:    '#posProjectId',
-        warehouse:  '#posWarehouseId',
-        onFiltered: function () { loadProducts(); }
-    });
+    //
+    // Shop scope (2026-09-16): skipped entirely while POS_SHIFT_WAREHOUSE_ID
+    // is locked — the shop is a fixed fact of the shift, not something a
+    // Project change should ever show/hide or clear. Binding it anyway would
+    // let the cascade hide the locked <option> the moment the cashier picks a
+    // project whose warehouses don't include this shop, even though the
+    // select stays disabled at that value.
+    if (!POS_SHIFT_WAREHOUSE_ID) {
+        bindWarehouseToProject({
+            project:    '#posProjectId',
+            warehouse:  '#posWarehouseId',
+            onFiltered: function () { loadProducts(); }
+        });
+    } else {
+        // Shop is fixed, but a Project change must still refresh the product
+        // grid (project_id is part of the product query) — just without the
+        // cascade's warehouse show/hide logic touching the locked select.
+        $('#posProjectId').on('change', function () { loadProducts(); });
+    }
 
     // VAT selector — two options only (No Tax / VAT 18%), cashier-chosen. Sync with
     // any restored cart, then apply the chosen rate to every line on change.

@@ -112,6 +112,11 @@ $can_restock_product  = hasPermission('adjust_stock') || isAdmin();
 // per warehouse-change; the JS layer just looks up the selected id.
 const POS_WAREHOUSE_MODES = <?= json_encode($_pos_warehouse_modes ?? []) ?>;
 const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
+// Shop scope (2026-09-16) — non-null when the active shift was opened on a
+// shop-assigned register; the Shop dropdown gets locked to this value so a
+// cashier can never sell against a different shop mid-shift (see the lock
+// logic near the bottom of pos_scripts_new.php).
+const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_active['warehouse_id'])) ? (int)$shift_active['warehouse_id'] : null) ?>;
 </script>
 
 <div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
@@ -196,7 +201,15 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                                     $_pos_project_scoped,
                                     fn($w) => userCan('warehouse', (int)$w['warehouse_id'])
                                 ));
-                                echo renderWarehouseOptions($_pos_warehouse_scoped);
+                                // Shop scope (2026-09-16): a shift opened on a shop-assigned
+                                // register locks every sale in that shift to that one shop —
+                                // pre-select it here so the dropdown already reflects it on
+                                // page load; the JS lock below disables the control so it can
+                                // never be changed mid-shift. A shift on a still-unassigned
+                                // ("legacy") register leaves this null — normal free choice.
+                                $_pos_shift_locked_warehouse_id = ($shift_active && !empty($shift_active['warehouse_id']))
+                                    ? (int)$shift_active['warehouse_id'] : null;
+                                echo renderWarehouseOptions($_pos_warehouse_scoped, $_pos_shift_locked_warehouse_id);
 
                                 // Phase 30 (pos_upgrade_plan.md §9) — a warehouse-scoped
                                 // pos_mode map, so the JS layer can show/hide restaurant
