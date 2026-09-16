@@ -296,6 +296,7 @@ return [
     'Add Supplier' => 'Ongeza Msambazaji',
     'Add Warehouse' => 'Ongeza Ghala',
     'Add Shop' => 'Ongeza Duka',
+    'Create Shop' => 'Fungua Duka',
     'Projects Management' => 'Usimamizi wa Miradi',
 
     // ------------------------------------------------------------------
