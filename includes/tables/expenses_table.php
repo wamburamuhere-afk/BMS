@@ -122,6 +122,7 @@ $(function () {
             approve:          <?= json_encode(t('Approve')) ?>,
             reject:           <?= json_encode(t('Reject')) ?>,
             markAsPaid:       <?= json_encode(t('Mark as Paid')) ?>,
+            voidPayment:      <?= json_encode(t('Void Payment')) ?>,
             delete:           <?= json_encode(t('Delete')) ?>,
             viewDetails:      <?= json_encode(t('View Details')) ?>,
             printVoucher:     <?= json_encode(t('Print Voucher')) ?>,

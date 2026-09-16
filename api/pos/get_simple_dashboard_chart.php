@@ -59,6 +59,16 @@ try {
     $expenseScope = scopeFilterSqlNullable('project', 'e')
                   . scopeFilterSqlNullable('warehouse', 'e');
 
+    // posSimpleBuySellSeries() treats an EMPTY $expenseScopeSql as "caller
+    // didn't opt into the expenses series" (its documented default). But
+    // scopeFilterSqlNullable() also legitimately returns '' for an admin /
+    // fully-unrestricted user (no filter needed) — those two meanings
+    // collided, so an admin viewing their own Simple POS dashboard silently
+    // got no expense line at all, regardless of how many expenses existed.
+    // ' AND 1=1' is a no-op filter that keeps the string non-empty either
+    // way, decoupling "opt in" from "no restriction needed".
+    if ($expenseScope === '') { $expenseScope = ' AND 1=1'; }
+
     $rows = posSimpleBuySellSeries($pdo, $startDate, $endDate, $period, $scope, $expenseScope);
 
     $data = [];
