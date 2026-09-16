@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-09-16 (fix/shop-warehouse-service-terminology) - Nav menu: Shop/Warehouse terminology wasn't switching, and Services was mislabeled "Non-Inventory Products"
+
+**Request:** user pointed at the "Ghala" (Inventory) nav dropdown — screenshotted "Bidhaa za Ghala" and "Maghala" — and said these should follow the same Warehouse↔Shop convention already agreed/used elsewhere in the app, and that non-inventory items must always be called "Huduma" (Service), not a warehouse-flavored phrase.
+
+**Root cause:** `header.php`'s "Ghala"/Inventory dropdown (top toggle, section headers, and the Products/Warehouses links) called `t()` directly on Warehouse-flavored English keys (`'Inventory'`, `'Stock Management'`, `'Inventory Products'`, `'Warehouse'`, `'Warehouses'`) instead of `wLabel('Warehouse-text', 'Shop-text')` — the tenant-conditional helper (`core/terminology.php`, `isShopLabel()`) already used correctly by `warehouses.php` and `services.php` for exactly this purpose. So a Shop-mode tenant (POS on, Projects off) still saw "Ghala"/"Maghala" everywhere in this menu instead of "Duka"/"Maduka". Separately, the Services link used `t('Non-Inventory Products')` (Swahili: "Bidhaa Zisizo za Ghala" — literally "products that are not of warehouse", awkward and inconsistent with the *other* nav dropdown in the same file, which already correctly labels the identical link `t('Service')`).
+
+**Fix — `header.php`:**
+- `t('Inventory')` → `wLabel('Inventory', 'Shop')` (top toggle)
+- `t('Stock Management')` → `wLabel('Stock Management', 'Shop Management')` (section header)
+- `t('Inventory Products')` → `wLabel('Inventory Products', 'Shop Products')` (both occurrences)
+- `t('Non-Inventory Products')` → `t('Services')` — unconditional, matches the sibling dropdown; a non-stocked item is a service regardless of what a tenant calls its stock locations
+- `t('Warehouse')` → `wLabel('Warehouse', 'Shop')` (section header)
+- `t('Warehouses')` → `wLabel('Warehouses', 'Shops')`
+
+**`lang/sw.php`:** added the one missing key, `'Shop Products' => 'Bidhaa za Duka'` — every other key these calls need (`'Shop'`, `'Shops'`, `'Shop Management'`, `'Services'`) already existed.
+
+**Verified:** simulated both terminology modes directly (`$GLOBALS['__bms_features']['projects'] = false` for Shop-mode) in English and Swahili — Warehouse-mode unchanged (Ghala/Usimamizi wa Ghala/Bidhaa za Ghala/Ghala/Maghala) except Services now correctly "Huduma" (was "Bidhaa Zisizo za Ghala"); Shop-mode now correctly Duka/Usimamizi wa Duka/Bidhaa za Duka/Duka/Maduka throughout. Cross-checked live on the real BEJUNDAS FINANCIAL SERVICES LTD tenant (Warehouse-mode): dropdown now reads exactly as expected, unchanged apart from the Services fix. `php -l` clean on both files.
+
 ## 2026-09-16 (feat/pos-shift-warehouse-scope) - POS Shift ↔ Shop (Warehouse) scoping — tills now obey the same shop-access grants as Project & Warehouse Access
 
 **Request:** user asked whether Open/Close Shift depends on a specific shop or all shops for a real multi-shop business, and — after being told the honest answer was "not professional as-is" (a shift could silently span multiple shops with no per-shop cash reconciliation, and any cashier with POS create permission could sign into ANY till regardless of which shop(s) they were actually granted via Settings > Admin > Project & Warehouse Access) — asked for it to be fixed, explicitly pointing at that Project Assignment page as the source of truth for who may touch which shop.
