@@ -1239,7 +1239,9 @@ function get_progress_color($percentage) {
                             <?php if(canCreate('suppliers')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> <?= t('Add Supplier') ?></a></li>
                             <?php endif; ?>
-                            <?php if(canCreate('warehouses')): ?>
+                            <?php if ($pos_simple_mode && canCreate('warehouses')): ?>
+                            <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>?action=add"><i class="bi bi-shop"></i> <?= t('Create Shop') ?></a></li>
+                            <?php elseif (canCreate('warehouses')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>?action=add"><i class="bi bi-shop"></i> <?= wLabel('Add Warehouse', 'Add Shop') ?></a></li>
                             <?php endif; ?>
 

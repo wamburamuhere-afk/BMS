@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-16 (feat/dashboard-create-shop-quick-action) - dashboard.php Quick Actions: "Create Shop" button (Simple POS only)
+
+**Request:** user asked for a "Create Shop" button in the dashboard's Quick Actions dropdown, visible only when Simple POS is on, opening the warehouse registration form (which already fully speaks "Shop"/"Duka" terminology for these tenants — `core/terminology.php`'s `wLabel()`/`isShopLabel()`).
+
+**Scouting:** a generic "Add Warehouse"/"Add Shop" Quick Actions entry already existed, but its label swap is driven by a *different* condition (`isShopLabel()`: POS + no Projects, or the superadmin's separate "Shop Mode" flag) than Simple Mode — the two can disagree, and adding a second entry unconditionally would have shown a confusing duplicate ("Add Shop" + "Create Shop") to Simple POS tenants where both conditions happen to be true.
+
+**Fix:** the existing single entry now branches on `$pos_simple_mode`: Simple Mode on → exactly one entry, labelled "Create Shop" (new, literal per the request); Simple Mode off → the exact original entry, completely unchanged, so non-Simple-POS tenants see zero behavior difference. Both branches still require `canCreate('warehouses')` and link to `warehouses.php?action=add`, which already auto-opens the Add Warehouse/Shop modal. Added the Swahili translation ("Fungua Duka" — "Open Shop", the natural phrasing over a literal "Unda Duka").
+
+**Tested — `tests/test_dashboard_create_shop_quick_action_cli.php` (new, 8/8):** wiring (both branches mutually exclusive on Simple Mode, both permission-gated, exactly 2 links to the destination — no stray third copy), confirmed `warehouses.php` honours `?action=add`, and Swahili translation resolves to a real string. Regression re-run: `test_dashboard_pending_expenses_notice_cli.php` (22/22), `test_dashboard_monthly_expenses_card_cli.php` (24/24) — no drift. `php -l` clean.
+
 ## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - dashboard.php "Monthly Expenses" clickable card (Phase 3 of 3)
 
 **Request:** user asked for a dashboard card named "Monthly Expenses" that, when clicked, opens the Expenses list pre-filtered to that specific month.
