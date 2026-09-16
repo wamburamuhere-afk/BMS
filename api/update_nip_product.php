@@ -10,9 +10,9 @@ try {
     }
     $user_id = $_SESSION['user_id'];
 
-    if (!canEdit('nip_materials')) {
+    if (!canEdit('products')) {
         http_response_code(403);
-        throw new Exception('Access Denied: you do not have permission to edit NIP products');
+        throw new Exception('Access Denied: you do not have permission to edit Services');
     }
 
     $product_id = intval($_POST['product_id'] ?? 0);
