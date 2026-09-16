@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - dashboard.php "Monthly Expenses" clickable card (Phase 3 of 3)
+
+**Request:** user asked for a dashboard card named "Monthly Expenses" that, when clicked, opens the Expenses list pre-filtered to that specific month.
+
+**Scouting:** `get_business_stats()` already computed a correctly-scoped Expenses figure (`$dashboard_stats['expenses']`, `status IN ('approved','paid')`) but it was never rendered anywhere — half the backend groundwork existed unused. That figure tracks whichever `time_range` the rest of the dashboard is filtered to (Today/Week/Year/etc.), which isn't what "Monthly Expenses" should mean, so this card computes its own figure pinned to the current calendar month regardless of the dashboard's own filter.
+
+**Fix:** added Simple-Mode-gated computation of the current month's recognized expense count/amount (`app/dashboard.php`, same `scopeFilterSqlNullable`/status discipline as the rest of this feature) and a new card in the Quick Stats Row (gated on `$pos_simple_mode && canView('expenses')`, same placement pattern as the Credit/Madeni card), linking to `expenses.php?date_from=<month start>&date_to=<month end>`. `expenses.php` now validates `date_from`/`date_to` from the query string as real calendar dates (`checkdate()`, not just a regex — rejects e.g. Feb 30) before they reach the Date From/To `<input value="...">` fields the existing filter JS already reads at init.
+
+**Tested — `tests/test_dashboard_monthly_expenses_card_cli.php` (new, 24/24):** wiring (month is always the calendar month, not the dashboard's time_range; card gate; click-through URL); runtime — the exact query run as a real admin session matches a raw unscoped COUNT/SUM for the current month exactly; the date whitelist tested against valid dates, an impossible calendar date, wrong month, unpadded format, and an XSS-shaped string (confirmed it never reaches the rendered HTML attribute). Full regression re-run, no drift from documented baselines: `test_dashboard_pending_expenses_notice_cli.php` (22/22), `test_expenses_table_sort_and_resize_cli.php` (11/11), `test_expenses_simple_pos_cli.php` (53/55, pre-existing unrelated failures), `test_pos_simple_mode_cli.php` (88/90, pre-existing unrelated failures). `php -l` clean on every touched file.
+
+## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - expenses.php list: explicit newest-first sort + card/table resize sync (Phase 2 of 3)
+
+**Request:** user reported that after adding a new expense on `expenses.php`, older rows seemed to disappear and the new one seemed to "appear in two rows".
+
+**Diagnosis:** DB inspection found no duplicate INSERT — `add_expense.php` runs exactly one `INSERT` per request, button is disabled during the AJAX call, and no near-duplicate rows exist in the data. Two real gaps found instead in `assets/js/tables/bms-expenses-table.js`: (1) `DataTable()` had no explicit `order` — column 0 (S/NO) is `orderable:false`, and with no order given, DataTables' default targeting column 0 produces inconsistent ordering instead of a clean fallback, so a brand-new expense (today's date) could land off page 1 while the page you're looking at appears unchanged; (2) the desktop-table/mobile-card visibility split (`renderCards`) was only re-evaluated on table draw, never on window resize/rotation, so at a borderline viewport width the same expense could end up rendered in both the table row and its mobile-card twin at once.
+
+**Fix:** `M.init()` now finds the `expense_date` column **by key** (survives the Simple-POS hide list, which removes `categories`/`project` but never the date column) and passes `order: [[dateColIdx, 'desc']]`. Added a `resize.<tableId>` handler, bound only when a card container exists, that re-runs `renderCards` off the data DataTables already has in memory (no extra request). Verified `api/account/get_expenses.php`'s own column-index map keeps `e.expense_date` at index 1 regardless of the Project column's presence, so the client's sort index always maps to the right SQL column.
+
+**Tested — `tests/test_expenses_table_sort_and_resize_cli.php` (new, 11/11):** `node --check` on the touched JS; source wiring; `M.init()` executed for real in Node (DataTable() stubbed to capture its call) across a full-page config, a Simple-POS config (categories+project hidden — confirms the date column survives and lands at the same index 1), and a card-less host (supplier_details.php's Expenses tab — confirms no resize listener is wastefully bound there). `php -l` clean on every touched PHP file.
+
+## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - Dashboard "pending expenses not on chart" notice (Phase 1 of 3)
+
+**Request:** user reported that under Simple POS mode, `dashboard.php`'s Expenses line looked "stuck at zero" even after creating expenses, and asked for a diagnosis before any fix.
+
+**Diagnosis:** not a broken query. The chart's Expenses line and the dashboard's own Expenses stat card both only sum `expenses.status IN ('approved','paid')` (`core/pos_dashboard_metrics.php::posSimpleBuySellSeries()`, `app/dashboard.php`'s `get_business_stats()`) — per `.claude/reporting-source.md`, only recognized/posted spend counts. Confirmed against real data: 17 of 46 expense rows sit at `pending` and are correctly excluded — the gate works as designed, but nothing told the user why the line wasn't moving.
+
+**Fix:** `app/dashboard.php` now computes the tenant's Pending expense count/amount (same `scopeFilterSqlNullable('warehouse'|'project', 'e')` discipline as every other Simple-Mode query) and shows a small dismissible-by-context alert above the chart, only when Simple Mode is on and the count is non-zero, with a "Review now" link to `expenses.php?status=pending`. `app/constant/accounts/expenses.php`'s Status filter now reads `?status=` from the query string (whitelisted against the 5 real statuses, defends against injection) so that deep link actually pre-filters the list.
+
+**Tested — `tests/test_dashboard_pending_expenses_notice_cli.php` (new, 22/22):** source wiring (figures computed only inside the Simple Mode branch, notice gated correctly, deep link present); runtime — the exact query run as a real admin session matches a raw unscoped COUNT/SUM exactly (17 records, 4,095,569.00); the `?status=` whitelist logic tested against valid statuses, wrong case, a SQL-injection-shaped value, empty and null (all safely fall through to "All"); Swahili translations resolve for both new strings. `php -l` clean on every touched file. Live browser click-through was offered but declined by the user in favor of manual verification; this is a static/DB-level verification, not a rendered-page screenshot.
+
 ## 2026-09-16 (feat/pos-credit-receivables) - Due-date reminder notifications + full test suite (Phase 4+5)
 
 **Request:** part of the original Swahili feature request — notify staff as a credit sale's due date approaches or passes, reusing the existing notification-rules "grant" UI rather than building a new one.

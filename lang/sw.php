@@ -4322,4 +4322,8 @@ return [
     'Version' => 'Toleo',
     'PHP Version' => 'Toleo la PHP',
     'Server' => 'Seva',
+
+    // Simple POS — dashboard pending-expenses notice (2026-09-16)
+    '%d expense(s) totaling %s are still Pending and not yet counted in the Expenses line below — approve or mark them Paid to include them.' => 'Matumizi %d yenye jumla ya %s bado yanasubiri idhini (Pending) na hayajahesabiwa kwenye mstari wa Matumizi hapa chini — yaidhinishe au yawekwe kama Yamelipwa ili yajumuishwe.',
+    'Review now' => 'Kagua sasa',
 ];

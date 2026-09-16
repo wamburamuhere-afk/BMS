@@ -368,22 +368,44 @@ if (!function_exists('renderExpenseCatRows')) {
                 <?php endif; ?>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Status') ?></label>
+                    <?php
+                    // Deep-link support (e.g. dashboard.php's pending-expenses
+                    // notice links here with ?status=pending) — pre-select the
+                    // dropdown so the first AJAX call (filters_js reads this
+                    // field's .val() at init) already arrives pre-filtered.
+                    $exp_status_qs = $_GET['status'] ?? '';
+                    $exp_valid_statuses = ['pending', 'reviewed', 'approved', 'rejected', 'paid'];
+                    if (!in_array($exp_status_qs, $exp_valid_statuses, true)) $exp_status_qs = '';
+                    ?>
                     <select class="form-select" id="statusFilter">
-                        <option value=""><?= t('All Status') ?></option>
-                        <option value="pending"><?= t('Pending') ?></option>
-                        <option value="reviewed"><?= t('Reviewed') ?></option>
-                        <option value="approved"><?= t('Approved') ?></option>
-                        <option value="rejected"><?= t('Rejected') ?></option>
-                        <option value="paid"><?= t('Paid') ?></option>
+                        <option value="" <?= $exp_status_qs === '' ? 'selected' : '' ?>><?= t('All Status') ?></option>
+                        <option value="pending" <?= $exp_status_qs === 'pending' ? 'selected' : '' ?>><?= t('Pending') ?></option>
+                        <option value="reviewed" <?= $exp_status_qs === 'reviewed' ? 'selected' : '' ?>><?= t('Reviewed') ?></option>
+                        <option value="approved" <?= $exp_status_qs === 'approved' ? 'selected' : '' ?>><?= t('Approved') ?></option>
+                        <option value="rejected" <?= $exp_status_qs === 'rejected' ? 'selected' : '' ?>><?= t('Rejected') ?></option>
+                        <option value="paid" <?= $exp_status_qs === 'paid' ? 'selected' : '' ?>><?= t('Paid') ?></option>
                     </select>
                 </div>
+                <?php
+                // Deep-link support (dashboard.php's "Monthly Expenses" card
+                // links here with ?date_from=&date_to=) — strictly validated
+                // as real Y-m-d dates (not just escaped) before ever reaching
+                // an HTML attribute, same discipline as $exp_status_qs above.
+                $exp_valid_ymd = function ($v) {
+                    if (!is_string($v) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return '';
+                    [$y, $m, $d] = array_map('intval', explode('-', $v));
+                    return checkdate($m, $d, $y) ? $v : '';
+                };
+                $exp_date_from_qs = $exp_valid_ymd($_GET['date_from'] ?? '');
+                $exp_date_to_qs   = $exp_valid_ymd($_GET['date_to'] ?? '');
+                ?>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Date From') ?></label>
-                    <input type="date" class="form-control" id="dateFromFilter">
+                    <input type="date" class="form-control" id="dateFromFilter" value="<?= htmlspecialchars($exp_date_from_qs) ?>">
                 </div>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Date To') ?></label>
-                    <input type="date" class="form-control" id="dateToFilter">
+                    <input type="date" class="form-control" id="dateToFilter" value="<?= htmlspecialchars($exp_date_to_qs) ?>">
                 </div>
                 <div class="col-md-12 d-flex justify-content-end">
                     <button type="button" class="btn btn-primary me-2" onclick="applyFilters()">

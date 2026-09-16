@@ -18,6 +18,25 @@ $pos_simple_mode = posSimpleModeEnabled();
 // tab use, so this figure can never disagree with theirs.
 $pos_credit_total = 0.0;
 $pos_credit_overdue_count = 0;
+
+// Pending-expenses notice (Simple Mode chart) — the "Bought vs Sold" chart's
+// Expenses line only sums expenses.status IN ('approved','paid') (same gate
+// as posSimpleBuySellSeries()/core/pos_dashboard_metrics.php, per
+// .claude/reporting-source.md: only recognized spend counts). A Pending
+// expense is real money the shop owner already spent, but it silently never
+// touches that line — this surfaces the gap instead of leaving the chart
+// looking flat/wrong with no explanation.
+$pos_pending_expense_count  = 0;
+$pos_pending_expense_amount = 0.0;
+
+// "Monthly Expenses" card — always the current calendar month, independent
+// of whichever time_range the rest of the dashboard is filtered to (so this
+// card means the same thing every time you look at it). Recognized spend
+// only (status IN ('approved','paid')), same rule as everything above.
+$pos_month_expense_count  = 0;
+$pos_month_expense_amount = 0.0;
+$pos_month_start = date('Y-m-01');
+$pos_month_end   = date('Y-m-t');
 if ($pos_simple_mode) {
     require_once ROOT_DIR . '/core/warehouse_scope.php';
     require_once ROOT_DIR . '/core/pos_credit_aging.php';
@@ -29,6 +48,38 @@ if ($pos_simple_mode) {
         ));
     } catch (Throwable $e) {
         // best-effort — the total figure above is the card's headline
+    }
+
+    try {
+        $expWhScope   = scopeFilterSqlNullable('warehouse', 'e');
+        $expProjScope = scopeFilterSqlNullable('project', 'e');
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS amt
+            FROM expenses e
+            WHERE e.status = 'pending' $expWhScope $expProjScope
+        ");
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $pos_pending_expense_count  = (int)($row['c'] ?? 0);
+        $pos_pending_expense_amount = (float)($row['amt'] ?? 0);
+    } catch (Throwable $e) {
+        // best-effort — chart still renders without this notice
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS amt
+            FROM expenses e
+            WHERE e.status IN ('approved','paid')
+              AND e.expense_date BETWEEN :from AND :to
+              $expWhScope $expProjScope
+        ");
+        $stmt->execute(['from' => $pos_month_start, 'to' => $pos_month_end]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $pos_month_expense_count  = (int)($row['c'] ?? 0);
+        $pos_month_expense_amount = (float)($row['amt'] ?? 0);
+    } catch (Throwable $e) {
+        // best-effort — card still renders (as zero) without this figure
     }
 }
 
@@ -1726,6 +1777,19 @@ function get_progress_color($percentage) {
                     </div>
                 </div>
                 <div class="card-body">
+                    <?php if ($pos_simple_mode && $pos_pending_expense_count > 0): ?>
+                    <div class="alert alert-warning py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                        <i class="bi bi-info-circle"></i>
+                        <span>
+                            <?= sprintf(
+                                t('%d expense(s) totaling %s are still Pending and not yet counted in the Expenses line below — approve or mark them Paid to include them.'),
+                                $pos_pending_expense_count,
+                                format_currency($pos_pending_expense_amount)
+                            ) ?>
+                            <a href="<?= getUrl('expenses') ?>?status=pending" class="fw-bold alert-link"><?= t('Review now') ?> &raquo;</a>
+                        </span>
+                    </div>
+                    <?php endif; ?>
                     <div class="chart-container" style="position: relative; height: 320px; width: 100%;">
                         <canvas id="performanceChart"></canvas>
                         <div id="chartLoader" class="text-center py-5 position-absolute top-50 start-50 translate-middle w-100" style="display:none;">
@@ -1832,6 +1896,36 @@ function get_progress_color($percentage) {
                             </div>
                         </div>
                     </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($pos_simple_mode && canView('expenses')): ?>
+                <div class="col-md-6 mb-4">
+                    <a href="<?= getUrl('expenses') ?>?date_from=<?= urlencode($pos_month_start) ?>&date_to=<?= urlencode($pos_month_end) ?>"
+                       class="text-decoration-none">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="mb-0 fw-bold text-body"><i class="bi bi-wallet2 text-warning me-2"></i> <?= t('Monthly Expenses') ?></h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center mb-4">
+                                    <div class="col-6">
+                                        <h3 class="fw-bold text-danger"><?= number_format($pos_month_expense_amount, 0) ?></h3>
+                                        <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('This Month') ?></small>
+                                    </div>
+                                    <div class="col-6 border-start">
+                                        <h3 class="fw-bold"><?= $pos_month_expense_count ?></h3>
+                                        <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Records') ?></small>
+                                    </div>
+                                </div>
+                                <div class="mt-auto">
+                                    <span class="btn btn-sm btn-outline-secondary w-100 border-2 fw-bold">
+                                        <i class="bi bi-list-ul me-1"></i> <?= t('View This Month\'s Expenses') ?>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
                 </div>
                 <?php endif; ?>
             </div>
