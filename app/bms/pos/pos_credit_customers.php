@@ -74,6 +74,7 @@ $can_delete = canDelete('pos');
                 <table class="table table-hover align-middle mb-0 w-100" id="creditAgingTable">
                     <thead class="bg-light text-muted small text-uppercase">
                         <tr>
+                            <th style="width:50px;"><?= t('S/NO') ?></th>
                             <th><?= t('Customer') ?></th>
                             <th><?= t('Phone') ?></th>
                             <th class="text-end"><?= t('Owed') ?></th>
@@ -86,6 +87,8 @@ $can_delete = canDelete('pos');
                     <tbody id="creditAgingBody"></tbody>
                 </table>
             </div>
+            <!-- Mobile card view (populated by pos-credit-aging.js's drawCallback) -->
+            <div id="creditAgingCards" class="px-2 d-none"></div>
             <div class="text-center py-5 d-none" id="creditAgingEmpty">
                 <i class="bi bi-emoji-smile" style="font-size:3rem;color:#ccc;"></i>
                 <h5 class="mt-3 text-muted"><?= t('Nobody owes you anything right now') ?></h5>
@@ -184,10 +187,11 @@ $can_delete = canDelete('pos');
 <script>
 $(function () {
     PosCreditAging.init({
+        tableSel: '#creditAgingTable',
         listContainer: '#creditAgingTableWrap',
+        cardContainer: '#creditAgingCards',
         loadingEl: '#creditAgingLoading',
         emptyEl: '#creditAgingEmpty',
-        bodyEl: '#creditAgingBody',
         customerId: null,
         canEdit: <?= json_encode($can_edit) ?>,
         canDelete: <?= json_encode($can_delete) ?>,
@@ -223,10 +227,26 @@ $(function () {
             saleAmount: <?= json_encode(t('Sale Amount:')) ?>,
             saleDate: <?= json_encode(t('Sale Date:')) ?>,
             dueDate: <?= json_encode(t('Due Date:')) ?>,
+            amountHeader: <?= json_encode(t('Amount')) ?>,
+            methodHeader: <?= json_encode(t('Method')) ?>,
+            byHeader: <?= json_encode(t('By')) ?>,
         }
     });
 });
 </script>
+
+<style>
+/* ── Mobile custom card view — mirrors expenses.php's .expense-mobile-card ── */
+@media (max-width: 768px) {
+    .credit-aging-mobile-card {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 8px 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+}
+</style>
 
 <?php
 require_once __DIR__ . '/../../../footer.php';
