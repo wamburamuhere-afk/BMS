@@ -3822,6 +3822,7 @@ return [
     'Mark as Reviewed' => 'Weka Alama Imekaguliwa',
     'Reject' => 'Kataa',
     'Mark as Paid' => 'Weka Alama Imelipwa',
+    'Void Payment' => 'Batilisha Malipo',
     'Print Voucher' => 'Chapisha Hati ya Malipo',
     'Day:' => 'Siku:',
     'Are you sure you want to mark this as' => 'Una uhakika unataka kuweka alama hii kama',

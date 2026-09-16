@@ -236,6 +236,7 @@ if (!empty($expenses)) {
     foreach ($expenses as &$exp) {
         $exp['categories'] = $allCategories[$exp['expense_id']] ?? [];
     }
+    unset($exp); // break the reference — every foreach below reuses $exp by value
 
     // Build full category paths (Type › Category › Sub-category)
     $allCatIds = [];
@@ -291,7 +292,9 @@ if (!empty($expenses)) {
                 }
                 $cat['category_path'] = implode(' › ', $path);
             }
+            unset($cat); // break the inner reference before the next $exp['categories']
         }
+        unset($exp); // break the outer reference — the daily-total loop below reuses $exp by value
     }
 
     // Compute daily category totals (sum of all expenses in same category on same date)
@@ -338,6 +341,7 @@ if (!empty($expenses)) {
                 }
             }
         }
+        unset($exp); // defensive — nothing reuses $exp after this today, but a future edit might
     }
 }
 

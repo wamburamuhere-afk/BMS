@@ -101,7 +101,16 @@ try {
 
     $description        = trim($_POST['description']);
     $notes              = isset($_POST['notes']) ? trim($_POST['notes']) : null;
-    $requested_status = trim($_POST['status'] ?? 'pending');
+    // Simple POS's Add Expense form has no status field at all — it's a
+    // single-step "I spent money" entry, not the multi-step Reviewed ->
+    // Approved -> Paid workflow the full form exposes. Default it to 'paid'
+    // instead of 'pending' so it actually counts as recognized spend right
+    // away (feeds the Simple Mode dashboard chart's expense line — see
+    // core/pos_dashboard_metrics.php). Safe because Simple POS always has a
+    // real bank_account_id by this point (auto-resolved above), so the
+    // 'paid' validation below passes the same way it already does for Quick
+    // Expense. Normal mode is untouched — still defaults to 'pending'.
+    $requested_status = trim($_POST['status'] ?? ($simplePos ? 'paid' : 'pending'));
     $status = ($requested_status === 'paid'
                && $bank_account_id > 0
                && $expense_account_id > 0

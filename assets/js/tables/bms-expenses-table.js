@@ -131,6 +131,16 @@
                 html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'rejected\');return false;"><i class="bi bi-x-circle text-danger"></i> ' + cfg.i18n.reject + '</a></li>';
             } else if (row.status === 'approved') {
                 html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'paid\');return false;"><i class="bi bi-cash text-success"></i> ' + cfg.i18n.markAsPaid + '</a></li>';
+            } else if (row.status === 'paid') {
+                // The backend (update_expense_status.php) already fully supports
+                // paid -> rejected as a void: it reverses the ledger entry, bank
+                // register row, and any linked payroll/invoice payment, and clears
+                // transaction_id so the record unlocks (editable, deletable again).
+                // Without this entry a paid expense was a dead end in the UI: no
+                // button anywhere could reach that transition, even though
+                // delete_expense.php and update_expense.php both explicitly tell
+                // the user to "void it first" when they try to delete/edit one.
+                html += '<li><a class="dropdown-item" href="#" onclick="BMSExpensesTable.setStatus(\'' + id + '\',' + eid + ',\'rejected\');return false;"><i class="bi bi-x-circle text-danger"></i> ' + cfg.i18n.voidPayment + '</a></li>';
             }
         }
         if (p.canDelete) {

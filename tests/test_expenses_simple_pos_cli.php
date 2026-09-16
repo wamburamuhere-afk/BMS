@@ -210,6 +210,33 @@ function _sp_post(string $root, int $uid, array $post): array {
     return is_array($json) ? $json : ['success' => false, 'message' => 'non-JSON output: ' . $out];
 }
 
+/**
+ * Simple POS now creates an expense as 'paid' (2026-09-16 fix — it feeds the
+ * Simple Mode dashboard's expense chart line immediately, matching the
+ * single-step "I spent money" UX with no status picker). A 'paid' expense
+ * posts a real ledger entry + bank_transactions row, so a raw
+ * `DELETE FROM expenses` would leave that posting orphaned. Void it first
+ * (the same paid -> rejected transition the UI's new "Void Payment" button
+ * uses) to reverse the ledger/bank effects, exactly like a real delete
+ * through the app would require, then remove the row.
+ */
+function _sp_cleanup_expense(PDO $pdo, string $root, int $uid, int $expenseId): void {
+    $status = $pdo->prepare("SELECT status FROM expenses WHERE expense_id = ?");
+    $status->execute([$expenseId]);
+    if ($status->fetchColumn() === 'paid') {
+        _sp_run_php("
+            require '$root/roots.php';
+            \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
+            \$_SERVER['REQUEST_METHOD'] = 'POST';
+            \$_POST = ['expense_id' => $expenseId, 'status' => 'rejected'];
+            ob_start();
+            include '$root/api/account/update_expense_status.php';
+            ob_end_clean();
+        ");
+    }
+    $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$expenseId]);
+}
+
 if (!$uid || !$supplier) {
     pass('no admin user / active supplier fixture available — section 5 skipped (n/a)');
 } else {
@@ -231,8 +258,13 @@ if (!$uid || !$supplier) {
         ((int)$e['expense_account_id'] === (int)$miscId) ? pass('auto-filled expense_account_id matches miscExpenseAccountId()') : fail('expense_account_id mismatch: got ' . $e['expense_account_id']);
         ((int)$e['bank_account_id'] === (int)$cashId) ? pass('auto-filled bank_account_id matches defaultCashAccountId()') : fail('bank_account_id mismatch: got ' . $e['bank_account_id']);
         ($e['paid_to_type'] === 'supplier' && (int)$e['paid_to_id'] === (int)$supplier['supplier_id']) ? pass('paid_to_type/id stored correctly') : fail('paid_to mismatch');
-        $e['status'] === 'pending' ? pass('creation posts nothing (status stays pending, matching GAP 1)') : fail('unexpected status: ' . $e['status']);
-        $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$res['id']]);
+        // 2026-09-16: Simple POS now defaults new expenses to 'paid' (was
+        // 'pending', GAP 1) — it already has a real auto-resolved bank
+        // account, so it posts immediately and shows up on the dashboard
+        // chart right away instead of waiting on a manual approval workflow
+        // the Simple POS UI never exposed a way to reach in the first place.
+        $e['status'] === 'paid' ? pass('creation posts immediately (status is paid, GAP 1 fixed)') : fail('unexpected status: ' . $e['status']);
+        _sp_cleanup_expense($pdo, $root, $uid, (int)$res['id']);
     } else {
         fail('Simple POS supplier expense failed: ' . ($res['message'] ?? 'unknown'));
     }
@@ -270,7 +302,7 @@ if (!$uid || !$supplier) {
         $edSrc = src($root, 'app/constant/accounts/expense_details.php');
         has($edSrc, "WHEN e.paid_to_type = 'other'", "expense_details.php's paid_to_name CASE covers 'other'");
 
-        $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$res2['id']]);
+        _sp_cleanup_expense($pdo, $root, $uid, (int)$res2['id']);
     } else {
         fail('Simple POS manual-payee expense failed: ' . ($res2['message'] ?? 'unknown'));
     }
