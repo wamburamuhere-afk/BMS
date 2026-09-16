@@ -38,7 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email'] ?? '');
         $manager_name = trim($_POST['manager_name'] ?? '');
         $manager_phone = trim($_POST['manager_phone'] ?? '');
-        $capacity = ($_POST['capacity'] ?? null) ?: null;
+        // warehouses.capacity is NOT NULL DEFAULT 0.00 — the form field is
+        // optional (no `required`, no asterisk), so a blank submission must
+        // fall back to 0, not null, or the insert throws a raw SQLSTATE 23000
+        // that surfaced to the user as an opaque "Database error" with no way
+        // to tell whether the warehouse was actually created.
+        $capacity = ($_POST['capacity'] ?? '') !== '' ? (float)$_POST['capacity'] : 0;
         $status = $_POST['status'] ?? 'active';
         $is_primary = isset($_POST['is_primary']) ? 1 : 0;
         $project_id = ($_POST['project_id'] ?? null) ?: null;
@@ -131,7 +136,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
 
                 logActivity($pdo, $user_id, 'Create warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
-                $_SESSION['success'] = [isShopLabel() ? 'Shop added successfully!' : 'Warehouse added successfully!'];
+
+                // Phase 6 warehouse-scope grants are transaction-derived or
+                // explicitly curated (project_scope.php) — a brand-new
+                // warehouse has neither, so it's invisible to its own
+                // non-admin creator on this very list. Rather than just
+                // explaining that, actually grant the creator access to what
+                // they just made — they already passed the project-scope
+                // check to create it — the same way Settings > Project &
+                // Warehouse Access does (user_scope_overrides,
+                // resource_type='warehouse'), then refresh their session
+                // scope so it's genuinely visible on the very next load.
+                $visible_to_creator = true;
+                if (!isAdmin()) {
+                    if (!isset($_SESSION['scope'])) loadUserScope((int)$user_id);
+                    $scope = $_SESSION['scope'] ?? [];
+                    if (empty($scope['is_admin'])) {
+                        $granted_warehouses = $scope['warehouses'] ?? [];
+                        if (!in_array('*', $granted_warehouses, true) && !in_array((int)$warehouse_id, $granted_warehouses, true)) {
+                            try {
+                                $pdo->prepare("INSERT IGNORE INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, ?)")
+                                    ->execute([$user_id, $warehouse_id, $user_id]);
+                                if (function_exists('refreshScopeCache')) refreshScopeCache((int)$user_id);
+                            } catch (Throwable $e) {
+                                error_log('warehouses.php: auto-grant creator warehouse access failed: ' . $e->getMessage());
+                            }
+                            $scope = $_SESSION['scope'] ?? [];
+                            $granted_warehouses = $scope['warehouses'] ?? [];
+                            $visible_to_creator = !empty($scope['is_admin'])
+                                || in_array('*', $granted_warehouses, true)
+                                || in_array((int)$warehouse_id, $granted_warehouses, true);
+                        }
+                    }
+                }
+
+                $safe_name = htmlspecialchars($warehouse_name, ENT_QUOTES, 'UTF-8');
+                if ($visible_to_creator) {
+                    $_SESSION['success'] = [isShopLabel() ? 'Shop added successfully!' : 'Warehouse added successfully!'];
+                } else {
+                    // Only reachable if the auto-grant insert itself failed
+                    // (e.g. a DB error) — a genuine "created but contact your
+                    // admin" case rather than the normal path.
+                    $_SESSION['warning'] = [isShopLabel()
+                        ? "Shop '{$safe_name}' was created successfully, but you don't have access to view it yet. Contact your admin to grant you access."
+                        : "Warehouse '{$safe_name}' was created successfully, but you don't have access to view it yet. Contact your admin to grant you access."];
+                }
                 header("Location: warehouses.php");
                 exit();
             } catch (PDOException $e) {
@@ -161,7 +210,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email'] ?? '');
         $manager_name = trim($_POST['manager_name'] ?? '');
         $manager_phone = trim($_POST['manager_phone'] ?? '');
-        $capacity = ($_POST['capacity'] ?? null) ?: null;
+        // See the matching comment in the add_warehouse handler above —
+        // warehouses.capacity is NOT NULL DEFAULT 0.00.
+        $capacity = ($_POST['capacity'] ?? '') !== '' ? (float)$_POST['capacity'] : 0;
         $status = $_POST['status'] ?? 'active';
         $is_primary = isset($_POST['is_primary']) ? 1 : 0;
         $project_id = ($_POST['project_id'] ?? null) ?: null;
@@ -860,6 +911,14 @@ function get_primary_badge($is_primary) {
         <?php unset($_SESSION['success']); ?>
         <?php endif; ?>
 
+        <?php if (!empty($_SESSION['warning'])): ?>
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle"></i> <?= implode('<br>', array_map('t', (array)$_SESSION['warning'])) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <?php unset($_SESSION['warning']); ?>
+        <?php endif; ?>
+
         <!-- Warehouses Grid View -->
         
         <!-- Filter Section -->
@@ -961,7 +1020,7 @@ function get_primary_badge($is_primary) {
                                 <?php foreach ($warehouses as $index => $warehouse): ?>
                                 <tr>
                                     <td><?= $index + 1 ?></td>
-                                    <td>
+                                    <td data-order="<?= (int)$warehouse['warehouse_id'] ?>">
                                         <code class="custom-code"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></code>
                                         <?php if ($warehouse['is_primary']): ?>
                                             <span class="badge bg-primary ms-1"><i class="bi bi-star-fill"></i> <?= t('Primary') ?></span>
@@ -1152,7 +1211,6 @@ function get_primary_badge($is_primary) {
                             </div>
                         </div>
                         <?php endif; ?>
-                        </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -1583,7 +1641,11 @@ function get_primary_badge($is_primary) {
         $('#warehousesTable').DataTable({
             pageLength: 25,
             lengthChange: false, // Disable built-in length menu (we have custom one in actions bar)
-            order: [[7, 'desc']], // Sort by Stock Value
+            // Newest-created first (Warehouse Code column carries a numeric
+            // data-order = warehouse_id) — a brand-new warehouse always has
+            // 0 stock value, so sorting by Stock Value buried it off-screen
+            // right after creation, for admins too.
+            order: [[1, 'desc']],
             language: {
                 search: <?= json_encode(t('Search:')) ?>,
                 info: <?= json_encode(t('Showing _START_ to _END_ of _TOTAL_ entries')) ?>,
