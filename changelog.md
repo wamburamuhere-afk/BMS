@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-15 (fix/user-role-translation) - Translate the role name shown in the user dropdown and dashboard banner
+
+**Request:** screenshot showing the user dropdown already fully in Swahili ("Wasifu na Mipangilio Yangu", "Msaada", "Toka") except the role badge ("ADMIN"), which stayed English. `$user_role` (from `roles.role_name`) was rendered raw via `htmlspecialchars()` with no `t()` wrapping at all, in both spots in `header.php`'s user dropdown (the collapsed toggle and the panel header) and `app/dashboard.php`'s welcome-banner badge.
+
+**Fix:** wrapped all 3 render sites in `t()`. Since role names are free-text and tenant-editable, a role with no catalog entry safely falls back to its own name (existing `t()` behaviour) rather than erroring or going blank.
+
+- `header.php` — both user-dropdown render sites.
+- `app/dashboard.php` — the welcome-banner role badge.
+- `lang/sw.php` — 6 new translations for this database's actual role names (`Admin`/`Staff` already existed): Accountant, CFO, Credit Manager, Director, Managing Director, Secretary (PS).
+
+**Verified:** new `tests/test_user_role_translation_cli.php` (11/11) — lint, source wiring (exactly 2 sites in header.php, 1 in dashboard.php, zero untranslated sites remaining), a live check that all 8 real role names in this database translate correctly, a custom/unlisted role name falling back safely, and a clean language revert. Existing `test_expenses_simple_pos_cli` (55/55) and `test_pos_i18n_coverage_cli` (134/135, the 1 failure a confirmed pre-existing unrelated gap) re-run clean. `php -l` clean on both touched files.
+
 ## 2026-09-15 (fix/expense-report-shop-filter) - Expense Report: Account filter/chart/column swapped for Shop under Simple POS
 
 **Request:** "in expenses report page do you have removed to filter by account? If is simple pos? Just i need replace that section with shop." Confirmed the earlier Business Reports i18n pass had only translated this page, not added Simple POS branching — the "Expense Account" filter, the "By Account" chart, and the Account table column all still showed unconditionally, even though every Simple POS expense auto-resolves to the same generic account (filtering/charting by it is meaningless there). Now that `expenses.warehouse_id` exists (previous phase), swapped all three for Shop under Simple Mode.
