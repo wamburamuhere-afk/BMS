@@ -2023,9 +2023,16 @@ function handleRoute() {
 
         $clean_version = substr($clean_uri, 0, -4);
 
-        // Mapped route: send the visitor to its clean URL.
+        // Mapped route: send the visitor to its clean URL. Must carry the
+        // query string across — found 2026-09-16 via a live warehouses.php
+        // Edit test: ajax_get_warehouse.php?id=16 (a mapped route) 301'd to
+        // /ajax_get_warehouse with id dropped, so every GET AJAX/page call
+        // made with a .php path *and* a query string silently lost its
+        // params on any route present in $routes. The sibling branch below
+        // (unmapped file) already got this right — this one didn't.
         if (isset($routes[$clean_version])) {
-            header("Location: " . getUrl($clean_version), true, 301);
+            $qs = $_SERVER['QUERY_STRING'] ?? '';
+            header("Location: " . getUrl($clean_version) . ($qs !== '' ? '?' . $qs : ''), true, 301);
             exit();
         }
 
