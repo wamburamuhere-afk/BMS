@@ -4034,4 +4034,15 @@ return [
 
     // Expense Report — Shop filter/breakdown for Simple POS (2026-09-15)
     'Expenditure analysis by shop, period and status' => 'Uchambuzi wa matumizi kwa duka, kipindi na hali',
+
+    // Role names shown in the user dropdown / dashboard badge (2026-09-15) —
+    // header.php's $user_role and app/dashboard.php's welcome banner now wrap
+    // it in t(); a custom role name not listed here safely falls back to
+    // itself (t()'s normal untranslated-key behaviour).
+    'Accountant' => 'Mhasibu',
+    'CFO' => 'Afisa Mkuu wa Fedha',
+    'Credit Manager' => 'Meneja wa Mikopo',
+    'Director' => 'Mkurugenzi',
+    'Managing Director' => 'Mkurugenzi Mtendaji',
+    'Secretary (PS)' => 'Katibu (PS)',
 ];

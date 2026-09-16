@@ -1108,7 +1108,7 @@ function get_progress_color($percentage) {
                 <div>
                     <h2 class="mb-1"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></h2>
                     <p class="text-muted mb-0"><?= t('Welcome back') ?>, <?= htmlspecialchars($username) ?>!
-                        <span class="badge bg-primary"><?= $user_role ?></span>
+                        <span class="badge bg-primary"><?= htmlspecialchars(t($user_role)) ?></span>
                     </p>
                 </div>
                 <div class="d-flex flex-row gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-md-auto">
