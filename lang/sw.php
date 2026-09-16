@@ -20,6 +20,7 @@ return [
     'Suppliers' => 'Wasambazaji',
     'Sub-Contractors' => 'Wakandarasi Wadogo',
     'Inventory Products' => 'Bidhaa za Ghala',
+    'Shop Products' => 'Bidhaa za Duka',
     'Non-Inventory Products' => 'Bidhaa Zisizo za Ghala',
 
     // ------------------------------------------------------------------

@@ -792,7 +792,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> <?= t('Sub-Contractors') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= t('Inventory Products') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= wLabel('Inventory Products', 'Shop Products') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Service') ?></a></li>
@@ -959,13 +959,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('products') || canView('warehouses')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-boxes"></i> <?= t('Inventory') ?>
+                                <i class="bi bi-boxes"></i> <?= wLabel('Inventory', 'Shop') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="inventoryDropdown">
-                                <li><h6 class="dropdown-header"><?= t('Stock Management') ?></h6></li>
+                                <li><h6 class="dropdown-header"><?= wLabel('Stock Management', 'Shop Management') ?></h6></li>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= t('Inventory Products') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Non-Inventory Products') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= wLabel('Inventory Products', 'Shop Products') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Services') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('categories')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Categories') ?></a></li>
@@ -976,9 +976,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('inventory_valuation')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('inventory_valuation') ?>"><i class="bi bi-calculator"></i> <?= t('Valuation') ?></a></li>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header"><?= t('Warehouse') ?></h6></li>
+                                <li><h6 class="dropdown-header"><?= wLabel('Warehouse', 'Shop') ?></h6></li>
                                 <?php if(canView('warehouses')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i> <?= t('Warehouses') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i> <?= wLabel('Warehouses', 'Shops') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('locations')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('locations') ?>"><i class="bi bi-geo-alt"></i> <?= t('Locations') ?></a></li>
