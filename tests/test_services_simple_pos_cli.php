@@ -19,6 +19,13 @@
  *                  wipe description/tax/cost/components that a fuller form
  *                  had set earlier (the exact class of bug already caught
  *                  once in update_expense.php this session).
+ *   F. ENTITLEMENT — create/update must gate on canCreate/canEdit('products'),
+ *                  NOT 'nip_materials' (owned by the 'procurement' feature).
+ *                  Services are sales-only and never stock-tracked, so a
+ *                  tenant restricted to Simple POS (Procurement off) must
+ *                  still be able to register/edit a Service — this was the
+ *                  "Access Denied: you do not have permission to create NIP
+ *                  products" bug reported 2026-09-16.
  */
 
 $root = dirname(__DIR__);
@@ -320,5 +327,105 @@ if (!$uid || !$wh || !$componentProduct) {
         $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$pid]);
         $left = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE product_id = $pid")->fetchColumn();
         ($left === 0) ? pass('test service fully cleaned up') : fail('test service not cleaned up');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+section('7. Entitlement — Service create/edit must survive Procurement being off');
+
+has(src($root, 'api/create_nip_product.php'), "canCreate('products')", "create_nip_product.php gates on canCreate('products')");
+has(src($root, 'api/update_nip_product.php'), "canEdit('products')", "update_nip_product.php gates on canEdit('products')");
+
+if (!$uid || !$wh) {
+    pass('no admin user / warehouse fixture available — section 7 skipped (n/a)');
+} else {
+    $wid = (int)$wh['warehouse_id'];
+    $svcName = 'CLI Procurement-Off Service ' . time() . '-' . rand(1000, 9999);
+
+    // Simulate the exact tenant setup from the bug report: every feature on
+    // EXCEPT Procurement (the owner of the 'nip_materials' page key) — the
+    // same $GLOBALS['__bms_features'] override core/feature_registry.php's
+    // own tenantFeatures() reads, used the same way by
+    // tests/test_pos_phase13_entitlement_cli.php.
+    $out = _svc_run_php("
+        \$_SESSION = [];
+        \$_SERVER['REQUEST_METHOD'] = 'POST';
+        require '$root/roots.php';
+        \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
+        \$GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+        \$GLOBALS['__bms_features']['procurement'] = false;
+
+        \$checks = [
+            'nip_materials_create_blocked' => canCreate('nip_materials') === false,
+            'products_create_allowed'      => canCreate('products') === true,
+        ];
+
+        \$_POST = [
+            'is_service'      => '1',
+            'track_inventory' => '0',
+            'unit'            => 'job',
+            'status'          => 'active',
+            'product_name'    => " . var_export($svcName, true) . ",
+            'selling_price'   => '15000',
+            'warehouse_id'    => '$wid',
+        ];
+        ob_start();
+        include '$root/api/create_nip_product.php';
+        \$createOut = ob_get_clean();
+        \$pos = strpos(\$createOut, '{');
+        \$createOut = \$pos === false ? \$createOut : substr(\$createOut, \$pos);
+        \$createRes = json_decode(\$createOut, true);
+
+        \$editOut = null;
+        if (!empty(\$createRes['success']) && !empty(\$createRes['product_id'])) {
+            \$_POST = [
+                'product_id'      => \$createRes['product_id'],
+                'is_service'      => '1',
+                'track_inventory' => '0',
+                'unit'            => 'job',
+                'status'          => 'active',
+                'product_name'    => " . var_export($svcName . ' EDITED', true) . ",
+                'selling_price'   => '18000',
+                'warehouse_id'    => '$wid',
+            ];
+            ob_start();
+            include '$root/api/update_nip_product.php';
+            \$editOut = ob_get_clean();
+            \$pos = strpos(\$editOut, '{');
+            \$editOut = \$pos === false ? \$editOut : substr(\$editOut, \$pos);
+        }
+
+        echo json_encode([
+            'checks'    => \$checks,
+            'create'    => \$createRes,
+            'edit'      => json_decode(\$editOut, true),
+        ]);
+    ");
+    $res = json_decode($out, true);
+
+    if (!is_array($res)) {
+        fail('section 7 subprocess did not return valid JSON: ' . $out);
+    } else {
+        ($res['checks']['nip_materials_create_blocked'] ?? null) === true
+            ? pass("canCreate('nip_materials') is false with Procurement off — proves the simulated tenant setup matches the bug report")
+            : fail("canCreate('nip_materials') should be false with Procurement off — test setup invalid");
+        ($res['checks']['products_create_allowed'] ?? null) === true
+            ? pass("canCreate('products') is true with Procurement off — Services are not gated by Procurement")
+            : fail("canCreate('products') should be true with Procurement off");
+
+        $pid = $res['create']['product_id'] ?? null;
+        (!empty($res['create']['success']) && $pid)
+            ? pass('Service CREATE succeeds with Procurement disabled for the tenant (regression: was "Access Denied: you do not have permission to create NIP products")')
+            : fail('Service CREATE was blocked with Procurement off: ' . ($res['create']['message'] ?? json_encode($res['create'])));
+
+        if ($pid) {
+            (!empty($res['edit']['success']))
+                ? pass('Service EDIT succeeds with Procurement disabled for the tenant')
+                : fail('Service EDIT was blocked with Procurement off: ' . ($res['edit']['message'] ?? json_encode($res['edit'])));
+
+            $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$pid]);
+            $left = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE product_id = " . (int)$pid)->fetchColumn();
+            ($left === 0) ? pass('test service fully cleaned up') : fail('test service not cleaned up');
+        }
     }
 }
