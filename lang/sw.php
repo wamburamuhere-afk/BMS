@@ -929,6 +929,7 @@ return [
     'Cost Price' => 'Bei ya Gharama',
     'The price you paid for this product' => 'Bei uliyolipa kwa bidhaa hii',
     'Selling Price' => 'Bei ya Kuuza',
+    'Amount to Sell' => 'Kiasi cha Kuuza',
     'Final price at which you sell to customers' => 'Bei ya mwisho unayouzia wateja',
     'Wholesale Price' => 'Bei ya Jumla',
     'Price for bulk/wholesale buyers' => 'Bei kwa wanunuzi wa jumla',

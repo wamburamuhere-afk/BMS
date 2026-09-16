@@ -124,6 +124,14 @@ if (projectsModuleActive()) {
 require_once ROOT_DIR . '/core/warehouse_scope.php';
 $warehouses = warehousesForSelect($pdo);
 
+// Simple POS: collapse the Add/Edit Service modals to Name + Amount to Sell
+// (+ Shop, only if the user is assigned to more than one). Same combined gate
+// as Products (products_simple_pos_plan.md) — a Simple POS tenant that has
+// been explicitly switched to "Advanced Product" keeps the full form.
+$simpleServiceForm = posSimpleModeEnabled() && !advancedProductEnabled();
+$showShopPicker    = count($warehouses) > 1;
+$onlyWarehouseId   = (count($warehouses) === 1) ? (int)$warehouses[0]['warehouse_id'] : 0;
+
 // Pagination URL helper
 function svc_pagination_url($p) {
     $params = $_GET;
@@ -572,6 +580,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     <div id="add-service-message" class="mb-3"></div>
 
                     <!-- ── NAVIGATION HEADERS ────────────────────────────────── -->
+                    <?php if (!$simpleServiceForm): ?>
                     <div class="d-flex gap-4 mb-4 border-bottom pb-2 px-1">
                         <h6 class="fw-bold cursor-pointer mb-0 pb-2" id="svc_add_tab1" onclick="toggleSvcAddStep(1)" style="color: #0d6efd; border-bottom: 2px solid #0d6efd; transition: all 0.3s; cursor: pointer;">
                             <i class="bi bi-info-circle me-2"></i><?= t('Product Identity') ?>
@@ -580,27 +589,28 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <i class="bi bi-cash-stack me-2"></i><?= t('Pricing & Planning') ?>
                         </h6>
                     </div>
+                    <?php endif; ?>
 
                     <!-- ── STEP 1: IDENTITY ──────────────────────────────────── -->
                     <div id="svc_add_step1">
                         <div class="row g-4 mb-4">
-                        <div class="col-md-7 border-end pe-md-4">
+                        <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-7 border-end pe-md-4' ?>">
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label class="form-label fw-bold small"><?= wLabel('Non-Inventory Product Name', 'Service Name') ?> <span class="text-danger">*</span></label>
                                     <textarea class="form-control form-control-lg bg-light border-0 shadow-sm"
                                         name="product_name" required rows="2" placeholder="<?= t('e.g. Consulting, Delivery Charge') ?>"></textarea>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-12<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                     <label class="form-label fw-bold small"><?= t('Description') ?></label>
                                     <textarea class="form-control bg-light border-0" name="description"
                                         rows="2" placeholder="<?= t('Describe this service...') ?>"></textarea>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                     <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                     <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" placeholder="<?= t('Auto-generated on save') ?>" readonly>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                     <label class="form-label fw-bold small text-primary"><?= t('Unit') ?></label>
                                     <div id="svc_unit_container">
                                         <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="svc_unit_select" onchange="checkOtherUnit(this, 'svc_unit_container')">
@@ -614,7 +624,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                     <label class="form-label fw-bold small text-primary"><?= t('Qty') ?></label>
                                     <input type="number" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold"
                                         name="assembly_quantity" id="svc_assembly_qty" value="1" readonly>
@@ -622,7 +632,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                         </div>
 
-                        <div class="col-md-5 ps-md-4">
+                        <div class="col-md-5 ps-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                             <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
                                 <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= wLabel('Non-Inventory Product', 'Service') ?></h5>
                                 <p class="small text-muted mb-3"><?= t('This product will be available in:') ?></p>
@@ -641,24 +651,24 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     </div>
 
                     <!-- ── STEP 2: PRICING & BOM ──────────────────────────────── -->
-                    <div id="svc_add_step2" style="display:none;">
+                    <div id="svc_add_step2" style="<?= $simpleServiceForm ? '' : 'display:none;' ?>">
 
                         <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold small text-success"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
+                            <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
+                                <label class="form-label fw-bold small text-success"><?= $simpleServiceForm ? t('Amount to Sell') : t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-success text-white">TZS</span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="svc_sell" value="0.00" step="0.01" required onkeyup="calcSvcMargin()" onchange="calcSvcMargin()">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-light">TZS</span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="svc_cost" value="0.00" step="0.01" readonly>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                                 <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="svc_tax_id">
                                     <option value=""><?= t('No Tax') ?></option>
@@ -670,7 +680,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="col-12 mt-3 pt-3 border-top">
                                 <div class="row g-3">
                                     <?php if (projectsModuleActive()): ?>
-                                    <div class="col-md-6">
+                                    <div class="col-md-6<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small"><?= t('Select Project (Optional)') ?></label>
                                         <select class="form-select form-select-sm fw-bold shadow-sm border border-secondary border-opacity-25" name="project_id" id="svc_project_id" onchange="filterWarehouses(this.value, 'svc_warehouse_id')">
                                             <option value=""><?= t('Select Project') ?></option>
@@ -680,7 +690,10 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                         </select>
                                     </div>
                                     <?php endif; ?>
-                                    <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
+                                    <?php if ($simpleServiceForm && !$showShopPicker): ?>
+                                    <input type="hidden" name="warehouse_id" id="svc_warehouse_id" value="<?= $onlyWarehouseId ?>">
+                                    <?php else: ?>
+                                    <div class="col-md-<?= ($simpleServiceForm || !projectsModuleActive()) ? 12 : 6 ?>">
                                         <label class="form-label fw-bold small"><?= wLabel('Select Warehouse', 'Select Shop') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="svc_warehouse_id" onchange="refreshAllComponentCosts()">
                                             <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
@@ -689,11 +702,12 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="table-responsive rounded-3 bg-white shadow-sm border overflow-hidden">
+                        <div class="table-responsive rounded-3 bg-white shadow-sm border overflow-hidden<?= $simpleServiceForm ? ' d-none' : '' ?>">
                             <table class="table table-hover align-middle mb-0" id="svcComponentTable">
                                 <thead class="bg-dark text-white text-center">
                                     <tr class="small">
@@ -759,6 +773,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     <div id="edit-svc-message" class="mb-3"></div>
 
                     <!-- ── NAVIGATION HEADERS ────────────────────────────────── -->
+                    <?php if (!$simpleServiceForm): ?>
                     <div class="d-flex gap-4 mb-4 border-bottom pb-2 px-1">
                         <h6 class="fw-bold cursor-pointer mb-0 pb-2" id="svc_edit_tab1" onclick="toggleSvcEditStep(1)" style="color: #0d6efd; border-bottom: 2px solid #0d6efd; transition: all 0.3s; cursor: pointer;">
                             <i class="bi bi-info-circle me-2"></i><?= t('Product Identity') ?>
@@ -767,26 +782,27 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <i class="bi bi-cash-stack me-2"></i><?= t('Pricing & Planning') ?>
                         </h6>
                     </div>
+                    <?php endif; ?>
 
                     <!-- ── STEP 1: IDENTITY ──────────────────────────────────── -->
                     <div id="svc_edit_step1">
                         <div class="row g-4 mb-4">
-                            <div class="col-md-8">
+                            <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-8' ?>">
                                 <div class="row g-3">
                                     <div class="col-12">
                                         <label class="form-label fw-bold small"><?= wLabel('Non-Inventory Product Name', 'Service Name') ?> <span class="text-danger">*</span></label>
                                         <textarea class="form-control form-control-lg bg-light border-0 shadow-sm"
                                             name="product_name" id="edit_svc_name" required rows="2"></textarea>
                                     </div>
-                                    <div class="col-12">
+                                    <div class="col-12<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small"><?= t('Description') ?></label>
                                         <textarea class="form-control bg-light border-0" name="description" id="edit_svc_desc" rows="2"></textarea>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                         <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" id="edit_svc_contract_no" readonly>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small text-primary"><?= t('Unit') ?></label>
                                         <div id="edit_svc_unit_container">
                                             <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="edit_svc_unit" onchange="checkOtherUnit(this, 'edit_svc_unit_container')">
@@ -800,14 +816,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small text-primary"><?= t('Qty') ?></label>
                                         <input type="number" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold"
                                             name="assembly_quantity" id="edit_svc_assembly_qty" value="1" readonly>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
                                     <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= wLabel('Non-Inventory Product', 'Service') ?></h5>
                                     <p class="small text-muted mb-3"><?= t('This product will be available in:') ?></p>
@@ -826,24 +842,24 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     </div>
 
                     <!-- ── STEP 2: PRICING & BOM ──────────────────────────────── -->
-                    <div id="svc_edit_step2" style="display:none;">
+                    <div id="svc_edit_step2" style="<?= $simpleServiceForm ? '' : 'display:none;' ?>">
 
                         <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold small text-success"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
+                            <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
+                                <label class="form-label fw-bold small text-success"><?= $simpleServiceForm ? t('Amount to Sell') : t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-success text-white">TZS</span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="edit_svc_sell" step="0.01" required onkeyup="calcSvcMarginEdit()" onchange="calcSvcMarginEdit()">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-light">TZS</span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="edit_svc_cost" step="0.01" readonly>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                                 <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="edit_svc_tax">
                                     <option value=""><?= t('No Tax') ?></option>
@@ -855,7 +871,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="col-12 mt-3 pt-3 border-top">
                                 <div class="row g-3">
                                     <?php if (projectsModuleActive()): ?>
-                                    <div class="col-md-6">
+                                    <div class="col-md-6<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small"><?= t('Select Project (Optional)') ?></label>
                                         <select class="form-select form-select-sm fw-bold shadow-sm border border-secondary border-opacity-25" name="project_id" id="edit_svc_project_id" onchange="filterWarehouses(this.value, 'edit_svc_warehouse_id')">
                                             <option value=""><?= t('Select Project') ?></option>
@@ -865,7 +881,10 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                         </select>
                                     </div>
                                     <?php endif; ?>
-                                    <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
+                                    <?php if ($simpleServiceForm && !$showShopPicker): ?>
+                                    <input type="hidden" name="warehouse_id" id="edit_svc_warehouse_id" value="<?= $onlyWarehouseId ?>">
+                                    <?php else: ?>
+                                    <div class="col-md-<?= ($simpleServiceForm || !projectsModuleActive()) ? 12 : 6 ?>">
                                         <label class="form-label fw-bold small"><?= wLabel('Select Warehouse', 'Select Shop') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="edit_svc_warehouse_id" onchange="refreshAllComponentCostsEdit()">
                                             <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
@@ -874,11 +893,12 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="table-responsive rounded-3 bg-white shadow-sm border overflow-hidden">
+                        <div class="table-responsive rounded-3 bg-white shadow-sm border overflow-hidden<?= $simpleServiceForm ? ' d-none' : '' ?>">
                             <table class="table table-hover align-middle mb-0" id="editSvcComponentTable">
                                 <thead class="bg-dark text-white text-center">
                                     <tr class="small">
@@ -992,6 +1012,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 <script>
 const SVC_APP_URL = '<?= rtrim(getUrl(''), '/') ?>';
 const ALL_WAREHOUSES = <?= json_encode($warehouses) ?>;
+const SIMPLE_SERVICE_FORM = <?= json_encode($simpleServiceForm) ?>;
 const SVC_I18N = <?= json_encode([
     'select_warehouse' => wLabel('Select Warehouse', 'Select Shop'),
     'please_select_warehouse_first' => wLabel('Please select a warehouse first', 'Please select a shop first'),
@@ -1036,6 +1057,9 @@ const PROJECTS_MODULE_ACTIVE = <?= json_encode(projectsModuleActive()) ?>;
 
 function filterWarehouses(projectId, targetId) {
     const select = document.getElementById(targetId);
+    // Simple POS with exactly one shop renders warehouse_id as a hidden input
+    // (auto-assigned, no picker) — nothing to rebuild in that case.
+    if (!select || select.tagName !== 'SELECT') return;
     const currentValue = select.value;
     select.innerHTML = `<option value="">${SVC_I18N.select_warehouse}</option>`;
     
@@ -1099,6 +1123,7 @@ function resetUnitSelect(containerId) {
 }
 
 function toggleSvcAddStep(step) {
+    if (SIMPLE_SERVICE_FORM) return; // Simple POS: both sections always shown together, no tabs
     if (step === 1) {
         document.getElementById('svc_add_step1').style.display = 'block';
         document.getElementById('svc_add_step2').style.display = 'none';
@@ -1109,6 +1134,7 @@ function toggleSvcAddStep(step) {
 }
 
 function toggleSvcEditStep(step) {
+    if (SIMPLE_SERVICE_FORM) return; // Simple POS: both sections always shown together, no tabs
     if (step === 1) {
         document.getElementById('svc_edit_step1').style.display = 'block';
         document.getElementById('svc_edit_step2').style.display = 'none';
@@ -1524,7 +1550,14 @@ function openEditSvcModal(product) {
         document.getElementById('edit_svc_project_id').value = product.project_id || '';
         filterWarehouses(product.project_id, 'edit_svc_warehouse_id'); // Re-filter before setting value
     }
-    document.getElementById('edit_svc_warehouse_id').value = product.warehouse_id || '';
+    // Simple POS with exactly one shop renders warehouse_id as a hidden input
+    // already carrying that shop's id — leave it alone (never blank it out to
+    // the record's possibly-null stored value); only sync it from the record
+    // when it's an actual picker the user can see and change.
+    const editWarehouseField = document.getElementById('edit_svc_warehouse_id');
+    if (editWarehouseField && editWarehouseField.tagName === 'SELECT') {
+        editWarehouseField.value = product.warehouse_id || '';
+    }
     // Auto-generate Item Code if this product never had one
     const generatedCode = product.contract_item_no || ('NIP-' + String(product.product_id).padStart(5, '0'));
     document.getElementById('edit_svc_contract_no').value = generatedCode;
@@ -1766,7 +1799,10 @@ $(function () {
         $(modalEl).on('shown.bs.modal', function () {
             svcModalSelects[modalId].forEach(function (sel) {
                 const $el = $(sel);
-                if (!$el.length) return;
+                // Simple POS with exactly one shop renders warehouse_id as a
+                // hidden input (auto-assigned, no picker shown) — Select2 only
+                // applies to actual <select> elements.
+                if (!$el.length || !$el.is('select')) return;
                 if (!$el.hasClass('select2-hidden-accessible')) {
                     $el.select2({ theme: 'bootstrap-5', dropdownParent: $(modalEl), width: '100%', allowClear: true });
                 }
