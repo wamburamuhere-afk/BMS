@@ -353,10 +353,12 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                             <!-- Data Grid: Label Left, Value Right -->
                             <div class="flex-grow-1">
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="d-flex justify-content-between align-items-center border-bottom border-light py-2">
                                     <span class="text-muted small"><?= t('Project:') ?></span>
                                     <span class="small fw-bold text-end"><?= !empty($svc['project_name']) ? htmlspecialchars($svc['project_name']) : '—' ?></span>
                                 </div>
+                                <?php endif; ?>
                                 <div class="d-flex justify-content-between align-items-center border-bottom border-light py-2">
                                     <span class="text-muted small"><?= t('Tax:') ?></span>
                                     <span class="small fw-bold text-end">
@@ -433,7 +435,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <th class="ps-3" style="width:50px;"><?= t('S/NO') ?></th>
                             <th style="width:110px;"><?= t('Item Code') ?></th>
                             <th><?= t('Product Name') ?></th>
-                            <th style="width:120px;"><?= t('Project') ?></th>
+                            <th style="width:120px;" class="<?= projectsModuleActive() ? '' : 'd-none' ?>"><?= t('Project') ?></th>
                             <th style="width:120px;"><?= t('Selling Price') ?></th>
                             <th style="width:90px;"><?= t('Tax') ?></th>
                             <th style="width:80px;"><?= t('Status') ?></th>
@@ -459,7 +461,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     </div>
                                 </div>
                             </td>
-                            <td>
+                            <td class="<?= projectsModuleActive() ? '' : 'd-none' ?>">
                                 <?php if (!empty($svc['project_name'])): ?>
                                 <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= htmlspecialchars($svc['project_name']) ?></span>
                                 <?php else: ?>
