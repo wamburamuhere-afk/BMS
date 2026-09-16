@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-16 (feat/services-simple-pos-registration) - Fix: Service create/edit wrongly gated by the Procurement module entitlement
+
+**Report:** "Error: Access Denied: you do not have permission to create NIP products" when creating a Service on a tenant restricted to Simple Point of Sale only (shop.demo.bjptechnologies.co.tz/services), while logged in as that tenant's own admin. User confirmed Services are sales-only (no purchase/procurement side) and never stock-tracked.
+
+**Root cause:** `api/create_nip_product.php` and `api/update_nip_product.php` — the endpoints `app/bms/product/services.php`'s Add/Edit Service modals submit to — gated on `canCreate('nip_materials')` / `canEdit('nip_materials')`. The `nip_materials` page key is owned by the `procurement` feature in `core/feature_registry.php`, and `core/permissions.php`'s `canCreate()`/`canEdit()` check tenant module entitlement *before* the `isAdmin()` bypass (by design, so a tenant admin can't self-grant a module the platform didn't sell them). Restricting the tenant to Simple POS turned Procurement off, which silently blocked Service creation/editing too — even for that tenant's own admin. Traced every caller: these two endpoints are used **only** by the Services page; the real Procurement/NIP-Materials pages (`app/bms/purchase/nip_materials.php`, `edit_nip_materials.php`, `view_material_list.php`) only reference existing service products inside project material lists via separate endpoints (`create_project_nip_product.php` etc.), which were left untouched.
+
+**Fix — `api/create_nip_product.php:13` and `api/update_nip_product.php:13`:** changed the gate to `canCreate('products')` / `canEdit('products')`, matching the permission the Services page itself already uses (`services.php:9-10`) and un-tying it from the Procurement entitlement. Error messages updated to reference "Services" instead of "NIP products".
+
+**Tested:** `tests/test_services_simple_pos_cli.php` — added §7 (Entitlement), simulating a tenant with every feature on except `procurement` via `$GLOBALS['__bms_features']` (same mechanism as `test_pos_phase13_entitlement_cli.php`) and running a real create + edit through the endpoints; verified the new test actually catches the bug (reproduced the exact reported error by temporarily reverting the fix, confirmed it fails, restored the fix). 66/66 passing.
+
 ## 2026-09-16 (feat/services-simple-pos-registration) - Simple POS: simplify Service registration to Name + Amount to Sell (+ Shop)
 
 **Request:** "i need also to advance the service registration form. where i need just to have service name, amount to sell, and selection of shop(this selection of should should appear only if user is assigned to more than one shop... so please create environment which will favour this just only if is simple point of sales allowed. otherwise be like is now... this also should be seen in sales report also everywhere sales being defined... make sure no bug or gap leaved on it." Same combined gate as the Products retrofit (products_simple_pos_plan.md): `posSimpleModeEnabled() && !advancedProductEnabled()`.

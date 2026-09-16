@@ -10,9 +10,9 @@ try {
     }
     $user_id = $_SESSION['user_id'];
 
-    if (!canCreate('nip_materials')) {
+    if (!canCreate('products')) {
         http_response_code(403);
-        throw new Exception('Access Denied: you do not have permission to create NIP products');
+        throw new Exception('Access Denied: you do not have permission to create Services');
     }
 
     // Phase D — gate the target project if being assigned
