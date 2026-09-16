@@ -368,13 +368,22 @@ if (!function_exists('renderExpenseCatRows')) {
                 <?php endif; ?>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Status') ?></label>
+                    <?php
+                    // Deep-link support (e.g. dashboard.php's pending-expenses
+                    // notice links here with ?status=pending) — pre-select the
+                    // dropdown so the first AJAX call (filters_js reads this
+                    // field's .val() at init) already arrives pre-filtered.
+                    $exp_status_qs = $_GET['status'] ?? '';
+                    $exp_valid_statuses = ['pending', 'reviewed', 'approved', 'rejected', 'paid'];
+                    if (!in_array($exp_status_qs, $exp_valid_statuses, true)) $exp_status_qs = '';
+                    ?>
                     <select class="form-select" id="statusFilter">
-                        <option value=""><?= t('All Status') ?></option>
-                        <option value="pending"><?= t('Pending') ?></option>
-                        <option value="reviewed"><?= t('Reviewed') ?></option>
-                        <option value="approved"><?= t('Approved') ?></option>
-                        <option value="rejected"><?= t('Rejected') ?></option>
-                        <option value="paid"><?= t('Paid') ?></option>
+                        <option value="" <?= $exp_status_qs === '' ? 'selected' : '' ?>><?= t('All Status') ?></option>
+                        <option value="pending" <?= $exp_status_qs === 'pending' ? 'selected' : '' ?>><?= t('Pending') ?></option>
+                        <option value="reviewed" <?= $exp_status_qs === 'reviewed' ? 'selected' : '' ?>><?= t('Reviewed') ?></option>
+                        <option value="approved" <?= $exp_status_qs === 'approved' ? 'selected' : '' ?>><?= t('Approved') ?></option>
+                        <option value="rejected" <?= $exp_status_qs === 'rejected' ? 'selected' : '' ?>><?= t('Rejected') ?></option>
+                        <option value="paid" <?= $exp_status_qs === 'paid' ? 'selected' : '' ?>><?= t('Paid') ?></option>
                     </select>
                 </div>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">

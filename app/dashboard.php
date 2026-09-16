@@ -18,6 +18,16 @@ $pos_simple_mode = posSimpleModeEnabled();
 // tab use, so this figure can never disagree with theirs.
 $pos_credit_total = 0.0;
 $pos_credit_overdue_count = 0;
+
+// Pending-expenses notice (Simple Mode chart) — the "Bought vs Sold" chart's
+// Expenses line only sums expenses.status IN ('approved','paid') (same gate
+// as posSimpleBuySellSeries()/core/pos_dashboard_metrics.php, per
+// .claude/reporting-source.md: only recognized spend counts). A Pending
+// expense is real money the shop owner already spent, but it silently never
+// touches that line — this surfaces the gap instead of leaving the chart
+// looking flat/wrong with no explanation.
+$pos_pending_expense_count  = 0;
+$pos_pending_expense_amount = 0.0;
 if ($pos_simple_mode) {
     require_once ROOT_DIR . '/core/warehouse_scope.php';
     require_once ROOT_DIR . '/core/pos_credit_aging.php';
@@ -29,6 +39,22 @@ if ($pos_simple_mode) {
         ));
     } catch (Throwable $e) {
         // best-effort — the total figure above is the card's headline
+    }
+
+    try {
+        $expWhScope   = scopeFilterSqlNullable('warehouse', 'e');
+        $expProjScope = scopeFilterSqlNullable('project', 'e');
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS amt
+            FROM expenses e
+            WHERE e.status = 'pending' $expWhScope $expProjScope
+        ");
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $pos_pending_expense_count  = (int)($row['c'] ?? 0);
+        $pos_pending_expense_amount = (float)($row['amt'] ?? 0);
+    } catch (Throwable $e) {
+        // best-effort — chart still renders without this notice
     }
 }
 
@@ -1726,6 +1752,19 @@ function get_progress_color($percentage) {
                     </div>
                 </div>
                 <div class="card-body">
+                    <?php if ($pos_simple_mode && $pos_pending_expense_count > 0): ?>
+                    <div class="alert alert-warning py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                        <i class="bi bi-info-circle"></i>
+                        <span>
+                            <?= sprintf(
+                                t('%d expense(s) totaling %s are still Pending and not yet counted in the Expenses line below — approve or mark them Paid to include them.'),
+                                $pos_pending_expense_count,
+                                format_currency($pos_pending_expense_amount)
+                            ) ?>
+                            <a href="<?= getUrl('expenses') ?>?status=pending" class="fw-bold alert-link"><?= t('Review now') ?> &raquo;</a>
+                        </span>
+                    </div>
+                    <?php endif; ?>
                     <div class="chart-container" style="position: relative; height: 320px; width: 100%;">
                         <canvas id="performanceChart"></canvas>
                         <div id="chartLoader" class="text-center py-5 position-absolute top-50 start-50 translate-middle w-100" style="display:none;">

@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - Dashboard "pending expenses not on chart" notice (Phase 1 of 3)
+
+**Request:** user reported that under Simple POS mode, `dashboard.php`'s Expenses line looked "stuck at zero" even after creating expenses, and asked for a diagnosis before any fix.
+
+**Diagnosis:** not a broken query. The chart's Expenses line and the dashboard's own Expenses stat card both only sum `expenses.status IN ('approved','paid')` (`core/pos_dashboard_metrics.php::posSimpleBuySellSeries()`, `app/dashboard.php`'s `get_business_stats()`) — per `.claude/reporting-source.md`, only recognized/posted spend counts. Confirmed against real data: 17 of 46 expense rows sit at `pending` and are correctly excluded — the gate works as designed, but nothing told the user why the line wasn't moving.
+
+**Fix:** `app/dashboard.php` now computes the tenant's Pending expense count/amount (same `scopeFilterSqlNullable('warehouse'|'project', 'e')` discipline as every other Simple-Mode query) and shows a small dismissible-by-context alert above the chart, only when Simple Mode is on and the count is non-zero, with a "Review now" link to `expenses.php?status=pending`. `app/constant/accounts/expenses.php`'s Status filter now reads `?status=` from the query string (whitelisted against the 5 real statuses, defends against injection) so that deep link actually pre-filters the list.
+
+**Tested — `tests/test_dashboard_pending_expenses_notice_cli.php` (new, 22/22):** source wiring (figures computed only inside the Simple Mode branch, notice gated correctly, deep link present); runtime — the exact query run as a real admin session matches a raw unscoped COUNT/SUM exactly (17 records, 4,095,569.00); the `?status=` whitelist logic tested against valid statuses, wrong case, a SQL-injection-shaped value, empty and null (all safely fall through to "All"); Swahili translations resolve for both new strings. `php -l` clean on every touched file. Live browser click-through was offered but declined by the user in favor of manual verification; this is a static/DB-level verification, not a rendered-page screenshot.
+
 ## 2026-09-16 (feat/pos-credit-receivables) - Due-date reminder notifications + full test suite (Phase 4+5)
 
 **Request:** part of the original Swahili feature request — notify staff as a credit sale's due date approaches or passes, reusing the existing notification-rules "grant" UI rather than building a new one.
