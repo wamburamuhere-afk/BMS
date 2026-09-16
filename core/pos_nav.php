@@ -55,6 +55,23 @@ if (!function_exists('posNavGroups')) {
             ];
         }
 
+        // pos_credit_receivables_plan.md Phase 2a — Simple POS only. Credit
+        // sales exist in Advanced POS too (process_sale.php enforces them
+        // identically either way), but the receivables-tracking UI built
+        // around them (due-date popup, this aging view, the dashboard card,
+        // due-date reminders) is a Simple-POS-specific addition — genuinely
+        // absent here otherwise, not just hidden, matching every other
+        // gated card in this same function.
+        if (posSimpleModeEnabled() && canView('pos')) {
+            $groups[] = [
+                'key'         => 'credit_customers',
+                'label'       => t('Who Owes Me'),
+                'description' => t('Track customers who bought on credit — due dates, repayments, overdue.'),
+                'url'         => 'pos/credit-customers',
+                'primary'     => false,
+            ];
+        }
+
         // Always present, small/secondary — a shortcut, not a relocation;
         // the page itself stays filed under System > Settings.
         $groups[] = [

@@ -13,6 +13,25 @@ require_once ROOT_DIR . '/header.php';
 // core/pos_nav.php::posSimpleModeEnabled() and .claude/reporting-source.md.
 $pos_simple_mode = posSimpleModeEnabled();
 
+// "Credit"/"Madeni" card (pos_credit_receivables_plan.md Phase 3) — reads the
+// same core/pos_credit_aging.php helper the "Who Owes Me" page and the Madeni
+// tab use, so this figure can never disagree with theirs.
+$pos_credit_total = 0.0;
+$pos_credit_overdue_count = 0;
+if ($pos_simple_mode) {
+    require_once ROOT_DIR . '/core/warehouse_scope.php';
+    require_once ROOT_DIR . '/core/pos_credit_aging.php';
+    $pos_credit_total = posCreditTotalOutstanding($pdo, scopeFilterSqlNullable('warehouse', 's'));
+    try {
+        $pos_credit_overdue_count = count(array_filter(
+            posCreditOpenSales($pdo, null, scopeFilterSqlNullable('warehouse', 's')),
+            function ($r) { return $r['is_overdue']; }
+        ));
+    } catch (Throwable $e) {
+        // best-effort — the total figure above is the card's headline
+    }
+}
+
 // Enforce login
 if (!isset($_SESSION['user_id'])) {
     header("Location: " . getUrl('login'));
@@ -1784,6 +1803,33 @@ function get_progress_color($percentage) {
                                 </a>
                             </div>
                             <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($pos_simple_mode && canView('pos')): ?>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-white py-3">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-danger me-2"></i> <?= t('Credit') ?> (Madeni)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-4">
+                                <div class="col-6">
+                                    <h3 class="fw-bold text-danger"><?= number_format($pos_credit_total, 0) ?></h3>
+                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Total Owed') ?></small>
+                                </div>
+                                <div class="col-6 border-start">
+                                    <h3 class="fw-bold <?= $pos_credit_overdue_count > 0 ? 'text-danger' : 'text-success' ?>"><?= $pos_credit_overdue_count ?></h3>
+                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Overdue') ?></small>
+                                </div>
+                            </div>
+                            <div class="mt-auto">
+                                <a href="<?= getUrl('pos/credit-customers') ?>" class="btn btn-sm btn-outline-danger w-100 border-2 fw-bold">
+                                    <i class="bi bi-list-ul me-1"></i> <?= t('View Who Owes Me') ?>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
