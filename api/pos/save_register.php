@@ -1,8 +1,11 @@
 <?php
-// scope-audit: skip — registers are a small global lookup table (no project/warehouse scope), same as tax_rates/brands
+// scope-audit: skip — writes are admin-only (canEdit('pos_config_settings')); the
+// warehouse_id being saved is validated against the ADMIN's own grant below via
+// userCan('warehouse', ...), not read back through a scoped SELECT.
 /**
  * API: Create/Update a POS Register (Till)
  * POST: register_id (blank = create), register_name, register_code, location,
+ *       warehouse_id (2026-09-16, optional — which shop this till belongs to),
  *       opening_cash, barcode_scanner, cash_drawer, card_reader,
  *       receipt_header, receipt_footer, receipt_logo
  * Permission: canEdit('pos_config_settings') — register setup is an admin/settings action.
@@ -31,6 +34,7 @@ $register_id    = (int)($_POST['register_id'] ?? 0);
 $register_name  = trim($_POST['register_name'] ?? '');
 $register_code  = trim($_POST['register_code'] ?? '');
 $location       = trim($_POST['location'] ?? '');
+$warehouse_id   = !empty($_POST['warehouse_id']) ? (int)$_POST['warehouse_id'] : null;
 $opening_cash   = (float)($_POST['opening_cash'] ?? 0);
 $barcode_scanner = !empty($_POST['barcode_scanner']) ? 1 : 0;
 $cash_drawer     = !empty($_POST['cash_drawer']) ? 1 : 0;
@@ -52,6 +56,14 @@ if ($register_name === '' || $register_code === '') {
     echo json_encode(['success' => false, 'message' => t('Register name and code are required.')]);
     exit;
 }
+// A register can only be assigned to a shop the ADMIN saving it is themselves
+// allowed to see — prevents an admin whose own warehouse grant was narrowed
+// from silently wiring a till to a shop outside their scope. isAdmin() bypasses
+// userCan() itself, so a real superadmin can still assign any warehouse.
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.', true)]);
+    exit;
+}
 if ($printer_connection_type === 'network' && $printer_ip_address === null) {
     echo json_encode(['success' => false, 'message' => t('A printer IP address is required for a network-connected printer.')]);
     exit;
@@ -70,14 +82,14 @@ try {
 
     if ($register_id > 0) {
         $pdo->prepare("UPDATE pos_registers
-                          SET register_name = ?, register_code = ?, location = ?, opening_cash = ?,
+                          SET register_name = ?, register_code = ?, location = ?, warehouse_id = ?, opening_cash = ?,
                               barcode_scanner = ?, cash_drawer = ?, card_reader = ?,
                               receipt_header = ?, receipt_footer = ?,
                               printer_connection_type = ?, printer_ip_address = ?, printer_port = ?,
                               receipt_template = ?,
                               updated_at = NOW()
                         WHERE register_id = ?")
-            ->execute([$register_name, $register_code, $location, $opening_cash,
+            ->execute([$register_name, $register_code, $location, $warehouse_id, $opening_cash,
                        $barcode_scanner, $cash_drawer, $card_reader,
                        $receipt_header, $receipt_footer,
                        $printer_connection_type, $printer_ip_address, $printer_port,
@@ -86,11 +98,11 @@ try {
         $message = t('Register updated successfully.');
     } else {
         $pdo->prepare("INSERT INTO pos_registers
-                          (register_name, register_code, location, opening_cash, status,
+                          (register_name, register_code, location, warehouse_id, opening_cash, status,
                            barcode_scanner, cash_drawer, card_reader, receipt_header, receipt_footer,
                            printer_connection_type, printer_ip_address, printer_port, receipt_template, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())")
-            ->execute([$register_name, $register_code, $location, $opening_cash,
+                       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())")
+            ->execute([$register_name, $register_code, $location, $warehouse_id, $opening_cash,
                        $barcode_scanner, $cash_drawer, $card_reader, $receipt_header, $receipt_footer,
                        $printer_connection_type, $printer_ip_address, $printer_port, $receipt_template]);
         $register_id = (int)$pdo->lastInsertId();

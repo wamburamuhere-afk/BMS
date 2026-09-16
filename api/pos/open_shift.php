@@ -52,11 +52,25 @@ try {
     // register #1 ("Main Counter", the schema's seed row) when the terminal is
     // still on the pre-register UI, so this never breaks an un-migrated client.
     $register_id = isset($_POST['register_id']) ? (int)$_POST['register_id'] : 1;
-    $reg = $pdo->prepare("SELECT register_id, register_name FROM pos_registers WHERE register_id = ? AND status = 'active'");
+    $reg = $pdo->prepare("SELECT register_id, register_name, warehouse_id FROM pos_registers WHERE register_id = ? AND status = 'active'");
     $reg->execute([$register_id]);
     $register = $reg->fetch(PDO::FETCH_ASSOC);
     if (!$register) {
         echo json_encode(['success' => false, 'message' => t('Selected register is not available. Please choose an active register.')]);
+        exit();
+    }
+
+    // Shop scope (2026-09-16): a register tied to a shop can only be staffed
+    // by a cashier actually granted that shop via Settings > Admin > Project &
+    // Warehouse Access — get_registers.php already hides it from the Start
+    // Shift dropdown, this is the server-side backstop against a hand-crafted
+    // request. A register with no warehouse_id (legacy/shared till) stays open
+    // to anyone with POS create permission, exactly as before this column
+    // existed.
+    $register_warehouse_id = $register['warehouse_id'] !== null ? (int)$register['warehouse_id'] : null;
+    if ($register_warehouse_id !== null && !userCan('warehouse', $register_warehouse_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => wLabel('Access denied: this register\'s warehouse is not in your assigned scope.', 'Access denied: this register\'s shop is not in your assigned scope.', true)]);
         exit();
     }
 
@@ -84,14 +98,16 @@ try {
     // Generate shift code
     $shift_code = 'SHIFT-' . date('Ymd-His') . '-' . $user_id;
 
-    // Create new shift
+    // Create new shift — warehouse_id is stamped from the register's own shop
+    // assignment now (not re-derived later via a join), same denormalisation
+    // pattern pos_sales already uses for register_id/register_name.
     $stmt = $pdo->prepare("
         INSERT INTO cash_register_shifts
-        (shift_code, user_id, register_id, start_time, starting_cash, status, created_at)
-        VALUES (?, ?, ?, NOW(), ?, 'active', NOW())
+        (shift_code, user_id, register_id, warehouse_id, start_time, starting_cash, status, created_at)
+        VALUES (?, ?, ?, ?, NOW(), ?, 'active', NOW())
     ");
 
-    $stmt->execute([$shift_code, $user_id, $register_id, $opening_cash]);
+    $stmt->execute([$shift_code, $user_id, $register_id, $register_warehouse_id, $opening_cash]);
     $shift_id = $pdo->lastInsertId();
 
     // Store shift ID in session
