@@ -74,6 +74,16 @@ try {
     $receipt_number = $input['receipt_number'] ?? ('RCP-' . date('Ymd') . '-' . mt_rand(1000, 9999));
     $split_details = $input['split_details'] ?? null;
 
+    // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales only
+    // (pos.php's due-date popup); undefined for every other sale, and even
+    // for a credit sale it's optional here — the client is what enforces
+    // "required" for Simple POS, this endpoint just accepts a real date or
+    // stores null, exactly like every other pre-existing caller.
+    $due_date = null;
+    if (!empty($input['due_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$input['due_date'])) {
+        $due_date = $input['due_date'];
+    }
+
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module. All three fields
     // are optional and additive: a plain retail sale that never sends them
     // behaves byte-for-byte as before. table_id is verified below (must
@@ -188,21 +198,27 @@ try {
                 receipt_number, shift_id, user_id, assigned_to, customer_id, warehouse_id, table_id, project_id,
                 subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
                 payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
-                sale_type, sale_status, payment_status, sale_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+                sale_type, sale_status, payment_status, due_date, sale_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', ?, NOW(), NOW())
         ");
         $stmt->execute([
             $receipt_number, $shift_id, $user_id, $assigned_to, $customer_id, $warehouse_id, $table_id, $project_id,
             $subtotal, $discount_percentage, $discount_amount, $tax, $total,
             $db_payment_method, $amount_tendered, $change, $payment_details_json, $register_id, $register_name,
-            $sale_type_in
+            $sale_type_in, $due_date
         ]);
     } catch (PDOException $e) {
-        $missingCol = stripos($e->getMessage(), 'assigned_to') !== false || stripos($e->getMessage(), "'table_id'") !== false;
-        if (!$missingCol) {
+        $missingAssignedTable = stripos($e->getMessage(), 'assigned_to') !== false || stripos($e->getMessage(), "'table_id'") !== false;
+        $missingDueDate = stripos($e->getMessage(), "'due_date'") !== false;
+        if (!$missingAssignedTable && !$missingDueDate) {
             throw $e; // a real, unrelated DB error — let the outer catch roll back normally
         }
-        error_log('process_sale.php: pos_sales.assigned_to/table_id missing (tenant DB likely missing the Phase 30 migration) — retrying without them: ' . $e->getMessage());
+        if ($missingDueDate) {
+            error_log('process_sale.php: pos_sales.due_date missing (tenant DB likely missing the 2026_09_16_pos_sales_due_date migration) — retrying without it.');
+        }
+        if ($missingAssignedTable) {
+            error_log('process_sale.php: pos_sales.assigned_to/table_id missing (tenant DB likely missing the Phase 30 migration) — retrying without them: ' . $e->getMessage());
+        }
         $stmt = $pdo->prepare("
             INSERT INTO pos_sales (
                 receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,

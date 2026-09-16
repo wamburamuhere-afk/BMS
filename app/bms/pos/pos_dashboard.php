@@ -52,11 +52,12 @@ $company_logo = getSetting('company_logo', '');
     <!-- ═══════════════ POS HUB — destination cards (Phase 30) ═══════════════ -->
     <?php
     $pos_nav_icons = [
-        'terminal'      => 'bi-bag-plus',
-        'shift_history' => 'bi-clock-history',
-        'catalog_setup' => 'bi-tags',
-        'restaurant'    => 'bi-egg-fried',
-        'settings'      => 'bi-gear',
+        'terminal'          => 'bi-bag-plus',
+        'shift_history'     => 'bi-clock-history',
+        'catalog_setup'     => 'bi-tags',
+        'restaurant'        => 'bi-egg-fried',
+        'credit_customers'  => 'bi-cash-coin',
+        'settings'          => 'bi-gear',
     ];
     ?>
     <div class="row g-3 mb-4">

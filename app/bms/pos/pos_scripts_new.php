@@ -20,6 +20,7 @@ let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = n
 const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
+const POS_SIMPLE_MODE = <?= posSimpleModeEnabled() ? 'true' : 'false' ?>; // pos_credit_receivables_plan.md Phase 1 — due-date popup on credit sales is Simple-POS-only
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
 
 // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module state. All null/false
@@ -69,6 +70,11 @@ const PT = {
     customerRequiredTitle: <?= json_encode(t('Customer required')) ?>,
     customerRequiredText: <?= json_encode(t('Select a customer to record a credit (pay-later) sale.')) ?>,
     processing: <?= json_encode(t('Processing...')) ?>,
+    creditDueDateTitle: <?= json_encode(t('When will this be paid back?')) ?>,
+    creditDueDateText: <?= json_encode(t('Set a due date for this credit sale so it can be tracked.')) ?>,
+    creditDueDateConfirm: <?= json_encode(t('Confirm Credit Sale')) ?>,
+    creditDueDateRequired: <?= json_encode(t('Please choose a due date.')) ?>,
+    creditDueDatePast: <?= json_encode(t('Due date cannot be in the past.')) ?>,
     earnedPts: <?= json_encode(t('Earned %d pt(s).')) ?>,
     redeemedPts: <?= json_encode(t('Redeemed %d pt(s).')) ?>,
     saleCompleted: <?= json_encode(t('Sale Completed!')) ?>,
@@ -1444,7 +1450,46 @@ function processPayment() {
         Swal.fire({ icon: 'warning', title: PT.customerRequiredTitle, text: PT.customerRequiredText });
         return;
     }
-    
+
+    // pos_credit_receivables_plan.md Phase 1 — Simple POS only. Once a
+    // customer is on record for a credit sale, capture WHEN it's expected
+    // back before the sale finalizes — nothing downstream (aging list,
+    // customer's Madeni tab, dashboard card, due-date reminders) has a date
+    // to work from otherwise. Advanced/full POS is untouched: no popup, sale
+    // proceeds exactly as it always has, due_date stays null server-side.
+    if (POS_SIMPLE_MODE && paymentMethod === 'credit' && customerId) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const defaultDueStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        Swal.fire({
+            icon: 'question',
+            title: PT.creditDueDateTitle,
+            text: PT.creditDueDateText,
+            input: 'date',
+            inputValue: defaultDueStr,
+            inputAttributes: { min: todayStr },
+            showCancelButton: true,
+            confirmButtonText: PT.creditDueDateConfirm,
+            cancelButtonText: PT.cancel,
+            inputValidator: (value) => {
+                if (!value) return PT.creditDueDateRequired;
+                if (value < todayStr) return PT.creditDueDatePast;
+                return null;
+            }
+        }).then((result) => {
+            if (!result.isConfirmed) return; // cashier backed out — sale not submitted, nothing changed
+            finalizePosSale(result.value);
+        });
+        return;
+    }
+
+    finalizePosSale(null);
+
+    // Everything from here down only runs via finalizePosSale() above — kept
+    // as a nested function (not a separate top-level one) so it can close
+    // over cart/customerId/warehouseId/paymentMethod/total/isSplitPayment/
+    // splitAmounts/currentTableId without re-deriving or re-passing all of
+    // them.
+    function finalizePosSale(dueDate) {
     // Calculate totals based on per-item data
     let subtotal = 0;
     let totalDiscount = 0;
@@ -1503,12 +1548,17 @@ function processPayment() {
         // every plain retail sale, which process_sale.php treats identically
         // to how it behaved before this phase.
         table_id: currentTableId || undefined,
-        sale_type: currentTableId ? 'dine_in' : undefined
+        sale_type: currentTableId ? 'dine_in' : undefined,
+        // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales
+        // only; undefined/null for every other sale, which process_sale.php
+        // treats identically to how it behaved before this phase.
+        due_date: dueDate || null
     };
-    
+
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
 
     submitPayment(paymentData);
+    } // end finalizePosSale()
 }
 
 // Phase 19 (pos_upgrade_plan.md §8) — extracted so a blocked credit-limit

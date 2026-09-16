@@ -1106,6 +1106,9 @@ $routes = [
     'pos/price-groups'           => POS_DIR . '/price_groups.php',
     'pos_price_groups'           => POS_DIR . '/price_groups.php',
 
+    // pos_credit_receivables_plan.md Phase 2a — Simple POS "Who Owes Me"
+    'pos/credit-customers'       => POS_DIR . '/pos_credit_customers.php',
+
     // POS Phase 30 — Restaurant Module (pos_upgrade_plan.md §9)
     'restaurant'                    => RESTAURANT_DIR . '/index.php',
     // floors.php gives the combined floor+table card overview; tables.php is

@@ -19,13 +19,14 @@
 
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/notify.php';
+require_once __DIR__ . '/../core/pos_nav.php'; // posSimpleModeEnabled() — gates the POS credit due-date reminders below
 global $pdo;
 
 if (!function_exists('run_notification_checks')) {
     function run_notification_checks(PDO $pdo): array
     {
         $isCli = (php_sapi_name() === 'cli');
-        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0];
+        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0, 'pos_credit_due' => 0];
 
         // ── Invoice overdue ────────────────────────────────────────────────
         try {
@@ -291,6 +292,74 @@ if (!function_exists('run_notification_checks')) {
             if ($e->getMessage() !== 'skip') { error_log('run_notification_checks restaurant.reservation_upcoming: ' . $e->getMessage()); }
         } catch (Throwable $e) {
             error_log('run_notification_checks restaurant.reservation_upcoming: ' . $e->getMessage());
+        }
+
+        // ── POS credit sale due-date reminders (pos_credit_receivables_plan.md
+        // Phase 4) — Simple POS tenants only, same gate as every other surface
+        // in this feature. Fires 3 days before the due date, on the due date,
+        // and every 7 days while still overdue (day 1, 8, 15, ...) — one
+        // notification per sale per firing day; dispatchEvent()'s
+        // date('Y-m-d') dedupe_suffix (the same convention invoice.overdue
+        // above already uses) means a second cron run the same day never
+        // double-sends. Reads core/pos_credit_aging.php — the one shared
+        // helper every receivables surface in this feature reads from.
+        try {
+            if (function_exists('posSimpleModeEnabled') && posSimpleModeEnabled()) {
+                require_once __DIR__ . '/../core/pos_credit_aging.php';
+                $creditRows = posCreditOpenSales($pdo);
+                $today = new DateTime('today');
+
+                foreach ($creditRows as $c) {
+                    if (empty($c['due_date'])) continue;
+                    $due = new DateTime($c['due_date']);
+                    $daysUntilDue = (int)$today->diff($due)->format('%r%a');
+
+                    $fire = null; // 'due_soon' | 'overdue'
+                    if ($daysUntilDue === 3 || $daysUntilDue === 0) {
+                        $fire = 'due_soon';
+                    } elseif ($daysUntilDue < 0) {
+                        $daysOverdue = -$daysUntilDue;
+                        if ($daysOverdue === 1 || ($daysOverdue - 1) % 7 === 0) {
+                            $fire = 'overdue';
+                        }
+                    }
+                    if ($fire === null) continue;
+
+                    $dueOn = date('d M Y', strtotime($c['due_date']));
+                    $owed  = number_format((float)$c['balance_due'], 2);
+                    $who   = $c['customer_name'] . (!empty($c['customer_phone']) ? ' (' . $c['customer_phone'] . ')' : '');
+
+                    if ($fire === 'due_soon') {
+                        $title = $daysUntilDue === 0 ? 'Credit sale due today: ' . $c['customer_name'] : 'Credit sale due soon: ' . $c['customer_name'];
+                        $message = $daysUntilDue === 0
+                            ? "{$who} owes {$owed} on credit sale {$c['receipt_number']} — due today ({$dueOn})."
+                            : "{$who} owes {$owed} on credit sale {$c['receipt_number']} — due in {$daysUntilDue} day(s) ({$dueOn}).";
+                        $eventKey = 'pos_credit.due_soon';
+                        $severity = 'medium';
+                    } else {
+                        $title = 'Credit sale overdue: ' . $c['customer_name'];
+                        $message = "{$who} owes {$owed} on credit sale {$c['receipt_number']} — overdue by {$daysOverdue} day(s) (was due {$dueOn}).";
+                        $eventKey = 'pos_credit.overdue';
+                        $severity = 'high';
+                    }
+
+                    $res = dispatchEvent($pdo, $eventKey, [
+                        'entity_type'   => 'pos_sale',
+                        'entity_id'     => (int)$c['sale_id'],
+                        'warehouse_id'  => $c['warehouse_id'] !== null ? (int)$c['warehouse_id'] : null,
+                        'customer_id'   => (int)$c['customer_id'],
+                        'title'         => $title,
+                        'message'       => $message,
+                        'action_url'    => 'pos/credit-customers',
+                        'severity'      => $severity,
+                        'dedupe_suffix' => date('Y-m-d'),
+                    ]);
+                    if (!empty($res['dispatched'])) $sum['pos_credit_due'] += (int)$res['created'] + (int)$res['emailed'];
+                }
+                if ($isCli) echo "  pos_credit.due_soon/overdue: scanned " . count($creditRows) . " open credit sale(s).\n";
+            }
+        } catch (Throwable $e) {
+            error_log('run_notification_checks pos_credit due: ' . $e->getMessage());
         }
 
         return $sum;
