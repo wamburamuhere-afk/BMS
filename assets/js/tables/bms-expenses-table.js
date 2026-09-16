@@ -393,6 +393,18 @@ function buildVoucher(cfg, id) {
         cfg.hide = cfg.hide || [];
         cfg.fixed = cfg.fixed || {};
 
+        var visibleCols = columns(cfg);
+
+        // Explicit initial sort — newest expense first. Column 0 (S/NO) is
+        // orderable:false, and with no `order` given DataTables' documented
+        // default is [[0,'asc']]; requesting sort on a non-orderable column
+        // produces inconsistent/empty ordering instead of falling back
+        // cleanly, so a brand-new expense could land on a later page while
+        // page 1 looked unchanged. Find 'expense_date' by key so this stays
+        // correct even if hidden columns shift its index (it's never itself
+        // hidden).
+        var dateColIdx = visibleCols.findIndex(function (c) { return c.key === 'expense_date'; });
+
         var opts = {
             responsive: false,
             serverSide: true,
@@ -410,7 +422,8 @@ function buildVoucher(cfg, id) {
                     return json.data;
                 }
             },
-            columns: columns(cfg).map(function (c) { return c.col; }),
+            columns: visibleCols.map(function (c) { return c.col; }),
+            order: (dateColIdx !== -1) ? [[dateColIdx, 'desc']] : [],
             dom: cfg.dom || 'rtip',
             pageLength: cfg.pageLength || 25,
             lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -419,6 +432,17 @@ function buildVoucher(cfg, id) {
         if (cfg.buttons) opts.buttons = cfg.buttons;
 
         var dt = $('#' + cfg.tableId).DataTable(opts);
+
+        // The table/card visibility split (renderCards) is decided by
+        // viewport width, but only re-evaluated on drawCallback — a resize
+        // or device rotation with no new draw left the stale view showing,
+        // and on borderline widths both the table row and its mobile-card
+        // twin could end up visible together for the same record. Re-run it
+        // on resize too, off the data DataTables already has in memory (no
+        // extra request).
+        if (cfg.cardContainer) {
+            $(window).on('resize.' + cfg.tableId, function () { renderCards(cfg, dt); });
+        }
 
         M._i[cfg.tableId] = { dt: dt, cfg: cfg };
         return dt;

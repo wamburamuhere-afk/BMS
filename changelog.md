@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - expenses.php list: explicit newest-first sort + card/table resize sync (Phase 2 of 3)
+
+**Request:** user reported that after adding a new expense on `expenses.php`, older rows seemed to disappear and the new one seemed to "appear in two rows".
+
+**Diagnosis:** DB inspection found no duplicate INSERT — `add_expense.php` runs exactly one `INSERT` per request, button is disabled during the AJAX call, and no near-duplicate rows exist in the data. Two real gaps found instead in `assets/js/tables/bms-expenses-table.js`: (1) `DataTable()` had no explicit `order` — column 0 (S/NO) is `orderable:false`, and with no order given, DataTables' default targeting column 0 produces inconsistent ordering instead of a clean fallback, so a brand-new expense (today's date) could land off page 1 while the page you're looking at appears unchanged; (2) the desktop-table/mobile-card visibility split (`renderCards`) was only re-evaluated on table draw, never on window resize/rotation, so at a borderline viewport width the same expense could end up rendered in both the table row and its mobile-card twin at once.
+
+**Fix:** `M.init()` now finds the `expense_date` column **by key** (survives the Simple-POS hide list, which removes `categories`/`project` but never the date column) and passes `order: [[dateColIdx, 'desc']]`. Added a `resize.<tableId>` handler, bound only when a card container exists, that re-runs `renderCards` off the data DataTables already has in memory (no extra request). Verified `api/account/get_expenses.php`'s own column-index map keeps `e.expense_date` at index 1 regardless of the Project column's presence, so the client's sort index always maps to the right SQL column.
+
+**Tested — `tests/test_expenses_table_sort_and_resize_cli.php` (new, 11/11):** `node --check` on the touched JS; source wiring; `M.init()` executed for real in Node (DataTable() stubbed to capture its call) across a full-page config, a Simple-POS config (categories+project hidden — confirms the date column survives and lands at the same index 1), and a card-less host (supplier_details.php's Expenses tab — confirms no resize listener is wastefully bound there). `php -l` clean on every touched PHP file.
+
 ## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - Dashboard "pending expenses not on chart" notice (Phase 1 of 3)
 
 **Request:** user reported that under Simple POS mode, `dashboard.php`'s Expenses line looked "stuck at zero" even after creating expenses, and asked for a diagnosis before any fix.
