@@ -34,14 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $phone = trim($_POST['phone'] ?? '');
 
             if (empty($full_name) || empty($email)) {
-                throw new Exception("Full name and email are required.");
+                throw new Exception(t("Full name and email are required."));
             }
 
             // Check if email is already in use by another user
             $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
             $check->execute([$email, $user_id]);
             if ($check->fetch()) {
-                throw new Exception("This email is already in use by another account.");
+                throw new Exception(t("This email is already in use by another account."));
             }
 
             $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, phone = ? WHERE user_id = ?");
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$user_id]);
             $current_user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $success_msg = "Profile updated successfully!";
+            $success_msg = t("Profile updated successfully!");
         } catch (Exception $e) {
             $error_msg = $e->getMessage();
         }
@@ -66,26 +66,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $confirm_password = $_POST['confirm_password'] ?? '';
 
             if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
-                throw new Exception("All password fields are required.");
+                throw new Exception(t("All password fields are required."));
             }
 
             if (!password_verify($current_password, $current_user['password'])) {
-                throw new Exception("Current password is incorrect.");
+                throw new Exception(t("Current password is incorrect."));
             }
 
             if (strlen($new_password) < 6) {
-                throw new Exception("New password must be at least 6 characters.");
+                throw new Exception(t("New password must be at least 6 characters."));
             }
 
             if ($new_password !== $confirm_password) {
-                throw new Exception("New passwords do not match.");
+                throw new Exception(t("New passwords do not match."));
             }
 
             $hashed = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE user_id = ?");
             $stmt->execute([$hashed, $user_id]);
 
-            $success_msg = "Password changed successfully!";
+            $success_msg = t("Password changed successfully!");
         } catch (Exception $e) {
             $error_msg = $e->getMessage();
         }
@@ -138,8 +138,8 @@ $prefs = [
         <div class="col-12 mt-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-0"><i class="bi bi-gear"></i> My Settings</h2>
-                    <p class="text-muted">Manage your account, password, and preferences</p>
+                    <h2 class="mb-0"><i class="bi bi-gear"></i> <?= t('My Settings') ?></h2>
+                    <p class="text-muted"><?= t('Manage your account, password, and preferences') ?></p>
                 </div>
             </div>
 
@@ -163,17 +163,17 @@ $prefs = [
     <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profileTab" type="button" role="tab">
-                <i class="bi bi-person me-1"></i> Profile
+                <i class="bi bi-person me-1"></i> <?= t('Profile') ?>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#securityTab" type="button" role="tab">
-                <i class="bi bi-shield-lock me-1"></i> Security
+                <i class="bi bi-shield-lock me-1"></i> <?= t('Security') ?>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="preferences-tab" data-bs-toggle="tab" data-bs-target="#preferencesTab" type="button" role="tab">
-                <i class="bi bi-sliders me-1"></i> Preferences
+                <i class="bi bi-sliders me-1"></i> <?= t('Preferences') ?>
             </button>
         </li>
     </ul>
@@ -186,35 +186,35 @@ $prefs = [
                 <div class="col-lg-8">
                     <div class="card border-0 shadow-sm rounded-4">
                         <div class="card-header bg-white border-0 p-4">
-                            <h5 class="fw-bold mb-0"><i class="bi bi-person-vcard me-2 text-primary"></i>Personal Information</h5>
+                            <h5 class="fw-bold mb-0"><i class="bi bi-person-vcard me-2 text-primary"></i><?= t('Personal Information') ?></h5>
                         </div>
                         <div class="card-body p-4">
                             <form method="POST">
                                 <div class="row g-4">
                                     <div class="col-md-6">
-                                        <label for="username" class="form-label">Username</label>
+                                        <label for="username" class="form-label"><?= t('Username') ?></label>
                                         <input type="text" class="form-control bg-light" id="username" value="<?= htmlspecialchars($current_user['username'] ?? '') ?>" disabled>
-                                        <div class="form-text">Username cannot be changed.</div>
+                                        <div class="form-text"><?= t('Username cannot be changed.') ?></div>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="full_name" class="form-label">Full Name <span class="text-danger">*</span></label>
+                                        <label for="full_name" class="form-label"><?= t('Full Name') ?> <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="full_name" name="full_name" value="<?= htmlspecialchars($current_user['full_name'] ?? '') ?>" required>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                                        <label for="email" class="form-label"><?= t('Email Address') ?> <span class="text-danger">*</span></label>
                                         <input type="email" class="form-control" id="email" name="email" value="<?= htmlspecialchars($current_user['email'] ?? '') ?>" required>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="phone" class="form-label">Phone Number</label>
+                                        <label for="phone" class="form-label"><?= t('Phone Number') ?></label>
                                         <input type="text" class="form-control" id="phone" name="phone" value="<?= htmlspecialchars($current_user['phone'] ?? '') ?>">
                                     </div>
 
                                     <div class="col-12 mt-4">
                                         <button type="submit" name="update_profile" class="btn btn-primary px-4 py-2">
-                                            <i class="bi bi-save me-2"></i>Save Changes
+                                            <i class="bi bi-save me-2"></i><?= t('Save Changes') ?>
                                         </button>
                                     </div>
                                 </div>
@@ -234,24 +234,24 @@ $prefs = [
                             </div>
                             <h5 class="fw-bold mb-1"><?= htmlspecialchars($current_user['full_name'] ?? $current_user['username']) ?></h5>
                             <p class="text-muted small mb-3"><?= htmlspecialchars($current_user['email'] ?? '') ?></p>
-                            <span class="badge bg-primary rounded-pill px-3 py-2"><?= htmlspecialchars($user_role) ?></span>
+                            <span class="badge bg-primary rounded-pill px-3 py-2"><?= htmlspecialchars(t($user_role)) ?></span>
 
                             <hr class="my-3">
 
                             <div class="text-start small">
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted">User ID:</span>
+                                    <span class="text-muted"><?= t('User ID:') ?></span>
                                     <span class="fw-bold">#<?= $current_user['user_id'] ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted">Status:</span>
+                                    <span class="text-muted"><?= t('Status:') ?></span>
                                     <span class="badge <?= ($current_user['is_active'] ?? 1) ? 'bg-success' : 'bg-danger' ?>">
-                                        <?= ($current_user['is_active'] ?? 1) ? 'Active' : 'Inactive' ?>
+                                        <?= ($current_user['is_active'] ?? 1) ? t('Active') : t('Inactive') ?>
                                     </span>
                                 </div>
                                 <?php if (!empty($current_user['last_login'])): ?>
                                 <div class="d-flex justify-content-between">
-                                    <span class="text-muted">Last Login:</span>
+                                    <span class="text-muted"><?= t('Last Login:') ?></span>
                                     <span><?= date('d M Y, h:i A', strtotime($current_user['last_login'])) ?></span>
                                 </div>
                                 <?php endif; ?>
@@ -268,12 +268,12 @@ $prefs = [
                 <div class="col-lg-6">
                     <div class="card border-0 shadow-sm rounded-4">
                         <div class="card-header bg-white border-0 p-4">
-                            <h5 class="fw-bold mb-0"><i class="bi bi-lock me-2 text-warning"></i>Change Password</h5>
+                            <h5 class="fw-bold mb-0"><i class="bi bi-lock me-2 text-warning"></i><?= t('Change Password') ?></h5>
                         </div>
                         <div class="card-body p-4">
                             <form method="POST">
                                 <div class="mb-3">
-                                    <label for="current_password" class="form-label">Current Password</label>
+                                    <label for="current_password" class="form-label"><?= t('Current Password') ?></label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="current_password" name="current_password" required>
                                         <button class="btn btn-outline-secondary toggle-password" type="button" data-target="current_password">
@@ -283,18 +283,18 @@ $prefs = [
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="new_password" class="form-label">New Password</label>
+                                    <label for="new_password" class="form-label"><?= t('New Password') ?></label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
                                         <button class="btn btn-outline-secondary toggle-password" type="button" data-target="new_password">
                                             <i class="bi bi-eye"></i>
                                         </button>
                                     </div>
-                                    <div class="form-text">Minimum 6 characters.</div>
+                                    <div class="form-text"><?= t('Minimum 6 characters.') ?></div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                                    <label for="confirm_password" class="form-label"><?= t('Confirm New Password') ?></label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="6">
                                         <button class="btn btn-outline-secondary toggle-password" type="button" data-target="confirm_password">
@@ -311,7 +311,7 @@ $prefs = [
                                 </div>
 
                                 <button type="submit" name="change_password" class="btn btn-warning px-4 py-2">
-                                    <i class="bi bi-shield-check me-2"></i>Update Password
+                                    <i class="bi bi-shield-check me-2"></i><?= t('Update Password') ?>
                                 </button>
                             </form>
                         </div>
@@ -321,26 +321,26 @@ $prefs = [
                 <div class="col-lg-6">
                     <div class="card border-0 shadow-sm rounded-4 bg-light">
                         <div class="card-body p-4">
-                            <h5 class="fw-bold mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i>Security Tips</h5>
+                            <h5 class="fw-bold mb-3"><i class="bi bi-shield-exclamation text-danger me-2"></i><?= t('Security Tips') ?></h5>
                             <ul class="list-unstyled small text-muted">
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Use a strong, unique password</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Don't share your credentials</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Change password regularly</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Log out after each session</li>
-                                <li><i class="bi bi-check-circle text-success me-2"></i>Use a mix of letters, numbers, and symbols</li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i><?= t('Use a strong, unique password') ?></li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i><?= t("Don't share your credentials") ?></li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i><?= t('Change password regularly') ?></li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i><?= t('Log out after each session') ?></li>
+                                <li><i class="bi bi-check-circle text-success me-2"></i><?= t('Use a mix of letters, numbers, and symbols') ?></li>
                             </ul>
                         </div>
                     </div>
 
                     <div class="card border-0 shadow-sm rounded-4 mt-4">
                         <div class="card-body p-4">
-                            <h5 class="fw-bold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Recent Activity</h5>
-                            <p class="text-muted small">Your last login was:
+                            <h5 class="fw-bold mb-3"><i class="bi bi-clock-history text-primary me-2"></i><?= t('Recent Activity') ?></h5>
+                            <p class="text-muted small"><?= t('Your last login was:') ?>
                                 <strong>
                                 <?php if (!empty($current_user['last_login'])): ?>
                                     <?= date('d M Y \a\t h:i A', strtotime($current_user['last_login'])) ?>
                                 <?php else: ?>
-                                    N/A
+                                    <?= t('N/A') ?>
                                 <?php endif; ?>
                                 </strong>
                             </p>
@@ -356,21 +356,21 @@ $prefs = [
                 <div class="col-lg-8">
                     <div class="card border-0 shadow-sm rounded-4">
                         <div class="card-header bg-white border-0 p-4">
-                            <h5 class="fw-bold mb-0"><i class="bi bi-sliders me-2 text-info"></i>Display & Notifications</h5>
+                            <h5 class="fw-bold mb-0"><i class="bi bi-sliders me-2 text-info"></i><?= t('Display & Notifications') ?></h5>
                         </div>
                         <div class="card-body p-4">
                             <form method="POST">
                                 <div class="row g-4">
                                     <div class="col-md-6">
-                                        <label for="user_theme" class="form-label">Theme</label>
+                                        <label for="user_theme" class="form-label"><?= t('Theme') ?></label>
                                         <select class="form-select" id="user_theme" name="user_theme">
-                                            <option value="light" <?= $prefs['user_theme'] == 'light' ? 'selected' : '' ?>>Light</option>
-                                            <option value="dark" <?= $prefs['user_theme'] == 'dark' ? 'selected' : '' ?>>Dark</option>
+                                            <option value="light" <?= $prefs['user_theme'] == 'light' ? 'selected' : '' ?>><?= t('Light') ?></option>
+                                            <option value="dark" <?= $prefs['user_theme'] == 'dark' ? 'selected' : '' ?>><?= t('Dark') ?></option>
                                         </select>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="user_language" class="form-label">Language</label>
+                                        <label for="user_language" class="form-label"><?= t('Language') ?></label>
                                         <select class="form-select" id="user_language" name="user_language">
                                             <option value="en" <?= $prefs['user_language'] == 'en' ? 'selected' : '' ?>><?= t('English') ?></option>
                                             <option value="sw" <?= $prefs['user_language'] == 'sw' ? 'selected' : '' ?>><?= t('Kiswahili') ?></option>
@@ -378,18 +378,18 @@ $prefs = [
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="user_timezone" class="form-label">Timezone</label>
+                                        <label for="user_timezone" class="form-label"><?= t('Timezone') ?></label>
                                         <select class="form-select" id="user_timezone" name="user_timezone">
-                                            <option value="Africa/Dar_es_Salaam" <?= $prefs['user_timezone'] == 'Africa/Dar_es_Salaam' ? 'selected' : '' ?>>East Africa Time (EAT)</option>
-                                            <option value="Africa/Nairobi" <?= $prefs['user_timezone'] == 'Africa/Nairobi' ? 'selected' : '' ?>>Nairobi (EAT)</option>
+                                            <option value="Africa/Dar_es_Salaam" <?= $prefs['user_timezone'] == 'Africa/Dar_es_Salaam' ? 'selected' : '' ?>><?= t('East Africa Time (EAT)') ?></option>
+                                            <option value="Africa/Nairobi" <?= $prefs['user_timezone'] == 'Africa/Nairobi' ? 'selected' : '' ?>><?= t('Nairobi (EAT)') ?></option>
                                             <option value="UTC" <?= $prefs['user_timezone'] == 'UTC' ? 'selected' : '' ?>>UTC</option>
-                                            <option value="America/New_York" <?= $prefs['user_timezone'] == 'America/New_York' ? 'selected' : '' ?>>Eastern Time (US)</option>
-                                            <option value="Europe/London" <?= $prefs['user_timezone'] == 'Europe/London' ? 'selected' : '' ?>>London (GMT)</option>
+                                            <option value="America/New_York" <?= $prefs['user_timezone'] == 'America/New_York' ? 'selected' : '' ?>><?= t('Eastern Time (US)') ?></option>
+                                            <option value="Europe/London" <?= $prefs['user_timezone'] == 'Europe/London' ? 'selected' : '' ?>><?= t('London (GMT)') ?></option>
                                         </select>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="user_date_format" class="form-label">Date Format</label>
+                                        <label for="user_date_format" class="form-label"><?= t('Date Format') ?></label>
                                         <select class="form-select" id="user_date_format" name="user_date_format">
                                             <option value="d/m/Y" <?= $prefs['user_date_format'] == 'd/m/Y' ? 'selected' : '' ?>>DD/MM/YYYY</option>
                                             <option value="m/d/Y" <?= $prefs['user_date_format'] == 'm/d/Y' ? 'selected' : '' ?>>MM/DD/YYYY</option>
@@ -401,28 +401,28 @@ $prefs = [
 
                                 <hr class="my-4">
 
-                                <h6 class="fw-bold mb-3">Notification Preferences</h6>
+                                <h6 class="fw-bold mb-3"><?= t('Notification Preferences') ?></h6>
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="user_email_notifications" name="user_email_notifications" value="1" <?= $prefs['user_email_notifications'] == '1' ? 'checked' : '' ?>>
-                                            <label class="form-check-label" for="user_email_notifications">Email Notifications</label>
+                                            <label class="form-check-label" for="user_email_notifications"><?= t('Email Notifications') ?></label>
                                         </div>
-                                        <div class="form-text">Receive email about system events and updates</div>
+                                        <div class="form-text"><?= t('Receive email about system events and updates') ?></div>
                                     </div>
 
                                     <div class="col-md-6">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="user_sms_notifications" name="user_sms_notifications" value="1" <?= $prefs['user_sms_notifications'] == '1' ? 'checked' : '' ?>>
-                                            <label class="form-check-label" for="user_sms_notifications">SMS Notifications</label>
+                                            <label class="form-check-label" for="user_sms_notifications"><?= t('SMS Notifications') ?></label>
                                         </div>
-                                        <div class="form-text">Receive SMS alerts for critical events</div>
+                                        <div class="form-text"><?= t('Receive SMS alerts for critical events') ?></div>
                                     </div>
                                 </div>
 
                                 <div class="mt-4">
                                     <button type="submit" name="save_preferences" class="btn btn-primary px-4 py-2">
-                                        <i class="bi bi-save me-2"></i>Save Preferences
+                                        <i class="bi bi-save me-2"></i><?= t('Save Preferences') ?>
                                     </button>
                                 </div>
                             </form>
@@ -435,6 +435,12 @@ $prefs = [
 </div>
 
 <script>
+const MS_PT = {
+    weak: <?= json_encode(t('Weak')) ?>,
+    fair: <?= json_encode(t('Fair')) ?>,
+    good: <?= json_encode(t('Good')) ?>,
+    strong: <?= json_encode(t('Strong')) ?>,
+};
 $(document).ready(function() {
     // Toggle password visibility
     $('.toggle-password').click(function() {
@@ -478,16 +484,16 @@ $(document).ready(function() {
 
         if (strength < 30) {
             strengthBar.removeClass().addClass('progress-bar bg-danger');
-            strengthText.text('Weak').removeClass().addClass('text-danger small');
+            strengthText.text(MS_PT.weak).removeClass().addClass('text-danger small');
         } else if (strength < 60) {
             strengthBar.removeClass().addClass('progress-bar bg-warning');
-            strengthText.text('Fair').removeClass().addClass('text-warning small');
+            strengthText.text(MS_PT.fair).removeClass().addClass('text-warning small');
         } else if (strength < 80) {
             strengthBar.removeClass().addClass('progress-bar bg-info');
-            strengthText.text('Good').removeClass().addClass('text-info small');
+            strengthText.text(MS_PT.good).removeClass().addClass('text-info small');
         } else {
             strengthBar.removeClass().addClass('progress-bar bg-success');
-            strengthText.text('Strong').removeClass().addClass('text-success small');
+            strengthText.text(MS_PT.strong).removeClass().addClass('text-success small');
         }
     });
 

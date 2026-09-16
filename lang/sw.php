@@ -4045,4 +4045,278 @@ return [
     'Director' => 'Mkurugenzi',
     'Managing Director' => 'Mkurugenzi Mtendaji',
     'Secretary (PS)' => 'Katibu (PS)',
+
+    // My Profile & Settings page — full translation (2026-09-15)
+    'Full name and email are required.' => 'Jina kamili na barua pepe vinahitajika.',
+    'This email is already in use by another account.' => 'Barua pepe hii tayari inatumiwa na akaunti nyingine.',
+    'Profile updated successfully!' => 'Wasifu umesasishwa kwa mafanikio!',
+    'All password fields are required.' => 'Sehemu zote za nenosiri zinahitajika.',
+    'Current password is incorrect.' => 'Nenosiri la sasa si sahihi.',
+    'New password must be at least 6 characters.' => 'Nenosiri jipya lazima liwe na angalau herufi 6.',
+    'New passwords do not match.' => 'Manenosiri mapya hayafanani.',
+    'Password changed successfully!' => 'Nenosiri limebadilishwa kwa mafanikio!',
+    'My Settings' => 'Mipangilio Yangu',
+    'Manage your account, password, and preferences' => 'Simamia akaunti yako, nenosiri, na mapendeleo',
+    'Profile' => 'Wasifu',
+    'Preferences' => 'Mapendeleo',
+    'Personal Information' => 'Taarifa Binafsi',
+    'Username cannot be changed.' => 'Jina la mtumiaji haliwezi kubadilishwa.',
+    'User ID:' => 'Kitambulisho cha Mtumiaji:',
+    'Last Login:' => 'Kuingia Mwisho:',
+    'Change Password' => 'Badilisha Nenosiri',
+    'Current Password' => 'Nenosiri la Sasa',
+    'New Password' => 'Nenosiri Jipya',
+    'Minimum 6 characters.' => 'Angalau herufi 6.',
+    'Update Password' => 'Sasisha Nenosiri',
+    'Security Tips' => 'Vidokezo vya Usalama',
+    'Use a strong, unique password' => 'Tumia nenosiri imara na la kipekee',
+    "Don't share your credentials" => 'Usishiriki taarifa zako za kuingia',
+    'Change password regularly' => 'Badilisha nenosiri mara kwa mara',
+    'Log out after each session' => 'Toka baada ya kila kikao',
+    'Use a mix of letters, numbers, and symbols' => 'Tumia mchanganyiko wa herufi, namba, na alama',
+    'Recent Activity' => 'Shughuli za Karibuni',
+    'Your last login was:' => 'Uliingia mwisho:',
+    'Display & Notifications' => 'Uonyeshaji na Arifa',
+    'Theme' => 'Mandhari',
+    'Light' => 'Nyepesi',
+    'Dark' => 'Nyeusi',
+    'Language' => 'Lugha',
+    'East Africa Time (EAT)' => 'Saa za Afrika Mashariki (EAT)',
+    'Nairobi (EAT)' => 'Nairobi (EAT)',
+    'Eastern Time (US)' => 'Saa za Mashariki (US)',
+    'London (GMT)' => 'London (GMT)',
+    'Email Notifications' => 'Arifa za Barua Pepe',
+    'Receive email about system events and updates' => 'Pokea barua pepe kuhusu matukio na masasisho ya mfumo',
+    'SMS Notifications' => 'Arifa za SMS',
+    'Receive SMS alerts for critical events' => 'Pokea arifa za SMS kwa matukio muhimu',
+    'Save Preferences' => 'Hifadhi Mapendeleo',
+    'Weak' => 'Dhaifu',
+    'Strong' => 'Imara',
+
+    // Help Center page — full translation (2026-09-15)
+    'Help Center' => 'Kituo cha Msaada',
+    'Find answers, guides, and support resources' => 'Pata majibu, miongozo, na rasilimali za usaidizi',
+    'How can we help you?' => 'Tunawezaje kukusaidia?',
+    'Search our knowledge base for quick answers' => 'Tafuta katika hazina yetu ya maarifa kwa majibu ya haraka',
+    'Type your question here...' => 'Andika swali lako hapa...',
+    'Getting Started' => 'Kuanza',
+    'Learn the basics of the system' => 'Jifunze misingi ya mfumo',
+    'Sales & Orders' => 'Mauzo na Oda',
+    'Manage sales and invoicing' => 'Simamia mauzo na ankara',
+    'Accounting and reports' => 'Uhasibu na ripoti',
+    'Administration' => 'Usimamizi',
+    'Users, roles, and settings' => 'Watumiaji, majukumu, na mipangilio',
+    'How do I log in to the system?' => 'Ninaingiaje kwenye mfumo?',
+    '<p>Enter your <strong>username</strong> and <strong>password</strong> on the login page. If you forgot your password, contact the system administrator to reset it.</p>
+                                    <p>After logging in, you\'ll be taken to the <strong>Dashboard</strong> which shows an overview of your business metrics.</p>' => '<p>Weka <strong>jina lako la mtumiaji</strong> na <strong>nenosiri</strong> kwenye ukurasa wa kuingia. Ukisahau nenosiri lako, wasiliana na msimamizi wa mfumo ili alirejeshe.</p>
+                                    <p>Baada ya kuingia, utaelekezwa kwenye <strong>Dashibodi</strong> inayoonyesha muhtasari wa vipimo vya biashara yako.</p>',
+    'How do I navigate the system?' => 'Ninatembeaje kwenye mfumo?',
+    '<p>The main navigation bar at the top contains all modules:</p>
+                                    <ul>
+                                        <li><strong>Dashboard</strong> – Overview of business performance</li>
+                                        <li><strong>Finance</strong> – Accounts, transactions, expenses</li>
+                                        <li><strong>Sales</strong> – Products, customers, orders, invoices, POS</li>
+                                        <li><strong>Operations</strong> – Employees, payroll, assets</li>
+                                        <li><strong>Reports</strong> – Financial and business reports</li>
+                                        <li><strong>Admin</strong> – User management and system settings</li>
+                                    </ul>
+                                    <p>Click your <strong>profile icon</strong> (top-right) to access personal settings, change password, or log out.</p>' => '<p>Upau mkuu wa uelekezaji juu una moduli zote:</p>
+                                    <ul>
+                                        <li><strong>Dashibodi</strong> – Muhtasari wa utendaji wa biashara</li>
+                                        <li><strong>Fedha</strong> – Akaunti, miamala, matumizi</li>
+                                        <li><strong>Mauzo</strong> – Bidhaa, wateja, oda, ankara, POS</li>
+                                        <li><strong>Uendeshaji</strong> – Wafanyakazi, mishahara, mali</li>
+                                        <li><strong>Ripoti</strong> – Ripoti za kifedha na biashara</li>
+                                        <li><strong>Msimamizi</strong> – Usimamizi wa watumiaji na mipangilio ya mfumo</li>
+                                    </ul>
+                                    <p>Bofya <strong>aikoni ya wasifu</strong> (juu-kulia) ili kufikia mipangilio binafsi, kubadilisha nenosiri, au kutoka.</p>',
+    'How do I change my password?' => 'Ninabadilishaje nenosiri langu?',
+    '<ol>
+                                        <li>Click your <strong>username</strong> in the top-right corner</li>
+                                        <li>Select <strong>"Settings"</strong> from the dropdown</li>
+                                        <li>Go to the <strong>"Security"</strong> tab</li>
+                                        <li>Enter your current password, then your new password twice</li>
+                                        <li>Click <strong>"Update Password"</strong></li>
+                                    </ol>' => '<ol>
+                                        <li>Bofya <strong>jina lako la mtumiaji</strong> kwenye kona ya juu-kulia</li>
+                                        <li>Chagua <strong>"Mipangilio"</strong> kwenye orodha kunjuzi</li>
+                                        <li>Nenda kwenye kichupo cha <strong>"Usalama"</strong></li>
+                                        <li>Weka nenosiri lako la sasa, kisha nenosiri jipya mara mbili</li>
+                                        <li>Bofya <strong>"Sasisha Nenosiri"</strong></li>
+                                    </ol>',
+    'How do I create a new sales order?' => 'Ninatengenezaje oda mpya ya mauzo?',
+    '<ol>
+                                        <li>Go to <strong>Sales → Orders</strong></li>
+                                        <li>Click <strong>"New Order"</strong></li>
+                                        <li>Select a customer and add products</li>
+                                        <li>Review quantities and pricing</li>
+                                        <li>Click <strong>"Save Order"</strong></li>
+                                    </ol>
+                                    <p>You can later convert an order into an invoice from the order details page.</p>' => '<ol>
+                                        <li>Nenda <strong>Mauzo → Oda</strong></li>
+                                        <li>Bofya <strong>"Oda Mpya"</strong></li>
+                                        <li>Chagua mteja na ongeza bidhaa</li>
+                                        <li>Kagua idadi na bei</li>
+                                        <li>Bofya <strong>"Hifadhi Oda"</strong></li>
+                                    </ol>
+                                    <p>Unaweza baadaye kubadilisha oda kuwa ankara kutoka ukurasa wa taarifa za oda.</p>',
+    'How do I generate an invoice?' => 'Ninatengenezaje ankara?',
+    '<ol>
+                                        <li>Go to <strong>Sales → Invoices</strong></li>
+                                        <li>Click <strong>"Create Invoice"</strong> OR open an existing order and click <strong>"Generate Invoice"</strong></li>
+                                        <li>Fill in invoice details and line items</li>
+                                        <li>Click <strong>"Save"</strong></li>
+                                        <li>Use the <strong>"Print"</strong> button to print or save as PDF</li>
+                                    </ol>' => '<ol>
+                                        <li>Nenda <strong>Mauzo → Ankara</strong></li>
+                                        <li>Bofya <strong>"Tengeneza Ankara"</strong> AU fungua oda iliyopo na bofya <strong>"Tengeneza Ankara"</strong></li>
+                                        <li>Jaza taarifa za ankara na vipengele vya mstari</li>
+                                        <li>Bofya <strong>"Hifadhi"</strong></li>
+                                        <li>Tumia kitufe cha <strong>"Chapisha"</strong> kuchapisha au kuhifadhi kama PDF</li>
+                                    </ol>',
+    'How do I use the POS (Point of Sale)?' => 'Ninatumiaje POS (Sehemu ya Mauzo)?',
+    '<ol>
+                                        <li>Go to <strong>Sales → POS</strong></li>
+                                        <li>Start a new <strong>shift</strong> by entering the opening balance</li>
+                                        <li>Search or browse products and click to add them to the cart</li>
+                                        <li>Adjust quantities as needed</li>
+                                        <li>Click <strong>"Pay"</strong> and select payment method (Cash, M-Pesa, Card)</li>
+                                        <li>Complete the transaction and print the receipt</li>
+                                    </ol>' => '<ol>
+                                        <li>Nenda <strong>Mauzo → POS</strong></li>
+                                        <li>Anza <strong>zamu</strong> mpya kwa kuweka salio la ufunguzi</li>
+                                        <li>Tafuta au vinjari bidhaa na bofya kuziongeza kwenye kikapu</li>
+                                        <li>Rekebisha idadi inavyohitajika</li>
+                                        <li>Bofya <strong>"Lipa"</strong> na chagua njia ya malipo (Fedha Taslimu, M-Pesa, Kadi)</li>
+                                        <li>Kamilisha muamala na uchapishe risiti</li>
+                                    </ol>',
+    'How do I add a new product?' => 'Ninaongezaje bidhaa mpya?',
+    '<ol>
+                                        <li>Go to <strong>Sales → Products</strong></li>
+                                        <li>Click <strong>"Add Product"</strong></li>
+                                        <li>Fill in product details: name, SKU, price, category, stock quantity</li>
+                                        <li>Upload a product image (optional)</li>
+                                        <li>Click <strong>"Save"</strong></li>
+                                    </ol>' => '<ol>
+                                        <li>Nenda <strong>Mauzo → Bidhaa</strong></li>
+                                        <li>Bofya <strong>"Ongeza Bidhaa"</strong></li>
+                                        <li>Jaza taarifa za bidhaa: jina, SKU, bei, aina, idadi ya hisa</li>
+                                        <li>Pakia picha ya bidhaa (hiari)</li>
+                                        <li>Bofya <strong>"Hifadhi"</strong></li>
+                                    </ol>',
+    'Finance & Accounting' => 'Fedha na Uhasibu',
+    'How do I record an expense?' => 'Ninaandikaje tumizi?',
+    '<ol>
+                                        <li>Go to <strong>Finance → Expenses</strong></li>
+                                        <li>Click <strong>"Add Expense"</strong></li>
+                                        <li>Select expense category, enter amount, date, and description</li>
+                                        <li>Attach receipt (optional)</li>
+                                        <li>Click <strong>"Save"</strong></li>
+                                    </ol>
+                                    <p>Expenses are automatically reflected in your financial reports.</p>' => '<ol>
+                                        <li>Nenda <strong>Fedha → Matumizi</strong></li>
+                                        <li>Bofya <strong>"Ongeza Tumizi"</strong></li>
+                                        <li>Chagua aina ya tumizi, weka kiasi, tarehe, na maelezo</li>
+                                        <li>Ambatanisha risiti (hiari)</li>
+                                        <li>Bofya <strong>"Hifadhi"</strong></li>
+                                    </ol>
+                                    <p>Matumizi yanaonekana moja kwa moja kwenye ripoti zako za kifedha.</p>',
+    'How do I view financial reports?' => 'Ninaonaje ripoti za kifedha?',
+    '<p>Go to <strong>Reports</strong> in the navigation menu. Available reports include:</p>
+                                    <ul>
+                                        <li><strong>Income Statement</strong> – Revenue vs expenses for a period</li>
+                                        <li><strong>Balance Sheet</strong> – Assets, liabilities, and equity</li>
+                                        <li><strong>Cash Flow</strong> – Money in and out</li>
+                                        <li><strong>Trial Balance</strong> – Account balances summary</li>
+                                        <li><strong>General Ledger</strong> – Detailed transaction history</li>
+                                    </ul>
+                                    <p>Most reports allow you to filter by <strong>date range</strong> and export to <strong>PDF or Excel</strong>.</p>' => '<p>Nenda <strong>Ripoti</strong> kwenye menyu ya uelekezaji. Ripoti zinazopatikana ni pamoja na:</p>
+                                    <ul>
+                                        <li><strong>Taarifa ya Mapato</strong> – Mapato dhidi ya matumizi kwa kipindi</li>
+                                        <li><strong>Mizania</strong> – Mali, madeni, na hisa</li>
+                                        <li><strong>Mtiririko wa Fedha</strong> – Fedha zinazoingia na kutoka</li>
+                                        <li><strong>Salio la Majaribio</strong> – Muhtasari wa salio za akaunti</li>
+                                        <li><strong>Kitabu Kikuu</strong> – Historia ya kina ya miamala</li>
+                                    </ul>
+                                    <p>Ripoti nyingi zinaruhusu kuchuja kwa <strong>kipindi cha tarehe</strong> na kuhamisha kwenda <strong>PDF au Excel</strong>.</p>',
+    'How do I record a journal entry?' => 'Ninaandikaje kumbukumbu ya jarida?',
+    '<ol>
+                                        <li>Go to <strong>Finance → Journal Entries</strong></li>
+                                        <li>Click <strong>"New Entry"</strong></li>
+                                        <li>Add debit and credit lines — totals must balance</li>
+                                        <li>Add description and reference number</li>
+                                        <li>Click <strong>"Save"</strong></li>
+                                    </ol>' => '<ol>
+                                        <li>Nenda <strong>Fedha → Kumbukumbu za Jarida</strong></li>
+                                        <li>Bofya <strong>"Kumbukumbu Mpya"</strong></li>
+                                        <li>Ongeza mistari ya deni na mkopo — jumla lazima zilingane</li>
+                                        <li>Ongeza maelezo na namba ya rejea</li>
+                                        <li>Bofya <strong>"Hifadhi"</strong></li>
+                                    </ol>',
+    'How do I add a new user?' => 'Ninaongezaje mtumiaji mpya?',
+    '<ol>
+                                        <li>Go to <strong>Admin → Users</strong></li>
+                                        <li>Click <strong>"Add New User"</strong></li>
+                                        <li>Fill in username, full name, email, and password</li>
+                                        <li>Assign a role (Admin, Manager, User, etc.)</li>
+                                        <li>Click <strong>"Create User"</strong></li>
+                                    </ol>
+                                    <p class="mb-0"><em>Note: Only administrators can add or manage users.</em></p>' => '<ol>
+                                        <li>Nenda <strong>Msimamizi → Watumiaji</strong></li>
+                                        <li>Bofya <strong>"Ongeza Mtumiaji Mpya"</strong></li>
+                                        <li>Jaza jina la mtumiaji, jina kamili, barua pepe, na nenosiri</li>
+                                        <li>Weka jukumu (Msimamizi, Meneja, Mtumiaji, n.k.)</li>
+                                        <li>Bofya <strong>"Tengeneza Mtumiaji"</strong></li>
+                                    </ol>
+                                    <p class="mb-0"><em>Kumbuka: Ni wasimamizi tu wanaoweza kuongeza au kusimamia watumiaji.</em></p>',
+    'How do I backup the database?' => 'Ninahifadhije nakala ya hifadhidata?',
+    '<ol>
+                                        <li>Go to <strong>Admin → Backup</strong></li>
+                                        <li>Click <strong>"Generate Backup"</strong> to create a new backup</li>
+                                        <li>Download the backup file for safe keeping</li>
+                                        <li>To restore, upload a <code>.sql</code> file and click <strong>"Upload & Restore"</strong></li>
+                                    </ol>' => '<ol>
+                                        <li>Nenda <strong>Msimamizi → Nakala ya Akiba</strong></li>
+                                        <li>Bofya <strong>"Tengeneza Nakala ya Akiba"</strong> kuunda nakala mpya</li>
+                                        <li>Pakua faili la nakala ya akiba kwa uhifadhi salama</li>
+                                        <li>Kurejesha, pakia faili la <code>.sql</code> na bofya <strong>"Pakia na Rejesha"</strong></li>
+                                    </ol>',
+    '<strong>Warning:</strong> Restoring a backup will overwrite all current data. Always create a fresh backup before restoring.' => '<strong>Onyo:</strong> Kurejesha nakala ya akiba kutafuta data yote ya sasa. Daima tengeneza nakala mpya ya akiba kabla ya kurejesha.',
+    'How do I update company information?' => 'Ninasasishaje taarifa za kampuni?',
+    '<ol>
+                                        <li>Go to <strong>Admin → Company Profile</strong></li>
+                                        <li>Update your company name, email, phone, address, and website</li>
+                                        <li>Upload your company logo</li>
+                                        <li>Click <strong>"Save"</strong></li>
+                                    </ol>
+                                    <p class="mb-0">These details will appear on invoices, receipts, and reports.</p>' => '<ol>
+                                        <li>Nenda <strong>Msimamizi → Wasifu wa Kampuni</strong></li>
+                                        <li>Sasisha jina la kampuni yako, barua pepe, simu, anwani, na tovuti</li>
+                                        <li>Pakia nembo ya kampuni yako</li>
+                                        <li>Bofya <strong>"Hifadhi"</strong></li>
+                                    </ol>
+                                    <p class="mb-0">Taarifa hizi zitaonekana kwenye ankara, risiti, na ripoti.</p>',
+    'How do I configure tax settings?' => 'Ninawekaje mipangilio ya kodi?',
+    '<ol>
+                                        <li>Go to <strong>Admin → Tax</strong></li>
+                                        <li>Set the tax name (e.g., VAT, GST)</li>
+                                        <li>Enter the default tax rate (%)</li>
+                                        <li>Choose pricing method (Tax Exclusive or Inclusive)</li>
+                                        <li>Click <strong>"Save Settings"</strong></li>
+                                    </ol>' => '<ol>
+                                        <li>Nenda <strong>Msimamizi → Kodi</strong></li>
+                                        <li>Weka jina la kodi (mfano, VAT, GST)</li>
+                                        <li>Weka kiwango cha kawaida cha kodi (%)</li>
+                                        <li>Chagua njia ya bei (Bila Kodi au Pamoja na Kodi)</li>
+                                        <li>Bofya <strong>"Hifadhi Mipangilio"</strong></li>
+                                    </ol>',
+    'Keyboard Shortcuts' => 'Njia za Mkato za Kibodi',
+    'Need More Help?' => 'Unahitaji Msaada Zaidi?',
+    'Contact our support team for assistance with technical issues or questions.' => 'Wasiliana na timu yetu ya usaidizi kwa msaada wa masuala ya kiufundi au maswali.',
+    'Email Support' => 'Wasiliana kwa Barua Pepe',
+    'Call Support' => 'Piga Simu kwa Usaidizi',
+    'System Info' => 'Taarifa za Mfumo',
+    'Version' => 'Toleo',
+    'PHP Version' => 'Toleo la PHP',
+    'Server' => 'Seva',
 ];

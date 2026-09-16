@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-15 (feat/my-settings-help-i18n) - Full language translation for My Profile & Settings and Help Center
+
+**Request:** "Once you open 'wasifu wa mipangilio yangu' within it there is three section do you have tried to see if all section has fully implemented for language translation... Also do you have tried to open 'msaada' and tried to se if all areas now has language translation?" — checked, and the answer was no: `my_settings.php` had 10 `t()`/`te()` calls across 511 lines (basically just the language dropdown itself), and `help.php` had **zero** across 559 lines.
+
+**Fix — full retrofit of both pages, same proven pattern as the Business Reports work:**
+- `app/constant/settings/my_settings.php` — all 3 tabs (Profile, Security, Preferences): every label, button, form-text hint, the Account Summary sidebar, Security Tips list, Recent Activity, all Preferences fields, and every PHP validation/success message (`Exception` throw sites + `$success_msg`) wrapped in `t()`. JS password-strength meter labels (Weak/Fair/Good/Strong) moved into a small `MS_PT` object. Also fixed a second untranslated `$user_role` badge on this page's sidebar (missed in the earlier user-dropdown fix).
+- `app/constant/settings/help.php` — header, search box, all 4 Quick Link cards, all 15 FAQ questions across Getting Started/Sales & Orders/Finance/Administration, and the sidebar (Keyboard Shortcuts, Contact Support, System Info). Each FAQ answer's rich HTML (`<strong>`, `<ol>`/`<li>`, etc.) is kept as **one** translation key rather than fragmented per-tag — same lesson already learned once in the POS module: concatenating separately-translated fragments breaks grammar/word order in Swahili.
+- `lang/sw.php` — 96 new translations (45 for My Settings, 51 for Help Center), generated programmatically for the multi-line HTML FAQ-answer keys to guarantee exact whitespace-sensitive key matches rather than risk a manual transcription error.
+
+**Verified:** new `tests/test_my_settings_help_i18n_cli.php` (17/17) — lint, a completeness guard confirming all 120 distinct `t()`/`te()` keys across both files have a real non-empty `lang/sw.php` translation (zero gaps), a live `loadLanguage('sw')`/`loadLanguage('en')` round-trip covering all 3 My Settings tabs and the Help Center FAQ/sidebar, and a regression guard confirming this work introduced no new duplicate `lang/sw.php` key (the pre-existing 29 duplicates, already present before this work, are unchanged). `php -l` clean on all 3 touched files.
+
 ## 2026-09-15 (fix/user-role-translation) - Translate the role name shown in the user dropdown and dashboard banner
 
 **Request:** screenshot showing the user dropdown already fully in Swahili ("Wasifu na Mipangilio Yangu", "Msaada", "Toka") except the role badge ("ADMIN"), which stayed English. `$user_role` (from `roles.role_name`) was rendered raw via `htmlspecialchars()` with no `t()` wrapping at all, in both spots in `header.php`'s user dropdown (the collapsed toggle and the panel header) and `app/dashboard.php`'s welcome-banner badge.
