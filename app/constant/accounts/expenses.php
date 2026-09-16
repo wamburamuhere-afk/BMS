@@ -386,13 +386,26 @@ if (!function_exists('renderExpenseCatRows')) {
                         <option value="paid" <?= $exp_status_qs === 'paid' ? 'selected' : '' ?>><?= t('Paid') ?></option>
                     </select>
                 </div>
+                <?php
+                // Deep-link support (dashboard.php's "Monthly Expenses" card
+                // links here with ?date_from=&date_to=) — strictly validated
+                // as real Y-m-d dates (not just escaped) before ever reaching
+                // an HTML attribute, same discipline as $exp_status_qs above.
+                $exp_valid_ymd = function ($v) {
+                    if (!is_string($v) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return '';
+                    [$y, $m, $d] = array_map('intval', explode('-', $v));
+                    return checkdate($m, $d, $y) ? $v : '';
+                };
+                $exp_date_from_qs = $exp_valid_ymd($_GET['date_from'] ?? '');
+                $exp_date_to_qs   = $exp_valid_ymd($_GET['date_to'] ?? '');
+                ?>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Date From') ?></label>
-                    <input type="date" class="form-control" id="dateFromFilter">
+                    <input type="date" class="form-control" id="dateFromFilter" value="<?= htmlspecialchars($exp_date_from_qs) ?>">
                 </div>
                 <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Date To') ?></label>
-                    <input type="date" class="form-control" id="dateToFilter">
+                    <input type="date" class="form-control" id="dateToFilter" value="<?= htmlspecialchars($exp_date_to_qs) ?>">
                 </div>
                 <div class="col-md-12 d-flex justify-content-end">
                     <button type="button" class="btn btn-primary me-2" onclick="applyFilters()">

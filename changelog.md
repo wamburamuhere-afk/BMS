@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - dashboard.php "Monthly Expenses" clickable card (Phase 3 of 3)
+
+**Request:** user asked for a dashboard card named "Monthly Expenses" that, when clicked, opens the Expenses list pre-filtered to that specific month.
+
+**Scouting:** `get_business_stats()` already computed a correctly-scoped Expenses figure (`$dashboard_stats['expenses']`, `status IN ('approved','paid')`) but it was never rendered anywhere — half the backend groundwork existed unused. That figure tracks whichever `time_range` the rest of the dashboard is filtered to (Today/Week/Year/etc.), which isn't what "Monthly Expenses" should mean, so this card computes its own figure pinned to the current calendar month regardless of the dashboard's own filter.
+
+**Fix:** added Simple-Mode-gated computation of the current month's recognized expense count/amount (`app/dashboard.php`, same `scopeFilterSqlNullable`/status discipline as the rest of this feature) and a new card in the Quick Stats Row (gated on `$pos_simple_mode && canView('expenses')`, same placement pattern as the Credit/Madeni card), linking to `expenses.php?date_from=<month start>&date_to=<month end>`. `expenses.php` now validates `date_from`/`date_to` from the query string as real calendar dates (`checkdate()`, not just a regex — rejects e.g. Feb 30) before they reach the Date From/To `<input value="...">` fields the existing filter JS already reads at init.
+
+**Tested — `tests/test_dashboard_monthly_expenses_card_cli.php` (new, 24/24):** wiring (month is always the calendar month, not the dashboard's time_range; card gate; click-through URL); runtime — the exact query run as a real admin session matches a raw unscoped COUNT/SUM for the current month exactly; the date whitelist tested against valid dates, an impossible calendar date, wrong month, unpadded format, and an XSS-shaped string (confirmed it never reaches the rendered HTML attribute). Full regression re-run, no drift from documented baselines: `test_dashboard_pending_expenses_notice_cli.php` (22/22), `test_expenses_table_sort_and_resize_cli.php` (11/11), `test_expenses_simple_pos_cli.php` (53/55, pre-existing unrelated failures), `test_pos_simple_mode_cli.php` (88/90, pre-existing unrelated failures). `php -l` clean on every touched file.
+
 ## 2026-09-16 (fix/simple-pos-dashboard-expense-chart) - expenses.php list: explicit newest-first sort + card/table resize sync (Phase 2 of 3)
 
 **Request:** user reported that after adding a new expense on `expenses.php`, older rows seemed to disappear and the new one seemed to "appear in two rows".
