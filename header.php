@@ -1318,13 +1318,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <i class="bi bi-person-circle fs-5 me-2"></i>
                                 <div class="d-none d-xl-block">
                                     <span class="d-block" style="font-size:0.85rem;line-height:1;"><?= htmlspecialchars($username) ?></span>
-                                    <span class="text-white-50" style="font-size:10px;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></span>
+                                    <span class="text-white-50" style="font-size:10px;text-transform:uppercase;"><?= htmlspecialchars(t($user_role)) ?></span>
                                 </div>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-0" aria-labelledby="userDrop">
                                 <li class="px-3 py-2 border-bottom">
                                     <div class="fw-bold" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></div>
-                                    <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></div>
+                                    <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars(t($user_role)) ?></div>
                                 </li>
                                 <?php if (!empty($_SESSION['employee_id'])): // ESS "My HR" — only for users linked to an employee (D24) ?>
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace me-2"></i> <?= t('My HR') ?></a></li>
