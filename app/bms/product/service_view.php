@@ -44,6 +44,12 @@ if (!$svc) {
     exit();
 }
 
+// Simple POS Services (products_simple_pos_plan.md) never expose the
+// BOM/Materials concept — same combined gate as the Add/Edit form
+// (services.php), so the read-only view stays consistent with what the
+// tenant can actually set.
+$hideMaterialComponents = posSimpleModeEnabled() && !advancedProductEnabled();
+
 // Phase D — project-scope gate
 $svc_project_id = $svc['project_id'] ?? null;
 if (!empty($svc_project_id) && function_exists('userCan') && !userCan('project', (int)$svc_project_id)) {
@@ -386,6 +392,7 @@ $company_logo = getSetting('company_logo', '');
                 </div>
 
                 <!-- Bottom: Material List -->
+                <?php if (!$hideMaterialComponents): ?>
                 <div class="col-12">
                     <div class="svc-comp-panel bg-white rounded-4 border overflow-hidden mt-2">
                         <div class="svc-comp-header p-3 bg-primary text-white d-flex justify-content-between align-items-center">
@@ -434,6 +441,7 @@ $company_logo = getSetting('company_logo', '');
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -514,7 +522,9 @@ function loadSvcComponents(page) {
     });
 }
 
+<?php if (!$hideMaterialComponents): ?>
 $(function() { loadSvcComponents(1); });
+<?php endif; ?>
 </script>
 
 <?php require_once 'footer.php'; ?>
