@@ -4329,8 +4329,12 @@ return [
     'Review now' => 'Kagua sasa',
 
     // POS credit receivables — "Who Owes Me" page + "Madeni" customer tab (2026-09-16)
-    'Who Owes Me' => 'Wanaonidai',
-    'View Who Owes Me' => 'Angalia Wanaonidai',
+    // 'Wanaonidai' (wana-NI-dai = "they claim FROM me") was backwards — it
+    // names people the shop owes, the opposite of this page (customers who
+    // owe the shop). 'Wanaodaiwa' (kudaiwa, passive: "to be claimed
+    // against" = to owe) correctly names the debtors.
+    'Who Owes Me' => 'Wanaodaiwa',
+    'View Who Owes Me' => 'Angalia Wanaodaiwa',
     'Track customers who bought on credit — due dates, repayments, overdue.' => 'Fuatilia wateja waliouziwa kwa mkopo — tarehe za malipo, marejesho, na yaliyochelewa.',
     'Customers with an open credit sale — due dates, repayments, overdue.' => 'Wateja wenye mauzo ya mkopo yaliyo wazi — tarehe za malipo, marejesho, na yaliyochelewa.',
     'Total Owed' => 'Jumla Anayodaiwa',

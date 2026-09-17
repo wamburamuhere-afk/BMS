@@ -315,14 +315,14 @@ PHP);
         $cookieJarSw = tempnam(sys_get_temp_dir(), 'catest_cookies_sw_');
         httpGet2("$base/_credit_aging_table_test_probe.php?act=login&uid=$adminUid&lang=sw", $cookieJarSw);
         [$codeSw, $bodySw] = httpGet2("$base/pos/credit-customers", $cookieJarSw);
-        str_contains((string)$bodySw, 'Wanaonidai')
-            ? pass('Who Owes Me page shows real Swahili text ("Wanaonidai") under the sw locale')
-            : fail('Who Owes Me page still shows raw English under the sw locale');
+        str_contains((string)$bodySw, 'Wanaodaiwa')
+            ? pass('Who Owes Me page shows real Swahili text ("Wanaodaiwa") under the sw locale')
+            : fail('Who Owes Me page still shows raw English (or the old backwards "Wanaonidai") under the sw locale');
 
         [$codeHub, $bodyHub] = httpGet2("$base/pos_dashboard", $cookieJarSw);
-        str_contains((string)$bodyHub, 'Wanaonidai')
+        str_contains((string)$bodyHub, 'Wanaodaiwa')
             ? pass('POS hub tile shows the Swahili "Who Owes Me" label under the sw locale')
-            : fail('POS hub tile still shows raw English under the sw locale');
+            : fail('POS hub tile still shows raw English (or the old backwards "Wanaonidai") under the sw locale');
 
         @unlink($cookieJar);
         @unlink($cookieJarSw);

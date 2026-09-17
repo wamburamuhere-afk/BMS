@@ -195,6 +195,17 @@ $(function () {
         customerId: null,
         canEdit: <?= json_encode($can_edit) ?>,
         canDelete: <?= json_encode($can_delete) ?>,
+        // The 3 summary cards above the table (#stat-total-owed etc.) had ids
+        // reserved for them since this page was first built, but nothing
+        // ever actually populated them — they always just showed the "—"
+        // placeholder. Wire them to the exact same {totalOutstanding, count,
+        // overdueCount} figures the table itself is built from, so they can
+        // never disagree with what's listed below.
+        onStats: function (s) {
+            $('#stat-total-owed').text(parseFloat(s.totalOutstanding || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }));
+            $('#stat-overdue-count').text(s.overdueCount);
+            $('#stat-open-count').text(s.count);
+        },
         urls: {
             list:   <?= json_encode(buildUrl('api/pos/get_credit_aging.php')) ?>,
             detail: <?= json_encode(buildUrl('api/pos/get_credit_sale_detail.php')) ?>,

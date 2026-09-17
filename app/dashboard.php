@@ -1702,8 +1702,12 @@ function get_progress_color($percentage) {
 
         <!-- 4. Inventory Value — plain, unfiltered products.php: its own
              default ($status_filter = 'active', is_service = 0) already
-             matches this card's query exactly, no extra params needed. -->
-        <?php if(canView('products') || canView('inventory_report')): ?>
+             matches this card's query exactly, no extra params needed.
+             Hidden for Simple POS tenants (request 2026-09-17) — a small
+             shop owner doesn't think in terms of a valued "inventory", and
+             the card was crowding the KPI strip once Credit/Monthly
+             Expenses moved in. Untouched for every other tenant. -->
+        <?php if(!$pos_simple_mode && (canView('products') || canView('inventory_report'))): ?>
         <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
            href="<?= getUrl('products') ?>">
             <div class="card bg-info text-white h-100">
