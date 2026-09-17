@@ -4379,4 +4379,15 @@ return [
     'All Customers' => 'Wateja Wote',
     'Top 5 largest' => 'Kubwa 5 Zaidi',
     'Search by customer name or phone…' => 'Tafuta kwa jina la mteja au simu…',
+
+    // Warehouse "Batches" tab (2026-09-17) — batch/lot tracking per shop.
+    'Batches' => 'Mizigo (Batch)',
+    'Every batch received into this shop' => 'Kila mzigo ulioingizwa dukani hapa',
+    'Batch Number' => 'Namba ya Mzigo',
+    'Manufacturing Date' => 'Tarehe ya Kutengenezwa',
+    'Exhausted' => 'Umeisha',
+    'Edit Batch' => 'Hariri Mzigo',
+    'No batches recorded for this shop yet' => 'Hakuna mizigo iliyorekodiwa kwa duka hili bado',
+    'A batch is created automatically the first time a product is added with opening stock, or whenever you restock at the POS.' => 'Mzigo huundwa kiotomatiki mara ya kwanza bidhaa inapoongezwa ikiwa na kiasi cha awali, au wakati wowote unapoongeza bidhaa dukani (POS).',
+    'This corrects this batch\'s own recorded details only. It does not change the quantity in stock, and does not change what the product sells for today — do that on the Product page.' => 'Hii inarekebisha taarifa za mzigo huu tu. Haibadilishi kiasi kilichopo stoo, wala haibadilishi bei ya sasa ya kuuzia bidhaa — fanya hivyo kwenye ukurasa wa Bidhaa.',
 ];

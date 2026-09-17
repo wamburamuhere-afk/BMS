@@ -28,6 +28,12 @@ if (!userCan('warehouse', $warehouse_id)) {
     die(isShopLabel() ? 'Access denied: this shop is not in your assigned scope.' : 'Access denied: this warehouse is not in your assigned scope.');
 }
 
+// "Batches" tab (2026-09-17 request) — Simple POS only; a normal tenant
+// sees the Recent Activity card exactly as before, no tab at all.
+require_once __DIR__ . '/../../../core/pos_nav.php';
+$pos_simple_mode      = posSimpleModeEnabled();
+$can_edit_warehouse   = canEdit('warehouses');
+
 // Fetch warehouse details
 $query = "
     SELECT w.*, 
@@ -302,45 +308,86 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </div>
-            <!-- Recent Activity -->
+            <?php
+            // Shared with both branches below so the Recent Activity DATA
+            // and its rendering logic stay single-sourced regardless of
+            // which chrome wraps it (plain card vs. Simple-POS tab pane) —
+            // only the wrapper differs, never the content.
+            if (!function_exists('render_warehouse_activity_items')) {
+                function render_warehouse_activity_items(array $recent_movements, bool $empty_translated = false): string {
+                    if (empty($recent_movements)) {
+                        $msg = $empty_translated ? t('No movements recorded yet') : 'No movements recorded yet';
+                        return '<div class="text-center py-3 text-muted small">' . htmlspecialchars($msg) . '</div>';
+                    }
+                    $in_types = ['purchase_in','adjustment_in','transfer_in','return_in','production_in','found','correction'];
+                    $html = '<ul class="list-group list-group-flush">';
+                    foreach ($recent_movements as $mv) {
+                        $mv_in    = in_array($mv['movement_type'], $in_types);
+                        $mv_color = $mv_in ? 'success' : 'danger';
+                        $mv_icon  = $mv_in ? 'bi-arrow-down-circle-fill' : 'bi-arrow-up-circle-fill';
+                        $mv_sign  = $mv_in ? '+' : '−';
+                        $mv_label = ucwords(str_replace('_', ' ', $mv['movement_type']));
+                        $mv_date  = date('d M', strtotime($mv['movement_date'] ?: $mv['created_at']));
+                        $html .= '<li class="list-group-item px-3 py-2">'
+                               . '<div class="d-flex align-items-start gap-2">'
+                               . '<i class="bi ' . $mv_icon . ' text-' . $mv_color . ' mt-1" style="font-size:0.85rem;flex-shrink:0;"></i>'
+                               . '<div class="flex-grow-1" style="min-width:0;">'
+                               . '<div class="fw-semibold text-truncate" style="font-size:0.8rem;">' . htmlspecialchars($mv['product_name']) . '</div>'
+                               . '<div class="text-muted" style="font-size:0.68rem;">' . $mv_label . ($mv['reference_number'] ? ' · ' . htmlspecialchars($mv['reference_number']) : '') . '</div>'
+                               . '</div>'
+                               . '<div class="text-end flex-shrink-0">'
+                               . '<div class="fw-bold small text-' . $mv_color . '">' . $mv_sign . number_format((float)$mv['quantity'], 0) . '</div>'
+                               . '<div class="text-muted" style="font-size:0.68rem;">' . $mv_date . '</div>'
+                               . '</div></div></li>';
+                    }
+                    $html .= '</ul>';
+                    return $html;
+                }
+            }
+            ?>
+            <?php if ($pos_simple_mode): ?>
+            <!-- Recent Activity / Batches — Simple POS only (request 2026-09-17) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white p-0">
+                    <ul class="nav nav-tabs card-header-tabs px-2 pt-2" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-recent-activity" type="button" role="tab">
+                                <i class="bi bi-clock-history me-1"></i> <?= t('Recent Activity') ?>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-warehouse-batches" type="button" role="tab">
+                                <i class="bi bi-box-seam me-1"></i> <?= t('Batches') ?>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="pane-recent-activity" role="tabpanel">
+                        <div class="d-flex justify-content-end px-3 pt-2">
+                            <span class="badge bg-light text-dark border"><?= t('Last 8') ?></span>
+                        </div>
+                        <div class="card-body p-0">
+                            <?= render_warehouse_activity_items($recent_movements, true) ?>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="pane-warehouse-batches" role="tabpanel">
+                        <?php include __DIR__ . '/warehouse_batches_tab.php'; ?>
+                    </div>
+                </div>
+            </div>
+            <?php else: ?>
+            <!-- Recent Activity — unchanged for non-Simple-POS tenants -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> Recent Activity</h5>
                     <span class="badge bg-light text-dark border">Last 8</span>
                 </div>
                 <div class="card-body p-0">
-                    <?php if (empty($recent_movements)): ?>
-                        <div class="text-center py-3 text-muted small">No movements recorded yet</div>
-                    <?php else: ?>
-                    <ul class="list-group list-group-flush">
-                        <?php
-                        $in_types = ['purchase_in','adjustment_in','transfer_in','return_in','production_in','found','correction'];
-                        foreach ($recent_movements as $mv):
-                            $mv_in    = in_array($mv['movement_type'], $in_types);
-                            $mv_color = $mv_in ? 'success' : 'danger';
-                            $mv_icon  = $mv_in ? 'bi-arrow-down-circle-fill' : 'bi-arrow-up-circle-fill';
-                            $mv_sign  = $mv_in ? '+' : '−';
-                            $mv_label = ucwords(str_replace('_', ' ', $mv['movement_type']));
-                            $mv_date  = date('d M', strtotime($mv['movement_date'] ?: $mv['created_at']));
-                        ?>
-                        <li class="list-group-item px-3 py-2">
-                            <div class="d-flex align-items-start gap-2">
-                                <i class="bi <?= $mv_icon ?> text-<?= $mv_color ?> mt-1" style="font-size:0.85rem;flex-shrink:0;"></i>
-                                <div class="flex-grow-1" style="min-width:0;">
-                                    <div class="fw-semibold text-truncate" style="font-size:0.8rem;"><?= htmlspecialchars($mv['product_name']) ?></div>
-                                    <div class="text-muted" style="font-size:0.68rem;"><?= $mv_label ?><?= $mv['reference_number'] ? ' · ' . htmlspecialchars($mv['reference_number']) : '' ?></div>
-                                </div>
-                                <div class="text-end flex-shrink-0">
-                                    <div class="fw-bold small text-<?= $mv_color ?>"><?= $mv_sign . number_format((float)$mv['quantity'], 0) ?></div>
-                                    <div class="text-muted" style="font-size:0.68rem;"><?= $mv_date ?></div>
-                                </div>
-                            </div>
-                        </li>
-                        <?php endforeach; ?>
-                    </ul>
-                    <?php endif; ?>
+                    <?= render_warehouse_activity_items($recent_movements, false) ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
 
         <!-- Main Content (Stock List) -->
