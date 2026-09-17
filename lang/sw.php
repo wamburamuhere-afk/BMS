@@ -2365,6 +2365,7 @@ return [
     // Warehouses — POS Mode field (merged from feat/restaurant-pos-mode-setup)
     'POS Mode' => 'Hali ya POS',
     'Retail' => 'Rejareja',
+    'Wholesale' => 'Jumla',
     'Hybrid (Retail + Restaurant)' => 'Mchanganyiko (Rejareja + Mkahawa)',
     'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.' => 'Mkahawa/Mchanganyiko hufungua Sakafu na Meza, Onyesho la Jikoni, na Uhifadhi wa Nafasi kwa ghala hili katika POS.',
     'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this shop in POS.' => 'Mkahawa/Mchanganyiko hufungua Sakafu na Meza, Onyesho la Jikoni, na Uhifadhi wa Nafasi kwa duka hili katika POS.',
