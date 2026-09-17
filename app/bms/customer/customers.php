@@ -117,6 +117,15 @@ if (projectsModuleActive()) {
     }
 }
 
+// Simple POS (2026-09-17 request, mirrors products_simple_pos_plan.md's
+// $simpleProductForm exactly): a much shorter, single-area Add/Edit Customer
+// form for a small shop with no accountant — Name/Phone/Credit Limit/Notes
+// only. A superadmin can re-enable the full 4-tab form per tenant via
+// "Advanced Customer" (advancedCustomerEnabled(), core/pos_nav.php) even
+// while Simple Mode is on.
+require_once __DIR__ . '/../../../core/pos_nav.php';
+$simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
+
 ?>
 
 <div class="container-fluid mt-4">
@@ -441,6 +450,28 @@ if (projectsModuleActive()) {
                 <div class="modal-body">
                     <div id="add-customer-message" class="mb-3"></div>
 
+                    <?php if ($simpleCustomerForm): ?>
+                    <!-- Simple POS — single-area Add Customer form (2026-09-17 request) -->
+                    <div class="row">
+                        <div class="col-md-7 mb-3">
+                            <label for="customer_name" class="form-label fw-bold"><?= t('Customer Name') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" id="customer_name" name="customer_name" required placeholder="<?= t('Enter customer name') ?>">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="phone" class="form-label fw-bold"><?= t('Phone Number') ?></label>
+                            <input type="text" class="form-control form-control-lg" id="phone" name="phone" placeholder="+255 123 456 789">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="credit_limit" class="form-label"><?= t('Credit Limit') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <input type="number" class="form-control" id="credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label for="description" class="form-label"><?= t('Notes') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <textarea class="form-control" id="description" name="description" rows="2" placeholder="<?= t('Anything worth remembering — where they live, how to reach them, etc.') ?>"></textarea>
+                        </div>
+                    </div>
+                    <input type="hidden" name="customer_type" value="individual">
+                    <?php else: ?>
                     <ul class="nav nav-tabs mb-3" id="customerTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#tab-basic" type="button" role="tab"><?= t('Basic Info') ?></button>
@@ -650,6 +681,7 @@ if (projectsModuleActive()) {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -737,6 +769,66 @@ if (projectsModuleActive()) {
                         <div id="edit-customer-message" class="mb-3"></div>
                         <input type="hidden" id="edit_customer_id" name="customer_id">
 
+                        <?php if ($simpleCustomerForm): ?>
+                        <!-- Simple POS — single-area Edit Customer form (2026-09-17 request).
+                             Every field NOT shown here still rides along as a hidden input,
+                             pre-filled by editCustomer()'s own population code with whatever
+                             is already stored — editing a customer in Simple mode must never
+                             silently wipe data entered while Advanced Customer was on (or
+                             before Simple Mode existed). Only Name/Phone/Credit Limit/Notes
+                             are ever actually changed here. -->
+                        <div class="row">
+                            <div class="col-md-7 mb-3">
+                                <label for="edit_customer_name" class="form-label fw-bold"><?= t('Customer Name') ?> <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-lg" id="edit_customer_name" name="customer_name" required placeholder="<?= t('Enter customer name') ?>">
+                            </div>
+                            <div class="col-md-5 mb-3">
+                                <label for="edit_phone" class="form-label fw-bold"><?= t('Phone Number') ?></label>
+                                <input type="text" class="form-control form-control-lg" id="edit_phone" name="phone" placeholder="+255 123 456 789">
+                            </div>
+                            <div class="col-md-5 mb-3">
+                                <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                                <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label for="edit_description" class="form-label"><?= t('Notes') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                                <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Anything worth remembering — where they live, how to reach them, etc.') ?>"></textarea>
+                            </div>
+                        </div>
+                        <!-- Preserved, not shown: whatever this customer already has for every
+                             advanced field stays exactly as-is on save (see comment above). -->
+                        <input type="hidden" id="edit_company_name" name="company_name">
+                        <input type="hidden" id="edit_acronym" name="acronym">
+                        <input type="hidden" id="edit_category_id" name="category_id">
+                        <input type="hidden" id="edit_customer_type" name="customer_type">
+                        <input type="hidden" id="edit_status" name="status">
+                        <input type="hidden" id="edit_year" name="year">
+                        <input type="hidden" id="edit_project_id" name="project_id">
+                        <input type="hidden" id="edit_default_price_group_id" name="default_price_group_id">
+                        <input type="hidden" id="edit_contact_person" name="contact_person">
+                        <input type="hidden" id="edit_contact_title" name="contact_title">
+                        <input type="hidden" id="edit_email" name="email">
+                        <input type="hidden" id="edit_company_email" name="company_email">
+                        <input type="hidden" id="edit_mobile" name="mobile">
+                        <input type="hidden" id="edit_fax" name="fax">
+                        <input type="hidden" id="edit_website" name="website">
+                        <input type="hidden" id="edit_country" name="country">
+                        <input type="hidden" id="edit_state" name="state">
+                        <input type="hidden" id="edit_city" name="city">
+                        <input type="hidden" id="edit_ward" name="ward">
+                        <input type="hidden" id="edit_village" name="village">
+                        <input type="hidden" id="edit_postal_code" name="postal_code">
+                        <input type="hidden" id="edit_address" name="address">
+                        <input type="hidden" id="edit_postal_address" name="postal_address">
+                        <input type="hidden" id="edit_tax_id" name="tax_id">
+                        <input type="hidden" id="edit_vat_number" name="vat_number">
+                        <input type="hidden" id="edit_default_wht_rate_id" name="default_wht_rate_id">
+                        <input type="hidden" id="edit_payment_terms" name="payment_terms">
+                        <input type="hidden" id="edit_currency" name="currency">
+                        <input type="hidden" id="edit_bank_name" name="bank_name">
+                        <input type="hidden" id="edit_bank_account" name="bank_account">
+                        <input type="hidden" id="edit_bank_address" name="bank_address">
+                        <?php else: ?>
                         <!-- Nav tabs for Edit -->
                         <ul class="nav nav-tabs mb-3" id="editCustomerTabs" role="tablist">
                             <li class="nav-item" role="presentation">
@@ -952,6 +1044,7 @@ if (projectsModuleActive()) {
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -1264,6 +1357,10 @@ $(document).ready(function() {
 
     // Select2 for Edit modal
     $('#editCustomerModal').on('shown.bs.modal', function() {
+        <?php if (!$simpleCustomerForm): ?>
+        // Simple POS: skipped — #edit_project_id is a plain hidden <input>
+        // there (preserving the record's real project untouched), not a
+        // <select>; Select2 expects a real <select> element.
         $('#edit_project_id').each(function() {
             if (!$(this).hasClass('select2-hidden-accessible')) {
                 $(this).select2({
@@ -1275,6 +1372,7 @@ $(document).ready(function() {
                 });
             }
         });
+        <?php endif; ?>
         initOtherSelects('#editCustomerModal', $('#editCustomerModal'));
     });
     $('#addCustomerModal, #editCustomerModal').on('hidden.bs.modal', function() {
@@ -1531,6 +1629,19 @@ function editCustomer(customerId) {
                     'bank_address': '#edit_bank_address',
                     'year': '#edit_year',
                     'project_id': '#edit_project_id'
+                    <?php if ($simpleCustomerForm): ?>
+                    // Simple POS: the location cascade below is skipped (its
+                    // live <select> elements don't exist in this mode), so
+                    // these 5 fields are preserved directly here instead,
+                    // straight onto the hidden inputs — same generic
+                    // "keep whatever's already there" plumbing as every
+                    // other hidden field above.
+                    ,'country': '#edit_country'
+                    ,'state': '#edit_state'
+                    ,'city': '#edit_city'
+                    ,'ward': '#edit_ward'
+                    ,'village': '#edit_village'
+                    <?php endif; ?>
                 };
 
                 // Handle Logo Preview
@@ -1558,7 +1669,11 @@ function editCustomer(customerId) {
 
                 // Location cascade prefill — matches stored names against the
                 // defined lists; unmatched legacy values are kept as extra
-                // options instead of being wiped.
+                // options instead of being wiped. Skipped in Simple POS: the
+                // live <select> elements it manages don't exist in that mode
+                // (the mapping loop above already preserved the raw values
+                // onto plain hidden inputs instead).
+                <?php if (!$simpleCustomerForm): ?>
                 editLocationCascade.setValues({
                     country:  c.country || 'Tanzania',
                     region:   c.state || '',
@@ -1566,6 +1681,7 @@ function editCustomer(customerId) {
                     ward:     c.ward || '',
                     village:  c.village || ''
                 });
+                <?php endif; ?>
 
                 const modalEl = document.getElementById('editCustomerModal');
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
