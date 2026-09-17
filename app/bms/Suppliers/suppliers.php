@@ -299,7 +299,7 @@ function supplier_status_label($status) {
                 <div class="collapse show" id="filterCollapse">
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-6 col-md-3">
+                            <div class="<?= $simpleSupplierForm ? 'col-12 col-md-4' : 'col-6 col-md-3' ?>">
                                 <label for="statusFilter" class="form-label small fw-bold"><?= t('Status') ?></label>
                                 <select class="form-select" id="statusFilter">
                                     <option value=""><?= t('All Status') ?></option>
@@ -309,6 +309,7 @@ function supplier_status_label($status) {
                                     <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                 </select>
                             </div>
+                            <?php if (!$simpleSupplierForm): ?>
                             <div class="col-6 col-md-3">
                                 <label for="categoryFilter" class="form-label small fw-bold"><?= t('Category') ?></label>
                                 <select class="form-select select2-static" id="categoryFilter">
@@ -326,6 +327,7 @@ function supplier_status_label($status) {
                                 <label for="cityFilter" class="form-label small fw-bold"><?= t('City') ?></label>
                                 <input type="text" class="form-control" id="cityFilter" placeholder="<?= t('Filter by city') ?>" autocomplete="off">
                             </div>
+                            <?php endif; ?>
                             <div class="col-md-12 d-flex flex-column flex-sm-row justify-content-end pt-2 gap-2">
                                 <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="clearFilters()">
                                     <i class="bi bi-arrow-clockwise"></i> <?= t('Clear') ?>
@@ -423,12 +425,14 @@ function supplier_status_label($status) {
                                 <th class="align-middle col-info col-code"><?= t('Supplier Code') ?></th>
                                 <th class="align-middle col-info col-name"><?= t('Supplier Name') ?></th>
                                 <th class="align-middle col-info col-contact"><?= t('Contact Info') ?></th>
+                                <?php if (!$simpleSupplierForm): ?>
                                 <th class="align-middle col-info col-address"><?= t('Address') ?></th>
                                 <th class="align-middle col-info col-category"><?= t('Category') ?></th>
                                 <th class="align-middle col-info col-project"><?= t('Project') ?></th>
                                 <th class="text-center align-middle col-stat"><?= t('Total Orders') ?></th>
                                 <th class="text-center align-middle col-stat"><?= t('Pending') ?></th>
                                 <th class="text-center align-middle col-stat"><?= t('Completed') ?></th>
+                                <?php endif; ?>
                                 <th class="align-middle col-status"><?= t('Status') ?></th>
                                 <th class="align-middle d-print-none"><?= t('Actions') ?></th>
                             </tr>
@@ -453,6 +457,7 @@ function supplier_status_label($status) {
                                         <?php endif; ?>
                                     </div>
                                 </td>
+                                <?php if (!$simpleSupplierForm): ?>
                                 <td>
                                     <div class="small text-muted" style="max-width: 150px; line-height: 1.2;">
                                         <?php if (!empty($supplier['address'])): ?>
@@ -490,6 +495,7 @@ function supplier_status_label($status) {
                                 <td class="text-center">
                                     <span class="badge bg-success"><?= $supplier['completed_orders'] ?></span>
                                 </td>
+                                <?php endif; ?>
                                 <td>
                                     <span class="badge bg-<?= get_status_badge($supplier['status']) ?>">
                                         <?= supplier_status_label($supplier['status']) ?>
@@ -511,7 +517,7 @@ function supplier_status_label($status) {
                                                  View Account is kept: it opens the full vendor statement, which is a
                                                  separate report, not one of that page's tabs. -->
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> <?= t('View Account') ?></a></li>
-                                            <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
+                                            <?php if (!$simpleSupplierForm && $company_type != 'microfinance' && $can_edit_suppliers): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> <?= t('New Order') ?></a></li>
                                             <?php endif; ?>
 
@@ -601,6 +607,7 @@ function supplier_status_label($status) {
                                     <?php endif; ?>
                                 </div>
 
+                                <?php if (!$simpleSupplierForm): ?>
                                 <div class="d-flex justify-content-between mt-3">
                                     <div class="text-center">
                                         <div class="badge bg-primary"><?= $supplier['total_orders'] ?></div>
@@ -618,6 +625,7 @@ function supplier_status_label($status) {
                                         <small><?= t('Pending') ?></small>
                                     </div>
                                 </div>
+                                <?php endif; ?>
                             </div>
                             <div class="card-footer bg-white border-top p-0">
                                 <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
