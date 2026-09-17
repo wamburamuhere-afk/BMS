@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-17 (fix/pos-credit-terminology-and-stats) - Follow-up: stat cards still white on the un-deployed fix + #d1e7dd styling
+
+**Request:** user reported the "Who Owes Me" summary cards still show "—" instead of real numbers, and asked for their background to be `#d1e7dd` (the light-green convention used across the app's other stat-card rows, e.g. `products.php`) instead of white.
+
+**On the blank cards:** the fix for this (the `onStats` wiring) is already committed on this same branch/PR (previous entry below) — it was still open, unmerged, at the time this was reported, so it correctly wasn't live yet on the demo site being tested. No further code change needed for that half; flagged to the user that this PR needs merging for the fix to actually appear.
+
+**Styling fix:** restyled the 3 summary cards (`app/bms/pos/pos_credit_customers.php`) from plain `card border-0 shadow-sm` (white) to the app-wide `.custom-stat-card` convention (`background-color: #d1e7dd`, green `#0f5132` text, copied verbatim from `products.php`'s own stat-card block) — same visual language as every other page's summary row, not a one-off color.
+
+**Tested:** extended `tests/test_pos_credit_terminology_and_stats_cli.php` to 22/22 — confirmed all 3 cards carry the `custom-stat-card` class and the `#d1e7dd` CSS block, confirmed the old per-card `text-danger` override is gone (the shared class now controls text color uniformly), and a live HTTP check confirms the real page actually serves this styling. Full regression re-run: `test_pos_credit_aging_table_cli.php` (32/32) — no drift. `php -l` clean.
+
 ## 2026-09-17 (fix/pos-credit-terminology-and-stats) - Fixed backwards Swahili term on "Who Owes Me", wired blank stat cards, hid Inventory Value for Simple POS
 
 **Request:** user reported three issues from the live demo tenant (shop.demo.bjptechnologies.co.tz): (1) the "Who Owes Me" page's Swahili title "Wanaonidai" has the debt direction backwards; (2) its three summary cards (Total Owed / Overdue / Open Credit Sales) show nothing at all; (3) asked to hide the dashboard's "Inventory Value" ("Thamani ya Ghala") card for Simple POS tenants.
