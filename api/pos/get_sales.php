@@ -25,11 +25,16 @@ if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' =
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date']   ?? date('Y-m-t');
+// Optional (2026-09-17, customer_details.php's Sales History tab) — narrows
+// to one customer's own sale history, on top of the existing date range and
+// project/warehouse scope, never replacing them.
+$customer_id = isset($_GET['customer_id']) ? (int)$_GET['customer_id'] : 0;
 
 try {
     global $pdo;
     $scope = scopeFilterSqlNullable('project', 'ps')    // '' for admins; AND (ps.project_id IS NULL OR IN (...)) for non-admins
            . scopeFilterSqlNullable('warehouse', 'ps');
+    $customerFilter = $customer_id > 0 ? " AND ps.customer_id = ?" : '';
 
     // Paid-to-date per sale (guarded: pos_sale_payments arrives with the credit/AR migration).
     $hasPayTable = false;
@@ -46,10 +51,12 @@ try {
               FROM pos_sales ps
          LEFT JOIN customers c ON c.customer_id = ps.customer_id
          LEFT JOIN projects  pr ON pr.project_id = ps.project_id
-             WHERE DATE(ps.sale_date) BETWEEN ? AND ?" . $scope . "
+             WHERE DATE(ps.sale_date) BETWEEN ? AND ?" . $customerFilter . $scope . "
           ORDER BY ps.sale_date DESC, ps.sale_id DESC";
     $st = $pdo->prepare($sql);
-    $st->execute([$start_date, $end_date]);
+    $params = [$start_date, $end_date];
+    if ($customer_id > 0) $params[] = $customer_id;
+    $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($rows as &$r) {
