@@ -1053,6 +1053,152 @@ if (!function_exists('setTenantAdvancedProduct')) {
     }
 }
 
+/**
+ * 2026-09-17 — "Advanced Customer" / "Advanced Supplier" overrides, same
+ * narrow "opens a tenant's own database" exception and same shape as
+ * tenantAdvancedProductStatus()/setTenantAdvancedProduct() above, kept as
+ * their own independent pair (not reusing Advanced Product) — a shop may
+ * want simple products but still need full supplier records, or vice versa.
+ * core/pos_nav.php::advancedCustomerEnabled()/advancedSupplierEnabled() read
+ * the same 'pos_advanced_customer'/'pos_advanced_supplier' keys from inside
+ * the tenant's own request instead.
+ */
+if (!function_exists('tenantAdvancedCustomerStatus')) {
+    /** @return array{enabled:bool, locked:bool}|null null if the tenant/DB can't be reached. */
+    function tenantAdvancedCustomerStatus(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $st2 = $tPdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_advanced_customer'");
+            $val = $st2 ? $st2->fetchColumn() : false;
+
+            return [
+                'enabled' => ($val === '1'),
+                'locked'  => !empty($t['pos_advanced_customer_locked']),
+            ];
+        } catch (Throwable $e) {
+            error_log('tenantAdvancedCustomerStatus(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('setTenantAdvancedCustomer')) {
+    /** @return array{ok:bool, error:?string} */
+    function setTenantAdvancedCustomer(int $tenantId, bool $enabled, bool $locked): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return ['ok' => false, 'error' => 'Tenant not found.'];
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return ['ok' => false, 'error' => 'Could not decrypt tenant credentials.'];
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+            $tPdo->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                VALUES ('pos_advanced_customer', ?, NOW())
+                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+            ")->execute([$enabled ? '1' : '0', $enabled ? '1' : '0']);
+
+            getControlPdo()->prepare("UPDATE tenants SET pos_advanced_customer_locked = ? WHERE id = ?")
+                ->execute([$locked ? 1 : 0, $tenantId]);
+
+            return ['ok' => true, 'error' => null];
+        } catch (Throwable $e) {
+            error_log('setTenantAdvancedCustomer(' . $tenantId . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not update this tenant right now.'];
+        }
+    }
+}
+
+if (!function_exists('tenantAdvancedSupplierStatus')) {
+    /** @return array{enabled:bool, locked:bool}|null null if the tenant/DB can't be reached. */
+    function tenantAdvancedSupplierStatus(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $st2 = $tPdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_advanced_supplier'");
+            $val = $st2 ? $st2->fetchColumn() : false;
+
+            return [
+                'enabled' => ($val === '1'),
+                'locked'  => !empty($t['pos_advanced_supplier_locked']),
+            ];
+        } catch (Throwable $e) {
+            error_log('tenantAdvancedSupplierStatus(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('setTenantAdvancedSupplier')) {
+    /** @return array{ok:bool, error:?string} */
+    function setTenantAdvancedSupplier(int $tenantId, bool $enabled, bool $locked): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return ['ok' => false, 'error' => 'Tenant not found.'];
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return ['ok' => false, 'error' => 'Could not decrypt tenant credentials.'];
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+            $tPdo->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                VALUES ('pos_advanced_supplier', ?, NOW())
+                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+            ")->execute([$enabled ? '1' : '0', $enabled ? '1' : '0']);
+
+            getControlPdo()->prepare("UPDATE tenants SET pos_advanced_supplier_locked = ? WHERE id = ?")
+                ->execute([$locked ? 1 : 0, $tenantId]);
+
+            return ['ok' => true, 'error' => null];
+        } catch (Throwable $e) {
+            error_log('setTenantAdvancedSupplier(' . $tenantId . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not update this tenant right now.'];
+        }
+    }
+}
+
 if (!function_exists('tenantShopModeStatus')) {
     /**
      * A FOURTH deliberate, narrow exception to "the superadmin panel never

@@ -125,6 +125,34 @@ if (!function_exists('advancedProductEnabled')) {
     }
 }
 
+if (!function_exists('advancedCustomerEnabled')) {
+    /**
+     * 2026-09-17 — same pattern as advancedProductEnabled(), independent
+     * toggle: shows the full, non-simplified Add/Edit Customer form (Company
+     * details, full Address, Tax/WHT/Bank fields) even on a tenant running
+     * Simple POS mode. Set only via actions/superadmin_tenant_advanced_customer.php
+     * (Tenant > Point of Sale > More). Every customer-page check is
+     * `posSimpleModeEnabled() && !advancedCustomerEnabled()`.
+     */
+    function advancedCustomerEnabled(): bool
+    {
+        return get_setting('pos_advanced_customer', '0') === '1';
+    }
+}
+
+if (!function_exists('advancedSupplierEnabled')) {
+    /**
+     * 2026-09-17 — same pattern as advancedCustomerEnabled(), for Supplier
+     * registration. Set only via actions/superadmin_tenant_advanced_supplier.php
+     * (Tenant > Point of Sale > More). Every supplier-page check is
+     * `posSimpleModeEnabled() && !advancedSupplierEnabled()`.
+     */
+    function advancedSupplierEnabled(): bool
+    {
+        return get_setting('pos_advanced_supplier', '0') === '1';
+    }
+}
+
 if (!function_exists('restaurantSubHubCards')) {
     /**
      * The Restaurant sub-hub's 5 destination cards — the single source shared
