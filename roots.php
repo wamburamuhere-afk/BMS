@@ -179,6 +179,11 @@ $routes = [
     // token emailed by api/document/request_external_signature.php.
     'sign-document'  => ROOT_DIR . '/sign_document.php',
     'sign_document'  => ROOT_DIR . '/sign_document.php',
+    // Public, unauthenticated — reached only via the reusable token a shop
+    // owner generates from warehouse_view.php (Simple POS only). See
+    // api/stock/generate_shop_catalog_link.php.
+    'shop-catalog'   => ROOT_DIR . '/shop_catalog.php',
+    'shop_catalog'   => ROOT_DIR . '/shop_catalog.php',
 
     // ========================================================================
     // ACCOUNTS MODULE (App Directory)
