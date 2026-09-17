@@ -39,32 +39,24 @@ try {
         exit;
     }
 
-    // Check for associated records
-    $hasDependencies = false;
-    
-    // Check sales orders
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE customer_id = ?");
+    // 2026-09-17 fix: this used to hard-DELETE the row whenever the customer
+    // had no sales_orders/invoices — which meant almost every Simple POS
+    // customer (who by definition never has either) got hard-deleted by
+    // default, even one still carrying an unpaid POS credit balance, in
+    // direct violation of this codebase's own "never hard-DELETE" standard
+    // (.claude/security.md §12). Always soft-delete now, no exceptions —
+    // the customer_id stays valid for every pos_sales/invoice row that
+    // already references it (their own history is never touched), and the
+    // record itself can be restored by an admin if deleted by mistake.
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM pos_sales WHERE customer_id = ?");
     $stmt->execute([$customerId]);
-    if ($stmt->fetchColumn() > 0) $hasDependencies = true;
+    $hasPosSales = $stmt->fetchColumn() > 0;
 
-    // Check invoices
-    if (!$hasDependencies) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE customer_id = ?");
-        $stmt->execute([$customerId]);
-        if ($stmt->fetchColumn() > 0) $hasDependencies = true;
-    }
-
-    if ($hasDependencies) {
-        // Soft delete
-        $stmt = $pdo->prepare("UPDATE customers SET status = 'deleted', updated_by = ? WHERE customer_id = ?");
-        $stmt->execute([$_SESSION['user_id'], $customerId]);
-        $message = 'Customer marked as deleted (soft delete due to existing records)';
-    } else {
-        // Hard delete
-        $stmt = $pdo->prepare("DELETE FROM customers WHERE customer_id = ?");
-        $stmt->execute([$customerId]);
-        $message = 'Customer permanently deleted';
-    }
+    $stmt = $pdo->prepare("UPDATE customers SET status = 'deleted', updated_by = ? WHERE customer_id = ?");
+    $stmt->execute([$_SESSION['user_id'], $customerId]);
+    $message = $hasPosSales
+        ? 'Customer marked as deleted. Their POS sales history and any credit balance are preserved and still trackable.'
+        : 'Customer marked as deleted.';
 
     logActivity($pdo, $_SESSION['user_id'], "Delete customer", "deleted customer \"{$customer['customer_name']}\" with id $customerId");
 
