@@ -1835,20 +1835,73 @@ global $company_name, $company_logo;
                         amountHeader: <?= json_encode(t('Amount')) ?>,
                         methodHeader: <?= json_encode(t('Method')) ?>,
                         byHeader: <?= json_encode(t('By')) ?>,
+                        phone: <?= json_encode(t('Phone')) ?>,
+                        owed: <?= json_encode(t('Owed')) ?>,
                     }
                 });
             });
             </script>
             <style>
-            /* ── Mobile custom card view — mirrors expenses.php's .expense-mobile-card ── */
+            /* ── Mobile custom card view — avatar + labelled-row profile-card
+               style, matching pos_credit_customers.php's own copy so the two
+               hosts of this shared module never visually drift apart. ── */
             @media (max-width: 768px) {
                 .credit-aging-mobile-card {
                     background: #fff;
                     border: 1px solid #e9ecef;
-                    border-radius: 8px;
-                    padding: 8px 10px;
+                    border-radius: 10px;
+                    padding: 10px 12px;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
                 }
+                .credit-aging-mobile-card .cag-head {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                    margin-bottom: 8px;
+                }
+                .credit-aging-mobile-card .cag-avatar {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: #0d6efd;
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    flex-shrink: 0;
+                }
+                .credit-aging-mobile-card .cag-name {
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    text-transform: uppercase;
+                    line-height: 1.25;
+                }
+                .credit-aging-mobile-card .cag-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 6px 0;
+                    border-bottom: 1px solid #f0f0f0;
+                    font-size: 0.78rem;
+                }
+                .credit-aging-mobile-card .cag-row:last-of-type { border-bottom: none; }
+                .credit-aging-mobile-card .cag-label {
+                    color: #6c757d;
+                    text-transform: uppercase;
+                    font-size: 0.65rem;
+                    letter-spacing: 0.03em;
+                    flex-shrink: 0;
+                }
+                .credit-aging-mobile-card .cag-value { text-align: right; }
+                .credit-aging-mobile-card .cag-actions {
+                    display: flex;
+                    gap: 6px;
+                    margin-top: 10px;
+                }
+                .credit-aging-mobile-card .cag-actions .btn { flex: 1; }
             }
             </style>
             <?php endif; ?>

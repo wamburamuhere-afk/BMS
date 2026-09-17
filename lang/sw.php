@@ -4364,4 +4364,19 @@ return [
     // Dashboard KPI strip — Credit/Madeni + Monthly Expenses cards (2026-09-16)
     'Monthly Expenses' => 'Matumizi ya Mwezi',
     'Records' => 'Kumbukumbu',
+
+    // "Who Owes Me" — grammatically-correct overdue-count label (2026-09-17).
+    // The generic 'Overdue' key ('Imechelewa') is reused on many unrelated
+    // pages, so it's left untouched; this page gets its own key instead,
+    // one that reads correctly under this stat card regardless of whether
+    // the count is 0, 1, or many — 'Mauzo Yaliyocheleweshwa' agrees with
+    // "mauzo" (sales, noun class 6), not with the number shown.
+    'Sales Overdue' => 'Mauzo Yaliyocheleweshwa',
+    'All Time' => 'Muda Wote',
+    'This Week' => 'Wiki Hii',
+    'This Month' => 'Mwezi Huu',
+    'This Year' => 'Mwaka Huu',
+    'All Customers' => 'Wateja Wote',
+    'Top 5 largest' => 'Kubwa 5 Zaidi',
+    'Search by customer name or phone…' => 'Tafuta kwa jina la mteja au simu…',
 ];
