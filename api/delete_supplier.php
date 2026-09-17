@@ -42,51 +42,40 @@ if (!$supplier) {
     exit();
 }
 
-// Check if supplier has associated records
+// 2026-09-17 fix (same bug found and fixed on the Customer side): this used
+// to hard-DELETE the row whenever the supplier had no purchase_orders/
+// supplier_payments — which is the default for nearly every Simple POS
+// supplier (Quick Restock's outflow never even links to a supplier_id, per
+// post_principle.md's "assume already paid" instruction), in direct
+// violation of this codebase's own "never hard-DELETE" standard
+// (.claude/security.md §12). Always soft-delete now, no exceptions.
+// suppliers.status already correctly includes 'deleted' in its enum (unlike
+// customers.status before its own 2026-09-17 migration), so no schema change
+// is needed here.
 $orders_stmt = $pdo->prepare("SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = ?");
 $orders_stmt->execute([$supplier_id]);
-$order_count = $orders_stmt->fetchColumn();
+$hasOrders = $orders_stmt->fetchColumn() > 0;
 
 $payments_stmt = $pdo->prepare("SELECT COUNT(*) FROM supplier_payments WHERE supplier_id = ?");
 $payments_stmt->execute([$supplier_id]);
-$payment_count = $payments_stmt->fetchColumn();
+$hasPayments = $payments_stmt->fetchColumn() > 0;
 
-if ($order_count > 0 || $payment_count > 0) {
-    // Soft delete (change status to deleted)
-    $delete_stmt = $pdo->prepare("UPDATE suppliers SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE supplier_id = ?");
-    
-    try {
-        $delete_stmt->execute([$_SESSION['user_id'], $supplier_id]);
+$delete_stmt = $pdo->prepare("UPDATE suppliers SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE supplier_id = ?");
 
-        logActivity($pdo, $_SESSION['user_id'], "Delete supplier", "deleted supplier \"" . $supplier['supplier_name'] . "\" with id $supplier_id (soft-deleted — had associated records)");
+try {
+    $delete_stmt->execute([$_SESSION['user_id'], $supplier_id]);
 
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => true,
-            'message' => 'Supplier marked as deleted (soft delete due to associated records)'
-        ]);
-        
-    } catch (PDOException $e) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-    }
-} else {
-    // Hard delete (remove from database)
-    $delete_stmt = $pdo->prepare("DELETE FROM suppliers WHERE supplier_id = ?");
-    
-    try {
-        $delete_stmt->execute([$supplier_id]);
+    logActivity($pdo, $_SESSION['user_id'], "Delete supplier", "deleted supplier \"" . $supplier['supplier_name'] . "\" with id $supplier_id");
 
-        logActivity($pdo, $_SESSION['user_id'], "Delete supplier", "deleted supplier \"" . $supplier['supplier_name'] . "\" with id $supplier_id");
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => true,
+        'message' => ($hasOrders || $hasPayments)
+            ? 'Supplier marked as deleted. Their purchase orders and payment history are preserved and still trackable.'
+            : 'Supplier marked as deleted.'
+    ]);
 
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => true,
-            'message' => 'Supplier permanently deleted'
-        ]);
-        
-    } catch (PDOException $e) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-    }
+} catch (PDOException $e) {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
