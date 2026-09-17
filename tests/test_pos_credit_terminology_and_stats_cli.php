@@ -84,6 +84,15 @@ has($whoOwes, "\$('#stat-overdue-count').text(s.overdueCount);", 'onStats popula
 has($whoOwes, "\$('#stat-open-count').text(s.count);", 'onStats populates #stat-open-count');
 
 // ─────────────────────────────────────────────────────────────────────────
+section('3b. Stat cards use the app-wide #d1e7dd convention, not white');
+has($whoOwes, '#d1e7dd', 'custom-stat-card CSS block present (same color used across products.php and others)');
+$statCardCount = substr_count($whoOwes, 'card custom-stat-card shadow-sm border-0 text-center p-3');
+$statCardCount === 3
+    ? pass('All 3 summary cards use the custom-stat-card class (was plain white "card border-0 shadow-sm")')
+    : fail("Expected 3 cards with custom-stat-card, found $statCardCount");
+hasnt($whoOwes, 'text-danger" id="stat-total-owed"', 'old per-card text-danger color class removed (custom-stat-card forces the uniform green text itself)');
+
+// ─────────────────────────────────────────────────────────────────────────
 section('4. Inventory Value card hidden for Simple POS');
 $dash = src($root, 'app/dashboard.php');
 has($dash, "if(!\$pos_simple_mode && (canView('products') || canView('inventory_report'))):", 'Inventory Value card gated on !$pos_simple_mode in addition to its original permission');
@@ -179,6 +188,9 @@ PHP);
         (strpos((string)$body, 'Wanaonidai') === false)
             ? pass('Live page no longer shows the backwards "Wanaonidai"')
             : fail('Live page still shows the backwards term');
+        (strpos((string)$body, '#d1e7dd') !== false && strpos((string)$body, 'custom-stat-card') !== false)
+            ? pass('Live page carries the custom-stat-card / #d1e7dd styling (was plain white)')
+            : fail('Live page missing the custom-stat-card styling');
 
         // The #stat-total-owed placeholder ("—") is server-rendered and is
         // ALWAYS in the raw HTML curl fetches — it's only replaced once the

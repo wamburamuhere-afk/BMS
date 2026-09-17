@@ -44,23 +44,41 @@ $can_delete = canDelete('pos');
         </div>
     </div>
 
+    <style>
+        /* Same convention used across the app's other stat-card rows
+           (e.g. products.php) — light green instead of plain white. */
+        .custom-stat-card {
+            background-color: #d1e7dd !important;
+            border-color: #badbcc !important;
+            transition: transform 0.2s;
+            border-radius: 12px;
+        }
+        .custom-stat-card:hover { transform: translateY(-3px); }
+        .custom-stat-card h3,
+        .custom-stat-card h4,
+        .custom-stat-card p,
+        .custom-stat-card i,
+        .custom-stat-card .small {
+            color: #0f5132 !important;
+        }
+    </style>
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-4 fw-bold text-danger" id="stat-total-owed">—</div>
-                <div class="small text-muted"><?= t('Total Owed') ?></div>
+            <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
+                <h4 class="mb-0 fw-bold" id="stat-total-owed">—</h4>
+                <p class="small mb-0"><?= t('Total Owed') ?></p>
             </div>
         </div>
         <div class="col-6 col-md-4">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-4 fw-bold text-warning" id="stat-overdue-count">—</div>
-                <div class="small text-muted"><?= t('Overdue') ?></div>
+            <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
+                <h4 class="mb-0 fw-bold" id="stat-overdue-count">—</h4>
+                <p class="small mb-0"><?= t('Overdue') ?></p>
             </div>
         </div>
         <div class="col-6 col-md-4">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-4 fw-bold text-primary" id="stat-open-count">—</div>
-                <div class="small text-muted"><?= t('Open Credit Sales') ?></div>
+            <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
+                <h4 class="mb-0 fw-bold" id="stat-open-count">—</h4>
+                <p class="small mb-0"><?= t('Open Credit Sales') ?></p>
             </div>
         </div>
     </div>
