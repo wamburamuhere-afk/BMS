@@ -932,9 +932,14 @@ function openPosMoreModal() {
             url: '/actions/superadmin_tenant_advanced_supplier.php',
             method: 'POST', dataType: 'json',
             data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
+        }),
+        $.ajax({
+            url: '/actions/superadmin_tenant_supplier_access.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
         })
-    ).done(function (r1, r2, r3, r4, r5) {
-        const res = r1[0], shopRes = r2[0], advProdRes = r3[0], advCustRes = r4[0], advSuppRes = r5[0];
+    ).done(function (r1, r2, r3, r4, r5, r6) {
+        const res = r1[0], shopRes = r2[0], advProdRes = r3[0], advCustRes = r4[0], advSuppRes = r5[0], supAccessRes = r6[0];
         if (!res || !res.success) {
             Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read Simple Mode status for this tenant.' });
             return;
@@ -953,6 +958,10 @@ function openPosMoreModal() {
         }
         if (!advSuppRes || !advSuppRes.success) {
             Swal.fire({ icon: 'error', title: 'Error', text: (advSuppRes && advSuppRes.message) || 'Could not read Advanced Supplier status for this tenant.' });
+            return;
+        }
+        if (!supAccessRes || !supAccessRes.success) {
+            Swal.fire({ icon: 'error', title: 'Error', text: (supAccessRes && supAccessRes.message) || 'Could not read Supplier Access status for this tenant.' });
             return;
         }
         function subFeatureBlock(id, label, description, state) {
@@ -992,10 +1001,15 @@ function openPosMoreModal() {
                 + '<label class="form-check-label fw-semibold" for="saAdvancedCustomerEnabled">Advanced Customer</label>'
                 + '<div class="text-muted small">Shows the full Add/Edit Customer form (Company details, Category, full structured Address, Tax ID/VAT/WHT, Bank details, etc.) even while this tenant is on Simple Mode, which normally trims customer registration down to Name/Phone/Credit Limit/Notes. Has no effect unless Simple Mode is also on. Superadmin-only.</div>'
                 + '</div>'
-                + '<div class="form-check">'
+                + '<div class="form-check mb-3 pb-3 border-bottom">'
                 + '<input class="form-check-input" type="checkbox" id="saAdvancedSupplierEnabled"' + (advSuppRes.enabled ? ' checked' : '') + '>'
                 + '<label class="form-check-label fw-semibold" for="saAdvancedSupplierEnabled">Advanced Supplier</label>'
                 + '<div class="text-muted small">Shows the full Add/Edit Supplier form (Company details, Category, full structured Address, Tax ID/VAT/WHT) even while this tenant is on Simple Mode. Bank Name/Account stay visible either way — a shop still needs to pay its suppliers. Has no effect unless Simple Mode is also on. Superadmin-only.</div>'
+                + '</div>'
+                + '<div class="form-check">'
+                + '<input class="form-check-input" type="checkbox" id="saSupplierAccessEnabled"' + (supAccessRes.enabled ? ' checked' : '') + '>'
+                + '<label class="form-check-label fw-semibold" for="saSupplierAccessEnabled">Supplier Access</label>'
+                + '<div class="text-muted small">Makes Suppliers visible (dashboard button, nav, the simplified supplier list/profile — same simplified shape as Customer) even without the full Procurement module. Procurement-only screens (Payments, Bills, Purchase Orders, RFQ, GRN, etc.) stay off until Procurement itself is enabled. Has no effect if Procurement is already on. Superadmin-only.</div>'
                 + '</div>'
                 + '</div>',
             showCancelButton: true,
@@ -1008,7 +1022,8 @@ function openPosMoreModal() {
                     shopMode: document.getElementById('saShopModeEnabled').checked,
                     advancedProduct: document.getElementById('saAdvancedProductEnabled').checked,
                     advancedCustomer: document.getElementById('saAdvancedCustomerEnabled').checked,
-                    advancedSupplier: document.getElementById('saAdvancedSupplierEnabled').checked
+                    advancedSupplier: document.getElementById('saAdvancedSupplierEnabled').checked,
+                    supplierAccess: document.getElementById('saSupplierAccessEnabled').checked
                 };
             }
         }).then(function (result) {
@@ -1071,10 +1086,19 @@ function openPosMoreModal() {
                         enabled: result.value.advancedSupplier ? 1 : 0,
                         locked: 1
                     }
+                }),
+                $.ajax({
+                    url: '/actions/superadmin_tenant_supplier_access.php',
+                    method: 'POST', dataType: 'json',
+                    data: {
+                        _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set',
+                        enabled: result.value.supplierAccess ? 1 : 0,
+                        locked: 1
+                    }
                 })
-            ).done(function (r1, r2, r3, r4, r5, r6) {
-                var res1 = r1[0], res2 = r2[0], res3 = r3[0], res4 = r4[0], res5 = r5[0], res6 = r6[0];
-                if (res1 && res1.success && res2 && res2.success && res3 && res3.success && res4 && res4.success && res5 && res5.success && res6 && res6.success) {
+            ).done(function (r1, r2, r3, r4, r5, r6, r7) {
+                var res1 = r1[0], res2 = r2[0], res3 = r3[0], res4 = r4[0], res5 = r5[0], res6 = r6[0], res7 = r7[0];
+                if (res1 && res1.success && res2 && res2.success && res3 && res3.success && res4 && res4.success && res5 && res5.success && res6 && res6.success && res7 && res7.success) {
                     Swal.fire({ icon: 'success', title: 'Saved', text: 'Point of Sale settings updated.', timer: 1800, showConfirmButton: false })
                         .then(function () { window.location.reload(); });
                 } else {
@@ -1084,7 +1108,8 @@ function openPosMoreModal() {
                         !res3 || !res3.success ? (res3 && res3.message) : null,
                         !res4 || !res4.success ? (res4 && res4.message) : null,
                         !res5 || !res5.success ? (res5 && res5.message) : null,
-                        !res6 || !res6.success ? (res6 && res6.message) : null
+                        !res6 || !res6.success ? (res6 && res6.message) : null,
+                        !res7 || !res7.success ? (res7 && res7.message) : null
                     ].filter(Boolean).join(' ') || 'Could not save.';
                     Swal.fire({ icon: 'error', title: 'Error', text: msg });
                 }

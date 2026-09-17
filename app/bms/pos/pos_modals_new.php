@@ -147,6 +147,32 @@ if ($can_restock_product ?? false) {
                         </div>
                     </div>
                     <?php
+                    // Optional "which supplier was this batch ordered from" (2026-09-17
+                    // Supplier Access request) — genuinely absent from the DOM (not just
+                    // hidden) unless Suppliers is actually reachable for this tenant
+                    // (full Procurement, or the lightweight Supplier Access toggle —
+                    // canView('suppliers') already folds both in via
+                    // tenantModuleAllowsPage()). Never required either way — "not
+                    // recommended but not required" per the product owner; a batch
+                    // restocked without it simply has no supplier on file, same as today.
+                    $_pos_can_pick_supplier = function_exists('canView') && canView('suppliers');
+                    $_pos_restock_suppliers = $_pos_can_pick_supplier
+                        ? $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC)
+                        : [];
+                    ?>
+                    <?php if ($_pos_can_pick_supplier): ?>
+                    <div class="mb-3 mt-2">
+                        <label class="form-label"><?= t('Supplier') ?></label>
+                        <select class="form-select" id="restock_supplier_id" name="supplier_id">
+                            <option value=""><?= t('— Not specified —') ?></option>
+                            <?php foreach ($_pos_restock_suppliers as $_sup): ?>
+                            <option value="<?= $_sup['supplier_id'] ?>"><?= safe_output($_sup['supplier_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted"><?= t('Optional — which supplier this batch was ordered from.') ?></small>
+                    </div>
+                    <?php endif; ?>
+                    <?php
                     // Simple Mode ("normal business man" —
                     // core/pos_nav.php::posSimpleModeEnabled()) never shows a
                     // GL account picker — api/pos/quick_restock.php resolves

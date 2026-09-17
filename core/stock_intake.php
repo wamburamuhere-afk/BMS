@@ -95,13 +95,18 @@ if (!function_exists('receiveProductBatch')) {
             $batchNumber = trim((string)($line['batch_number'] ?? ''));
             $expiryDate  = $line['expiry_date'] ?? null;
             $mfgDate     = $line['manufacturing_date'] ?? null;
+            // supplier_id is optional (2026-09-17, Supplier Access / Quick Restock
+            // request) — "not recommended but not required" per the product owner,
+            // so a batch with no supplier on file stays exactly as valid as before.
+            $supplierId = isset($line['supplier_id']) ? (int)$line['supplier_id'] : 0;
             $insertBatch = $pdo->prepare("
                 INSERT INTO product_batches
-                    (product_id, warehouse_id, batch_number, expiry_date, manufacturing_date, quantity_received, quantity_remaining, unit_cost, wholesale_price, selling_price, receipt_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    (product_id, warehouse_id, supplier_id, batch_number, expiry_date, manufacturing_date, quantity_received, quantity_remaining, unit_cost, wholesale_price, selling_price, receipt_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             $insertBatch->execute([
                 $productId, $warehouseId,
+                $supplierId > 0 ? $supplierId : null,
                 $batchNumber !== '' ? $batchNumber : null,
                 !empty($expiryDate) ? $expiryDate : null,
                 !empty($mfgDate) ? $mfgDate : null,
