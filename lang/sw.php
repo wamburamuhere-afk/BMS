@@ -4356,4 +4356,8 @@ return [
     'Void this credit sale?' => 'Batilisha mauzo haya ya mkopo?',
     'This reverses the stock and cash. Cannot be undone.' => 'Hatua hii itarejesha bidhaa stoo na fedha. Haiwezi kutenguliwa.',
     'Yes, void it' => 'Ndiyo, batilisha',
+
+    // Dashboard KPI strip — Credit/Madeni + Monthly Expenses cards (2026-09-16)
+    'Monthly Expenses' => 'Matumizi ya Mwezi',
+    'Records' => 'Kumbukumbu',
 ];
