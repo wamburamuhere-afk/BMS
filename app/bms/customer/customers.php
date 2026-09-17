@@ -270,7 +270,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                 <div class="collapse show" id="filterCollapse">
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-6 col-md-3">
+                            <div class="<?= $simpleCustomerForm ? 'col-12 col-md-4' : 'col-6 col-md-3' ?>">
                                 <label for="statusFilter" class="form-label small fw-bold"><?= t('Status') ?></label>
                                 <select class="form-select" id="statusFilter" name="statusFilter">
                                     <option value=""><?= t('All Status') ?></option>
@@ -280,6 +280,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                     <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                 </select>
                             </div>
+                            <?php if (!$simpleCustomerForm): ?>
                             <div class="col-6 col-md-3">
                                 <label for="categoryFilter" class="form-label small fw-bold"><?= t('Category') ?></label>
                                 <select class="form-select select2-static" id="categoryFilter" name="categoryFilter">
@@ -297,6 +298,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                 <label for="cityFilter" class="form-label small fw-bold"><?= t('City') ?></label>
                                 <input type="text" class="form-control" id="cityFilter" name="cityFilter" placeholder="<?= t('Filter by city') ?>" autocomplete="off">
                             </div>
+                            <?php endif; ?>
                             <div class="col-md-12 d-flex flex-column flex-sm-row justify-content-end pt-2 gap-2">
                                 <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="clearFilters()">
                                     <i class="bi bi-arrow-clockwise"></i> <?= t('Clear') ?>
@@ -389,23 +391,28 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                         <div id="tableView" class="table-responsive">
                             <table id="customersTable" class="table table-hover align-middle mb-0" style="width: 100% !important;">
                                 <thead>
+                                    <?php $__rs = $simpleCustomerForm ? '1' : '2'; ?>
                                     <tr class="bg-light">
-                                        <th rowspan="2" class="align-middle ps-3" style="width:55px;">S/NO</th>
-                                        <th rowspan="2" class="align-middle ps-3"><?= t('Code') ?></th>
-                                        <th rowspan="2" class="align-middle"><?= t('Customer Name') ?></th>
-                                        <th rowspan="2" class="align-middle"><?= t('Contact Info') ?></th>
+                                        <th rowspan="<?= $__rs ?>" class="align-middle ps-3" style="width:55px;">S/NO</th>
+                                        <th rowspan="<?= $__rs ?>" class="align-middle ps-3"><?= t('Code') ?></th>
+                                        <th rowspan="<?= $__rs ?>" class="align-middle"><?= t('Customer Name') ?></th>
+                                        <th rowspan="<?= $__rs ?>" class="align-middle"><?= t('Contact Info') ?></th>
+                                        <?php if (!$simpleCustomerForm): ?>
                                         <th rowspan="2" class="align-middle"><?= t('Address') ?></th>
                                         <th rowspan="2" class="align-middle"><?= t('Category') ?></th>
                                         <th colspan="3" class="text-center border-bottom"><?= t('Activity Summary') ?></th>
                                         <th rowspan="2" class="align-middle"><?= t('Financial Balance') ?></th>
-                                        <th rowspan="2" class="align-middle text-center"><?= t('Status') ?></th>
-                                        <th rowspan="2" class="align-middle text-end pe-3"><?= t('Actions') ?></th>
+                                        <?php endif; ?>
+                                        <th rowspan="<?= $__rs ?>" class="align-middle text-center"><?= t('Status') ?></th>
+                                        <th rowspan="<?= $__rs ?>" class="align-middle text-end pe-3"><?= t('Actions') ?></th>
                                     </tr>
+                                    <?php if (!$simpleCustomerForm): ?>
                                     <tr class="bg-light border-top">
                                         <th class="text-center small fw-bold text-uppercase py-1" style="font-size: 0.65rem; color: #666;"><?= t('Orders') ?></th>
                                         <th class="text-center small fw-bold text-uppercase py-1" style="font-size: 0.65rem; color: #666;"><?= t('Invoices') ?></th>
                                         <th class="text-center small fw-bold text-uppercase py-1" style="font-size: 0.65rem; color: #666;"><?= t('Pending') ?></th>
                                     </tr>
+                                    <?php endif; ?>
                                 </thead>
                                 <tbody>
                                     <!-- Loaded via AJAX -->
@@ -1084,9 +1091,11 @@ $(document).ready(function() {
                 url: '<?= buildUrl('api/get_customers_paged.php') ?>',
                 data: function(d) {
                     d.status = $('#statusFilter').val();
+                    <?php if (!$simpleCustomerForm): ?>
                     d.category = $('#categoryFilter').val();
                     d.country = $('#countryFilter').val();
                     d.city = $('#cityFilter').val();
+                    <?php endif; ?>
                     d.attention = <?= $attention ? 1 : 0 ?>;
                 },
                 dataSrc: function(json) {
@@ -1130,7 +1139,8 @@ $(document).ready(function() {
                     `,
                     createdCell: (td) => $(td).attr('data-label', 'Contact Info')
                 },
-                { 
+                <?php if (!$simpleCustomerForm): ?>
+                {
                     data: 'address',
                     render: (data, t, row) => `
                         <div class="small text-muted" style="max-width: 150px; line-height: 1.2;">
@@ -1145,25 +1155,25 @@ $(document).ready(function() {
                     render: (data) => data ? `<span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25 px-2">${safeOutput(data)}</span>` : `<span class="text-muted small">${<?= json_encode(t('N/A')) ?>}</span>`,
                     createdCell: (td) => $(td).attr('data-label', 'Category')
                 },
-                { 
+                {
                     data: 'total_orders',
                     className: 'text-center',
                     render: (data) => `<span class="badge bg-primary shadow-sm" style="min-width: 30px; border-radius: 6px;">${data}</span>`,
                     createdCell: (td) => $(td).attr('data-label', 'Orders')
                 },
-                { 
+                {
                     data: 'total_invoices',
                     className: 'text-center',
                     render: (data) => `<span class="badge bg-info text-white shadow-sm" style="min-width: 30px; border-radius: 6px;">${data}</span>`,
                     createdCell: (td) => $(td).attr('data-label', 'Invoices')
                 },
-                { 
+                {
                     data: 'pending_orders',
                     className: 'text-center',
                     render: (data) => `<span class="badge bg-warning text-dark shadow-sm" style="min-width: 30px; border-radius: 6px;">${data}</span>`,
                     createdCell: (td) => $(td).attr('data-label', 'Pending')
                 },
-                { 
+                {
                     data: null,
                     render: (data, t, row) => `
                         <div class="p-1 px-2 rounded bg-light border border-opacity-10">
@@ -1179,6 +1189,7 @@ $(document).ready(function() {
                     `,
                     createdCell: (td) => $(td).attr('data-label', 'Financial Balance')
                 },
+                <?php endif; ?>
                 {
                     data: 'status',
                     className: 'text-center',
@@ -1202,6 +1213,7 @@ $(document).ready(function() {
                         if (<?= json_encode($can_edit_customers) ?>) {
                            actions += `<li><a class="dropdown-item" href="#" onclick="editCustomer(${row.customer_id})"><i class="bi bi-pencil text-primary"></i> <?= t('Edit Customer') ?></a></li>`;
                         }
+                        <?php if (!$simpleCustomerForm): ?>
                         actions += `
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="<?= getUrl('sales_orders') ?>?customer=${row.customer_id}"><i class="bi bi-cart text-success"></i> <?= t('View Orders') ?></a></li>
@@ -1213,6 +1225,7 @@ $(document).ready(function() {
                         if (<?= json_encode($company_type != 'microfinance' && $can_edit_customers) ?>) {
                             actions += `<li><a class="dropdown-item" href="<?= getUrl('sales_order_create') ?>?customer=${row.customer_id}"><i class="bi bi-file-plus text-primary"></i> <?= t('New Order') ?></a></li>`;
                         }
+                        <?php endif; ?>
                         if (<?= json_encode($can_delete_customers) ?>) {
                            actions += `<li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(${row.customer_id})"><i class="bi bi-trash"></i> <?= t('Delete Customer') ?></a></li>`;
                         }
@@ -1259,10 +1272,14 @@ $(document).ready(function() {
                                         <span class="badge bg-${getStatusBadge(customer.status)}" style="font-size:0.65rem">${getStatusLabel(customer.status)}</span>
                                     </div>
                                     ${customer.email ? '<div class="small text-muted mb-1"><i class="bi bi-envelope me-1"></i>' + safeOutput(customer.email) + '</div>' : ''}
+                                    <?php if ($simpleCustomerForm): ?>
+                                    ${customer.phone || customer.mobile ? '<div class="small text-muted mb-0"><i class="bi bi-telephone me-1"></i>' + safeOutput(customer.phone || customer.mobile) + '</div>' : ''}
+                                    <?php else: ?>
                                     <div class="d-flex justify-content-between small mb-0">
                                         <span class="text-muted"><?= t('Orders') ?>: <strong>${customer.total_orders}</strong></span>
                                         <span class="text-muted"><?= t('Unpaid') ?>: <strong class="text-danger">${formatCurrency(customer.total_unpaid)}</strong></span>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
                                     <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
@@ -1270,7 +1287,9 @@ $(document).ready(function() {
                                         <?php if ($can_edit_customers): ?>
                                         <button class="btn btn-sm btn-outline-warning" onclick="editCustomer(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Edit') ?>"><i class="bi bi-pencil"></i></button>
                                         <?php endif; ?>
+                                        <?php if (!$simpleCustomerForm): ?>
                                         ${customer.total_invoices > 0 ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View Account') ?>"><i class="bi bi-file-earmark-text"></i></a>` : ''}
+                                        <?php endif; ?>
                                         <?php if ($can_delete_customers): ?>
                                         <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Delete') ?>"><i class="bi bi-trash"></i></button>
                                         <?php endif; ?>

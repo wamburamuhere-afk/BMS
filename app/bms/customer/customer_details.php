@@ -272,6 +272,39 @@ if ($show_credit_tab) {
 }
 $can_edit_credit   = $show_credit_tab && canEdit('pos');
 $can_delete_credit = $show_credit_tab && canDelete('pos');
+// Headroom left on this customer's credit line — asked for explicitly
+// ("shows a specific loan available"), computed from the same credit_limit
+// the profile card already displays and the same currently_owed the Madeni
+// counters above already computed, never a third parallel calculation.
+$credit_available = max(0, (float)($customer['credit_limit'] ?? 0) - (float)$credit_counters['currently_owed']);
+
+// Simple POS / module-closed decluttering (2026-09-17 request) — the 7
+// formal B2B sales-cycle tabs (Sales Orders, Quotations, Invoices, Payments,
+// Deliveries, LPOs, Credit Notes & Advances) all belong to ONE tenant
+// entitlement, the 'sales' feature (core/feature_registry.php) — a tenant
+// that never purchased that module should never see them, independent of
+// Simple POS. Additionally collapsed under Simple POS itself (even for a
+// tenant that DOES have Sales) via the same $simpleCustomerForm flag
+// customers.php's own registration form already uses, via the new
+// "Advanced Customer" superadmin override.
+require_once __DIR__ . '/../../../core/feature_registry.php';
+$simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
+$hideSalesTabs = $simpleCustomerForm || !tenantFeatureEnabled('sales');
+
+// Sales History tab (new, 2026-09-17) — every POS sale (paid AND credit) for
+// this customer, not just the open/credit ones Madeni already covers. Gated
+// on the 'pos' feature itself (independent of Simple/Advanced) — the same
+// "don't show a closed module's tab" principle applied to Sales above.
+$show_sales_history_tab = tenantFeatureEnabled('pos');
+
+// Which tab-pane opens by default once the Sales-cycle tabs above may not
+// exist at all: prefer Madeni (money owed is the single most useful thing to
+// see first for a Simple POS shop), then Sales History, then System Info as
+// the last resort so there is always exactly one active pane.
+$default_tab_id = 'pane-orders';
+if ($hideSalesTabs) {
+    $default_tab_id = $show_credit_tab ? 'pane-madeni' : ($show_sales_history_tab ? 'pane-saleshistory' : 'pane-sysinfo');
+}
 
 global $company_name, $company_logo;
 ?>
@@ -639,7 +672,9 @@ global $company_name, $company_logo;
             </div>
             <?php endif; ?>
 
-            <!-- Representative/Personal Information -->
+            <!-- Representative/Personal Information — Simple POS shows only what
+                 registration actually collects (Name/Phone); the rest is defaulted/
+                 never asked for, so an "N/A" row for it is clutter, not information. -->
             <div class="card mb-4">
                 <div class="card-header bg-light border-bottom">
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-<?= $isCompany ? 'person-badge' : 'person-lines-fill' ?>"></i> <?= $isCompany ? 'Company Representative' : 'Personal' ?> Information</h6>
@@ -651,6 +686,11 @@ global $company_name, $company_logo;
                             <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['customer_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
+                            <label class="form-label text-muted small mb-1">Phone</label>
+                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['phone']) ?></p>
+                        </div>
+                        <?php if (!$simpleCustomerForm): ?>
+                        <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Title</label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['contact_title']) ? safe_output($customer['contact_title']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
@@ -661,10 +701,6 @@ global $company_name, $company_logo;
                          <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Mobile</label>
                             <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['mobile']) ?></p>
-                        </div>
-                        <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Phone</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['phone']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Fax</label>
@@ -682,6 +718,7 @@ global $company_name, $company_logo;
                                 <?php endif; ?>
                             </p>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -698,7 +735,8 @@ global $company_name, $company_logo;
             </div>
             <?php endif; ?>
 
-            <!-- Address Information -->
+            <?php if (!$simpleCustomerForm): ?>
+            <!-- Address Information — never collected in Simple POS registration -->
             <div class="card mb-4">
                 <div class="card-header bg-light border-bottom">
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-geo-alt"></i> Address Information</h6>
@@ -736,8 +774,11 @@ global $company_name, $company_logo;
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
-            <!-- Financial & Banking Information -->
+            <!-- Financial & Banking Information — Simple POS keeps only Credit Limit
+                 (the one field its own credit-tracking actually depends on); Payment
+                 Terms/Currency/Bank details are never collected there. -->
             <div class="card mb-4 financial-details-card">
                 <div class="card-header bg-light border-bottom">
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-stack"></i> Financial & Banking Details</h6>
@@ -748,6 +789,7 @@ global $company_name, $company_logo;
                             <label class="form-label text-muted small mb-1">Credit Limit</label>
                             <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= safe_output($customer['currency'] ?? 'TZS') ?></p>
                         </div>
+                        <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1">Payment Terms</label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['payment_terms']) ? ucwords(str_replace('_', ' ', $customer['payment_terms'])) : '<span class="text-muted">N/A</span>' ?></p>
@@ -768,6 +810,7 @@ global $company_name, $company_logo;
                             <label class="form-label text-muted small mb-1">Bank Address</label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_address']) ? nl2br(safe_output($customer['bank_address'])) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -943,8 +986,9 @@ global $company_name, $company_logo;
 
             <!-- Section Tabs -->
             <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="customerDetailTabs" role="tablist">
+                <?php if (!$hideSalesTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-orders" type="button" role="tab"><i class="bi bi-cart-check me-1"></i> Sales Orders</button>
+                    <button class="nav-link <?= $default_tab_id === 'pane-orders' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-orders" type="button" role="tab"><i class="bi bi-cart-check me-1"></i> Sales Orders</button>
                 </li>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-quotations" type="button" role="tab"><i class="bi bi-file-earmark-ruled me-1"></i> Quotations</button>
@@ -966,20 +1010,27 @@ global $company_name, $company_logo;
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-creditnotes" type="button" role="tab"><i class="bi bi-arrow-counterclockwise me-1"></i> Credit Notes &amp; Advances</button>
                 </li>
+                <?php endif; ?>
+                <?php if ($show_sales_history_tab): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link <?= $default_tab_id === 'pane-saleshistory' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-saleshistory" type="button" role="tab"><i class="bi bi-receipt-cutoff me-1"></i> <?= t('Sales History') ?></button>
+                </li>
+                <?php endif; ?>
                 <?php if ($show_credit_tab): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
-                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-madeni" type="button" role="tab"><i class="bi bi-cash-coin me-1"></i> Madeni
+                    <button class="nav-link <?= $default_tab_id === 'pane-madeni' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-madeni" type="button" role="tab"><i class="bi bi-cash-coin me-1"></i> Madeni
                         <?php if ($credit_counters['currently_owed'] > 0): ?><span class="badge bg-danger ms-1"><?= number_format($credit_counters['currently_owed']) ?></span><?php endif; ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
-                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> System Info</button>
+                    <button class="nav-link <?= $default_tab_id === 'pane-sysinfo' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> System Info</button>
                 </li>
             </ul>
             <div class="tab-content" id="customerDetailTabContent">
 
-            <div class="tab-pane fade show active" id="pane-orders" role="tabpanel">
+            <?php if (!$hideSalesTabs): ?>
+            <div class="tab-pane fade <?= $default_tab_id === 'pane-orders' ? 'show active' : '' ?>" id="pane-orders" role="tabpanel">
             <!-- Sales Order History -->
             <div class="card border-0 shadow-sm mb-4<?= empty($customer_orders) ? ' d-print-none' : '' ?>">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -1627,9 +1678,49 @@ global $company_name, $company_logo;
                 </div>
             </div>
             </div><!-- #pane-creditnotes -->
+            <?php endif; ?>
+
+            <?php if ($show_sales_history_tab): ?>
+            <div class="tab-pane fade <?= $default_tab_id === 'pane-saleshistory' ? 'show active' : '' ?>" id="pane-saleshistory" role="tabpanel">
+            <!-- Sales History (2026-09-17) — every POS sale (paid AND credit) for this
+                 customer; Madeni below already covers the open/credit-only view in
+                 more detail (repay/void actions) — this is the full picture, read-only. -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt-cutoff me-2"></i> <?= t('POS Sales History') ?></h6>
+                </div>
+                <div class="card-body p-0">
+                    <div id="salesHistoryLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
+                    <div class="table-responsive d-none" id="salesHistoryTableWrap">
+                        <table class="table table-hover align-middle mb-0 w-100" id="salesHistoryTable">
+                            <thead class="bg-light text-muted small text-uppercase">
+                                <tr>
+                                    <th style="width:50px;"><?= t('S/NO') ?></th>
+                                    <th><?= t('Receipt') ?></th>
+                                    <th><?= t('Sale Date') ?></th>
+                                    <th class="text-end"><?= t('Amount') ?></th>
+                                    <th><?= t('Payment') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end"><?= t('Actions') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesHistoryBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="salesHistoryCards" class="px-2 d-none"></div>
+                    <div class="text-center py-4 d-none" id="salesHistoryEmpty">
+                        <i class="bi bi-receipt" style="font-size:2.5rem;color:#ccc;"></i>
+                        <p class="mt-2 mb-0 text-muted"><?= t('No POS sales recorded for this customer yet.') ?></p>
+                    </div>
+                </div>
+            </div>
+            </div><!-- #pane-saleshistory -->
+            <?php endif; ?>
 
             <?php if ($show_credit_tab): ?>
-            <div class="tab-pane fade" id="pane-madeni" role="tabpanel">
+            <div class="tab-pane fade <?= $default_tab_id === 'pane-madeni' ? 'show active' : '' ?>" id="pane-madeni" role="tabpanel">
             <!-- Madeni (POS Credit Sales) — pos_credit_receivables_plan.md Phase 2b -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
@@ -1659,6 +1750,12 @@ global $company_name, $company_logo;
                             <div class="card border-0 bg-light text-center p-2">
                                 <div class="fs-5 fw-bold text-danger"><?= number_format($credit_counters['currently_owed'], 2) ?></div>
                                 <div class="small text-muted">Anadaiwa Sasa</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-primary"><?= number_format($credit_available, 2) ?></div>
+                                <div class="small text-muted"><?= t('Available Credit') ?></div>
                             </div>
                         </div>
                     </div>
@@ -1839,6 +1936,76 @@ global $company_name, $company_logo;
                         owed: <?= json_encode(t('Owed')) ?>,
                     }
                 });
+
+                <?php if ($show_sales_history_tab): ?>
+                // Sales History (2026-09-17) — every POS sale (paid + credit) for this
+                // customer, read-only. Same deferPane discipline as Madeni above: a
+                // table built inside a display:none pane measures zero-width.
+                (function () {
+                    var loaded = false;
+                    // Not globally shared on this page (unlike customers.php, which
+                    // defines its own copy too) — small local helpers, same behaviour.
+                    function safeOutput(v) { return v === null || v === undefined || v === '' ? '' : $('<div>').text(String(v)).html(); }
+                    function formatCurrency(v) { return <?= json_encode(get_setting('currency', 'TZS')) ?> + ' ' + (parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+                    function loadSalesHistory() {
+                        if (loaded) return;
+                        loaded = true;
+                        $.getJSON(<?= json_encode(buildUrl('api/pos/get_sales.php')) ?>, {
+                            customer_id: <?= (int)$customer_id ?>,
+                            start_date: '2000-01-01',
+                            end_date: <?= json_encode(date('Y-m-d')) ?>
+                        }, function (res) {
+                            $('#salesHistoryLoading').addClass('d-none');
+                            var rows = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+                            if (rows.length === 0) {
+                                $('#salesHistoryEmpty').removeClass('d-none');
+                                return;
+                            }
+                            var isMobile = window.innerWidth < 768;
+                            var tbody = $('#salesHistoryBody').empty();
+                            var cards = $('#salesHistoryCards').empty();
+                            rows.forEach(function (r, i) {
+                                var statusBadge = r.sale_status === 'voided'
+                                    ? '<span class="badge bg-secondary"><?= t("Voided") ?></span>'
+                                    : (r.balance_due > 0.01 ? '<span class="badge bg-warning text-dark"><?= t("Credit") ?></span>' : '<span class="badge bg-success"><?= t("Paid") ?></span>');
+                                var receiptLink = <?= json_encode(buildUrl('api/pos/print_receipt.php')) ?> + '?id=' + r.sale_id;
+                                tbody.append(
+                                    '<tr>' +
+                                    '<td>' + (i + 1) + '</td>' +
+                                    '<td>' + (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(r.receipt_number) + '</td>' +
+                                    '<td>' + safeOutput(r.sale_date) + '</td>' +
+                                    '<td class="text-end fw-bold">' + formatCurrency(r.grand_total) + '</td>' +
+                                    '<td>' + safeOutput(r.payment_method || '-') + '</td>' +
+                                    '<td>' + statusBadge + '</td>' +
+                                    '<td class="text-end"><a class="btn btn-sm btn-outline-primary" href="' + receiptLink + '" target="_blank"><i class="bi bi-receipt"></i></a></td>' +
+                                    '</tr>'
+                                );
+                                cards.append(
+                                    '<div class="card border-0 shadow-sm mb-2"><div class="card-body p-3">' +
+                                    '<div class="d-flex justify-content-between align-items-start mb-1">' +
+                                    '<div><div class="fw-bold small">' + safeOutput(r.receipt_number) + '</div>' +
+                                    '<small class="text-muted">' + safeOutput(r.sale_date) + '</small></div>' +
+                                    statusBadge +
+                                    '</div>' +
+                                    '<div class="d-flex justify-content-between align-items-center mt-2">' +
+                                    '<span class="fw-bold text-primary">' + formatCurrency(r.grand_total) + '</span>' +
+                                    '<a class="btn btn-sm btn-outline-primary" href="' + receiptLink + '" target="_blank"><i class="bi bi-receipt"></i></a>' +
+                                    '</div></div></div>'
+                                );
+                            });
+                            if (isMobile) { $('#salesHistoryCards').removeClass('d-none'); }
+                            else { $('#salesHistoryTableWrap').removeClass('d-none'); }
+                        }).fail(function () {
+                            $('#salesHistoryLoading').addClass('d-none');
+                            $('#salesHistoryEmpty').removeClass('d-none');
+                        });
+                    }
+                    if ($('#pane-saleshistory').hasClass('active') || $('#pane-saleshistory').is(':visible')) {
+                        loadSalesHistory();
+                    }
+                    $('[data-bs-target="#pane-saleshistory"]').on('shown.bs.tab', loadSalesHistory);
+                })();
+                <?php endif; ?>
             });
             </script>
             <style>
@@ -1906,7 +2073,7 @@ global $company_name, $company_logo;
             </style>
             <?php endif; ?>
 
-            <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
+            <div class="tab-pane fade <?= $default_tab_id === 'pane-sysinfo' ? 'show active' : '' ?>" id="pane-sysinfo" role="tabpanel">
             <!-- System Information -->
             <div class="card">
                 <div class="card-header bg-light border-bottom">
@@ -2472,6 +2639,62 @@ function deleteLpo(lpoId, lpoNumber) {
                 <div class="modal-body">
                     <div id="edit-customer-message" class="mb-3"></div>
                     <input type="hidden" id="edit_customer_id" name="customer_id">
+                    <?php if ($simpleCustomerForm): ?>
+                    <!-- Simple POS — single-area Edit Customer form (2026-09-17 request),
+                         same technique as customers.php's own Edit modal: every field NOT
+                         shown here rides along as a hidden input, pre-filled by
+                         editCustomer()'s own population code with whatever is already
+                         stored, so editing here can never silently wipe data entered while
+                         Advanced Customer was on (process_edit_customer.php is a
+                         full-overwrite update, not a partial patch). -->
+                    <div class="row">
+                        <div class="col-md-7 mb-3">
+                            <label for="edit_customer_name" class="form-label fw-bold">Customer Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" id="edit_customer_name" name="customer_name" required placeholder="Enter customer name">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="edit_phone" class="form-label fw-bold">Phone Number</label>
+                            <input type="text" class="form-control form-control-lg" id="edit_phone" name="phone" placeholder="+255 123 456 789">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="edit_credit_limit" class="form-label">Credit Limit <span class="text-muted small">(optional)</span></label>
+                            <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label for="edit_description" class="form-label">Notes <span class="text-muted small">(optional)</span></label>
+                            <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="Anything worth remembering — where they live, how to reach them, etc."></textarea>
+                        </div>
+                    </div>
+                    <input type="hidden" id="edit_company_name" name="company_name">
+                    <input type="hidden" id="edit_acronym" name="acronym">
+                    <input type="hidden" id="edit_category_id" name="category_id">
+                    <input type="hidden" id="edit_customer_type" name="customer_type">
+                    <input type="hidden" id="edit_status" name="status">
+                    <input type="hidden" id="edit_year" name="year">
+                    <input type="hidden" id="edit_project_id" name="project_id">
+                    <input type="hidden" id="edit_contact_person" name="contact_person">
+                    <input type="hidden" id="edit_contact_title" name="contact_title">
+                    <input type="hidden" id="edit_email" name="email">
+                    <input type="hidden" id="edit_company_email" name="company_email">
+                    <input type="hidden" id="edit_mobile" name="mobile">
+                    <input type="hidden" id="edit_fax" name="fax">
+                    <input type="hidden" id="edit_website" name="website">
+                    <input type="hidden" id="edit_country" name="country">
+                    <input type="hidden" id="edit_state" name="state">
+                    <input type="hidden" id="edit_city" name="city">
+                    <input type="hidden" id="edit_ward" name="ward">
+                    <input type="hidden" id="edit_village" name="village">
+                    <input type="hidden" id="edit_postal_code" name="postal_code">
+                    <input type="hidden" id="edit_address" name="address">
+                    <input type="hidden" id="edit_postal_address" name="postal_address">
+                    <input type="hidden" id="edit_tax_id" name="tax_id">
+                    <input type="hidden" id="edit_vat_number" name="vat_number">
+                    <input type="hidden" id="edit_payment_terms" name="payment_terms">
+                    <input type="hidden" id="edit_currency" name="currency">
+                    <input type="hidden" id="edit_bank_name" name="bank_name">
+                    <input type="hidden" id="edit_bank_account" name="bank_account">
+                    <input type="hidden" id="edit_bank_address" name="bank_address">
+                    <?php else: ?>
                     <ul class="nav nav-tabs mb-3" id="editCustomerTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="edit-basic-tab" data-bs-toggle="tab" data-bs-target="#edit-basic" type="button" role="tab">Basic Info</button>
@@ -2691,6 +2914,7 @@ function deleteLpo(lpoId, lpoNumber) {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -2799,6 +3023,17 @@ function editCustomer(customerId) {
                     'bank_address': '#edit_bank_address',
                     'year': '#edit_year',
                     'project_id': '#edit_project_id'
+                    <?php if ($simpleCustomerForm): ?>
+                    // Simple POS: the location cascade below is skipped (its live
+                    // <select> elements don't exist here), so these 5 fields are
+                    // preserved directly through the generic mapping loop instead,
+                    // straight onto the hidden inputs.
+                    ,'country': '#edit_country'
+                    ,'state': '#edit_state'
+                    ,'city': '#edit_city'
+                    ,'ward': '#edit_ward'
+                    ,'village': '#edit_village'
+                    <?php endif; ?>
                 };
                 if (c.logo_path) {
                     $('#edit_logo_preview').attr('src', '<?= buildUrl('') ?>' + c.logo_path);
@@ -2818,7 +3053,10 @@ function editCustomer(customerId) {
 
                 // Location cascade prefill — matches stored names against the
                 // defined lists; unmatched legacy values are kept as extra
-                // options instead of being wiped.
+                // options instead of being wiped. Skipped in Simple POS: the
+                // mapping loop above already preserved the raw values onto
+                // plain hidden inputs.
+                <?php if (!$simpleCustomerForm): ?>
                 editLocationCascade.setValues({
                     country:  c.country || 'Tanzania',
                     region:   c.state || '',
@@ -2826,6 +3064,7 @@ function editCustomer(customerId) {
                     ward:     c.ward || '',
                     village:  c.village || ''
                 });
+                <?php endif; ?>
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('editCustomerModal')).show();
                 setTimeout(() => {
                     const tab = document.querySelector('#edit-basic-tab');
