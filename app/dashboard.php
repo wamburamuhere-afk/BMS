@@ -1233,15 +1233,16 @@ function get_progress_color($percentage) {
                             <?php if(canCreate('customers')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('customers') ?>?action=add"><i class="bi bi-person-plus"></i> <?= t('Add Customer') ?></a></li>
                             <?php endif; ?>
+                            <?php if ($pos_simple_mode && canCreate('warehouses')): ?>
+                            <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>?action=add"><i class="bi bi-shop"></i> <?= t('Create Shop') ?></a></li>
+                            <?php endif; ?>
                             <?php if(canCreate('products')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('product_create') ?>"><i class="bi bi-plus-circle"></i> <?= t('Add Product') ?></a></li>
                             <?php endif; ?>
                             <?php if(canCreate('suppliers')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> <?= t('Add Supplier') ?></a></li>
                             <?php endif; ?>
-                            <?php if ($pos_simple_mode && canCreate('warehouses')): ?>
-                            <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>?action=add"><i class="bi bi-shop"></i> <?= t('Create Shop') ?></a></li>
-                            <?php elseif (canCreate('warehouses')): ?>
+                            <?php if (!$pos_simple_mode && canCreate('warehouses')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>?action=add"><i class="bi bi-shop"></i> <?= wLabel('Add Warehouse', 'Add Shop') ?></a></li>
                             <?php endif; ?>
 
@@ -1495,12 +1496,22 @@ function get_progress_color($percentage) {
         .dashboard-stat-link { display: block; }
         .dashboard-stat-link .card { transition: transform .15s ease, box-shadow .15s ease; }
         .dashboard-stat-link:hover .card { transform: translateY(-2px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15); }
+        /* The KPI strip can carry up to 7 cards (5 base + Credit/Madeni +
+           Monthly Expenses for Simple POS). On desktop they must all sit in
+           one row, equal width — override the mobile-friendly flex-wrap +
+           fixed min-width above that breakpoint. Below it, cards keep
+           wrapping onto multiple rows exactly as before. */
+        @media (min-width: 1200px) {
+            .dashboard-kpi-row { flex-wrap: nowrap; }
+            .dashboard-kpi-row > .dashboard-stat-link { min-width: 0; flex: 1 1 0; }
+        }
     </style>
     <?php endif; ?>
 
     <!-- Quick Links Section -->
     <?php
     $ql_has_links = canView('pos') || canCreate('invoices') || canCreate('customers')
+                 || ($pos_simple_mode && canCreate('warehouses'))
                  || canCreate('suppliers') || canCreate('products')
                  || (projectsModuleActive() && canView('projects'));
     ?>
@@ -1538,6 +1549,15 @@ function get_progress_color($percentage) {
                             <a href="<?= getUrl('customers') ?>?action=add" class="btn btn-outline-info w-100 h-100 py-3">
                                 <i class="bi bi-person-plus display-6"></i>
                                 <div class="mt-2"><?= t('Add Customer') ?></div>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($pos_simple_mode && canCreate('warehouses')): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <a href="<?= getUrl('warehouses') ?>?action=add" class="btn btn-outline-primary w-100 h-100 py-3">
+                                <i class="bi bi-shop display-6"></i>
+                                <div class="mt-2"><?= t('Create Shop') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1593,7 +1613,7 @@ function get_progress_color($percentage) {
     <!-- Statistics Cards -->
     <!-- flex-wrap + flex-fill (not fixed Bootstrap columns) so the row always
          spans full width no matter how many cards a tenant's modules leave visible -->
-    <div class="d-flex flex-wrap gap-3 mb-4">
+    <div class="d-flex flex-wrap gap-3 mb-4 dashboard-kpi-row">
         <!-- 1. Monthly Revenue — clicks through to the Income Statement for
              this exact date range: that's the same glProfitLoss() figure,
              not a re-derived approximation. -->
@@ -1741,6 +1761,66 @@ function get_progress_color($percentage) {
             </div>
         </a>
         <?php endif; ?>
+
+        <!-- 6. Credit (Madeni) — Simple POS only. Moved up here from the lower
+             Quick Stats Row so it sits in this same one-row KPI strip
+             alongside Monthly Revenue/POS Sales/Total Shops, per request.
+             Same posCreditTotalOutstanding() figure the "Who Owes Me" page
+             always reads, so this can never disagree with that page. -->
+        <?php if ($pos_simple_mode && canView('pos')): ?>
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 200px;"
+           href="<?= getUrl('pos/credit-customers') ?>">
+            <div class="card bg-secondary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= format_currency($pos_credit_total) ?></h4>
+                            <p class="mb-0"><?= t('Credit') ?> (Madeni)</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-cash-coin" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small>
+                            <i class="bi bi-exclamation-circle"></i>
+                            <?= $pos_credit_overdue_count ?> <?= t('Overdue') ?>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </a>
+        <?php endif; ?>
+
+        <!-- 7. Monthly Expenses — Simple POS only. Moved up here from the
+             lower Quick Stats Row for the same reason as the Credit card
+             above. Always the current calendar month, recognized spend only
+             (status approved/paid), independent of the dashboard's own
+             time_range filter — see $pos_month_start/$pos_month_end above. -->
+        <?php if ($pos_simple_mode && canView('expenses')): ?>
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 200px;"
+           href="<?= getUrl('expenses') ?>?date_from=<?= urlencode($pos_month_start) ?>&date_to=<?= urlencode($pos_month_end) ?>">
+            <div class="card text-white h-100" style="background-color:#6f42c1;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= format_currency($pos_month_expense_amount) ?></h4>
+                            <p class="mb-0"><?= t('Monthly Expenses') ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-wallet2" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small>
+                            <i class="bi bi-receipt"></i>
+                            <?= $pos_month_expense_count ?> <?= t('Records') ?>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </a>
+        <?php endif; ?>
     </div>
 
     <!-- Main Content Area -->
@@ -1871,63 +1951,6 @@ function get_progress_color($percentage) {
                             <?php endif; ?>
                         </div>
                     </div>
-                </div>
-                <?php endif; ?>
-
-                <?php if ($pos_simple_mode && canView('pos')): ?>
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100 shadow-sm">
-                        <div class="card-header bg-white py-3">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-danger me-2"></i> <?= t('Credit') ?> (Madeni)</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center mb-4">
-                                <div class="col-6">
-                                    <h3 class="fw-bold text-danger"><?= number_format($pos_credit_total, 0) ?></h3>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Total Owed') ?></small>
-                                </div>
-                                <div class="col-6 border-start">
-                                    <h3 class="fw-bold <?= $pos_credit_overdue_count > 0 ? 'text-danger' : 'text-success' ?>"><?= $pos_credit_overdue_count ?></h3>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Overdue') ?></small>
-                                </div>
-                            </div>
-                            <div class="mt-auto">
-                                <a href="<?= getUrl('pos/credit-customers') ?>" class="btn btn-sm btn-outline-danger w-100 border-2 fw-bold">
-                                    <i class="bi bi-list-ul me-1"></i> <?= t('View Who Owes Me') ?>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <?php if ($pos_simple_mode && canView('expenses')): ?>
-                <div class="col-md-6 mb-4">
-                    <a href="<?= getUrl('expenses') ?>?date_from=<?= urlencode($pos_month_start) ?>&date_to=<?= urlencode($pos_month_end) ?>"
-                       class="text-decoration-none">
-                        <div class="card h-100 shadow-sm">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="mb-0 fw-bold text-body"><i class="bi bi-wallet2 text-warning me-2"></i> <?= t('Monthly Expenses') ?></h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row text-center mb-4">
-                                    <div class="col-6">
-                                        <h3 class="fw-bold text-danger"><?= number_format($pos_month_expense_amount, 0) ?></h3>
-                                        <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('This Month') ?></small>
-                                    </div>
-                                    <div class="col-6 border-start">
-                                        <h3 class="fw-bold"><?= $pos_month_expense_count ?></h3>
-                                        <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Records') ?></small>
-                                    </div>
-                                </div>
-                                <div class="mt-auto">
-                                    <span class="btn btn-sm btn-outline-secondary w-100 border-2 fw-bold">
-                                        <i class="bi bi-list-ul me-1"></i> <?= t('View This Month\'s Expenses') ?>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
                 </div>
                 <?php endif; ?>
             </div>

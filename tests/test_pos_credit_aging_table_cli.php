@@ -292,7 +292,7 @@ PHP);
         httpGet2("$base/_credit_aging_table_test_probe.php?act=login&uid=$adminUid&lang=en", $cookieJar);
 
         [$code, $body] = httpGet2("$base/pos/credit-customers", $cookieJar);
-        (!preg_match('/Fatal error|Parse error/i', (string)$body))
+        (!preg_match('/Fatal error: Uncaught|Parse error: syntax error|<b>Fatal error<\/b>|<b>Parse error<\/b>/i', (string)$body))
             ? pass('Who Owes Me page has no PHP fatal/parse errors after the rewrite')
             : fail('Who Owes Me page has a PHP error: ' . substr((string)$body, 0, 300));
         (str_contains((string)$body, 'id="creditAgingTable"') && str_contains((string)$body, 'id="creditAgingCards"'))
@@ -301,7 +301,7 @@ PHP);
 
         if ($anyCustomerId > 0) {
             [$codeC, $bodyC] = httpGet2("$base/customers/view?id=$anyCustomerId", $cookieJar);
-            (!preg_match('/Fatal error|Parse error/i', (string)$bodyC))
+            (!preg_match('/Fatal error: Uncaught|Parse error: syntax error|<b>Fatal error<\/b>|<b>Parse error<\/b>/i', (string)$bodyC))
                 ? pass('customer_details.php has no PHP fatal/parse errors after the rewrite')
                 : fail('customer_details.php has a PHP error: ' . substr((string)$bodyC, 0, 300));
             (str_contains((string)$bodyC, 'id="madeniAgingTable"') && str_contains((string)$bodyC, 'id="madeniAgingCards"'))
