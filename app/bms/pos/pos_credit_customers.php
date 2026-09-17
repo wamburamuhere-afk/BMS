@@ -72,7 +72,7 @@ $can_delete = canDelete('pos');
         <div class="col-6 col-md-4">
             <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
                 <h4 class="mb-0 fw-bold" id="stat-overdue-count">—</h4>
-                <p class="small mb-0"><?= t('Overdue') ?></p>
+                <p class="small mb-0"><?= t('Sales Overdue') ?></p>
             </div>
         </div>
         <div class="col-6 col-md-4">
@@ -81,6 +81,27 @@ $can_delete = canDelete('pos');
                 <p class="small mb-0"><?= t('Open Credit Sales') ?></p>
             </div>
         </div>
+    </div>
+
+    <!-- Filters — simple on purpose: a name/phone search box (client-side,
+         same data already fetched), a period quick-pick against sale date,
+         and a one-tap "Top 5 largest" toggle instead of a whole separate
+         amount-range control. -->
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div class="flex-grow-1" style="min-width:200px; max-width:320px;">
+            <input type="text" class="form-control form-control-sm" id="creditSearchInput"
+                   placeholder="<?= t('Search by customer name or phone…') ?>">
+        </div>
+        <select class="form-select form-select-sm" id="creditPeriodFilter" style="width:auto;">
+            <option value=""><?= t('All Time') ?></option>
+            <option value="today"><?= t('Today') ?></option>
+            <option value="week"><?= t('This Week') ?></option>
+            <option value="month"><?= t('This Month') ?></option>
+            <option value="year"><?= t('This Year') ?></option>
+        </select>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="creditTop5Btn">
+            <i class="bi bi-sort-numeric-down"></i> <?= t('Top 5 largest') ?>
+        </button>
     </div>
 
     <div class="card border-0 shadow-sm">
@@ -213,6 +234,11 @@ $(function () {
         customerId: null,
         canEdit: <?= json_encode($can_edit) ?>,
         canDelete: <?= json_encode($can_delete) ?>,
+        filters: {
+            searchInput: '#creditSearchInput',
+            periodSelect: '#creditPeriodFilter',
+            top5Btn: '#creditTop5Btn',
+        },
         // The 3 summary cards above the table (#stat-total-owed etc.) had ids
         // reserved for them since this page was first built, but nothing
         // ever actually populated them — they always just showed the "—"
@@ -259,21 +285,73 @@ $(function () {
             amountHeader: <?= json_encode(t('Amount')) ?>,
             methodHeader: <?= json_encode(t('Method')) ?>,
             byHeader: <?= json_encode(t('By')) ?>,
+            phone: <?= json_encode(t('Phone')) ?>,
+            owed: <?= json_encode(t('Owed')) ?>,
         }
     });
 });
 </script>
 
 <style>
-/* ── Mobile custom card view — mirrors expenses.php's .expense-mobile-card ── */
+/* ── Mobile custom card view — avatar + labelled-row profile-card style,
+   matching the pattern used for people-records elsewhere in the app. ── */
 @media (max-width: 768px) {
     .credit-aging-mobile-card {
         background: #fff;
         border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 8px 10px;
+        border-radius: 10px;
+        padding: 10px 12px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
+    .credit-aging-mobile-card .cag-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+    .credit-aging-mobile-card .cag-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
+    .credit-aging-mobile-card .cag-name {
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        line-height: 1.25;
+    }
+    .credit-aging-mobile-card .cag-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.78rem;
+    }
+    .credit-aging-mobile-card .cag-row:last-of-type { border-bottom: none; }
+    .credit-aging-mobile-card .cag-label {
+        color: #6c757d;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.03em;
+        flex-shrink: 0;
+    }
+    .credit-aging-mobile-card .cag-value { text-align: right; }
+    .credit-aging-mobile-card .cag-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .credit-aging-mobile-card .cag-actions .btn { flex: 1; }
 }
 </style>
 

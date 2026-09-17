@@ -36,7 +36,20 @@
 
     function fmtDate(d) {
         if (!d) return '-';
-        return new Date((String(d).indexOf('T') !== -1 ? d : d + 'T00:00:00'))
+        // sale_date is a DATETIME ("YYYY-MM-DD HH:MM:SS"), due_date is a
+        // DATE ("YYYY-MM-DD"). The old check only looked for 'T' — a plain
+        // space-separated datetime string still got 'T00:00:00' appended
+        // AFTER its own time portion ("...05:00:00T00:00:00"), which
+        // Date() can't parse, silently rendering "Invalid Date" for every
+        // sale_date. A space means a time is already present — swap it for
+        // 'T' instead of appending a second one.
+        var s = String(d);
+        var iso = s.indexOf(' ') !== -1 ? s.replace(' ', 'T')
+                 : s.indexOf('T') !== -1 ? s
+                 : s + 'T00:00:00';
+        var dt = new Date(iso);
+        if (isNaN(dt.getTime())) return '-';
+        return dt
             .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
@@ -61,6 +74,31 @@
     function paidBadge(cfg, row) {
         if (parseFloat(row.paid) > 0) return '<span class="badge bg-primary-soft text-primary border border-primary">' + esc(cfg.i18n.partial) + '</span>';
         return '<span class="badge bg-secondary-soft text-secondary border border-secondary">' + esc(cfg.i18n.unpaid) + '</span>';
+    }
+
+    /** First letter of up to 2 words — the avatar-circle initials on a mobile card. */
+    function initials(name) {
+        var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return '?';
+        return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+    }
+
+    /**
+     * Individual outline icon buttons (not a gear dropdown) for the mobile
+     * card — matches the icon-row convention used on other card views in
+     * this app, easier to tap on a phone than opening a menu first.
+     */
+    function cardRowActions(cfg, row) {
+        var id = cfg._id, sid = row.sale_id, html = '';
+        html += '<button type="button" class="btn btn-sm btn-outline-info" title="' + esc(cfg.i18n.view) + '" onclick="PosCreditAging.view(\'' + id + '\',' + sid + ')"><i class="bi bi-eye"></i></button>';
+        if (cfg.canEdit) {
+            html += '<button type="button" class="btn btn-sm btn-outline-success" title="' + esc(cfg.i18n.repay) + '" onclick="PosCreditAging.repay(\'' + id + '\',' + sid + ')"><i class="bi bi-cash"></i></button>';
+            html += '<button type="button" class="btn btn-sm btn-outline-warning" title="' + esc(cfg.i18n.edit) + '" onclick="PosCreditAging.edit(\'' + id + '\',' + sid + ')"><i class="bi bi-pencil"></i></button>';
+        }
+        if (cfg.canDelete) {
+            html += '<button type="button" class="btn btn-sm btn-outline-danger" title="' + esc(cfg.i18n.delete) + '" onclick="PosCreditAging.remove(\'' + id + '\',' + sid + ')"><i class="bi bi-trash"></i></button>';
+        }
+        return html;
     }
 
     function rowActions(cfg, row) {
@@ -120,6 +158,12 @@
         return all.filter(function (c) { return (cfg.hide || []).indexOf(c.key) === -1; });
     }
 
+    function columnIndexOfKey(cfg, key) {
+        var idx = -1;
+        columns(cfg).forEach(function (c, i) { if (c.key === key) idx = i; });
+        return idx;
+    }
+
     function renderCards(cfg, dt) {
         if (!cfg.cardContainer) return;
         // dataSrc() already put the page into its "empty" state (emptyEl
@@ -144,19 +188,18 @@
             var row = this.data();
             container.append(
                 '<div class="credit-aging-mobile-card mb-2">' +
-                  '<div class="d-flex justify-content-between align-items-start mb-1"><div>' +
-                    '<strong class="d-block" style="font-size:0.85rem">' + esc(row.customer_name || '-') + '</strong>' +
-                    '<small class="text-muted">' + esc(row.customer_phone || '-') + '</small>' +
-                  '</div><div class="d-flex align-items-center gap-2">' +
-                    statusBadge(cfg, row) +
-                    rowActions(cfg, row) +
-                  '</div></div>' +
-                  '<div class="d-flex flex-wrap align-items-center gap-2" style="font-size:0.78rem">' +
-                    '<span class="text-danger fw-bold">' + money(row.balance_due) + '</span>' +
-                    paidBadge(cfg, row) +
-                    '<span class="text-muted"><i class="bi bi-calendar3 me-1"></i>' + esc(cfg.i18n.saleDate).replace(':', '') + ': ' + fmtDate(row.sale_date) + '</span>' +
-                    '<span class="text-muted"><i class="bi bi-calendar-event me-1"></i>' + esc(cfg.i18n.dueDate).replace(':', '') + ': ' + fmtDate(row.due_date) + '</span>' +
+                  '<div class="cag-head">' +
+                    '<div class="cag-avatar">' + esc(initials(row.customer_name)) + '</div>' +
+                    '<div class="flex-grow-1" style="min-width:0;">' +
+                      '<div class="cag-name">' + esc(row.customer_name || '-') + '</div>' +
+                      '<div class="mt-1">' + statusBadge(cfg, row) + '</div>' +
+                    '</div>' +
                   '</div>' +
+                  '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.phone) + '</span><span class="cag-value">' + esc(row.customer_phone || '-') + '</span></div>' +
+                  '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.owed) + '</span><span class="cag-value fw-bold text-danger">' + money(row.balance_due) + ' ' + paidBadge(cfg, row) + '</span></div>' +
+                  '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.saleDate).replace(':', '') + '</span><span class="cag-value">' + fmtDate(row.sale_date) + '</span></div>' +
+                  '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.dueDate).replace(':', '') + '</span><span class="cag-value">' + fmtDate(row.due_date) + '</span></div>' +
+                  '<div class="cag-actions">' + cardRowActions(cfg, row) + '</div>' +
                 '</div>'
             );
         });
@@ -225,6 +268,63 @@
         return dt;
     }
 
+    /**
+     * Optional filter bar — only wired when cfg.filters names real elements
+     * on the page (the "Who Owes Me" host only; the Madeni tab is already
+     * scoped to one customer, so a person/period filter there wouldn't add
+     * anything). Everything here runs client-side against the one batch of
+     * rows already fetched — no extra requests, matches "keep it simple".
+     */
+    function wireFilters(cfg, dt) {
+        var f = cfg.filters;
+        if (!f) return;
+
+        if (f.searchInput && $(f.searchInput).length) {
+            $(f.searchInput).on('keyup', function () { dt.search(this.value).draw(); });
+        }
+
+        if (f.periodSelect && $(f.periodSelect).length) {
+            var tableId = (cfg.tableSel || '').replace('#', '');
+            $.fn.dataTable.ext.search.push(function (settings, searchData, index, rowData) {
+                if (settings.nTable.id !== tableId) return true; // never touch other tables on the page
+                var period = $(f.periodSelect).val();
+                if (!period || !rowData) return true;
+
+                var raw = rowData.sale_date;
+                if (!raw) return false;
+                var d = new Date(String(raw).replace(' ', 'T'));
+                if (isNaN(d.getTime())) return false;
+                var now = new Date();
+
+                if (period === 'today') return d.toDateString() === now.toDateString();
+                if (period === 'week') {
+                    var day = now.getDay();
+                    var start = new Date(now); start.setDate(now.getDate() - day + (day === 0 ? -6 : 1)); start.setHours(0, 0, 0, 0);
+                    var end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+                    return d >= start && d <= end;
+                }
+                if (period === 'month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+                if (period === 'year') return d.getFullYear() === now.getFullYear();
+                return true;
+            });
+            $(f.periodSelect).on('change', function () { dt.draw(); });
+        }
+
+        if (f.top5Btn && $(f.top5Btn).length) {
+            var owedIdx = columnIndexOfKey(cfg, 'owed');
+            var active = false;
+            $(f.top5Btn).on('click', function () {
+                active = !active;
+                $(this).toggleClass('active', active);
+                if (active && owedIdx !== -1) {
+                    dt.order([owedIdx, 'desc']).page.len(5).draw();
+                } else {
+                    dt.order([]).page.len(cfg.pageLength || 25).draw();
+                }
+            });
+        }
+    }
+
     /* ── Public API ──────────────────────────────────────────────────── */
 
     M.init = function (cfg) {
@@ -235,7 +335,9 @@
 
         function start() {
             $(cfg.loadingEl).removeClass('d-none');
-            M._i[id].dt = buildTable(cfg);
+            var dt = buildTable(cfg);
+            M._i[id].dt = dt;
+            wireFilters(cfg, dt);
         }
 
         if (cfg.deferPane && window.BMSTbl && typeof window.BMSTbl.defer === 'function') {
