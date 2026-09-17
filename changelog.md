@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-17 (fix/supplier-details-consolidation) - Same profile consolidation applied to Supplier: killed the Statistics Cards row and the scattered Basic/Contact/Address/Bank cards for Simple POS
+
+**Request:** "analyse for supplier side also to be well implemented also like you implemented in customer side" — direct mirror of the Customer follow-up, applied to `supplier_details.php`. Confirmed upfront: Suppliers are NOT hidden for Simple POS — the whole module stays fully visible/usable, only specific fields/cards within it simplify.
+
+**Scouted first, matching the exact same problem shape:**
+- A "Statistics Cards" row (Total Orders / Total Spent / Pending Orders / Pending Amount) sits above the tabs, 100% `purchase_orders`-derived — always zero for a Simple POS supplier using Quick Restock. **Unlike Customer, there's no equivalent replacement data** (Quick Restock's outflow never links to a `supplier_id` at all, confirmed in the earlier CRUD-scope pass) — so this just disappears entirely for Simple POS, no swap-in.
+- Basic Info / Contact Info / Address cards already self-hide empty fields individually (no `N/A` bug like Customer had), but for a supplier with only Name/Phone/Bank Name/Bank Account/Notes filled in, the Contact Info card would render as a whole separate card box containing just one row ("Phone"), and Address would always show "Country: Tanzania" (a silent default, never real input) with nothing else in it.
+- Bank Information sat in its own separate full-width block below, already correctly self-hiding — but still a fourth disconnected card instead of one place.
+
+**Fixed, gated on `$simpleSupplierForm` only:** Statistics Cards row hidden entirely; Basic Info + Contact Info + Address + Bank Information collapse into one **"Supplier Information"** card showing exactly what registration collects — Full Name, Phone, Status, and Bank Name/Bank Account only when actually set, plus Notes if present. Normal/advanced tenants keep the byte-for-byte original 4-card layout via an `if/else` split.
+
+**Tested:** extended `tests/test_supplier_crud_simple_pos_cli.php` to 38/38 — updated the pre-existing "Bank Information card shows" assertion (the heading text it checked for no longer exists in Simple mode, folded into the new card) to check the bank *value* instead, added a literal zero-`N/A` proof matching Customer's, and confirmed normal tenants keep the original Statistics Cards row untouched. Full regression, zero drift: `test_customer_supplier_simple_pos_cli.php` (109/109). `php -l` clean.
+
 ## 2026-09-17 (feat/customer-crud-simple-pos-scope, follow-up) - Consolidated the surviving Simple POS profile fields into one card instead of the remains of 4 scattered ones; killed the last "N/A" rows
 
 **Request:** live screenshots showed the pre-merge state of this same PR (confirmed: PR #2019 was still open/undeployed, not a new bug) — but also a genuinely new ask on top: even once each empty field is hidden, the survivors (Name/Phone/Credit Limit/Notes) were still spread across the leftover headers of 4 separate cards (Company Info, Personal Info, Notes, Financial & Banking). Wanted them collected into one area, confirmed the registration/edit forms already match field-for-field, and asked for an explicit analysis before touching anything so the module-closed/Simple-POS gates already built wouldn't get tangled.
