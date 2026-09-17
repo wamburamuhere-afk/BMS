@@ -438,6 +438,16 @@ try {
         // the lock, and it's always 1 once set (the tenant admin never
         // self-manages this — products_simple_pos_plan.md §3).
         'pos_advanced_product_locked' => "ADD COLUMN `pos_advanced_product_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_simple_mode_locked`",
+        // Same shape again (2026-09-17): independent superadmin-only overrides
+        // showing the full (non-simplified) Customer / Supplier registration
+        // form even on a tenant running Simple POS mode. Kept separate from
+        // pos_advanced_product_locked — a shop may want simple products but
+        // still need full supplier records (e.g. formal bank-transfer
+        // payment details), or vice versa. Values live in the tenant's own
+        // database (system_settings.pos_advanced_customer / _supplier); these
+        // are only the locks.
+        'pos_advanced_customer_locked' => "ADD COLUMN `pos_advanced_customer_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_advanced_product_locked`",
+        'pos_advanced_supplier_locked' => "ADD COLUMN `pos_advanced_supplier_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_advanced_customer_locked`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");

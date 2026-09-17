@@ -146,6 +146,18 @@ if (projectsModuleActive()) {
         }
     }
 }
+
+// Simple POS (2026-09-17 request, mirrors products_simple_pos_plan.md's
+// $simpleProductForm / customers.php's $simpleCustomerForm exactly): a much
+// shorter, single-area Add/Edit Supplier form for a small shop with no
+// accountant. Bank Name/Account stay visible even in Simple mode — unlike a
+// retail customer, a shop genuinely pays its suppliers, often by bank
+// transfer. A superadmin can re-enable the full 4-tab form per tenant via
+// "Advanced Supplier" (advancedSupplierEnabled(), core/pos_nav.php) even
+// while Simple Mode is on.
+require_once __DIR__ . '/../../../core/pos_nav.php';
+$simpleSupplierForm = posSimpleModeEnabled() && !advancedSupplierEnabled();
+
 // Translated status label for badges (t() keys already exist from Customers).
 function supplier_status_label($status) {
     static $labels = null;
@@ -672,6 +684,34 @@ function supplier_status_label($status) {
                     </div>
                     <?php endif; ?>
 
+                    <?php if ($simpleSupplierForm): ?>
+                    <!-- Simple POS — single-area Add Supplier form (2026-09-17 request) -->
+                    <div class="row">
+                        <div class="col-md-7 mb-3">
+                            <label for="supplier_name" class="form-label fw-bold"><?= t('Supplier Name') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" id="supplier_name" name="supplier_name" required placeholder="<?= t('Enter supplier name') ?>">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="phone" class="form-label fw-bold"><?= t('Phone Number') ?></label>
+                            <input type="text" class="form-control form-control-lg" id="phone" name="phone" placeholder="+255 123 456 789">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="bank_name" class="form-label"><?= t('Bank Name') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="bank_account" class="form-label"><?= t('Bank Account') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label for="description" class="form-label"><?= t('Notes') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <textarea class="form-control" id="description" name="description" rows="2" placeholder="<?= t('Anything worth remembering — what they supply, how to reach them, etc.') ?>"></textarea>
+                        </div>
+                    </div>
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <input type="hidden" name="project_id" value="<?= (int)$proj_ctx_id ?>">
+                    <?php endif; ?>
+                    <?php else: ?>
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="addSupplierTabs" role="tablist">
                     <li class="nav-item">
@@ -879,6 +919,7 @@ function supplier_status_label($status) {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -974,6 +1015,68 @@ function supplier_status_label($status) {
                     <?php endif; ?>
                     <input type="hidden" id="edit_supplier_id" name="supplier_id">
 
+                    <?php if ($simpleSupplierForm): ?>
+                    <!-- Simple POS — single-area Edit Supplier form (2026-09-17 request).
+                         Every field NOT shown here still rides along as a hidden input,
+                         pre-filled by editSupplier()'s own population code with whatever
+                         is already stored — editing a supplier in Simple mode must never
+                         silently wipe data entered while Advanced Supplier was on (or
+                         before Simple Mode existed). Only Name/Phone/Bank/Notes are ever
+                         actually changed here. -->
+                    <div class="row">
+                        <div class="col-md-7 mb-3">
+                            <label for="edit_supplier_name" class="form-label fw-bold"><?= t('Supplier Name') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" id="edit_supplier_name" name="supplier_name" required placeholder="<?= t('Enter supplier name') ?>">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="edit_phone" class="form-label fw-bold"><?= t('Phone Number') ?></label>
+                            <input type="text" class="form-control form-control-lg" id="edit_phone" name="phone" placeholder="+255 123 456 789">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_bank_name" class="form-label"><?= t('Bank Name') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_bank_account" class="form-label"><?= t('Bank Account') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label for="edit_description" class="form-label"><?= t('Notes') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                            <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Anything worth remembering — what they supply, how to reach them, etc.') ?>"></textarea>
+                        </div>
+                    </div>
+                    <!-- Preserved, not shown: whatever this supplier already has for every
+                         advanced field stays exactly as-is on save (see comment above). -->
+                    <input type="hidden" id="edit_company_name" name="company_name">
+                    <input type="hidden" id="edit_acronym" name="acronym">
+                    <input type="hidden" id="edit_supplier_type" name="supplier_type">
+                    <input type="hidden" id="edit_supplier_year" name="year">
+                    <input type="hidden" id="edit_category_id" name="category_id">
+                    <input type="hidden" id="edit_status" name="status">
+                    <input type="hidden" id="edit_project_id" name="project_id">
+                    <input type="hidden" id="edit_credit_limit" name="credit_limit">
+                    <input type="hidden" id="edit_contact_person" name="contact_person">
+                    <input type="hidden" id="edit_contact_title" name="contact_title">
+                    <input type="hidden" id="edit_email" name="email">
+                    <input type="hidden" id="edit_company_email" name="company_email">
+                    <input type="hidden" id="edit_mobile" name="mobile">
+                    <input type="hidden" id="edit_fax" name="fax">
+                    <input type="hidden" id="edit_website" name="website">
+                    <input type="hidden" id="edit_country" name="country">
+                    <input type="hidden" id="edit_state" name="state">
+                    <input type="hidden" id="edit_city" name="city">
+                    <input type="hidden" id="edit_ward" name="ward">
+                    <input type="hidden" id="edit_village" name="village">
+                    <input type="hidden" id="edit_postal_code" name="postal_code">
+                    <input type="hidden" id="edit_address" name="address">
+                    <input type="hidden" id="edit_postal_address" name="postal_address">
+                    <input type="hidden" id="edit_tax_id" name="tax_id">
+                    <input type="hidden" id="edit_vat_number" name="vat_number">
+                    <input type="hidden" id="edit_default_wht_rate_id" name="default_wht_rate_id">
+                    <input type="hidden" id="edit_payment_terms" name="payment_terms">
+                    <input type="hidden" id="edit_currency" name="currency">
+                    <input type="hidden" id="edit_bank_address" name="bank_address">
+                    <?php else: ?>
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="editSupplierTabs" role="tablist">
                     <li class="nav-item">
@@ -1186,6 +1289,7 @@ function supplier_status_label($status) {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -1713,7 +1817,17 @@ function editSupplier(supplierId) {
                 
                 // Location cascade prefill — matches stored names against the
                 // defined lists; unmatched legacy values are kept as extra
-                // options instead of being wiped.
+                // options instead of being wiped. Skipped in Simple POS: the
+                // live <select> elements it manages don't exist in that mode
+                // — the raw values are preserved directly onto plain hidden
+                // inputs instead, below.
+                <?php if ($simpleSupplierForm): ?>
+                $('#edit_country').val(response.data.country || 'Tanzania');
+                $('#edit_state').val(response.data.state || '');
+                $('#edit_city').val(response.data.city || '');
+                $('#edit_ward').val(response.data.ward || '');
+                $('#edit_village').val(response.data.village || '');
+                <?php else: ?>
                 editLocationCascade.setValues({
                     country:  response.data.country || 'Tanzania',
                     region:   response.data.state || '',
@@ -1721,6 +1835,7 @@ function editSupplier(supplierId) {
                     ward:     response.data.ward || '',
                     village:  response.data.village || ''
                 });
+                <?php endif; ?>
 
                 $('#edit_postal_code').val(response.data.postal_code || '');
                 
@@ -1998,8 +2113,18 @@ $(document).ready(function() {
             $('<input type="hidden" name="project_id">').val(projLock).appendTo($form);
         }
     }
+    <?php if (!$simpleSupplierForm): ?>
+    // Simple POS: skipped entirely — #project_id doesn't exist on the Add
+    // form there (a plain hidden input carries $proj_ctx_id instead, set
+    // server-side), and #edit_project_id on the Edit form is itself a plain
+    // hidden input already carrying the record's real project — disabling it
+    // here would stop it from submitting at all (lockProjectField() assumes
+    // it's disabling a live <select> and adding its OWN fallback hidden
+    // input, which it skips once it sees one already present under that
+    // name — exactly what #edit_project_id already is in this mode).
     $('#addSupplierModal').on('shown.bs.modal',  function(){ lockProjectField('#project_id'); });
     $('#editSupplierModal').on('shown.bs.modal', function(){ lockProjectField('#edit_project_id'); });
+    <?php endif; ?>
 
     if (action === 'add') {
         setTimeout(function() {
