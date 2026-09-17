@@ -215,6 +215,18 @@ if ($adminUid <= 0) {
         // has saved (this dev environment's admin happens to have 'sw' set) —
         // accept either, same tolerance already needed for other pages' tests.
         (str_contains($simpleDetail, 'Available Credit') || str_contains($simpleDetail, 'Mkopo Uliopo')) ? pass('Simple POS: Available Credit stat is present') : fail('Available Credit stat missing');
+        // 2026-09-17 follow-up (user-reported): the surviving Simple POS fields
+        // (Name/Phone/Credit Limit/Notes/Status) must sit in ONE consolidated
+        // card, not scattered across the remains of 4 separate ones — and the
+        // page must show ZERO "N/A" placeholder rows anywhere once collapsed.
+        (str_contains($simpleDetail, 'Customer Information') || str_contains($simpleDetail, 'Taarifa za Mteja'))
+            ? pass('Simple POS: the consolidated "Customer Information" card is present') : fail('consolidated card missing');
+        (!str_contains($simpleDetail, 'Total Billed'))
+            ? pass('Simple POS: the old invoice/sales-order Financial Summary cards are gone') : fail('old Financial Summary cards (Total Billed etc.) still present');
+        (str_contains($simpleDetail, 'Currently Owed') || str_contains($simpleDetail, 'Anadaiwa Sasa'))
+            ? pass('Simple POS: the top summary row was swapped for Currently Owed/Available Credit') : fail('the swapped-in summary row is missing');
+        (substr_count($simpleDetail, 'N/A') === 0)
+            ? pass('Simple POS: ZERO "N/A" placeholder rows anywhere on the page') : fail('N/A rows still present: ' . substr_count($simpleDetail, 'N/A') . ' found — clutter not fully removed');
 
         // Module-closed, but NOT Simple POS — proves the two gates are independent.
         _ccc_set_settings($root, '0', '0');
@@ -226,8 +238,8 @@ if ($adminUid <= 0) {
 
         // Full normal tenant — nothing hidden.
         $normalDetail = _ccc_render($root, $adminUid, 'app/bms/customer/customer_details.php', false, ['id' => $custId]);
-        (str_contains($normalDetail, 'data-bs-target="#pane-orders"') && str_contains($normalDetail, 'Address Information'))
-            ? pass('Normal tenant: everything present, unchanged') : fail('normal tenant lost tabs/cards — regression');
+        (str_contains($normalDetail, 'data-bs-target="#pane-orders"') && str_contains($normalDetail, 'Address Information') && str_contains($normalDetail, 'Total Billed'))
+            ? pass('Normal tenant: everything present, unchanged — including the original Financial Summary cards') : fail('normal tenant lost tabs/cards — regression');
 
         section('5. Live — Sales History (api/pos/get_sales.php customer_id filter)');
         // Manufacture a second customer + a sale for each, to prove isolation.

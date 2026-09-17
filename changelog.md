@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-17 (feat/customer-crud-simple-pos-scope, follow-up) - Consolidated the surviving Simple POS profile fields into one card instead of the remains of 4 scattered ones; killed the last "N/A" rows
+
+**Request:** live screenshots showed the pre-merge state of this same PR (confirmed: PR #2019 was still open/undeployed, not a new bug) — but also a genuinely new ask on top: even once each empty field is hidden, the survivors (Name/Phone/Credit Limit/Notes) were still spread across the leftover headers of 4 separate cards (Company Info, Personal Info, Notes, Financial & Banking). Wanted them collected into one area, confirmed the registration/edit forms already match field-for-field, and asked for an explicit analysis before touching anything so the module-closed/Simple-POS gates already built wouldn't get tangled.
+
+**Two more gaps found while re-reading the page top-to-bottom for this:**
+- A row of 4 stat cards (Total Billed / Total Paid / Balance Due / Sales Orders) sits *above* the tabs, computed entirely from `invoices`/`sales_orders` — same "always zero for Simple POS" problem as the tabs, but I'd missed it in the first pass since it isn't a tab or a profile card.
+- The left-sidebar "Quick Information" card (Type/Email/Category/Year rows) had the exact same unguarded-empty-field problem as the main content cards did before the original fix — a separate area I hadn't looked at yet.
+
+**Fixed, gated on `$simpleCustomerForm` only (module-closed alone does NOT trigger any of this — confirmed by test):**
+- The 4 top stat cards are replaced with 2 that reuse data already on the page — **Currently Owed** and **Available Credit** (`$credit_counters['currently_owed']` / `$credit_available`, the exact same variables the Madeni tab and the profile card below already use — no new query).
+- Company/Personal/Notes/Address/Financial & Banking collapse into ONE **"Customer Information"** card: Full Name, Phone, Credit Limit, Status, and Notes if present — exactly the fields the Add/Edit form itself collects, nothing else.
+- The sidebar Quick Information card drops Type/Email/Category/Year (always "Individual"/empty/"Uncategorized"/blank for a Simple POS customer).
+- Normal/advanced tenants get the byte-for-byte original layout — every change lives in an `if ($simpleCustomerForm) {...} else {...}` split, confirmed live by rendering the same customer both ways.
+
+**Tested:** extended `tests/test_customer_crud_simple_pos_cli.php` to 71/71 — added a direct proof that the rendered Simple POS page contains **zero** `N/A` placeholder strings anywhere (the actual complaint, checked literally, not just "the fields I remembered to hide"), confirmed the consolidated card and the swapped summary row render, and strengthened the normal-tenant check to also require the original Financial Summary cards survive untouched. Full regression: `test_customer_supplier_simple_pos_cli.php` (109/109), `test_pos_credit_aging_table_cli.php` (32/32) — zero drift. (`test_pos_credit_receivables_cli.php` showed 4 unrelated failures in its notification/reminder-dedup section, nothing this change touches — see that suite's own investigation if it recurs on a clean run.) `php -l` clean.
+
 ## 2026-09-17 (feat/customer-crud-simple-pos-scope) - Full Customer CRUD scout for Simple POS: list/detail decluttering, Sales History tab, Available Credit, Edit-modal fix, and a real pre-existing Delete bug found+fixed
 
 **Request:** "check the whole CRUD" before building anything — the registration form was already Simple-POS-simplified, but nothing else on the Customer surface (list page, detail page, the detail page's own separate Edit modal, Delete) had been scouted. Explicitly asked what should hide vs. stay vs. get added, with reasoning, before any code changed — plan presented and confirmed before this work started.

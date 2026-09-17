@@ -498,6 +498,7 @@ global $company_name, $company_logo;
                             <td><?= safe_output($representative_name) ?></td>
                         </tr>
                         <?php endif; ?>
+                        <?php if (!$simpleCustomerForm): ?>
                         <tr>
                             <td><strong>Type:</strong></td>
                             <td>
@@ -506,10 +507,12 @@ global $company_name, $company_logo;
                                 </span>
                             </td>
                         </tr>
+                        <?php endif; ?>
                         <tr>
                             <td><strong>Phone:</strong></td>
                             <td><?= safe_output($customer['phone']) ?></td>
                         </tr>
+                        <?php if (!$simpleCustomerForm): ?>
                         <tr>
                             <td><strong>Email:</strong></td>
                             <td><?= safe_output($customer['email']) ?></td>
@@ -522,6 +525,7 @@ global $company_name, $company_logo;
                             <td><strong>Year:</strong></td>
                             <td><?= !empty($customer['year']) ? safe_output($customer['year']) : '<span class="text-muted">N/A</span>' ?></td>
                         </tr>
+                        <?php endif; ?>
                         <tr>
                             <td><strong>Status:</strong></td>
                             <td>
@@ -558,6 +562,44 @@ global $company_name, $company_logo;
         <div class="col-md-8">
             <div id="customerMainContent">
 
+                <?php if ($hideSalesTabs): ?>
+                <!-- Simple POS / module-closed: the 4 cards below are invoice/sales_order
+                     derived — always zero here, same reason the tabs are hidden. Swapped
+                     for the 2 numbers that actually mean something for this page's
+                     audience, reusing the exact same $credit_counters/$credit_available
+                     the Madeni tab and the profile card below already compute — never a
+                     third calculation of the same figures. -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-6">
+                        <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid <?= $credit_counters['currently_owed'] > 0 ? '#dc3545' : '#198754' ?> !important;">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center mb-1">
+                                    <div class="rounded-circle <?= $credit_counters['currently_owed'] > 0 ? 'bg-danger' : 'bg-success' ?> bg-opacity-10 p-2 me-2">
+                                        <i class="bi bi-cash-coin <?= $credit_counters['currently_owed'] > 0 ? 'text-danger' : 'text-success' ?>"></i>
+                                    </div>
+                                    <span class="text-muted small fw-semibold"><?= t('Currently Owed') ?></span>
+                                </div>
+                                <h5 class="mb-0 fw-bold <?= $credit_counters['currently_owed'] > 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($credit_counters['currently_owed'], 2) ?></h5>
+                                <small class="text-muted"><?= $credit_counters['currently_owed'] > 0 ? t('Outstanding amount') : t('Fully settled') ?></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-6">
+                        <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #0d6efd !important;">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center mb-1">
+                                    <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-2">
+                                        <i class="bi bi-wallet2 text-primary"></i>
+                                    </div>
+                                    <span class="text-muted small fw-semibold"><?= t('Available Credit') ?></span>
+                                </div>
+                                <h5 class="mb-0 fw-bold text-primary"><?= number_format($credit_available, 2) ?></h5>
+                                <small class="text-muted"><?= t('Room left on their credit line') ?></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php else: ?>
                 <!-- Financial Summary Cards -->
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-md-3">
@@ -617,7 +659,47 @@ global $company_name, $company_logo;
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 <!-- End Financial Summary Cards -->
+
+            <?php if ($simpleCustomerForm): ?>
+            <!-- Simple POS — one consolidated card instead of the remains of 4 separate
+                 ones (Company/Personal/Address/Financial), each mostly empty once their
+                 individually-hidden fields are stripped out. Every field shown here is
+                 exactly what the Add/Edit Customer form itself collects in Simple mode —
+                 nothing more, nothing hidden that has a real value. -->
+            <div class="card mb-4">
+                <div class="card-header bg-light border-bottom">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-person-lines-fill"></i> <?= t('Customer Information') ?></h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6 col-md-6 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Full Name') ?></label>
+                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['customer_name']) ?></p>
+                        </div>
+                        <div class="col-6 col-md-6 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Phone') ?></label>
+                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['phone']) ?></p>
+                        </div>
+                        <div class="col-6 col-md-6 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Credit Limit') ?></label>
+                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= safe_output($customer['currency'] ?? 'TZS') ?></p>
+                        </div>
+                        <div class="col-6 col-md-6 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
+                            <p class="mb-0 fw-semibold fs-7"><span class="badge bg-<?= get_status_badge($customer['status']) ?>"><?= ucfirst($customer['status']) ?></span></p>
+                        </div>
+                        <?php if (!empty($customer['notes'])): ?>
+                        <div class="col-12 mb-0">
+                            <label class="form-label text-muted small mb-1"><?= t('Notes') ?></label>
+                            <p class="mb-0"><?= nl2br(safe_output($customer['notes'])) ?></p>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <?php else: ?>
 
             <?php if ($isCompany): ?>
             <!-- Company Information -->
@@ -814,7 +896,7 @@ global $company_name, $company_logo;
                     </div>
                 </div>
             </div>
-
+            <?php endif; ?>
 
 
 
