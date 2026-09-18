@@ -230,7 +230,7 @@ global $company_name, $company_logo;
     <div class="d-none d-print-block text-center mb-4">
        
         <h4 class="fw-bold text-dark text-uppercase">SUPPLIER INFORMATION REPORT</h4>
-        <h5 class="text-muted"><?= htmlspecialchars($supplier['supplier_name']) ?> (<?= htmlspecialchars($supplier['supplier_code']) ?>)</h5>
+        <h5 class="text-muted"><?= caseFormat($supplier['supplier_name']) ?> (<?= htmlspecialchars($supplier['supplier_code']) ?>)</h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
 
@@ -239,7 +239,7 @@ global $company_name, $company_logo;
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= getUrl('suppliers') ?>">Suppliers</a></li>
-            <li class="breadcrumb-item active"><?= htmlspecialchars($supplier['supplier_name']) ?></li>
+            <li class="breadcrumb-item active"><?= caseFormat($supplier['supplier_name']) ?></li>
         </ol>
     </nav>
 
@@ -250,9 +250,9 @@ global $company_name, $company_logo;
                 <div>
                     <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-truck"></i> Supplier View</h2>
                     <p class="text-muted mb-0 small mt-1 header-desc">
-                        Detailed information about <?= htmlspecialchars($supplier['supplier_name']) ?> 
+                        Detailed information about <?= caseFormat($supplier['supplier_name']) ?> 
                         <?php if (!empty($supplier['company_name'])): ?>
-                        • Company: <?= htmlspecialchars($supplier['company_name']) ?>
+                        • Company: <?= caseFormat($supplier['company_name']) ?>
                         <?php endif; ?>
                         • Code: <code><?= htmlspecialchars($supplier['supplier_code']) ?></code>
                     </p>
@@ -374,7 +374,7 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Full Name') ?></label>
-                            <p class="mb-0 fw-semibold"><?= htmlspecialchars($supplier['supplier_name']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($supplier['supplier_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Phone') ?></label>
@@ -387,7 +387,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($supplier['bank_name']) || !empty($supplier['bank_account'])): ?>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Bank Name') ?></label>
-                            <p class="mb-0 fw-semibold"><?= !empty($supplier['bank_name']) ? htmlspecialchars($supplier['bank_name']) : '<span class="text-muted">' . t('Not set') . '</span>' ?></p>
+                            <p class="mb-0 fw-semibold"><?= !empty($supplier['bank_name']) ? caseFormat($supplier['bank_name']) : '<span class="text-muted">' . t('Not set') . '</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Bank Account') ?></label>
@@ -397,7 +397,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($supplier['description'])): ?>
                         <div class="col-12 mb-0">
                             <label class="form-label text-muted small mb-1"><?= t('Notes') ?></label>
-                            <p class="mb-0"><?= nl2br(htmlspecialchars($supplier['description'])) ?></p>
+                            <p class="mb-0"><?= nl2br(caseFormat($supplier['description'])) ?></p>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -461,7 +461,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($supplier['company_name'])): ?>
                         <tr>
                             <td><strong>Company Name:</strong></td>
-                            <td><?= htmlspecialchars($supplier['company_name']) ?></td>
+                            <td><?= caseFormat($supplier['company_name']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!empty($supplier['acronym'])): ?>
@@ -491,7 +491,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($supplier['contact_person'])): ?>
                         <tr>
                             <td><strong>Contact Person:</strong></td>
-                            <td><?= htmlspecialchars($supplier['contact_person']) ?></td>
+                            <td><?= caseFormat($supplier['contact_person']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!empty($supplier['contact_title'])): ?>
@@ -619,14 +619,14 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <?php if (!empty($supplier['address'])): ?>
                     <p class="mb-2"><strong>Address:</strong><br>
-                    <?= nl2br(htmlspecialchars($supplier['address'])) ?></p>
+                    <?= nl2br(caseFormat($supplier['address'])) ?></p>
                     <?php endif; ?>
                     
                     <table class="table table-sm mb-0">
                         <?php if (!empty($supplier['country'])): ?>
                         <tr>
                             <td style="width: 40%;"><strong>Country:</strong></td>
-                            <td><?= htmlspecialchars($supplier['country']) ?></td>
+                            <td><?= caseFormat($supplier['country']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!empty($supplier['state'])): ?>
@@ -650,7 +650,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($supplier['city'])): ?>
                         <tr>
                             <td><strong>City:</strong></td>
-                            <td><?= htmlspecialchars($supplier['city']) ?></td>
+                            <td><?= caseFormat($supplier['city']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!empty($supplier['postal_code'])): ?>
@@ -684,7 +684,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($supplier['bank_name'])): ?>
                         <div class="col-6 col-md-4 mb-2 mb-md-0">
                             <p class="mb-0 text-muted small fw-bold">Bank Name</p>
-                            <p class="mb-0"><?= htmlspecialchars($supplier['bank_name']) ?></p>
+                            <p class="mb-0"><?= caseFormat($supplier['bank_name']) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($supplier['bank_account'])): ?>
@@ -715,7 +715,7 @@ global $company_name, $company_logo;
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-chat-text"></i> Description</h6>
                 </div>
                 <div class="card-body">
-                    <?= nl2br(htmlspecialchars($supplier['description'])) ?>
+                    <?= nl2br(caseFormat($supplier['description'])) ?>
                 </div>
             </div>
         </div>
@@ -1378,7 +1378,7 @@ global $company_name, $company_logo;
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Created By</label>
-                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['created_by_name'], '—') ?></p>
+                                    <p class="mb-0 fw-semibold"><?= caseFormat($supplier['created_by_name'], '—') ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Date Created</label>
@@ -1386,7 +1386,7 @@ global $company_name, $company_logo;
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Last Updated By</label>
-                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['updated_by_name'], '—') ?></p>
+                                    <p class="mb-0 fw-semibold"><?= caseFormat($supplier['updated_by_name'], '—') ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Last Updated</label>
@@ -1394,7 +1394,7 @@ global $company_name, $company_logo;
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Category</label>
-                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['category_name'], '—') ?></p>
+                                    <p class="mb-0 fw-semibold"><?= caseFormat($supplier['category_name'], '—') ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Projects Linked</label>
