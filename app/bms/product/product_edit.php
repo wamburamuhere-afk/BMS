@@ -562,6 +562,7 @@ function deleteSellingUnit(id) {
 
     <!-- Main Navigation Tabs -->
     <div class="card border-0 shadow-sm overflow-hidden mb-4">
+        <?php if (!$simpleProductForm): ?>
         <div class="card-header bg-white p-0 border-bottom">
             <ul class="nav nav-pills custom-tabs nav-justified" id="productTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -579,27 +580,224 @@ function deleteSellingUnit(id) {
                         <i class="bi bi-boxes me-2"></i> <?= t('Inventory & Stock') ?>
                     </button>
                 </li>
-                <?php if (!$simpleProductForm): ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link py-3 rounded-0" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab">
                         <i class="bi bi-gear me-2"></i> <?= t('Advanced Details') ?>
                     </button>
                 </li>
-                <?php endif; ?>
             </ul>
         </div>
-        
+        <?php endif; ?>
+
         <div class="card-body p-4 pt-5">
             <div id="form-message" class="mb-4"></div>
-            
+
             <form id="productForm" enctype="multipart/form-data">
+
+                <input type="hidden" name="is_service" value="<?= $product['is_service'] ? '1' : '0' ?>">
+                <input type="hidden" name="track_inventory" value="<?= $product['track_inventory'] ? '1' : '0' ?>">
+
+                <?php if ($simpleProductForm): ?>
+                <!-- Simple POS — single-section Edit Product form, mirrors product_create.php's
+                     simple section field-for-field (products_simple_pos_plan.md §5). Wholesale
+                     Price and a relabeled "Retail Price" now both show here AND on Create, in the
+                     same 3-column Buying/Wholesale/Retail layout as the POS Restock modal
+                     (2026-09-18 request). Every field the full form collects but this one doesn't
+                     still round-trips via a hidden input below, so update_product.php's
+                     full-overwrite update never silently wipes it. -->
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="product_name" class="form-label fw-bold"><?= t('Product Name') ?> <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-lg bg-light border-0 py-3" id="product_name" name="product_name"
+                                       placeholder="<?= t('e.g. Royco Soup Cubes') ?>" value="<?= safe_output($product['product_name']) ?>" required>
+                            </div>
+
+                            <div class="col-md-12 mt-4">
+                                <label for="category_id" class="form-label fw-bold"><?= t('Category') ?></label>
+                                <div class="input-group">
+                                    <select class="form-select bg-light border-0 py-2 select2-static" id="category_id" name="category_id">
+                                        <option value=""><?= t('Select Category') ?></option>
+                                        <?= build_category_tree($categories, 0, 0, $product['category_id']) ?>
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary border-0 bg-light-primary" onclick="showQuickCategoryModal()">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Buying / Wholesale / Retail — same 3-column layout as the POS Restock modal -->
+                            <div class="col-md-4 mt-4">
+                                <label for="cost_price" class="form-label fw-bold"><?= t('Buying Price') ?> <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <input type="number" class="form-control bg-light border-0" id="cost_price" name="cost_price"
+                                           min="0" step="0.01" value="<?= $product['cost_price'] ?>" required onkeyup="calculateMarkup()">
+                                </div>
+                            </div>
+                            <div class="col-md-4 mt-4">
+                                <label for="wholesale_price" class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <input type="number" class="form-control bg-light border-0" id="wholesale_price" name="wholesale_price"
+                                           min="0" step="0.01" value="<?= $product['wholesale_price'] ?>">
+                                </div>
+                            </div>
+                            <div class="col-md-4 mt-4">
+                                <label for="selling_price" class="form-label fw-bold"><?= t('Retail Price') ?> <span class="text-danger">*</span></label>
+                                <div class="input-group border border-primary rounded-3 overflow-hidden shadow-sm">
+                                    <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
+                                    <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
+                                           min="0" step="0.01" value="<?= $product['selling_price'] ?>" required onkeyup="calculateMarkup(); calculateMinSellingPrice();">
+                                </div>
+                            </div>
+                            <input type="hidden" id="discount_rate" name="discount_rate" value="<?= $product['discount_rate'] ?>">
+                            <input type="hidden" id="min_selling_price" name="min_selling_price" value="<?= $product['min_selling_price'] ?>">
+
+                            <div class="col-md-6 mt-4">
+                                <label for="unit" class="form-label fw-bold"><?= t('Unit of Measure') ?> <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control bg-light border-0 py-2" name="unit" id="unit" list="unit_list"
+                                           placeholder="<?= t('e.g. pcs, kg, Box') ?>" required value="<?= safe_output($product['unit']) ?>" onchange="updateUnitLabels()">
+                                    <datalist id="unit_list">
+                                        <?php foreach ($units as $u): ?>
+                                            <option value="<?= htmlspecialchars($u['unit_code']) ?>"><?= htmlspecialchars($u['unit_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </datalist>
+                                    <button class="btn btn-outline-primary border-0 bg-light" type="button" onclick="showQuickAddUnit()" title="<?= t('Add to Database') ?>">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <?php if (!$product['is_service'] && !empty($warehouses) && !$showShopPicker): ?>
+                            <div class="col-md-6 mt-4">
+                                <label class="form-label fw-bold"><?= t('Stock Quantity') ?></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control bg-light border-0"
+                                           name="stock[<?= (int)$warehouses[0]['warehouse_id'] ?>]"
+                                           value="<?= $stock_per_warehouse[$warehouses[0]['warehouse_id']] ?? 0 ?>"
+                                           placeholder="0" min="0">
+                                    <span class="input-group-text unit-label"><?= htmlspecialchars($product['unit']) ?></span>
+                                </div>
+                            </div>
+                            <?php elseif (!$product['is_service'] && !empty($warehouses)): ?>
+                            <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                                <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                    <i class="bi bi-box-seam me-2"></i> <?= wLabel('CURRENT STOCK (Per Warehouse)', 'CURRENT STOCK (Per Shop)') ?>
+                                </h6>
+                                <p class="text-muted small mb-3"><?= wLabel('Edit stock quantities per warehouse below. Changes are recorded as stock adjustments automatically.', 'Edit stock quantities per shop below. Changes are recorded as stock adjustments automatically.') ?></p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover border">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th><?= wLabel('Store / Warehouse Name', 'Shop Name') ?></th>
+                                                <th style="width:200px;" class="text-center"><?= t('Available Quantity') ?></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($warehouses as $wh): ?>
+                                            <tr>
+                                                <td class="align-middle fw-semibold"><?= safe_output($wh['warehouse_name']) ?></td>
+                                                <td>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" class="form-control text-center"
+                                                               name="stock[<?= $wh['warehouse_id'] ?>]"
+                                                               value="<?= $stock_per_warehouse[$wh['warehouse_id']] ?? 0 ?>"
+                                                               placeholder="0" min="0">
+                                                        <span class="input-group-text unit-label"><?= htmlspecialchars($product['unit']) ?></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4 border-start ps-xxl-5">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold"><?= t('Product Image') ?></label>
+                            <div id="imagePreview" class="border rounded-4 p-3 mb-3 d-flex align-items-center justify-content-center <?= !empty($product['image_url']) ? 'bg-white' : 'bg-light shadow-inner' ?>" style="height: 220px;">
+                                <?php if (!empty($product['image_url'])): ?>
+                                <div class="position-relative w-100 h-100 d-flex align-items-center justify-content-center">
+                                    <img src="<?= safe_output($product['image_url']) ?>" class="img-fluid rounded shadow-sm" style="max-height: 100%; object-fit: contain;">
+                                    <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 rounded-circle" onclick="removeImage(event)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                                <?php else: ?>
+                                <div class="text-center opacity-50">
+                                    <i class="bi bi-image-fill display-3"></i>
+                                    <p class="small mt-2"><?= t('Drop here or Click to Upload') ?></p>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                            <input type="file" class="form-control visually-hidden" id="product_image" name="product_image"
+                                   accept="image/*" onchange="previewImage(event)">
+                            <button type="button" class="btn btn-light border w-100 rounded-pill py-2" onclick="document.getElementById('product_image').click()">
+                                <i class="bi bi-upload me-1"></i> <?= t('Choose Image') ?>
+                            </button>
+                        </div>
+
+                        <div class="mb-3 p-3 bg-light rounded-4">
+                            <label class="form-label fw-bold"><?= t('Status') ?></label>
+                            <div class="d-flex flex-column gap-2">
+                                <div class="form-check custom-radio">
+                                    <input class="form-check-input" type="radio" name="status" id="status_active" value="active" <?= $product['status'] == 'active' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="status_active"><?= t('Active') ?> <span class="text-muted small">(<?= t('Visible in Sales') ?>)</span></label>
+                                </div>
+                                <div class="form-check custom-radio">
+                                    <input class="form-check-input" type="radio" name="status" id="status_inactive" value="inactive" <?= $product['status'] == 'inactive' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="status_inactive"><?= t('Inactive') ?> <span class="text-muted small">(<?= t('Draft') ?>)</span></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" name="sku" value="<?= safe_output($product['sku']) ?>">
+                <input type="hidden" name="barcode" value="<?= safe_output($product['barcode']) ?>">
+                <input type="hidden" name="barcode_symbology" value="<?= safe_output($product['barcode_symbology'] ?: 'CODE128') ?>">
+                <input type="hidden" name="description" value="<?= safe_output($product['description']) ?>">
+                <input type="hidden" name="tax_id" value="<?= safe_output($product['tax_id']) ?>">
+                <?php if ($product['is_taxable']): ?>
+                <input type="hidden" name="is_taxable" value="1">
+                <?php endif; ?>
+                <input type="hidden" name="reorder_level" value="<?= $product['reorder_level'] ?>">
+                <input type="hidden" name="min_stock_level" value="<?= $product['min_stock_level'] ?>">
+                <input type="hidden" name="max_stock_level" value="<?= $product['max_stock_level'] ?>">
+                <input type="hidden" id="weight" name="weight" value="<?= $product['weight'] ?>">
+                <input type="hidden" id="dim_length" name="dim_length" value="<?= $dim_length ?>">
+                <input type="hidden" id="dim_width" name="dim_width" value="<?= $dim_width ?>">
+                <input type="hidden" id="dim_height" name="dim_height" value="<?= $dim_height ?>">
+                <?php if (!empty($product['is_combo'])): ?>
+                <input type="hidden" name="is_combo" value="1">
+                <?php endif; ?>
+                <input type="hidden" name="brand_id" value="<?= safe_output($product['brand_id']) ?>">
+                <input type="hidden" name="manufacturer" value="<?= safe_output($product['manufacturer']) ?>">
+                <input type="hidden" name="model" value="<?= safe_output($product['model']) ?>">
+                <input type="hidden" name="serial_number" value="<?= safe_output($product['serial_number']) ?>">
+                <input type="hidden" name="warranty_period" value="<?= $product['warranty_period'] ?>">
+                <input type="hidden" name="warranty_unit" value="<?= safe_output($product['warranty_unit'] ?? '') ?>">
+                <input type="hidden" name="guarantee_period" value="<?= safe_output($product['guarantee_period'] ?? '', '') ?>">
+                <input type="hidden" name="guarantee_unit" value="<?= safe_output($product['guarantee_unit'] ?? '') ?>">
+                <input type="hidden" name="expiry_days" value="<?= $product['expiry_days'] ?>">
+
+                <div class="d-flex justify-content-end mt-5 pt-4 border-top">
+                    <button type="submit" class="btn btn-success px-5 py-2 rounded-pill shadow-sm fw-bold">
+                        <i class="bi bi-check-circle-fill me-1"></i> <?= $product['is_service'] == 1 ? t('Update Service') : t('Update Product') ?>
+                    </button>
+                </div>
+                <?php else: ?>
                 <div class="tab-content" id="productTabContent">
-                    
+
                     <!-- Tab 1: General Information -->
                     <div class="tab-pane fade show active" id="general" role="tabpanel">
-
-                        <input type="hidden" name="is_service" value="<?= $product['is_service'] ? '1' : '0' ?>">
-                        <input type="hidden" name="track_inventory" value="<?= $product['track_inventory'] ? '1' : '0' ?>">
 
                         <div class="row g-4">
                             <div class="col-md-8">
@@ -1392,6 +1590,7 @@ function deleteSellingUnit(id) {
                     </div>
 
                 </div>
+                <?php endif; ?>
 
                 <input type="hidden" name="updated_by" value="<?= $user_id ?>">
             </form>
