@@ -222,7 +222,7 @@ $accent = getSetting('print_template_color_so_studio', '#2b2b2b');
     <div class="field-grid">
         <div class="field-row"><span class="flabel">NO:</span><span class="fvalue"><?= htmlspecialchars($order['order_number']) ?></span></div>
         <div class="field-row"><span class="flabel">DATE:</span><span class="fvalue"><?= date('d M Y', strtotime($order['order_date'])) ?></span></div>
-        <div class="field-row"><span class="flabel">CUSTOMER:</span><span class="fvalue"><?= htmlspecialchars($order['customer_name']) ?></span></div>
+        <div class="field-row"><span class="flabel">CUSTOMER:</span><span class="fvalue"><?= caseFormat($order['customer_name']) ?></span></div>
         <div class="field-row"><span class="flabel">STATUS:</span><span class="fvalue"><?= strtoupper($order['status']) ?></span></div>
         <?php if (!empty($order['c_phone'])): ?>
         <div class="field-row"><span class="flabel">PHONE:</span><span class="fvalue"><?= htmlspecialchars($order['c_phone']) ?></span></div>
@@ -231,7 +231,7 @@ $accent = getSetting('print_template_color_so_studio', '#2b2b2b');
         <div class="field-row"><span class="flabel">EMAIL:</span><span class="fvalue"><?= htmlspecialchars($order['c_email']) ?></span></div>
         <?php endif; ?>
         <?php if (!empty($order['company_name'])): ?>
-        <div class="field-row"><span class="flabel">COMPANY:</span><span class="fvalue"><?= htmlspecialchars($order['company_name']) ?></span></div>
+        <div class="field-row"><span class="flabel">COMPANY:</span><span class="fvalue"><?= caseFormat($order['company_name']) ?></span></div>
         <?php endif; ?>
         <?php
         $c_addr = trim(($order['c_postal_address'] ? 'P.O. Box ' . $order['c_postal_address'] . ', ' : '') . ($order['c_address'] ?? ''), ', ');
@@ -252,10 +252,10 @@ $accent = getSetting('print_template_color_so_studio', '#2b2b2b');
         <div class="field-row"><span class="flabel">PROJECT:</span><span class="fvalue"><?= htmlspecialchars($order['project_name']) ?></span></div>
         <?php endif; ?>
         <?php if (!empty($order['warehouse_name'])): ?>
-        <div class="field-row"><span class="flabel">WAREHOUSE:</span><span class="fvalue"><?= htmlspecialchars($order['warehouse_name']) ?></span></div>
+        <div class="field-row"><span class="flabel">WAREHOUSE:</span><span class="fvalue"><?= caseFormat($order['warehouse_name']) ?></span></div>
         <?php endif; ?>
-        <div class="field-row"><span class="flabel">SALESPERSON:</span><span class="fvalue"><?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></span></div>
-        <div class="field-row"><span class="flabel">PREPARED BY:</span><span class="fvalue"><?= htmlspecialchars(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></span></div>
+        <div class="field-row"><span class="flabel">SALESPERSON:</span><span class="fvalue"><?= caseFormat($order['salesperson_name'] ?? 'N/A') ?></span></div>
+        <div class="field-row"><span class="flabel">PREPARED BY:</span><span class="fvalue"><?= caseFormat(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></span></div>
     </div>
 
     <div class="section-label">Items</div>
@@ -278,7 +278,7 @@ $accent = getSetting('print_template_color_so_studio', '#2b2b2b');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>

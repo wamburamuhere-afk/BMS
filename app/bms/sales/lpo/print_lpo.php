@@ -179,7 +179,7 @@ try {
     <div class="details-grid">
         <div class="box">
             <h3>Customer</h3>
-            <p><strong><?= htmlspecialchars($lpo['customer_display_name'] ?? '') ?></strong></p>
+            <p><strong><?= caseFormat($lpo['customer_display_name'] ?? '') ?></strong></p>
             <?php if (!empty($lpo['c_address'])): ?><p><?= htmlspecialchars($lpo['c_address']) ?></p><?php endif; ?>
             <?php if (!empty($lpo['c_phone'])): ?><p><?= htmlspecialchars($lpo['c_phone']) ?></p><?php endif; ?>
             <?php if (!empty($lpo['c_email'])): ?><p><?= htmlspecialchars($lpo['c_email']) ?></p><?php endif; ?>
@@ -193,9 +193,9 @@ try {
             <h3>LPO Information</h3>
             <p><strong>Expiry Date:</strong> <?= !empty($lpo['expiry_date']) ? date('d M Y', strtotime($lpo['expiry_date'])) : 'Not specified' ?></p>
             <?php if (!empty($lpo['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($lpo['project_name']) ?></p><?php endif; ?>
-            <?php if (!empty($lpo['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($lpo['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($lpo['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($lpo['warehouse_name']) ?></p><?php endif; ?>
             <?php if (!empty($lpo['description'])): ?><p><strong>Description:</strong> <?= htmlspecialchars($lpo['description']) ?></p><?php endif; ?>
-            <p><strong>Created By:</strong> <?= htmlspecialchars($lpo['username'] ?? 'N/A') ?></p>
+            <p><strong>Created By:</strong> <?= caseFormat($lpo['username'] ?? 'N/A') ?></p>
         </div>
     </div>
 
@@ -214,7 +214,7 @@ try {
             <?php foreach ($items as $i => $item): ?>
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
-                <td><?= htmlspecialchars($item['product_name']) ?></td>
+                <td><?= caseFormat($item['product_name']) ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right"><?= number_format($item['tax_rate'], 1) ?>%</td>

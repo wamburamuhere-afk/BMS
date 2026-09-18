@@ -194,7 +194,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     Invoices
                 <?php endif; ?>
                 <?php if (!empty($filtered_customer_name)): ?>
-                    <span class="text-primary fs-3">| <?= safe_output($filtered_customer_name) ?></span>
+                    <span class="text-primary fs-3">| <?= caseFormat($filtered_customer_name) ?></span>
                     <a href="<?= getUrl('invoices') ?>" class="btn btn-sm btn-outline-secondary ms-2 rounded-pill shadow-sm d-print-none">
                         <i class="bi bi-x-circle"></i> View All
                     </a>
@@ -203,9 +203,9 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
             <p class="text-muted mb-0 d-print-none">
                 <?php if (!empty($filtered_customer_name)): ?>
                     <?php if ($payment_filter == 'paid'): ?>
-                        Viewing payment history for <strong><?= safe_output($filtered_customer_name) ?></strong>
+                        Viewing payment history for <strong><?= caseFormat($filtered_customer_name) ?></strong>
                     <?php else: ?>
-                        Showing invoices and payment status for <strong><?= safe_output($filtered_customer_name) ?></strong>
+                        Showing invoices and payment status for <strong><?= caseFormat($filtered_customer_name) ?></strong>
                     <?php endif; ?>
                 <?php else: ?>
                     Manage customer invoices and payment history
@@ -271,10 +271,10 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                         </div>
                         <div class="col-md-3">
                             <label class="text-muted small fw-bold text-uppercase d-block mb-1">Name & Company</label>
-                            <span class="fw-bold fs-6 d-block"><?= safe_output($filtered_customer['customer_name'] ?? '') ?></span>
+                            <span class="fw-bold fs-6 d-block"><?= caseFormat($filtered_customer['customer_name'] ?? '') ?></span>
                             <?php if (!empty($filtered_customer['company_name'])): ?>
-                                <small class="text-muted text-truncate d-block" title="<?= safe_output($filtered_customer['company_name']) ?>">
-                                    <?= safe_output($filtered_customer['company_name']) ?>
+                                <small class="text-muted text-truncate d-block" title="<?= caseFormat($filtered_customer['company_name']) ?>">
+                                    <?= caseFormat($filtered_customer['company_name']) ?>
                                 </small>
                             <?php endif; ?>
                         </div>
@@ -354,7 +354,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                         while ($c = $cust_stmt->fetch()):
                         ?>
                             <option value="<?= $c['customer_id'] ?>" <?= $filtered_customer_id == $c['customer_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($c['customer_name']) ?>
+                                <?= caseFormat($c['customer_name']) ?>
                             </option>
                         <?php endwhile; ?>
                     </select>
@@ -534,13 +534,13 @@ $(document).ready(function() {
             },
             { 
                 data: 'customer_name',
-                render: (data, t, row) => `<strong>${data}</strong>${row.company_name ? '<br><small class="text-muted">' + row.company_name + '</small>' : ''}`
+                render: (data, t, row) => `<strong>${caseFormatJs(data)}</strong>${row.company_name ? '<br><small class="text-muted">' + caseFormatJs(row.company_name) + '</small>' : ''}`
             },
             <?php if ($enable_projects): ?>
             { 
                 data: 'project_name',
                 defaultContent: '-',
-                render: (data) => data ? `<span class="text-primary fw-bold" style="font-size: 0.85rem;">${data}</span>` : '-'
+                render: (data) => data ? `<span class="text-primary fw-bold" style="font-size: 0.85rem;">${caseFormatJs(data)}</span>` : '-'
             },
             <?php endif; ?>
             {

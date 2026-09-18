@@ -409,7 +409,7 @@ foreach ($orders as $order) {
             <div class="py-2 mt-2">
                 <h3 class="fw-bold mb-1 text-dark text-uppercase">SALES ORDERS LIST</h3>
                 <p class="text-dark mb-0 small text-uppercase">
-                    <?php if (!empty($filtered_customer_name)) echo "CUSTOMER: " . strtoupper($filtered_customer_name) . " | "; ?>
+                    <?php if (!empty($filtered_customer_name)) echo "CUSTOMER: " . htmlspecialchars($filtered_customer_name) . " | "; ?>
                     PRINTED ON: <?= date('M d, Y h:i A') ?>
                 </p>
             </div>
@@ -432,7 +432,7 @@ foreach ($orders as $order) {
                     <h2 class="fw-bold mb-1">
                         <i class="bi bi-cart-check text-primary me-2"></i>Sales Orders
                         <?php if (!empty($filtered_customer_name)): ?>
-                            <span class="text-primary small fw-normal ms-2">| <?= safe_output($filtered_customer_name) ?></span>
+                            <span class="text-primary small fw-normal ms-2">| <?= caseFormat($filtered_customer_name) ?></span>
                             <a href="<?= getUrl('sales_orders') ?>" class="btn btn-sm btn-outline-secondary ms-2 rounded-pill shadow-sm">
                                 <i class="bi bi-x-circle"></i> View All
                             </a>
@@ -440,7 +440,7 @@ foreach ($orders as $order) {
                     </h2>
                     <p class="text-muted mb-0">
                         <?php if (!empty($filtered_customer_name)): ?>
-                            Viewing all orders for <strong><?= safe_output($filtered_customer_name) ?></strong>
+                            Viewing all orders for <strong><?= caseFormat($filtered_customer_name) ?></strong>
                         <?php else: ?>
                             Manage customer sales orders and deliveries
                         <?php endif; ?>
@@ -478,9 +478,9 @@ foreach ($orders as $order) {
                                 </div>
                                 <div class="col-md-3">
                                     <label class="text-muted small fw-bold text-uppercase d-block mb-1">Name & Company</label>
-                                    <span class="fw-bold fs-6 d-block"><?= safe_output($filtered_customer['customer_name'] ?? '') ?></span>
+                                    <span class="fw-bold fs-6 d-block"><?= caseFormat($filtered_customer['customer_name'] ?? '') ?></span>
                                     <?php if (!empty($filtered_customer['company_name'])): ?>
-                                        <small class="text-muted"><?= safe_output($filtered_customer['company_name']) ?></small>
+                                        <small class="text-muted"><?= caseFormat($filtered_customer['company_name']) ?></small>
                                     <?php endif; ?>
                                 </div>
                                 <div class="col-md-2">
@@ -586,9 +586,9 @@ foreach ($orders as $order) {
                         <option value="">All Customers</option>
                         <?php foreach ($customers as $customer): ?>
                             <option value="<?= $customer['customer_id'] ?>" <?= $customer_filter == $customer['customer_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($customer['customer_name']) ?>
+                                <?= caseFormat($customer['customer_name']) ?>
                                 <?php if (!empty($customer['company_name'])): ?>
-                                    (<?= safe_output($customer['company_name']) ?>)
+                                    (<?= caseFormat($customer['company_name']) ?>)
                                 <?php endif; ?>
                             </option>
                         <?php endforeach; ?>

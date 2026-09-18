@@ -401,9 +401,9 @@ try {
     <div class="details-grid">
         <div class="box">
             <h3>Customer</h3>
-            <p><strong><?= htmlspecialchars($order['customer_name']) ?></strong></p>
+            <p><strong><?= caseFormat($order['customer_name']) ?></strong></p>
             <?php if (!empty($order['company_name'])): ?>
-            <p><?= htmlspecialchars($order['company_name']) ?></p>
+            <p><?= caseFormat($order['company_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['c_postal_address'])): ?>
             <p>P.O. Box <?= htmlspecialchars($order['c_postal_address']) ?></p>
@@ -434,9 +434,9 @@ try {
             <p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['warehouse_name'])): ?>
-            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
+            <p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($order['warehouse_name']) ?></p>
             <?php endif; ?>
-            <p><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></p>
+            <p><strong>Salesperson:</strong> <?= !empty($order['salesperson_name']) ? caseFormat($order['salesperson_name']) : 'N/A' ?></p>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></p>
         </div>
     </div>
@@ -461,7 +461,7 @@ try {
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? '', 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>
