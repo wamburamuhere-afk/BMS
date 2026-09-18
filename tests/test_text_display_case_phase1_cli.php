@@ -292,7 +292,7 @@ if ($uid) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('5. Default mode (\'as_typed\') — zero behaviour change confirmed live');
+section('5. \'as_typed\' mode — zero behaviour change confirmed live (no longer the stored default as of 2026-09-18, but still a selectable, unchanged-passthrough mode)');
 
 if ($uid) {
     _tdp1_run_php("require '$root/roots.php'; save_setting('text_display_case', 'as_typed'); echo 'SET';");

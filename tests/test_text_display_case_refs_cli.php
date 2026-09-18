@@ -260,7 +260,7 @@ has($dashSrc, "\$('#ret_customer').text(applyCaseModeJs(res.sale.customer_name))
 has($dashSrc, '<td>${caseFormatJs(l.product_name)}</td>', 'Dashboard return modal line items use caseFormatJs()');
 has($dashSrc, '<small class="text-muted">${caseFormatJs(row.party)}', 'Dashboard mobile card: party uses caseFormatJs()');
 
-_tdr_set_mode($root, 'as_typed');
+_tdr_set_mode($root, 'title');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('Batch D — Z-report / shift history');
@@ -327,7 +327,7 @@ if ($uid) {
     }
 }
 
-_tdr_set_mode($root, 'as_typed');
+_tdr_set_mode($root, 'title');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('Batch E — Expenses');
@@ -390,7 +390,7 @@ if ($uid) {
     }
 }
 
-_tdr_set_mode($root, 'as_typed');
+_tdr_set_mode($root, 'title');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('Batch F — Reports (13 report pages + shared search endpoints)');
@@ -449,7 +449,7 @@ if ($uid) {
         'app/constant/reports/vendor_statement.php', ['vendor_id' => $sid, 'vendor_type' => 'supplier'], 'vendor_statement.php pre-filled name div');
 }
 
-_tdr_set_mode($root, 'as_typed');
+_tdr_set_mode($root, 'title');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('Batch G — bonus: purchase-document shared tables (GRN/delivery notes/returns/RFQ)');
