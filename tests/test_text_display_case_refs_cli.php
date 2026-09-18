@@ -328,3 +328,66 @@ if ($uid) {
 }
 
 _tdr_set_mode($root, 'as_typed');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('Batch E — Expenses');
+
+$rc = 0; $out = [];
+exec("php -l " . escapeshellarg("$root/app/constant/accounts/expenses.php") . " 2>&1", $out, $rc);
+$rc === 0 ? pass('lint: app/constant/accounts/expenses.php') : fail('php -l failed: app/constant/accounts/expenses.php — ' . implode(' ', $out));
+$rcNode = 0; $outNode = [];
+exec('node --check ' . escapeshellarg("$root/assets/js/tables/bms-expenses-table.js") . ' 2>&1', $outNode, $rcNode);
+$rcNode === 0 ? pass('node --check: assets/js/tables/bms-expenses-table.js') : fail('node --check failed: assets/js/tables/bms-expenses-table.js — ' . implode(' ', $outNode));
+
+has(src($root, 'app/constant/accounts/expenses.php'), "'name' => applyCaseMode(\$s['supplier_name'])], \$suppliers))", 'Expenses Paid-To supplier picker uses applyCaseMode()');
+has(src($root, 'app/constant/accounts/expenses.php'), "'name' => applyCaseMode(trim(\$e['first_name']", 'Expenses Paid-To staff picker uses applyCaseMode()');
+has(src($root, 'app/constant/accounts/expenses.php'), 'caseFormat($warehouse[\'warehouse_name\'])', 'Expenses Simple-POS shop dropdown uses caseFormat()');
+
+$expTableSrc = src($root, 'assets/js/tables/bms-expenses-table.js');
+has($expTableSrc, 'window.caseFormatJs ? window.caseFormatJs(raw) : esc(raw)', 'Expenses table Paid-To column uses caseFormatJs()');
+has($expTableSrc, 'window.caseFormatJs(d.paid_to_name) : esc(d.paid_to_name)', 'Expenses mobile card Paid-To uses caseFormatJs()');
+has($expTableSrc, 'const paidTo = window.applyCaseModeJs ? window.applyCaseModeJs(paidToRaw) : paidToRaw;', 'Payment voucher Paid-To uses applyCaseModeJs()');
+
+// Live check: get_expenses.php (the shared API source) intentionally left
+// returning the RAW name — the case transform happens at the JS render
+// layer (bms-expenses-table.js), not the API — since paid_to_name is
+// resolved fresh via JOIN, never a stored snapshot, either point would be
+// architecturally safe, but keeping the transform at render time matches
+// every other AJAX/DataTables source in this codebase (Phase 1 precedent).
+if ($uid) {
+    $supFixture = $pdo->query("SELECT e.expense_id, e.paid_to_id
+                                  FROM expenses e
+                                 WHERE e.paid_to_type = 'supplier' AND e.paid_to_id IS NOT NULL
+                                 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($supFixture) {
+        $supId = (int)$supFixture['paid_to_id'];
+        $orig = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE supplier_id = ?");
+        $orig->execute([$supId]);
+        $origName = $orig->fetchColumn();
+
+        $testLower = 'zz refs expense test';
+        _tdr_run_php("
+            require '$root/roots.php';
+            save_setting('text_display_case', 'upper');
+            \$pdo->prepare('UPDATE suppliers SET supplier_name = ? WHERE supplier_id = ?')->execute([" . var_export($testLower, true) . ", $supId]);
+            echo 'SET';
+        ");
+        try {
+            $json = _tdr_call($root, $uid, 'api/account/get_expenses.php', ['draw' => 1, 'start' => 0, 'length' => 100]);
+            (strpos($json, $testLower) !== false)
+                ? pass("get_expenses.php: API returns the RAW (untransformed) supplier name — transform happens client-side")
+                : fail("get_expenses.php: expected the raw lowercase supplier name in the API response — got something else");
+        } finally {
+            _tdr_run_php("
+                require '$root/roots.php';
+                save_setting('text_display_case', 'as_typed');
+                \$pdo->prepare('UPDATE suppliers SET supplier_name = ? WHERE supplier_id = ?')->execute([" . var_export($origName, true) . ", $supId]);
+                echo 'RESTORED';
+            ");
+        }
+    } else {
+        pass('no expense fixture paid to a supplier — get_expenses.php live check skipped (n/a)');
+    }
+}
+
+_tdr_set_mode($root, 'as_typed');
