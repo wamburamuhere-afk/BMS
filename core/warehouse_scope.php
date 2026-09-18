@@ -167,3 +167,18 @@ if (!function_exists('renderWarehouseOptions')) {
         return $html;
     }
 }
+
+if (!function_exists('singleWarehouseContext')) {
+    /**
+     * Returns the one accessible warehouse when there is exactly 1, or null.
+     * Use this to skip the warehouse dropdown in creation forms when the user
+     * (or the entire tenant) only has one shop/warehouse — call it once, check
+     * the result: non-null → use hidden input + static label; null → show the
+     * normal <select>.
+     */
+    function singleWarehouseContext(PDO $pdo): ?array
+    {
+        $list = warehousesForSelect($pdo);
+        return count($list) === 1 ? $list[0] : null;
+    }
+}

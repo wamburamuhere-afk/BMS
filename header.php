@@ -314,6 +314,46 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         });
     }
 
+    // Single-warehouse auto-select (2026-09-18)
+    // When a warehouse/shop <select> has exactly 1 real option the user should
+    // not have to pick it — auto-select it and replace the dropdown with a
+    // read-only name label. The <select> is kept in the DOM (just hidden) so
+    // form submission still sends the value and JS can still read .val().
+    // Runs on DOM ready AND every shown.bs.modal so both page-level forms and
+    // dynamically opened create modals are covered.
+    function bmsAutoSelectWarehouse($scope) {
+        $scope.find('select[name="warehouse_id"], select#posWarehouseId').each(function () {
+            var $sel = $(this);
+            if ($sel.data('bms-single-wh-done')) return; // idempotent
+            $sel.data('bms-single-wh-done', true);
+            var $real = $sel.find('option').filter(function () {
+                var v = String($(this).val());
+                return v !== '' && v !== '0';
+            });
+            if ($real.length !== 1) return; // 0 or 2+ options → leave as normal dropdown
+            var wid  = $real.first().val();
+            var name = applyCaseModeJs($real.first().text().trim());
+            // Set value and fire change so dependents react (loadProducts,
+            // warehouse-project-filter, Select2 display, etc.)
+            $sel.val(wid);
+            if (!$sel.prop('disabled')) $sel.trigger('change');
+            // Hide the select visually but keep it in the DOM so form POST
+            // still submits the value and JS (.val()) still works.
+            // Remove `required` to prevent browser validation on a hidden field.
+            $sel.addClass('d-none').prop('required', false);
+            // If wrapped in an input-group, hide that too
+            var $ig = $sel.parent('.input-group');
+            if ($ig.length) $ig.addClass('d-none');
+            // Insert a compact plaintext display where the select was
+            var $display = $('<div class="bms-single-wh-display d-flex align-items-center gap-2 py-1 small"></div>')
+                .append('<i class="bi bi-house-door text-primary"></i>')
+                .append($('<span class="fw-semibold text-dark"></span>').text(name));
+            ($ig.length ? $ig : $sel).before($display);
+        });
+    }
+    $(document).ready(function () { bmsAutoSelectWarehouse($(document)); });
+    $(document).on('shown.bs.modal', function (e) { bmsAutoSelectWarehouse($(e.target)); });
+
     // Global helper for logging activities moved to header.php
     function logReportAction(action, description) {
         if (navigator.sendBeacon) {
