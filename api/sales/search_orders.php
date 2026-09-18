@@ -40,7 +40,7 @@ try {
     $results = array_map(function($order) {
         return [
             'id' => $order['sales_order_id'],
-            'text' => '#' . $order['order_number'] . ' - ' . $order['customer_name']
+            'text' => '#' . $order['order_number'] . ' - ' . applyCaseMode($order['customer_name'])
         ];
     }, $orders);
 

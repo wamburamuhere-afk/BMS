@@ -118,9 +118,9 @@ $currency     = getSetting('currency', 'TZS');
     <h1><?= htmlspecialchars($company_name) ?> — <?= t('Z-Report') ?></h1>
     <div class="sub">
         <?= t('Shift') ?> <?= htmlspecialchars($shift['shift_code']) ?> ·
-        <?= t('Register:') ?> <?= htmlspecialchars($shift['register_name'] ?: t('N/A')) ?> (<?= htmlspecialchars($shift['register_code'] ?: '—') ?>)
-        <?php if ($shift['warehouse_name']): ?> · <?= wLabel('Warehouse:', 'Shop:') ?> <?= htmlspecialchars($shift['warehouse_name']) ?><?php endif; ?> ·
-        <?= t('Cashier:') ?> <?= htmlspecialchars($shift['cashier_name'] ?: t('N/A')) ?><br>
+        <?= t('Register:') ?> <?= $shift['register_name'] ? caseFormat($shift['register_name']) : t('N/A') ?> (<?= htmlspecialchars($shift['register_code'] ?: '—') ?>)
+        <?php if ($shift['warehouse_name']): ?> · <?= wLabel('Warehouse:', 'Shop:') ?> <?= caseFormat($shift['warehouse_name']) ?><?php endif; ?> ·
+        <?= t('Cashier:') ?> <?= $shift['cashier_name'] ? caseFormat($shift['cashier_name']) : t('N/A') ?><br>
         <?= t('Opened:') ?> <?= date('d/m/Y H:i', strtotime($shift['start_time'])) ?>
         <?php if ($shift['end_time']): ?> · <?= t('Closed:') ?> <?= date('d/m/Y H:i', strtotime($shift['end_time'])) ?><?php endif; ?>
         · <?= t('Status:') ?> <strong><?= htmlspecialchars(ucfirst($shift['status'])) ?></strong>

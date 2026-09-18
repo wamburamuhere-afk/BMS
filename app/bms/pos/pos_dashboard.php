@@ -892,7 +892,7 @@ function initDashboardTables() {
         responsive: false, pageLength: 10, dom: 'tip', order: [[2,'asc']],
         columns: [
             { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
-            { data: 'name', render: d => safeOutput(d) },
+            { data: 'name', render: d => caseFormatJs(d) },
             { data: 'current', className: 'text-end fw-bold',
               render: (d,t,r) => `<span class="${d<=0?'text-danger':'text-primary'}">${(+d).toLocaleString()}</span>` },
             { data: 'min', className: 'text-end text-muted', render: d => (+d).toLocaleString() }
@@ -905,7 +905,7 @@ function initDashboardTables() {
         columns: [
             { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
             { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
-            { data: 'party', render: d => safeOutput(d) },
+            { data: 'party', render: d => caseFormatJs(d) },
             { data: 'grand_total', className: 'text-end fw-bold', render: d => money(d) },
             { data: 'sale_status', render: d => statusBadge(d) }
         ],
@@ -980,7 +980,7 @@ function initHistoryTable() {
             { data: null,             orderable: false, className: 'text-muted', render: (d,t,r,m) => m.row+1 },
             { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
             { data: 'sale_date',      render: d => fmt(d) },
-            { data: 'party',          render: d => safeOutput(d) },
+            { data: 'party',          render: d => caseFormatJs(d) },
             { data: 'grand_total',    className: 'text-end fw-bold', render: d => money(d) },
             { data: 'payment_method', render: (d,t,r) => payBadge(r) },
             { data: 'sale_status',    render: d => statusBadge(d) },
@@ -1081,7 +1081,7 @@ function loadDashboard() {
         } else {
             let html = '<table class="table table-sm mb-0"><thead><tr class="text-primary"><th class="text-primary text-center" style="width:35px">' + <?= json_encode(t('S/NO')) ?> + '</th><th class="text-primary">' + <?= json_encode(t('Product')) ?> + '</th><th class="text-primary text-end">' + <?= json_encode(t('Qty')) ?> + '</th><th class="text-primary text-end">' + <?= json_encode(t('Revenue')) ?> + '</th></tr></thead><tbody>';
             d.top_products.forEach((p, i) => {
-                html += `<tr><td class="text-center text-muted">${i+1}</td><td>${safeOutput(p.name)}</td><td class="text-end fw-bold">${(+p.qty).toLocaleString()}</td><td class="text-end text-primary">${money(p.revenue)}</td></tr>`;
+                html += `<tr><td class="text-center text-muted">${i+1}</td><td>${caseFormatJs(p.name)}</td><td class="text-end fw-bold">${(+p.qty).toLocaleString()}</td><td class="text-end text-primary">${money(p.revenue)}</td></tr>`;
             });
             $('#topProducts').html(html + '</tbody></table>');
         }
@@ -1106,7 +1106,7 @@ function loadDashboard() {
         } else {
             let cHtml = '<table class="table table-sm mb-0"><tbody>';
             cashiers.forEach((c, i) => {
-                cHtml += `<tr><td class="text-center text-muted" style="width:28px">${i+1}</td><td>${safeOutput(c.name)}</td><td class="text-end text-muted small">${c.count} ${T.salesLabel}</td><td class="text-end fw-bold text-primary">${money(c.total)}</td></tr>`;
+                cHtml += `<tr><td class="text-center text-muted" style="width:28px">${i+1}</td><td>${caseFormatJs(c.name)}</td><td class="text-end text-muted small">${c.count} ${T.salesLabel}</td><td class="text-end fw-bold text-primary">${money(c.total)}</td></tr>`;
             });
             $('#topCashiers').html(cHtml + '</tbody></table>');
         }
@@ -1187,7 +1187,7 @@ function openReceive(saleId) {
     if (!row) return;
     $('#rcv_sale_id').val(saleId);
     $('#rcv_receipt').text(row.receipt_number);
-    $('#rcv_customer').text(row.party);
+    $('#rcv_customer').text(applyCaseModeJs(row.party));
     $('#rcv_balance').text(money(row.balance_due));
     $('#rcv_amount').val((row.balance_due || 0).toFixed(2)).attr('max', row.balance_due);
     new bootstrap.Modal(document.getElementById('receiveModal')).show();
@@ -1199,12 +1199,12 @@ function openReturn(saleId) {
         if (!res.success) { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); return; }
         $('#ret_sale_id').val(res.sale.sale_id);
         $('#ret_receipt').text(res.sale.receipt_number);
-        $('#ret_customer').text(res.sale.customer_name);
+        $('#ret_customer').text(applyCaseModeJs(res.sale.customer_name));
         let html = '';
         res.lines.forEach(l => {
             const dis = l.returnable <= 0 ? 'disabled' : '';
             html += `<tr data-iid="${l.sale_item_id}">
-                <td>${safeOutput(l.product_name)}</td>
+                <td>${caseFormatJs(l.product_name)}</td>
                 <td class="text-end">${l.quantity}</td>
                 <td class="text-end">${l.returnable}</td>
                 <td><input type="number" class="form-control form-control-sm ret-qty" min="0" max="${l.returnable}" step="any" value="0" ${dis}></td>
@@ -1232,7 +1232,7 @@ function renderCards(rows) {
                         <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number)}</div>
                         <div>${statusBadge(row.sale_status)}</div>
                     </div>
-                    <small class="text-muted">${safeOutput(row.party)} &middot; ${fmt(row.sale_date)}</small>
+                    <small class="text-muted">${caseFormatJs(row.party)} &middot; ${fmt(row.sale_date)}</small>
                     <div class="fw-bold text-primary mt-1">${CURRENCY} ${money(row.grand_total)}</div>
                 </div>
                 <div class="card-footer bg-white border-top p-0">

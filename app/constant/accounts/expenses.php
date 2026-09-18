@@ -569,13 +569,13 @@ if (!function_exists('renderExpenseCatRows')) {
                             <select class="form-select select2-static" name="warehouse_id">
                                 <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
                                 <?php foreach ($warehouses as $warehouse): ?>
-                                    <option value="<?= (int)$warehouse['warehouse_id'] ?>"><?= safe_output($warehouse['warehouse_name']) ?></option>
+                                    <option value="<?= (int)$warehouse['warehouse_id'] ?>"><?= caseFormat($warehouse['warehouse_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <?php else: ?>
                             <input type="hidden" name="warehouse_id" value="<?= $onlyWarehouseId ?>">
                             <div class="form-control-plaintext text-muted small">
-                                <?= !empty($warehouses[0]['warehouse_name']) ? safe_output($warehouses[0]['warehouse_name']) : t('—') ?>
+                                <?= !empty($warehouses[0]['warehouse_name']) ? caseFormat($warehouses[0]['warehouse_name']) : t('—') ?>
                             </div>
                             <?php endif; ?>
                         </div>
@@ -775,9 +775,9 @@ $(document).ready(function() {
         canDelete: <?= canDelete('expenses') ? 'true' : 'false' ?>
     };
 
-    const suppliersData      = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $suppliers)) ?>;
-    const staffData          = <?= json_encode(array_map(fn($e) => ['id' => $e['employee_id'], 'name' => trim($e['first_name'] . ' ' . $e['last_name'])], $employees)) ?>;
-    const subContractorsData = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $sub_contractors)) ?>;
+    const suppliersData      = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => applyCaseMode($s['supplier_name'])], $suppliers)) ?>;
+    const staffData          = <?= json_encode(array_map(fn($e) => ['id' => $e['employee_id'], 'name' => applyCaseMode(trim($e['first_name'] . ' ' . $e['last_name']))], $employees)) ?>;
+    const subContractorsData = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => applyCaseMode($s['supplier_name'])], $sub_contractors)) ?>;
 
     // Initialize Select2 Static
     function initSelect2() {

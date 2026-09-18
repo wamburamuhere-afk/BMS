@@ -82,7 +82,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value=""><?= t('All My Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
-                            <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                            <option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -93,7 +93,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
                         <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?>
-                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
+                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -103,7 +103,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="user_id" id="f-user" class="form-select" style="width:100%">
                         <option value=""><?= t('All Staff') ?></option>
                         <?php foreach ($cashiers as $c): ?>
-                            <option value="<?= (int)$c['user_id'] ?>"><?= safe_output($c['name']) ?></option>
+                            <option value="<?= (int)$c['user_id'] ?>"><?= caseFormat($c['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -271,11 +271,11 @@ $(function () {
                 table.clear();
                 res.rows.forEach((r, i) => table.row.add([
                     i + 1,
-                    esc(r.name),
+                    caseFormatJs(r.name),
                     Number(r.sales_count).toLocaleString(),
                     fmtQty(r.qty_sold),
                     fmt(r.total_value),
-                    `<button type="button" class="btn btn-sm btn-outline-primary" data-user-id="${r.user_id}" data-user-name="${esc(r.name)}" onclick="viewCashierItems(${r.user_id}, '${esc(r.name).replace(/'/g, "\\'")}')"><i class="bi bi-list-ul"></i></button>`
+                    `<button type="button" class="btn btn-sm btn-outline-primary" data-user-id="${r.user_id}" data-user-name="${caseFormatJs(r.name)}" onclick="viewCashierItems(${r.user_id}, '${caseFormatJs(r.name).replace(/'/g, "\\'")}')"><i class="bi bi-list-ul"></i></button>`
                 ]));
                 table.draw();
             })
@@ -303,7 +303,7 @@ $(function () {
                 }
                 let html = '';
                 res.items.forEach(it => {
-                    html += `<tr><td class="ps-3">${esc(it.product_name)}</td><td class="text-end">${fmtQty(it.qty_sold)}</td><td class="text-end pe-3">${fmt(it.total_value)}</td></tr>`;
+                    html += `<tr><td class="ps-3">${caseFormatJs(it.product_name)}</td><td class="text-end">${fmtQty(it.qty_sold)}</td><td class="text-end pe-3">${fmt(it.total_value)}</td></tr>`;
                 });
                 $('#itemsModalBody').html(html);
             })

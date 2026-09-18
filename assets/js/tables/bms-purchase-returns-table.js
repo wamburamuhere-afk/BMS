@@ -35,7 +35,7 @@
             }},
             { key: 'return_number',  col: { data: 'return_number' } },
             { key: 'return_date',    col: { data: 'return_date' } },
-            { key: 'supplier',       col: { data: 'supplier_name' } },
+            { key: 'supplier',       col: { data: 'supplier_name', render: function (d) { return d ? window.caseFormatJs(d) : ''; } } },
             { key: 'receipt_number', col: { data: 'receipt_number' } },
             { key: 'total_items',    col: { data: 'total_items' } },
             { key: 'total_amount',   col: { data: 'total_amount' } },
@@ -70,7 +70,7 @@
                       '<span class="badge bg-' + badge + '" style="font-size:0.65rem;">' + String(row.status_key || '').toUpperCase() + '</span>' +
                     '</div>' +
                     '<div class="card-body py-2 px-3">' +
-                      (showSupplier ? '<div class="small text-muted mb-1">Supplier: <strong class="text-dark">' + (row.supplier_name || '') + '</strong></div>' : '') +
+                      (showSupplier ? '<div class="small text-muted mb-1">Supplier: <strong class="text-dark">' + (row.supplier_name ? window.caseFormatJs(row.supplier_name) : '') + '</strong></div>' : '') +
                       '<div class="small text-muted mb-1">Date: <span class="text-dark">' + (row.return_date || '') + '</span></div>' +
                       '<div class="small text-muted mb-1">GRN: <span class="text-dark">' + (row.receipt_number || 'N/A') + '</span></div>' +
                       '<div class="small text-muted mb-1">Items: <span class="text-dark">' + (row.total_items || 0) + '</span></div>' +

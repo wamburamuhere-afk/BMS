@@ -40,7 +40,7 @@ if ($_POST) {
                 // for what each mode does; textDisplayCaseMode() also re-validates
                 // on read, so this is defense in depth, not the only guard).
                 'text_display_case' => in_array($_POST['text_display_case'] ?? '', ['as_typed', 'sentence', 'lower', 'upper', 'title', 'toggle'], true)
-                    ? $_POST['text_display_case'] : 'as_typed',
+                    ? $_POST['text_display_case'] : 'title',
             ];
             
             // Handle Logo Upload
@@ -557,13 +557,13 @@ if ($_POST) {
                                         <p class="text-muted small mb-3"><?= t('Controls how names and text appear across the system (lists, views, documents) — the data you type is never changed, and you can switch this anytime with no data loss.') ?></p>
                                         <div class="row g-3 align-items-end">
                                             <div class="col-md-5">
-                                                <?php $current_case_mode = get_setting('text_display_case', 'as_typed'); ?>
+                                                <?php $current_case_mode = get_setting('text_display_case', 'title'); ?>
                                                 <select class="form-select" id="text_display_case" name="text_display_case" onchange="updateTextCasePreview()">
-                                                    <option value="as_typed" <?= $current_case_mode === 'as_typed' ? 'selected' : '' ?>><?= t('As Typed (Default)') ?></option>
+                                                    <option value="as_typed" <?= $current_case_mode === 'as_typed' ? 'selected' : '' ?>><?= t('As Typed') ?></option>
                                                     <option value="sentence" <?= $current_case_mode === 'sentence' ? 'selected' : '' ?>><?= t('Sentence case') ?></option>
                                                     <option value="lower" <?= $current_case_mode === 'lower' ? 'selected' : '' ?>><?= t('lowercase') ?></option>
                                                     <option value="upper" <?= $current_case_mode === 'upper' ? 'selected' : '' ?>><?= t('UPPERCASE') ?></option>
-                                                    <option value="title" <?= $current_case_mode === 'title' ? 'selected' : '' ?>><?= t('Capitalize Each Word') ?></option>
+                                                    <option value="title" <?= $current_case_mode === 'title' ? 'selected' : '' ?>><?= t('Capitalize Each Word (Default)') ?></option>
                                                     <option value="toggle" <?= $current_case_mode === 'toggle' ? 'selected' : '' ?>><?= t('Toggle Case') ?></option>
                                                 </select>
                                             </div>
