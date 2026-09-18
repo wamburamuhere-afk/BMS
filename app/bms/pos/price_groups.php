@@ -301,7 +301,7 @@ function loadPriceGrid(id, search) {
         res.data.forEach(p => {
             const overrideVal = p.override_price !== null ? p.override_price : '';
             html += `<tr data-product-id="${p.product_id}">
-                <td><div class="fw-bold small">${safeOutput(p.product_name)}</div><div class="text-muted" style="font-size:11px;">${safeOutput(p.sku || '')}</div></td>
+                <td><div class="fw-bold small">${caseFormatJs(p.product_name)}</div><div class="text-muted" style="font-size:11px;">${safeOutput(p.sku || '')}</div></td>
                 <td class="text-end small">${Number(p.selling_price).toLocaleString()}</td>
                 <td class="text-end">
                     <input type="number" class="form-control form-control-sm text-end price-override-input" min="0" step="0.01"

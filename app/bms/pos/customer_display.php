@@ -214,6 +214,31 @@ loadLanguage($__cd_lang);
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+        // Text Display Case (2026-09-18 refs gap-fill) — this page has no
+        // header.php (standalone second-screen display), so it can't reuse
+        // header.php's caseFormatJs()/applyCaseModeJs() globals; duplicated
+        // here in minimal form for the one field this page shows (product
+        // name). See core/text_display_case.php for the canonical PHP rules
+        // this mirrors.
+        const TEXT_CASE_MODE = <?= json_encode(textDisplayCaseMode()) ?>;
+        function applyCaseModeJs(str) {
+            if (str === null || str === undefined || str === '') return '';
+            str = String(str);
+            switch (TEXT_CASE_MODE) {
+                case 'lower': return str.toLowerCase();
+                case 'upper': return str.toUpperCase();
+                case 'title': return str.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+                case 'sentence': return str.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, function (c) { return c.toUpperCase(); });
+                case 'toggle': return str.split('').map(function (ch) { return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase(); }).join('');
+                default: return str;
+            }
+        }
+        function caseFormatJs(str) {
+            return applyCaseModeJs(str).replace(/[&<>"']/g, function (m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+            });
+        }
+
         let lastTimestamp = 0;
         let displayCurrency = 'TZS'; // Phase 11 (pos_upgrade_plan.md §7) — updated from the server's real setting below
 
@@ -260,7 +285,7 @@ loadLanguage($__cd_lang);
                 const itemTotal = (item.price * item.quantity) + (item.price * item.quantity * item.tax_rate / 100);
                 html += `
                     <div class="cart-item">
-                        <div class="item-name">${item.product_name}</div>
+                        <div class="item-name">${caseFormatJs(item.product_name)}</div>
                         <div class="item-qty">x${item.quantity}</div>
                         <div class="item-price">${displayCurrency} ${itemTotal.toFixed(2)}</div>
                     </div>

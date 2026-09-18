@@ -128,7 +128,7 @@
             }},
             { key: 'customer', col: {
                 data: 'customer_name',
-                render: function (d) { return '<strong>' + esc(d || '-') + '</strong>'; }
+                render: function (d) { return '<strong>' + (d ? window.caseFormatJs(d) : '-') + '</strong>'; }
             }},
             { key: 'phone', col: {
                 data: 'customer_phone',
@@ -191,7 +191,7 @@
                   '<div class="cag-head">' +
                     '<div class="cag-avatar">' + esc(initials(row.customer_name)) + '</div>' +
                     '<div class="flex-grow-1" style="min-width:0;">' +
-                      '<div class="cag-name">' + esc(row.customer_name || '-') + '</div>' +
+                      '<div class="cag-name">' + (row.customer_name ? window.caseFormatJs(row.customer_name) : '-') + '</div>' +
                       '<div class="mt-1">' + statusBadge(cfg, row) + '</div>' +
                     '</div>' +
                   '</div>' +
@@ -403,7 +403,7 @@
         if (!row) return;
 
         $('#repay_sale_id').val(saleId);
-        $('#repay_customer_name').text(row.customer_name || '-');
+        $('#repay_customer_name').text(row.customer_name ? window.applyCaseModeJs(row.customer_name) : '-');
         $('#repay_balance_due').text(money(row.balance_due));
         $('#repay_amount').val('').attr('max', row.balance_due);
         $('#repay_reference').val('');

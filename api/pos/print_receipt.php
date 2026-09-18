@@ -120,9 +120,9 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         'company_name' => $company_name, 'company_address' => $company_address,
         'company_phone' => $company_phone, 'company_tin' => $company_tin, 'company_vrn' => $company_vrn,
         'receipt_number' => $sale['receipt_number'], 'cashier_name' => $sale['cashier_name'],
-        'sale_date' => $sale['sale_date'], 'customer_name' => $sale['customer_name'],
+        'sale_date' => $sale['sale_date'], 'customer_name' => applyCaseMode($sale['customer_name']),
         'items' => array_map(fn($i) => [
-            'product_name' => $i['product_name'], 'quantity' => $i['quantity'],
+            'product_name' => applyCaseMode($i['product_name']), 'quantity' => $i['quantity'],
             'unit_price' => $i['unit_price'], 'line_total' => $i['line_total'],
         ], $items),
         'subtotal' => $sale['subtotal'], 'tax_amount' => $sale['tax_amount'],
@@ -274,24 +274,24 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         </div>
         <div>
             <span><?= t('Cashier:') ?></span>
-            <span><?= $sale['cashier_name'] ?? t('N/A') ?></span>
+            <span><?= $sale['cashier_name'] ? caseFormat($sale['cashier_name']) : t('N/A') ?></span>
         </div>
         <?php if ($register_label !== ''): ?>
         <div>
             <span><?= t('Register:') ?></span>
-            <span><?= htmlspecialchars($register_label) ?></span>
+            <span><?= caseFormat($register_label) ?></span>
         </div>
         <?php endif; ?>
         <?php if (!empty($sale['warehouse_name'])): ?>
         <div>
             <span><?= wLabel('Warehouse:', 'Shop:', true) ?></span>
-            <span><?= htmlspecialchars($sale['warehouse_name']) ?></span>
+            <span><?= caseFormat($sale['warehouse_name']) ?></span>
         </div>
         <?php endif; ?>
         <?php if ($sale['customer_name']): ?>
         <div>
             <span><?= t('Customer:') ?></span>
-            <span><?= htmlspecialchars($sale['customer_name']) ?></span>
+            <span><?= caseFormat($sale['customer_name']) ?></span>
         </div>
         <?php endif; ?>
     </div>
@@ -304,7 +304,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         </div>
         <?php foreach ($items as $item): ?>
         <div class="item-row">
-            <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+            <div class="item-name"><?= caseFormat($item['product_name']) ?></div>
             <div class="item-qty"><?= $item['quantity'] ?></div>
             <div class="item-price"><?= number_format($item['line_total'], 0) ?></div>
         </div>

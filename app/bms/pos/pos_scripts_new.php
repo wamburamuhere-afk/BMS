@@ -688,7 +688,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                         if (!imgPath.startsWith('http') && !imgPath.startsWith('/')) {
                              imgPath = '../../../' + product.image_url; 
                         }
-                        imageContent = `<img src="${imgPath}" alt="${product.product_name}" style="height: 100%; max-width: 100%; object-fit: contain;">`;
+                        imageContent = `<img src="${imgPath}" alt="${caseFormatJs(product.product_name)}" style="height: 100%; max-width: 100%; object-fit: contain;">`;
                     } else {
                         imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
                     }
@@ -714,7 +714,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                                         ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
                                     </div>
                                     ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
-                                    <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
+                                    <h6 class="card-title mb-1 small text-truncate fw-bold" title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}</h6>
                                     <p class="card-text text-muted small mb-1">${product.sku || ''}</p>
                                     <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
                                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
@@ -825,7 +825,7 @@ function showProductQuickView(productId) {
     const showModifiers = POS_RESTAURANT_ENABLED && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail' && currentProduct.is_service != 1;
 
     const html = `
-        <h6>${currentProduct.product_name}</h6>
+        <h6>${caseFormatJs(currentProduct.product_name)}</h6>
         <p class="text-muted small mb-2">${currentProduct.sku || PT.noSku}</p>
         <p class="text-success fw-bold" id="quickViewPrice">${POS_CURRENCY} ${parseFloat(currentProduct.effective_price ?? currentProduct.selling_price).toLocaleString()}</p>
         ${currentProduct.is_service != 1 ? `<p class="small ${currentProduct.stock_quantity <= 10 ? 'text-danger' : 'text-muted'}">
@@ -1210,7 +1210,7 @@ function updateCartDisplay() {
             const row = `
                 <tr>
                     <td>
-                        <strong class="small">${item.product_name}</strong>
+                        <strong class="small">${caseFormatJs(item.product_name)}</strong>
                         ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
                         ${item.modifiers && item.modifiers.length ? `<br><span class="small text-muted">${item.modifiers.map(m => safeOutput(m.option_name)).join(', ')}</span>` : ''}
                         ${discountBadge}
@@ -1298,7 +1298,7 @@ function editLinePrice(index) {
         inputValidator: (value) => {
             const v = parseFloat(value);
             if (isNaN(v) || v < item.min_selling_price) {
-                return PT.priceOverrideBelowMin.replace('%s', item.product_name).replace('%s', item.min_selling_price.toLocaleString());
+                return PT.priceOverrideBelowMin.replace('%s', applyCaseModeJs(item.product_name)).replace('%s', item.min_selling_price.toLocaleString());
             }
         }
     }).then(result => {
@@ -1688,7 +1688,7 @@ function buildWhatsAppReceiptText(receiptNumber) {
     lines.push(<?= json_encode(t('Receipt #')) ?> + receiptNumber);
     cart.forEach(item => {
         const total = (item.discounted_price * item.quantity).toLocaleString();
-        lines.push(`${item.product_name} x${item.quantity} = ${POS_CURRENCY} ${total}`);
+        lines.push(`${applyCaseModeJs(item.product_name)} x${item.quantity} = ${POS_CURRENCY} ${total}`);
     });
     const total = $('#cartTotal').text().trim();
     lines.push('---');
@@ -1846,7 +1846,7 @@ function selectTable(tableId, warehouseId, tableNumber) {
             try {
                 cart = JSON.parse(existing.items_data);
                 currentHoldId = existing.hold_id;
-                if (existing.customer_id) setCustomerSelection(existing.customer_id, existing.customer_name);
+                if (existing.customer_id) setCustomerSelection(existing.customer_id, applyCaseModeJs(existing.customer_name));
             } catch (e) {
                 console.error('Error restoring table order', e);
                 cart = [];
@@ -2085,7 +2085,7 @@ function showHeldSales() {
                         const row = `
                             <tr>
                                 <td>${sale.hold_reference || 'HOLD-' + sale.hold_id}</td>
-                                <td>${sale.customer_name || PT.walkIn}</td>
+                                <td>${sale.customer_name ? caseFormatJs(sale.customer_name) : PT.walkIn}</td>
                                 <td>${JSON.parse(sale.items_data).length}</td>
                                 <td>${POS_CURRENCY} ${parseFloat(sale.total_amount).toLocaleString()}</td>
                                 <td>${new Date(sale.held_at).toLocaleTimeString()}</td>
@@ -2134,7 +2134,7 @@ function loadHeldSale(holdId) {
                                 
                                 // Restore customer if saved
                                 if (sale.customer_id) {
-                                    setCustomerSelection(sale.customer_id, sale.customer_name);
+                                    setCustomerSelection(sale.customer_id, applyCaseModeJs(sale.customer_name));
                                 }
                                 
                                 updateCartDisplay();
@@ -2577,7 +2577,7 @@ function openDiscountModal() {
                            value="${index}" id="discount_item_${index}" ${isChecked}>
                     <label class="form-check-label w-100" for="discount_item_${index}">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span>${item.product_name}</span>
+                            <span>${caseFormatJs(item.product_name)}</span>
                             <span class="badge bg-secondary">${item.price.toLocaleString()}</span>
                         </div>
                         ${minPriceInfo}
@@ -2658,14 +2658,14 @@ function applyProductDiscount() {
         // Enforce Min Selling Price ONLY for Percentage Mode
         if (posDiscountType === 'percentage') {
             if (value > 0 && newPrice < (item.min_selling_price - 0.01)) {
-                errorMessages.push(PT.priceBelowMinimum.replace('%s', item.product_name).replace('%s', newPrice.toLocaleString()).replace('%s', item.min_selling_price.toLocaleString()));
+                errorMessages.push(PT.priceBelowMinimum.replace('%s', caseFormatJs(item.product_name)).replace('%s', newPrice.toLocaleString()).replace('%s', item.min_selling_price.toLocaleString()));
                 isValid = false;
             }
         }
 
         // Basic limit for fixed (can't be negative)
         if (newPrice < 0) {
-             errorMessages.push(PT.resultingPriceNegative.replace('%s', item.product_name));
+             errorMessages.push(PT.resultingPriceNegative.replace('%s', caseFormatJs(item.product_name)));
              isValid = false;
         }
 
@@ -2835,7 +2835,7 @@ function updateCashBalanceUI() {
         const fmtPrice = price.toLocaleString('en-US');
         scanToast(
             '<i class="bi bi-check-circle-fill me-1" style="margin-top:2px;flex-shrink:0"></i>' +
-            '<span><strong>' + product.product_name + '</strong><br>' +
+            '<span><strong>' + caseFormatJs(product.product_name) + '</strong><br>' +
             '<small>' + POS_CURRENCY + ' ' + fmtPrice + ' &mdash; ' + PT.cartQtyLabel + ' ' + newQty + '</small></span>',
             false
         );

@@ -55,6 +55,9 @@ function _tdr_call(string $root, int $uid, string $script, array $get = []): str
     ");
 }
 
+function src(string $root, string $rel): string { $p = "$root/$rel"; return file_exists($p) ? file_get_contents($p) : ''; }
+function has(string $hay, string $needle, string $label): void { strpos($hay, $needle) !== false ? pass($label) : fail("$label — missing `" . substr($needle, 0, 100) . "`"); }
+
 function _tdr_set_mode(string $root, string $mode): void {
     _tdr_run_php("require '$root/roots.php'; save_setting('text_display_case', " . var_export($mode, true) . "); echo 'SET';");
 }
@@ -135,6 +138,108 @@ if ($uid) {
         'api/search_products.php', ['q' => 'zz refs test'], 'search_products (text label only)');
 } else {
     pass('no admin user fixture available — Batch A live checks skipped (n/a)');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+section('Batch B — POS screen (grid, cart, credit aging, customer display, receipt)');
+
+$touchedB = [
+    'app/bms/pos/pos_scripts_new.php', 'app/bms/pos/pos_modals_new.php',
+    'assets/js/pos-credit-aging.js', 'app/bms/pos/customer_display.php',
+    'app/bms/pos/price_groups.php', 'api/pos/print_receipt.php',
+];
+foreach ($touchedB as $f) {
+    $rc = 0; $out = [];
+    exec("php -l " . escapeshellarg("$root/$f") . " 2>&1", $out, $rc);
+    $rc === 0 ? pass("lint: $f") : fail("php -l failed: $f — " . implode(' ', $out));
+}
+
+// JS-render source checks — proves the exact render path was switched from
+// the plain escape-only helper to the case-aware one, for every spot that
+// can't be exercised as a subprocess (client-side template literals).
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'alt="${caseFormatJs(product.product_name)}"', 'POS grid tile: image alt uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}', 'POS grid tile: name/title uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), '<h6>${caseFormatJs(currentProduct.product_name)}</h6>', 'POS quick-view: product name uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), '<strong class="small">${caseFormatJs(item.product_name)}</strong>', 'POS cart line: product name uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), "replace('%s', applyCaseModeJs(item.product_name))", 'POS price-override-below-min warning uses applyCaseModeJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), '${applyCaseModeJs(item.product_name)} x${item.quantity}', 'POS WhatsApp receipt text uses applyCaseModeJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'setCustomerSelection(existing.customer_id, applyCaseModeJs(existing.customer_name))', 'POS held-table-order resume uses applyCaseModeJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'caseFormatJs(sale.customer_name) : PT.walkIn', 'POS held-sales list: customer name uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'setCustomerSelection(sale.customer_id, applyCaseModeJs(sale.customer_name))', 'POS held-sale load: customer name uses applyCaseModeJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), '<span>${caseFormatJs(item.product_name)}</span>', 'POS discount picker: product name uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), "replace('%s', caseFormatJs(item.product_name)).replace('%s', newPrice", 'POS discount min-price error uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), "PT.resultingPriceNegative.replace('%s', caseFormatJs(item.product_name))", 'POS negative-price error uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), "'<span><strong>' + caseFormatJs(product.product_name) + '</strong><br>' +", 'POS barcode-scan toast uses caseFormatJs()');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'product_name:      product.product_name,', 'POS scanAddToCart: raw product_name preserved as the cart-line snapshot (never case-transformed at storage time)');
+has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'product_name: currentProduct.product_name,', 'POS addToCart: raw product_name preserved as the cart-line snapshot (never case-transformed at storage time)');
+
+has(src($root, 'app/bms/pos/pos_modals_new.php'), 'caseFormat($_sup[\'supplier_name\'])', 'POS restock-modal supplier dropdown uses caseFormat()');
+
+has(src($root, 'assets/js/pos-credit-aging.js'), "window.caseFormatJs(d) : '-'", 'Credit-aging table column: customer name uses caseFormatJs()');
+has(src($root, 'assets/js/pos-credit-aging.js'), 'window.caseFormatJs(row.customer_name) : \'-\'', 'Credit-aging mobile card: customer name uses caseFormatJs()');
+has(src($root, 'assets/js/pos-credit-aging.js'), 'window.applyCaseModeJs(row.customer_name) : \'-\'', 'Credit-aging repay modal: customer name uses applyCaseModeJs()');
+
+has(src($root, 'app/bms/pos/customer_display.php'), '${caseFormatJs(item.product_name)}', 'Customer-facing 2nd-screen display: product name uses caseFormatJs()');
+has(src($root, 'app/bms/pos/price_groups.php'), '${caseFormatJs(p.product_name)}', 'Price-group product grid: product name uses caseFormatJs()');
+
+// Live end-to-end — print_receipt.php (the actual physical/PDF customer receipt)
+if ($uid) {
+    $fixture = $pdo->query("SELECT s.sale_id, s.customer_id, i.product_id
+                               FROM pos_sales s JOIN pos_sale_items i ON i.sale_id = s.sale_id
+                              WHERE s.customer_id IS NOT NULL LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$fixture) {
+        $fixture = $pdo->query("SELECT s.sale_id, s.customer_id, i.product_id
+                                   FROM pos_sales s JOIN pos_sale_items i ON i.sale_id = s.sale_id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    }
+    if ($fixture) {
+        $saleId = (int)$fixture['sale_id'];
+        $prodId = (int)$fixture['product_id'];
+        $custId = $fixture['customer_id'] !== null ? (int)$fixture['customer_id'] : null;
+
+        $origProduct = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ?");
+        $origProduct->execute([$prodId]);
+        $origProductName = $origProduct->fetchColumn();
+
+        $origCustomerName = null;
+        if ($custId) {
+            $origCustomer = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ?");
+            $origCustomer->execute([$custId]);
+            $origCustomerName = $origCustomer->fetchColumn();
+        }
+
+        $testLower = 'zz refs receipt test';
+        $testUpper = strtoupper($testLower);
+
+        _tdr_run_php("
+            require '$root/roots.php';
+            save_setting('text_display_case', 'upper');
+            \$pdo->prepare('UPDATE products SET product_name = ? WHERE product_id = ?')->execute([" . var_export($testLower, true) . ", $prodId]);
+            " . ($custId ? "\$pdo->prepare('UPDATE customers SET customer_name = ? WHERE customer_id = ?')->execute([" . var_export($testLower . ' cust', true) . ", $custId]);" : "") . "
+            echo 'SET';
+        ");
+
+        try {
+            $html = _tdr_call($root, $uid, 'api/pos/print_receipt.php', ['id' => $saleId]);
+            (strpos($html, $testUpper) !== false)
+                ? pass("print_receipt.php: UPPERCASED product name found in the printed receipt")
+                : fail("print_receipt.php: UPPERCASED product name NOT found in the printed receipt");
+            if ($custId) {
+                (strpos($html, strtoupper($testLower . ' cust')) !== false)
+                    ? pass("print_receipt.php: UPPERCASED customer name found in the printed receipt")
+                    : fail("print_receipt.php: UPPERCASED customer name NOT found in the printed receipt");
+            }
+        } finally {
+            _tdr_run_php("
+                require '$root/roots.php';
+                save_setting('text_display_case', 'as_typed');
+                \$pdo->prepare('UPDATE products SET product_name = ? WHERE product_id = ?')->execute([" . var_export($origProductName, true) . ", $prodId]);
+                " . ($custId ? "\$pdo->prepare('UPDATE customers SET customer_name = ? WHERE customer_id = ?')->execute([" . var_export($origCustomerName, true) . ", $custId]);" : "") . "
+                echo 'RESTORED';
+            ");
+        }
+    } else {
+        pass('no pos_sales fixture with items available — print_receipt.php live check skipped (n/a)');
+    }
 }
 
 _tdr_set_mode($root, 'as_typed');
