@@ -9,6 +9,15 @@ autoEnforcePermission('suppliers');
 // Include the header
 includeHeader();
 
+// Sub-Contractors is owned by the Projects feature, not by the Simple-POS
+// Supplier Access toggle (core/feature_registry.php's 'projects' entry) —
+// the autoEnforcePermission() call above only checked the shared 'suppliers'
+// page key, which that toggle deliberately opens.
+if (!tenantFeatureEnabled('projects')) {
+    header('Location: ' . getUrl('unauthorized'));
+    exit();
+}
+
 // Permission flags (canX() handles admin bypass internally)
 $can_view   = canView('suppliers');
 $can_create = canCreate('suppliers');
