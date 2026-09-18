@@ -58,6 +58,11 @@ $paid_from_account_id   = (int)($_POST['paid_from_account_id'] ?? 0);
 // every restock would break for non-perishable goods.
 $manufacturing_date     = !empty($_POST['manufacturing_date']) ? $_POST['manufacturing_date'] : null;
 $expiry_date            = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
+// Optional (2026-09-17 Supplier Access request) — "not recommended but not
+// required": which supplier a batch was ordered from. Never blocks a restock
+// on its own; only rejected if a non-empty value doesn't resolve to a real,
+// active supplier the user is allowed to see.
+$supplier_id            = (int)($_POST['supplier_id'] ?? 0);
 
 // Simple Mode — the modal never shows an account picker for a "normal
 // business man" (pos_modals_new.php), so nothing is posted for
@@ -116,6 +121,20 @@ if ($wholesale_price !== null && $wholesale_price < 0) {
     exit;
 }
 
+if ($supplier_id > 0) {
+    if (!canView('suppliers')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => t('Permission denied')]);
+        exit;
+    }
+    $supChk = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_id = ? AND status = 'active'");
+    $supChk->execute([$supplier_id]);
+    if (!$supChk->fetchColumn()) {
+        echo json_encode(['success' => false, 'message' => t('Selected supplier was not found.')]);
+        exit;
+    }
+}
+
 try {
     $prod = $pdo->prepare("SELECT product_name, is_service, track_inventory FROM products WHERE product_id = ? AND status != 'deleted'");
     $prod->execute([$product_id]);
@@ -142,6 +161,7 @@ try {
         'warehouse_id'     => $warehouse_id,
         'quantity'         => $quantity,
         'unit_cost'        => $buying_price,
+        'supplier_id'      => $supplier_id > 0 ? $supplier_id : null,
         'write_batch'      => true,
         'wholesale_price'  => $wholesale_price,
         'selling_price'    => $selling_price,

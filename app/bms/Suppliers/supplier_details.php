@@ -25,6 +25,17 @@ $can_delete = canDelete('suppliers');
 // there is no hidden supplier-linked POS data to surface as a new tab.
 require_once __DIR__ . '/../../../core/pos_nav.php';
 $simpleSupplierForm = posSimpleModeEnabled() && !advancedSupplierEnabled();
+// 2026-09-17 — the Supplier Access toggle (core/feature_registry.php's
+// 'suppliers' bypass in tenantModuleAllowsPage()) can make this page
+// reachable for a tenant that does NOT have the 'procurement' feature
+// enabled at all. $simpleSupplierForm alone isn't enough to hide the
+// procurement-cycle tabs in that case (a tenant could have Advanced Supplier
+// on, making $simpleSupplierForm false, while Procurement is still off) — so
+// every tab below that belongs to Procurement (Payments/Bills/Purchase
+// Orders/GRN/Returns/DN/RFQ/Debit Notes/Projects) must also close when
+// Procurement itself isn't on. Same shape as customer_details.php's
+// $hideSalesTabs = $simpleCustomerForm || !tenantFeatureEnabled('sales').
+$hideProcurementTabs = $simpleSupplierForm || !tenantFeatureEnabled('procurement');
 // Recent Payments is the page's default tab today — needs a real fallback
 // once it (and everything else formal-procurement-shaped) is hidden. Expenses
 // is kept even in Simple mode (a lighter, standalone record, not part of the
@@ -32,7 +43,7 @@ $simpleSupplierForm = posSimpleModeEnabled() && !advancedSupplierEnabled();
 // Info (always has data) is the last resort, same discipline as
 // customer_details.php's own $default_tab_id.
 $default_supplier_tab = 'pane-payments';
-if ($simpleSupplierForm) {
+if ($hideProcurementTabs) {
     $default_supplier_tab = canView('expenses') ? 'pane-expenses' : 'pane-sysinfo';
 }
 
@@ -718,7 +729,7 @@ global $company_name, $company_logo;
             <!-- flex-nowrap + overflow-auto: eleven tabs scroll sideways on a phone
                  instead of wrapping into three stacked rows. Same as customer details. -->
             <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="supplierSectionTabs" role="tablist">
-                <?php if (!$simpleSupplierForm): ?>
+                <?php if (!$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link <?= $default_supplier_tab === 'pane-payments' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
                         <i class="bi bi-cash-coin me-1"></i> Recent Payments
@@ -735,35 +746,35 @@ global $company_name, $company_logo;
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if (canView('grn') && !$simpleSupplierForm): ?>
+                <?php if (canView('grn') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-grn" type="button" role="tab">
                         <i class="bi bi-box-seam me-1"></i> Goods Received
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if (hasPermission('purchase_returns') && !$simpleSupplierForm): ?>
+                <?php if (hasPermission('purchase_returns') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-returns" type="button" role="tab">
                         <i class="bi bi-arrow-return-left me-1"></i> Purchase Returns
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if ((canView('dn') || canView('grn')) && !$simpleSupplierForm): ?>
+                <?php if ((canView('dn') || canView('grn')) && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-dn" type="button" role="tab">
                         <i class="bi bi-truck me-1"></i> Delivery Notes
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if (canView('rfq') && !$simpleSupplierForm): ?>
+                <?php if (canView('rfq') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-rfq" type="button" role="tab">
                         <i class="bi bi-file-earmark-text me-1"></i> RFQs
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if (canView('debit_notes') && !$simpleSupplierForm): ?>
+                <?php if (canView('debit_notes') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-debitnotes" type="button" role="tab">
                         <i class="bi bi-receipt-cutoff me-1"></i> Debit Notes
@@ -777,7 +788,7 @@ global $company_name, $company_logo;
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if (!$simpleSupplierForm): ?>
+                <?php if (!$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
@@ -797,7 +808,7 @@ global $company_name, $company_logo;
 
         <!-- Goods Received (GRN) — same table code as app/bms/grn/grn.php, locked
              to this supplier and with the (redundant) Supplier column hidden. -->
-        <?php if (canView('grn') && !$simpleSupplierForm): ?>
+        <?php if (canView('grn') && !$hideProcurementTabs): ?>
         <div class="tab-pane fade" id="pane-grn" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
@@ -838,7 +849,7 @@ global $company_name, $company_logo;
         <?php endif; ?>
 
         <!-- Purchase Returns — same table code as app/bms/purchase/purchase_returns.php -->
-        <?php if (hasPermission('purchase_returns') && !$simpleSupplierForm): ?>
+        <?php if (hasPermission('purchase_returns') && !$hideProcurementTabs): ?>
         <div class="tab-pane fade" id="pane-returns" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
@@ -880,7 +891,7 @@ global $company_name, $company_logo;
 
         <!-- Delivery Notes (inbound) — same table code as app/bms/grn/delivery_notes.php.
              Inbound only: an outbound DN goes to a customer, not to this supplier. -->
-        <?php if ((canView('dn') || canView('grn')) && !$simpleSupplierForm): ?>
+        <?php if ((canView('dn') || canView('grn')) && !$hideProcurementTabs): ?>
         <div class="tab-pane fade" id="pane-dn" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
@@ -922,7 +933,7 @@ global $company_name, $company_logo;
         <?php endif; ?>
 
         <!-- RFQs / Supplier Quotes — same table code as app/bms/purchase/rfq.php -->
-        <?php if (canView('rfq') && !$simpleSupplierForm): ?>
+        <?php if (canView('rfq') && !$hideProcurementTabs): ?>
         <div class="tab-pane fade" id="pane-rfq" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
@@ -963,7 +974,7 @@ global $company_name, $company_logo;
         <?php endif; ?>
 
         <!-- Debit Notes — same table code as app/bms/purchase/debit_notes/debit_notes.php -->
-        <?php if (canView('debit_notes') && !$simpleSupplierForm): ?>
+        <?php if (canView('debit_notes') && !$hideProcurementTabs): ?>
         <div class="tab-pane fade" id="pane-debitnotes" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
@@ -1047,7 +1058,7 @@ global $company_name, $company_logo;
         <?php endif; ?>
 
         <!-- Projects Involved -->
-        <?php if (!$simpleSupplierForm): ?>
+        <?php if (!$hideProcurementTabs): ?>
         <div class="tab-pane fade" id="pane-projects" role="tabpanel">
             <div class="row mt-2 mb-4">
                 <div class="col-12">
@@ -1129,7 +1140,7 @@ global $company_name, $company_logo;
         </div>
         <?php endif; ?>
 
-        <?php if (!$simpleSupplierForm): ?>
+        <?php if (!$hideProcurementTabs): ?>
         <!-- Received Invoices -->
         <div class="tab-pane fade" id="pane-invoices" role="tabpanel">
             <div class="row mb-4">
@@ -1266,8 +1277,8 @@ global $company_name, $company_logo;
 
         <!-- Payments -->
         <div class="tab-pane fade show active" id="pane-payments" role="tabpanel">
-        <!-- $simpleSupplierForm can never be true here — this whole block is
-             already inside the "!$simpleSupplierForm" wrap opened above the
+        <!-- $hideProcurementTabs can never be true here — this whole block is
+             already inside the "!$hideProcurementTabs" wrap opened above the
              Received Invoices comment, so "show active" is always correct
              (this is always $default_supplier_tab === 'pane-payments' when reached). -->
             <div class="row mb-4">
