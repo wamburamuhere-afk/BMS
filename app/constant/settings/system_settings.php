@@ -34,7 +34,13 @@ if ($_POST) {
                 'timezone' => $_POST['timezone'] ?? '',
                 'date_format' => $_POST['date_format'] ?? '',
                 'items_per_page' => $_POST['items_per_page'] ?? '',
-                'enable_projects' => $_POST['enable_projects'] ?? 0
+                'enable_projects' => $_POST['enable_projects'] ?? 0,
+                // Global "Text Display Case" (2026-09-18) — whitelisted, never
+                // trust the posted value verbatim (see core/text_display_case.php
+                // for what each mode does; textDisplayCaseMode() also re-validates
+                // on read, so this is defense in depth, not the only guard).
+                'text_display_case' => in_array($_POST['text_display_case'] ?? '', ['as_typed', 'sentence', 'lower', 'upper', 'title', 'toggle'], true)
+                    ? $_POST['text_display_case'] : 'as_typed',
             ];
             
             // Handle Logo Upload
@@ -539,6 +545,38 @@ if ($_POST) {
                             </div>
                         </div>
 
+                        <!-- Global "Text Display Case" (2026-09-18 request) — visible for both
+                             Simple POS and normal tenants (not a Simple-POS-only setting, unlike
+                             most other toggles in this app). Read-only DISPLAY formatting: raw
+                             stored data is never rewritten — see core/text_display_case.php. -->
+                        <div class="row g-4 mt-1">
+                            <div class="col-12">
+                                <div class="card info-card">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-2 text-dark text-uppercase small letter-spacing-1"><?= t('Text Display Case') ?></h6>
+                                        <p class="text-muted small mb-3"><?= t('Controls how names and text appear across the system (lists, views, documents) — the data you type is never changed, and you can switch this anytime with no data loss.') ?></p>
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-md-5">
+                                                <?php $current_case_mode = get_setting('text_display_case', 'as_typed'); ?>
+                                                <select class="form-select" id="text_display_case" name="text_display_case" onchange="updateTextCasePreview()">
+                                                    <option value="as_typed" <?= $current_case_mode === 'as_typed' ? 'selected' : '' ?>><?= t('As Typed (Default)') ?></option>
+                                                    <option value="sentence" <?= $current_case_mode === 'sentence' ? 'selected' : '' ?>><?= t('Sentence case') ?></option>
+                                                    <option value="lower" <?= $current_case_mode === 'lower' ? 'selected' : '' ?>><?= t('lowercase') ?></option>
+                                                    <option value="upper" <?= $current_case_mode === 'upper' ? 'selected' : '' ?>><?= t('UPPERCASE') ?></option>
+                                                    <option value="title" <?= $current_case_mode === 'title' ? 'selected' : '' ?>><?= t('Capitalize Each Word') ?></option>
+                                                    <option value="toggle" <?= $current_case_mode === 'toggle' ? 'selected' : '' ?>><?= t('Toggle Case') ?></option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <div class="small text-muted mb-1"><?= t('Preview:') ?></div>
+                                                <div class="p-2 px-3 bg-light rounded border fw-bold" id="text_case_preview_box">John Doe Supplies</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mt-5 pt-3 border-top d-flex justify-content-between align-items-center">
                             <span class="text-muted small"><?= t('System Version:') ?> <span class="fw-bold">v2.1.0</span></span>
                             <button type="submit" name="save_general" class="btn btn-primary px-5">
@@ -995,6 +1033,9 @@ $(document).ready(function() {
         }
     });
 
+    // Text Display Case — reflect the saved setting in the preview box on load.
+    updateTextCasePreview();
+
     // Test Email Configuration
     $('#testEmailConfig').click(function() {
         const btn = $(this);
@@ -1082,4 +1123,39 @@ $(document).ready(function() {
         });
     }
 });
+
+// Text Display Case — client-side preview ONLY, mirroring
+// core/text_display_case.php's applyCaseMode() rule-for-rule so what the
+// admin sees here matches what every page will actually render. The saved
+// setting itself is enforced server-side (this is cosmetic feedback, not
+// the source of truth), and raw stored data is never touched either way.
+function updateTextCasePreview() {
+    var sample = 'john mwangi supplies';
+    var mode = document.getElementById('text_display_case').value;
+    var result;
+    switch (mode) {
+        case 'lower':
+            result = sample.toLowerCase();
+            break;
+        case 'upper':
+            result = sample.toUpperCase();
+            break;
+        case 'title':
+            result = sample.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+            break;
+        case 'sentence':
+            result = sample.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, function (c) { return c.toUpperCase(); });
+            break;
+        case 'toggle':
+            result = sample.split('').map(function (ch) {
+                return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
+            }).join('');
+            break;
+        case 'as_typed':
+        default:
+            result = sample;
+    }
+    document.getElementById('text_case_preview_box').textContent = result;
+}
+
 </script>
