@@ -179,7 +179,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
     <!-- Print-only Header -->
     <div class="d-none d-print-block text-center mb-4">
         <h4 class="fw-bold text-dark text-uppercase">SUB-CONTRACTOR INFORMATION REPORT</h4>
-        <h5 class="text-muted"><?= htmlspecialchars($sc['supplier_name']) ?> (<?= htmlspecialchars($sc['supplier_code']) ?>)</h5>
+        <h5 class="text-muted"><?= caseFormat($sc['supplier_name']) ?> (<?= htmlspecialchars($sc['supplier_code']) ?>)</h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
 
@@ -194,7 +194,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
             <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('sub_contractors') ?>">Sub-Contractors</a></li>
             <?php endif; ?>
-            <li class="breadcrumb-item active"><?= htmlspecialchars($sc['supplier_name']) ?></li>
+            <li class="breadcrumb-item active"><?= caseFormat($sc['supplier_name']) ?></li>
         </ol>
     </nav>
 
@@ -205,8 +205,8 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 <div>
                     <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-person-workspace text-info"></i> Sub-Contractor View</h2>
                     <p class="text-muted mb-0 small mt-1 header-desc">
-                        Detailed information about <?= htmlspecialchars($sc['supplier_name']) ?> 
-                        <?php if($sc['company_name']): ?> • <?= htmlspecialchars($sc['company_name']) ?><?php endif; ?>
+                        Detailed information about <?= caseFormat($sc['supplier_name']) ?> 
+                        <?php if($sc['company_name']): ?> • <?= caseFormat($sc['company_name']) ?><?php endif; ?>
                         • Code: <code><?= htmlspecialchars($sc['supplier_code']) ?></code>
                     </p>
                 </div>
@@ -299,8 +299,8 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 <div class="card-body">
                     <table class="table table-sm border-0">
                         <tr><td class="text-muted border-0">Status:</td><td class="border-0"><span class="badge bg-<?= get_status_badge($sc['status']) ?>"><?= ucfirst($sc['status']) ?></span></td></tr>
-                        <tr><td class="text-muted border-0">Type:</td><td class="border-0"><?= htmlspecialchars($sc['supplier_type'] ?: 'N/A') ?></td></tr>
-                        <tr><td class="text-muted border-0">Category:</td><td class="border-0"><?= htmlspecialchars($sc['category_name'] ?? 'General') ?></td></tr>
+                        <tr><td class="text-muted border-0">Type:</td><td class="border-0"><?= !empty($sc['supplier_type']) ? caseFormat($sc['supplier_type']) : 'N/A' ?></td></tr>
+                        <tr><td class="text-muted border-0">Category:</td><td class="border-0"><?= !empty($sc['category_name']) ? caseFormat($sc['category_name']) : 'General' ?></td></tr>
                         <tr><td class="text-muted border-0">Year:</td><td class="border-0"><?= htmlspecialchars($sc['year'] ?? 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">Projects:</td><td class="border-0"><span class="badge bg-primary"><?= $total_projects ?></span> <?= $total_projects == 1 ? 'project' : 'projects' ?></td></tr>
                         <tr><td class="text-muted border-0">TIN:</td><td class="border-0"><?= htmlspecialchars($sc['tax_id'] ?? 'N/A') ?></td></tr>
@@ -317,13 +317,13 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 </div>
                 <div class="card-body">
                     <table class="table table-sm border-0">
-                        <tr><td class="text-muted border-0">Bank Name:</td><td class="border-0"><?= htmlspecialchars($sc['bank_name'] ?: 'N/A') ?></td></tr>
+                        <tr><td class="text-muted border-0">Bank Name:</td><td class="border-0"><?= !empty($sc['bank_name']) ? caseFormat($sc['bank_name']) : 'N/A' ?></td></tr>
                         <tr><td class="text-muted border-0">Account:</td><td class="border-0"><code><?= htmlspecialchars($sc['bank_account'] ?: 'N/A') ?></code></td></tr>
                         <tr><td class="text-muted border-0">Currency:</td><td class="border-0"><?= htmlspecialchars($sc['currency'] ?: 'TZS') ?></td></tr>
                         <tr><td class="text-muted border-0">Payment Terms:</td><td class="border-0"><?= htmlspecialchars($sc['payment_terms'] ?: 'N/A') ?></td></tr>
                     </table>
                     <?php if($sc['bank_address']): ?>
-                    <p class="mb-0 small text-muted mt-2"><strong>Bank Address:</strong><br><?= nl2br(htmlspecialchars($sc['bank_address'])) ?></p>
+                    <p class="mb-0 small text-muted mt-2"><strong>Bank Address:</strong><br><?= nl2br(caseFormat($sc['bank_address'])) ?></p>
                     <?php endif; ?>
                 </div>
             </div>
@@ -338,8 +338,8 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 </div>
                 <div class="card-body">
                     <table class="table table-sm border-0">
-                        <tr><td class="text-muted border-0">Contact Person:</td><td class="border-0"><?= htmlspecialchars($sc['contact_person'] ?: 'N/A') ?></td></tr>
-                        <tr><td class="text-muted border-0">Title:</td><td class="border-0"><?= htmlspecialchars($sc['contact_title'] ?: 'N/A') ?></td></tr>
+                        <tr><td class="text-muted border-0">Contact Person:</td><td class="border-0"><?= !empty($sc['contact_person']) ? caseFormat($sc['contact_person']) : 'N/A' ?></td></tr>
+                        <tr><td class="text-muted border-0">Title:</td><td class="border-0"><?= !empty($sc['contact_title']) ? caseFormat($sc['contact_title']) : 'N/A' ?></td></tr>
                         <tr><td class="text-muted border-0">Email:</td><td class="border-0"><a href="mailto:<?= htmlspecialchars($sc['email']) ?>"><?= htmlspecialchars($sc['email'] ?: 'N/A') ?></a></td></tr>
                         <tr><td class="text-muted border-0">Phone:</td><td class="border-0"><?= htmlspecialchars($sc['phone'] ?: 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">Mobile:</td><td class="border-0"><?= htmlspecialchars($sc['mobile'] ?: 'N/A') ?></td></tr>
@@ -354,7 +354,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-justify-left"></i> Description & Notes</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted"><?= nl2br(htmlspecialchars($sc['description'] ?: 'No additional notes provided.')) ?></p>
+                    <p class="mb-0 text-muted"><?= !empty($sc['description']) ? nl2br(caseFormat($sc['description'])) : 'No additional notes provided.' ?></p>
                 </div>
             </div>
         </div>
@@ -368,20 +368,20 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 <div class="card-body">
                     <div class="mb-3">
                         <p class="mb-1 text-muted small fw-bold uppercase">Physical Address</p>
-                        <p class="mb-0"><?= nl2br(htmlspecialchars($sc['address'] ?: 'N/A')) ?></p>
+                        <p class="mb-0"><?= !empty($sc['address']) ? nl2br(caseFormat($sc['address'])) : 'N/A' ?></p>
                     </div>
                     <div class="mb-3">
                         <p class="mb-1 text-muted small fw-bold uppercase">Postal Address</p>
-                        <p class="mb-0"><?= htmlspecialchars($sc['postal_address'] ?: 'N/A') ?></p>
+                        <p class="mb-0"><?= !empty($sc['postal_address']) ? caseFormat($sc['postal_address']) : 'N/A' ?></p>
                     </div>
                     <hr class="opacity-10">
                     <div class="row g-2">
-                        <div class="col-6"><p class="mb-0 text-muted small"><strong>District:</strong> <?= htmlspecialchars($sc['city'] ?: 'N/A') ?></p></div>
-                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Region:</strong> <?= htmlspecialchars($sc['state'] ?: 'N/A') ?></p></div>
-                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Ward:</strong> <?= htmlspecialchars($sc['ward'] ?: 'N/A') ?></p></div>
-                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Street/Village:</strong> <?= htmlspecialchars($sc['village'] ?: 'N/A') ?></p></div>
+                        <div class="col-6"><p class="mb-0 text-muted small"><strong>District:</strong> <?= !empty($sc['city']) ? caseFormat($sc['city']) : 'N/A' ?></p></div>
+                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Region:</strong> <?= !empty($sc['state']) ? caseFormat($sc['state']) : 'N/A' ?></p></div>
+                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Ward:</strong> <?= !empty($sc['ward']) ? caseFormat($sc['ward']) : 'N/A' ?></p></div>
+                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Street/Village:</strong> <?= !empty($sc['village']) ? caseFormat($sc['village']) : 'N/A' ?></p></div>
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>Zip:</strong> <?= htmlspecialchars($sc['postal_code'] ?: 'N/A') ?></p></div>
-                        <div class="col-12"><p class="mb-0 text-muted small"><strong>Country:</strong> <?= htmlspecialchars($sc['country'] ?: 'Tanzania') ?></p></div>
+                        <div class="col-12"><p class="mb-0 text-muted small"><strong>Country:</strong> <?= !empty($sc['country']) ? caseFormat($sc['country']) : 'Tanzania' ?></p></div>
                     </div>
                 </div>
             </div>
@@ -696,7 +696,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Record Payment — <?= safe_output($sc['supplier_name'] ?? 'Sub-Contractor') ?></h5>
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Record Payment — <?= !empty($sc['supplier_name']) ? caseFormat($sc['supplier_name']) : 'Sub-Contractor' ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

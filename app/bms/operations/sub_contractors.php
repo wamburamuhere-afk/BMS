@@ -361,24 +361,24 @@ function sc_status_label($status) {
                                 <tr>
                                     <td class="text-center"><?= $sn++ ?></td>
                                     <td><span class="custom-code"><?= safe_output($sc['supplier_code']) ?></span></td>
-                                    <td><strong><?= safe_output($sc['supplier_name']) ?></strong></td>
+                                    <td><strong><?= caseFormat($sc['supplier_name']) ?></strong></td>
                                     <td>
                                         <div class="small">
-                                            <?= safe_output($sc['contact_person'] ?? '') ?><br>
+                                            <?= caseFormat($sc['contact_person'] ?? '') ?><br>
                                             <i class="bi bi-telephone"></i> <?= safe_output($sc['phone'] ?? '') ?>
                                         </div>
                                     </td>
                                     <td>
                                         <div class="small">
                                             <?= safe_output(substr($sc['address'] ?? '', 0, 30)) ?>...<br>
-                                            <strong><?= safe_output($sc['city'] ?? '') ?></strong>
+                                            <strong><?= caseFormat($sc['city'] ?? '') ?></strong>
                                         </div>
                                     </td>
-                                    <td><span class="badge bg-secondary"><?= safe_output($sc['category_name'] ?? t('General')) ?></span></td>
+                                    <td><span class="badge bg-secondary"><?= !empty($sc['category_name']) ? caseFormat($sc['category_name']) : t('General') ?></span></td>
                                     <td>
                                         <?php if (!empty($sc['primary_project_name'])): ?>
                                         <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
-                                            <i class="bi bi-briefcase me-1"></i><?= safe_output($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
+                                            <i class="bi bi-briefcase me-1"></i><?= caseFormat($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
                                         </a>
                                         <?php elseif ($sc['project_count'] > 0): ?>
                                         <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
@@ -442,24 +442,24 @@ function sc_status_label($status) {
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
-                                            <div class="fw-bold" style="font-size:0.9rem"><?= safe_output($sc['supplier_name']) ?></div>
-                                            <small class="text-muted"><?= safe_output($sc['supplier_code']) ?> &bull; <?= safe_output($sc['category_name'] ?? t('General')) ?></small>
+                                            <div class="fw-bold" style="font-size:0.9rem"><?= caseFormat($sc['supplier_name']) ?></div>
+                                            <small class="text-muted"><?= safe_output($sc['supplier_code']) ?> &bull; <?= !empty($sc['category_name']) ? caseFormat($sc['category_name']) : t('General') ?></small>
                                         </div>
                                         <span class="badge bg-<?= get_status_badge($sc['status']) ?>" style="font-size:0.65rem"><?= sc_status_label($sc['status']) ?></span>
                                     </div>
                                     <?php if (!empty($sc['contact_person']) || !empty($sc['phone'])): ?>
                                     <div class="small text-muted mb-1">
-                                        <?php if (!empty($sc['contact_person'])): ?><i class="bi bi-person me-1"></i><?= safe_output($sc['contact_person']) ?><?php endif; ?>
+                                        <?php if (!empty($sc['contact_person'])): ?><i class="bi bi-person me-1"></i><?= caseFormat($sc['contact_person']) ?><?php endif; ?>
                                         <?php if (!empty($sc['phone'])): ?> &bull; <i class="bi bi-telephone me-1"></i><?= safe_output($sc['phone']) ?><?php endif; ?>
                                     </div>
                                     <?php endif; ?>
                                     <?php if (!empty($sc['city'])): ?>
-                                    <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= safe_output($sc['city']) ?></div>
+                                    <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= caseFormat($sc['city']) ?></div>
                                     <?php endif; ?>
                                     <div class="small text-muted">
                                         <i class="bi bi-briefcase me-1"></i>
                                         <?php if (!empty($sc['primary_project_name'])): ?>
-                                        <?= safe_output($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
+                                        <?= caseFormat($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
                                         <?php elseif ($sc['project_count'] > 0): ?>
                                         <?= (int)$sc['project_count'] ?> <?= $sc['project_count'] != 1 ? t('projects') : t('project') ?>
                                         <?php else: ?><span><?= t('No projects') ?></span><?php endif; ?>
