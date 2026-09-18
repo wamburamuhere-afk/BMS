@@ -286,7 +286,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                 <select class="form-select select2-static" id="categoryFilter" name="categoryFilter">
                                     <option value=""><?= t('All Categories') ?></option>
                                     <?php foreach ($categories as $category): ?>
-                                        <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
+                                        <option value="<?= $category['category_id'] ?>"><?= caseFormat($category['category_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -1123,16 +1123,16 @@ $(document).ready(function() {
                     render: (data) => `<code>${safeOutput(data)}</code>`,
                     createdCell: (td) => $(td).attr('data-label', 'Code')
                 },
-                { 
+                {
                     data: 'customer_name',
-                    render: (data) => `<strong>${safeOutput(data)}</strong>`,
+                    render: (data) => `<strong>${caseFormatJs(data)}</strong>`,
                     createdCell: (td) => $(td).attr('data-label', 'Customer Name')
                 },
-                { 
+                {
                     data: null,
                     render: (data, t, row) => `
                         <div class="small text-muted" style="line-height: 1.1;">
-                            ${row.contact_person ? '<span class="text-dark fw-bold">' + safeOutput(row.contact_person) + '</span><br>' : ''}
+                            ${row.contact_person ? '<span class="text-dark fw-bold">' + caseFormatJs(row.contact_person) + '</span><br>' : ''}
                             ${row.email ? '<i class="bi bi-envelope small"></i> ' + safeOutput(row.email.substring(0, 20)) + (row.email.length > 20 ? '...' : '') + '<br>' : ''}
                             ${row.phone || row.mobile ? '<i class="bi bi-telephone small"></i> ' + safeOutput(row.phone || row.mobile) : ''}
                         </div>
@@ -1144,15 +1144,15 @@ $(document).ready(function() {
                     data: 'address',
                     render: (data, t, row) => `
                         <div class="small text-muted" style="max-width: 150px; line-height: 1.2;">
-                            ${data ? safeOutput(data.substring(0, 40)) + '<br>' : ''}
-                            <span class="fw-bold text-dark">${safeOutput(row.city || '')}${row.country ? ', ' + safeOutput(row.country) : ''}</span>
+                            ${data ? caseFormatJs(data.substring(0, 40)) + '<br>' : ''}
+                            <span class="fw-bold text-dark">${caseFormatJs(row.city || '')}${row.country ? ', ' + caseFormatJs(row.country) : ''}</span>
                         </div>
                     `,
                     createdCell: (td) => $(td).attr('data-label', 'Address')
                 },
                 {
                     data: 'category_name',
-                    render: (data) => data ? `<span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25 px-2">${safeOutput(data)}</span>` : `<span class="text-muted small">${<?= json_encode(t('N/A')) ?>}</span>`,
+                    render: (data) => data ? `<span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25 px-2">${caseFormatJs(data)}</span>` : `<span class="text-muted small">${<?= json_encode(t('N/A')) ?>}</span>`,
                     createdCell: (td) => $(td).attr('data-label', 'Category')
                 },
                 {
@@ -1266,7 +1266,7 @@ $(document).ready(function() {
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
-                                            <div class="fw-bold" style="font-size:0.9rem">${safeOutput(customer.customer_name)}</div>
+                                            <div class="fw-bold" style="font-size:0.9rem">${caseFormatJs(customer.customer_name)}</div>
                                             <small class="text-muted">${safeOutput(customer.customer_code)}</small>
                                         </div>
                                         <span class="badge bg-${getStatusBadge(customer.status)}" style="font-size:0.65rem">${getStatusLabel(customer.status)}</span>
