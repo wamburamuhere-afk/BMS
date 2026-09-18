@@ -125,14 +125,20 @@ has($listSrc, "\$simpleSupplierForm): ?>", 'the simple-mode conditional wrapping
 section('2b. Source wiring — supplier_details.php (detail)');
 $detailSrc = src($root, 'app/bms/Suppliers/supplier_details.php');
 has($detailSrc, '$simpleSupplierForm = posSimpleModeEnabled() && !advancedSupplierEnabled();', 'reuses the exact same flag as the registration form');
-has($detailSrc, "canView('grn') && !\$simpleSupplierForm", 'GRN tab keeps its existing entitlement check AND adds Simple POS on top');
-has($detailSrc, "hasPermission('purchase_returns') && !\$simpleSupplierForm", 'Purchase Returns tab: entitlement check preserved, Simple POS added');
-has($detailSrc, "canView('rfq') && !\$simpleSupplierForm", 'RFQ tab: entitlement check preserved, Simple POS added');
-has($detailSrc, "canView('debit_notes') && !\$simpleSupplierForm", 'Debit Notes tab: entitlement check preserved, Simple POS added');
+// 2026-09-17 (Supplier Access request) — the procurement-cycle tabs now gate
+// on $hideProcurementTabs ($simpleSupplierForm OR Procurement itself being
+// off), not bare $simpleSupplierForm, so they also close when the new
+// Supplier Access toggle opens this page without Procurement. See
+// tests/test_supplier_access_simple_pos_cli.php for the live-tenant proof.
+has($detailSrc, '$hideProcurementTabs = $simpleSupplierForm || !tenantFeatureEnabled(\'procurement\');', 'defines the combined procurement-tabs gate on top of the Simple POS flag');
+has($detailSrc, "canView('grn') && !\$hideProcurementTabs", 'GRN tab keeps its existing entitlement check AND adds the combined gate on top');
+has($detailSrc, "hasPermission('purchase_returns') && !\$hideProcurementTabs", 'Purchase Returns tab: entitlement check preserved, combined gate added');
+has($detailSrc, "canView('rfq') && !\$hideProcurementTabs", 'RFQ tab: entitlement check preserved, combined gate added');
+has($detailSrc, "canView('debit_notes') && !\$hideProcurementTabs", 'Debit Notes tab: entitlement check preserved, combined gate added');
 has($detailSrc, "\$default_supplier_tab = canView('expenses') ? 'pane-expenses' : 'pane-sysinfo';", 'default tab falls back to Expenses (kept) then System Info, never a blank Sales Orders-style assumption');
-// Expenses is deliberately NOT gated on !$simpleSupplierForm anywhere.
+// Expenses is deliberately NOT gated on !$hideProcurementTabs anywhere.
 $expensesBlockStart = strpos($detailSrc, "<?php if (canView('expenses')): ?>");
-$expensesBlockHasSimpleGate = $expensesBlockStart !== false && strpos(substr($detailSrc, $expensesBlockStart, 40), '$simpleSupplierForm') !== false;
+$expensesBlockHasSimpleGate = $expensesBlockStart !== false && strpos(substr($detailSrc, $expensesBlockStart, 40), '$hideProcurementTabs') !== false;
 (!$expensesBlockHasSimpleGate) ? pass('Expenses tab is deliberately KEPT even in Simple POS (not part of the formal PO/GRN/Bill cycle)') : fail('Expenses tab was wrongly gated on Simple POS too');
 
 section('2c. Source wiring — delete_supplier.php');

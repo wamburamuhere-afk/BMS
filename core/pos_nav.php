@@ -153,6 +153,25 @@ if (!function_exists('advancedSupplierEnabled')) {
     }
 }
 
+if (!function_exists('supplierAccessEnabled')) {
+    /**
+     * 2026-09-17 — a DIFFERENT kind of toggle from advancedSupplierEnabled()
+     * above: that one changes which FORM renders once Suppliers is already
+     * reachable. This one changes REACHABILITY itself — it lets a Simple POS
+     * tenant see Suppliers (nav + supplier_details.php + the simplified
+     * supplier CRUD) without the full Procurement module being on. Set only
+     * via actions/superadmin_tenant_supplier_access.php (Tenant > Point of
+     * Sale > More). Read directly by
+     * core/feature_registry.php::tenantModuleAllowsPage()'s 'suppliers'
+     * bypass — see that function for why it re-reads get_setting() itself
+     * rather than calling this helper.
+     */
+    function supplierAccessEnabled(): bool
+    {
+        return get_setting('pos_supplier_access', '0') === '1';
+    }
+}
+
 if (!function_exists('restaurantSubHubCards')) {
     /**
      * The Restaurant sub-hub's 5 destination cards — the single source shared

@@ -1199,6 +1199,85 @@ if (!function_exists('setTenantAdvancedSupplier')) {
     }
 }
 
+if (!function_exists('tenantSupplierAccessStatus')) {
+    /**
+     * 2026-09-17 — a DIFFERENT kind of toggle from the pos_advanced_* pair
+     * above: those change which FORM renders once a page is already
+     * reachable. This one changes REACHABILITY itself — it lets a Simple POS
+     * tenant see Suppliers (nav + supplier_details.php + the simplified
+     * supplier CRUD, same simplification as Customer's) without turning on
+     * the full Procurement module. See
+     * core/feature_registry.php::tenantModuleAllowsPage() for the bypass this
+     * setting drives.
+     *
+     * @return array{enabled:bool, locked:bool}|null null if the tenant/DB can't be reached.
+     */
+    function tenantSupplierAccessStatus(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $st2 = $tPdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_supplier_access'");
+            $val = $st2 ? $st2->fetchColumn() : false;
+
+            return [
+                'enabled' => ($val === '1'),
+                'locked'  => !empty($t['pos_supplier_access_locked']),
+            ];
+        } catch (Throwable $e) {
+            error_log('tenantSupplierAccessStatus(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('setTenantSupplierAccess')) {
+    /** @return array{ok:bool, error:?string} */
+    function setTenantSupplierAccess(int $tenantId, bool $enabled, bool $locked): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return ['ok' => false, 'error' => 'Tenant not found.'];
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return ['ok' => false, 'error' => 'Could not decrypt tenant credentials.'];
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+            $tPdo->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                VALUES ('pos_supplier_access', ?, NOW())
+                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+            ")->execute([$enabled ? '1' : '0', $enabled ? '1' : '0']);
+
+            getControlPdo()->prepare("UPDATE tenants SET pos_supplier_access_locked = ? WHERE id = ?")
+                ->execute([$locked ? 1 : 0, $tenantId]);
+
+            return ['ok' => true, 'error' => null];
+        } catch (Throwable $e) {
+            error_log('setTenantSupplierAccess(' . $tenantId . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not update this tenant right now.'];
+        }
+    }
+}
+
 if (!function_exists('tenantShopModeStatus')) {
     /**
      * A FOURTH deliberate, narrow exception to "the superadmin panel never

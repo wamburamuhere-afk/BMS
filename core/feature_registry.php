@@ -904,6 +904,21 @@ if (!function_exists('tenantModuleAllowsPage')) {
             return true;
         }
 
+        // 'suppliers' — lightweight Supplier visibility for a Simple POS
+        // tenant that hasn't (or can't) turn on the full Procurement module,
+        // 2026-09-17: superadmin-only override set via
+        // actions/superadmin_tenant_supplier_access.php (Tenant > Point of
+        // Sale > More), core/pos_nav.php::supplierAccessEnabled(). Deliberately
+        // scoped to the 'suppliers' page_key ONLY — it does NOT bypass
+        // 'supplier_payments'/'purchase'/'rfq'/etc, which stay gated behind
+        // 'procurement' exactly as before, so a tenant with only this toggle
+        // gets the simplified supplier list/profile (same shape as Customer's)
+        // and nothing else Procurement owns. Same get_setting() pattern as the
+        // 'expenses' check above, for the same chokepoint reason.
+        if ($pageKey === 'suppliers' && function_exists('get_setting') && get_setting('pos_supplier_access', '0') === '1') {
+            return true;
+        }
+
         $owners = featureForPageKey($pageKey);
         if (!$owners) return true;
 
