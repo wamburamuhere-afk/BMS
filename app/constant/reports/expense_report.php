@@ -316,7 +316,7 @@ $(function () {
                     i + 1,
                     r.expense_date ? new Date(r.expense_date).toLocaleDateString() : '',
                     esc(r.reference_number || ''),
-                    (POS_SIMPLE ? (r.warehouse_name ? caseFormatJs(r.warehouse_name) : '') : esc(r.expense_account_name || '')) || PT.unclassified,
+                    ((v => v ? (POS_SIMPLE ? caseFormatJs(v) : esc(v)) : PT.unclassified)(POS_SIMPLE ? r.warehouse_name : r.expense_account_name)),
                     r.paid_to_name ? caseFormatJs(r.paid_to_name) : '—',
                     esc(r.description || ''),
                     fmt(r.amount),
