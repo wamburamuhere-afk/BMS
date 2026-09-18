@@ -15,6 +15,9 @@
  * the POS Restock modal, and "Selling Price" is relabeled "Retail Price" to
  * match Restock's terminology exactly (both requests: "bei ya jumla" /
  * "bei ya rejareja" should be visible on Create the same way they are there).
+ * Also added the same day: a real "Low Stock Alert" field (min_stock_level)
+ * so a Simple POS user can actually turn on dashboard.php's own low-stock
+ * notification, which already reads this exact column.
  *
  *   A. STATIC   — files lint clean; source wiring for both branches present.
  *   B. RENDERED — the real page, three states: Simple POS, normal, and
@@ -118,6 +121,10 @@ if (!$uid) {
     // modal — a real, visible, editable field, not the old hidden-only one.
     (preg_match('/<input type="number"[^>]*id="wholesale_price"/', $simple) === 1) ? pass('Simple POS render: Wholesale Price is a real, visible field (matches Restock)') : fail('Wholesale Price field is missing or still hidden-only');
     has($simple, 'Retail Price', 'Simple POS render: "Selling Price" relabeled to "Retail Price" (matches Restock)');
+    // 2026-09-18 request: a real "Low Stock" (min_stock_level) field so a Simple
+    // POS user can actually turn on dashboard.php's own low-stock alert, which
+    // already reads this exact column.
+    (preg_match('/<input type="number"[^>]*id="min_stock_level"/', $simple) === 1) ? pass('Simple POS render: Low Stock Alert (min_stock_level) is a real, visible field') : fail('Low Stock Alert field is missing');
     (strpos($simple, 'id="discount_rate"') === false) ? pass('Simple POS render: Discount Rate field absent') : fail('Discount Rate field still present');
     (strpos($simple, 'id="brand_id"') === false) ? pass('Simple POS render: Advanced Details tab (Brand) absent') : fail('Advanced Details tab still present');
     (strpos($simple, 'id="weight"') === false) ? pass('Simple POS render: Weight/Dimensions absent') : fail('Weight field still present');
@@ -168,6 +175,7 @@ if (!$uid || !$wh) {
             'cost_price'         => '500',
             'selling_price'      => '800',
             'min_selling_price'  => '800.00',
+            'min_stock_level'    => '5', // Low Stock Alert — proves the real field actually saves, not just renders
             'unit'               => 'pcs',
             'manufacturing_date' => '2026-02-01',
             'expiry_date'        => '2027-02-01',
@@ -195,6 +203,7 @@ if (!$uid || !$wh) {
         ($prod['description'] === null || $prod['description'] === '') ? pass('description left empty (never collected)') : fail('description unexpectedly set: ' . $prod['description']);
         ($prod['tax_id'] === null) ? pass('tax_id left null (no tax, hidden field)') : fail('tax_id unexpectedly set: ' . var_export($prod['tax_id'], true));
         ((float)$prod['wholesale_price'] === 0.0) ? pass('wholesale_price defaults to 0') : fail('wholesale_price unexpectedly set: ' . $prod['wholesale_price']);
+        ((float)$prod['min_stock_level'] === 5.0) ? pass('min_stock_level (Low Stock Alert) saved correctly via the real field') : fail('min_stock_level lost or wrong: ' . $prod['min_stock_level']);
         ((int)$prod['is_service'] === 0) ? pass('is_service defaults to 0 (physical product)') : fail('is_service unexpectedly set');
         ((int)$prod['track_inventory'] === 1) ? pass('track_inventory still defaults to 1 even though the checkbox is not rendered') : fail('track_inventory not defaulting correctly');
         ((int)$prod['is_taxable'] === 0) ? pass('is_taxable defaults to 0 (consistent with no tax configured)') : fail('is_taxable unexpectedly 1 with no tax_id');
