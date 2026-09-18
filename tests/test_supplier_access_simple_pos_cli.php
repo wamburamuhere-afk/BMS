@@ -123,6 +123,40 @@ if (($argv[1] ?? '') === '--tenant-modal') {
     exit(0);
 }
 
+// ─── Tenant-side add_supplier_payment.php worker — a bare payment, no PO ──
+if (($argv[1] ?? '') === '--tenant-payment') {
+    $host       = (string)$argv[2];
+    $userId     = (int)$argv[3];
+    $supplierId = (int)$argv[4];
+    $acctId     = (int)$argv[5];
+
+    $_SERVER['HTTP_HOST']      = $host;
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+
+    require_once __DIR__ . '/../roots.php';
+    $_SESSION['user_id']    = $userId;
+    $_SESSION['role_id']    = 1;
+    $_SESSION['is_admin']   = true;
+    $_SESSION['csrf_token'] = 'test-token';
+
+    $_POST = [
+        'supplier_id'          => $supplierId,
+        'payment_date'         => date('Y-m-d'),
+        'amount'               => 12500,
+        'currency'             => 'TZS',
+        'payment_method'       => 'cash',
+        'paid_from_account_id' => $acctId,
+        'reference_number'     => '',
+        'notes'                => 'Supplier Access test payment',
+        '_csrf'                => 'test-token',
+        // no purchase_order_id at all — the point of this check
+    ];
+    ob_start();
+    include __DIR__ . '/../api/add_supplier_payment.php';
+    fwrite(STDOUT, ob_get_clean());
+    exit(0);
+}
+
 // ─── Runner ─────────────────────────────────────────────────────────────────
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../core/control_db.php';
@@ -198,7 +232,9 @@ $navSrc = src($root, 'core/pos_nav.php');
 has($navSrc, "function supplierAccessEnabled(): bool", 'pos_nav.php has supplierAccessEnabled()');
 
 $frSrc = src($root, 'core/feature_registry.php');
-has($frSrc, "if (\$pageKey === 'suppliers' && function_exists('get_setting') && get_setting('pos_supplier_access', '0') === '1') {", 'tenantModuleAllowsPage() has the suppliers-only bypass');
+has($frSrc, "if (in_array(\$pageKey, ['suppliers', 'supplier_payments'], true)", "tenantModuleAllowsPage() bypass covers 'suppliers' and 'supplier_payments'");
+ok("bypass does not also cover 'purchase_orders'/'rfq'/'grn' (would leak the rest of Procurement)",
+    !preg_match("/in_array\\(\\\$pageKey, \\['suppliers', 'supplier_payments'[^\\]]*'(purchase_orders|rfq|grn)'/", $frSrc));
 
 $tvSrc = src($root, 'app/superadmin/tenant_view.php');
 has($tvSrc, 'saSupplierAccessEnabled', 'tenant_view.php dialog has the Supplier Access checkbox');
@@ -364,6 +400,17 @@ if (!$r['ok']) { echo "\nCannot continue.\n"; exit(1); }
 $tenantId   = (int)$r['tenant_id'];
 $tenantHost = $sub . '.' . $BASE;
 
+// A fresh tenant's database comes from schema/tenant_schema_template.sql,
+// which has the journal_mappings TABLE but no seed rows — those are seeded by
+// migrations/tenant/2026_09_15_journal_mappings_seed.php (and every other
+// pending tenant migration). In production this gap self-heals on the next
+// deploy's tenant_migration_runner pass, before a real tenant is likely to
+// touch a feature that needs it; a test that provisions and immediately uses
+// the tenant must close that same gap itself to see realistic post-signup
+// state, not the raw-template snapshot.
+require_once __DIR__ . '/../core/tenant_migration_runner.php';
+runTenantMigrations($tenantId);
+
 register_shutdown_function(function () use ($tenantId) {
     try {
         $t = getTenant($tenantId);
@@ -483,7 +530,7 @@ ok('suppliers/payments stays blocked too (owned by procurement, unaffected eithe
 ok('Restock modal no longer shows the Supplier field (Suppliers unreachable)', !str_contains(tenantModal($tenantHost, $ownerUserId), 'id="restock_supplier_id"'));
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('9. Live tenant — enable Supplier Access via the real endpoint: suppliers reopen, procurement stays shut');
+section('9. Live tenant — enable Supplier Access via the real endpoint: suppliers AND payments reopen, everything else Procurement-owned stays shut');
 
 $r = endpoint('actions/superadmin_tenant_supplier_access.php', ['tenant_id' => $tenantId, 'action' => 'set', 'enabled' => 1, 'locked' => 1], ['auth' => true]);
 ok('POSITIVE CONTROL: action=set actually persists', str_contains($r['out'], '"success":true'), substr($r['out'], 0, 200));
@@ -493,13 +540,61 @@ ok('...control DB lock flag set', controlLockFlag($c, $tenantId, 'pos_supplier_a
 $suppliersOpenHtml = tenantRoute($tenantHost, '/suppliers', $ownerUserId);
 ok('suppliers.php is REACHABLE again — the bypass works with Procurement genuinely off', str_contains($suppliersOpenHtml, 'id="form-message"'));
 
-$paymentsStillBlockedHtml = tenantRoute($tenantHost, '/suppliers/payments', $ownerUserId);
-ok('suppliers/payments STAYS blocked — the bypass is scoped to \'suppliers\' only, no leak', !str_contains($paymentsStillBlockedHtml, 'id="paymentsTable"'));
+// 2026-09-17 (follow-up) — "if Supplier is allowed, paying them should follow
+// the same logic": the bypass now covers 'supplier_payments' too, not just
+// 'suppliers'. It stays scoped to exactly these two page_keys — everything
+// else Procurement owns (purchase orders, RFQ, GRN, etc.) is still off.
+$paymentsOpenHtml = tenantRoute($tenantHost, '/suppliers/payments', $ownerUserId);
+ok('suppliers/payments is ALSO reachable now — paying a supplier follows the same logic as seeing one', str_contains($paymentsOpenHtml, 'id="paymentsTable"'));
+
+$poOpenHtml = tenantRoute($tenantHost, '/purchase_orders', $ownerUserId);
+ok('purchase_orders stays blocked — the bypass never grows beyond suppliers + paying them', !str_contains($poOpenHtml, 'Fatal error') && strlen(trim($poOpenHtml)) < 5000);
 
 ok('Restock modal shows the Supplier field again (Suppliers reachable via the toggle)', str_contains(tenantModal($tenantHost, $ownerUserId), 'id="restock_supplier_id"'));
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('10. Live tenant — supplier_details.php: page opens, procurement-cycle tabs stay CLOSED');
+section('10. Live tenant — a real Supplier Payment can be recorded with no PO and no other Procurement data');
+
+$tPdo->prepare("INSERT INTO suppliers (supplier_code, supplier_name, status, created_at) VALUES (?, ?, 'active', NOW())")
+    ->execute(['SUP-TEST-0002', 'Supplier Access Payment Co']);
+$paySupplierId = (int)$tPdo->lastInsertId();
+ok('a second real supplier exists to pay', $paySupplierId > 0);
+
+require_once __DIR__ . '/../core/payment_source.php';
+$payCashAccts = cashBankAccounts($tPdo);
+$payCashAcct  = $payCashAccts ? (int)$payCashAccts[0]['account_id'] : 0;
+if ($payCashAcct <= 0) {
+    ok('no cash/bank account fixture in the fresh tenant — payment runtime check skipped (n/a)', true);
+} else {
+    // recordGlobalTransaction() mirrors every leg into the canonical
+    // journal_entries ledger under entity_type='books_transaction' (one row
+    // per books_transactions leg, NOT 'supplier_payment' — that string is only
+    // the `transactions.transaction_type`) — see
+    // api/helpers/transaction_helper.php's own "Mirror the same legs into the
+    // canonical journal_entries ledger" comment. A plain before/after count is
+    // more robust here than depending on that internal entity_type string.
+    $entryCountBefore = (int)$tPdo->query("SELECT COUNT(*) FROM journal_entries")->fetchColumn();
+
+    $cmd = 'php ' . escapeshellarg(__FILE__) . ' --tenant-payment '
+         . escapeshellarg($tenantHost) . ' ' . escapeshellarg((string)$ownerUserId) . ' '
+         . escapeshellarg((string)$paySupplierId) . ' ' . escapeshellarg((string)$payCashAcct);
+    $out = []; exec($cmd . ' 2>&1', $out, $rc);
+    $joined = implode("\n", $out);
+    $payJson = json_decode($joined, true);
+    ok('api/add_supplier_payment.php accepts a bare supplier + amount + paid-from, no PO', !empty($payJson['success']), substr($joined, 0, 300));
+
+    if (!empty($payJson['success'])) {
+        $paidRow = $tPdo->query("SELECT amount, purchase_order_id, transaction_id FROM supplier_payments WHERE supplier_id = $paySupplierId ORDER BY payment_id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        ok('the payment row landed with the right amount', $paidRow && (float)$paidRow['amount'] === 12500.0);
+        ok('...and no purchase_order_id (never required)', $paidRow && $paidRow['purchase_order_id'] === null);
+        ok('...and it recorded a transaction_id (the consolidated outflow posted)', $paidRow && (int)$paidRow['transaction_id'] > 0);
+        $entryCountAfter = (int)$tPdo->query("SELECT COUNT(*) FROM journal_entries")->fetchColumn();
+        ok('...and it actually posted to the canonical ledger (journal_entries grew)', $entryCountAfter > $entryCountBefore);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('11. Live tenant — supplier_details.php: page opens, procurement-cycle tabs stay CLOSED');
 
 $tPdo->prepare("INSERT INTO suppliers (supplier_code, supplier_name, status, created_at) VALUES (?, ?, 'active', NOW())")
     ->execute(['SUP-TEST-0001', 'Supplier Access Test Co']);
@@ -522,7 +617,7 @@ foreach ([
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('11. Live tenant — re-enabling Procurement brings the tabs back (fix does not over-hide)');
+section('12. Live tenant — re-enabling Procurement brings the tabs back (fix does not over-hide)');
 
 // Both back to their platform defaults (true) — setTenantFeatures() deletes an
 // override row once it matches the default, so this also leaves zero rows in
@@ -539,7 +634,7 @@ $paymentsReopenedHtml = tenantRoute($tenantHost, '/suppliers/payments', $ownerUs
 ok('suppliers/payments is reachable again too, now that Procurement is back', str_contains($paymentsReopenedHtml, 'id="paymentsTable"'));
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('12. A deleted tenant has no database left to query');
+section('13. A deleted tenant has no database left to query');
 
 $deadSub = 'supaccdead' . bin2hex(random_bytes(3));
 $rd = provisionTenant('Supplier Access Dead Co', $deadSub, "owner@$deadSub.test", 'Password!123');
@@ -552,7 +647,7 @@ $r = endpoint('actions/superadmin_tenant_supplier_access.php', ['tenant_id' => $
 ok('the endpoint refuses cleanly for a deleted tenant (no crash)', refused($r), substr($r['out'], 0, 200));
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('13. Superadmin-only by design — no tenant-facing UI/endpoint exposes this setting');
+section('14. Superadmin-only by design — no tenant-facing UI/endpoint exposes this setting');
 
 $avail = tenantRoute($tenantHost, '/available_modules', $ownerUserId);
 ok('Available Modules renders with no PHP fatal', !str_contains($avail, 'Fatal error'));

@@ -1205,10 +1205,10 @@ if (!function_exists('tenantSupplierAccessStatus')) {
      * above: those change which FORM renders once a page is already
      * reachable. This one changes REACHABILITY itself — it lets a Simple POS
      * tenant see Suppliers (nav + supplier_details.php + the simplified
-     * supplier CRUD, same simplification as Customer's) without turning on
-     * the full Procurement module. See
-     * core/feature_registry.php::tenantModuleAllowsPage() for the bypass this
-     * setting drives.
+     * supplier CRUD, same simplification as Customer's) AND record Supplier
+     * Payments against them, without turning on the full Procurement module.
+     * See core/feature_registry.php::tenantModuleAllowsPage() for the bypass
+     * this setting drives.
      *
      * @return array{enabled:bool, locked:bool}|null null if the tenant/DB can't be reached.
      */

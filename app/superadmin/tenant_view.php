@@ -1009,7 +1009,7 @@ function openPosMoreModal() {
                 + '<div class="form-check">'
                 + '<input class="form-check-input" type="checkbox" id="saSupplierAccessEnabled"' + (supAccessRes.enabled ? ' checked' : '') + '>'
                 + '<label class="form-check-label fw-semibold" for="saSupplierAccessEnabled">Supplier Access</label>'
-                + '<div class="text-muted small">Makes Suppliers visible (dashboard button, nav, the simplified supplier list/profile — same simplified shape as Customer) even without the full Procurement module. Procurement-only screens (Payments, Bills, Purchase Orders, RFQ, GRN, etc.) stay off until Procurement itself is enabled. Has no effect if Procurement is already on. Superadmin-only.</div>'
+                + '<div class="text-muted small">Makes Suppliers visible (dashboard button, nav, the simplified supplier list/profile — same simplified shape as Customer) AND lets the tenant record Supplier Payments against them, even without the full Procurement module. Other Procurement-only screens (Bills, Purchase Orders, RFQ, GRN, etc.) stay off until Procurement itself is enabled. Has no effect if Procurement is already on. Superadmin-only.</div>'
                 + '</div>'
                 + '</div>',
             showCancelButton: true,
