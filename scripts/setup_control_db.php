@@ -448,6 +448,15 @@ try {
         // are only the locks.
         'pos_advanced_customer_locked' => "ADD COLUMN `pos_advanced_customer_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_advanced_product_locked`",
         'pos_advanced_supplier_locked' => "ADD COLUMN `pos_advanced_supplier_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_advanced_customer_locked`",
+        // 2026-09-17 — lightweight Supplier visibility for Simple POS tenants
+        // that don't have the full Procurement module enabled. Unlike the
+        // pos_advanced_* toggles (which change the FORM shown once a page is
+        // already reachable), this one changes REACHABILITY itself: it makes
+        // core/feature_registry.php::tenantModuleAllowsPage() treat the
+        // 'suppliers' page_key as allowed even with 'procurement' off. Value
+        // lives in the tenant's own database (system_settings.pos_supplier_access);
+        // this is only the lock.
+        'pos_supplier_access_locked' => "ADD COLUMN `pos_supplier_access_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_advanced_supplier_locked`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
