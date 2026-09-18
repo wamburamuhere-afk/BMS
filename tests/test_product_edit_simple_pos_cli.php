@@ -4,14 +4,20 @@
  *   php tests/test_product_edit_simple_pos_cli.php
  *
  * Covers products_simple_pos_plan.md §5: app/bms/product/product_edit.php hides
- * the exact same fields Create hides (SKU, Barcode, Description, Tax, Wholesale
- * Price, Discount Rate, the whole Advanced Details tab, Physical Specifications)
+ * the exact same fields Create hides (SKU, Barcode, Description, Tax,
+ * Discount Rate, the whole Advanced Details tab, Physical Specifications)
  * when Simple POS is on and the "Advanced Product" override is off — but since
  * Edit deals with an EXISTING record, every hidden field must round-trip its
  * current value via a hidden input, or api/update_product.php's full-replace
  * write would silently wipe it. Two fields (is_taxable, is_combo) are read by
  * PRESENCE (isset), not value, so their hidden-preserve must only render when
  * the stored value is truthy — the opposite pattern from every other field.
+ * Updated 2026-09-18: the form also collapses from 3 tabs (General/Pricing/
+ * Inventory) down to ONE single section, matching Create exactly (was
+ * previously tab-hidden-fields-only, not a real single-section layout).
+ * Wholesale Price is no longer hidden — it's a real, editable field now,
+ * alongside a "Selling Price" relabeled "Retail Price", both matching the
+ * POS Restock modal's Buying/Wholesale/Retail 3-column layout.
  *
  *   A. STATIC   — file lints clean; source wiring for both branches present.
  *   B. RENDERED — the real page, three states: Simple POS, normal, and
@@ -101,7 +107,12 @@ has($editSrc, '$simpleProductForm = posSimpleModeEnabled() && !advancedProductEn
 has($editSrc, '<input type="hidden" name="sku" value="<?= safe_output($product[\'sku\']) ?>">', 'SKU hidden-preserve on the else branch');
 has($editSrc, '<input type="hidden" name="barcode" value="<?= safe_output($product[\'barcode\']) ?>">', 'Barcode hidden-preserve on the else branch');
 has($editSrc, '<input type="hidden" name="description" value="<?= safe_output($product[\'description\']) ?>">', 'Description hidden-preserve on the else branch');
-has($editSrc, '<input type="hidden" name="wholesale_price" value="<?= $product[\'wholesale_price\'] ?>">', 'Wholesale Price hidden-preserve');
+// 2026-09-18 request: Wholesale Price is no longer hidden-only — it's now a
+// real, visible, editable field (matching Create and the POS Restock modal's
+// 3-column Buying/Wholesale/Retail layout), so it's tested as visible below
+// instead of belonging to the hidden-preserve set.
+has($editSrc, '<label for="wholesale_price" class="form-label fw-bold"><?= t(\'Wholesale Price\') ?></label>', 'Wholesale Price is a real visible label in the simple section');
+has($editSrc, '<label for="selling_price" class="form-label fw-bold"><?= t(\'Retail Price\') ?>', '"Selling Price" relabeled "Retail Price" in the simple section (matches Restock)');
 has($editSrc, '<input type="hidden" id="discount_rate" name="discount_rate"', 'Discount Rate hidden-preserve keeps its id (so calculateMinSellingPrice() reads the real rate, not 0)');
 has($editSrc, '<input type="hidden" name="tax_id" value="<?= safe_output($product[\'tax_id\']) ?>">', 'tax_id always hidden-preserved (value-based, safe unconditionally)');
 has($editSrc, "<?php if (\$product['is_taxable']): ?>", 'is_taxable hidden input only rendered when truthy (isset()-based field on the API side)');
@@ -175,7 +186,7 @@ if (!$uid || !$wh) {
     lacks($simple, 'id="barcode"', 'Simple POS render: Barcode input field absent');
     lacks($simple, 'id="description"', 'Simple POS render: Description field absent');
     lacks($simple, 'id="tax_id"', 'Simple POS render: Tax Configuration select absent');
-    lacks($simple, 'id="wholesale_price"', 'Simple POS render: Wholesale Price field absent');
+    (preg_match('/<input type="number"[^>]*id="wholesale_price"/', $simple) === 1) ? pass('Simple POS render: Wholesale Price is a real, visible field (matches Restock)') : fail('Wholesale Price field is missing or still hidden-only');
     lacks($simple, 'id="edit_is_taxable"', 'Simple POS render: is_taxable checkbox absent');
     lacks($simple, 'id="brand_id"', 'Simple POS render: Brand select (Advanced tab) absent');
     lacks($simple, 'id="advanced-tab"', 'Simple POS render: Advanced Details tab BUTTON absent');
@@ -184,7 +195,7 @@ if (!$uid || !$wh) {
     has($simple, 'id="product_name"', 'Simple POS render: Product Name field still present (required)');
 
     $hidden = _pes_extract_hidden($simple);
-    foreach (['sku', 'barcode', 'barcode_symbology', 'description', 'tax_id', 'wholesale_price', 'discount_rate',
+    foreach (['sku', 'barcode', 'barcode_symbology', 'description', 'tax_id', 'discount_rate',
               'brand_id', 'manufacturer', 'model', 'serial_number', 'warranty_period', 'warranty_unit',
               'guarantee_period', 'guarantee_unit', 'expiry_days', 'weight', 'dim_length', 'dim_width', 'dim_height',
               'reorder_level', 'min_stock_level', 'max_stock_level', 'min_selling_price', 'is_taxable', 'is_combo'] as $f) {
@@ -195,24 +206,18 @@ if (!$uid || !$wh) {
     (($hidden['discount_rate'] ?? null) === '12.50') ? pass('discount_rate hidden value matches the real stored rate (not defaulted to 0)') : fail('discount_rate hidden mismatch: ' . var_export($hidden['discount_rate'] ?? null, true));
 
     // The page header already carries a persistent Save button wired via
-    // form="productForm" (line ~533) — independent of which tab is active,
-    // so it alone already guarantees the form stays submittable even with
-    // the Advanced Details pane permanently display:none in Simple POS.
+    // form="productForm" (line ~533) — independent of tab state.
     has($simple, 'form="productForm"', 'Header-level Update button (form="productForm") present — submits regardless of active tab');
-    // The Inventory tab's own footer additionally gets its own Update button
-    // in Simple POS (since it's now the last visible tab, replacing the dead
-    // "Next: Additional" link that used to target the now-absent advanced-tab).
-    $inventoryPos = strpos($simple, 'id="inventory"');
-    $advancedCommentPos = strpos($simple, 'Tab 4: Advanced Details');
-    $inventoryFooterSubmit = false;
-    if ($inventoryPos !== false && $advancedCommentPos !== false) {
-        $inventorySection = substr($simple, $inventoryPos, $advancedCommentPos - $inventoryPos);
-        $inventoryFooterSubmit = strpos($inventorySection, 'type="submit"') !== false;
-        $inventoryFooterSubmit = $inventoryFooterSubmit && strpos($inventorySection, '#advanced-tab') === false;
-    }
-    $inventoryFooterSubmit
-        ? pass('Inventory tab footer: dead "Next: Additional" link replaced with a real Update button')
-        : fail('Inventory tab footer still has a dead link or is missing its own Update button');
+    // 2026-09-18 restructure: Simple POS collapsed from 3 tabs down to one
+    // single section (matching Create — products_simple_pos_plan.md §5,
+    // extended per explicit request), so there's no longer a separate
+    // "Inventory tab footer" — just this one section's own bottom Update
+    // button, and crucially NO tab navigation at all.
+    lacks($simple, 'id="productTabs"', 'Simple POS render: no tab navigation (collapsed to one section, matching Create)');
+    lacks($simple, 'id="general-tab"', 'Simple POS render: General/Pricing/Inventory tab buttons absent');
+    (preg_match('/<button type="submit" class="btn btn-success[^"]*"[^>]*>\s*<i class="bi bi-check-circle-fill me-1"><\/i>/', $simple) === 1)
+        ? pass('Simple POS render: single section ends with its own real Update button')
+        : fail('Simple POS single-section Update button missing');
 
     // State B: normal mode — fully unchanged.
     _pes_set_settings($root, '0', '0');
@@ -244,6 +249,7 @@ if (!$uid || !$wh) {
     $payload['category_id'] = $catId ?? '';
     $payload['cost_price'] = '1000';
     $payload['selling_price'] = '1600'; // the one real edit a Simple POS user makes
+    $payload['wholesale_price'] = '1300.00'; // now a real visible field — the render pre-fills it, so the real form always resends it unchanged
     $payload['unit'] = 'pcs';
     $payload['status'] = 'active';
     $payload['is_service'] = '0';
@@ -316,6 +322,7 @@ if (!$uid || !$wh) {
     $payloadB['category_id'] = $catId ?? '';
     $payloadB['cost_price'] = '500';
     $payloadB['selling_price'] = '900';
+    $payloadB['wholesale_price'] = '1300.00'; // now a real visible field, same as payload A
     $payloadB['unit'] = 'pcs';
     $payloadB['status'] = 'active';
     $payloadB['is_service'] = '0';

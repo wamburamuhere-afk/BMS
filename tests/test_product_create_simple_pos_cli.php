@@ -6,10 +6,15 @@
  * Covers products_simple_pos_plan.md §3-4: app/bms/product/product_create.php
  * collapses from 4 tabs to one single-section form when Simple POS is on and
  * the superadmin "Advanced Product" override is off — SKU/Barcode still
- * auto-generate (as hidden inputs), Description/Tax/Wholesale/the whole
- * Advanced Details tab disappear, "Cost Price" becomes "Buying Price", the
- * Shop picker only appears with >1 shop in scope, and Manufacturing/Expiry
- * Date are new fields feeding straight into the real batch Phase 1 wired up.
+ * auto-generate (as hidden inputs), Description/Tax/the whole Advanced
+ * Details tab disappear, "Cost Price" becomes "Buying Price", the Shop
+ * picker only appears with >1 shop in scope, and Manufacturing/Expiry Date
+ * are new fields feeding straight into the real batch Phase 1 wired up.
+ * Updated 2026-09-18: Wholesale Price is no longer hidden — it now shows as
+ * a real field alongside Buying/Retail Price, in the same 3-column layout as
+ * the POS Restock modal, and "Selling Price" is relabeled "Retail Price" to
+ * match Restock's terminology exactly (both requests: "bei ya jumla" /
+ * "bei ya rejareja" should be visible on Create the same way they are there).
  *
  *   A. STATIC   — files lint clean; source wiring for both branches present.
  *   B. RENDERED — the real page, three states: Simple POS, normal, and
@@ -48,11 +53,16 @@ function _pcs_set_settings(string $root, string $simple, string $advanced): void
     _pcs_run_php("require '$root/roots.php'; save_setting('pos_simple_mode', " . var_export($simple, true) . "); save_setting('pos_advanced_product', " . var_export($advanced, true) . "); echo 'SAVED';");
 }
 function _pcs_render(string $root, int $uid): string {
+    // loadLanguage('en') forced AFTER header.php's own language resolution so
+    // rendered-HTML assertions are deterministic regardless of this admin
+    // user's stored language preference (which defaults to Swahili here) —
+    // same fix as test_services_simple_pos_cli.php's _svc_render().
     return _pcs_run_php("
         \$_SERVER['REQUEST_METHOD'] = 'GET';
         require '$root/roots.php';
         \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
         \$_SESSION['first_name'] = 'Test'; \$_SESSION['last_name'] = 'Admin'; \$_SESSION['user_role'] = 'Admin';
+        \$_SESSION['user_lang'] = 'en';
         ob_start();
         include '$root/app/bms/product/product_create.php';
         echo ob_get_clean();
@@ -103,7 +113,11 @@ if (!$uid) {
     (preg_match('/<input type="hidden" name="barcode"/', $simple) === 1) ? pass('Simple POS render: Barcode still auto-generated as a hidden input') : fail('Barcode hidden input missing');
     (strpos($simple, 'id="description"') === false) ? pass('Simple POS render: Description field absent') : fail('Description field still present');
     (strpos($simple, 'id="tax_id"') === false) ? pass('Simple POS render: Tax field absent') : fail('Tax field still present');
-    (strpos($simple, 'id="wholesale_price"') === false) ? pass('Simple POS render: Wholesale Price field absent') : fail('Wholesale Price field still present');
+    // 2026-09-18 request: "bei ya jumla" (Wholesale Price) now shown here too,
+    // in the same 3-column Buying/Wholesale/Retail layout as the POS Restock
+    // modal — a real, visible, editable field, not the old hidden-only one.
+    (preg_match('/<input type="number"[^>]*id="wholesale_price"/', $simple) === 1) ? pass('Simple POS render: Wholesale Price is a real, visible field (matches Restock)') : fail('Wholesale Price field is missing or still hidden-only');
+    has($simple, 'Retail Price', 'Simple POS render: "Selling Price" relabeled to "Retail Price" (matches Restock)');
     (strpos($simple, 'id="discount_rate"') === false) ? pass('Simple POS render: Discount Rate field absent') : fail('Discount Rate field still present');
     (strpos($simple, 'id="brand_id"') === false) ? pass('Simple POS render: Advanced Details tab (Brand) absent') : fail('Advanced Details tab still present');
     (strpos($simple, 'id="weight"') === false) ? pass('Simple POS render: Weight/Dimensions absent') : fail('Weight field still present');
