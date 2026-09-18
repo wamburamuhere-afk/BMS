@@ -55,7 +55,7 @@ try {
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $results[] = [
             'id'   => (int)$r['id'],
-            'text' => $r['name'] . ($r['type'] === 'sub_contractor' ? ' (Sub-contractor)' : ''),
+            'text' => applyCaseMode($r['name']) . ($r['type'] === 'sub_contractor' ? ' (Sub-contractor)' : ''),
             'type' => $r['type'],
         ];
     }

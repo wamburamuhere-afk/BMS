@@ -42,7 +42,7 @@ $currency = get_setting('currency', 'TZS');
                 <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
-                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <?php endif; ?>
                 <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Department</label>
@@ -171,7 +171,7 @@ $(function () {
             renderCharts(res.charts);
             table.clear();
             res.rows.forEach((r, i) => table.row.add([
-                i + 1, esc((r.full_name||'').trim()), esc(r.department), esc(r.position),
+                i + 1, caseFormatJs((r.full_name||'').trim()), esc(r.department), esc(r.position),
                 r.hire_date ? new Date(r.hire_date).toLocaleDateString() : '—', badge(r.status), fmt(r.basic_salary)
             ]));
             table.draw();

@@ -315,7 +315,7 @@ try {
                         <select name="project_id" id="cf-project" class="form-select form-select-sm" style="width: 170px;" onchange="cfFilterWarehouses()">
                             <option value="">All Projects</option>
                             <?php foreach ($cf_projects as $p): ?>
-                            <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>><?= safe_output($p['project_name']) ?></option>
+                            <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>><?= caseFormat($p['project_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <?php endif; ?>
@@ -323,7 +323,7 @@ try {
                         <select name="warehouse_id" id="cf-warehouse" class="form-select form-select-sm" style="width: 170px;">
                             <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                             <?php foreach ($cf_warehouses as $w): ?>
-                            <option value="<?= (int)$w['warehouse_id'] ?>" data-project="<?= (int)($w['project_id'] ?? 0) ?>" <?= $warehouse_id === (int)$w['warehouse_id'] ? 'selected' : '' ?>><?= safe_output($w['warehouse_name']) ?></option>
+                            <option value="<?= (int)$w['warehouse_id'] ?>" data-project="<?= (int)($w['project_id'] ?? 0) ?>" <?= $warehouse_id === (int)$w['warehouse_id'] ? 'selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <?php endif; ?>

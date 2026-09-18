@@ -94,7 +94,7 @@ $cf = fn($v) => $currency . ' ' . number_format((float)$v, 2);
                     <?php foreach ($rows as $i => $r): ?>
                     <tr>
                         <td class="ps-3"><?= $i + 1 ?></td>
-                        <td><?= safe_output($r['customer_name']) ?></td>
+                        <td><?= caseFormat($r['customer_name']) ?></td>
                         <td><?= safe_output($r['tin_number'], '—') ?></td>
                         <td class="text-end"><?= $cf($r['total_base']) ?></td>
                         <td class="text-end fw-semibold"><?= $cf($r['total_wht']) ?></td>

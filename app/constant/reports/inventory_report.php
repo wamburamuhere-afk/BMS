@@ -46,13 +46,13 @@ $year_to   = date('Y-12-31');
 // Reusable <option> blocks for the shared Product / Warehouse pickers.
 $product_options = '';
 foreach ($products as $p) {
-    $label = $p['product_name'] ?: '—';
+    $label = $p['product_name'] ? applyCaseMode($p['product_name']) : '—';
     if (!empty($p['product_code'])) $label .= ' (' . $p['product_code'] . ')';
     $product_options .= '<option value="' . (int)$p['product_id'] . '">' . safe_output($label) . '</option>';
 }
 $warehouse_options = '';
 foreach ($warehouses as $w) {
-    $warehouse_options .= '<option value="' . (int)$w['warehouse_id'] . '">' . safe_output($w['warehouse_name']) . '</option>';
+    $warehouse_options .= '<option value="' . (int)$w['warehouse_id'] . '">' . caseFormat($w['warehouse_name']) . '</option>';
 }
 ?>
 
@@ -140,7 +140,7 @@ foreach ($warehouses as $w) {
                         <select id="s-project" class="form-select" style="width:100%">
                             <option value=""><?= t('All Projects') ?></option>
                             <?php foreach ($projects as $p): ?>
-                                <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                                <option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -684,7 +684,7 @@ $(function () {
             snapStatus = new Chart(snapChartStatus, { type:'doughnut', data:{ labels:res.charts.stock_status.map(r=>r.label), datasets:[{data:res.charts.stock_status.map(r=>+r.value),backgroundColor:['#052c65','#6ea8fe','#dc3545']}] }, options:{...baseOpts} });
             snapTop = new Chart(snapChartTop, { type:'bar', data:{ labels:res.charts.top_items.map(r=>r.name), datasets:[{label:PT.costValue,data:res.charts.top_items.map(r=>+r.total),backgroundColor:BLUE}] }, options:{...baseOpts,indexAxis:'y',plugins:{legend:{display:false}}} });
             snapTable.clear();
-            res.rows.forEach((r,i)=>snapTable.row.add([ i+1, esc(r.product_code||'—'), esc(r.product_name||'—'), esc(r.category||PT.uncategorised), esc(r.warehouse_name), num(r.current_stock), fmt(r.cost_value), fmt(r.selling_value), r.product_id||'' ]));
+            res.rows.forEach((r,i)=>snapTable.row.add([ i+1, esc(r.product_code||'—'), caseFormatJs(r.product_name||'—'), esc(r.category||PT.uncategorised), caseFormatJs(r.warehouse_name), num(r.current_stock), fmt(r.cost_value), fmt(r.selling_value), r.product_id||'' ]));
             snapTable.draw();
         }).fail(()=>Swal.fire({icon:'error',title:PT.error,text:PT.serverError}));
     }
@@ -715,7 +715,7 @@ $(function () {
                 datasets:[{label:PT.in,data:res.charts.timeline.map(r=>+r.in_qty),backgroundColor:'#198754'},{label:PT.out,data:res.charts.timeline.map(r=>+r.out_qty),backgroundColor:'#dc3545'}] }, options:{...baseOpts} });
             mvType = new Chart(mvChartType, { type:'doughnut', data:{ labels:res.charts.by_type.map(r=>cap(r.name)), datasets:[{data:res.charts.by_type.map(r=>+r.qty),backgroundColor:blues}] }, options:{...baseOpts} });
             mvTable.clear();
-            res.rows.forEach((r,i)=>mvTable.row.add([ i+1, dt(r.movement_date), dirBadge(r.direction), cap(r.movement_type), esc(r.product_name), esc(r.warehouse_name), num(r.quantity)+' '+esc(r.unit), fmt(r.value), num(r.stock_after), esc(r.reference_number), esc(r.recorded_by) ]));
+            res.rows.forEach((r,i)=>mvTable.row.add([ i+1, dt(r.movement_date), dirBadge(r.direction), cap(r.movement_type), caseFormatJs(r.product_name), caseFormatJs(r.warehouse_name), num(r.quantity)+' '+esc(r.unit), fmt(r.value), num(r.stock_after), esc(r.reference_number), caseFormatJs(r.recorded_by) ]));
             mvTable.draw();
         }).fail(()=>Swal.fire({icon:'error',title:PT.error,text:PT.serverError}));
     }
@@ -745,7 +745,7 @@ $(function () {
             tfRoute = new Chart(tfChartRoute, { type:'bar', data:{ labels:res.charts.by_route.map(r=>r.name), datasets:[{label:PT.value,data:res.charts.by_route.map(r=>+r.total),backgroundColor:BLUE}] }, options:{...baseOpts,indexAxis:'y',plugins:{legend:{display:false}}} });
             tfStatus = new Chart(tfChartStatus, { type:'doughnut', data:{ labels:res.charts.by_status.map(r=>cap(r.name)), datasets:[{data:res.charts.by_status.map(r=>+r.count),backgroundColor:blues}] }, options:{...baseOpts} });
             tfTable.clear();
-            res.rows.forEach((r,i)=>tfTable.row.add([ i+1, dt(r.transfer_date), esc(r.transfer_number), esc(r.from_warehouse), esc(r.to_warehouse), esc(r.product_name), num(r.quantity)+' '+esc(r.unit), num(r.received_quantity), fmt(r.value), statusBadge(r.status) ]));
+            res.rows.forEach((r,i)=>tfTable.row.add([ i+1, dt(r.transfer_date), esc(r.transfer_number), caseFormatJs(r.from_warehouse), caseFormatJs(r.to_warehouse), caseFormatJs(r.product_name), num(r.quantity)+' '+esc(r.unit), num(r.received_quantity), fmt(r.value), statusBadge(r.status) ]));
             tfTable.draw();
         }).fail(()=>Swal.fire({icon:'error',title:PT.error,text:PT.serverError}));
     }
@@ -780,7 +780,7 @@ $(function () {
             ajReason = new Chart(ajChartReason, { type:'bar', data:{ labels:res.charts.by_reason.map(r=>cap(r.name)), datasets:[{label:PT.qty,data:res.charts.by_reason.map(r=>+r.qty),backgroundColor:BLUE}] }, options:{...baseOpts,indexAxis:'y',plugins:{legend:{display:false}}} });
             ajDir = new Chart(ajChartDir, { type:'doughnut', data:{ labels:res.charts.by_direction.map(r=>r.name), datasets:[{data:res.charts.by_direction.map(r=>+r.count),backgroundColor:['#198754','#dc3545']}] }, options:{...baseOpts} });
             ajTable.clear();
-            res.rows.forEach((r,i)=>ajTable.row.add([ i+1, dt(r.movement_date), esc(r.reference_number), esc(r.product_name), dirBadge(r.direction), num(r.quantity)+' '+esc(r.unit), fmt(r.value), esc(r.warehouse_name), esc(r.reason), esc(r.recorded_by) ]));
+            res.rows.forEach((r,i)=>ajTable.row.add([ i+1, dt(r.movement_date), esc(r.reference_number), caseFormatJs(r.product_name), dirBadge(r.direction), num(r.quantity)+' '+esc(r.unit), fmt(r.value), caseFormatJs(r.warehouse_name), esc(r.reason), caseFormatJs(r.recorded_by) ]));
             ajTable.draw();
         }).fail(()=>Swal.fire({icon:'error',title:PT.error,text:PT.serverError}));
     }

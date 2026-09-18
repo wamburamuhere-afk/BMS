@@ -30,7 +30,11 @@ try {
         $stmt = $pdo->prepare("SELECT project_id AS id, project_name AS text FROM projects WHERE status = 'active' AND project_name LIKE ? $scope ORDER BY project_name ASC LIMIT 30");
         $stmt->execute(['%' . $q . '%']);
     }
-    echo json_encode(['results' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    $results = array_map(function ($r) {
+        $r['text'] = applyCaseMode($r['text']);
+        return $r;
+    }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    echo json_encode(['results' => $results]);
 } catch (PDOException $e) {
     echo json_encode(['results' => []]);
 }

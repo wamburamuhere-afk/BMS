@@ -391,3 +391,62 @@ if ($uid) {
 }
 
 _tdr_set_mode($root, 'as_typed');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('Batch F — Reports (13 report pages + shared search endpoints)');
+
+$touchedF = [
+    'app/constant/reports/pos_user_sales_report.php', 'app/constant/reports/pos_profit_report.php',
+    'app/constant/reports/inventory_report.php', 'app/constant/reports/expense_report.php',
+    'app/constant/reports/sales_report.php', 'app/constant/reports/purchase_report.php',
+    'app/constant/reports/trends_analysis.php', 'app/constant/reports/sales_forecast.php',
+    'app/constant/reports/product_analysis.php', 'app/constant/reports/performance_dashboard.php',
+    'app/constant/reports/customer_analysis.php', 'app/constant/reports/cash_flow.php',
+    'app/constant/reports/balance_sheet.php', 'app/constant/reports/tax_report.php',
+    'app/constant/reports/employee_report.php', 'app/constant/reports/ap_aging.php',
+    'app/constant/reports/vendor_statement.php', 'app/constant/reports/ar_aging.php',
+    'app/constant/reports/customer_statement.php', 'app/constant/reports/employee_statement.php',
+    'app/constant/reports/wht_receivable_report.php',
+    'api/account/search_vendors.php', 'api/account/search_employees.php', 'api/search_projects.php',
+    'api/purchase/search_approved_purchase_returns.php', 'api/sales/search_approved_sales_returns.php',
+    'api/sales/search_orders.php',
+];
+foreach ($touchedF as $f) {
+    $rc = 0; $out = [];
+    exec("php -l " . escapeshellarg("$root/$f") . " 2>&1", $out, $rc);
+    $rc === 0 ? pass("lint: $f") : fail("php -l failed: $f — " . implode(' ', $out));
+}
+
+// Systemic dropdown sweeps — spot-check a few of the 13/17 files each pattern touched.
+has(src($root, 'app/constant/reports/sales_report.php'), "caseFormat(\$w['warehouse_name'])", 'sales_report.php warehouse filter uses caseFormat()');
+has(src($root, 'app/constant/reports/ar_aging.php'), "caseFormat(\$p['project_name'])", 'ar_aging.php project filter uses caseFormat()');
+has(src($root, 'app/constant/reports/tax_report.php'), "caseFormat(\$p['project_name'])", 'tax_report.php project filter uses caseFormat()');
+has(src($root, 'app/constant/reports/sales_report.php'), "caseFormat(\$u['name'])", 'sales_report.php salesperson filter uses caseFormat()');
+
+// Per-report JS-render fixes.
+has(src($root, 'app/constant/reports/pos_user_sales_report.php'), 'caseFormatJs(it.product_name)', 'pos_user_sales_report.php item modal uses caseFormatJs()');
+has(src($root, 'app/constant/reports/inventory_report.php'), 'caseFormatJs(r.product_name||\'—\')', 'inventory_report.php snapshot table uses caseFormatJs()');
+has(src($root, 'app/constant/reports/expense_report.php'), 'r.paid_to_name ? caseFormatJs(r.paid_to_name) : \'—\'', 'expense_report.php paid-to column uses caseFormatJs()');
+has(src($root, 'app/constant/reports/sales_report.php'), 'r.customer_name ? caseFormatJs(r.customer_name) : PT.walkIn', 'sales_report.php customer column uses caseFormatJs()');
+has(src($root, 'app/constant/reports/purchase_report.php'), 'r.supplier_name ? caseFormatJs(r.supplier_name) : PT.unknown', 'purchase_report.php supplier column uses caseFormatJs()');
+has(src($root, 'app/constant/reports/product_analysis.php'), "r.product_name ? caseFormatJs(r.product_name) : ''", 'product_analysis.php product column uses caseFormatJs()');
+has(src($root, 'app/constant/reports/customer_analysis.php'), "r.customer_name ? caseFormatJs(r.customer_name) : 'Walk-in'", 'customer_analysis.php customer column uses caseFormatJs()');
+has(src($root, 'app/constant/reports/ar_aging.php'), 'caseFormatJs(c.customer_name)', 'ar_aging.php customer table uses caseFormatJs()');
+has(src($root, 'app/constant/reports/employee_report.php'), "caseFormatJs((r.full_name||'').trim())", 'employee_report.php employee column uses caseFormatJs()');
+has(src($root, 'app/constant/reports/vendor_statement.php'), 'applyCaseModeJs(res.vendor.supplier_name)', 'vendor_statement.php doc header uses applyCaseModeJs()');
+has(src($root, 'app/constant/reports/customer_statement.php'), 'applyCaseModeJs(res.customer.customer_name)', 'customer_statement.php doc header uses applyCaseModeJs()');
+has(src($root, 'app/constant/reports/employee_statement.php'), 'applyCaseModeJs(res.employee.full_name)', 'employee_statement.php doc header uses applyCaseModeJs()');
+
+// Live end-to-end: the PHP-rendered "pre-filled vendor/customer/employee name"
+// divs (single-shot server render, not client JS) on the three statement pages.
+if ($uid) {
+    $cid = (int)$pdo->query("SELECT customer_id FROM customers WHERE status != 'deleted' LIMIT 1")->fetchColumn();
+    if ($cid) _tdr_check($root, $uid, $pdo, 'customers', 'customer_id', $cid, 'customer_name',
+        'app/constant/reports/customer_statement.php', ['customer_id' => $cid], 'customer_statement.php pre-filled name div');
+
+    $sid = (int)$pdo->query("SELECT supplier_id FROM suppliers WHERE status != 'deleted' LIMIT 1")->fetchColumn();
+    if ($sid) _tdr_check($root, $uid, $pdo, 'suppliers', 'supplier_id', $sid, 'supplier_name',
+        'app/constant/reports/vendor_statement.php', ['vendor_id' => $sid, 'vendor_type' => 'supplier'], 'vendor_statement.php pre-filled name div');
+}
+
+_tdr_set_mode($root, 'as_typed');
