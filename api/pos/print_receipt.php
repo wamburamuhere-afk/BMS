@@ -155,6 +155,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Receipt #<?= $sale['receipt_number'] ?></title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -163,7 +164,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             width: <?= $receipt_width ?>mm;
             margin: 0 auto;
             padding: 10px;
-            font-size: 12px;
+            font-size: 13px;
         }
         .header {
             text-align: center;
@@ -231,11 +232,11 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             font-size: 11px;
         }
         @media print {
-            @page { margin: 0; }
+            @page { size: <?= $receipt_width ?>mm auto; margin: 3mm 5mm; }
             body {
                 width: <?= $receipt_width ?>mm;
                 margin: 0;
-                padding: 10px; /* Compensation for removed page margin */
+                padding: 0;
             }
             .no-print { display: none; }
         }
