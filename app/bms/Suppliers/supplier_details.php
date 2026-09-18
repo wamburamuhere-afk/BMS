@@ -317,7 +317,11 @@ global $company_name, $company_logo;
         </div>
     </div>
 
-    <!-- Statistics Cards -->
+    <?php if (!$simpleSupplierForm): ?>
+    <!-- Statistics Cards — 100% purchase_orders-derived, always zero for a
+         Simple POS supplier (Quick Restock never touches this table at all,
+         unlike a formal PO). No equivalent replacement data exists here the
+         way Customer's Madeni/credit numbers did — just hidden. -->
     <div class="row mb-4 g-3">
         <div class="col-6 col-md-3">
             <div class="card custom-stat-card h-100">
@@ -352,6 +356,56 @@ global $company_name, $company_logo;
             </div>
         </div>
     </div>
+    <?php endif; ?>
+
+    <?php if ($simpleSupplierForm): ?>
+    <!-- Simple POS — one consolidated card instead of the remains of 4
+         separate ones (Basic Info/Contact/Address/Bank Information), each
+         mostly empty once their individually-hidden fields are stripped
+         out. Every field shown here is exactly what the Add/Edit Supplier
+         form itself collects in Simple mode — nothing more. -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light border-bottom">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-truck"></i> <?= t('Supplier Information') ?></h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6 col-md-4 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Full Name') ?></label>
+                            <p class="mb-0 fw-semibold"><?= htmlspecialchars($supplier['supplier_name']) ?></p>
+                        </div>
+                        <div class="col-6 col-md-4 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Phone') ?></label>
+                            <p class="mb-0 fw-semibold"><?= !empty($supplier['phone']) ? '<a href="tel:' . htmlspecialchars($supplier['phone']) . '">' . htmlspecialchars($supplier['phone']) . '</a>' : '<span class="text-muted">' . t('Not set') . '</span>' ?></p>
+                        </div>
+                        <div class="col-6 col-md-4 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
+                            <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= ucfirst($supplier['status']) ?></span></p>
+                        </div>
+                        <?php if (!empty($supplier['bank_name']) || !empty($supplier['bank_account'])): ?>
+                        <div class="col-6 col-md-4 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Bank Name') ?></label>
+                            <p class="mb-0 fw-semibold"><?= !empty($supplier['bank_name']) ? htmlspecialchars($supplier['bank_name']) : '<span class="text-muted">' . t('Not set') . '</span>' ?></p>
+                        </div>
+                        <div class="col-6 col-md-4 mb-3">
+                            <label class="form-label text-muted small mb-1"><?= t('Bank Account') ?></label>
+                            <p class="mb-0 fw-semibold"><?= !empty($supplier['bank_account']) ? htmlspecialchars($supplier['bank_account']) : '<span class="text-muted">' . t('Not set') . '</span>' ?></p>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($supplier['description'])): ?>
+                        <div class="col-12 mb-0">
+                            <label class="form-label text-muted small mb-1"><?= t('Notes') ?></label>
+                            <p class="mb-0"><?= nl2br(htmlspecialchars($supplier['description'])) ?></p>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
 
     <!-- Supplier Info Cards -->
     <div class="row mb-4">
@@ -666,6 +720,7 @@ global $company_name, $company_logo;
             </div>
         </div>
     </div>
+    <?php endif; ?>
     <?php endif; ?>
 
     <!-- Section Tab Navigation -->
