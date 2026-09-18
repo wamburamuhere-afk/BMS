@@ -242,4 +242,22 @@ if ($uid) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+section('Batch C — POS dashboard');
+
+$rc = 0; $out = [];
+exec("php -l " . escapeshellarg("$root/app/bms/pos/pos_dashboard.php") . " 2>&1", $out, $rc);
+$rc === 0 ? pass('lint: app/bms/pos/pos_dashboard.php') : fail('php -l failed: app/bms/pos/pos_dashboard.php — ' . implode(' ', $out));
+
+$dashSrc = src($root, 'app/bms/pos/pos_dashboard.php');
+has($dashSrc, "{ data: 'name', render: d => caseFormatJs(d) }", 'Dashboard low-stock table: product name uses caseFormatJs()');
+has($dashSrc, "{ data: 'party', render: d => caseFormatJs(d) }", 'Dashboard recent-sales table: party uses caseFormatJs()');
+has($dashSrc, "{ data: 'party',          render: d => caseFormatJs(d) }", 'Dashboard sales-history table: party uses caseFormatJs()');
+has($dashSrc, '<td>${caseFormatJs(p.name)}</td>', 'Dashboard Top Products tile uses caseFormatJs()');
+has($dashSrc, '<td>${caseFormatJs(c.name)}</td>', 'Dashboard Top Cashiers tile uses caseFormatJs()');
+has($dashSrc, "\$('#rcv_customer').text(applyCaseModeJs(row.party));", 'Dashboard receive-payment modal uses applyCaseModeJs()');
+has($dashSrc, "\$('#ret_customer').text(applyCaseModeJs(res.sale.customer_name));", 'Dashboard return modal customer uses applyCaseModeJs()');
+has($dashSrc, '<td>${caseFormatJs(l.product_name)}</td>', 'Dashboard return modal line items use caseFormatJs()');
+has($dashSrc, '<small class="text-muted">${caseFormatJs(row.party)}', 'Dashboard mobile card: party uses caseFormatJs()');
+
 _tdr_set_mode($root, 'as_typed');
