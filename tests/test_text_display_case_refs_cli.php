@@ -261,3 +261,70 @@ has($dashSrc, '<td>${caseFormatJs(l.product_name)}</td>', 'Dashboard return moda
 has($dashSrc, '<small class="text-muted">${caseFormatJs(row.party)}', 'Dashboard mobile card: party uses caseFormatJs()');
 
 _tdr_set_mode($root, 'as_typed');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('Batch D — Z-report / shift history');
+
+foreach (['app/bms/pos/zreport.php', 'app/bms/pos/shift_history.php'] as $f) {
+    $rc = 0; $out = [];
+    exec("php -l " . escapeshellarg("$root/$f") . " 2>&1", $out, $rc);
+    $rc === 0 ? pass("lint: $f") : fail("php -l failed: $f — " . implode(' ', $out));
+}
+has(src($root, 'app/bms/pos/shift_history.php'), 'caseFormatJs(r.register) : \'—\'', 'Shift history mobile card: register uses caseFormatJs()');
+
+if ($uid) {
+    $shift = $pdo->query("SELECT sh.shift_id, sh.register_id, sh.user_id
+                            FROM cash_register_shifts sh
+                            JOIN users u ON u.user_id = sh.user_id
+                            JOIN pos_registers r ON r.register_id = sh.register_id
+                           LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($shift) {
+        $shiftId = (int)$shift['shift_id'];
+        $regId   = (int)$shift['register_id'];
+        $cashierUid = (int)$shift['user_id'];
+
+        $origReg = $pdo->prepare("SELECT register_name FROM pos_registers WHERE register_id = ?");
+        $origReg->execute([$regId]); $origRegName = $origReg->fetchColumn();
+
+        $origUser = $pdo->prepare("SELECT username FROM users WHERE user_id = ?");
+        $origUser->execute([$cashierUid]); $origUsername = $origUser->fetchColumn();
+
+        $testLower = 'zz refs zreport test';
+        $testUpper = strtoupper($testLower);
+
+        _tdr_run_php("
+            require '$root/roots.php';
+            save_setting('text_display_case', 'upper');
+            \$pdo->prepare('UPDATE pos_registers SET register_name = ? WHERE register_id = ?')->execute([" . var_export($testLower, true) . ", $regId]);
+            \$pdo->prepare('UPDATE users SET username = ? WHERE user_id = ?')->execute([" . var_export($testLower . ' cashier', true) . ", $cashierUid]);
+            echo 'SET';
+        ");
+
+        try {
+            $html = _tdr_call($root, $uid, 'app/bms/pos/zreport.php', ['shift_id' => $shiftId]);
+            (strpos($html, $testUpper) !== false)
+                ? pass("zreport.php: UPPERCASED register name found")
+                : fail("zreport.php: UPPERCASED register name NOT found");
+            (strpos($html, strtoupper($testLower . ' cashier')) !== false)
+                ? pass("zreport.php: UPPERCASED cashier name found")
+                : fail("zreport.php: UPPERCASED cashier name NOT found");
+
+            $listHtml = _tdr_call($root, $uid, 'app/bms/pos/shift_history.php');
+            (strpos($listHtml, $testUpper) !== false)
+                ? pass("shift_history.php: UPPERCASED register name found in list")
+                : fail("shift_history.php: UPPERCASED register name NOT found in list");
+        } finally {
+            _tdr_run_php("
+                require '$root/roots.php';
+                save_setting('text_display_case', 'as_typed');
+                \$pdo->prepare('UPDATE pos_registers SET register_name = ? WHERE register_id = ?')->execute([" . var_export($origRegName, true) . ", $regId]);
+                \$pdo->prepare('UPDATE users SET username = ? WHERE user_id = ?')->execute([" . var_export($origUsername, true) . ", $cashierUid]);
+                echo 'RESTORED';
+            ");
+        }
+    } else {
+        pass('no cash_register_shifts fixture available — Batch D live checks skipped (n/a)');
+    }
+}
+
+_tdr_set_mode($root, 'as_typed');
