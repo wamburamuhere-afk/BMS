@@ -47,7 +47,11 @@ if ($enable_projects == '1') {
 
 // Fetch Suppliers, Staff and Sub-Contractors for "Paid To"
 $suppliers       = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-$employees       = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Staff (Employee) as a payee is an HR-module concept — a tenant with HR off
+// has no employees table worth offering here, and should never see the
+// option at all (not just an empty list behind it).
+$enable_hr       = tenantFeatureEnabled('hr');
+$employees       = $enable_hr ? $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC) : [];
 $sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Simple POS mode (expenses_simple_pos_plan.md): a simplified Add/Edit Expense
@@ -609,14 +613,14 @@ if (!function_exists('renderExpenseCatRows')) {
                             <?php elseif ($posSimple): ?>
                                 <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
                                     <option value="supplier" selected><?= t('Supplier') ?></option>
-                                    <option value="staff"><?= t('Staff (Employee)') ?></option>
+                                    <?php if ($enable_hr): ?><option value="staff"><?= t('Staff (Employee)') ?></option><?php endif; ?>
                                     <option value="other"><?= t('More…') ?></option>
                                 </select>
                             <?php else: ?>
                                 <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
                                     <option value=""><?= t('Select Type') ?></option>
                                     <option value="supplier"><?= t('Supplier') ?></option>
-                                    <option value="staff"><?= t('Staff (Employee)') ?></option>
+                                    <?php if ($enable_hr): ?><option value="staff"><?= t('Staff (Employee)') ?></option><?php endif; ?>
                                     <option value="sub_contractor"><?= t('Sub Contractor') ?></option>
                                 </select>
                             <?php endif; ?>
