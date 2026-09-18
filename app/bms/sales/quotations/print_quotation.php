@@ -120,7 +120,7 @@ $reviewer_role = trim($order['reviewer_role'] ?? '');
 $approver_name = trim($order['approver_name'] ?? '');
 $approver_role = trim($order['approver_role'] ?? '');
 
-$creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
+$creator_label  = $creator_name  ? applyCaseMode($creator_name)  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
 $reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
 $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
 
@@ -441,7 +441,7 @@ if ($cust_address !== '') {
     <div class="details-grid">
         <div class="box">
             <h3>Customer</h3>
-            <p><strong><?= htmlspecialchars($order['customer_name']) ?></strong></p>
+            <p><strong><?= caseFormat($order['customer_name']) ?></strong></p>
             <?php foreach ($addr_lines as $addr_line): ?>
             <p><?= htmlspecialchars($addr_line) ?></p>
             <?php endforeach; ?>
@@ -468,9 +468,9 @@ if ($cust_address !== '') {
             <p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($order['warehouse_name'])): ?>
-            <p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
+            <p><strong>Warehouse:</strong> <?= caseFormat($order['warehouse_name']) ?></p>
             <?php endif; ?>
-            <p><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></p>
+            <p><strong>Salesperson:</strong> <?= caseFormat($order['salesperson_name'] ?? 'N/A') ?></p>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_label) ?></p>
         </div>
     </div>
@@ -495,7 +495,7 @@ if ($cust_address !== '') {
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>

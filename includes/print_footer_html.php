@@ -16,6 +16,6 @@ if (empty($printed_at)) {
 ?>
 <div class="footer-spacer"></div>
 <div class="print-footer">
-    <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <strong><?= htmlspecialchars(ucfirst($printed_role)) ?></strong> on <?= htmlspecialchars($printed_at) ?></p>
+    <p>This document was Printed by <strong><?= caseFormat($printed_by) ?></strong> &mdash; <strong><?= htmlspecialchars(ucfirst($printed_role)) ?></strong> on <?= htmlspecialchars($printed_at) ?></p>
     <p class="brand">Powered By BJP Technologies &copy; <?= date('Y') ?>, All Rights Reserved</p>
 </div>

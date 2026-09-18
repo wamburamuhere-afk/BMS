@@ -240,8 +240,8 @@ $accent = getSetting('print_template_color_so_confirmation', '#c8981f');
 
     <div class="to-block">
         <p><strong>To:</strong></p>
-        <p><?= htmlspecialchars($order['customer_name']) ?></p>
-        <?php if (!empty($order['company_name'])): ?><p><?= htmlspecialchars($order['company_name']) ?></p><?php endif; ?>
+        <p><?= caseFormat($order['customer_name']) ?></p>
+        <?php if (!empty($order['company_name'])): ?><p><?= caseFormat($order['company_name']) ?></p><?php endif; ?>
         <?php if (!empty($order['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($order['c_postal_address']) ?></p><?php endif; ?>
         <?php if (!empty($order['c_address'])): ?><p><?= htmlspecialchars($order['c_address']) ?></p><?php endif; ?>
         <?php if (!empty($order['c_phone'])): ?><p><?= htmlspecialchars($order['c_phone']) ?></p><?php endif; ?>
@@ -258,7 +258,7 @@ $accent = getSetting('print_template_color_so_confirmation', '#c8981f');
     <div class="subject-line">Subject: Confirmation of Sales Order No. <?= htmlspecialchars($order['order_number']) ?></div>
 
     <div class="body-para">
-        Dear <?= htmlspecialchars($order['customer_name']) ?>,<br><br>
+        Dear <?= caseFormat($order['customer_name']) ?>,<br><br>
         We are pleased to confirm the details of your Sales Order below. Please review the items and terms, and contact us should you have any questions.
     </div>
 
@@ -268,8 +268,8 @@ $accent = getSetting('print_template_color_so_confirmation', '#c8981f');
         <div><strong>Status:</strong> <?= strtoupper($order['status']) ?></div>
         <?php if (!empty($order['project_contract_no'])): ?><div><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></div><?php endif; ?>
         <?php if (!empty($order['project_name'])): ?><div><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></div><?php endif; ?>
-        <?php if (!empty($order['warehouse_name'])): ?><div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></div><?php endif; ?>
-        <div><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></div>
+        <?php if (!empty($order['warehouse_name'])): ?><div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($order['warehouse_name']) ?></div><?php endif; ?>
+        <div><strong>Salesperson:</strong> <?= !empty($order['salesperson_name']) ? caseFormat($order['salesperson_name']) : 'N/A' ?></div>
         <div><strong>Prepared By:</strong> <?= htmlspecialchars(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></div>
     </div>
 
@@ -292,7 +292,7 @@ $accent = getSetting('print_template_color_so_confirmation', '#c8981f');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? '', 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>

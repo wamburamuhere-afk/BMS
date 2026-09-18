@@ -112,9 +112,9 @@ $reviewer_role = trim($invoice['reviewer_role'] ?? '');
 $approver_name = trim($invoice['approver_name'] ?? '');
 $approver_role = trim($invoice['approver_role'] ?? '');
 
-$creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
-$reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
-$approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
+$creator_label  = $creator_name  ? applyCaseMode($creator_name)  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
+$reviewer_label = $reviewer_name ? applyCaseMode($reviewer_name) . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
+$approver_label = $approver_name ? applyCaseMode($approver_name) . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
 
 // Three-approval watermark + e-signature data
 $wf_status = $invoice['status'] ?? 'pending';
@@ -450,7 +450,7 @@ $wf = [
             <p><strong>Invoice #:</strong> <?= htmlspecialchars($invoice['invoice_number']) ?></p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($invoice['invoice_date'])) ?></p>
             <p><strong>Due Date:</strong> <?= date('d M Y', strtotime($invoice['due_date'])) ?></p>
-            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($invoice['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($invoice['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($invoice['status']) ?></p>
         </div>
     </div>
@@ -459,9 +459,9 @@ $wf = [
     <div class="details-grid">
         <div class="box">
             <h3>Bill To</h3>
-            <p><strong><?= htmlspecialchars($invoice['customer_name']) ?></strong></p>
+            <p><strong><?= caseFormat($invoice['customer_name']) ?></strong></p>
             <?php if (!empty($invoice['company_name'])): ?>
-            <p><?= htmlspecialchars($invoice['company_name']) ?></p>
+            <p><?= caseFormat($invoice['company_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($invoice['c_postal_address'])): ?>
             <p>P.O. Box <?= htmlspecialchars($invoice['c_postal_address']) ?></p>
@@ -540,7 +540,7 @@ $wf = [
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
                 <td>
-                    <?= htmlspecialchars($item['product_name'] ?? 'Unknown Product') ?>
+                    <?= $item['product_name'] ? caseFormat($item['product_name']) : 'Unknown Product' ?>
                     <?php if (!empty($item['description'])): ?>
                     <br><small style="color:#6c757d; font-size:10px;"><?= htmlspecialchars($item['description']) ?></small>
                     <?php endif; ?>

@@ -413,7 +413,7 @@ $wf = [
             <p><strong><?= $doc_label ?></strong> <?= htmlspecialchars($return['return_number']) ?></p>
             <p><strong><?= $date_label ?></strong> <?= date('d M Y', strtotime($return['return_date'])) ?></p>
             <p><strong>Ref Order:</strong> <?= htmlspecialchars($return['order_number'] ?? 'N/A') ?></p>
-            <?php if (!empty($return['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($return['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($return['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($return['status']) ?></p>
         </div>
     </div>
@@ -422,9 +422,9 @@ $wf = [
     <div class="details-grid">
         <div class="box">
             <h3>Credit To</h3>
-            <p><strong><?= htmlspecialchars($return['customer_name']) ?></strong></p>
+            <p><strong><?= caseFormat($return['customer_name']) ?></strong></p>
             <?php if (!empty($return['company_name'])): ?>
-            <p><?= htmlspecialchars($return['company_name']) ?></p>
+            <p><?= caseFormat($return['company_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($return['c_postal_address'])): ?>
             <p>P.O. Box <?= htmlspecialchars($return['c_postal_address']) ?></p>
@@ -441,7 +441,7 @@ $wf = [
         </div>
         <div class="box">
             <h3>Return Information</h3>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars(trim(($return['creator_first'] ?? '') . ' ' . ($return['creator_last'] ?? '')) ?: $return['creator_username'] ?: 'System') ?></p>
+            <p><strong>Prepared By:</strong> <?= caseFormat(trim(($return['creator_first'] ?? '') . ' ' . ($return['creator_last'] ?? '')) ?: $return['creator_username'] ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
         </div>
     </div>
@@ -466,7 +466,7 @@ $wf = [
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($item['total_amount'] ?? $lineTotal, 2) ?></td>

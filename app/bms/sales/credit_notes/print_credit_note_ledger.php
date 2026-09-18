@@ -218,15 +218,15 @@ $accent = getSetting('print_template_color_cn_ledger', '#2F5D50');
         <div class="meta-item"><div class="lbl">Date</div><div class="val"><?= date('d M Y', strtotime($cn['credit_date'])) ?></div></div>
         <?php if (!empty($cn['return_number'])): ?><div class="meta-item"><div class="lbl">Ref Return</div><div class="val"><?= htmlspecialchars($cn['return_number']) ?></div></div><?php endif; ?>
         <?php if (!empty($cn['invoice_number'])): ?><div class="meta-item"><div class="lbl">Ref Invoice</div><div class="val"><?= htmlspecialchars($cn['invoice_number']) ?></div></div><?php endif; ?>
-        <?php if (!empty($cn['warehouse_name'])): ?><div class="meta-item"><div class="lbl"><?= wLabel('Warehouse', 'Shop') ?></div><div class="val"><?= htmlspecialchars($cn['warehouse_name']) ?></div></div><?php endif; ?>
+        <?php if (!empty($cn['warehouse_name'])): ?><div class="meta-item"><div class="lbl"><?= wLabel('Warehouse', 'Shop') ?></div><div class="val"><?= caseFormat($cn['warehouse_name']) ?></div></div><?php endif; ?>
         <div class="meta-item"><div class="lbl">Status</div><div class="val status"><?= strtoupper($cn['status']) ?></div></div>
     </div>
 
     <div class="panel-row">
         <div class="panel">
             <h3>Credit To</h3>
-            <p><strong><?= htmlspecialchars($cn['customer_name']) ?></strong></p>
-            <?php if (!empty($cn['company_name'])): ?><p><?= htmlspecialchars($cn['company_name']) ?></p><?php endif; ?>
+            <p><strong><?= caseFormat($cn['customer_name']) ?></strong></p>
+            <?php if (!empty($cn['company_name'])): ?><p><?= caseFormat($cn['company_name']) ?></p><?php endif; ?>
             <?php if (!empty($cn['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($cn['c_postal_address']) ?></p><?php endif; ?>
             <?php if (!empty($cn['c_address'])): ?><p><?= htmlspecialchars($cn['c_address']) ?></p><?php endif; ?>
             <?php if (!empty($cn['c_phone'])): ?><p><?= htmlspecialchars($cn['c_phone']) ?></p><?php endif; ?>
@@ -238,7 +238,7 @@ $accent = getSetting('print_template_color_cn_ledger', '#2F5D50');
         </div>
         <div class="panel">
             <h3>Credit Note Information</h3>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_name ?: 'System') ?></p>
+            <p><strong>Prepared By:</strong> <?= caseFormat($creator_name ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
             <?php if (!empty($cn['reason'])): ?><p><strong>Reason:</strong> <?= htmlspecialchars($cn['reason']) ?></p><?php endif; ?>
         </div>
@@ -261,7 +261,7 @@ $accent = getSetting('print_template_color_cn_ledger', '#2F5D50');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($it['sku']) ? htmlspecialchars($it['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($it['description'] ?? 'Item') ?></td>
+                <td><?= caseFormat($it['description'] ?? 'Item') ?></td>
                 <td class="text-right"><?= rtrim(rtrim(number_format($it['quantity'], 2), '0'), '.') ?></td>
                 <td class="text-right"><?= number_format($it['unit_price'], 2) ?></td>
                 <td class="text-center"><?= ((float)$it['tax_rate'] == 18) ? '18%' : '—' ?></td>
