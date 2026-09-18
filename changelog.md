@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-09-17 (feat/pos-simple-user-sales-profit-reports) - Two new Reports-menu entries for Simple POS: Sales by User Report, Profit Report
+
+**Request (Swahili):** add a "Watumiaji" (Users) report showing which salesperson sold what and its value, and a Profit report for a chosen date range — both only when POS is allowed and only for Simple POS tenants, placed in Reports right after Expense Report.
+
+**New permissions** (`pos_user_sales_report`, `pos_profit_report`, Reports module) — brand-new, not a carve-out, so seeded admin-only (mirrors `pos_advanced`'s pattern) via `migrations/tenant/2026_09_17_pos_reports_by_user_and_profit.php` for existing tenants and appended to `schema/tenant_seed_defaults.sql` (ids 232/233) for new ones. Added to `hasReportsAccess()`'s permission list in `core/permissions.php` so the Reports nav shows for a role holding only these. Routes added in `roots.php`; menu entries added in `header.php` right after the Expense Report `<li>`, gated `canView('pos') && canView(...)`.
+
+**Sales by User Report** (`app/constant/reports/pos_user_sales_report.php` + `api/account/get_user_sales_report.php`) — per-cashier totals (transactions, qty sold, value) from `pos_sales`/`pos_sale_items` (`sale_status='completed'`), scoped per `.claude/security.md` §23, with a "View Items" drill-down modal showing exactly which products a cashier sold and their value.
+
+**Profit Report** (`app/constant/reports/pos_profit_report.php` + `api/account/get_profit_report.php`) — date-range profit, wrapping `glProfitLoss()` (`core/financial_reports.php`) directly per `.claude/reporting-source.md` (the one ledger) — no raw POS/expense SQL. Cards for Revenue/COGS/Gross Profit/Expenses/Net Profit/Net Margin, plus a monthly trend (capped at 24 points).
+
+Both pages/APIs redirect/404 when `!posSimpleModeEnabled()` (mirrors `pos_credit_customers.php`). Swahili strings added to `lang/sw.php` (reused the existing `Cashier`/`Items`/`Sales`/`Transactions`/`Total Sales`/`Net Profit`/`No records found.` keys rather than duplicating them with different wording, after finding they already existed for other screens).
+
+**Tested:** new `tests/test_pos_user_sales_and_profit_reports_cli.php` (38/38) — lint, source wiring, live in-process checks (per-cashier totals reconcile to real completed-POS totals, items drill-down, Profit Report matches a direct `glProfitLoss()` call exactly, monthly-trend cap, non-admin out-of-scope warehouse → 403), plus a genuine subprocess check that Simple-Mode-OFF makes both APIs refuse cleanly (in-process toggling can't observe this — `get_setting()` caches `system_settings` once per process at `roots.php` bootstrap).
+
 ## 2026-09-17 (dashboard) - "Monthly Revenue" KPI card hidden for Simple POS tenants
 
 **Request:** "in dashboard.php ... 'monthly revenue' ... it seems like peak from income statement ... for simple pos should not seen." Confirmed: the card's `$dashboard_stats['sales']['total_revenue']` comes from `glProfitLoss()` — the canonical double-entry ledger's Income Statement figure (accrual basis) — not a POS-derived number. A Simple POS shop owner doesn't reason in those terms; `Today's POS Sales` already answers "how much did I sell" for that tenant shape.

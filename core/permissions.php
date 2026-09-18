@@ -762,7 +762,7 @@ function hasReportsAccess()
         'sales_report', 'purchase_report', 'inventory_report', 'profit_loss_report', 'expense_report',
         'performance_dashboard', 'customer_analysis', 'product_analysis', 'sales_forecast', 'trends_analysis',
         'tax_report', 'audit_report', 'compliance_report', 'employee_report', 'asset_report',
-        'financial_statements',
+        'financial_statements', 'pos_user_sales_report', 'pos_profit_report',
     ];
     foreach ($reportPermissions as $perm) {
         if (canView($perm)) return true;
