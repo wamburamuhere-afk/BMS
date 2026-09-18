@@ -106,7 +106,7 @@ $company_logo = getSetting('company_logo', '');
                         <table class="table table-hover mb-0">
                             <tr>
                                 <th class="bg-light ps-3 text-nowrap" width="35%">Procuring Entity</th>
-                            <td class="fw-bold"><?= safe_output($tender['entity_name'] ?: $tender['procuring_entity_name']) ?></td>
+                            <td class="fw-bold"><?= caseFormat($tender['entity_name'] ?: $tender['procuring_entity_name']) ?></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Acronym</th>
@@ -122,7 +122,7 @@ $company_logo = getSetting('company_logo', '');
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Physical Address</th>
-                            <td><?= safe_output($tender['physical_address']) ?></td>
+                            <td><?= caseFormat($tender['physical_address']) ?></td>
                         </tr>
                     </table>
                     </div>
@@ -140,11 +140,11 @@ $company_logo = getSetting('company_logo', '');
                         <table class="table table-hover mb-0">
                             <tr>
                                 <th class="bg-light ps-3 text-nowrap" width="35%">Description</th>
-                            <td><?= nl2br(safe_output($tender['tender_description'])) ?></td>
+                            <td><?= nl2br(caseFormat($tender['tender_description'])) ?></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Category</th>
-                            <td><?= safe_output($tender['tender_category']) ?> <?= $tender['tender_category_specify'] ? "({$tender['tender_category_specify']})" : '' ?></td>
+                            <td><?= caseFormat($tender['tender_category']) ?> <?= $tender['tender_category_specify'] ? "({$tender['tender_category_specify']})" : '' ?></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">NeST Reference</th>
