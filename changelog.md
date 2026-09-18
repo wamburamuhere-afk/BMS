@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-18 (products, Simple POS follow-up) - "Add New Product" now opens the same way everywhere, plus a real Low Stock Alert field
+
+**Request:** "once i click 'add product' from quick button available in dashboard.php page and once i click 'add new product' as button available here in products.php it seems like they are not opened in the same way... i need also add one field as 'low stock' so as to get notification just put it to be available... all of this changes is if and only if for simple pos."
+
+**Found the inconsistency:** `dashboard.php`'s "Add Product" quick action (both the dropdown and the Quick Links tile) is a plain link to `product_create.php` — same as every "Edit" action across the app. `products.php`'s own "Add New Product" button instead opened a completely separate, third product-creation UI: its own `#addProductModal` Quick Add modal — confirmed by the page's own pre-existing `Ctrl+N` shortcut, which already bypassed that modal and went straight to `product_create.php`, i.e. two different behaviors already coexisted on the same page.
+
+**Fixed, Simple POS only:** `products.php`'s "Add New Product" button now navigates to `product_create.php` exactly like dashboard's quick action and the Ctrl+N shortcut, instead of opening the Quick Add modal — one single, consistent add-product experience. Normal tenants and Simple POS tenants with "Advanced Product" on: unchanged, the modal still opens exactly as before.
+
+**Low Stock Alert field, Simple POS only:** `product_create.php` and `product_edit.php` both gain a real "Low Stock Alert" field, mapped to `min_stock_level` — confirmed this is the exact column `dashboard.php`'s own System Alerts widget and "Low Stock" KPI card already compare available stock against (`available_stock <= min_stock_level AND min_stock_level > 0`), so setting it is what actually turns that existing notification on for a product; it was previously either absent (Create) or hidden-only, defaulting to 0/off. `reorder_level` and `max_stock_level` stay untouched (still hidden, unused by any actual alert) — only the one field that genuinely drives a notification was exposed, per the request.
+
+**Tested:** `tests/test_product_create_simple_pos_cli.php` (43/43), `tests/test_product_edit_simple_pos_cli.php` (96/96), `tests/test_products_list_simple_pos_cli.php` (38/38) — new assertions for the real, visible Low Stock Alert field (renders + round-trips through the actual create/update endpoints) and the "Add New Product" link-vs-modal behavior across all three modes (Simple POS / normal / Simple POS + Advanced Product override). `php -l` clean on every touched file.
+
 ## 2026-09-18 (products, Simple POS) - Wholesale Price now visible on Create (matching Restock), and Edit collapses to one section like Create
 
 **Request:** "in simple pos... add bei ya jumla kama ilivyo kwenye restock... edit form for product should be the same like create product form is... bei ya jumla na bei ya rejareja ionekane vyema... edit form inakua section moja kama ilivyo create product." Two asks: (1) show Wholesale Price on the Create form, previously hidden entirely for Simple POS; (2) make Edit's Simple POS layout a single section exactly like Create's — it still used the full 3-tab (General/Pricing/Inventory) structure with only individual fields hidden inside each tab, not a real single-section collapse.

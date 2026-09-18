@@ -17,7 +17,10 @@
  * previously tab-hidden-fields-only, not a real single-section layout).
  * Wholesale Price is no longer hidden — it's a real, editable field now,
  * alongside a "Selling Price" relabeled "Retail Price", both matching the
- * POS Restock modal's Buying/Wholesale/Retail 3-column layout.
+ * POS Restock modal's Buying/Wholesale/Retail 3-column layout. Also added
+ * the same day: a real "Low Stock Alert" field (min_stock_level, previously
+ * hidden-only), so a Simple POS user can actually turn on dashboard.php's
+ * own low-stock notification, which already reads this exact column.
  *
  *   A. STATIC   — file lints clean; source wiring for both branches present.
  *   B. RENDERED — the real page, three states: Simple POS, normal, and
@@ -187,6 +190,10 @@ if (!$uid || !$wh) {
     lacks($simple, 'id="description"', 'Simple POS render: Description field absent');
     lacks($simple, 'id="tax_id"', 'Simple POS render: Tax Configuration select absent');
     (preg_match('/<input type="number"[^>]*id="wholesale_price"/', $simple) === 1) ? pass('Simple POS render: Wholesale Price is a real, visible field (matches Restock)') : fail('Wholesale Price field is missing or still hidden-only');
+    // 2026-09-18 request: a real "Low Stock" (min_stock_level) field so a Simple
+    // POS user can actually turn on dashboard.php's own low-stock alert, which
+    // already reads this exact column — was previously hidden-only.
+    (preg_match('/<input type="number"[^>]*id="min_stock_level"/', $simple) === 1) ? pass('Simple POS render: Low Stock Alert (min_stock_level) is a real, visible field') : fail('Low Stock Alert field is missing or still hidden-only');
     lacks($simple, 'id="edit_is_taxable"', 'Simple POS render: is_taxable checkbox absent');
     lacks($simple, 'id="brand_id"', 'Simple POS render: Brand select (Advanced tab) absent');
     lacks($simple, 'id="advanced-tab"', 'Simple POS render: Advanced Details tab BUTTON absent');
@@ -198,7 +205,7 @@ if (!$uid || !$wh) {
     foreach (['sku', 'barcode', 'barcode_symbology', 'description', 'tax_id', 'discount_rate',
               'brand_id', 'manufacturer', 'model', 'serial_number', 'warranty_period', 'warranty_unit',
               'guarantee_period', 'guarantee_unit', 'expiry_days', 'weight', 'dim_length', 'dim_width', 'dim_height',
-              'reorder_level', 'min_stock_level', 'max_stock_level', 'min_selling_price', 'is_taxable', 'is_combo'] as $f) {
+              'reorder_level', 'max_stock_level', 'min_selling_price', 'is_taxable', 'is_combo'] as $f) {
         array_key_exists($f, $hidden) ? pass("hidden-preserve input present for `$f`") : fail("hidden-preserve input MISSING for `$f`");
     }
     (($hidden['is_taxable'] ?? null) === '1') ? pass('is_taxable hidden value is "1" (product is taxable)') : fail('is_taxable hidden value wrong: ' . var_export($hidden['is_taxable'] ?? null, true));
@@ -250,6 +257,7 @@ if (!$uid || !$wh) {
     $payload['cost_price'] = '1000';
     $payload['selling_price'] = '1600'; // the one real edit a Simple POS user makes
     $payload['wholesale_price'] = '1300.00'; // now a real visible field — the render pre-fills it, so the real form always resends it unchanged
+    $payload['min_stock_level'] = '2'; // now a real visible "Low Stock Alert" field, same reasoning
     $payload['unit'] = 'pcs';
     $payload['status'] = 'active';
     $payload['is_service'] = '0';
@@ -288,6 +296,7 @@ if (!$uid || !$wh) {
         ((int)$after['is_taxable'] === 1) ? pass('is_taxable stayed 1 (was truthy, hidden input correctly present)') : fail('is_taxable flipped: ' . var_export($after['is_taxable'], true));
         ((int)$after['is_combo'] === 1) ? pass('is_combo stayed 1 (was truthy, hidden input correctly present)') : fail('is_combo flipped: ' . var_export($after['is_combo'], true));
         (abs((float)$after['wholesale_price'] - 1300.00) < 0.01) ? pass('wholesale_price preserved') : fail('wholesale_price lost: ' . $after['wholesale_price']);
+        ((float)$after['min_stock_level'] === 2.0) ? pass('min_stock_level (Low Stock Alert) round-trips through the real visible field') : fail('min_stock_level lost: ' . $after['min_stock_level']);
         (abs((float)$after['discount_rate'] - 12.50) < 0.01) ? pass('discount_rate preserved (used its real id, not defaulted to 0)') : fail('discount_rate corrupted: ' . $after['discount_rate']);
         (abs((float)$after['weight'] - 3.250) < 0.001) ? pass('weight preserved') : fail('weight lost: ' . $after['weight']);
         ($after['dimensions'] === '10×20×30 cm') ? pass('dimensions preserved') : fail('dimensions lost: ' . var_export($after['dimensions'], true));
@@ -323,6 +332,7 @@ if (!$uid || !$wh) {
     $payloadB['cost_price'] = '500';
     $payloadB['selling_price'] = '900';
     $payloadB['wholesale_price'] = '1300.00'; // now a real visible field, same as payload A
+    $payloadB['min_stock_level'] = '2'; // now a real visible field, same as payload A
     $payloadB['unit'] = 'pcs';
     $payloadB['status'] = 'active';
     $payloadB['is_service'] = '0';
