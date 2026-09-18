@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-18 — Suppliers DataTables TN/18 fix + Expenses nav icon
+
+**Files:** `app/bms/Suppliers/suppliers.php`, `header.php`
+
+**Suppliers TN/18 (suppliers.php):** Moved the print-buffer spacer out of `<tfoot>` (which had a hardcoded `colspan="11"` mismatching the 6- or 12-column table) and into a `<div class="d-none d-print-block">` after the `</table>`. DataTables was counting the single `<td colspan="11">` as 1 column vs the actual column count, triggering the "Incorrect column count" (TN/18) alert on every page load.
+
+**Expenses icon (header.php):** Replaced `bi-currency-dollar` with `bi-receipt` in both the Finance dropdown and the standalone nav link — more descriptive for expenses, distinct from the Revenue icon (`bi-cash-coin`).
+
+---
+
 ## 2026-09-18 — POS receipt mobile print fix + price groups available to all POS users
 
 **Files:** `api/pos/print_receipt.php`, `app/bms/pos/pos.php`
