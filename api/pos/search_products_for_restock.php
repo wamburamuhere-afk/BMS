@@ -34,7 +34,8 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $text = $r['sku'] ? ($r['sku'] . ' — ' . $r['product_name']) : $r['product_name'];
+        $name = applyCaseMode($r['product_name']);
+        $text = $r['sku'] ? ($r['sku'] . ' — ' . $name) : $name;
         $results[] = ['id' => (int)$r['product_id'], 'text' => $text];
     }
     echo json_encode(['results' => $results]);

@@ -53,7 +53,7 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $text = $r['customer_name'];
+        $text = applyCaseMode($r['customer_name']);
         if ($r['customer_code']) $text .= ' (' . $r['customer_code'] . ')';
         $results[] = ['id' => (int)$r['customer_id'], 'text' => $text];
     }

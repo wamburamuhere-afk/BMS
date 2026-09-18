@@ -49,7 +49,7 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $results[] = ['id' => (int)$r['supplier_id'], 'text' => $r['supplier_name']];
+        $results[] = ['id' => (int)$r['supplier_id'], 'text' => applyCaseMode($r['supplier_name'])];
     }
     echo json_encode(['results' => $results]);
 
