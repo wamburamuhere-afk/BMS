@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-18 — Simple POS: hide Procurement nav item
+
+**File:** `header.php`
+
+Added `!posSimpleModeEnabled()` guard to the entire Procurement block. In Simple POS mode, Procurement (Suppliers, RFQ, PO, GRN, Bills, etc.) is now hidden from the header entirely. Suppliers remain accessible via Core → Suppliers and the dashboard.
+
+---
+
 ## 2026-09-18 — Simple POS: "Shop" nav item links directly to warehouses (no dropdown)
 
 **File:** `header.php`
