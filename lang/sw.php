@@ -4046,6 +4046,26 @@ return [
     // Expense Report — Shop filter/breakdown for Simple POS (2026-09-15)
     'Expenditure analysis by shop, period and status' => 'Uchambuzi wa matumizi kwa duka, kipindi na hali',
 
+    // Sales by User Report + Profit Report — Simple POS only (2026-09-17)
+    'Sales by User Report' => 'Ripoti ya Mauzo kwa Muuzaji',
+    'SALES BY USER REPORT' => 'RIPOTI YA MAUZO KWA MUUZAJI',
+    'What each cashier sold, and its total value' => 'Kila muuzaji ameuza nini, na thamani yake',
+    'Sales Value by Cashier' => 'Thamani ya Mauzo kwa Muuzaji',
+    'Sales by Cashier' => 'Mauzo kwa Muuzaji',
+    'Total Sales Value' => 'Jumla ya Thamani ya Mauzo',
+    'Items Sold' => 'Bidhaa Zilizouzwa',
+    'Active Cashiers' => 'Wauzaji Waliofanya Mauzo',
+    'Qty Sold' => 'Idadi Iliyouzwa',
+    'Items Sold by' => 'Bidhaa Alizouza',
+    'No items found for this cashier in this period.' => 'Hakuna bidhaa zilizopatikana kwa muuzaji huyu katika kipindi hiki.',
+
+    'Profit Report' => 'Ripoti ya Faida',
+    'PROFIT REPORT' => 'RIPOTI YA FAIDA',
+    'Profit earned for the period you choose' => 'Faida iliyopatikana kwa kipindi ulichochagua',
+    'Gross Profit' => 'Faida Jumla',
+    'Net Margin' => 'Asilimia ya Faida Halisi',
+    'Monthly Trend' => 'Mwelekeo wa Kila Mwezi',
+
     // Role names shown in the user dropdown / dashboard badge (2026-09-15) —
     // header.php's $user_role and app/dashboard.php's welcome banner now wrap
     // it in t(); a custom role name not listed here safely falls back to
