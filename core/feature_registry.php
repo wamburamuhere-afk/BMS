@@ -904,18 +904,27 @@ if (!function_exists('tenantModuleAllowsPage')) {
             return true;
         }
 
-        // 'suppliers' — lightweight Supplier visibility for a Simple POS
-        // tenant that hasn't (or can't) turn on the full Procurement module,
-        // 2026-09-17: superadmin-only override set via
-        // actions/superadmin_tenant_supplier_access.php (Tenant > Point of
-        // Sale > More), core/pos_nav.php::supplierAccessEnabled(). Deliberately
-        // scoped to the 'suppliers' page_key ONLY — it does NOT bypass
-        // 'supplier_payments'/'purchase'/'rfq'/etc, which stay gated behind
+        // 'suppliers' / 'supplier_payments' — lightweight Supplier visibility
+        // (+ the ability to pay them) for a Simple POS tenant that hasn't (or
+        // can't) turn on the full Procurement module, 2026-09-17: superadmin-
+        // only override set via actions/superadmin_tenant_supplier_access.php
+        // (Tenant > Point of Sale > More), core/pos_nav.php::supplierAccessEnabled().
+        // 'supplier_payments' joined the bypass 2026-09-17 (follow-up) — "if
+        // Supplier is allowed, paying them should follow the same logic":
+        // supplier_payments.php's own Add/Edit form already treats its
+        // Purchase Order field as optional (api/add_supplier_payment.php never
+        // requires one), so a bare supplier + amount + paid-from account posts
+        // a normal Dr Accounts Payable / Cr Paid-From entry with nothing
+        // Procurement-shaped required — the exact same shape Quick Restock's
+        // own already-paid outflow uses. Deliberately STILL scoped to just
+        // these two page_keys — it does NOT bypass 'purchase'/'purchase_orders'/
+        // 'rfq'/'grn'/'dn'/'debit_notes'/etc, which stay gated behind
         // 'procurement' exactly as before, so a tenant with only this toggle
-        // gets the simplified supplier list/profile (same shape as Customer's)
-        // and nothing else Procurement owns. Same get_setting() pattern as the
-        // 'expenses' check above, for the same chokepoint reason.
-        if ($pageKey === 'suppliers' && function_exists('get_setting') && get_setting('pos_supplier_access', '0') === '1') {
+        // gets Suppliers + paying them and nothing else Procurement owns. Same
+        // get_setting() pattern as the 'expenses' check above, for the same
+        // chokepoint reason.
+        if (in_array($pageKey, ['suppliers', 'supplier_payments'], true)
+            && function_exists('get_setting') && get_setting('pos_supplier_access', '0') === '1') {
             return true;
         }
 

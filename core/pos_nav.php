@@ -159,12 +159,13 @@ if (!function_exists('supplierAccessEnabled')) {
      * above: that one changes which FORM renders once Suppliers is already
      * reachable. This one changes REACHABILITY itself — it lets a Simple POS
      * tenant see Suppliers (nav + supplier_details.php + the simplified
-     * supplier CRUD) without the full Procurement module being on. Set only
-     * via actions/superadmin_tenant_supplier_access.php (Tenant > Point of
+     * supplier CRUD) AND pay them (supplier_payments.php) without the full
+     * Procurement module being on. Set only via
+     * actions/superadmin_tenant_supplier_access.php (Tenant > Point of
      * Sale > More). Read directly by
-     * core/feature_registry.php::tenantModuleAllowsPage()'s 'suppliers'
-     * bypass — see that function for why it re-reads get_setting() itself
-     * rather than calling this helper.
+     * core/feature_registry.php::tenantModuleAllowsPage()'s 'suppliers' /
+     * 'supplier_payments' bypass — see that function for why it re-reads
+     * get_setting() itself rather than calling this helper.
      */
     function supplierAccessEnabled(): bool
     {
