@@ -788,7 +788,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('suppliers')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> <?= t('Suppliers') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('suppliers')): ?>
+                                <?php if(canView('suppliers') && tenantFeatureEnabled('projects')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> <?= t('Sub-Contractors') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>

@@ -6,8 +6,11 @@ ob_start();
 // Include the header
 require_once 'header.php';
 
-// Check user permissions dynamically (Mirroring Suppliers permission logic)
-$can_view_sc = canView('suppliers');
+// Check user permissions dynamically (Mirroring Suppliers permission logic).
+// Sub-Contractors is owned by the Projects feature, not by the Simple-POS
+// Supplier Access toggle (core/feature_registry.php's 'projects' entry) —
+// canView('suppliers') alone would let that toggle leak this page open.
+$can_view_sc = canView('suppliers') && tenantFeatureEnabled('projects');
 $can_create_sc = canCreate('suppliers');
 $can_edit_sc = canEdit('suppliers');
 $can_delete_sc = canDelete('suppliers');
