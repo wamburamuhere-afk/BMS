@@ -508,9 +508,19 @@ function get_quick_actions($product) {
                 </div>
                 <div class="ms-auto flex-shrink-0 pt-1 pt-md-2">
                     <?php if ($can_create_products): ?>
+                    <?php if ($simpleProductForm): ?>
+                    <!-- Simple POS (2026-09-18 request): same page dashboard.php's own "Add
+                         Product" quick action already opens (product_create.php), instead of
+                         this page's separate Quick Add modal — one consistent add-product
+                         experience, matching how Edit already always navigates to a real page. -->
+                    <a href="<?= getUrl('product_create') ?>" class="btn btn-primary btn-sm px-1 px-md-2 shadow-sm" style="border-radius: 6px;">
+                        <i class="bi bi-plus-circle"></i> <span class="d-none d-sm-inline"><?= t('Add New Product') ?></span><span class="d-inline d-sm-none text-uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Add New') ?></span>
+                    </a>
+                    <?php else: ?>
                     <button type="button" class="btn btn-primary btn-sm px-1 px-md-2 shadow-sm" style="border-radius: 6px;" onclick="openAddProductModal('inventory')" type="button">
                         <i class="bi bi-plus-circle"></i> <span class="d-none d-sm-inline"><?= t('Add New Product') ?></span><span class="d-inline d-sm-none text-uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Add New') ?></span>
                     </button>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>

@@ -12,6 +12,11 @@
  * wLabel() terminology gap, and adds Manufacturing/Expiry Date fields to the
  * modal's Opening Stock section in EVERY mode (parity with the main Create
  * form's batch-date fields, per products_simple_pos_plan.md §1).
+ * Updated 2026-09-18: for Simple POS, the "Add New Product" button no longer
+ * opens this page's own Quick Add modal — it navigates straight to
+ * product_create.php instead, matching dashboard.php's own "Add Product"
+ * quick action, this page's own Ctrl+N shortcut, and how "Edit" already
+ * always works (a real page, never a modal) — one consistent experience.
  *
  *   A. STATIC   — file lints clean; source wiring for both branches present.
  *   B. RENDERED — the real page, three states: Simple POS, normal, and
@@ -104,6 +109,14 @@ if (!$uid) {
     has($simple, 'id="modal_expiry_date"', 'Simple POS render: Expiry Date still present (all-modes field)');
     has($simple, 'id="tab1-tab"', 'Simple POS render: Quick Add modal Basic Info tab still present');
 
+    // 2026-09-18 request: "Add New Product" opened this page's own separate
+    // Quick Add modal, while dashboard.php's own "Add Product" quick action
+    // (and this page's Ctrl+N shortcut, and every "Edit" link) all navigate
+    // straight to product_create.php instead — one inconsistent add-product
+    // experience. Simple POS now gets the same single experience everywhere.
+    (preg_match('#<a href="[^"]*/product_create"[^>]*class="btn btn-primary btn-sm#', $simple) === 1) ? pass('Simple POS render: "Add New Product" is now a real link to product_create.php') : fail('"Add New Product" is not a real link to product_create.php');
+    lacks($simple, "onclick=\"openAddProductModal('inventory')\"", 'Simple POS render: "Add New Product" no longer opens the Quick Add modal');
+
     // State B: normal mode — fully unchanged.
     _pls_set_settings($root, '0', '0');
     $normal = _pls_render($root, $uid);
@@ -111,12 +124,14 @@ if (!$uid) {
     has($normal, 'id="modal_tax_id"', 'Normal mode render: Quick Add modal Tax Rate select present');
     has($normal, 'id="tab4-tab"', 'Normal mode render: Quick Add modal Additional Details tab present');
     has($normal, 'id="modal_manufacturing_date"', 'Normal mode render: Manufacturing Date present (all-modes field)');
+    has($normal, "onclick=\"openAddProductModal('inventory')\"", 'Normal mode render: "Add New Product" still opens the Quick Add modal (unaffected)');
 
     // State C: Simple POS + Advanced Product override — full form restored.
     _pls_set_settings($root, '1', '1');
     $override = _pls_render($root, $uid);
     has($override, '<th width="12%">SKU</th>', 'Simple POS + Advanced Product: SKU column restored');
     has($override, 'id="tab4-tab"', 'Simple POS + Advanced Product: Additional Details tab restored');
+    has($override, "onclick=\"openAddProductModal('inventory')\"", 'Simple POS + Advanced Product: "Add New Product" opens the Quick Add modal again (matches full-form restoration)');
 
     _pls_set_settings($root, (string)($simpleModeBefore === false ? '0' : $simpleModeBefore), (string)($advancedProdBefore === false ? '0' : $advancedProdBefore));
 }

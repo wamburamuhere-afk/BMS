@@ -716,6 +716,21 @@ function deleteSellingUnit(id) {
                                 </div>
                             </div>
                             <?php endif; ?>
+
+                            <!-- 2026-09-18 request: a real, optional "Low Stock" threshold —
+                                 previously hidden entirely for Simple POS. Maps to
+                                 min_stock_level, the exact column dashboard.php's own System
+                                 Alerts widget + "Low Stock" KPI card already compare available
+                                 stock against — so setting this is what actually turns that
+                                 notification on for this product (0 = off, matching before). -->
+                            <div class="col-md-6 mt-4">
+                                <label for="min_stock_level" class="form-label fw-bold small text-muted"><?= t('Low Stock Alert') ?></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control bg-light border-0" id="min_stock_level" name="min_stock_level" min="0" step="0.001" value="<?= $product['min_stock_level'] ?>">
+                                    <span class="input-group-text bg-light unit-label"><?= htmlspecialchars($product['unit']) ?></span>
+                                </div>
+                                <small class="text-muted"><?= t('Get notified when stock falls to or below this level. Leave 0 for no alert.') ?></small>
+                            </div>
                         </div>
                     </div>
 
@@ -769,7 +784,6 @@ function deleteSellingUnit(id) {
                 <input type="hidden" name="is_taxable" value="1">
                 <?php endif; ?>
                 <input type="hidden" name="reorder_level" value="<?= $product['reorder_level'] ?>">
-                <input type="hidden" name="min_stock_level" value="<?= $product['min_stock_level'] ?>">
                 <input type="hidden" name="max_stock_level" value="<?= $product['max_stock_level'] ?>">
                 <input type="hidden" id="weight" name="weight" value="<?= $product['weight'] ?>">
                 <input type="hidden" id="dim_length" name="dim_length" value="<?= $dim_length ?>">

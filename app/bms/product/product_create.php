@@ -245,6 +245,21 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                 </div>
                             </div>
 
+                            <!-- 2026-09-18 request: a real, optional "Low Stock" threshold —
+                                 previously hidden entirely for Simple POS. Maps to
+                                 min_stock_level, the exact column dashboard.php's own System
+                                 Alerts widget + "Low Stock" KPI card already compare available
+                                 stock against — so setting this is what actually turns that
+                                 notification on for this product (0 = off, matching before). -->
+                            <div class="col-md-6 mt-4">
+                                <label for="min_stock_level" class="form-label fw-bold small text-muted"><?= t('Low Stock Alert') ?></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control bg-light border-0" id="min_stock_level" name="min_stock_level" min="0" step="0.001" value="0">
+                                    <span class="input-group-text bg-light unit-label">pcs</span>
+                                </div>
+                                <small class="text-muted"><?= t('Get notified when stock falls to or below this level. Leave 0 for no alert.') ?></small>
+                            </div>
+
                             <div class="col-md-6 mt-4">
                                 <label for="manufacturing_date" class="form-label fw-bold small text-muted"><?= t('Manufacturing Date') ?></label>
                                 <input type="date" class="form-control bg-light border-0 py-2" id="manufacturing_date" name="manufacturing_date">
