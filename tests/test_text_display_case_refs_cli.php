@@ -450,3 +450,21 @@ if ($uid) {
 }
 
 _tdr_set_mode($root, 'as_typed');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('Batch G — bonus: purchase-document shared tables (GRN/delivery notes/returns/RFQ)');
+
+foreach ([
+    'assets/js/tables/bms-grn-table.js', 'assets/js/tables/bms-delivery-notes-table.js',
+    'assets/js/tables/bms-purchase-returns-table.js', 'assets/js/tables/bms-rfq-table.js',
+] as $f) {
+    $rc = 0; $out = [];
+    exec('node --check ' . escapeshellarg("$root/$f") . ' 2>&1', $out, $rc);
+    $rc === 0 ? pass("node --check: $f") : fail("node --check failed: $f — " . implode(' ', $out));
+}
+
+has(src($root, 'assets/js/tables/bms-grn-table.js'), 'window.caseFormatJs ? window.caseFormatJs(data) : esc(data)', 'GRN table supplier column uses caseFormatJs()');
+has(src($root, 'assets/js/tables/bms-grn-table.js'), "window.caseFormatJs(row.supplier_name) + '</h6>'", 'GRN mobile card supplier uses caseFormatJs()');
+has(src($root, 'assets/js/tables/bms-delivery-notes-table.js'), "window.caseFormatJs(data) + '</span> ' + kind", 'Delivery notes table party column uses caseFormatJs()');
+has(src($root, 'assets/js/tables/bms-purchase-returns-table.js'), "render: function (d) { return d ? window.caseFormatJs(d) : ''; }", 'Purchase returns table supplier column uses caseFormatJs()');
+has(src($root, 'assets/js/tables/bms-rfq-table.js'), 'window.caseFormatJs(d) + \'</span>\'', 'RFQ table supplier column uses caseFormatJs()');

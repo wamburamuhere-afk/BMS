@@ -48,20 +48,20 @@
             { key: 'supplier', col: {
                 data: 'supplier_name', responsivePriority: 2,
                 render: function (d) {
-                    return d ? '<span style="white-space:normal;word-break:break-word;">' + esc(d) + '</span>'
+                    return d ? '<span style="white-space:normal;word-break:break-word;">' + window.caseFormatJs(d) + '</span>'
                              : '<span class="text-muted">—</span>';
                 }
             }},
             { key: 'project', col: {
                 data: 'project_name', defaultContent: '—', responsivePriority: 6,
                 render: function (d) {
-                    return d ? '<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rfq-project-badge" style="white-space:normal;">' + esc(d) + '</span>' : '—';
+                    return d ? '<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rfq-project-badge" style="white-space:normal;">' + window.caseFormatJs(d) + '</span>' : '—';
                 }
             }},
             { key: 'warehouse', col: {
                 data: 'warehouse_name', responsivePriority: 4,
                 render: function (d) {
-                    return d ? '<span style="white-space:normal;word-break:break-word;">' + esc(d) + '</span>'
+                    return d ? '<span style="white-space:normal;word-break:break-word;">' + window.caseFormatJs(d) + '</span>'
                              : '<span class="text-muted">—</span>';
                 }
             }},

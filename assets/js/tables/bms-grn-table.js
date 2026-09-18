@@ -63,9 +63,11 @@
             { key: 'supplier', col: {
                 data: 'supplier_name',
                 render: function (data, type, row) {
-                    var html = '<div class="text-wrap-cell fw-bold" title="' + esc(data) + '">' + esc(data) + '</div>';
+                    var name = window.caseFormatJs ? window.caseFormatJs(data) : esc(data);
+                    var html = '<div class="text-wrap-cell fw-bold" title="' + name + '">' + name + '</div>';
                     if (row.company_name) {
-                        html += '<div class="text-wrap-cell text-muted small" title="' + esc(row.company_name) + '">' + esc(row.company_name) + '</div>';
+                        var company = window.caseFormatJs ? window.caseFormatJs(row.company_name) : esc(row.company_name);
+                        html += '<div class="text-wrap-cell text-muted small" title="' + company + '">' + company + '</div>';
                     }
                     return html;
                 }
@@ -83,7 +85,7 @@
                 data: 'project_name',
                 render: function (data) {
                     return data
-                        ? '<div class="text-wrap-cell"><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 grn-project-badge" style="white-space: normal; word-break: break-word;">' + esc(data) + '</span></div>'
+                        ? '<div class="text-wrap-cell"><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 grn-project-badge" style="white-space: normal; word-break: break-word;">' + window.caseFormatJs(data) + '</span></div>'
                         : '<span class="text-muted small">N/A</span>';
                 }
             }},
@@ -179,11 +181,11 @@
         data.each(function (row) {
             var projectBlock = (cfg.hide.indexOf('project') === -1)
                 ? '<div class="col-12 mt-2"><small class="text-muted d-block small">Project</small>' +
-                  '<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap d-inline-block" style="max-width: 100%;">' + esc(row.project_name || 'N/A') + '</span></div>'
+                  '<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap d-inline-block" style="max-width: 100%;">' + (row.project_name ? window.caseFormatJs(row.project_name) : 'N/A') + '</span></div>'
                 : '';
             var supplierBlock = (cfg.hide.indexOf('supplier') === -1)
-                ? '<h6 class="fw-bold mb-0">' + esc(row.supplier_name) + '</h6>' +
-                  '<small class="text-muted">' + esc(row.company_name || '') + '</small>'
+                ? '<h6 class="fw-bold mb-0">' + window.caseFormatJs(row.supplier_name) + '</h6>' +
+                  '<small class="text-muted">' + (row.company_name ? window.caseFormatJs(row.company_name) : '') + '</small>'
                 : '';
 
             $c.append(
