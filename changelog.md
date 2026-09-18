@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-17 (dashboard) - "Monthly Revenue" KPI card hidden for Simple POS tenants
+
+**Request:** "in dashboard.php ... 'monthly revenue' ... it seems like peak from income statement ... for simple pos should not seen." Confirmed: the card's `$dashboard_stats['sales']['total_revenue']` comes from `glProfitLoss()` — the canonical double-entry ledger's Income Statement figure (accrual basis) — not a POS-derived number. A Simple POS shop owner doesn't reason in those terms; `Today's POS Sales` already answers "how much did I sell" for that tenant shape.
+
+**Fixed:** `app/dashboard.php` — added `!$pos_simple_mode &&` to the Monthly Revenue card's display condition, same precedent already set for the Inventory Value card in this same KPI strip. Nothing else changed: the underlying `glProfitLoss()` query still runs (it also feeds the Performance Overview chart), and every other tenant's card is untouched.
+
+**Tested:** new `tests/test_dashboard_monthly_revenue_simple_pos_cli.php` (7/7) — static gate check + a live toggle (Simple POS on: income_statement deep-link absent, Today's POS Sales still present; Simple POS off: card present again). Zero drift: `test_dashboard_kpi_row_cli.php` (21/21), `test_dashboard_time_range_cli.php` (16/16). `php -l` clean.
+
 ## 2026-09-17 (feat/supplier-access-simple-pos) - "Supplier Access" toggle: Suppliers visible for Simple POS tenants without full Procurement, restock-with-supplier, and a real tab-closing gap fixed
 
 **Request:** allow a superadmin to enable Supplier visibility for a Simple POS tenant even without the full Procurement module, from a new checkbox inside the existing "Point of Sale → More" dialog. When on, Suppliers should appear (nav + dashboard) and use the already-simplified CRUD (PRs #2015/#2020/#2023). Tabs on `supplier_details.php` tied to sub-features that are still off (Payments/Bills/Purchase Orders/Projects/GRN/Returns/DN/RFQ/Debit Notes) must stay hidden even though the toggle opens the page itself. Quick Restock should gain an OPTIONAL "which supplier was this batch ordered from" field — never required, and genuinely absent from the form when Suppliers isn't reachable at all.

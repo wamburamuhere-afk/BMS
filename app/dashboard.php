@@ -1616,8 +1616,14 @@ function get_progress_color($percentage) {
     <div class="d-flex flex-wrap gap-3 mb-4 dashboard-kpi-row">
         <!-- 1. Monthly Revenue — clicks through to the Income Statement for
              this exact date range: that's the same glProfitLoss() figure,
-             not a re-derived approximation. -->
-        <?php if(canView('invoices') || canView('sales_report') || hasReportsAccess()): ?>
+             not a re-derived approximation. Hidden for Simple POS tenants
+             (request 2026-09-17) — it's an accrual/ledger (double-entry)
+             figure surfaced from the Income Statement, not something a small
+             shop owner using Simple POS reasons about; Today's POS Sales
+             already covers "how much did I sell" for that tenant shape.
+             Same precedent as Inventory Value below. Untouched for every
+             other tenant. -->
+        <?php if(!$pos_simple_mode && (canView('invoices') || canView('sales_report') || hasReportsAccess())): ?>
         <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
            href="<?= getUrl('income_statement') . '?start_date=' . urlencode($start_date) . '&end_date=' . urlencode($end_date) ?>">
             <div class="card bg-primary text-white h-100">
