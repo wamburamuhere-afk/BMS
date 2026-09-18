@@ -1082,7 +1082,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- Purchases -->
-                        <?php if (canView('suppliers')|| canView('rfq') || canView('purchase_orders') || canView('tenders')): ?>
+                        <?php if (!posSimpleModeEnabled() && (canView('suppliers')|| canView('rfq') || canView('purchase_orders') || canView('tenders'))): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="purchasesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-basket"></i> <?= t('Procurement') ?>
