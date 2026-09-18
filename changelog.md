@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-09-18 — Single-shop auto-select: hide warehouse dropdown when only 1 option
+
+**Files:** `core/warehouse_scope.php`, `header.php`
+
+**PHP helper (`warehouse_scope.php`):** Added `singleWarehouseContext(PDO $pdo): ?array` — returns the one warehouse array when the user can access exactly 1, or `null`. PHP-level forms can call this to skip the dropdown entirely at render time.
+
+**Universal JS (`header.php` — `bmsAutoSelectWarehouse`):** Runs on DOM ready AND every `shown.bs.modal`. Finds any `select[name="warehouse_id"]` or `select#posWarehouseId` with exactly 1 real option (non-empty value). When matched:
+- Auto-selects the value and fires `change` (so dependent components like `loadProducts`, warehouse-project-filter cascade react immediately)
+- Hides the `<select>` and its `.input-group` wrapper with `d-none`; removes the `required` attribute so browser validation doesn't block on the hidden field
+- Inserts a compact `🏠 Shop Name` static label in place of the dropdown
+
+Result: tenants with 1 shop see the shop name displayed immediately with no dropdown to interact with, in POS, expense create modals, and every other creation form system-wide. Multi-shop tenants are unaffected (0 or 2+ options → function exits immediately).
+
+---
+
 ## 2026-09-18 — Suppliers DataTables TN/18 fix + Expenses nav icon
 
 **Files:** `app/bms/Suppliers/suppliers.php`, `header.php`
