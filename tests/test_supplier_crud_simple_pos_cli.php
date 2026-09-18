@@ -140,6 +140,9 @@ has($detailSrc, "\$default_supplier_tab = canView('expenses') ? 'pane-expenses' 
 $expensesBlockStart = strpos($detailSrc, "<?php if (canView('expenses')): ?>");
 $expensesBlockHasSimpleGate = $expensesBlockStart !== false && strpos(substr($detailSrc, $expensesBlockStart, 40), '$hideProcurementTabs') !== false;
 (!$expensesBlockHasSimpleGate) ? pass('Expenses tab is deliberately KEPT even in Simple POS (not part of the formal PO/GRN/Bill cycle)') : fail('Expenses tab was wrongly gated on Simple POS too');
+has($detailSrc, "Quick Restock never touches this table at all", 'Statistics Cards row is explicitly documented as gated on Simple POS, no replacement data (unlike Customer)');
+has($detailSrc, "t('Supplier Information')", 'the consolidated Supplier Information card exists');
+has($detailSrc, "one consolidated card instead of the remains of 4", 'consolidation is documented and gated on $simpleSupplierForm');
 
 section('2c. Source wiring — delete_supplier.php');
 $delSrc = src($root, 'api/delete_supplier.php');
@@ -190,16 +193,23 @@ if ($adminUid <= 0) {
         (!str_contains($simpleDetail, 'data-bs-target="#pane-projects"'))
             ? pass('Simple POS: Projects Involved tab is gone') : fail('Projects tab still present in Simple POS');
         (substr_count($simpleDetail, 'nav-link active') === 1) ? pass('Simple POS: exactly one tab marked active by default') : fail('not exactly one default-active tab found');
-        // Bank Information card: Supplier's simple registration KEEPS bank fields
-        // visible (unlike Customer) — so if this supplier has one saved, the card
-        // should still render even in Simple POS (no card-level gate needed/added).
-        (str_contains($simpleDetail, 'Bank Information') && str_contains($simpleDetail, 'NMB'))
-            ? pass('Simple POS: Bank Information card still shows (bank details ARE collected for Supplier, unlike Customer)') : fail('Bank Information card missing even though bank_name was set');
+        // 2026-09-17 follow-up: Bank Name/Account fold into the new consolidated
+        // "Supplier Information" card (no separate "Bank Information" heading
+        // anymore in Simple mode) — Supplier's simple registration KEEPS bank
+        // fields visible (unlike Customer), so the VALUE must still render.
+        (str_contains($simpleDetail, 'NMB'))
+            ? pass('Simple POS: bank details still show (bank fields ARE collected for Supplier, unlike Customer), now inside the consolidated card') : fail('bank_name value missing even though it was set');
+        (str_contains($simpleDetail, 'Supplier Information') || str_contains($simpleDetail, 'Taarifa'))
+            ? pass('Simple POS: the consolidated "Supplier Information" card is present') : fail('consolidated card missing');
+        (!str_contains($simpleDetail, 'Total Orders'))
+            ? pass('Simple POS: the old purchase_orders-derived Statistics Cards row is gone') : fail('old Statistics Cards row (Total Orders etc.) still present');
+        (substr_count($simpleDetail, 'N/A') === 0)
+            ? pass('Simple POS: ZERO "N/A" placeholder rows anywhere on the page') : fail('N/A rows still present: ' . substr_count($simpleDetail, 'N/A') . ' found');
 
         _scc_set_settings($root, '0');
         $normalDetail = _scc_render($root, $adminUid, 'app/bms/Suppliers/supplier_details.php', ['id' => $suppId]);
-        (str_contains($normalDetail, 'data-bs-target="#pane-payments"') && str_contains($normalDetail, 'data-bs-target="#pane-projects"'))
-            ? pass('Normal tenant: everything present, unchanged') : fail('normal tenant lost tabs — regression');
+        (str_contains($normalDetail, 'data-bs-target="#pane-payments"') && str_contains($normalDetail, 'data-bs-target="#pane-projects"') && str_contains($normalDetail, 'Total Orders'))
+            ? pass('Normal tenant: everything present, unchanged — including the original Statistics Cards row') : fail('normal tenant lost tabs/cards — regression');
 
         section('5. Live — Delete is now always soft-delete');
         $delRes = _scc_post($root, $adminUid, 'api/delete_supplier.php', ['supplier_id' => $suppId]);

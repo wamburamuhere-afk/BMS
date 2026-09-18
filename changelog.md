@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-17 (dashboard) - "Monthly Revenue" KPI card hidden for Simple POS tenants
+
+**Request:** "in dashboard.php ... 'monthly revenue' ... it seems like peak from income statement ... for simple pos should not seen." Confirmed: the card's `$dashboard_stats['sales']['total_revenue']` comes from `glProfitLoss()` — the canonical double-entry ledger's Income Statement figure (accrual basis) — not a POS-derived number. A Simple POS shop owner doesn't reason in those terms; `Today's POS Sales` already answers "how much did I sell" for that tenant shape.
+
+**Fixed:** `app/dashboard.php` — added `!$pos_simple_mode &&` to the Monthly Revenue card's display condition, same precedent already set for the Inventory Value card in this same KPI strip. Nothing else changed: the underlying `glProfitLoss()` query still runs (it also feeds the Performance Overview chart), and every other tenant's card is untouched.
+
+**Tested:** new `tests/test_dashboard_monthly_revenue_simple_pos_cli.php` (7/7) — static gate check + a live toggle (Simple POS on: income_statement deep-link absent, Today's POS Sales still present; Simple POS off: card present again). Zero drift: `test_dashboard_kpi_row_cli.php` (21/21), `test_dashboard_time_range_cli.php` (16/16). `php -l` clean.
+
 ## 2026-09-17 (feat/supplier-access-simple-pos, follow-up) - Supplier Access now also unlocks paying that supplier — Supplier Payments works with no PO, plus a real journal_mappings provisioning gap found and worked around
 
 **Request:** "if Supplier is allowed [for Simple POS], paying should also follow the same logic" — the toggle made Suppliers visible but left `supplier_payments.php` gated behind full Procurement, so a Simple POS shop could see a supplier but never record having paid them.
@@ -34,6 +42,19 @@
 - `api/pos/quick_restock.php` — optional `supplier_id`, validated only if provided (must resolve to a real, active supplier), never blocks a restock on its own.
 
 **Tested:** new `tests/test_supplier_access_simple_pos_cli.php` (89/89) — static/wiring, a live-provisioned throwaway tenant proving the toggle's full lifecycle (baseline reachable → Procurement off blocks everything → toggle reopens `suppliers.php` while `suppliers/payments` stays blocked → tabs stay closed on `supplier_details.php` until Procurement is genuinely back on → Restock field appears/disappears in lockstep), and the legacy-DB runtime path for `quick_restock.php` (supplier given / omitted / bogus). Full regression, zero drift: `test_supplier_crud_simple_pos_cli.php` (33/33 — 4 assertions updated for the renamed `$hideProcurementTabs` gate, not a behavior regression), `test_customer_crud_simple_pos_cli.php` (71/71), `test_customer_supplier_simple_pos_cli.php` (109/109), `test_superadmin_advanced_customer_supplier_cli.php` (46/46), `test_pos_quick_restock_cli.php` (36/36), `test_pos_restock_batch_dates_cli.php` (19/19), `test_feature_registry_cli.php` (142/142), `test_feature_gating_cli.php` (43/43). `test_supplier_details_related_tabs_cli.php`'s pre-existing 6 failures confirmed unrelated (reproduced identically with every change in this PR reverted). `php -l` clean on every touched/new file.
+
+## 2026-09-17 (fix/supplier-details-consolidation) - Same profile consolidation applied to Supplier: killed the Statistics Cards row and the scattered Basic/Contact/Address/Bank cards for Simple POS
+
+**Request:** "analyse for supplier side also to be well implemented also like you implemented in customer side" — direct mirror of the Customer follow-up, applied to `supplier_details.php`. Confirmed upfront: Suppliers are NOT hidden for Simple POS — the whole module stays fully visible/usable, only specific fields/cards within it simplify.
+
+**Scouted first, matching the exact same problem shape:**
+- A "Statistics Cards" row (Total Orders / Total Spent / Pending Orders / Pending Amount) sits above the tabs, 100% `purchase_orders`-derived — always zero for a Simple POS supplier using Quick Restock. **Unlike Customer, there's no equivalent replacement data** (Quick Restock's outflow never links to a `supplier_id` at all, confirmed in the earlier CRUD-scope pass) — so this just disappears entirely for Simple POS, no swap-in.
+- Basic Info / Contact Info / Address cards already self-hide empty fields individually (no `N/A` bug like Customer had), but for a supplier with only Name/Phone/Bank Name/Bank Account/Notes filled in, the Contact Info card would render as a whole separate card box containing just one row ("Phone"), and Address would always show "Country: Tanzania" (a silent default, never real input) with nothing else in it.
+- Bank Information sat in its own separate full-width block below, already correctly self-hiding — but still a fourth disconnected card instead of one place.
+
+**Fixed, gated on `$simpleSupplierForm` only:** Statistics Cards row hidden entirely; Basic Info + Contact Info + Address + Bank Information collapse into one **"Supplier Information"** card showing exactly what registration collects — Full Name, Phone, Status, and Bank Name/Bank Account only when actually set, plus Notes if present. Normal/advanced tenants keep the byte-for-byte original 4-card layout via an `if/else` split.
+
+**Tested:** extended `tests/test_supplier_crud_simple_pos_cli.php` to 38/38 — updated the pre-existing "Bank Information card shows" assertion (the heading text it checked for no longer exists in Simple mode, folded into the new card) to check the bank *value* instead, added a literal zero-`N/A` proof matching Customer's, and confirmed normal tenants keep the original Statistics Cards row untouched. Full regression, zero drift: `test_customer_supplier_simple_pos_cli.php` (109/109). `php -l` clean.
 
 ## 2026-09-17 (feat/customer-crud-simple-pos-scope, follow-up) - Consolidated the surviving Simple POS profile fields into one card instead of the remains of 4 scattered ones; killed the last "N/A" rows
 

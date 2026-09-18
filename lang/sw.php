@@ -1365,6 +1365,7 @@ return [
     'Currently Owed' => 'Anadaiwa Sasa',
     'Room left on their credit line' => 'Nafasi iliyobaki kwenye mkopo wake',
     'Customer Information' => 'Taarifa za Mteja',
+    'Not set' => 'Haijawekwa',
     'Outstanding amount' => 'Kiasi Kinachodaiwa',
     'Fully settled' => 'Imelipwa Kikamilifu',
     'Balance Mismatch' => 'Salio Halilingani',
