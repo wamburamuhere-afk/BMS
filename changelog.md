@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-18 — Simple POS: "Shop" nav item links directly to warehouses (no dropdown)
+
+**File:** `header.php`
+
+In Simple POS mode (`posSimpleModeEnabled()`), the "Shop" navbar item is now a plain direct link to `warehouses.php`. The dropdown (with Products, Services, Categories, Adjustments, Valuation, Locations) is hidden entirely — those pages remain accessible via the core/full navigation for users who need them. In full (non-Simple POS) mode the dropdown is unchanged and also no longer redundantly gates Adjustments/Valuation/Locations behind an extra `!posSimpleModeEnabled()` check (those entries simply don't render in Simple POS because the whole block is skipped).
+
+---
+
 ## 2026-09-18 — Single-shop auto-select: hide warehouse dropdown when only 1 option
 
 **Files:** `core/warehouse_scope.php`, `header.php`
