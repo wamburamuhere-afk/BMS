@@ -228,15 +228,15 @@ $accent = getSetting('print_template_color_sr_meridian', '#3f8f5f');
         <div class="meta-chip"><div class="lbl">Date</div><div class="val"><?= date('d M Y', strtotime($return['return_date'])) ?></div></div>
         <?php if (!empty($return['order_number'])): ?><div class="meta-chip"><div class="lbl">Ref Order</div><div class="val"><?= htmlspecialchars($return['order_number']) ?></div></div><?php endif; ?>
         <?php if (!empty($return['invoice_number'])): ?><div class="meta-chip"><div class="lbl">Ref Invoice</div><div class="val"><?= htmlspecialchars($return['invoice_number']) ?></div></div><?php endif; ?>
-        <?php if (!empty($return['warehouse_name'])): ?><div class="meta-chip"><div class="lbl"><?= wLabel('Warehouse', 'Shop') ?></div><div class="val"><?= htmlspecialchars($return['warehouse_name']) ?></div></div><?php endif; ?>
+        <?php if (!empty($return['warehouse_name'])): ?><div class="meta-chip"><div class="lbl"><?= wLabel('Warehouse', 'Shop') ?></div><div class="val"><?= caseFormat($return['warehouse_name']) ?></div></div><?php endif; ?>
         <div class="meta-chip status-chip"><div class="lbl">Status</div><div class="val"><?= strtoupper($return['status']) ?></div></div>
     </div>
 
     <div class="panel-row">
         <div class="panel">
             <h3>Returned By</h3>
-            <p><strong><?= htmlspecialchars($return['customer_name']) ?></strong></p>
-            <?php if (!empty($return['company_name'])): ?><p><?= htmlspecialchars($return['company_name']) ?></p><?php endif; ?>
+            <p><strong><?= caseFormat($return['customer_name']) ?></strong></p>
+            <?php if (!empty($return['company_name'])): ?><p><?= caseFormat($return['company_name']) ?></p><?php endif; ?>
             <?php if (!empty($return['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($return['c_postal_address']) ?></p><?php endif; ?>
             <?php if (!empty($return['c_address'])): ?><p><?= htmlspecialchars($return['c_address']) ?></p><?php endif; ?>
             <?php if (!empty($return['c_phone'])): ?><p><?= htmlspecialchars($return['c_phone']) ?></p><?php endif; ?>
@@ -248,7 +248,7 @@ $accent = getSetting('print_template_color_sr_meridian', '#3f8f5f');
         </div>
         <div class="panel">
             <h3>Return Information</h3>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_name ?: 'System') ?></p>
+            <p><strong>Prepared By:</strong> <?= caseFormat($creator_name ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
             <?php if ($refund_status): ?><p><strong>Refund:</strong> <?= htmlspecialchars($refund_status) ?></p><?php endif; ?>
         </div>
@@ -274,7 +274,7 @@ $accent = getSetting('print_template_color_sr_meridian', '#3f8f5f');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-center"><?= (isset($item['tax_rate']) && (float)$item['tax_rate'] == 18) ? '18%' : '—' ?></td>

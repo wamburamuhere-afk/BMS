@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-09-18 (system-wide, Phase 2) - Text Display Case wired into Sales documents (print templates + list/view pages)
+
+**Scope:** All sales-side print templates and their list/view pages — 4 invoice print skins (standard/onyx/summit/wave), 4 sales order print skins (standard/confirmation/ledger/studio), 4 quotation print skins (standard/meadow/noir/terra), 4 credit note print skins (standard/ember/horizon/ledger), 4 sales return print skins (standard/intake/meridian/register), LPO print template, and key list/view pages (invoices.php, sales_orders.php, invoice_view.php, sales_order_view.php, credit_note_view.php, sales_return_view.php). Two high-leverage shared includes also fixed: `includes/workflow_signature_row.php` (used by 42 print files) and `includes/print_footer_html.php`.
+
+**Changes:** `htmlspecialchars()`/`safe_output()` on customer names, company names, warehouse names, salesperson names, product names, creator/reviewer/approver names, and item descriptions all replaced with `caseFormat()` (PHP, display-only render contexts) or `caseFormatJs()` (JS DataTables column renders). Creator labels assembled from multiple fields use `applyCaseMode()` on the name portion before concatenation. Print-only headers that force uppercase via CSS left as `htmlspecialchars()` (CSS `text-transform` handles the visual, PHP should not double-transform). LPO create form `value=` attribute deliberately NOT touched — Phase 10 scope only.
+
 ## 2026-09-18 (system-wide, Phase 1) - Text Display Case wired into 11 master-data modules
 
 **Request:** "make sure for this phase 1 work seriously without leave anything as gap... start with phase 0 now. Dont leave gap please is better to test to ensure no rush made" — then later: "after fix/complete to implement phase, please test it, if not bug or gap commit and move to the next phase. When completed all then create test to all phases then push to github and open PR."

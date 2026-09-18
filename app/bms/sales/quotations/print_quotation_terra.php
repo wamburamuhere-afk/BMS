@@ -110,7 +110,7 @@ $reviewer_name = trim($order['reviewer_name'] ?? '');
 $reviewer_role = trim($order['reviewer_role'] ?? '');
 $approver_name = trim($order['approver_name'] ?? '');
 $approver_role = trim($order['approver_role'] ?? '');
-$creator_label = $creator_name ? $creator_name . ($creator_role ? ' (' . ucfirst($creator_role) . ')' : '') : 'Unknown';
+$creator_label = $creator_name ? applyCaseMode($creator_name) . ($creator_role ? ' (' . ucfirst($creator_role) . ')' : '') : 'Unknown';
 
 $quote_id_for_sig = $order['sales_order_id'] ?? 0;
 $wf_sigs = $quote_id_for_sig ? getWorkflowSignatures($pdo, 'quotation', $quote_id_for_sig) : [];
@@ -280,7 +280,7 @@ $accent = getSetting('print_template_color_qt_terra', '#9c6b3e');
     <div class="panel-row">
         <div class="panel">
             <h3>Customer</h3>
-            <p><strong><?= htmlspecialchars($order['customer_name']) ?></strong></p>
+            <p><strong><?= caseFormat($order['customer_name']) ?></strong></p>
             <?php foreach ($addr_lines as $addr_line): ?>
             <p><?= htmlspecialchars($addr_line) ?></p>
             <?php endforeach; ?>
@@ -298,8 +298,8 @@ $accent = getSetting('print_template_color_qt_terra', '#9c6b3e');
             <h3>Quotation Information</h3>
             <?php if (!empty($order['project_contract_no'])): ?><p><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></p><?php endif; ?>
             <?php if (!empty($order['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($order['project_name']) ?></p><?php endif; ?>
-            <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($order['warehouse_name']) ?></p><?php endif; ?>
-            <p><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></p>
+            <?php if (!empty($order['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($order['warehouse_name']) ?></p><?php endif; ?>
+            <p><strong>Salesperson:</strong> <?= caseFormat($order['salesperson_name'] ?? 'N/A') ?></p>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_label) ?></p>
         </div>
     </div>
@@ -323,7 +323,7 @@ $accent = getSetting('print_template_color_qt_terra', '#9c6b3e');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>

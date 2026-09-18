@@ -280,8 +280,8 @@ $accent = getSetting('print_template_color_inv_wave', '#164a91');
     <div class="panel-row">
         <div class="panel">
             <h3>Bill To</h3>
-            <p><strong><?= htmlspecialchars($invoice['customer_name']) ?></strong></p>
-            <?php if (!empty($invoice['company_name'])): ?><p><?= htmlspecialchars($invoice['company_name']) ?></p><?php endif; ?>
+            <p><strong><?= caseFormat($invoice['customer_name']) ?></strong></p>
+            <?php if (!empty($invoice['company_name'])): ?><p><?= caseFormat($invoice['company_name']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($invoice['c_postal_address']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_address'])): ?><p><?= htmlspecialchars($invoice['c_address']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_phone'])): ?><p><?= htmlspecialchars($invoice['c_phone']) ?></p><?php endif; ?>

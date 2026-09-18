@@ -115,7 +115,7 @@ $_renderSigCol = function(string $label, string $name, string $role,
 
     echo htmlspecialchars($label) . '<br>';
     echo '<small>';
-    echo htmlspecialchars($name) . ($role ? ' &mdash; ' . htmlspecialchars($role) : '');
+    echo ($name !== '' ? caseFormat($name) : '') . ($role ? ' &mdash; ' . htmlspecialchars($role) : '');
     echo '</small>';
     echo '</div>';
 };

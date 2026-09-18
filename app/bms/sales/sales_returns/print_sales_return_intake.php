@@ -227,8 +227,8 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
     <div class="panel-row">
         <div class="panel">
             <h3>Returned By</h3>
-            <div class="field-line"><span class="flabel">Name:</span> <?= htmlspecialchars($return['customer_name']) ?></div>
-            <?php if (!empty($return['company_name'])): ?><div class="field-line"><span class="flabel">Company:</span> <?= htmlspecialchars($return['company_name']) ?></div><?php endif; ?>
+            <div class="field-line"><span class="flabel">Name:</span> <?= caseFormat($return['customer_name']) ?></div>
+            <?php if (!empty($return['company_name'])): ?><div class="field-line"><span class="flabel">Company:</span> <?= caseFormat($return['company_name']) ?></div><?php endif; ?>
             <div class="field-line"><span class="flabel">Address:</span> <?= htmlspecialchars($return['c_address'] ?: '') ?></div>
             <div class="field-line"><span class="flabel">Phone:</span> <?= htmlspecialchars($return['c_phone'] ?: '') ?></div>
             <?php if (!empty($return['c_email'])): ?><div class="field-line"><span class="flabel">E-mail:</span> <?= htmlspecialchars($return['c_email']) ?></div><?php endif; ?>
@@ -247,10 +247,10 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
         <div class="field-line"><span class="flabel">Date:</span> <?= date('d M Y', strtotime($return['return_date'])) ?></div>
         <?php if (!empty($return['order_number'])): ?><div class="field-line"><span class="flabel">Ref Order:</span> <?= htmlspecialchars($return['order_number']) ?></div><?php endif; ?>
         <?php if (!empty($return['invoice_number'])): ?><div class="field-line"><span class="flabel">Ref Invoice:</span> <?= htmlspecialchars($return['invoice_number']) ?></div><?php endif; ?>
-        <?php if (!empty($return['warehouse_name'])): ?><div class="field-line"><span class="flabel"><?= wLabel('Warehouse:', 'Shop:') ?></span> <?= htmlspecialchars($return['warehouse_name']) ?></div><?php endif; ?>
+        <?php if (!empty($return['warehouse_name'])): ?><div class="field-line"><span class="flabel"><?= wLabel('Warehouse:', 'Shop:') ?></span> <?= caseFormat($return['warehouse_name']) ?></div><?php endif; ?>
         <div class="field-line"><span class="flabel">Status:</span> <?= strtoupper($return['status']) ?></div>
         <?php if ($refund_status): ?><div class="field-line"><span class="flabel">Refund:</span> <?= htmlspecialchars($refund_status) ?></div><?php endif; ?>
-        <div class="field-line"><span class="flabel">Prepared By:</span> <?= htmlspecialchars($creator_name ?: 'System') ?></div>
+        <div class="field-line"><span class="flabel">Prepared By:</span> <?= caseFormat($creator_name ?: 'System') ?></div>
         <div class="field-line"><span class="flabel">Currency:</span> <?= htmlspecialchars($currency) ?></div>
     </div>
 
@@ -275,7 +275,7 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($item['product_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? 'Unknown Product') ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-center"><?= (isset($item['tax_rate']) && (float)$item['tax_rate'] == 18) ? '18%' : '—' ?></td>
@@ -295,10 +295,10 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
         <div class="section-title">Acknowledgment</div>
         <div class="ack-row">
             <div class="ack-col">
-                <div class="ack-label">Returned By: <?= htmlspecialchars($return['customer_name']) ?></div>
+                <div class="ack-label">Returned By: <?= caseFormat($return['customer_name']) ?></div>
             </div>
             <div class="ack-col">
-                <div class="ack-label">Received By: <?= htmlspecialchars($creator_name ?: 'Staff') ?></div>
+                <div class="ack-label">Received By: <?= caseFormat($creator_name ?: 'Staff') ?></div>
             </div>
         </div>
     </div>

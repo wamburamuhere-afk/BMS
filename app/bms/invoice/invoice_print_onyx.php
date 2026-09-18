@@ -106,7 +106,7 @@ $reviewer_name = trim($invoice['reviewer_name'] ?? '');
 $reviewer_role = trim($invoice['reviewer_role'] ?? '');
 $approver_name = trim($invoice['approver_name'] ?? '');
 $approver_role = trim($invoice['approver_role'] ?? '');
-$creator_label = $creator_name ? $creator_name . ($creator_role ? ' (' . ucfirst($creator_role) . ')' : '') : 'Unknown';
+$creator_label = $creator_name ? applyCaseMode($creator_name) . ($creator_role ? ' (' . ucfirst($creator_role) . ')' : '') : 'Unknown';
 
 $wf_status = $invoice['status'] ?? 'pending';
 $inv_id_for_sig = $invoice['invoice_id'] ?? 0;
@@ -269,8 +269,8 @@ $accent = getSetting('print_template_color_inv_onyx', '#1c1c1c');
     <div class="panel-row">
         <div class="panel">
             <h3>Bill To</h3>
-            <p><strong><?= htmlspecialchars($invoice['customer_name']) ?></strong></p>
-            <?php if (!empty($invoice['company_name'])): ?><p><?= htmlspecialchars($invoice['company_name']) ?></p><?php endif; ?>
+            <p><strong><?= caseFormat($invoice['customer_name']) ?></strong></p>
+            <?php if (!empty($invoice['company_name'])): ?><p><?= caseFormat($invoice['company_name']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($invoice['c_postal_address']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_address'])): ?><p><?= htmlspecialchars($invoice['c_address']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_phone'])): ?><p><?= htmlspecialchars($invoice['c_phone']) ?></p><?php endif; ?>
@@ -289,7 +289,7 @@ $accent = getSetting('print_template_color_inv_onyx', '#1c1c1c');
             <?php if (!empty($invoice['payment_terms'])): ?><p><strong>Payment Terms:</strong> <?= htmlspecialchars(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></p><?php endif; ?>
             <?php if ($dn_ref): ?><p><strong>DN Ref:</strong> <?= htmlspecialchars($dn_ref) ?></p><?php endif; ?>
             <?php if ($lpo_ref): ?><p><strong>LPO Ref:</strong> <?= htmlspecialchars($lpo_ref) ?></p><?php endif; ?>
-            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($invoice['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= caseFormat($invoice['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Created By:</strong> <?= htmlspecialchars($creator_label) ?></p>
         </div>
     </div>
@@ -317,7 +317,7 @@ $accent = getSetting('print_template_color_inv_onyx', '#1c1c1c');
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
                 <td>
-                    <?= htmlspecialchars($item['product_name'] ?? 'Unknown Product') ?>
+                    <?= $item['product_name'] ? caseFormat($item['product_name']) : 'Unknown Product' ?>
                     <?php if (!empty($item['description'])): ?>
                     <br><small style="color:#6c757d; font-size:10px;"><?= htmlspecialchars($item['description']) ?></small>
                     <?php endif; ?>

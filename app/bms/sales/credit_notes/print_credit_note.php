@@ -193,7 +193,7 @@ $wf = [
             <p><strong>Credit Note #:</strong> <?= htmlspecialchars($cn['credit_note_number']) ?></p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($cn['credit_date'])) ?></p>
             <?php if (!empty($cn['return_number'])): ?><p><strong>Ref Return:</strong> <?= htmlspecialchars($cn['return_number']) ?></p><?php endif; ?>
-            <?php if (!empty($cn['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= htmlspecialchars($cn['warehouse_name']) ?></p><?php endif; ?>
+            <?php if (!empty($cn['warehouse_name'])): ?><p><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($cn['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($cn['status']) ?></p>
         </div>
     </div>
@@ -201,8 +201,8 @@ $wf = [
     <div class="details-grid">
         <div class="box">
             <h3>Credit To</h3>
-            <p><strong><?= htmlspecialchars($cn['customer_name']) ?></strong></p>
-            <?php if (!empty($cn['company_name'])): ?><p><?= htmlspecialchars($cn['company_name']) ?></p><?php endif; ?>
+            <p><strong><?= caseFormat($cn['customer_name']) ?></strong></p>
+            <?php if (!empty($cn['company_name'])): ?><p><?= caseFormat($cn['company_name']) ?></p><?php endif; ?>
             <?php if (!empty($cn['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($cn['c_postal_address']) ?></p><?php endif; ?>
             <?php if (!empty($cn['c_address'])): ?><p><?= htmlspecialchars($cn['c_address']) ?></p><?php endif; ?>
             <?php if (!empty($cn['c_phone'])): ?><p><?= htmlspecialchars($cn['c_phone']) ?></p><?php endif; ?>
@@ -214,7 +214,7 @@ $wf = [
         </div>
         <div class="box">
             <h3>Credit Note Information</h3>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_name ?: 'System') ?></p>
+            <p><strong>Prepared By:</strong> <?= caseFormat($creator_name ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
             <?php if (!empty($cn['reason'])): ?><p><strong>Reason:</strong> <?= htmlspecialchars($cn['reason']) ?></p><?php endif; ?>
         </div>
@@ -237,7 +237,7 @@ $wf = [
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($it['sku']) ? htmlspecialchars($it['sku']) : '—' ?></td>
-                <td><?= htmlspecialchars($it['description'] ?? 'Item') ?></td>
+                <td><?= caseFormat($it['description'] ?? 'Item') ?></td>
                 <td class="text-right"><?= rtrim(rtrim(number_format($it['quantity'], 2), '0'), '.') ?></td>
                 <td class="text-right"><?= number_format($it['unit_price'], 2) ?></td>
                 <td class="text-center"><?= ((float)$it['tax_rate'] == 18) ? '18%' : '—' ?></td>
