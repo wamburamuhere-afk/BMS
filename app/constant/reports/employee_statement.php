@@ -46,7 +46,7 @@ if ($preEmpId > 0) {
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Employee</label>
                     <?php if ($preEmpId > 0): ?>
                         <input type="hidden" id="f-employee" value="<?= $preEmpId ?>">
-                        <div class="form-control bg-light fw-bold"><?= safe_output($preEmpName) ?></div>
+                        <div class="form-control bg-light fw-bold"><?= caseFormat($preEmpName) ?></div>
                     <?php else: ?>
                         <select name="employee_id" id="f-employee" class="form-select" style="width:100%"></select>
                     <?php endif; ?>
@@ -198,7 +198,7 @@ $(function () {
                     return;
                 }
 
-                $('#doc-emp-name').text(res.employee.full_name || '—');
+                $('#doc-emp-name').text(res.employee.full_name ? applyCaseModeJs(res.employee.full_name) : '—');
                 const detail = [res.employee.employee_number, res.employee.department].filter(Boolean).join(' · ');
                 $('#doc-emp-detail').text(detail);
                 $('#doc-period').text('Period: ' + dt(res.date_from) + '  –  ' + dt(res.date_to));

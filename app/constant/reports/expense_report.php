@@ -87,7 +87,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value=""><?= t('All My Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
-                            <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                            <option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -98,7 +98,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
                         <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?>
-                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
+                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -316,8 +316,8 @@ $(function () {
                     i + 1,
                     r.expense_date ? new Date(r.expense_date).toLocaleDateString() : '',
                     esc(r.reference_number || ''),
-                    esc((POS_SIMPLE ? r.warehouse_name : r.expense_account_name) || PT.unclassified),
-                    esc(r.paid_to_name || '—'),
+                    ((v => v ? (POS_SIMPLE ? caseFormatJs(v) : esc(v)) : PT.unclassified)(POS_SIMPLE ? r.warehouse_name : r.expense_account_name)),
+                    r.paid_to_name ? caseFormatJs(r.paid_to_name) : '—',
                     esc(r.description || ''),
                     fmt(r.amount),
                     badge(r.status)

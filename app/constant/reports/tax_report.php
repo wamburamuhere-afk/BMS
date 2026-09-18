@@ -49,7 +49,7 @@ $currency  = get_setting('currency', 'TZS');
                 <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
-                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <?php endif; ?>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>

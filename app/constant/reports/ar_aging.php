@@ -57,7 +57,7 @@ $currency = get_setting('currency', 'TZS');
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?>
-                            <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                            <option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -243,7 +243,7 @@ $(function () {
         const top = customers.slice(0, 8);
         cCustomers = new Chart(document.getElementById('chartCustomers'), {
             type: 'bar',
-            data: { labels: top.map(c => c.customer_name),
+            data: { labels: top.map(c => applyCaseModeJs(c.customer_name)),
                     datasets: [{ label: 'Balance', data: top.map(c => +c.total), backgroundColor: BLUE }] },
             options: { ...baseOpts, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } }
         });
@@ -275,7 +275,7 @@ $(function () {
                 custTable.clear();
                 res.customers.forEach((c, i) => custTable.row.add([
                     i + 1,
-                    esc(c.customer_name),
+                    caseFormatJs(c.customer_name),
                     fmt(c.current), fmt(c.d1_30), fmt(c.d31_60), fmt(c.d61_90), fmt(c.over_90),
                     fmt(c.total),
                     `<a class="btn btn-sm btn-outline-primary" href="${STMT_URL}?customer_id=${c.customer_id}&date_to=${encodeURIComponent(params.as_of_date)}"><i class="bi bi-file-earmark-text me-1"></i>Statement</a>`
@@ -286,7 +286,7 @@ $(function () {
                 res.rows.forEach((r, i) => invTable.row.add([
                     i + 1,
                     esc(r.invoice_number),
-                    esc(r.customer_name),
+                    caseFormatJs(r.customer_name),
                     r.invoice_date ? new Date(r.invoice_date).toLocaleDateString() : '',
                     r.due_date ? new Date(r.due_date).toLocaleDateString() : '—',
                     r.days_overdue > 0 ? r.days_overdue : 0,

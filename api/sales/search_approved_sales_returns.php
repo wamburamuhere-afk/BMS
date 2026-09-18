@@ -50,7 +50,7 @@ try {
         $amt = number_format((float)($r['grand_total'] ?: $r['total_amount']), 2);
         $results[] = [
             'id'   => (int)$r['sales_return_id'],
-            'text' => $r['return_number'] . ' — ' . ($r['customer_name'] ?: 'Walk-in') . ' (TZS ' . $amt . ')',
+            'text' => $r['return_number'] . ' — ' . ($r['customer_name'] ? applyCaseMode($r['customer_name']) : 'Walk-in') . ' (TZS ' . $amt . ')',
         ];
     }
     echo json_encode(['results' => $results]);

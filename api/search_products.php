@@ -34,7 +34,7 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $label = $r['product_name'];
+        $label = applyCaseMode($r['product_name']);
         if (!empty($r['sku'])) $label .= ' (' . $r['sku'] . ')';
         $results[] = [
             'id'         => (int)$r['product_id'],

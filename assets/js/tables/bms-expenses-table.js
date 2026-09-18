@@ -86,7 +86,8 @@
             { key: 'paid_to', col: {
                 data: 'paid_to_name', width: '12%',
                 render: function (d, t, row) {
-                    var name = esc(d || row.vendor || cfg.i18n.na);
+                    var raw = d || row.vendor || cfg.i18n.na;
+                    var name = window.caseFormatJs ? window.caseFormatJs(raw) : esc(raw);
                     if (row.paid_to_type === 'supplier') {
                         return '<div><span class="badge bg-primary-soft text-primary border border-primary small mb-1">' + cfg.i18n.supplier + '</span><br><strong>' + name + '</strong></div>';
                     }
@@ -197,7 +198,7 @@
                     '<span class="text-danger fw-bold">' + money(d.amount) + '</span>' +
                     ((d.daily_category_total && parseFloat(d.daily_category_total) !== parseFloat(d.amount))
                         ? '<span class="text-muted ms-1" style="font-size:0.7rem">' + cfg.i18n.dayPrefix + ' ' + money(d.daily_category_total) + '</span>' : '') +
-                    ((showPaidTo && d.paid_to_name) ? '<span class="text-muted"><i class="bi bi-person"></i> ' + esc(d.paid_to_name) + '</span>' : '') +
+                    ((showPaidTo && d.paid_to_name) ? '<span class="text-muted"><i class="bi bi-person"></i> ' + (window.caseFormatJs ? window.caseFormatJs(d.paid_to_name) : esc(d.paid_to_name)) + '</span>' : '') +
                   '</div>' +
                 '</div>'
             );
@@ -233,7 +234,8 @@ function buildVoucher(cfg, id) {
         const fmtAmt   = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const voucherNo = 'PV-' + String(d.expense_id).padStart(5, '0');
         const date = d.expense_date ? new Date(d.expense_date.includes('T') ? d.expense_date : d.expense_date + 'T00:00:00').toLocaleDateString('en-US', { day:'2-digit', month:'long', year:'numeric' }) : '-';
-        const paidTo = d.paid_to_name || d.vendor || '-';
+        const paidToRaw = d.paid_to_name || d.vendor || '-';
+        const paidTo = window.applyCaseModeJs ? window.applyCaseModeJs(paidToRaw) : paidToRaw;
         const paidTypeLabel = d.paid_to_type === 'other' ? (d.payee_manual_role || d.paid_to_type) : d.paid_to_type;
         const printedBy = cfg.voucher.printedBy;
         const printedRole = cfg.voucher.printedRole;
@@ -333,7 +335,7 @@ function buildVoucher(cfg, id) {
 
         <!-- DETAILS TABLE -->
         <table class="pv-table">
-            <tr><td>${cfg.i18n.paidTo}</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${paidTypeLabel ? ' <span style="font-size:8pt;color:#888;">('+paidTypeLabel+')</span>' : ''}</td></tr>
+            <tr><td>${cfg.i18n.paidTo}</td><td><strong>${paidTo}</strong>${paidTypeLabel ? ' <span style="font-size:8pt;color:#888;">('+paidTypeLabel+')</span>' : ''}</td></tr>
             <tr><td>${cfg.i18n.description}</td><td>${d.description || '-'}</td></tr>
             <tr><td>${cfg.i18n.expenseAccount}</td><td>${d.expense_account_name ? ((d.expense_account_code ? d.expense_account_code + ' — ' : '') + d.expense_account_name) : '-'}</td></tr>
             <tr><td>${cfg.i18n.paidFromBank}</td><td>${d.bank_account_name ? ((d.bank_account_code ? d.bank_account_code + ' — ' : '') + d.bank_account_name) : '-'}</td></tr>

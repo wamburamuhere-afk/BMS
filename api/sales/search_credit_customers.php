@@ -48,8 +48,8 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $text = $r['customer_name'];
-        if (!empty($r['company_name'])) $text .= ' — ' . $r['company_name'];
+        $text = applyCaseMode($r['customer_name']);
+        if (!empty($r['company_name'])) $text .= ' — ' . applyCaseMode($r['company_name']);
         $results[] = ['id' => (int)$r['customer_id'], 'text' => $text];
     }
     echo json_encode(['results' => $results]);

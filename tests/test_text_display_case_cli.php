@@ -135,9 +135,9 @@ foreach (['as_typed', 'sentence', 'lower', 'upper', 'title', 'toggle'] as $mode)
 section('5. Invalid/unset setting values fall back safely');
 
 _tdc_run_php("require '$root/roots.php'; save_setting('text_display_case', 'literally_anything_else'); echo 'SET';");
-$fallbackCheck = _tdc_run_php("require '$root/roots.php'; echo textDisplayCaseMode() . '|' . applyCaseMode('John Mwangi');");
-eq($fallbackCheck, 'as_typed|John Mwangi', 'a garbage stored value falls back to as_typed cleanly (both textDisplayCaseMode() and applyCaseMode() with no explicit mode), never crashes or applies garbage');
-_tdc_run_php("require '$root/roots.php'; save_setting('text_display_case', 'as_typed'); echo 'RESET';");
+$fallbackCheck = _tdc_run_php("require '$root/roots.php'; echo textDisplayCaseMode() . '|' . applyCaseMode('john mwangi');");
+eq($fallbackCheck, 'title|John Mwangi', 'a garbage stored value falls back to title (Capitalize Each Word, the 2026-09-18 default) cleanly (both textDisplayCaseMode() and applyCaseMode() with no explicit mode), never crashes or applies garbage');
+_tdc_run_php("require '$root/roots.php'; save_setting('text_display_case', 'title'); echo 'RESET';");
 
 // ─────────────────────────────────────────────────────────────────────────
 section('6. System Settings page — save handler + rendered select');
@@ -205,20 +205,20 @@ if (!$uid) {
         echo 'SAVED';
     ");
     $garbageAttempt = _tdc_run_php("require '$root/roots.php'; echo get_setting('text_display_case', 'MISSING');");
-    (trim($garbageAttempt) === 'as_typed')
-        ? pass('a garbage/malicious posted value is rejected and falls back to as_typed, never saved verbatim')
+    (trim($garbageAttempt) === 'title')
+        ? pass('a garbage/malicious posted value is rejected and falls back to title (the default), never saved verbatim')
         : fail('garbage value was NOT rejected: ' . var_export($garbageAttempt, true));
 
-    // Reset to the neutral default so this test run leaves no side effect
-    // for other tests/sessions sharing this dev DB.
-    _tdc_run_php("require '$root/roots.php'; save_setting('text_display_case', 'as_typed'); echo 'RESET';");
+    // Reset to the default so this test run leaves no side effect for other
+    // tests/sessions sharing this dev DB.
+    _tdc_run_php("require '$root/roots.php'; save_setting('text_display_case', 'title'); echo 'RESET';");
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 section('7. Translation coverage (Swahili)');
 require_once "$root/core/i18n.php";
 loadLanguage('sw');
-foreach (['Text Display Case', 'As Typed (Default)', 'Sentence case', 'lowercase', 'UPPERCASE', 'Capitalize Each Word', 'Toggle Case', 'Preview:'] as $key) {
+foreach (['Text Display Case', 'As Typed', 'Sentence case', 'lowercase', 'UPPERCASE', 'Capitalize Each Word (Default)', 'Toggle Case', 'Preview:'] as $key) {
     $sw = t($key);
     ($sw !== $key && $sw !== '') ? pass("'$key' has a real Swahili translation ('$sw')") : fail("'$key' falls back to raw English under sw locale");
 }

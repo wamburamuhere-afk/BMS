@@ -166,7 +166,7 @@ if ($can_restock_product ?? false) {
                         <select class="form-select" id="restock_supplier_id" name="supplier_id">
                             <option value=""><?= t('— Not specified —') ?></option>
                             <?php foreach ($_pos_restock_suppliers as $_sup): ?>
-                            <option value="<?= $_sup['supplier_id'] ?>"><?= safe_output($_sup['supplier_name']) ?></option>
+                            <option value="<?= $_sup['supplier_id'] ?>"><?= caseFormat($_sup['supplier_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <small class="text-muted"><?= t('Optional — which supplier this batch was ordered from.') ?></small>

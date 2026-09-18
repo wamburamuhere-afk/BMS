@@ -36,7 +36,7 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $text = $r['customer_name'];
+        $text = applyCaseMode($r['customer_name']);
         $phone = $r['mobile'] ?: $r['phone'];
         if ($phone) $text .= ' — ' . $phone;
         $results[] = [
