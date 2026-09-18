@@ -449,7 +449,7 @@ $sr_status_badge = [
                         </div>
                     <?php endif; ?>
                     
-                    <h4 class="card-title mb-1"><?= safe_output(implode(' ', array_filter([$employee['first_name'], $employee['middle_name'] ?? '', $employee['last_name']]))) ?></h4>
+                    <h4 class="card-title mb-1"><?= caseFormat(implode(' ', array_filter([$employee['first_name'], $employee['middle_name'] ?? '', $employee['last_name']]))) ?></h4>
                     <p class="text-muted mb-2"><?= caseFormat($employee['designation_name']) ?></p>
                     <span class="badge bg-<?= $employee['employment_status'] === 'active' ? 'success' : 'secondary' ?> mb-3">
                         <?= ucfirst(str_replace('_', ' ', $employee['employment_status'])) ?>
@@ -511,7 +511,7 @@ $sr_status_badge = [
                                 <?= strtoupper(substr($dr['first_name'], 0, 1) . substr($dr['last_name'], 0, 1)) ?>
                             </div>
                             <a href="<?= getUrl('employee_details') ?>?id=<?= (int)$dr['employee_id'] ?>" class="text-decoration-none text-dark">
-                                <?= safe_output(trim($dr['first_name'] . ' ' . $dr['last_name'])) ?>
+                                <?= caseFormat(trim($dr['first_name'] . ' ' . $dr['last_name'])) ?>
                             </a>
                         </li>
                         <?php endforeach; ?>
@@ -1558,7 +1558,7 @@ $sr_status_badge = [
                 <div class="modal-dialog">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="bi bi-clock-history me-1"></i> Mark Attendance — <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
+                            <h5 class="modal-title"><i class="bi bi-clock-history me-1"></i> Mark Attendance — <?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form id="markEmpAttendanceForm" autocomplete="off">
@@ -1785,7 +1785,7 @@ $sr_status_badge = [
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Apply for Leave — <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
+                            <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Apply for Leave — <?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form id="applyEmpLeaveForm" autocomplete="off">
@@ -1838,7 +1838,7 @@ $sr_status_badge = [
                                         <select class="form-select select2-static" name="handover_to">
                                             <option value="">Select Colleague</option>
                                             <?php foreach ($handover_candidates as $hc): ?>
-                                            <option value="<?= (int)$hc['employee_id'] ?>"><?= safe_output($hc['first_name'] . ' ' . $hc['last_name']) ?></option>
+                                            <option value="<?= (int)$hc['employee_id'] ?>"><?= caseFormat($hc['first_name'] . ' ' . $hc['last_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
