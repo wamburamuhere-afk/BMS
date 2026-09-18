@@ -315,7 +315,7 @@ function supplier_status_label($status) {
                                 <select class="form-select select2-static" id="categoryFilter">
                                     <option value=""><?= t('All Categories') ?></option>
                                     <?php foreach ($categories as $category): ?>
-                                        <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
+                                        <option value="<?= $category['category_id'] ?>"><?= caseFormat($category['category_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -445,12 +445,12 @@ function supplier_status_label($status) {
                                     <span class="custom-code"><?= safe_output($supplier['supplier_code']) ?></span>
                                 </td>
                                 <td>
-                                    <strong><?= safe_output($supplier['supplier_name']) ?></strong>
+                                    <strong><?= caseFormat($supplier['supplier_name']) ?></strong>
                                 </td>
                                 <td>
                                     <div class="small text-muted" style="line-height: 1.2;">
                                         <?php if (!empty($supplier['contact_person'])): ?>
-                                        <span class="text-dark fw-bold"><?= safe_output($supplier['contact_person']) ?></span><br>
+                                        <span class="text-dark fw-bold"><?= caseFormat($supplier['contact_person']) ?></span><br>
                                         <?php endif; ?>
                                         <?php if (!empty($supplier['phone'])): ?>
                                         <i class="bi bi-telephone small"></i> <?= safe_output($supplier['phone']) ?>
@@ -463,12 +463,12 @@ function supplier_status_label($status) {
                                         <?php if (!empty($supplier['address'])): ?>
                                         <?= safe_output(substr($supplier['address'], 0, 40)) ?><br>
                                         <?php endif; ?>
-                                        <span class="fw-bold text-dark"><?= safe_output($supplier['city'] ?? '') ?></span>
+                                        <span class="fw-bold text-dark"><?= caseFormat($supplier['city'] ?? '') ?></span>
                                     </div>
                                 </td>
                                 <td>
                                     <?php if (!empty($supplier['category_name'])): ?>
-                                    <span class="badge bg-secondary"><?= safe_output($supplier['category_name']) ?></span>
+                                    <span class="badge bg-secondary"><?= caseFormat($supplier['category_name']) ?></span>
                                     <?php else: ?>
                                     <span class="badge bg-light text-dark"><?= t('No Category') ?></span>
                                     <?php endif; ?>
@@ -476,7 +476,7 @@ function supplier_status_label($status) {
                                 <td>
                                     <?php if (!empty($supplier['primary_project_name'])): ?>
                                     <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
-                                        <i class="bi bi-briefcase me-1"></i><?= safe_output($supplier['primary_project_name']) ?><?php if ($supplier['project_count'] > 0): ?> +<?= (int)$supplier['project_count'] ?><?php endif; ?>
+                                        <i class="bi bi-briefcase me-1"></i><?= caseFormat($supplier['primary_project_name']) ?><?php if ($supplier['project_count'] > 0): ?> +<?= (int)$supplier['project_count'] ?><?php endif; ?>
                                     </a>
                                     <?php elseif ($supplier['project_count'] > 0): ?>
                                     <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
@@ -559,7 +559,7 @@ function supplier_status_label($status) {
                     <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><?= safe_output($supplier['supplier_name']) ?></h6>
+                                <h6 class="mb-0"><?= caseFormat($supplier['supplier_name']) ?></h6>
                                 <span class="badge bg-<?= get_status_badge($supplier['status']) ?>">
                                     <?= supplier_status_label($supplier['status']) ?>
                                 </span>
@@ -568,10 +568,10 @@ function supplier_status_label($status) {
                                 <div class="mb-2">
                                     <small class="text-muted"><?= t('Code') ?>: <?= safe_output($supplier['supplier_code']) ?></small><br>
                                     <?php if (!empty($supplier['company_name'])): ?>
-                                    <strong><?= safe_output($supplier['company_name']) ?></strong><br>
+                                    <strong><?= caseFormat($supplier['company_name']) ?></strong><br>
                                     <?php endif; ?>
                                     <?php if (!empty($supplier['contact_person'])): ?>
-                                    <small><i class="bi bi-person"></i> <?= safe_output($supplier['contact_person']) ?></small><br>
+                                    <small><i class="bi bi-person"></i> <?= caseFormat($supplier['contact_person']) ?></small><br>
                                     <?php endif; ?>
                                 </div>
                                 
@@ -586,9 +586,9 @@ function supplier_status_label($status) {
                                 
                                 <div class="mb-2">
                                     <?php if (!empty($supplier['city'])): ?>
-                                    <small><i class="bi bi-geo-alt"></i> <?= safe_output($supplier['city']) ?></small>
+                                    <small><i class="bi bi-geo-alt"></i> <?= caseFormat($supplier['city']) ?></small>
                                     <?php if (!empty($supplier['country'])): ?>
-                                    , <small><?= safe_output($supplier['country']) ?></small>
+                                    , <small><?= caseFormat($supplier['country']) ?></small>
                                     <?php endif; ?>
                                     <?php endif; ?>
                                 </div>
@@ -596,7 +596,7 @@ function supplier_status_label($status) {
                                 <div class="mb-2">
                                     <?php if (!empty($supplier['primary_project_name'])): ?>
                                     <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
-                                        <i class="bi bi-briefcase me-1"></i><?= safe_output($supplier['primary_project_name']) ?><?php if ($supplier['project_count'] > 0): ?> +<?= (int)$supplier['project_count'] ?><?php endif; ?>
+                                        <i class="bi bi-briefcase me-1"></i><?= caseFormat($supplier['primary_project_name']) ?><?php if ($supplier['project_count'] > 0): ?> +<?= (int)$supplier['project_count'] ?><?php endif; ?>
                                     </a>
                                     <?php elseif ($supplier['project_count'] > 0): ?>
                                     <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">

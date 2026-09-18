@@ -427,7 +427,7 @@ global $company_logo, $company_name;
     <div class="d-none d-print-block text-center mb-4">
        
         <h4 class="fw-bold text-dark text-uppercase">PRODUCT DETAILS REPORT</h4>
-        <h5 class="text-muted"><?= safe_output($product['product_name']) ?><?= $simpleProductForm ? '' : ' (' . safe_output($product['sku']) . ')' ?></h5>
+        <h5 class="text-muted"><?= caseFormat($product['product_name']) ?><?= $simpleProductForm ? '' : ' (' . safe_output($product['sku']) . ')' ?></h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
 
@@ -436,7 +436,7 @@ global $company_logo, $company_name;
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= $product['is_service'] == 1 ? getUrl('services') : getUrl('products') ?>"><?= $product['is_service'] == 1 ? 'Services' : 'Products' ?></a></li>
-            <li class="breadcrumb-item active text-truncate" style="max-width: 150px;"><?= safe_output($product['product_name']) ?></li>
+            <li class="breadcrumb-item active text-truncate" style="max-width: 150px;"><?= caseFormat($product['product_name']) ?></li>
         </ol>
     </nav>
 
@@ -538,7 +538,7 @@ global $company_logo, $company_name;
                     <img src="<?= getUrl($product['image_url']) ?>" 
                          class="img-fluid rounded mb-3 product-view-image" 
                          style="max-height: 300px; object-fit: contain;"
-                         alt="<?= safe_output($product['product_name']) ?>">
+                         alt="<?= caseFormat($product['product_name']) ?>">
                     <?php else: ?>
                     <div class="d-flex align-items-center justify-content-center" 
                          style="height: 300px; background: #f8f9fa; border-radius: 0.375rem;">
@@ -566,7 +566,7 @@ global $company_logo, $company_name;
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col-md-6 border-end-md">
-                            <h3 class="text-dark fw-bold text-break mb-3"><?= safe_output($product['product_name']) ?></h3>
+                            <h3 class="text-dark fw-bold text-break mb-3"><?= caseFormat($product['product_name']) ?></h3>
                             
                             <div class="row g-2">
                                 <?php if (!$simpleProductForm): ?>
@@ -585,20 +585,20 @@ global $company_logo, $company_name;
                                 
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Category:</small> 
-                                    <span class="custom-badge mt-1"><?= !empty($product['category_name']) ? safe_output($product['category_name']) : 'Uncategorized' ?></span>
+                                    <span class="custom-badge mt-1"><?= !empty($product['category_name']) ? caseFormat($product['category_name']) : 'Uncategorized' ?></span>
                                 </div>
                                 
                                 <?php if (!empty($product['brand_name'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Brand:</small> 
-                                    <span class="custom-badge mt-1"><?= safe_output($product['brand_name']) ?></span>
+                                    <span class="custom-badge mt-1"><?= caseFormat($product['brand_name']) ?></span>
                                 </div>
                                 <?php endif; ?>
                                 
                                 <?php if (!empty($product['supplier_name'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Supplier:</small> 
-                                    <span class="custom-badge mt-1"><?= safe_output($product['supplier_name']) ?></span>
+                                    <span class="custom-badge mt-1"><?= caseFormat($product['supplier_name']) ?></span>
                                 </div>
                                 <?php endif; ?>
                                 
@@ -662,18 +662,18 @@ global $company_logo, $company_name;
                     <?php if (!empty($product['description']) && !$simpleProductForm): ?>
                     <div class="mt-3">
                         <strong>Description:</strong>
-                        <p class="mt-1"><?= nl2br(safe_output($product['description'])) ?></p>
+                        <p class="mt-1"><?= nl2br(caseFormat($product['description'])) ?></p>
                     </div>
                     <?php endif; ?>
                     
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <small class="text-muted">Created:</small>
-                            <p><?= format_date($product['created_at'], 'd M Y, h:i A') ?> by <?= safe_output($product['created_by_name']) ?></p>
+                            <p><?= format_date($product['created_at'], 'd M Y, h:i A') ?> by <?= caseFormat($product['created_by_name']) ?></p>
                         </div>
                         <div class="col-md-6">
                             <small class="text-muted">Last Updated:</small>
-                            <p><?= format_date($product['updated_at'], 'd M Y, h:i A') ?> by <?= safe_output($product['updated_by_name']) ?></p>
+                            <p><?= format_date($product['updated_at'], 'd M Y, h:i A') ?> by <?= caseFormat($product['updated_by_name']) ?></p>
                         </div>
                     </div>
                 </div>
@@ -1282,18 +1282,18 @@ global $company_logo, $company_name;
                                             <div class="row">
                                                 <div class="col-6">
                                                     <small class="text-muted">Created By:</small>
-                                                    <p><?= safe_output($product['created_by_name']) ?></p>
+                                                    <p><?= caseFormat($product['created_by_name']) ?></p>
                                                 </div>
                                                 <div class="col-6">
                                                     <small class="text-muted">Updated By:</small>
-                                                    <p><?= safe_output($product['updated_by_name']) ?></p>
+                                                    <p><?= caseFormat($product['updated_by_name']) ?></p>
                                                 </div>
                                             </div>
                                             <?php if (!empty($product['notes'])): ?>
                                             <div class="mt-3">
                                                 <strong>Internal Notes:</strong>
                                                 <div class="border rounded p-2 mt-1 bg-light">
-                                                    <?= nl2br(safe_output($product['notes'])) ?>
+                                                    <?= nl2br(caseFormat($product['notes'])) ?>
                                                 </div>
                                             </div>
                                             <?php endif; ?>

@@ -61,7 +61,7 @@ try {
                             <tbody>
                                 <?php foreach ($brands as $brand): ?>
                                     <tr>
-                                        <td><strong><?= htmlspecialchars($brand['brand_name']) ?></strong></td>
+                                        <td><strong><?= caseFormat($brand['brand_name']) ?></strong></td>
                                         <td><small class="text-muted"><?= htmlspecialchars($brand['website'] ?? 'N/A') ?></small></td>
                                         <td>
                                             <span class="badge bg-<?= $brand['status'] == 'active' ? 'success' : 'danger' ?>">

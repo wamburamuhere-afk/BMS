@@ -223,10 +223,10 @@ try {
         
         $data_rows[] = [
             $emp['employee_number'],
-            safe_output($emp['first_name'] . ' ' . $emp['last_name']),
-            safe_output($emp['department_name'] ?? '-'),
-            safe_output($emp['designation_name'] ?? '-'),
-            safe_output($emp['project_name'] ?? 'General'),
+            caseFormat($emp['first_name'] . ' ' . $emp['last_name']),
+            !empty($emp['department_name']) ? caseFormat($emp['department_name']) : '-',
+            !empty($emp['designation_name']) ? caseFormat($emp['designation_name']) : '-',
+            !empty($emp['project_name']) ? caseFormat($emp['project_name']) : 'General',
             $statusHtml,
             $emp['total_attendance'],
             $emp['total_leaves'],

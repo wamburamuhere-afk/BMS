@@ -850,8 +850,8 @@ function get_quick_actions($product) {
                                             <?php endif; ?>
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark"><?= safe_output($product['product_name']) ?></div>
-                                            <small class="text-muted"><?= safe_output($product['brand_name'] ?? t('No Brand')) ?></small>
+                                            <div class="fw-bold text-dark"><?= caseFormat($product['product_name']) ?></div>
+                                            <small class="text-muted"><?= !empty($product['brand_name']) ? caseFormat($product['brand_name']) : t('No Brand') ?></small>
                                         </div>
                                     </div>
                                 </td>
@@ -862,7 +862,7 @@ function get_quick_actions($product) {
                                 <?php endif; ?>
                                 <td>
                                     <?php if (!empty($product['category_name'])): ?>
-                                    <span class="badge bg-light text-dark border"><?= safe_output($product['category_name']) ?></span>
+                                    <span class="badge bg-light text-dark border"><?= caseFormat($product['category_name']) ?></span>
                                     <?php else: ?>
                                     <span class="text-muted small"><?= t('No Category') ?></span>
                                     <?php endif; ?>
@@ -1036,8 +1036,8 @@ function get_quick_actions($product) {
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div class="flex-grow-1 overflow-hidden">
-                                    <h6 class="fw-bold mb-0 text-truncate" title="<?= safe_output($product['product_name']) ?>"><?= safe_output($product['product_name']) ?></h6>
-                                    <small class="text-muted d-block text-truncate"><?= safe_output($product['category_name'] ?? t('General')) ?></small>
+                                    <h6 class="fw-bold mb-0 text-truncate" title="<?= caseFormat($product['product_name']) ?>"><?= caseFormat($product['product_name']) ?></h6>
+                                    <small class="text-muted d-block text-truncate"><?= !empty($product['category_name']) ? caseFormat($product['category_name']) : t('General') ?></small>
                                 </div>
                                 <div class="text-end ms-2">
                                     <div class="fw-bold text-primary small"><?= format_currency($product['selling_price']) ?></div>

@@ -275,7 +275,7 @@ $company_logo = getSetting('company_logo', '');
                     <li class="breadcrumb-item"><a href="<?= $back_url ?>">
                         <?= $from_project ? 'Project' : 'Services' ?>
                     </a></li>
-                    <li class="breadcrumb-item active text-truncate" style="max-width: 150px;" aria-current="page"><?= htmlspecialchars($svc['product_name']) ?></li>
+                    <li class="breadcrumb-item active text-truncate" style="max-width: 150px;" aria-current="page"><?= caseFormat($svc['product_name']) ?></li>
                 </ol>
             </nav>
         </div>
@@ -293,7 +293,7 @@ $company_logo = getSetting('company_logo', '');
     <div class="text-center mb-4 report-header d-none d-print-block">
         
         <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;">NON-INVENTORY PRODUCT DETAILS</h3>
-        <h5 class="text-dark fw-bold mb-1" style="word-break:break-word;overflow-wrap:anywhere;max-width:100%;"><?= htmlspecialchars($svc['product_name']) ?></h5>
+        <h5 class="text-dark fw-bold mb-1" style="word-break:break-word;overflow-wrap:anywhere;max-width:100%;"><?= caseFormat($svc['product_name']) ?></h5>
         <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
     </div>
 
@@ -308,7 +308,7 @@ $company_logo = getSetting('company_logo', '');
                             <i class="bi bi-gear-wide-connected fs-3 text-primary"></i>
                         </div>
                         <div style="min-width:0;">
-                            <h3 class="fw-bold mb-0 text-dark" style="word-break:break-word;overflow-wrap:anywhere;"><?= htmlspecialchars($svc['product_name']) ?></h3>
+                            <h3 class="fw-bold mb-0 text-dark" style="word-break:break-word;overflow-wrap:anywhere;"><?= caseFormat($svc['product_name']) ?></h3>
                             <span class="badge bg-light text-primary border border-primary border-opacity-25 mt-1">SKU: <?= htmlspecialchars($svc['sku'] ?: 'N/A') ?></span>
                         </div>
                     </div>
@@ -357,7 +357,7 @@ $company_logo = getSetting('company_logo', '');
                                 <span class="spec-label">Tax Rate</span>
                                 <span class="spec-value">
                                     <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="font-size: 0.65rem;">
-                                        <?= htmlspecialchars($svc['tax_name'] ?: 'No Tax') ?> 
+                                        <?= !empty($svc['tax_name']) ? caseFormat($svc['tax_name']) : 'No Tax' ?>
                                         <?= $svc['tax_rate_percentage'] ? '('.$svc['tax_rate_percentage'].'%)' : '' ?>
                                     </span>
                                 </span>
@@ -365,7 +365,7 @@ $company_logo = getSetting('company_logo', '');
                             <div class="mt-2">
                                 <label class="spec-label d-block mb-1">Description</label>
                                 <div class="bg-white p-2 rounded border small text-dark" style="min-height: 50px;">
-                                    <?= nl2br(htmlspecialchars($svc['description'] ?: 'No description.')) ?>
+                                    <?= !empty($svc['description']) ? nl2br(caseFormat($svc['description'])) : 'No description.' ?>
                                 </div>
                             </div>
                         </div>

@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $safe_name = htmlspecialchars($warehouse_name, ENT_QUOTES, 'UTF-8');
+                $safe_name = caseFormat($warehouse_name);
                 if ($visible_to_creator) {
                     $_SESSION['success'] = [isShopLabel() ? 'Shop added successfully!' : 'Warehouse added successfully!'];
                 } else {
@@ -1027,20 +1027,20 @@ function get_primary_badge($is_primary) {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <strong><?= htmlspecialchars($warehouse['warehouse_name'] ?? '') ?></strong>
+                                        <strong><?= caseFormat($warehouse['warehouse_name'] ?? '') ?></strong>
                                     </td>
                                     <td>
                                         <?php if (!empty($warehouse['location'])): ?>
-                                            <i class="bi bi-geo-alt text-primary"></i> <?= htmlspecialchars($warehouse['location'] ?? '') ?>
+                                            <i class="bi bi-geo-alt text-primary"></i> <?= caseFormat($warehouse['location'] ?? '') ?>
                                         <?php else: ?>
                                             <span class="text-muted fst-italic"><?= t('No location') ?></span>
                                         <?php endif; ?>
                                         <?php if (!empty($warehouse['address'])): ?>
-                                            <br><small class="text-muted"><?= htmlspecialchars(substr($warehouse['address'] ?? '', 0, 50)) ?><?= strlen($warehouse['address'] ?? '') > 50 ? '...' : '' ?></small>
+                                            <br><small class="text-muted"><?= caseFormat(substr($warehouse['address'] ?? '', 0, 50)) ?><?= strlen($warehouse['address'] ?? '') > 50 ? '...' : '' ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <div class="fw-bold"><?= htmlspecialchars($warehouse['contact_person'] ?? t('N/A')) ?></div>
+                                        <div class="fw-bold"><?= !empty($warehouse['contact_person']) ? caseFormat($warehouse['contact_person']) : t('N/A') ?></div>
                                         <small class="text-muted"><?= htmlspecialchars($warehouse['phone'] ?? '-') ?></small>
                                     </td>
                                     <td class="text-center">

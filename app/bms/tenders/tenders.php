@@ -1058,13 +1058,16 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
             },
             {
                 data: null,
-                render: (d, t, row) => `<span class="entity-text" title="${safeOutput(row.entity_name || row.procuring_entity_name)}">${safeOutput(row.entity_name || row.procuring_entity_name)}</span>`
+                render: (d, t, row) => `<span class="entity-text" title="${caseFormatJs(row.entity_name || row.procuring_entity_name)}">${caseFormatJs(row.entity_name || row.procuring_entity_name)}</span>`
             },
             {
                 data: 'acronym', className: 'd-none d-md-table-cell',
                 render: d => `<span class="badge bg-light text-dark border fw-bold">${safeOutput(d || '-')}</span>`
             },
-            { data: 'tender_category', className: 'd-none d-md-table-cell' },
+            {
+                data: 'tender_category', className: 'd-none d-md-table-cell',
+                render: d => caseFormatJs(d || '')
+            },
             {
                 data: 'submission_deadline', className: 'deadline-cell',
                 render: d => d ? new Date(d).toLocaleDateString() : '-'

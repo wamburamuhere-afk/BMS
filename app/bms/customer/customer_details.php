@@ -77,11 +77,15 @@ $fin_order_count = count($customer_orders);
 $isCompany = ($customer['customer_type'] === 'business');
 
 // Format names
+// applyCaseMode() (transform only, no escaping) — not caseFormat() — because
+// every use site below already wraps these in safe_output() itself; using
+// caseFormat() here would escape twice (e.g. "Tom & Jerry" -> "Tom &amp;
+// Jerry" -> re-escaped to "Tom &amp;amp; Jerry").
 if ($isCompany && !empty($customer['company_name'])) {
-    $customer_name = safe_output($customer['company_name']);
-    $representative_name = safe_output($customer['customer_name']); 
+    $customer_name = applyCaseMode($customer['company_name']);
+    $representative_name = applyCaseMode($customer['customer_name']);
 } else {
-    $customer_name = safe_output($customer['customer_name']);
+    $customer_name = applyCaseMode($customer['customer_name']);
 }
 
 // Check for business attachments (company only)
@@ -519,7 +523,7 @@ global $company_name, $company_logo;
                         </tr>
                         <tr>
                             <td><strong>Category:</strong></td>
-                            <td><?= !empty($customer['category_name']) ? safe_output($customer['category_name']) : 'Uncategorized' ?></td>
+                            <td><?= !empty($customer['category_name']) ? caseFormat($customer['category_name']) : 'Uncategorized' ?></td>
                         </tr>
                         <tr>
                             <td><strong>Year:</strong></td>
@@ -676,7 +680,7 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Full Name') ?></label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['customer_name']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['customer_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Phone') ?></label>
@@ -693,7 +697,7 @@ global $company_name, $company_logo;
                         <?php if (!empty($customer['notes'])): ?>
                         <div class="col-12 mb-0">
                             <label class="form-label text-muted small mb-1"><?= t('Notes') ?></label>
-                            <p class="mb-0"><?= nl2br(safe_output($customer['notes'])) ?></p>
+                            <p class="mb-0"><?= nl2br(caseFormat($customer['notes'])) ?></p>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -711,7 +715,7 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Company Name</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['company_name']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['company_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Company Email</label>
@@ -765,7 +769,7 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Full Name</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['customer_name']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['customer_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Phone</label>
@@ -774,7 +778,7 @@ global $company_name, $company_logo;
                         <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Title</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['contact_title']) ? safe_output($customer['contact_title']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['contact_title']) ? caseFormat($customer['contact_title']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Contact Email</label>
@@ -793,7 +797,7 @@ global $company_name, $company_logo;
                             <p class="mb-0 fw-semibold fs-7">
                                 <?php if (!empty($customer['linked_project_name'])): ?>
                                     <span class="badge bg-primary-soft text-primary border border-primary">
-                                        <i class="bi bi-diagram-3 me-1"></i> <?= safe_output($customer['linked_project_name']) ?>
+                                        <i class="bi bi-diagram-3 me-1"></i> <?= caseFormat($customer['linked_project_name']) ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="text-muted">General / No Project</span>
@@ -812,7 +816,7 @@ global $company_name, $company_logo;
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-journal-text"></i> Additional Notes</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0"><?= nl2br(safe_output($customer['notes'])) ?></p>
+                    <p class="mb-0"><?= nl2br(caseFormat($customer['notes'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -827,27 +831,27 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-12 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Postal Address</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['address']) ? safe_output($customer['address']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['address']) ? caseFormat($customer['address']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">District</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['city']) ? safe_output($customer['city']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['city']) ? caseFormat($customer['city']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">State/Region</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['state']) ? safe_output($customer['state']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['state']) ? caseFormat($customer['state']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">Ward</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['ward']) ? safe_output($customer['ward']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['ward']) ? caseFormat($customer['ward']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">Street/Village</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['village']) ? safe_output($customer['village']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['village']) ? caseFormat($customer['village']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">Country</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['country']) ? safe_output($customer['country']) : 'Tanzania' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['country']) ? caseFormat($customer['country']) : 'Tanzania' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">Postal Code</label>
@@ -882,7 +886,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Bank Name</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_name']) ? safe_output($customer['bank_name']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_name']) ? caseFormat($customer['bank_name']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Bank Account</label>
@@ -890,7 +894,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-12 mb-3">
                             <label class="form-label text-muted small mb-1">Bank Address</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_address']) ? nl2br(safe_output($customer['bank_address'])) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_address']) ? nl2br(caseFormat($customer['bank_address'])) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <?php endif; ?>
                     </div>

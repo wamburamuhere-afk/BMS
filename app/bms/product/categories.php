@@ -102,7 +102,7 @@ $category_tree = get_category_tree($all_categories);
                                         <td class="ps-4">
                                             <?= str_repeat('<span class="ms-3"></span>', $cat['depth']) ?>
                                             <?php if ($cat['depth'] > 0): ?><i class="bi bi-arrow-return-right text-muted me-1"></i><?php endif; ?>
-                                            <strong><?= htmlspecialchars($cat['category_name']) ?></strong>
+                                            <strong><?= caseFormat($cat['category_name']) ?></strong>
                                         </td>
                                         <td><small class="text-muted"><?= $cat['description'] ? htmlspecialchars($cat['description']) : t('N/A') ?></small></td>
                                         <td>
@@ -195,7 +195,7 @@ $category_tree = get_category_tree($all_categories);
                             <option value="0"><?= t('None (Top Level)') ?></option>
                             <?php foreach ($category_tree as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>">
-                                    <?= str_repeat('&nbsp;&nbsp;', $cat['depth']) ?> <?= htmlspecialchars($cat['category_name']) ?>
+                                    <?= str_repeat('&nbsp;&nbsp;', $cat['depth']) ?> <?= caseFormat($cat['category_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

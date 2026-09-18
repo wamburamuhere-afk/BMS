@@ -530,10 +530,14 @@ $(document).ready(function() {
                 responsivePriority: 1,
                 render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
             },
-            { 
+            {
                 data: 'project_name',
                 responsivePriority: 1,
-                render: (data, t, row) => `<strong>${data}</strong><br><small class="text-muted text-uppercase" style="font-size:0.65rem">Manager: ${row.project_manager || 'N/A'}</small>`
+                // caseFormatJs() also fixes a pre-existing gap here: project_name/
+                // project_manager were interpolated completely unescaped before —
+                // caseFormatJs() escapes (same as safeOutput()) in addition to
+                // applying the case transform.
+                render: (data, t, row) => `<strong>${caseFormatJs(data)}</strong><br><small class="text-muted text-uppercase" style="font-size:0.65rem">Manager: ${row.project_manager ? caseFormatJs(row.project_manager) : 'N/A'}</small>`
             },
             { 
                 data: 'deadline',
@@ -969,8 +973,8 @@ function renderProjectCards() {
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
-                                <div class="fw-bold" style="font-size:0.9rem">${row.project_name}</div>
-                                <small class="text-muted">${row.project_manager || 'No Manager'}</small>
+                                <div class="fw-bold" style="font-size:0.9rem">${caseFormatJs(row.project_name)}</div>
+                                <small class="text-muted">${row.project_manager ? caseFormatJs(row.project_manager) : 'No Manager'}</small>
                             </div>
                             <span class="badge ${statusCls} text-uppercase" style="font-size:0.65rem">${(row.status||'').replace('_',' ')}</span>
                         </div>

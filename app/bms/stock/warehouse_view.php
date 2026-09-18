@@ -124,7 +124,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
     <div class="d-none d-print-block text-center mb-4">
 
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">WAREHOUSE INVENTORY REPORT</h2>
-        <h5 class="text-muted"><?= htmlspecialchars($warehouse['warehouse_name']) ?> (<?= htmlspecialchars($warehouse['warehouse_code']) ?>)</h5>
+        <h5 class="text-muted"><?= caseFormat($warehouse['warehouse_name']) ?> (<?= htmlspecialchars($warehouse['warehouse_code']) ?>)</h5>
         <?php if (!empty($project_name)): ?>
         <p class="mb-0" style="font-size: 11pt; font-weight: 700;">Project: <?= htmlspecialchars($project_name) ?></p>
         <?php endif; ?>
@@ -145,12 +145,12 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <?php else: ?>
                         <li class="breadcrumb-item"><a href="warehouses.php"><?= wLabel('Warehouses', 'Shops') ?></a></li>
                     <?php endif; ?>
-                    <li class="breadcrumb-item active"><?= htmlspecialchars($warehouse['warehouse_name']) ?></li>
+                    <li class="breadcrumb-item active"><?= caseFormat($warehouse['warehouse_name']) ?></li>
                 </ol>
             </nav>
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="fw-bold"><i class="bi bi-house-door text-success"></i> <?= htmlspecialchars($warehouse['warehouse_name'] ?? '') ?></h2>
+                    <h2 class="fw-bold"><i class="bi bi-house-door text-success"></i> <?= caseFormat($warehouse['warehouse_name'] ?? '') ?></h2>
                     <p class="text-muted mb-0">Code: <span class="badge bg-light text-dark"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></span></p>
                 </div>
                 <div class="d-flex gap-2">
@@ -287,15 +287,15 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                         </li>
                         <li class="list-group-item px-0">
                             <span class="text-muted d-block mb-1">Location</span>
-                            <strong><i class="bi bi-geo-alt"></i> <?= htmlspecialchars($warehouse['location'] ?: 'Not specified') ?></strong>
+                            <strong><i class="bi bi-geo-alt"></i> <?= !empty($warehouse['location']) ? caseFormat($warehouse['location']) : 'Not specified' ?></strong>
                         </li>
                         <li class="list-group-item px-0">
                             <span class="text-muted d-block mb-1">Full Address</span>
-                            <span><?= nl2br(htmlspecialchars($warehouse['address'] ?: 'No address provided')) ?></span>
+                            <span><?= !empty($warehouse['address']) ? nl2br(caseFormat($warehouse['address'])) : 'No address provided' ?></span>
                         </li>
                         <li class="list-group-item px-0">
                             <span class="text-muted d-block mb-1">Contact Person</span>
-                            <strong><?= htmlspecialchars($warehouse['contact_person'] ?: 'N/A') ?></strong>
+                            <strong><?= !empty($warehouse['contact_person']) ? caseFormat($warehouse['contact_person']) : 'N/A' ?></strong>
                         </li>
                         <li class="list-group-item px-0 d-flex justify-content-between">
                             <span class="text-muted">Phone</span>
@@ -308,7 +308,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     </ul>
                 </div>
                 <div class="card-footer bg-light">
-                    <small class="text-muted">Created by: <?= htmlspecialchars($warehouse['creator_name'] ?: 'System') ?> (<?= date('M d, Y', strtotime($warehouse['created_at'])) ?>)</small>
+                    <small class="text-muted">Created by: <?= !empty($warehouse['creator_name']) ? caseFormat($warehouse['creator_name']) : 'System' ?> (<?= date('M d, Y', strtotime($warehouse['created_at'])) ?>)</small>
                 </div>
             </div>
 
