@@ -1037,7 +1037,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
                         
-                        <!-- Inventory -->
+                        <!-- Inventory / Shop -->
+                        <?php if(posSimpleModeEnabled()): ?>
+                        <!-- Simple POS: "Shop" links directly to warehouses — no dropdown,
+                             no products/services/categories (those are accessible via core). -->
+                        <?php if(canView('warehouses')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('warehouses') ?>">
+                                <i class="bi bi-house-door"></i> <?= wLabel('Inventory', 'Shop') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php else: ?>
                         <?php if(canView('products') || canView('warehouses')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -1052,21 +1063,22 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('categories')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Categories') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('stock_adjustments') && !posSimpleModeEnabled()): ?>
+                                <?php if(canView('stock_adjustments')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('stock_adjustments') ?>"><i class="bi bi-arrow-left-right"></i> <?= t('Adjustments') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('inventory_valuation') && !posSimpleModeEnabled()): ?>
+                                <?php if(canView('inventory_valuation')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('inventory_valuation') ?>"><i class="bi bi-calculator"></i> <?= t('Valuation') ?></a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header"><?= wLabel('Warehouse', 'Shop') ?></h6></li>
                                 <?php if(canView('warehouses')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i> <?= wLabel('Warehouses', 'Shops') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('locations') && !posSimpleModeEnabled()): ?>
+                                <?php if(canView('locations')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('locations') ?>"><i class="bi bi-geo-alt"></i> <?= t('Locations') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
+                        <?php endif; ?>
                         <?php endif; ?>
 
                         <!-- Purchases -->
