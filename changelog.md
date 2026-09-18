@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-18 (fix/subcontractor-and-expense-hr-gating) - Sub-Contractors nav leak fixed; Expenses "Paid To: Staff" hidden when HR is off
+
+**Request:** live-site bug reports on a Simple POS tenant with Procurement off and the Supplier Access toggle on — "Sub-Contractors" showed under the "Core" nav even though every other Procurement page stayed hidden; separately, Expenses' "Paid To" dropdown always offered "Staff (Employee)" even for a tenant with the whole HR module switched off by the superadmin.
+
+**Sub-Contractors:** `sub_contractors.php` and its nav link (`header.php`) both gated on `canView('suppliers')` alone — the Supplier Access toggle (2026-09-17) deliberately makes that true for Simple POS tenants without Procurement, which unintentionally opened this link too. `core/feature_registry.php` already documents that Sub-Contractors is owned by the **Projects** feature, not Procurement or the supplier-access bypass (moved there in an earlier fix, precisely to avoid this class of bug) — the router already 404'd the destination, so the only real gap was the nav link and the pages' own permission checks not matching. Fixed by requiring `tenantFeatureEnabled('projects')` in addition to `canView('suppliers')` in all three places: `header.php`'s nav `<li>`, `sub_contractors.php`'s `$can_view_sc`, and a new explicit check in `sub_contractor_details.php` (which previously relied solely on `autoEnforcePermission('suppliers')`).
+
+**Expenses "Paid To":** `app/constant/accounts/expenses.php` queried `employees` and rendered the "Staff (Employee)" option unconditionally, with no `tenantFeatureEnabled('hr')` check anywhere — unlike every other module-gated field on the same form. Fixed: the employees query is now skipped entirely when HR is off, and the "Staff" option is dropped from both Paid-To renderings (Simple POS and normal mode).
+
+**Tested:** new `tests/test_sub_contractors_projects_gate_and_expense_hr_gate_cli.php` (19/19) — lint, source wiring, and live in-process page renders (via a fresh-subprocess-per-scenario technique, since `$GLOBALS['__bms_features']` must be overridden *after* `roots.php`'s own bootstrap runs — `bmsConnectPdo()` resets it unconditionally in this single-tenant local setup) proving both the "on" and "off" states render correctly for all four touched files. No regressions: `test_expenses_simple_pos_cli.php`, `test_expense_report_shop_filter_cli.php`, `test_simple_pos_expense_bugs_cli.php`, `test_sub_contractor_project_link_cli.php` all re-run clean (two pre-existing, unrelated failures in the first two confirmed present even with these changes fully reverted).
+
 ## 2026-09-18 (products, Simple POS follow-up) - "Add New Product" now opens the same way everywhere, plus a real Low Stock Alert field
 
 **Request:** "once i click 'add product' from quick button available in dashboard.php page and once i click 'add new product' as button available here in products.php it seems like they are not opened in the same way... i need also add one field as 'low stock' so as to get notification just put it to be available... all of this changes is if and only if for simple pos."
