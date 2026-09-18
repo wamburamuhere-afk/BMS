@@ -97,9 +97,9 @@ foreach ($shifts as $s) {
                 <tr>
                     <td class="text-center"><?= $sno ?></td>
                     <td><?= safe_output($s['shift_code']) ?></td>
-                    <td><?= safe_output($s['register_name'], '—') ?></td>
-                    <td><?= safe_output($s['warehouse_name'], '—') ?></td>
-                    <?php if ($can_view_all): ?><td><?= safe_output($s['cashier_name']) ?></td><?php endif; ?>
+                    <td><?= caseFormat($s['register_name'], '—') ?></td>
+                    <td><?= caseFormat($s['warehouse_name'], '—') ?></td>
+                    <?php if ($can_view_all): ?><td><?= caseFormat($s['cashier_name']) ?></td><?php endif; ?>
                     <td><?= date('d/m/Y H:i', strtotime($s['start_time'])) ?></td>
                     <td><?= $s['end_time'] ? date('d/m/Y H:i', strtotime($s['end_time'])) : '—' ?></td>
                     <td class="text-end"><?= number_format((float)$s['total_sales'], 2) ?></td>
@@ -120,8 +120,8 @@ foreach ($shifts as $s) {
                                     <button type="button" class="dropdown-item py-2 rounded text-danger force-close-btn"
                                             data-shift-id="<?= (int)$s['shift_id'] ?>"
                                             data-shift-code="<?= htmlspecialchars($s['shift_code'], ENT_QUOTES) ?>"
-                                            data-cashier="<?= htmlspecialchars($s['cashier_name'] ?? t('Unknown'), ENT_QUOTES) ?>"
-                                            data-register="<?= htmlspecialchars($s['register_name'] ?? '—', ENT_QUOTES) ?>">
+                                            data-cashier="<?= $s['cashier_name'] ? caseFormat($s['cashier_name']) : t('Unknown') ?>"
+                                            data-register="<?= $s['register_name'] ? caseFormat($s['register_name']) : '—' ?>">
                                         <i class="bi bi-lock text-danger me-2"></i> <?= t('Force Close') ?>
                                     </button>
                                 </li>
@@ -165,7 +165,7 @@ function renderShiftCards(rows) {
     rows.forEach(r => {
         html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
             <div class="d-flex justify-content-between"><span class="fw-bold">${r.code}</span><span class="badge bg-${r.status === 'active' ? 'success' : 'secondary'}">${r.status}</span></div>
-            <small class="text-muted">${r.register || '—'}${r.warehouse ? ' · ' + r.warehouse : ''} · ${r.opened}</small>
+            <small class="text-muted">${r.register ? caseFormatJs(r.register) : '—'}${r.warehouse ? ' · ' + caseFormatJs(r.warehouse) : ''} · ${r.opened}</small>
             <div class="mt-2 small">${T_TOTAL_LABEL} ${r.total} ${r.diff ? '· ' + T_DIFF_LABEL + ' ' + r.diff : ''}</div>
             <a href="${r.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-file-earmark-text"></i> ${T_ZREPORT_LABEL}</a>
         </div></div></div>`;

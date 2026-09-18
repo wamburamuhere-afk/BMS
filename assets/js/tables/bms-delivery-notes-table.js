@@ -74,15 +74,15 @@
                 render: function (data, type, row) {
                     var kindLabels = { subcontractor: 'Sub-Contractor', customer: 'Customer' };
                     var kind = '<small class="badge bg-light text-dark border">' + (kindLabels[row.party_type] || 'Supplier') + '</small>';
-                    return '<span class="fw-bold">' + esc(data) + '</span> ' + kind +
-                           (row.company_name ? '<br><small class="text-muted">' + esc(row.company_name) + '</small>' : '');
+                    return '<span class="fw-bold">' + window.caseFormatJs(data) + '</span> ' + kind +
+                           (row.company_name ? '<br><small class="text-muted">' + window.caseFormatJs(row.company_name) + '</small>' : '');
                 }
             }},
             { key: 'project', col: {
                 data: 'project_name',
                 render: function (data) {
                     return data
-                        ? '<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 dn-project-badge" style="white-space: normal; word-break: break-word;">' + esc(data) + '</span>'
+                        ? '<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 dn-project-badge" style="white-space: normal; word-break: break-word;">' + window.caseFormatJs(data) + '</span>'
                         : '<span class="text-muted small">N/A</span>';
                 }
             }},
@@ -173,14 +173,14 @@
                       '<div class="d-flex justify-content-between align-items-start mb-3"><div>' +
                         '<code class="small d-block mb-1">' + esc(row.dn_number || row.delivery_number || 'No DN #') + '</code>' +
                         '<div class="mb-1">' + typeBadge(row.dn_type) + '</div>' +
-                        (showParty ? '<h6 class="fw-bold mb-0">' + esc(row.supplier_name) + '</h6><small class="text-muted">' + esc(row.company_name || '') + '</small>' : '') +
+                        (showParty ? '<h6 class="fw-bold mb-0">' + window.caseFormatJs(row.supplier_name) + '</h6><small class="text-muted">' + (row.company_name ? window.caseFormatJs(row.company_name) : '') + '</small>' : '') +
                       '</div><span class="badge bg-' + sc + ' small" style="font-size: 0.65rem;">' + String(row.status).toUpperCase() + '</span></div>' +
                       '<div class="row g-2 mb-3">' +
                         '<div class="col-6"><small class="text-muted d-block small">Date</small><span class="small fw-medium text-dark">' + date(row.delivery_date) + '</span></div>' +
                         '<div class="col-6"><small class="text-muted d-block small">Status</small><span class="badge bg-' + sc + ' small" style="font-size:0.65rem;">' + String(row.status).toUpperCase() + '</span></div>' +
                         '<div class="col-6"><small class="text-muted d-block small">Warehouse</small><span class="small text-dark text-truncate d-block" title="' + esc(row.warehouse_name) + '">' + esc(row.warehouse_name) + '</span></div>' +
                         '<div class="col-6"><small class="text-muted d-block small">Items</small><span class="small text-dark">' + row.total_items + ' items</span></div>' +
-                        (showProject ? '<div class="col-12 mt-2"><small class="text-muted d-block small">Project</small><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap d-inline-block w-100" style="white-space: normal; word-break: break-word;">' + esc(row.project_name || 'N/A') + '</span></div>' : '') +
+                        (showProject ? '<div class="col-12 mt-2"><small class="text-muted d-block small">Project</small><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap d-inline-block w-100" style="white-space: normal; word-break: break-word;">' + (row.project_name ? window.caseFormatJs(row.project_name) : 'N/A') + '</span></div>' : '') +
                       '</div>' +
                       '<div class="dn-card-actions">' +
                         '<a href="' + cfg.urls.view + '?id=' + row.delivery_id + '" class="btn btn-sm btn-outline-primary dn-card-btn" title="View"><i class="bi bi-eye"></i></a>' +

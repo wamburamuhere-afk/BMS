@@ -24,14 +24,16 @@ if (!function_exists('textDisplayCaseMode')) {
      * The 6 modes mirror Microsoft Word's own "Aa" case-menu order and
      * labels exactly (the reference screenshot this feature was built from)
      * — 'as_typed' is the one extra, default-safe option Word has no
-     * equivalent for (it has no neutral "off" state), so an unconfigured or
-     * fresh tenant sees zero behaviour change until an admin opts in.
+     * equivalent for (it has no neutral "off" state). Default is 'title'
+     * (Capitalize Each Word), 2026-09-18 request — an unconfigured or fresh
+     * tenant now sees title-cased display everywhere by default; 'as_typed'
+     * remains available as an explicit opt-out.
      */
     function textDisplayCaseMode(): string
     {
-        $mode = get_setting('text_display_case', 'as_typed');
+        $mode = get_setting('text_display_case', 'title');
         $valid = ['as_typed', 'sentence', 'lower', 'upper', 'title', 'toggle'];
-        return in_array($mode, $valid, true) ? $mode : 'as_typed';
+        return in_array($mode, $valid, true) ? $mode : 'title';
     }
 }
 

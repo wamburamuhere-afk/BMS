@@ -47,7 +47,7 @@ try {
         $amt = number_format((float)$r['total_amount'], 2);
         $results[] = [
             'id'   => (int)$r['purchase_return_id'],
-            'text' => $r['return_number'] . ' — ' . ($r['supplier_name'] ?: 'Supplier') . ' (TZS ' . $amt . ')',
+            'text' => $r['return_number'] . ' — ' . ($r['supplier_name'] ? applyCaseMode($r['supplier_name']) : 'Supplier') . ' (TZS ' . $amt . ')',
         ];
     }
     echo json_encode(['results' => $results]);

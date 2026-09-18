@@ -68,7 +68,7 @@ if ($preVendId > 0) {
                         <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= $vendLabel ?></label>
                         <input type="hidden" id="f-vendor" value="<?= $preVendId ?>">
                         <input type="hidden" id="f-vendor-type" value="<?= htmlspecialchars($preVendType) ?>">
-                        <div class="form-control bg-light fw-bold"><?= safe_output($preVendName) ?></div>
+                        <div class="form-control bg-light fw-bold"><?= caseFormat($preVendName) ?></div>
                     <?php else: ?>
                         <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier / Sub-contractor</label>
                         <select name="vendor_id" id="f-vendor" class="form-select" style="width:100%"></select>
@@ -304,7 +304,7 @@ $(function () {
                     return;
                 }
 
-                $('#doc-vend-name').text(res.vendor.supplier_name || '—');
+                $('#doc-vend-name').text(res.vendor.supplier_name ? applyCaseModeJs(res.vendor.supplier_name) : '—');
                 const contact = [res.vendor.phone, res.vendor.email, res.vendor.address].filter(Boolean).join(' · ');
                 $('#doc-vend-contact').text(contact);
                 $('#doc-period').text('Period: ' + dt(res.date_from) + '  –  ' + dt(res.date_to));

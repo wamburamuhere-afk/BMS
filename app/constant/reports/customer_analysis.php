@@ -59,13 +59,13 @@ $currency  = get_setting('currency', 'TZS');
                 <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
-                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <?php endif; ?>
                 <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
                         <option value=""><?= wLabel('All My Warehouses', 'All My Shops') ?></option>
-                        <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option><?php endforeach; ?>
+                        <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
@@ -205,7 +205,7 @@ $(function () {
                 renderCharts(res.charts);
                 table.clear();
                 res.rows.forEach((r, i) => table.row.add([
-                    i + 1, r.customer_name || 'Walk-in',
+                    i + 1, r.customer_name ? caseFormatJs(r.customer_name) : 'Walk-in',
                     Number(r.total_orders).toLocaleString(), fmt(r.avg_order),
                     r.last_order ? new Date(r.last_order).toLocaleDateString() : '—', fmt(r.total_spent)
                 ]));

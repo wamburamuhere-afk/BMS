@@ -48,7 +48,7 @@ if ($preCustId > 0) {
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Customer</label>
                     <?php if ($preCustId > 0): ?>
                         <input type="hidden" id="f-customer" value="<?= $preCustId ?>">
-                        <div class="form-control bg-light fw-bold"><?= safe_output($preCustName) ?></div>
+                        <div class="form-control bg-light fw-bold"><?= caseFormat($preCustName) ?></div>
                     <?php else: ?>
                         <select name="customer_id" id="f-customer" class="form-select" style="width:100%"></select>
                     <?php endif; ?>
@@ -279,7 +279,7 @@ $(function () {
                     return;
                 }
 
-                $('#doc-cust-name').text(res.customer.customer_name || '—');
+                $('#doc-cust-name').text(res.customer.customer_name ? applyCaseModeJs(res.customer.customer_name) : '—');
                 const contact = [res.customer.phone, res.customer.email, res.customer.address].filter(Boolean).join(' · ');
                 $('#doc-cust-contact').text(contact);
                 $('#doc-period').text('Period: ' + dt(res.date_from) + '  –  ' + dt(res.date_to));

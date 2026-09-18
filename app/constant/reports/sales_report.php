@@ -71,7 +71,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value=""><?= t('All My Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
-                            <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                            <option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -81,7 +81,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
                         <option value=""><?= wLabel('All My Warehouses', 'All My Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?>
-                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
+                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -94,7 +94,7 @@ $currency  = get_setting('currency', 'TZS');
                     <select name="salesperson_id" id="f-salesperson" class="form-select" style="width:100%">
                         <option value=""><?= t('All Staff') ?></option>
                         <?php foreach ($users as $u): ?>
-                            <option value="<?= (int)$u['user_id'] ?>"><?= safe_output($u['name']) ?></option>
+                            <option value="<?= (int)$u['user_id'] ?>"><?= caseFormat($u['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -327,13 +327,13 @@ $(function () {
                     esc(r.ref_number || ''),
                     r.sale_date ? new Date(r.sale_date).toLocaleDateString() : '',
                     r.due_date  ? new Date(r.due_date).toLocaleDateString()  : '—',
-                    esc(r.customer_name || PT.walkIn),
+                    r.customer_name ? caseFormatJs(r.customer_name) : PT.walkIn,
                     fmt(r.grand_total),
                     fmt(r.paid_amount),
                     statusBadge(r.status),
                     esc(r.payment_method || '—'),
                     sourceBadge(r.source),
-                    esc((r.salesperson || '').trim() || '—')
+                    (r.salesperson || '').trim() ? caseFormatJs((r.salesperson || '').trim()) : '—'
                 ]));
                 table.draw();
                 adjustColumns(params.source);
