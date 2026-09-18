@@ -546,11 +546,9 @@ function supplier_status_label($status) {
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
-                        <!-- Buffer tfoot: reserves space for fixed footer during print -->
-                        <tfoot class="cust-print-buf d-none d-print-table-footer-group">
-                            <tr><td colspan="11" style="height: 1.2cm; border:none !important;"></td></tr>
-                        </tfoot>
                     </table>
+                    <!-- Print buffer spacer (outside table — tfoot with wrong colspan was causing DataTables TN/18) -->
+                    <div class="cust-print-buf d-none d-print-block" style="height: 1.2cm;"></div>
                 </div>
                 
                 <!-- Card View (Hidden by default) -->

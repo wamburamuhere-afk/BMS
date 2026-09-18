@@ -869,7 +869,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             <ul class="dropdown-menu" aria-labelledby="financeDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Accounting') ?></h6></li>
                                 <?php if(canView('expenses')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-currency-dollar"></i> <?= t('Expenses') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-receipt"></i> <?= t('Expenses') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('revenue')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('revenue') ?>"><i class="bi bi-cash-coin"></i> <?= t('Revenue / Other Income') ?></a></li>
@@ -918,7 +918,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php elseif(canView('expenses')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('expenses') ?>">
-                                <i class="bi bi-currency-dollar"></i> <?= t('Expenses') ?>
+                                <i class="bi bi-receipt"></i> <?= t('Expenses') ?>
                             </a>
                         </li>
                         <?php endif; ?>
