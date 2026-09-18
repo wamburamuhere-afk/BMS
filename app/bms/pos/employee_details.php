@@ -449,8 +449,8 @@ $sr_status_badge = [
                         </div>
                     <?php endif; ?>
                     
-                    <h4 class="card-title mb-1"><?= safe_output(implode(' ', array_filter([$employee['first_name'], $employee['middle_name'] ?? '', $employee['last_name']]))) ?></h4>
-                    <p class="text-muted mb-2"><?= safe_output($employee['designation_name']) ?></p>
+                    <h4 class="card-title mb-1"><?= caseFormat(implode(' ', array_filter([$employee['first_name'], $employee['middle_name'] ?? '', $employee['last_name']]))) ?></h4>
+                    <p class="text-muted mb-2"><?= caseFormat($employee['designation_name']) ?></p>
                     <span class="badge bg-<?= $employee['employment_status'] === 'active' ? 'success' : 'secondary' ?> mb-3">
                         <?= ucfirst(str_replace('_', ' ', $employee['employment_status'])) ?>
                     </span>
@@ -511,7 +511,7 @@ $sr_status_badge = [
                                 <?= strtoupper(substr($dr['first_name'], 0, 1) . substr($dr['last_name'], 0, 1)) ?>
                             </div>
                             <a href="<?= getUrl('employee_details') ?>?id=<?= (int)$dr['employee_id'] ?>" class="text-decoration-none text-dark">
-                                <?= safe_output(trim($dr['first_name'] . ' ' . $dr['last_name'])) ?>
+                                <?= caseFormat(trim($dr['first_name'] . ' ' . $dr['last_name'])) ?>
                             </a>
                         </li>
                         <?php endforeach; ?>
@@ -547,48 +547,48 @@ $sr_status_badge = [
                         <li class="mb-3">
                             <i class="bi bi-geo-alt text-primary me-2"></i>
                             <strong>Address:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['physical_address'] ?? $employee['address']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['physical_address'] ?? $employee['address']) ?></span>
                         </li>
                         <?php if (!empty($employee['postal_address'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-mailbox text-primary me-2"></i>
                             <strong>Postal Address:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['postal_address']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['postal_address']) ?></span>
                         </li>
                         <?php endif; ?>
                         <?php if (!empty($employee['country'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-globe text-primary me-2"></i>
                             <strong>Country:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['country']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['country']) ?></span>
                         </li>
                         <?php endif; ?>
                         <?php if (!empty($employee['state'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-globe text-primary me-2"></i>
                             <strong>Region:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['state']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['state']) ?></span>
                         </li>
                         <?php endif; ?>
                         <?php if (!empty($employee['city'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-globe text-primary me-2"></i>
                             <strong>District:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['city']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['city']) ?></span>
                         </li>
                         <?php endif; ?>
                         <?php if (!empty($employee['ward'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-globe text-primary me-2"></i>
                             <strong>Ward:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['ward']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['ward']) ?></span>
                         </li>
                         <?php endif; ?>
                         <?php if (!empty($employee['village'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-globe text-primary me-2"></i>
                             <strong>Street/Village:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['village']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['village']) ?></span>
                         </li>
                         <?php endif; ?>
                     </ul>
@@ -610,11 +610,11 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Department</label>
-                            <p class="fw-bold"><?= safe_output($employee['department_name']) ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['department_name']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Employment Type</label>
-                            <p class="fw-bold"><?= safe_output($employee['employment_type'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['employment_type']) ? caseFormat($employee['employment_type']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Join Date</label>
@@ -622,15 +622,15 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Reporting To</label>
-                            <p class="fw-bold"><?= safe_output($employee['reporting_to'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['reporting_to']) ? caseFormat($employee['reporting_to']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Work Location</label>
-                            <p class="fw-bold"><?= safe_output($employee['work_location'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['work_location']) ? caseFormat($employee['work_location']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Project</label>
-                            <p class="fw-bold"><?= safe_output($employee['project_name'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['project_name']) ? caseFormat($employee['project_name']) : 'N/A' ?></p>
                         </div>
                         <?php if ($employee['employment_status'] === 'probation' && !empty($employee['probation_end_date'])): ?>
                         <div class="col-sm-6 col-md-4">
@@ -676,11 +676,11 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Name</label>
-                            <p class="fw-bold"><?= safe_output($employee['bank_name'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['bank_name']) ? caseFormat($employee['bank_name']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Account Holder Name</label>
-                            <p class="fw-bold"><?= safe_output($employee['account_holder_name'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['account_holder_name']) ? caseFormat($employee['account_holder_name']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Account</label>
@@ -688,7 +688,7 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Branch</label>
-                            <p class="fw-bold"><?= safe_output($employee['bank_branch'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['bank_branch']) ? caseFormat($employee['bank_branch']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Identifier Code <small>(SWIFT/routing)</small></label>
@@ -760,7 +760,7 @@ $sr_status_badge = [
                     <div class="row g-3">
                         <div class="col-sm-6 col-md-3">
                             <label class="text-muted small text-uppercase">Contact Name</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= !empty($employee['emergency_contact']) ? caseFormat($employee['emergency_contact']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-3">
                             <label class="text-muted small text-uppercase">Relationship</label>
@@ -1558,7 +1558,7 @@ $sr_status_badge = [
                 <div class="modal-dialog">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="bi bi-clock-history me-1"></i> Mark Attendance — <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
+                            <h5 class="modal-title"><i class="bi bi-clock-history me-1"></i> Mark Attendance — <?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form id="markEmpAttendanceForm" autocomplete="off">
@@ -1785,7 +1785,7 @@ $sr_status_badge = [
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Apply for Leave — <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
+                            <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Apply for Leave — <?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form id="applyEmpLeaveForm" autocomplete="off">
@@ -1838,7 +1838,7 @@ $sr_status_badge = [
                                         <select class="form-select select2-static" name="handover_to">
                                             <option value="">Select Colleague</option>
                                             <?php foreach ($handover_candidates as $hc): ?>
-                                            <option value="<?= (int)$hc['employee_id'] ?>"><?= safe_output($hc['first_name'] . ' ' . $hc['last_name']) ?></option>
+                                            <option value="<?= (int)$hc['employee_id'] ?>"><?= caseFormat($hc['first_name'] . ' ' . $hc['last_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>

@@ -344,7 +344,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                             <!-- Product Identity -->
                             <div class="mb-3">
-                                <h6 class="fw-bold text-dark mb-1" style="font-size: 0.95rem;"><?= htmlspecialchars($svc['product_name']) ?></h6>
+                                <h6 class="fw-bold text-dark mb-1" style="font-size: 0.95rem;"><?= caseFormat($svc['product_name']) ?></h6>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="text-muted small"><?= t('SKU/Code:') ?></span>
                                     <code class="small fw-bold text-primary" style="font-size: 0.75rem;"><?= htmlspecialchars($svc['sku'] ?? 'N/A') ?></code>
@@ -356,13 +356,13 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                 <?php if (projectsModuleActive()): ?>
                                 <div class="d-flex justify-content-between align-items-center border-bottom border-light py-2">
                                     <span class="text-muted small"><?= t('Project:') ?></span>
-                                    <span class="small fw-bold text-end"><?= !empty($svc['project_name']) ? htmlspecialchars($svc['project_name']) : '—' ?></span>
+                                    <span class="small fw-bold text-end"><?= !empty($svc['project_name']) ? caseFormat($svc['project_name']) : '—' ?></span>
                                 </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between align-items-center border-bottom border-light py-2">
                                     <span class="text-muted small"><?= t('Tax:') ?></span>
                                     <span class="small fw-bold text-end">
-                                        <?= !empty($svc['tax_name']) ? htmlspecialchars($svc['tax_name']) : t('No Tax') ?>
+                                        <?= !empty($svc['tax_name']) ? caseFormat($svc['tax_name']) : t('No Tax') ?>
                                     </span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center py-2 mb-2">
@@ -454,16 +454,16 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                         <i class="bi bi-gear text-primary"></i>
                                     </div>
                                     <div>
-                                        <div class="fw-bold text-dark"><?= htmlspecialchars($svc['product_name']) ?></div>
+                                        <div class="fw-bold text-dark"><?= caseFormat($svc['product_name']) ?></div>
                                         <?php if (!empty($svc['supplier_name'])): ?>
-                                        <small class="text-muted"><?= htmlspecialchars($svc['supplier_name']) ?></small>
+                                        <small class="text-muted"><?= caseFormat($svc['supplier_name']) ?></small>
                                         <?php endif; ?>
                                     </div>
                                 </div>
                             </td>
                             <td class="<?= projectsModuleActive() ? '' : 'd-none' ?>">
                                 <?php if (!empty($svc['project_name'])): ?>
-                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= htmlspecialchars($svc['project_name']) ?></span>
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= caseFormat($svc['project_name']) ?></span>
                                 <?php else: ?>
                                 <span class="text-muted small">—</span>
                                 <?php endif; ?>
@@ -472,7 +472,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <td>
                                 <?php if (!empty($svc['tax_name'])): ?>
                                 <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
-                                    <?= htmlspecialchars($svc['tax_name']) ?> (<?= $svc['tax_rate_percentage'] ?>%)
+                                    <?= caseFormat($svc['tax_name']) ?> (<?= $svc['tax_rate_percentage'] ?>%)
                                 </span>
                                 <?php else: ?>
                                 <span class="text-muted small"><?= t('No Tax') ?></span>

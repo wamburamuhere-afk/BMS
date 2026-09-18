@@ -106,6 +106,7 @@ require_once ROOT_DIR . '/core/i18n.php'; // Load UI translation engine (t()/te(
 require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
 require_once ROOT_DIR . '/core/terminology.php'; // Tenant-conditional Warehouse/Shop display labels (wLabel/wLabelE)
 require_once ROOT_DIR . '/core/tenant_quotas.php'; // Phase 12 — usage quotas (assertUploadWithinQuota, tenantWithinUserLimit)
+require_once ROOT_DIR . '/core/text_display_case.php'; // Global "Text Display Case" setting — read-only display formatting (caseFormat/applyCaseMode)
 require_once ROOT_DIR . '/actions/check_auth.php';
 
 // The bootstrap has finished reading the session, so drop the session file lock

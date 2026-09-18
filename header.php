@@ -233,6 +233,48 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     const CSRF_TOKEN = '<?= csrf_token() ?>';
     $.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
 
+    // Text Display Case (2026-09-18) — JS twin of core/text_display_case.php's
+    // applyCaseMode()/caseFormat(), for pages whose lists render rows
+    // client-side from AJAX/DataTables JSON (server-side PHP never runs on
+    // that raw JSON, since it's built in the API endpoint then rendered by a
+    // JS `columns[].render` function, or set via jQuery .text()). Same rule,
+    // same read-only-display-only guarantee: never call either of these on
+    // a value that will be written back into an editable input.
+    const TEXT_CASE_MODE = <?= json_encode(textDisplayCaseMode()) ?>;
+    // Pure transform, NO escaping — use this with jQuery .text()/.val() or
+    // any DOM API that already escapes for you (textContent, etc.). Passing
+    // an escaped string to .text() would show literal "&amp;" on screen
+    // instead of "&", since .text() doesn't decode entities.
+    function applyCaseModeJs(str, modeOverride) {
+        if (str === null || str === undefined || str === '') return '';
+        str = String(str);
+        var mode = modeOverride || TEXT_CASE_MODE;
+        switch (mode) {
+            case 'lower':
+                return str.toLowerCase();
+            case 'upper':
+                return str.toUpperCase();
+            case 'title':
+                return str.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+            case 'sentence':
+                return str.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, function (c) { return c.toUpperCase(); });
+            case 'toggle':
+                return str.split('').map(function (ch) {
+                    return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
+                }).join('');
+            // 'as_typed' (default): unchanged
+            default:
+                return str;
+        }
+    }
+    // Transform + escape — use this when building an HTML string yourself
+    // (template literals inserted via .html()/innerHTML/DataTables render:).
+    function caseFormatJs(str) {
+        return applyCaseModeJs(str).replace(/[&<>"']/g, function (m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
+
     // Set global SweetAlert2 defaults - Green OK button everywhere
     const originalSwalFire = Swal.fire.bind(Swal);
     Swal.fire = function(...args) {

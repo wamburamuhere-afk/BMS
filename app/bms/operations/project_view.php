@@ -1377,7 +1377,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT BUDGET MANAGEMENT</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <!-- Budget Filters -->
@@ -1441,7 +1441,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT EXPENSES REPORT</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="expensesContent">
@@ -1473,7 +1473,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT LINKED INVOICES</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -1513,7 +1513,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT BILLS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -1548,7 +1548,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT SALES ORDERS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -1578,7 +1578,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT PURCHASE ORDERS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="purchasesContent">
@@ -1613,7 +1613,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT RFQs</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procRFQContent">
@@ -1645,7 +1645,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DELIVERY ORDERS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procOrdersContent">
@@ -1682,7 +1682,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DELIVERY NOTES (DN)</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procDNContent">
@@ -1717,7 +1717,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DELIVERY ORDERS (DO)</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-success" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procDOTable"></div>
@@ -1751,7 +1751,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT GOODS RECEIVED NOTES (GRN)</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procGRNContent">
@@ -1787,7 +1787,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT GOODS RETURN NOTES</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procReturnsContent">
@@ -1828,7 +1828,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DEBIT NOTES</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="procDebitNotesContent">
@@ -1878,7 +1878,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color:#000;text-transform:uppercase;">NIP MATERIALS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
                         </div>
 
@@ -1916,7 +1916,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;">NON-INVENTORY PRODUCTS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color:#666!important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
@@ -1995,7 +1995,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT PAYMENT VOUCHERS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="vouchersContent">
@@ -2025,7 +2025,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT MATERIALS &amp; STOCK</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -2058,7 +2058,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT SUPPLIERS</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="suppliersProjectContent">
@@ -2077,7 +2077,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="text-transform:uppercase;">PROJECT SUB-CONTRACTORS</h3>
                             <h6 class="text-muted fw-bold mb-0">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <p class="text-muted small">Generated: <?= date('d M Y, H:i') ?></p>
                             <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
                         </div>
@@ -2212,7 +2212,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="text-transform:uppercase;">PROJECT INSPECTIONS</h3>
                             <h6 class="text-muted fw-bold mb-0">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <p class="text-muted small">Generated: <?= date('d M Y, H:i') ?></p>
                             <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
                         </div>
@@ -2334,7 +2334,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="text-transform:uppercase;">INTERIM PAYMENT CERTIFICATES</h3>
                             <h6 class="text-muted fw-bold mb-0">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <p class="text-muted small">Generated: <?= date('d M Y, H:i') ?></p>
                             <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
                         </div>
@@ -2442,7 +2442,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT STAFF LIST</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="staffProjectContent">
@@ -2460,7 +2460,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT ATTENDANCE REPORT</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <p class="text-muted small mb-1" id="attPrintPeriod"></p>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -2556,7 +2556,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT LEAVE REPORT</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <p class="text-muted small mb-1" id="leavePrintPeriod"></p>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -2669,7 +2669,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT PAYROLL REGISTRY</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <p class="text-muted small mb-1" id="payrollPrintPeriod"></p>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -2753,7 +2753,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT NOTES</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3 d-print-none">
@@ -2784,7 +2784,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DOCUMENTS LIBRARY</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div id="projectDocsList" class="row g-3">
@@ -2885,7 +2885,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT MILESTONES REPORT</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -2952,7 +2952,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">ORIGINAL PROJECT SCOPE</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -3026,7 +3026,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">REVISED PROJECT SCOPE</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
@@ -3096,7 +3096,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">VARIATION PROJECT SCOPE - ADDENDUM NO: <span id="print-variation-no">1</span></h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
@@ -3164,7 +3164,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">VARIATION PROJECT SCOPE - ADDENDUM NO: <span id="print-variation-history-no">1</span></h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
 
@@ -3253,7 +3253,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">ADDITIONAL PROJECT SCOPE</h3>
                             <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <h5 class="text-dark fw-bold mb-1"><?= caseFormat($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
                         <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
@@ -3429,7 +3429,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                                     <h3 class="fw-bold mb-1" id="performanceReportTitle" style="color: #000 !important; text-transform: uppercase;">PROJECT PROGRESS REPORT</h3>
                                     <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
-                                    <h5 class="text-dark fw-bold mb-1" id="projectNameReport"><?= htmlspecialchars($project_name) ?></h5>
+                                    <h5 class="text-dark fw-bold mb-1" id="projectNameReport"><?= caseFormat($project_name) ?></h5>
                                     <p class="text-muted small text-uppercase fw-bold letter-spacing-1 mb-2" id="performanceReportSubtitle">DAILY UPDATE</p>
                                     <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                                 </div>
@@ -6020,7 +6020,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endif; ?>
                     <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;"><?= htmlspecialchars($company_name) ?></h2>
                     <h3 class="fw-bold" style="text-transform:uppercase;">SUB-CONTRACTOR PROFILE</h3>
-                    <h5 class="text-dark fw-bold"><?= htmlspecialchars($project_name) ?></h5>
+                    <h5 class="text-dark fw-bold"><?= caseFormat($project_name) ?></h5>
                     <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
                 </div>
 
@@ -6465,7 +6465,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Project</label>
-                            <input type="text" class="form-control form-control-sm bg-light" value="<?= htmlspecialchars($project_name) ?>" readonly>
+                            <input type="text" class="form-control form-control-sm bg-light" value="<?= caseFormat($project_name) ?>" readonly>
                         </div>
                     </div>
                     <!-- IPC Items Table -->
@@ -6595,7 +6595,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Project</label>
-                            <input type="text" class="form-control form-control-sm bg-light" value="<?= htmlspecialchars($project_name) ?>" readonly>
+                            <input type="text" class="form-control form-control-sm bg-light" value="<?= caseFormat($project_name) ?>" readonly>
                         </div>
                     </div>
                     <!-- IPC Items Table -->
@@ -7002,7 +7002,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <select class="form-select" id="eps_project_id" name="project_id">
                                         <option value="">-- General Supplier (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
-                                            <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
+                                            <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>

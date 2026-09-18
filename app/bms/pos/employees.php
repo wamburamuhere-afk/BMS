@@ -431,7 +431,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                         <div class="card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-0"><?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h6>
+                                    <h6 class="mb-0"><?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?></h6>
                                     <small class="text-muted"><?= safe_output($employee['employee_number']) ?></small>
                                 </div>
                                 <span class="badge bg-<?= get_status_badge($employee['employment_status']) ?>">
@@ -446,10 +446,10 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 </div>
                                 
                                 <div class="mb-2 text-center">
-                                    <strong><?= safe_output($employee['designation_name']) ?></strong><br>
-                                    <small class="text-muted"><?= safe_output($employee['department_name']) ?></small>
+                                    <strong><?= caseFormat($employee['designation_name']) ?></strong><br>
+                                    <small class="text-muted"><?= caseFormat($employee['department_name']) ?></small>
                                     <?php if ($employee['project_name']): ?>
-                                    <div class="mt-1"><small class="badge bg-light-soft text-primary border border-primary-subtle" style="font-size: 0.65rem;"><i class="bi bi-briefcase me-1"></i><?= safe_output($employee['project_name']) ?></small></div>
+                                    <div class="mt-1"><small class="badge bg-light-soft text-primary border border-primary-subtle" style="font-size: 0.65rem;"><i class="bi bi-briefcase me-1"></i><?= caseFormat($employee['project_name']) ?></small></div>
                                     <?php endif; ?>
                                 </div>
                                 
