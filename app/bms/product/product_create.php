@@ -178,17 +178,28 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                 </div>
                             </div>
 
-                            <div class="col-md-6 mt-4">
+                            <!-- Buying / Wholesale / Retail — same 3-column layout as the POS
+                                 Restock modal (2026-09-18 request: "bei ya jumla" now shown here
+                                 too, and "bei ya rejareja" relabeled to match Restock exactly). -->
+                            <div class="col-md-4 mt-4">
                                 <label for="cost_price" class="form-label fw-bold"><?= t('Buying Price') ?> <span class="text-danger">*</span></label>
-                                <div class="input-group input-group-lg">
+                                <div class="input-group">
                                     <span class="input-group-text bg-white border-0">TZS</span>
                                     <input type="number" class="form-control bg-light border-0" id="cost_price" name="cost_price"
                                            min="0" step="0.01" value="0.00" required>
                                 </div>
                             </div>
-                            <div class="col-md-6 mt-4">
-                                <label for="selling_price" class="form-label fw-bold"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
-                                <div class="input-group input-group-lg border border-primary rounded-3 overflow-hidden shadow-sm">
+                            <div class="col-md-4 mt-4">
+                                <label for="wholesale_price" class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <input type="number" class="form-control bg-light border-0" id="wholesale_price" name="wholesale_price"
+                                           min="0" step="0.01" value="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-4 mt-4">
+                                <label for="selling_price" class="form-label fw-bold"><?= t('Retail Price') ?> <span class="text-danger">*</span></label>
+                                <div class="input-group border border-primary rounded-3 overflow-hidden shadow-sm">
                                     <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
                                     <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
                                            min="0" step="0.01" value="0.00" required onkeyup="calculateMinSellingPrice()">
