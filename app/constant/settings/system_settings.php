@@ -1130,32 +1130,12 @@ $(document).ready(function() {
 // setting itself is enforced server-side (this is cosmetic feedback, not
 // the source of truth), and raw stored data is never touched either way.
 function updateTextCasePreview() {
+    // Reuses header.php's global applyCaseModeJs() (mode override param, so
+    // it can preview the dropdown's CURRENTLY SELECTED value, not yet saved)
+    // instead of duplicating the same switch/case rule a second time here.
     var sample = 'john mwangi supplies';
     var mode = document.getElementById('text_display_case').value;
-    var result;
-    switch (mode) {
-        case 'lower':
-            result = sample.toLowerCase();
-            break;
-        case 'upper':
-            result = sample.toUpperCase();
-            break;
-        case 'title':
-            result = sample.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-            break;
-        case 'sentence':
-            result = sample.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, function (c) { return c.toUpperCase(); });
-            break;
-        case 'toggle':
-            result = sample.split('').map(function (ch) {
-                return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
-            }).join('');
-            break;
-        case 'as_typed':
-        default:
-            result = sample;
-    }
-    document.getElementById('text_case_preview_box').textContent = result;
+    document.getElementById('text_case_preview_box').textContent = applyCaseModeJs(sample, mode);
 }
 
 </script>

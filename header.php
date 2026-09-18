@@ -234,37 +234,43 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     $.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
 
     // Text Display Case (2026-09-18) — JS twin of core/text_display_case.php's
-    // caseFormat(), for pages whose lists render rows client-side from AJAX/
-    // DataTables JSON (server-side safe_output()/caseFormat() never runs on
+    // applyCaseMode()/caseFormat(), for pages whose lists render rows
+    // client-side from AJAX/DataTables JSON (server-side PHP never runs on
     // that raw JSON, since it's built in the API endpoint then rendered by a
-    // JS `columns[].render` function). Same rule, same escape-after-transform
-    // order, same read-only-display-only guarantee: never call this on a value
-    // that will be written back into an editable input.
+    // JS `columns[].render` function, or set via jQuery .text()). Same rule,
+    // same read-only-display-only guarantee: never call either of these on
+    // a value that will be written back into an editable input.
     const TEXT_CASE_MODE = <?= json_encode(textDisplayCaseMode()) ?>;
-    function caseFormatJs(str) {
+    // Pure transform, NO escaping — use this with jQuery .text()/.val() or
+    // any DOM API that already escapes for you (textContent, etc.). Passing
+    // an escaped string to .text() would show literal "&amp;" on screen
+    // instead of "&", since .text() doesn't decode entities.
+    function applyCaseModeJs(str, modeOverride) {
         if (str === null || str === undefined || str === '') return '';
         str = String(str);
-        switch (TEXT_CASE_MODE) {
+        var mode = modeOverride || TEXT_CASE_MODE;
+        switch (mode) {
             case 'lower':
-                str = str.toLowerCase();
-                break;
+                return str.toLowerCase();
             case 'upper':
-                str = str.toUpperCase();
-                break;
+                return str.toUpperCase();
             case 'title':
-                str = str.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-                break;
+                return str.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
             case 'sentence':
-                str = str.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, function (c) { return c.toUpperCase(); });
-                break;
+                return str.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, function (c) { return c.toUpperCase(); });
             case 'toggle':
-                str = str.split('').map(function (ch) {
+                return str.split('').map(function (ch) {
                     return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
                 }).join('');
-                break;
             // 'as_typed' (default): unchanged
+            default:
+                return str;
         }
-        return str.replace(/[&<>"']/g, function (m) {
+    }
+    // Transform + escape — use this when building an HTML string yourself
+    // (template literals inserted via .html()/innerHTML/DataTables render:).
+    function caseFormatJs(str) {
+        return applyCaseModeJs(str).replace(/[&<>"']/g, function (m) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
         });
     }

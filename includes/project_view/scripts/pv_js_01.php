@@ -395,11 +395,13 @@ function loadProjectInventory(force, onDone) {
 }
 
 function renderProject(d, fin, progress) {
-    // Header
-    $('#projectNameDisplay').text(d.project_name);
-    $('#projectNameReport').text(d.project_name);
-    $('#projectTitlePrint').text(d.project_name);
-    $('#projectManagerDisplay').text(d.project_manager || 'Not Assigned');
+    // Header — applyCaseModeJs() (transform only, no escaping): .text() already
+    // escapes via textContent, so passing it the escaping caseFormatJs() would
+    // show literal "&amp;" on screen instead of "&".
+    $('#projectNameDisplay').text(applyCaseModeJs(d.project_name));
+    $('#projectNameReport').text(applyCaseModeJs(d.project_name));
+    $('#projectTitlePrint').text(applyCaseModeJs(d.project_name));
+    $('#projectManagerDisplay').text(d.project_manager ? applyCaseModeJs(d.project_manager) : 'Not Assigned');
     $('#projectIdMeta').text(d.project_id);
 
     // Update Planning Summary Cards
@@ -726,7 +728,7 @@ function renderProject(d, fin, progress) {
     }
 
     // Description
-    $('#descriptionDisplay').text(d.description || 'No description provided.');
+    $('#descriptionDisplay').text(d.description ? applyCaseModeJs(d.description) : 'No description provided.');
     
     $('#createdAtMeta').text(formatDateTime(d.created_at));
     $('#updatedAtMeta').text(d.updated_at ? formatDateTime(d.updated_at) : 'N/A');
