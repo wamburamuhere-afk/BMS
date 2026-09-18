@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-18 — POS receipt mobile print fix + price groups available to all POS users
+
+**Files:** `api/pos/print_receipt.php`, `app/bms/pos/pos.php`
+
+**Receipt print (print_receipt.php):** Added `<meta name="viewport" content="width=device-width, initial-scale=1">` so mobile browsers render at actual screen width instead of virtual desktop width. Changed `@page { margin: 0 }` to `@page { size: <width>mm auto; margin: 3mm 5mm }` so printing to PDF/thermal uses the correct paper width and the receipt fills the page. Bumped base font-size from 12px to 13px for better readability.
+
+**Price groups (pos.php):** Removed `pos_advanced` entitlement gate from price group loading. Price groups (Retail/Wholesale etc.) now load and display for all POS users whenever 2+ active price groups exist in the database.
+
+---
+
 ## 2026-09-18 (system-wide, Phase 2) - Text Display Case wired into Sales documents (print templates + list/view pages)
 
 **Scope:** All sales-side print templates and their list/view pages — 4 invoice print skins (standard/onyx/summit/wave), 4 sales order print skins (standard/confirmation/ledger/studio), 4 quotation print skins (standard/meadow/noir/terra), 4 credit note print skins (standard/ember/horizon/ledger), 4 sales return print skins (standard/intake/meridian/register), LPO print template, and key list/view pages (invoices.php, sales_orders.php, invoice_view.php, sales_order_view.php, credit_note_view.php, sales_return_view.php). Two high-leverage shared includes also fixed: `includes/workflow_signature_row.php` (used by 42 print files) and `includes/print_footer_html.php`.

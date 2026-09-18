@@ -371,7 +371,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                . '<div class="d-flex align-items-start gap-2">'
                                . '<i class="bi ' . $mv_icon . ' text-' . $mv_color . ' mt-1" style="font-size:0.85rem;flex-shrink:0;"></i>'
                                . '<div class="flex-grow-1" style="min-width:0;">'
-                               . '<div class="fw-semibold text-truncate" style="font-size:0.8rem;">' . htmlspecialchars($mv['product_name']) . '</div>'
+                               . '<div class="fw-semibold text-truncate" style="font-size:0.8rem;">' . caseFormat($mv['product_name']) . '</div>'
                                . '<div class="text-muted" style="font-size:0.68rem;">' . $mv_label . ($mv['reference_number'] ? ' · ' . htmlspecialchars($mv['reference_number']) : '') . '</div>'
                                . '</div>'
                                . '<div class="text-end flex-shrink-0">'
@@ -508,8 +508,8 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                 <tr class="<?= $h_row ?>">
                                     <td><?= $index + 1 ?></td>
                                     <td>
-                                        <strong><?= htmlspecialchars($s['product_name'] ?? '') ?></strong><br>
-                                        <small class="text-muted"><?= htmlspecialchars($s['category_name'] ?? 'N/A') ?> | <?= htmlspecialchars($s['brand_name'] ?? 'N/A') ?></small>
+                                        <strong><?= caseFormat($s['product_name'] ?? '') ?></strong><br>
+                                        <small class="text-muted"><?= caseFormat($s['category_name'] ?? 'N/A') ?> | <?= caseFormat($s['brand_name'] ?? 'N/A') ?></small>
                                     </td>
                                     <td><code class="custom-code text-dark"><?= htmlspecialchars(($s['sku'] ?: $s['product_code']) ?? '') ?></code></td>
                                     <td>

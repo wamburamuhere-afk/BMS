@@ -83,13 +83,10 @@ $currency = getSetting('currency', 'TZS');
 // Phase 11 (pos_upgrade_plan.md §7) — loyalty program on/off.
 $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
 
-// Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. Gated behind the
-// 'pos_advanced' entitlement, same as Registers/Loyalty; base-tier POS
-// behaves exactly as before this phase (no selector, plain selling_price).
-$price_groups_enabled = canView('pos_advanced');
-$price_groups = $price_groups_enabled
-    ? $pdo->query("SELECT price_group_id, name, is_default FROM price_groups WHERE status = 'active' ORDER BY is_default DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC)
-    : [];
+// Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. Available to all
+// POS users so every cashier can switch between Retail/Wholesale price groups.
+$price_groups_enabled = true;
+$price_groups = $pdo->query("SELECT price_group_id, name, is_default FROM price_groups WHERE status = 'active' ORDER BY is_default DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting.
 require_once ROOT_DIR . '/core/pos_denominations.php';
