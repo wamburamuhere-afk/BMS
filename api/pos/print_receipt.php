@@ -13,6 +13,7 @@ if (isset($_SESSION['user_lang'])) {
 }
 require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_nav.php';
 
 if (!isAuthenticated()) { die("Unauthorized"); }
 if (!canView('pos'))    { die("Permission denied"); }
@@ -277,7 +278,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <span><?= t('Cashier:') ?></span>
             <span><?= $sale['cashier_name'] ? caseFormat($sale['cashier_name']) : t('N/A') ?></span>
         </div>
-        <?php if ($register_label !== ''): ?>
+        <?php if (!posSimpleModeEnabled() && $register_label !== ''): ?>
         <div>
             <span><?= t('Register:') ?></span>
             <span><?= caseFormat($register_label) ?></span>

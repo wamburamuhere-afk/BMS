@@ -103,10 +103,23 @@ try {
     }
 
     // A register can only be staffed by one active shift at a time.
-    $regBusy = $pdo->prepare("SELECT COUNT(*) FROM cash_register_shifts WHERE register_id = ? AND status = 'active'");
+    $regBusy = $pdo->prepare("
+        SELECT TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS full_name,
+               u.username,
+               DATE_FORMAT(sh.start_time, '%d %b, %H:%i') AS started_label
+        FROM cash_register_shifts sh
+        JOIN users u ON u.user_id = sh.user_id
+        WHERE sh.register_id = ? AND sh.status = 'active'
+        LIMIT 1
+    ");
     $regBusy->execute([$register_id]);
-    if ($regBusy->fetchColumn() > 0) {
-        echo json_encode(['success' => false, 'message' => sprintf(t('Register "%s" is already in an active shift with another cashier.'), $register['register_name'])]);
+    $busyShift = $regBusy->fetch(PDO::FETCH_ASSOC);
+    if ($busyShift) {
+        $busyCashier = trim($busyShift['full_name']) ?: $busyShift['username'];
+        echo json_encode(['success' => false, 'message' => sprintf(
+            t('%s has an active shift since %s. They must close it before you can start.'),
+            $busyCashier, $busyShift['started_label']
+        )]);
         exit();
     }
 
