@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-19 — Header: mobile marquee only scrolls when company name is too long to fit
+
+**File:** `header.php`
+
+The mobile header marquee animated all company names unconditionally — even short names like "BJP SHOP" that easily fit the available space. Fixed with a DOM-ready JS check: neutralise the `padding-left: 100%` and `animation` CSS inline, measure real text width vs container width, and only restore the scrolling animation when the text actually overflows. Short names stay static and centred; long names scroll as before.
+
+---
+
 ## 2026-09-19 — Simple POS: remove register dropdown from Start Shift; cashier-identity shift model
 
 **Files:** `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/open_shift.php`, `api/pos/print_receipt.php`
