@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-19 — products.php: fix mobile nav turning white
+
+**File:** `app/bms/product/products.php`
+
+Removed `background: #fff` from the `@media (max-width: 767px) .navbar` rule. That override was painting the blue header nav white on mobile, making nav items invisible. `position: sticky` and `z-index` are preserved.
+
+---
+
 ## 2026-09-18 — POS Restock: permission-controlled, no longer admin-only
 
 **Files:** `app/bms/pos/pos.php`, `migrations/tenant/2026_09_18_pos_restock_permission.php`
