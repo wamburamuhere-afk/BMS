@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-18 — Stat cards: universal digit no-wrap + sentence-case labels
+
+**File:** `header.php`
+
+Two global fixes applied to all stat cards (all pages, all report dashboards):
+
+1. **CSS** — `[id^="stat-"]` block: `white-space: nowrap !important; overflow: hidden !important; font-size: clamp(0.72rem, 3.2vw, 1.25rem) !important; line-height: 1.4`. Numbers now scale down on mobile with `clamp` and are prevented from wrapping to a second row by `white-space: nowrap`.
+
+2. **JS** — on DOM ready, scans every `[id^="stat-"]` element, finds `.text-uppercase` siblings inside the same `.card` or `.card-body`, and removes the class. Labels revert to their natural title/sentence case (no more ALL CAPS).
+
+---
+
 ## 2026-09-18 — Simple POS: hide Procurement nav item
 
 **File:** `header.php`

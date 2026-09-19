@@ -354,6 +354,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     $(document).ready(function () { bmsAutoSelectWarehouse($(document)); });
     $(document).on('shown.bs.modal', function (e) { bmsAutoSelectWarehouse($(e.target)); });
 
+    // Stat card labels: remove forced uppercase so text shows in its natural case
+    $(document).ready(function () {
+        $('[id^="stat-"]').each(function () {
+            $(this).closest('.card-body, .card').find('.text-uppercase').not('[id^="stat-"]').removeClass('text-uppercase');
+        });
+    });
+
     // Global helper for logging activities moved to header.php
     function logReportAction(action, description) {
         if (navigator.sendBeacon) {
@@ -795,6 +802,16 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         .table-striped > tbody > tr:nth-of-type(odd) { background-color: rgba(255,255,255,0.03) !important; }
     </style>
     <?php endif; ?>
+
+    <style>
+        /* Stat cards: numbers scale to fit, never wrap to a second row */
+        [id^="stat-"] {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            font-size: clamp(0.72rem, 3.2vw, 1.25rem) !important;
+            line-height: 1.4 !important;
+        }
+    </style>
 
 <script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>"></script>
 </head>
