@@ -255,13 +255,13 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
             <tbody>
                 <?php foreach ($inactiveEmployees as $emp): ?>
                 <tr>
-                    <td><?= safe_output($emp['employee_number']) ?></td>
-                    <td><?= safe_output(trim($emp['first_name'] . ' ' . $emp['last_name'])) ?></td>
-                    <td><?= safe_output($emp['department_name'], '—') ?></td>
-                    <td><?= safe_output($emp['designation_name'], '—') ?></td>
-                    <td><span class="badge" style="background:#6c757d;color:#fff;"><?= safe_output($reasonLabels[$emp['employment_status']] ?? $emp['employment_status'], '—') ?></span></td>
-                    <td><?= safe_output($emp['inactivation_reason'], '—') ?></td>
-                    <td><?= safe_output($emp['updated_by_name'], '—') ?></td>
+                    <td><?= caseFormat($emp['employee_number']) ?></td>
+                    <td><?= caseFormat(trim($emp['first_name'] . ' ' . $emp['last_name'])) ?></td>
+                    <td><?= caseFormat($emp['department_name'], '—') ?></td>
+                    <td><?= caseFormat($emp['designation_name'], '—') ?></td>
+                    <td><span class="badge" style="background:#6c757d;color:#fff;"><?= caseFormat($reasonLabels[$emp['employment_status']] ?? $emp['employment_status'], '—') ?></span></td>
+                    <td><?= caseFormat($emp['inactivation_reason'], '—') ?></td>
+                    <td><?= caseFormat($emp['updated_by_name'], '—') ?></td>
                     <td><?= $emp['updated_at'] ? date('d M Y, H:i', strtotime($emp['updated_at'])) : '—' ?></td>
                     <td class="text-end d-print-none">
                         <div class="dropdown d-flex justify-content-end">

@@ -92,12 +92,12 @@ $catLabel = function (string $statement, string $category) use ($bs_order, $is_o
     <?php if(!empty($c_logo)): ?>
         <div class="mb-2"><img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 70px;"></div>
     <?php endif; ?>
-    <h2 style="margin:0; font-size: 18pt;"><?= safe_output($c_name) ?></h2>
+    <h2 style="margin:0; font-size: 18pt;"><?= caseFormat($c_name) ?></h2>
     <?php if ($c_tin || $c_vrn): ?>
         <p style="margin:2px 0; font-size: 9pt;">
-            <?= $c_tin ? 'TIN: ' . safe_output($c_tin) : '' ?>
+            <?= $c_tin ? 'TIN: ' . caseFormat($c_tin) : '' ?>
             <?= $c_tin && $c_vrn ? '&nbsp;|&nbsp;' : '' ?>
-            <?= $c_vrn ? 'VRN: ' . safe_output($c_vrn) : '' ?>
+            <?= $c_vrn ? 'VRN: ' . caseFormat($c_vrn) : '' ?>
         </p>
     <?php endif; ?>
     <h3 style="margin-top: 10px; font-size: 13pt; text-transform: uppercase; letter-spacing: 2px;">Trial Balance</h3>

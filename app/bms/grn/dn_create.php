@@ -237,7 +237,7 @@ $return_url = $is_from_po
                                 <select class="form-select select2-static" name="project_id" id="dn_project_id">
                                     <option value="0">-- No Project (General) --</option>
                                     <?php foreach ($all_projects as $p): ?>
-                                    <option value="<?= $p['project_id'] ?>" <?= ($project_id == $p['project_id']) ? 'selected' : '' ?>><?= safe_output($p['project_name']) ?></option>
+                                    <option value="<?= $p['project_id'] ?>" <?= ($project_id == $p['project_id']) ? 'selected' : '' ?>><?= caseFormat($p['project_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -345,7 +345,7 @@ $return_url = $is_from_po
                             <?php foreach ($dn_attachments as $a): ?>
                             <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1" id="att-<?= $a['attachment_id'] ?>">
                                 <a href="<?= getUrl($a['file_path']) ?>" target="_blank" class="text-decoration-none small text-truncate">
-                                    <i class="bi bi-file-earmark-text text-primary me-1"></i><?= safe_output($a['file_name']) ?>
+                                    <i class="bi bi-file-earmark-text text-primary me-1"></i><?= caseFormat($a['file_name']) ?>
                                 </a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachment(<?= $a['attachment_id'] ?>)"><i class="bi bi-trash"></i></button>
                             </div>

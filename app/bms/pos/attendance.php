@@ -382,7 +382,7 @@ if ($employees) {
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <div>
             <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Attendance History</h5>
-            <p class="text-muted small mb-0">Viewing history for this staff member, from project "<?= safe_output($back_to_project_name) ?>"</p>
+            <p class="text-muted small mb-0">Viewing history for this staff member, from project "<?= caseFormat($back_to_project_name) ?>"</p>
         </div>
         <a href="<?= getUrl('project_view') ?>?id=<?= $back_to_project_id ?>" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-kanban"></i> Back to Project
@@ -396,7 +396,7 @@ if ($employees) {
                 <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
             </div>
         <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= safe_output($c_name) ?></h1>
+        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= caseFormat($c_name) ?></h1>
         
         <div class="mt-3 text-center">
             <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= ($view_mode == 'day') ? 'DAILY ATTENDANCE REPORT' : strtoupper($view_mode) . ' ATTENDANCE SUMMARY' ?></h2>
@@ -566,7 +566,7 @@ if ($employees) {
                                 <option value="">All Departments</option>
                                 <?php foreach ($departments as $dept): ?>
                                 <option value="<?= $dept['department_id'] ?>" <?= ($selected_department == $dept['department_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($dept['department_name']) ?>
+                                    <?= caseFormat($dept['department_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -715,13 +715,13 @@ if ($employees) {
                             <tr>
                                 <td><?= $sn++ ?></td>
                                 <td>
-                                    <strong><?= safe_output($record['employee_number']) ?></strong>
+                                    <strong><?= caseFormat($record['employee_number']) ?></strong>
                                 </td>
                                 <td>
-                                    <?= safe_output($record['first_name'] . ' ' . $record['last_name']) ?>
+                                    <?= caseFormat($record['first_name'] . ' ' . $record['last_name']) ?>
                                 </td>
                                 <td>
-                                    <?= safe_output($record['department_name']) ?>
+                                    <?= caseFormat($record['department_name']) ?>
                                 </td>
                                 <?php if ($view_mode == 'day'): ?>
                                 <td>
@@ -808,7 +808,7 @@ if ($employees) {
                                                placeholder="Add notes"
                                                onchange="updateAttendanceNotes(<?= $record['employee_id'] ?>, this.value)">
                                         <?php else: ?>
-                                        <small><?= safe_output($record['notes']) ?></small>
+                                        <small><?= caseFormat($record['notes']) ?></small>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -998,7 +998,7 @@ if ($employees) {
                                 <option value="">Select Employee</option>
                                 <?php foreach ($employees as $employee): ?>
                                 <option value="<?= $employee['employee_id'] ?>">
-                                    <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?> (<?= safe_output($employee['employee_number']) ?>)
+                                    <?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?> (<?= caseFormat($employee['employee_number']) ?>)
                                 </option>
                                 <?php endforeach; ?>
                             </select>

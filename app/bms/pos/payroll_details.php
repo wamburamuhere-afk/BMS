@@ -156,7 +156,7 @@ $page_title = 'Payroll Details';
                     <img src="<?= getUrl($c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
                 </div>
             <?php endif; ?>
-            <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= safe_output($c_name) ?></h1>
+            <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= caseFormat($c_name) ?></h1>
             <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">PAYROLL DISBURSEMENT REPORT</h2>
             <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
         </div>

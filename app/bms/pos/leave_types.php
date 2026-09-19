@@ -110,12 +110,12 @@ $unpaid_types = $active_types - $paid_types;
                     <td><?= $i + 1 ?></td>
                     <td>
                         <span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:<?= htmlspecialchars($t['color'] ?: '#0d6efd') ?>"></span>
-                        <span class="fw-bold"><?= safe_output($t['type_name']) ?></span>
+                        <span class="fw-bold"><?= caseFormat($t['type_name']) ?></span>
                         <?php if ((int)($t['count_working_days_only'] ?? 0) === 1): ?>
                             <i class="bi bi-calendar-week text-info ms-1" title="Counts working days only — excludes weekends & public holidays"></i>
                         <?php endif; ?>
                         <?php if (!empty($t['description'])): ?>
-                            <div class="small text-muted"><?= safe_output($t['description']) ?></div>
+                            <div class="small text-muted"><?= caseFormat($t['description']) ?></div>
                         <?php endif; ?>
                     </td>
                     <td class="text-center"><?= (int)$t['max_days_per_year'] ?></td>

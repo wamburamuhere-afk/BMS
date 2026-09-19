@@ -187,9 +187,9 @@ includeHeader();
                             <?php foreach ($customers as $cust): ?>
                                 <option value="<?= $cust['customer_id'] ?>"
                                     <?= ($customer_id > 0 && $cust['customer_id'] == $customer_id) ? 'selected' : '' ?>>
-                                    <?= safe_output($cust['customer_name']) ?>
+                                    <?= caseFormat($cust['customer_name']) ?>
                                     <?php if (!empty($cust['company_name'])): ?>
-                                        (<?= safe_output($cust['company_name']) ?>)
+                                        (<?= caseFormat($cust['company_name']) ?>)
                                     <?php endif; ?>
                                 </option>
                             <?php endforeach; ?>
@@ -225,7 +225,7 @@ includeHeader();
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
                                     <?= (($quotation && isset($quotation['project_id']) && $quotation['project_id'] == $proj['project_id']) || ($project_id == $proj['project_id'])) ? 'selected' : '' ?>>
-                                    <?= safe_output($proj['project_name']) ?>
+                                    <?= caseFormat($proj['project_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

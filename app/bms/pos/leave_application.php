@@ -146,7 +146,7 @@ $company_logo = $settings['company_logo'] ?? '';
                 <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
             </div>
         <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt; font-family: sans-serif;"><?= safe_output($company_name) ?></h1>
+        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt; font-family: sans-serif;"><?= caseFormat($company_name) ?></h1>
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px; font-family: sans-serif;">LEAVE APPLICATION REPORT</h2>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
         <p style="text-align: right; font-weight: 600; color: #475569; margin-bottom: 20px; font-size: 12px; font-family: sans-serif;">REFERENCE: #LEV-<?= $leave['leave_id'] ?> &nbsp;|&nbsp; DATE: <?= date('d M Y') ?></p>
@@ -158,19 +158,19 @@ $company_logo = $settings['company_logo'] ?? '';
         <div class="grid">
             <div class="field">
                 <div class="label">Employee Name</div>
-                <div class="value"><?= safe_output($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
+                <div class="value"><?= caseFormat($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
             </div>
             <div class="field">
                 <div class="label">Employee ID</div>
-                <div class="value"><?= safe_output($leave['employee_number']) ?></div>
+                <div class="value"><?= caseFormat($leave['employee_number']) ?></div>
             </div>
             <div class="field">
                 <div class="label">Department / Unit</div>
-                <div class="value"><?= safe_output($leave['department_name']) ?></div>
+                <div class="value"><?= caseFormat($leave['department_name']) ?></div>
             </div>
             <div class="field">
                 <div class="label">Designation</div>
-                <div class="value"><?= safe_output($leave['designation'] ?? 'N/A') ?></div>
+                <div class="value"><?= caseFormat($leave['designation'] ?? 'N/A') ?></div>
             </div>
         </div>
     </div>
@@ -181,7 +181,7 @@ $company_logo = $settings['company_logo'] ?? '';
         <div class="grid">
             <div class="field">
                 <div class="label">Leave Category</div>
-                <div class="value"><?= safe_output($leave['official_type'] ?? '', '—') ?></div>
+                <div class="value"><?= caseFormat($leave['official_type'] ?? '', '—') ?></div>
             </div>
             <div class="field">
                 <div class="label">Total Duration</div>
@@ -200,7 +200,7 @@ $company_logo = $settings['company_logo'] ?? '';
         <div class="full-field">
             <div class="label">Justification / Reason</div>
             <div class="reason-text">
-                <?= nl2br(safe_output($leave['reason'])) ?>
+                <?= nl2br(caseFormat($leave['reason'])) ?>
             </div>
         </div>
     </div>
@@ -215,7 +215,7 @@ $company_logo = $settings['company_logo'] ?? '';
             </div>
             <div class="field">
                 <div class="label">Authorized By</div>
-                <div class="value"><?= safe_output($leave['approved_by_name'] ?? 'PENDING REVIEW') ?></div>
+                <div class="value"><?= caseFormat($leave['approved_by_name'] ?? 'PENDING REVIEW') ?></div>
             </div>
         </div>
     </div>

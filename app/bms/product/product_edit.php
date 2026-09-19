@@ -699,7 +699,7 @@ function deleteSellingUnit(id) {
                                         <tbody>
                                             <?php foreach ($warehouses as $wh): ?>
                                             <tr>
-                                                <td class="align-middle fw-semibold"><?= safe_output($wh['warehouse_name']) ?></td>
+                                                <td class="align-middle fw-semibold"><?= caseFormat($wh['warehouse_name']) ?></td>
                                                 <td>
                                                     <div class="input-group input-group-sm">
                                                         <input type="number" class="form-control text-center"
@@ -1197,7 +1197,7 @@ function deleteSellingUnit(id) {
                                     <thead class="table-light">
                                         <tr>
                                             <th><?= t('Unit') ?></th>
-                                            <th><?= sprintf(t('= how many %s'), safe_output($product['unit'])) ?></th>
+                                            <th><?= sprintf(t('= how many %s'), caseFormat($product['unit'])) ?></th>
                                             <th><?= t('Price per unit (optional)') ?></th>
                                             <th style="width:60px;"></th>
                                         </tr>
@@ -1290,7 +1290,7 @@ function deleteSellingUnit(id) {
                                     <option value=""><?= t('— None (not routed to a kitchen) —') ?></option>
                                     <?php foreach ($kitchen_stations as $ks): ?>
                                     <option value="<?= (int)$ks['station_id'] ?>" <?= (int)($product['kitchen_station_id'] ?? 0) === (int)$ks['station_id'] ? 'selected' : '' ?>>
-                                        <?= safe_output($ks['name']) ?> (<?= safe_output($ks['warehouse_name']) ?>)
+                                        <?= caseFormat($ks['name']) ?> (<?= caseFormat($ks['warehouse_name']) ?>)
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -1301,7 +1301,7 @@ function deleteSellingUnit(id) {
                                 <select class="form-select select2-static" id="modifier_groups_select" multiple style="width:100%">
                                     <?php foreach ($modifier_groups as $mg): ?>
                                     <option value="<?= (int)$mg['group_id'] ?>" <?= in_array((int)$mg['group_id'], $product_modifier_group_ids, true) ? 'selected' : '' ?>>
-                                        <?= safe_output($mg['name']) ?>
+                                        <?= caseFormat($mg['name']) ?>
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -1322,13 +1322,13 @@ function deleteSellingUnit(id) {
                             </h6>
                             <p class="mb-2">
                                 <?= t('This is a variant of') ?>
-                                <a href="<?= getUrl('product_edit') ?>?id=<?= (int)$variant_parent['product_id'] ?>"><?= safe_output($variant_parent['product_name']) ?></a>.
+                                <a href="<?= getUrl('product_edit') ?>?id=<?= (int)$variant_parent['product_id'] ?>"><?= caseFormat($variant_parent['product_name']) ?></a>.
                             </p>
                             <?php
                             $va = json_decode($product['variant_attributes'] ?? '{}', true) ?: [];
                             foreach ($va as $attrName => $attrValue):
                             ?>
-                            <span class="badge bg-light text-dark border me-1"><?= safe_output($attrName) ?>: <?= safe_output($attrValue) ?></span>
+                            <span class="badge bg-light text-dark border me-1"><?= caseFormat($attrName) ?>: <?= caseFormat($attrValue) ?></span>
                             <?php endforeach; ?>
                         </div>
                         <?php elseif ($pos_advanced_entitled && !$product['is_service']): ?>
@@ -1356,14 +1356,14 @@ function deleteSellingUnit(id) {
                                     <tbody>
                                         <?php foreach ($variant_children as $vc): $vAttrs = json_decode($vc['variant_attributes'] ?? '{}', true) ?: []; ?>
                                         <tr>
-                                            <td><?= safe_output($vc['product_name']) ?></td>
+                                            <td><?= caseFormat($vc['product_name']) ?></td>
                                             <td>
                                                 <?php foreach ($vAttrs as $an => $av): ?>
-                                                <span class="badge bg-light text-dark border me-1"><?= safe_output($an) ?>: <?= safe_output($av) ?></span>
+                                                <span class="badge bg-light text-dark border me-1"><?= caseFormat($an) ?>: <?= caseFormat($av) ?></span>
                                                 <?php endforeach; ?>
                                             </td>
                                             <td class="text-end"><?= number_format((float)$vc['selling_price'], 2) ?></td>
-                                            <td><span class="badge bg-<?= $vc['status'] === 'active' ? 'success' : 'secondary' ?>"><?= safe_output($vc['status']) ?></span></td>
+                                            <td><span class="badge bg-<?= $vc['status'] === 'active' ? 'success' : 'secondary' ?>"><?= caseFormat($vc['status']) ?></span></td>
                                             <td class="text-end">
                                                 <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('product_edit') ?>?id=<?= (int)$vc['product_id'] ?>">
                                                     <i class="bi bi-pencil"></i> <?= t('Edit') ?>
@@ -1429,7 +1429,7 @@ function deleteSellingUnit(id) {
                                     <tbody>
                                         <?php foreach ($warehouses as $wh): ?>
                                         <tr>
-                                            <td class="align-middle fw-semibold"><?= safe_output($wh['warehouse_name']) ?></td>
+                                            <td class="align-middle fw-semibold"><?= caseFormat($wh['warehouse_name']) ?></td>
                                             <td>
                                                 <div class="input-group input-group-sm">
                                                     <input type="number" class="form-control text-center"
@@ -1631,7 +1631,7 @@ function deleteSellingUnit(id) {
                         <input type="text" class="form-control" id="su_unit_label" name="unit_label" placeholder="<?= t('e.g. Carton, Box, Dozen') ?>" required maxlength="50">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label"><?= sprintf(t('= how many %s'), safe_output($product['unit'])) ?> <span class="text-danger">*</span></label>
+                        <label class="form-label"><?= sprintf(t('= how many %s'), caseFormat($product['unit'])) ?> <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="su_multiplier" name="base_unit_multiplier" min="0.0001" step="0.0001" required>
                     </div>
                     <div class="mb-3">

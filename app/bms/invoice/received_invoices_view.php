@@ -195,7 +195,7 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
         <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
             <div>
                 <div class="riv-label">Invoice Reference</div>
-                <div class="fw-bold" style="font-size:1.35rem;color:#0d6efd;"><?= safe_output($inv['invoice_ref']) ?></div>
+                <div class="fw-bold" style="font-size:1.35rem;color:#0d6efd;"><?= caseFormat($inv['invoice_ref']) ?></div>
                 <div class="d-flex gap-2 mt-2 flex-wrap">
                     <span class="status-pill" style="background:<?= $s['bg'] ?>;color:<?= $s['color'] ?>">
                         <?= $s['label'] ?>
@@ -239,27 +239,27 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                 <div class="row g-3">
                     <div class="col-sm-6">
                         <div class="riv-label">From</div>
-                        <div class="riv-value"><?= safe_output($inv['party_name'] ?? 'N/A') ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['party_name'] ?? 'N/A') ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="riv-label">Date Raised</div>
-                        <div class="riv-value"><?= safe_output($inv['date_raised']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['date_raised']) ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="riv-label">Date Recorded</div>
-                        <div class="riv-value"><?= safe_output($inv['date_recorded']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['date_recorded']) ?></div>
                     </div>
                     <?php if (!empty($inv['payment_terms'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Payment Terms</div>
-                        <div class="riv-value"><?= safe_output(ri_format_terms($inv['payment_terms'])) ?></div>
+                        <div class="riv-value"><?= caseFormat(ri_format_terms($inv['payment_terms'])) ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($inv['due_date'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Due Date</div>
                         <div class="riv-value <?= $is_overdue ? 'text-danger' : '' ?>">
-                            <?= safe_output($inv['due_date']) ?>
+                            <?= caseFormat($inv['due_date']) ?>
                             <?php if ($is_overdue): ?>
                             <span class="badge bg-danger ms-1" style="font-size:.7rem">Overdue <?= $days_overdue ?>d</span>
                             <?php endif; ?>
@@ -269,32 +269,32 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                     <?php if ($inv['invoice_type'] === 'supplier' && !empty($inv['po_number'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">PO Reference</div>
-                        <div class="riv-value"><?= safe_output($inv['po_number']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['po_number']) ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($inv['project_name'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Project</div>
-                        <div class="riv-value"><?= safe_output($inv['project_name']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['project_name']) ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if ($inv['invoice_type'] === 'sub_contractor' && (!empty($inv['sc_invoice_basis']) || !empty($inv['sc_basis_ref']))): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Invoice Basis</div>
-                        <div class="riv-value"><?= safe_output($inv['sc_invoice_basis'] ?? '—') ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['sc_invoice_basis'] ?? '—') ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="riv-label">Basis Reference</div>
-                        <div class="riv-value"><?= safe_output($inv['sc_basis_ref'] ?? '—') ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['sc_basis_ref'] ?? '—') ?></div>
                     </div>
                     <?php endif; ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Recorded By</div>
-                        <div class="riv-value"><?= safe_output($inv['recorded_by_name'] ?? '—') ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['recorded_by_name'] ?? '—') ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="riv-label">Created At</div>
-                        <div class="riv-value"><?= safe_output($inv['created_at']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['created_at']) ?></div>
                     </div>
                 </div>
             </div>
@@ -320,9 +320,9 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                                 $lt = (float)$it['quantity'] * (float)$it['unit_price'];
                                 $riv_sub += $lt; $riv_vat += (float)$it['tax_amount']; ?>
                             <tr>
-                                <td><?= safe_output($it['item_name']) ?></td>
+                                <td><?= caseFormat($it['item_name']) ?></td>
                                 <td class="text-end"><?= number_format((float)$it['quantity'], 2) ?></td>
-                                <td><?= safe_output($it['unit'] ?? '') ?></td>
+                                <td><?= caseFormat($it['unit'] ?? '') ?></td>
                                 <td class="text-end"><?= number_format((float)$it['unit_price'], 2) ?></td>
                                 <td class="text-end"><?= number_format((float)$it['tax_rate'], 0) ?>%</td>
                                 <td class="text-end"><?= number_format($lt, 2) ?></td>
@@ -343,7 +343,7 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
             <?php if (!empty($inv['notes'])): ?>
             <div class="riv-section">
                 <div class="riv-section-title"><i class="bi bi-chat-left-text me-1"></i>Notes</div>
-                <p class="mb-0" style="white-space:pre-wrap;font-size:0.95rem;"><?= safe_output($inv['notes']) ?></p>
+                <p class="mb-0" style="white-space:pre-wrap;font-size:0.95rem;"><?= caseFormat($inv['notes']) ?></p>
             </div>
             <?php endif; ?>
 
@@ -370,12 +370,12 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                             <?php foreach ($inv_payments as $i => $pmt): ?>
                             <tr>
                                 <td class="text-muted small"><?= $i + 1 ?></td>
-                                <td><?= safe_output($pmt['payment_date']) ?></td>
+                                <td><?= caseFormat($pmt['payment_date']) ?></td>
                                 <td class="text-end fw-semibold">TZS <?= number_format((float)$pmt['amount'], 2) ?></td>
-                                <td><?= safe_output($pmt['payment_method']) ?></td>
-                                <td class="small"><?= safe_output($pmt['account_name'] ?? '—') ?></td>
-                                <td class="small text-muted"><?= safe_output($pmt['reference'] ?? '—') ?></td>
-                                <td class="small"><?= safe_output($pmt['recorded_by_name'] ?? '—') ?></td>
+                                <td><?= caseFormat($pmt['payment_method']) ?></td>
+                                <td class="small"><?= caseFormat($pmt['account_name'] ?? '—') ?></td>
+                                <td class="small text-muted"><?= caseFormat($pmt['reference'] ?? '—') ?></td>
+                                <td class="small"><?= caseFormat($pmt['recorded_by_name'] ?? '—') ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -400,22 +400,22 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                 <div class="row g-3">
                     <div class="col-sm-6">
                         <div class="riv-label">Payment Date</div>
-                        <div class="riv-value"><?= safe_output($inv['payment_date']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['payment_date']) ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="riv-label">Payment Method</div>
-                        <div class="riv-value"><?= safe_output($inv['payment_method'] ?? '—') ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['payment_method'] ?? '—') ?></div>
                     </div>
                     <?php if (!empty($inv['payment_ref'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Payment Reference</div>
-                        <div class="riv-value"><?= safe_output($inv['payment_ref']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['payment_ref']) ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($inv['payment_recorded_by_name'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Recorded By</div>
-                        <div class="riv-value"><?= safe_output($inv['payment_recorded_by_name']) ?></div>
+                        <div class="riv-value"><?= caseFormat($inv['payment_recorded_by_name']) ?></div>
                     </div>
                     <?php endif; ?>
                 </div>

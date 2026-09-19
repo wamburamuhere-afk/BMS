@@ -97,7 +97,7 @@ $operator_display = [
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2><i class="bi bi-people-fill"></i> Group Details</h2>
-                    <p class="text-muted mb-0">Detailed information about <?= safe_output($group['group_name']) ?> group</p>
+                    <p class="text-muted mb-0">Detailed information about <?= caseFormat($group['group_name']) ?> group</p>
                 </div>
                 <div>
                     <a href="<?= getUrl('customers/groups') ?>" class="btn btn-outline-secondary btn-sm">
@@ -119,14 +119,14 @@ $operator_display = [
         <div class="col-md-4 mb-4">
             <!-- Group Summary Card -->
             <div class="card mb-4">
-                <div class="card-header text-white" style="background-color: <?= safe_output($group['color']) ?>">
+                <div class="card-header text-white" style="background-color: <?= caseFormat($group['color']) ?>">
                     <h6 class="mb-0"><i class="bi bi-info-circle"></i> Group Summary</h6>
                 </div>
                 <div class="card-body text-center">
                     <div class="group-color mb-3 mx-auto" 
-                         style="width: 80px; height: 80px; background-color: <?= safe_output($group['color']) ?>; border-radius: 50%; border: 3px solid #dee2e6;"></div>
-                    <h4><?= safe_output($group['group_name']) ?></h4>
-                    <p class="text-muted"><?= safe_output($group['description']) ?></p>
+                         style="width: 80px; height: 80px; background-color: <?= caseFormat($group['color']) ?>; border-radius: 50%; border: 3px solid #dee2e6;"></div>
+                    <h4><?= caseFormat($group['group_name']) ?></h4>
+                    <p class="text-muted"><?= caseFormat($group['description']) ?></p>
                     
                     <div class="row text-center mt-4">
                         <div class="col-6">
@@ -181,13 +181,13 @@ $operator_display = [
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Group Name</label>
-                            <p class="mb-0 fw-semibold"><?= safe_output($group['group_name']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($group['group_name']) ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Group Type</label>
                             <p class="mb-0">
                                 <span class="badge bg-<?= $group['group_type'] === 'static' ? 'info' : 'warning' ?>">
-                                    <?= safe_output($group_type_display[$group['group_type']] ?? $group['group_type']) ?>
+                                    <?= caseFormat($group_type_display[$group['group_type']] ?? $group['group_type']) ?>
                                 </span>
                             </p>
                         </div>
@@ -202,14 +202,14 @@ $operator_display = [
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Group Color</label>
                             <p class="mb-0">
-                                <span class="badge" style="background-color: <?= safe_output($group['color']) ?>; color: white;">
-                                    <?= safe_output($group['color']) ?>
+                                <span class="badge" style="background-color: <?= caseFormat($group['color']) ?>; color: white;">
+                                    <?= caseFormat($group['color']) ?>
                                 </span>
                             </p>
                         </div>
                         <div class="col-12 mb-3">
                             <label class="form-label text-muted small mb-1">Description</label>
-                            <p class="mb-0 fw-semibold"><?= safe_output($group['description']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($group['description']) ?></p>
                         </div>
                     </div>
                 </div>
@@ -229,11 +229,11 @@ $operator_display = [
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1">Operator</label>
-                            <p class="mb-0 fw-semibold"><?= safe_output($operator_display[$rules['operator']] ?? $rules['operator']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($operator_display[$rules['operator']] ?? $rules['operator']) ?></p>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1">Value</label>
-                            <p class="mb-0 fw-semibold"><?= safe_output($rules['value']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($rules['value']) ?></p>
                         </div>
                     </div>
                     <div class="alert alert-info mb-0">
@@ -270,7 +270,7 @@ $operator_display = [
                             <div class="progress" style="height: 25px;">
                                 <div class="progress-bar" 
                                      role="progressbar" 
-                                     style="width: <?= $member_percentage ?>%; background-color: <?= safe_output($group['color']) ?>"
+                                     style="width: <?= $member_percentage ?>%; background-color: <?= caseFormat($group['color']) ?>"
                                      aria-valuenow="<?= $member_percentage ?>" 
                                      aria-valuemin="0" 
                                      aria-valuemax="100">
@@ -312,8 +312,8 @@ $operator_display = [
                                 <tbody>
                                     <?php foreach ($members as $member): 
                                         $customer_name = ($member['entity_type'] === 'company') ? 
-                                            safe_output($member['company_name']) : 
-                                            safe_output(trim($member['first_name'] . ' ' . $member['last_name']));
+                                            caseFormat($member['company_name']) : 
+                                            caseFormat(trim($member['first_name'] . ' ' . $member['last_name']));
                                     ?>
                                     <tr>
                                         <td>
@@ -332,18 +332,18 @@ $operator_display = [
                                         </td>
                                         <td>
                                             <div>
-                                                <small class="text-muted"><?= safe_output($member['phone_number']) ?></small>
+                                                <small class="text-muted"><?= caseFormat($member['phone_number']) ?></small>
                                                 <br>
-                                                <small class="text-muted"><?= safe_output($member['email_address']) ?></small>
+                                                <small class="text-muted"><?= caseFormat($member['email_address']) ?></small>
                                             </div>
                                         </td>
-                                        <td><?= safe_output($member['occupation_business']) ?></td>
+                                        <td><?= caseFormat($member['occupation_business']) ?></td>
                                         <td>
                                             <small><?= date('M d, Y', strtotime($member['added_at'])) ?></small>
                                             <br>
                                             <small class="text-muted"><?= date('h:i A', strtotime($member['added_at'])) ?></small>
                                         </td>
-                                        <td><?= safe_output($member['added_by_name']) ?></td>
+                                        <td><?= caseFormat($member['added_by_name']) ?></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="customer_details.php?id=<?= $member['customer_id'] ?>" 
@@ -401,7 +401,7 @@ $operator_display = [
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Created By</label>
-                            <p class="mb-0 fw-semibold"><?= safe_output($group['created_by_name']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($group['created_by_name']) ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Created Date</label>
@@ -410,7 +410,7 @@ $operator_display = [
                         <?php if (!empty($group['updated_at'])): ?>
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Last Updated By</label>
-                            <p class="mb-0 fw-semibold"><?= safe_output($group['updated_by_name']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= caseFormat($group['updated_by_name']) ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Last Updated</label>

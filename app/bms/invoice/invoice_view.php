@@ -160,7 +160,7 @@ includeHeader();
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 mb-0 text-gray-800">Invoice Details</h1>
-            <p class="text-muted mb-0">View details for Invoice #<?= safe_output($invoice['invoice_number']) ?></p>
+            <p class="text-muted mb-0">View details for Invoice #<?= caseFormat($invoice['invoice_number']) ?></p>
         </div>
         <div class="d-flex gap-2">
             <a href="<?= getUrl('invoices') ?>" class="btn btn-outline-primary">
@@ -310,7 +310,7 @@ includeHeader();
                             <?php if (floatval($invoice['tax_amount']) > 0): ?>
                             <span class="badge bg-warning bg-opacity-10 text-warning border font-monospace" style="font-size:0.68rem;">Tax <?= number_format($invoice['tax_amount'], 2) ?></span>
                             <?php endif; ?>
-                            <span class="badge bg-success bg-opacity-10 text-success border font-monospace" style="font-size:0.68rem;"><?= safe_output($invoice['currency']) ?> <?= number_format($invoice['grand_total'], 2) ?></span>
+                            <span class="badge bg-success bg-opacity-10 text-success border font-monospace" style="font-size:0.68rem;"><?= caseFormat($invoice['currency']) ?> <?= number_format($invoice['grand_total'], 2) ?></span>
                         </div>
                         <span class="text-muted small">Issued: <?= date('M d, Y', strtotime($invoice['invoice_date'])) ?></span>
                     </div>
@@ -341,11 +341,11 @@ includeHeader();
                                 ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold text-dark"><?= safe_output($item['product_name']) ?></div>
+                                        <div class="fw-bold text-dark"><?= caseFormat($item['product_name']) ?></div>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-light text-dark border"><?= $item['quantity'] ?></span>
-                                        <small class="text-muted"><?= safe_output($item['unit']) ?></small>
+                                        <small class="text-muted"><?= caseFormat($item['unit']) ?></small>
                                     </td>
                                     <td class="text-end font-monospace"><?= number_format($item['unit_price'], 2) ?></td>
                                     <td class="text-end text-muted small"><?= $item['tax_rate'] ?>%</td>
@@ -377,7 +377,7 @@ includeHeader();
                                 <tr class="border-top border-2">
                                     <td colspan="4" class="text-end fw-bold fs-5 text-dark">Grand Total:</td>
                                     <td class="text-end pe-4 fw-bold fs-5 text-success font-monospace">
-                                        <?= number_format($invoice['grand_total'], 2) ?> <?= safe_output($invoice['currency']) ?>
+                                        <?= number_format($invoice['grand_total'], 2) ?> <?= caseFormat($invoice['currency']) ?>
                                     </td>
                                 </tr>
                             </tfoot>
@@ -429,8 +429,8 @@ includeHeader();
                                ?>
                                <tr>
                                    <td class="ps-4"><?= date('M d, Y', strtotime($payment['payment_date'])) ?></td>
-                                   <td><?= safe_output($payment['reference_number'] ?? '-') ?></td>
-                                   <td><?= safe_output($pmt_method_display) ?></td>
+                                   <td><?= caseFormat($payment['reference_number'] ?? '-') ?></td>
+                                   <td><?= caseFormat($pmt_method_display) ?></td>
                                    <td class="text-end font-monospace text-success fw-bold"><?= number_format($payment['amount'], 2) ?></td>
                                    <td class="text-end pe-4 font-monospace <?= $running_bal <= 0 ? 'text-success fw-bold' : 'text-warning fw-semibold' ?>">
                                        <?= number_format(max(0, $running_bal), 2) ?>
@@ -458,7 +458,7 @@ includeHeader();
                     <h6 class="mb-0 fw-bold">Notes</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted"><?= nl2br(safe_output($invoice['notes'])) ?></p>
+                    <p class="mb-0 text-muted"><?= nl2br(caseFormat($invoice['notes'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -470,7 +470,7 @@ includeHeader();
                     <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($invoice['terms_conditions'])) ?></p>
+                    <p class="mb-0 text-muted small"><?= nl2br(caseFormat($invoice['terms_conditions'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -484,9 +484,9 @@ includeHeader();
                     <h6 class="mb-0 fw-bold"><i class="bi bi-building"></i> Customer Information</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="fw-bold mb-1 text-dark"><?= safe_output($invoice['customer_name']) ?></h5>
+                    <h5 class="fw-bold mb-1 text-dark"><?= caseFormat($invoice['customer_name']) ?></h5>
                     <?php if (!empty($invoice['company_name'])): ?>
-                        <div class="text-muted mb-2"><?= safe_output($invoice['company_name']) ?></div>
+                        <div class="text-muted mb-2"><?= caseFormat($invoice['company_name']) ?></div>
                     <?php endif; ?>
                     
                     <hr class="my-3">
@@ -494,21 +494,21 @@ includeHeader();
                     <?php if (!empty($invoice['customer_email'])): ?>
                         <div class="d-flex mb-2 align-items-center">
                             <i class="bi bi-envelope text-muted me-2"></i>
-                            <span class="text-truncate"><?= safe_output($invoice['customer_email']) ?></span>
+                            <span class="text-truncate"><?= caseFormat($invoice['customer_email']) ?></span>
                         </div>
                     <?php endif; ?>
                     
                     <?php if (!empty($invoice['customer_phone'])): ?>
                         <div class="d-flex mb-2 align-items-center">
                             <i class="bi bi-telephone text-muted me-2"></i>
-                            <span><?= safe_output($invoice['customer_phone']) ?></span>
+                            <span><?= caseFormat($invoice['customer_phone']) ?></span>
                         </div>
                     <?php endif; ?>
                     
                     <?php if (!empty($invoice['customer_address'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-geo-alt text-muted me-2 mt-1"></i>
-                            <span><?= nl2br(safe_output($invoice['customer_address'])) ?></span>
+                            <span><?= nl2br(caseFormat($invoice['customer_address'])) ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -545,7 +545,7 @@ includeHeader();
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Sales Order:</span>
                         <a href="<?= getUrl('sales_order_view') ?>?id=<?= $invoice['order_id'] ?>" class="text-decoration-none fw-medium">
-                            <?= safe_output($so_order_number ?: 'View Order') ?> <i class="bi bi-box-arrow-up-right small"></i>
+                            <?= caseFormat($so_order_number ?: 'View Order') ?> <i class="bi bi-box-arrow-up-right small"></i>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -554,7 +554,7 @@ includeHeader();
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">DN Ref:</span>
                         <a href="<?= getUrl('dn_view') ?>?id=<?= $invoice['delivery_id'] ?>" class="text-decoration-none fw-medium">
-                            <?= safe_output($dn_reference_number ?: 'View DN') ?> <i class="bi bi-box-arrow-up-right small"></i>
+                            <?= caseFormat($dn_reference_number ?: 'View DN') ?> <i class="bi bi-box-arrow-up-right small"></i>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -563,7 +563,7 @@ includeHeader();
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">LPO Ref:</span>
                         <a href="<?= getUrl('lpo_view') ?>?id=<?= $invoice['customer_lpo_id'] ?>" class="text-decoration-none fw-medium">
-                            <?= safe_output($lpo_reference_number ?: 'View LPO') ?> <i class="bi bi-box-arrow-up-right small"></i>
+                            <?= caseFormat($lpo_reference_number ?: 'View LPO') ?> <i class="bi bi-box-arrow-up-right small"></i>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -571,26 +571,26 @@ includeHeader();
                     <?php if (!empty($invoice['project_name'])): ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Project:</span>
-                        <span class="fw-medium text-primary"><?= safe_output($invoice['project_name']) ?></span>
+                        <span class="fw-medium text-primary"><?= caseFormat($invoice['project_name']) ?></span>
                     </div>
                     <?php endif; ?>
 
                     <?php if (!empty($invoice['warehouse_name'])): ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Warehouse:</span>
-                        <span class="fw-medium text-success"><?= safe_output($invoice['warehouse_name']) ?></span>
+                        <span class="fw-medium text-success"><?= caseFormat($invoice['warehouse_name']) ?></span>
                     </div>
                     <?php endif; ?>
 
                     <?php if (!empty($invoice['payment_terms'])): ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Payment Terms:</span>
-                        <span class="fw-medium"><?= safe_output(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></span>
+                        <span class="fw-medium"><?= caseFormat(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></span>
                     </div>
                     <?php endif; ?>
                     <div class="d-flex justify-content-between mb-0">
                         <span class="text-muted">Created By:</span>
-                        <span class="fw-medium"><?= safe_output($invoice['created_by_name'] ?? 'N/A') ?></span>
+                        <span class="fw-medium"><?= caseFormat($invoice['created_by_name'] ?? 'N/A') ?></span>
                     </div>
                 </div>
             </div>
@@ -627,9 +627,9 @@ includeHeader();
                                class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-between p-2 text-decoration-none shadow-sm text-start">
                                 <div class="text-truncate me-2">
                                     <i class="bi bi-file-earmark-pdf me-1"></i> 
-                                    <span class="fw-bold small"><?= safe_output($att['file_name']) ?></span>
+                                    <span class="fw-bold small"><?= caseFormat($att['file_name']) ?></span>
                                     <div class="text-muted" style="font-size: 0.7rem;">
-                                        Ref: <?= safe_output($att['reference_number'] ?: date('d/m/Y', strtotime($att['payment_date']))) ?>
+                                        Ref: <?= caseFormat($att['reference_number'] ?: date('d/m/Y', strtotime($att['payment_date']))) ?>
                                     </div>
                                 </div>
                                 <i class="bi bi-eye"></i>

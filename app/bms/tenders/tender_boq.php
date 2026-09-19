@@ -41,7 +41,7 @@ $tenderNavActive = 'boq';
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
         <div class="mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-primary"><i class="bi bi-receipt-cutoff me-2"></i>Bills of Quantities</h2>
-            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= safe_output($tender['tender_no']) ?></span></p>
+            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= caseFormat($tender['tender_no']) ?></span></p>
         </div>
         <a href="<?= getUrl('tenders') ?>" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-left"></i> Back to List</a>
     </div>
@@ -102,7 +102,7 @@ $tenderNavActive = 'boq';
                     </tbody>
                     <tfoot>
                         <tr class="fw-bold">
-                            <td colspan="5" class="text-end">Total — <?= safe_output($bill['bill_title']) ?></td>
+                            <td colspan="5" class="text-end">Total — <?= caseFormat($bill['bill_title']) ?></td>
                             <td class="text-end bill-total" data-bill-id="<?= $billId ?>"><?= number_format(array_sum(array_column($items, 'amount')), 2) ?></td>
                             <?php if ($can_edit): ?><td></td><?php endif; ?>
                         </tr>
@@ -133,7 +133,7 @@ $tenderNavActive = 'boq';
             <div class="card-body">
                 <?php foreach ($bills as $bill): $items = $itemsByBill[$bill['bill_id']] ?? []; ?>
                 <div class="d-flex justify-content-between py-1 border-bottom">
-                    <span><?= safe_output($bill['bill_title']) ?></span>
+                    <span><?= caseFormat($bill['bill_title']) ?></span>
                     <span class="summary-bill-amount" data-bill-id="<?= $bill['bill_id'] ?>"><?= number_format(array_sum(array_column($items, 'amount')), 2) ?></span>
                 </div>
                 <?php endforeach; ?>

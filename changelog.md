@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-19 — Text display case Phases 7–13: `safe_output` → `caseFormat` sweep
+
+**Branch:** `feat/text-display-case-phase2`
+
+Converted all read-only display contexts from `safe_output()` to `caseFormat()` across seven modules. Form inputs, hidden inputs, date inputs, textarea content, `value=` attributes, CSS class/color attributes, mailto/tel/http href attributes, image src attributes, and JS data-filter attributes were all kept as `safe_output()`.
+
+- **Phase 7 — GRN/Delivery** (`grn/delivery_notes.php`, `dn_view.php`, `do_view.php`, `grn.php`, `grn_view.php`, `dn_create.php`, `dn_outbound.php`, `do_create.php`, `grn_create.php`, `grn_edit.php`)
+- **Phase 8 — Operations/Assets** (`operations/asset_dashboard.php`, `asset_view.php`, `maintenance.php`, `warehouse_stock_view.php`, `sub_contractor_details.php`, `assets.php`, `sub_contractors.php`, `project_view.php`)
+- **Phase 9 — CRM** (`crm/crm_campaigns.php`, `crm_import_leads.php`, `crm_pipeline_stages.php`, `crm_leads.php`, `crm_lead_view.php`)
+- **Phase 10 — Restaurant** (`restaurant/index.php`, `menu.php`, `tables.php`, `order_view.php`, `kitchen.php`, `reports.php`)
+- **Phase 11 — Customer/Product/Stock/Suppliers** (`customer/customers.php`, `customer_details.php`, `customer_groups.php`, `customer_group_details.php`, `customer_group_members.php`, `Suppliers/suppliers.php`, `supplier_details.php`, `supplier_payments.php`, `stock/stock_movements.php`, `stock_transfers.php`, `stock_adjustments.php`, `product/product_view.php`, `products.php`, `product_edit.php`)
+- **Phase 12 — Remaining HR/Invoice/Sales** (`pos/pos_dashboard.php`, `price_groups.php`, `shift_history.php`, `employees.php`, `employee_details.php`, `invoice/invoices.php`, `sales/sales_orders.php`)
+- **Phase 13 — Tenders** (`tenders/tenders.php`, `tender_checklist.php`, `tender_print.php`, `tender_view.php`, `tender_create.php`, `tender_edit.php`, `tender_boq.php`, `tender_materials.php`, `tender_form_of_tender.php`)
+
+---
+
 ## 2026-09-19 — Header: language toggle pill in navbar (EN ↔ SW one-click switch)
 
 **Files:** `header.php`, `api/set_language.php`

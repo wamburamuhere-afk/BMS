@@ -112,15 +112,15 @@ $statusBadge = [
                 <tbody>
                     <?php foreach ($campaigns as $c): ?>
                     <tr>
-                        <td class="fw-semibold"><?= safe_output($c['campaign_name']) ?></td>
-                        <td><?= safe_output($c['type']) ?></td>
-                        <td><?= safe_output($c['start_date'], '—') ?> <?= $c['end_date'] ? '→ ' . $c['end_date'] : '' ?></td>
+                        <td class="fw-semibold"><?= caseFormat($c['campaign_name']) ?></td>
+                        <td><?= caseFormat($c['type']) ?></td>
+                        <td><?= caseFormat($c['start_date'], '—') ?> <?= $c['end_date'] ? '→ ' . $c['end_date'] : '' ?></td>
                         <td class="text-end"><?= number_format((float)$c['budget'], 0) ?></td>
                         <td class="text-end"><?= number_format((float)$c['spent'], 0) ?></td>
                         <td class="text-end"><?= (int)$c['leads_count'] ?></td>
                         <td class="text-end"><?= (int)$c['leads_converted'] ?></td>
                         <td class="text-end"><?= number_format((float)$c['won_value'], 0) ?></td>
-                        <td><span class="badge" style="background:<?= $statusBadge[$c['status']] ?? '#6c757d;color:#fff' ?>"><?= safe_output($c['status']) ?></span></td>
+                        <td><span class="badge" style="background:<?= $statusBadge[$c['status']] ?? '#6c757d;color:#fff' ?>"><?= caseFormat($c['status']) ?></span></td>
                         <td class="text-end">
                             <div class="dropdown d-flex justify-content-end">
                                 <button class="btn btn-sm btn-outline-primary dropdown-toggle px-2" type="button" data-bs-toggle="dropdown">

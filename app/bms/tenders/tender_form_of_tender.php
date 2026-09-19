@@ -37,7 +37,7 @@ $tenderNavActive = 'fot';
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
         <div class="mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-primary"><i class="bi bi-envelope-paper me-2"></i>Form of Tender / Covering Letter</h2>
-            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= safe_output($tender['tender_no']) ?></span></p>
+            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= caseFormat($tender['tender_no']) ?></span></p>
         </div>
         <div class="d-flex gap-2">
             <a href="<?= buildUrl('api/tender_form_of_tender.php') ?>?action=PRINT&tender_id=<?= (int)$id ?>" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-printer"></i> Print / Save PDF</a>
@@ -57,7 +57,7 @@ $tenderNavActive = 'fot';
             </div>
 
             <p class="text-muted small">
-                Addressed to <strong><?= safe_output($tender['procuring_entity_name'] ?: '[Procuring Entity — set it in Details]') ?></strong>.
+                Addressed to <strong><?= caseFormat($tender['procuring_entity_name'] ?: '[Procuring Entity — set it in Details]') ?></strong>.
                 The letter below is drafted automatically from the tender details and BOQ grand total. Edit freely — your edits are kept until you press "Re-draft From Details".
             </p>
 

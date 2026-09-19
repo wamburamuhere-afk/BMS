@@ -241,7 +241,7 @@ function generate_grn_number() {
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <h2 class="mb-1"><i class="bi <?= $doc_icon ?>"></i> <?= t('Edit') ?> <?= $doc_label ?> (<?= $doc_short ?>)</h2>
-                    <p class="text-muted mb-0"><?= sprintf(t('Modify Goods Received Note #%s'), safe_output($grn['receipt_number'])) ?></p>
+                    <p class="text-muted mb-0"><?= sprintf(t('Modify Goods Received Note #%s'), caseFormat($grn['receipt_number'])) ?></p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
@@ -296,9 +296,9 @@ function generate_grn_number() {
                             <?php foreach ($suppliers as $supp): ?>
                                 <option value="<?= $supp['supplier_id'] ?>" 
                                     <?= ($supplier_id > 0 && $supp['supplier_id'] == $supplier_id) ? 'selected' : '' ?>>
-                                    <?= safe_output($supp['supplier_name']) ?>
+                                    <?= caseFormat($supp['supplier_name']) ?>
                                     <?php if (!empty($supp['company_name'])): ?>
-                                        (<?= safe_output($supp['company_name']) ?>)
+                                        (<?= caseFormat($supp['company_name']) ?>)
                                     <?php endif; ?>
                                 </option>
                             <?php endforeach; ?>
@@ -314,7 +314,7 @@ function generate_grn_number() {
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
                                     <?= ($project_id_param > 0 && $proj['project_id'] == $project_id_param) ? 'selected' : '' ?>>
-                                    <?= safe_output($proj['project_name']) ?>
+                                    <?= caseFormat($proj['project_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -330,8 +330,8 @@ function generate_grn_number() {
                                 <option value="<?= $wh['warehouse_id'] ?>"
                                     data-project="<?= $wh['project_id'] ?>"
                                     <?= ($warehouse_id > 0 && $wh['warehouse_id'] == $warehouse_id) ? 'selected' : '' ?>>
-                                    <?= safe_output($wh['warehouse_name']) ?>
-                                    <?php if (!empty($wh['location'])): ?>- <?= safe_output($wh['location']) ?><?php endif; ?>
+                                    <?= caseFormat($wh['warehouse_name']) ?>
+                                    <?php if (!empty($wh['location'])): ?>- <?= caseFormat($wh['location']) ?><?php endif; ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -349,8 +349,8 @@ function generate_grn_number() {
                                     <option value="<?= $po['purchase_order_id'] ?>" 
                                         <?= ($po_id > 0 && $po['purchase_order_id'] == $po_id) ? 'selected' : '' ?>
                                         data-supplier-id="<?= $po['supplier_id'] ?? 0 ?>">
-                                        <?= safe_output($po['order_number']) ?> -
-                                        <?= safe_output($po['supplier_name']) ?>
+                                        <?= caseFormat($po['order_number']) ?> -
+                                        <?= caseFormat($po['supplier_name']) ?>
                                         (<?= sprintf(t('%s items pending'), $po['pending_qty']) ?>)
                                     </option>
                                 <?php endforeach; ?>

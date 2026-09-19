@@ -60,7 +60,7 @@ $statusBadge = function ($s) {
     <!-- Print header -->
     <div class="d-none d-print-block text-center mb-2">
         <h4 style="margin:0;text-transform:uppercase;">PAYE Register</h4>
-        <div class="small text-muted">Period: <?= safe_output($rangeLabel) ?> · Generated <?= date('d M Y') ?></div>
+        <div class="small text-muted">Period: <?= caseFormat($rangeLabel) ?> · Generated <?= date('d M Y') ?></div>
     </div>
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4 d-print-none">
@@ -92,7 +92,7 @@ $statusBadge = function ($s) {
                     <select name="dept" class="form-select">
                         <option value="">All</option>
                         <?php foreach ($departments as $d): ?>
-                            <option value="<?= (int)$d['department_id'] ?>" <?= $f_dept===(int)$d['department_id']?'selected':'' ?>><?= safe_output($d['department_name']) ?></option>
+                            <option value="<?= (int)$d['department_id'] ?>" <?= $f_dept===(int)$d['department_id']?'selected':'' ?>><?= caseFormat($d['department_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -137,7 +137,7 @@ $statusBadge = function ($s) {
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3 border-bottom d-print-none"><h5 class="mb-0 fw-bold">PAYE by Employee — <?= safe_output($rangeLabel) ?></h5></div>
+        <div class="card-header bg-white py-3 border-bottom d-print-none"><h5 class="mb-0 fw-bold">PAYE by Employee — <?= caseFormat($rangeLabel) ?></h5></div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover align-middle" style="width:100%">
@@ -160,9 +160,9 @@ $statusBadge = function ($s) {
                         $taxable = max(0, (float)$r['gross_salary'] - (float)$r['nssf_employee']); ?>
                         <tr>
                             <td class="ps-3"><?= $i++ ?></td>
-                            <td><div class="fw-semibold"><?= safe_output($r['first_name'].' '.$r['last_name']) ?></div><div class="small text-muted">#<?= safe_output($r['employee_number'] ?: '—') ?></div></td>
-                            <td><?= safe_output($r['department_name'] ?: '—') ?></td>
-                            <td><?= safe_output(date('M Y', strtotime($r['payroll_period'].'-01'))) ?></td>
+                            <td><div class="fw-semibold"><?= caseFormat($r['first_name'].' '.$r['last_name']) ?></div><div class="small text-muted">#<?= caseFormat($r['employee_number'] ?: '—') ?></div></td>
+                            <td><?= caseFormat($r['department_name'] ?: '—') ?></td>
+                            <td><?= caseFormat(date('M Y', strtotime($r['payroll_period'].'-01'))) ?></td>
                             <td class="text-end"><?= number_format((float)$r['gross_salary'],0) ?></td>
                             <td class="text-end text-muted"><?= number_format((float)$r['nssf_employee'],0) ?></td>
                             <td class="text-end"><?= number_format($taxable,0) ?></td>

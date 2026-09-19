@@ -2148,7 +2148,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <select class="form-select" id="projScCategoryFilter">
                                             <option value="">All Categories</option>
                                             <?php foreach ($supplier_categories as $cat): ?>
-                                            <option value="<?= safe_output($cat['category_name']) ?>"><?= safe_output($cat['category_name']) ?></option>
+                                            <option value="<?= safe_output($cat['category_name']) ?>"><?= caseFormat($cat['category_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
@@ -5790,7 +5790,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <label class="form-label">Category</label>
                                     <select class="form-select" name="category_id">
                                         <option value="">Select Category</option>
-                                        <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option><?php endforeach; ?>
+                                        <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option><?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" name="credit_limit" step="0.01" value="0"></div>
@@ -5920,7 +5920,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <label class="form-label">Category</label>
                                     <select class="form-select" id="pesc_category" name="category_id">
                                         <option value="">Select Category</option>
-                                        <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option><?php endforeach; ?>
+                                        <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option><?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
@@ -7240,7 +7240,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <select class="form-select" id="scPayAccount">
                             <option value="">Select account…</option>
                             <?php foreach (cashBankAccounts($pdo) as $acc): ?>
-                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= caseFormat($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <small class="text-muted">Cash/bank account the money is paid from.</small>

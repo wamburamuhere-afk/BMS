@@ -288,8 +288,8 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
     <div class="alert alert-info d-flex align-items-center gap-2 d-print-none">
         <i class="bi bi-info-circle fs-5"></i>
         <div>
-            Pre-filling from Customer LPO <strong><?= safe_output($lpo['lpo_number']) ?></strong>
-            — <strong><?= safe_output($locked_customer_name) ?></strong>
+            Pre-filling from Customer LPO <strong><?= caseFormat($lpo['lpo_number']) ?></strong>
+            — <strong><?= caseFormat($locked_customer_name) ?></strong>
             — <?= count($lpo_items) ?> item(s) with remaining quantity loaded.
             <a href="<?= getUrl('lpo_view') ?>?id=<?= $lpo_id ?>" class="ms-2">Back to LPO</a>
         </div>
@@ -300,8 +300,8 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
     <div class="alert alert-info d-flex align-items-center gap-2 d-print-none">
         <i class="bi bi-info-circle fs-5"></i>
         <div>
-            Pre-filling from Sales Order <strong><?= safe_output($so['order_number']) ?></strong>
-            — <strong><?= safe_output($locked_customer_name) ?></strong>
+            Pre-filling from Sales Order <strong><?= caseFormat($so['order_number']) ?></strong>
+            — <strong><?= caseFormat($locked_customer_name) ?></strong>
             <?php if (!empty($so_items)): ?>
             — <?= count($so_items) ?> item(s) with remaining quantity loaded.
             <?php else: ?>
@@ -337,7 +337,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                                 <label class="form-label fw-semibold">DN Number</label>
                                 <div class="form-control bg-light fw-bold text-primary">
                                     <i class="bi bi-magic me-1"></i>
-                                    <?= $is_edit && $dn ? safe_output($dn['delivery_number']) : 'Generated automatically on save' ?>
+                                    <?= $is_edit && $dn ? caseFormat($dn['delivery_number']) : 'Generated automatically on save' ?>
                                 </div>
                                 <small class="text-muted">Outbound delivery notes are numbered automatically by the system.</small>
                             </div>
@@ -350,7 +350,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                             <input type="hidden" name="party_id" id="dn_party_id" value="<?= $cur_party_id ?>">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Send To</label>
-                                <div class="form-control bg-light fw-bold"><i class="bi bi-truck me-1"></i> <?= safe_output($legacy_party_name) ?></div>
+                                <div class="form-control bg-light fw-bold"><i class="bi bi-truck me-1"></i> <?= caseFormat($legacy_party_name) ?></div>
                                 <small class="text-muted"><?= $cur_party_type === 'subcontractor' ? 'Sub-Contractor' : 'Supplier' ?> — legacy record, this page now only creates customer deliveries.</small>
                             </div>
                             <?php elseif ($party_locked_via_source): ?>
@@ -359,7 +359,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                             <input type="hidden" name="party_id" id="dn_party_id" value="<?= $cur_party_id ?>">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Send To</label>
-                                <div class="form-control bg-light fw-bold"><i class="bi bi-person-check me-1"></i> <?= safe_output($locked_customer_name) ?></div>
+                                <div class="form-control bg-light fw-bold"><i class="bi bi-person-check me-1"></i> <?= caseFormat($locked_customer_name) ?></div>
                                 <?php $locked_via = $so ? 'Sales Order' : ($lpo ? 'LPO' : (($is_edit && !empty($dn['order_id'])) ? 'Sales Order' : 'LPO')); ?>
                                 <small class="text-muted">Customer — locked from the linked <?= $locked_via ?>.</small>
                             </div>
@@ -392,7 +392,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                                 <select class="form-select select2-static" name="project_id" id="dn_project_id">
                                     <option value="0">-- No Project (General) --</option>
                                     <?php foreach ($all_projects as $p): ?>
-                                    <option value="<?= $p['project_id'] ?>" <?= ($project_id == $p['project_id']) ? 'selected' : '' ?>><?= safe_output($p['project_name']) ?></option>
+                                    <option value="<?= $p['project_id'] ?>" <?= ($project_id == $p['project_id']) ? 'selected' : '' ?>><?= caseFormat($p['project_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -474,7 +474,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                             <?php foreach ($dn_attachments as $a): ?>
                             <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1" id="att-<?= $a['attachment_id'] ?>">
                                 <a href="<?= getUrl($a['file_path']) ?>" target="_blank" class="text-decoration-none small text-truncate">
-                                    <i class="bi bi-file-earmark-text text-primary me-1"></i><?= safe_output($a['file_name']) ?>
+                                    <i class="bi bi-file-earmark-text text-primary me-1"></i><?= caseFormat($a['file_name']) ?>
                                 </a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachment(<?= $a['attachment_id'] ?>)"><i class="bi bi-trash"></i></button>
                             </div>

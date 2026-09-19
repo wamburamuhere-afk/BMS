@@ -90,7 +90,7 @@ $badge = [
             <h4 class="mb-1 fw-bold"><i class="bi bi-receipt text-primary me-2"></i><?= htmlspecialchars($cn['credit_note_number']) ?></h4>
             <span class="badge" style="background:<?= $badge[0] ?>;color:<?= $badge[1] ?>;padding:.45em .8em;border-radius:50rem;"><?= strtoupper($status) ?></span>
             <span class="text-muted ms-2"><i class="bi bi-calendar-event"></i> <?= date('d M Y', strtotime($cn['credit_date'])) ?></span>
-            <?php if (!empty($cn['warehouse_name'])): ?><span class="text-muted ms-2"><i class="bi bi-building"></i> <?= safe_output($cn['warehouse_name']) ?></span><?php endif; ?>
+            <?php if (!empty($cn['warehouse_name'])): ?><span class="text-muted ms-2"><i class="bi bi-building"></i> <?= caseFormat($cn['warehouse_name']) ?></span><?php endif; ?>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <?php if ($status === 'pending' && $can_review): ?>
@@ -145,7 +145,7 @@ $badge = [
                         <tbody>
                             <?php foreach ($items as $it): ?>
                             <tr>
-                                <td><?= safe_output($it['description']) ?></td>
+                                <td><?= caseFormat($it['description']) ?></td>
                                 <td class="text-center"><?= rtrim(rtrim(number_format($it['quantity'], 2), '0'), '.') ?></td>
                                 <td class="text-end"><?= number_format($it['unit_price'], 2) ?></td>
                                 <td class="text-center"><?= ((float)$it['tax_rate'] == 18) ? '18%' : '—' ?></td>
@@ -165,8 +165,8 @@ $badge = [
             <?php if (!empty($cn['reason']) || !empty($cn['notes'])): ?>
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-body">
-                    <?php if (!empty($cn['reason'])): ?><p class="mb-1"><strong>Reason:</strong> <?= safe_output($cn['reason']) ?></p><?php endif; ?>
-                    <?php if (!empty($cn['notes'])): ?><p class="mb-0 text-muted"><strong>Notes:</strong> <?= nl2br(safe_output($cn['notes'])) ?></p><?php endif; ?>
+                    <?php if (!empty($cn['reason'])): ?><p class="mb-1"><strong>Reason:</strong> <?= caseFormat($cn['reason']) ?></p><?php endif; ?>
+                    <?php if (!empty($cn['notes'])): ?><p class="mb-0 text-muted"><strong>Notes:</strong> <?= nl2br(caseFormat($cn['notes'])) ?></p><?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -176,14 +176,14 @@ $badge = [
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-primary text-white py-2"><i class="bi bi-person me-1"></i> Customer</div>
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><?= safe_output($cn['customer_name']) ?></h6>
-                    <?php if (!empty($cn['company_name'])): ?><p class="text-muted small mb-2"><?= safe_output($cn['company_name']) ?></p><?php endif; ?>
-                    <?php if (!empty($cn['c_email'])): ?><div class="small"><i class="bi bi-envelope text-muted me-1"></i><?= safe_output($cn['c_email']) ?></div><?php endif; ?>
-                    <?php if (!empty($cn['c_phone'])): ?><div class="small"><i class="bi bi-telephone text-muted me-1"></i><?= safe_output($cn['c_phone']) ?></div><?php endif; ?>
+                    <h6 class="fw-bold mb-1"><?= caseFormat($cn['customer_name']) ?></h6>
+                    <?php if (!empty($cn['company_name'])): ?><p class="text-muted small mb-2"><?= caseFormat($cn['company_name']) ?></p><?php endif; ?>
+                    <?php if (!empty($cn['c_email'])): ?><div class="small"><i class="bi bi-envelope text-muted me-1"></i><?= caseFormat($cn['c_email']) ?></div><?php endif; ?>
+                    <?php if (!empty($cn['c_phone'])): ?><div class="small"><i class="bi bi-telephone text-muted me-1"></i><?= caseFormat($cn['c_phone']) ?></div><?php endif; ?>
                     <hr>
                     <div class="small"><strong>Origin:</strong>
                         <?php if (!empty($cn['sales_return_id'])): ?>
-                            <a href="<?= getUrl('sales_return_view') ?>?id=<?= (int)$cn['sales_return_id'] ?>" class="text-decoration-none"><?= safe_output($cn['return_number'] ?: ('Return #' . $cn['sales_return_id'])) ?></a>
+                            <a href="<?= getUrl('sales_return_view') ?>?id=<?= (int)$cn['sales_return_id'] ?>" class="text-decoration-none"><?= caseFormat($cn['return_number'] ?: ('Return #' . $cn['sales_return_id'])) ?></a>
                         <?php elseif (!empty($cn['invoice_id'])): ?>
                             Invoice #<?= (int)$cn['invoice_id'] ?>
                         <?php else: ?>
@@ -208,7 +208,7 @@ $badge = [
                         <div class="list-group-item d-flex align-items-center justify-content-between py-2">
                             <div class="d-flex align-items-center text-truncate me-2">
                                 <i class="bi <?= $icon ?> fs-5 <?= $icol ?> me-2"></i>
-                                <span class="fw-semibold text-truncate"><?= safe_output($att['file_name']) ?></span>
+                                <span class="fw-semibold text-truncate"><?= caseFormat($att['file_name']) ?></span>
                                 <span class="text-muted small ms-2">(<?= strtoupper($ext) ?>)</span>
                             </div>
                             <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-arrow-down"></i></a>
@@ -222,17 +222,17 @@ $badge = [
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-shield-check text-primary me-1"></i> Approval Trail</div>
                 <div class="card-body small">
-                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Created</span><span><?= safe_output($cn['created_by_name'] ?: '—') ?><?= $cn['created_at'] ? ' · ' . date('d M', strtotime($cn['created_at'])) : '' ?></span></div>
-                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Reviewed</span><span><?= $cn['reviewed_by'] ? safe_output($cn['reviewer_name']) . ($cn['reviewed_at'] ? ' · ' . date('d M', strtotime($cn['reviewed_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
-                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Approved</span><span><?= $cn['approved_by'] ? safe_output($cn['approver_name']) . ($cn['approved_at'] ? ' · ' . date('d M', strtotime($cn['approved_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
-                    <div class="d-flex justify-content-between"><span class="text-muted">Refunded</span><span><?php if ($status === 'paid'): ?><?= safe_output($cn['paid_from_name'] ?: 'Paid') ?><?= $cn['paid_at'] ? ' · ' . date('d M', strtotime($cn['paid_at'])) : '' ?><?php else: ?><span class="text-muted">—</span><?php endif; ?></span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Created</span><span><?= caseFormat($cn['created_by_name'] ?: '—') ?><?= $cn['created_at'] ? ' · ' . date('d M', strtotime($cn['created_at'])) : '' ?></span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Reviewed</span><span><?= $cn['reviewed_by'] ? caseFormat($cn['reviewer_name']) . ($cn['reviewed_at'] ? ' · ' . date('d M', strtotime($cn['reviewed_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Approved</span><span><?= $cn['approved_by'] ? caseFormat($cn['approver_name']) . ($cn['approved_at'] ? ' · ' . date('d M', strtotime($cn['approved_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted">Refunded</span><span><?php if ($status === 'paid'): ?><?= caseFormat($cn['paid_from_name'] ?: 'Paid') ?><?= $cn['paid_at'] ? ' · ' . date('d M', strtotime($cn['paid_at'])) : '' ?><?php else: ?><span class="text-muted">—</span><?php endif; ?></span></div>
                 </div>
             </div>
 
             <?php if ($status === 'paid'): ?>
             <div class="alert" style="background:#052c65;color:#fff;border:0;">
-                <i class="bi bi-check-circle me-1"></i> Refund of <strong>TZS <?= number_format($cn['grand_total'], 2) ?></strong> paid from <strong><?= safe_output($cn['paid_from_name'] ?: 'account') ?></strong>.
-                <?php if (!empty($cn['payment_reference'])): ?><div class="small mt-1">Ref: <?= safe_output($cn['payment_reference']) ?></div><?php endif; ?>
+                <i class="bi bi-check-circle me-1"></i> Refund of <strong>TZS <?= number_format($cn['grand_total'], 2) ?></strong> paid from <strong><?= caseFormat($cn['paid_from_name'] ?: 'account') ?></strong>.
+                <?php if (!empty($cn['payment_reference'])): ?><div class="small mt-1">Ref: <?= caseFormat($cn['payment_reference']) ?></div><?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
@@ -252,7 +252,7 @@ $badge = [
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="credit_note_id" value="<?= $id ?>">
-                    <p class="mb-3">Refund <strong class="text-primary">TZS <?= number_format($cn['grand_total'], 2) ?></strong> to <strong><?= safe_output($cn['customer_name']) ?></strong>.</p>
+                    <p class="mb-3">Refund <strong class="text-primary">TZS <?= number_format($cn['grand_total'], 2) ?></strong> to <strong><?= caseFormat($cn['customer_name']) ?></strong>.</p>
                     <div class="mb-3">
                         <label class="form-label">Paid From <span class="text-danger">*</span></label>
                         <select class="form-select" name="paid_from_account_id" id="pay_account" required style="width:100%">

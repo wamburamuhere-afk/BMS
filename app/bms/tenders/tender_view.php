@@ -69,14 +69,14 @@ $company_logo = getSetting('company_logo', '');
       
         
         <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 8px 0; font-size: 18pt; letter-spacing: 1px;">TENDER DETAILS REPORT</h2>
-        <p class="text-dark mb-1" style="font-size: 11pt;">Tender NO: <span class="fw-bold"><?= safe_output($tender['tender_no']) ?></span></p>
+        <p class="text-dark mb-1" style="font-size: 11pt;">Tender NO: <span class="fw-bold"><?= caseFormat($tender['tender_no']) ?></span></p>
         <div style="border-bottom: 3px solid #0d6efd; width: 120px; margin: 15px auto 25px;"></div>
     </div>
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
         <div class="d-print-none mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-primary"><i class="bi bi-file-earmark-text me-2"></i>Tender Details</h2>
-            <p class="text-muted small mb-0">Viewing comprehensive details for Tender No: <span class="fw-bold text-dark"><?= safe_output($tender['tender_no']) ?></span></p>
+            <p class="text-muted small mb-0">Viewing comprehensive details for Tender No: <span class="fw-bold text-dark"><?= caseFormat($tender['tender_no']) ?></span></p>
         </div>
         <div class="d-flex flex-nowrap gap-1 gap-md-2 no-print justify-content-center justify-content-md-end">
             <a href="<?= getUrl('tenders') ?>" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-left"></i> <span class="d-none d-sm-inline">Back to List</span><span class="d-inline d-sm-none">Back</span></a>
@@ -89,7 +89,7 @@ $company_logo = getSetting('company_logo', '');
 
     <?php if ($linkedProject): ?>
     <div class="alert alert-success d-flex align-items-center justify-content-between no-print">
-        <span><i class="bi bi-check-circle-fill me-2"></i>This tender was <strong>AWARDED</strong> — Project created: <strong><?= safe_output($linkedProject['project_name']) ?></strong></span>
+        <span><i class="bi bi-check-circle-fill me-2"></i>This tender was <strong>AWARDED</strong> — Project created: <strong><?= caseFormat($linkedProject['project_name']) ?></strong></span>
         <a href="<?= getUrl('project_view') ?>?id=<?= $linkedProject['project_id'] ?>" class="btn btn-sm btn-success text-nowrap"><i class="bi bi-arrow-right-circle"></i> View Project</a>
     </div>
     <?php endif; ?>
@@ -110,15 +110,15 @@ $company_logo = getSetting('company_logo', '');
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Acronym</th>
-                            <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2"><?= safe_output($tender['acronym']) ?></span></td>
+                            <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2"><?= caseFormat($tender['acronym']) ?></span></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Location</th>
-                            <td><?= safe_output($display_ward) ?>, <?= safe_output($display_council) ?>, <?= safe_output($display_district) ?>, <?= safe_output($display_region) ?></td>
+                            <td><?= caseFormat($display_ward) ?>, <?= caseFormat($display_council) ?>, <?= caseFormat($display_district) ?>, <?= caseFormat($display_region) ?></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Contacts</th>
-                            <td><?= safe_output($tender['contact_number']) ?></td>
+                            <td><?= caseFormat($tender['contact_number']) ?></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Physical Address</th>
@@ -148,7 +148,7 @@ $company_logo = getSetting('company_logo', '');
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">NeST Reference</th>
-                            <td><?= safe_output($tender['nest_reference'] ?? null, '—') ?></td>
+                            <td><?= caseFormat($tender['nest_reference'] ?? null, '—') ?></td>
                         </tr>
                         <tr>
                             <th class="bg-light ps-3">Deadline</th>
@@ -220,10 +220,10 @@ $company_logo = getSetting('company_logo', '');
                             <?php foreach($assigned_staff as $idx => $s): ?>
                                 <tr>
                                     <td class="ps-3 fw-bold text-muted"><?= $idx + 1 ?></td>
-                                    <td class="fw-bold text-dark"><?= safe_output($s['first_name'] . ' ' . $s['last_name']) ?></td>
-                                    <td><?= safe_output($s['employee_number']) ?></td>
-                                    <td><small class="text-muted fw-bold"><?= safe_output($s['designation_name'] ?? '-') ?></small></td>
-                                    <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2"><?= safe_output($s['role_position']) ?></span></td>
+                                    <td class="fw-bold text-dark"><?= caseFormat($s['first_name'] . ' ' . $s['last_name']) ?></td>
+                                    <td><?= caseFormat($s['employee_number']) ?></td>
+                                    <td><small class="text-muted fw-bold"><?= caseFormat($s['designation_name'] ?? '-') ?></small></td>
+                                    <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2"><?= caseFormat($s['role_position']) ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -287,9 +287,9 @@ $company_logo = getSetting('company_logo', '');
                             <div class="card-body d-flex align-items-center gap-3 p-3">
                                 <i class="bi <?= $doc['file_icon'] ?> flex-shrink-0" style="font-size:2rem;"></i>
                                 <div class="overflow-hidden">
-                                    <div class="fw-semibold small text-dark"><?= safe_output($doc['label']) ?></div>
-                                    <div class="text-muted text-truncate" style="font-size:0.73rem;" title="<?= safe_output($doc['name']) ?>">
-                                        <?= safe_output($doc['name']) ?>
+                                    <div class="fw-semibold small text-dark"><?= caseFormat($doc['label']) ?></div>
+                                    <div class="text-muted text-truncate" style="font-size:0.73rem;" title="<?= caseFormat($doc['name']) ?>">
+                                        <?= caseFormat($doc['name']) ?>
                                     </div>
                                     <span class="badge bg-light text-secondary border mt-1" style="font-size:0.65rem;">
                                         <?= strtoupper($doc['ext']) ?>
@@ -299,11 +299,11 @@ $company_logo = getSetting('company_logo', '');
                             <div class="card-footer bg-white border-top p-2 d-flex gap-2">
                                 <?php if ($doc['viewable']): ?>
                                 <button class="btn btn-sm btn-outline-primary flex-fill"
-                                        onclick="viewDoc('<?= safe_output($view_url) ?>', '<?= safe_output(addslashes($doc['label'])) ?>')">
+                                        onclick="viewDoc('<?= caseFormat($view_url) ?>', '<?= caseFormat(addslashes($doc['label'])) ?>')">
                                     <i class="bi bi-eye me-1"></i>View
                                 </button>
                                 <?php endif; ?>
-                                <a href="<?= safe_output($view_url) ?>&amp;download=1"
+                                <a href="<?= caseFormat($view_url) ?>&amp;download=1"
                                    class="btn btn-sm btn-outline-secondary flex-fill"
                                    target="_blank">
                                     <i class="bi bi-download me-1"></i>Download
@@ -340,9 +340,9 @@ $company_logo = getSetting('company_logo', '');
                             <?php foreach($logs as $log): ?>
                                 <tr class="small">
                                     <td class="ps-3 text-muted"><?= format_date($log['created_at'], 'd M Y, H:i:s') ?></td>
-                                    <td class="fw-bold text-primary"><?= safe_output($log['full_name']) ?></td>
+                                    <td class="fw-bold text-primary"><?= caseFormat($log['full_name']) ?></td>
                                     <td><span class="badge bg-primary bg-opacity-75 small px-2"><?= $log['action'] ?></span></td>
-                                    <td class="text-muted"><?= safe_output($log['description']) ?></td>
+                                    <td class="text-muted"><?= caseFormat($log['description']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -378,7 +378,7 @@ $company_logo = getSetting('company_logo', '');
 
 <script>
 function printTender() {
-    logActivityAction('PRINT', 'Tender Print', 'Printed details for tender: <?= safe_output($tender['tender_no']) ?>', 'tender', <?= $id ?>);
+    logActivityAction('PRINT', 'Tender Print', 'Printed details for tender: <?= caseFormat($tender['tender_no']) ?>', 'tender', <?= $id ?>);
     window.print();
 }
 

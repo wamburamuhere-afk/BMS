@@ -209,7 +209,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                         <?php foreach ($customers as $customer): ?>
                                             <option value="<?= safe_output($customer['customer_name']) ?>"
                                                     data-customer-id="<?= $customer['customer_id'] ?>">
-                                                <?= safe_output($customer['customer_name']) ?><?= !empty($customer['company_name']) ? ' (' . safe_output($customer['company_name']) . ')' : '' ?>
+                                                <?= caseFormat($customer['customer_name']) ?><?= !empty($customer['company_name']) ? ' (' . caseFormat($customer['company_name']) . ')' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                         <option value="ADD_NEW_CUSTOMER" class="fw-bold text-primary">--- CREATE NEW CUSTOMER ---</option>

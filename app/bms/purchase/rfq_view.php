@@ -85,9 +85,9 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
         <?php if(!empty($c_logo)): ?>
         <div class="mb-2"><img src="<?= htmlspecialchars('../../../'.$c_logo) ?>" alt="Logo" style="max-height:80px;"></div>
         <?php endif; ?>
-        <h1 style="color:#0d6efd;font-weight:800;text-transform:uppercase;font-size:22pt;margin:0;"><?= safe_output($c_name) ?></h1>
-        <p class="small text-uppercase mb-1"><?php $we=[];if(!empty($c_web))$we[]='Web: '.safe_output($c_web);if(!empty($c_email))$we[]='Email: '.safe_output($c_email);echo implode(' | ',$we); ?></p>
-        <p class="small text-uppercase mb-1"><?php $tv=[];if(!empty($c_tin))$tv[]='TIN: '.safe_output($c_tin);if(!empty($c_vrn))$tv[]='VRN: '.safe_output($c_vrn);echo implode(' | ',$tv); ?></p>
+        <h1 style="color:#0d6efd;font-weight:800;text-transform:uppercase;font-size:22pt;margin:0;"><?= caseFormat($c_name) ?></h1>
+        <p class="small text-uppercase mb-1"><?php $we=[];if(!empty($c_web))$we[]='Web: '.caseFormat($c_web);if(!empty($c_email))$we[]='Email: '.caseFormat($c_email);echo implode(' | ',$we); ?></p>
+        <p class="small text-uppercase mb-1"><?php $tv=[];if(!empty($c_tin))$tv[]='TIN: '.caseFormat($c_tin);if(!empty($c_vrn))$tv[]='VRN: '.caseFormat($c_vrn);echo implode(' | ',$tv); ?></p>
         <div class="mt-2">
             <h2 style="color:#495057;font-weight:600;text-transform:uppercase;font-size:14pt;letter-spacing:2px;"><?= t('REQUEST FOR QUOTATION') ?></h2>
             <p style="color:#6c757d;font-size:9pt;"><?= t('Generated:') ?> <?= date('d M Y, h:i A') ?></p>
@@ -95,7 +95,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
         <div style="border-bottom:3px solid #0d6efd;margin:10px 0 20px;"></div>
     </div>
     <div class="d-none d-print-block" style="position:fixed;bottom:0;left:0;right:0;border-top:1px solid #dee2e6;padding:5px 0;text-align:center;">
-        <small style="color:#666;font-size:8pt;"><?= safe_output($c_name) ?> &mdash; RFQ #<?= safe_output($rfq['rfq_number']) ?> &mdash; <?= t('Printed:') ?> <?= date('d M Y, h:i A') ?></small>
+        <small style="color:#666;font-size:8pt;"><?= caseFormat($c_name) ?> &mdash; RFQ #<?= caseFormat($rfq['rfq_number']) ?> &mdash; <?= t('Printed:') ?> <?= date('d M Y, h:i A') ?></small>
     </div>
 
     <!-- Breadcrumb -->
@@ -107,7 +107,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>"><?= t('RFQ') ?></a></li>
             <?php endif; ?>
-            <li class="breadcrumb-item active"><?= safe_output($rfq['rfq_number']) ?></li>
+            <li class="breadcrumb-item active"><?= caseFormat($rfq['rfq_number']) ?></li>
         </ol>
     </nav>
 
@@ -186,15 +186,15 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <div class="row g-3">
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('RFQ Number') ?></p>
-                    <span class="rfq-code"><?= safe_output($rfq['rfq_number']) ?></span>
+                    <span class="rfq-code"><?= caseFormat($rfq['rfq_number']) ?></span>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('RFQ Date') ?></p>
-                    <strong><?= safe_output($rfq['rfq_date'] ?? '—') ?></strong>
+                    <strong><?= caseFormat($rfq['rfq_date'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Deadline') ?></p>
-                    <strong><?= safe_output($rfq['deadline_date'] ?? '—') ?></strong>
+                    <strong><?= caseFormat($rfq['deadline_date'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Status') ?></p>
@@ -202,16 +202,16 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Supplier') ?></p>
-                    <strong><?= safe_output($rfq['supplier_name'] ?? '—') ?></strong>
+                    <strong><?= caseFormat($rfq['supplier_name'] ?? '—') ?></strong>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= wLabel('Warehouse', 'Shop') ?></p>
-                    <strong><?= safe_output($rfq['warehouse_name'] ?? '—') ?></strong>
+                    <strong><?= caseFormat($rfq['warehouse_name'] ?? '—') ?></strong>
                 </div>
                 <?php if (!empty($rfq['project_name'])): ?>
                 <div class="col-6 col-md-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= t('Project') ?></p>
-                    <strong><?= safe_output($rfq['project_name']) ?></strong>
+                    <strong><?= caseFormat($rfq['project_name']) ?></strong>
                 </div>
                 <?php endif; ?>
             </div>
@@ -241,9 +241,9 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                         <?php foreach ($items as $i => $item): ?>
                         <tr>
                             <td class="ps-4 fw-bold text-muted"><?= $i+1 ?></td>
-                            <td><?= safe_output($item['description']) ?></td>
-                            <td><?= safe_output($item['unit'] ?? '—') ?></td>
-                            <td><?= safe_output($item['qty']) ?></td>
+                            <td><?= caseFormat($item['description']) ?></td>
+                            <td><?= caseFormat($item['unit'] ?? '—') ?></td>
+                            <td><?= caseFormat($item['qty']) ?></td>
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
@@ -279,8 +279,8 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                             <span class="text-uppercase fw-bold small"><?= t('Prepared By') ?></span>
                         </div>
                         <?php if ($has_prepared): ?>
-                        <div class="auth-name fw-bold"><?= safe_output($rfq['prepared_by_name']) ?></div>
-                        <div class="auth-role text-muted small"><?= safe_output($rfq['prepared_by_role'] ?? '') ?></div>
+                        <div class="auth-name fw-bold"><?= caseFormat($rfq['prepared_by_name']) ?></div>
+                        <div class="auth-role text-muted small"><?= caseFormat($rfq['prepared_by_role'] ?? '') ?></div>
                         <?php else: ?>
                         <div class="text-muted small fst-italic"><?= t('Not yet recorded') ?></div>
                         <?php endif; ?>
@@ -297,8 +297,8 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                             <span class="text-uppercase fw-bold small"><?= t('Reviewed By') ?></span>
                         </div>
                         <?php if ($has_reviewed): ?>
-                        <div class="auth-name fw-bold"><?= safe_output($rfq['reviewed_by_name']) ?></div>
-                        <div class="auth-role text-muted small"><?= safe_output($rfq['reviewed_by_role'] ?? '') ?></div>
+                        <div class="auth-name fw-bold"><?= caseFormat($rfq['reviewed_by_name']) ?></div>
+                        <div class="auth-role text-muted small"><?= caseFormat($rfq['reviewed_by_role'] ?? '') ?></div>
                         <div class="auth-date text-muted" style="font-size:.75rem;">
                             <?php if (!empty($rfq['reviewed_at'])): ?>
                                 <?= date('d M Y, h:i A', strtotime($rfq['reviewed_at'])) ?>
@@ -320,8 +320,8 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                             <span class="text-uppercase fw-bold small"><?= t('Approved By') ?></span>
                         </div>
                         <?php if ($has_approved): ?>
-                        <div class="auth-name fw-bold"><?= safe_output($rfq['approved_by_name']) ?></div>
-                        <div class="auth-role text-muted small"><?= safe_output($rfq['approved_by_role'] ?? '') ?></div>
+                        <div class="auth-name fw-bold"><?= caseFormat($rfq['approved_by_name']) ?></div>
+                        <div class="auth-role text-muted small"><?= caseFormat($rfq['approved_by_role'] ?? '') ?></div>
                         <div class="auth-date text-muted" style="font-size:.75rem;">
                             <?php if (!empty($rfq['approved_at'])): ?>
                                 <?= date('d M Y, h:i A', strtotime($rfq['approved_at'])) ?>
@@ -354,16 +354,16 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                 <li class="list-group-item d-flex align-items-center gap-3 py-2 px-3">
                     <i class="bi bi-file-earmark text-primary fs-5"></i>
                     <div class="flex-grow-1">
-                        <div class="fw-semibold"><?= safe_output($att['attachment_name'] ?: $att['original_name']) ?></div>
+                        <div class="fw-semibold"><?= caseFormat($att['attachment_name'] ?: $att['original_name']) ?></div>
                         <?php if ($att['attachment_name'] && $att['original_name'] && $att['attachment_name'] !== $att['original_name']): ?>
-                        <div class="text-muted small"><?= safe_output($att['original_name']) ?></div>
+                        <div class="text-muted small"><?= caseFormat($att['original_name']) ?></div>
                         <?php endif; ?>
                     </div>
                     <a href="<?= getUrl($att['file_path']) ?>" target="_blank"
                        class="btn btn-sm btn-outline-primary py-1 d-print-none">
                         <i class="bi bi-file-earmark-arrow-down me-1"></i><?= t('Download') ?>
                     </a>
-                    <span class="d-none d-print-inline small text-muted"><?= safe_output($att['file_path']) ?></span>
+                    <span class="d-none d-print-inline small text-muted"><?= caseFormat($att['file_path']) ?></span>
                 </li>
                 <?php endforeach; ?>
             </ul>
@@ -435,7 +435,7 @@ function printRfqDoc(template) {
 function submitForReview() {
     Swal.fire({
         title: <?= json_encode(t('Submit for Review?')) ?>,
-        text: <?= json_encode(sprintf(t('RFQ #%s will be sent for review. You will no longer be able to edit it.'), safe_output($rfq['rfq_number']))) ?>,
+        text: <?= json_encode(sprintf(t('RFQ #%s will be sent for review. You will no longer be able to edit it.'), caseFormat($rfq['rfq_number']))) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#0d6efd',
@@ -465,7 +465,7 @@ function submitForReview() {
 function approveRFQ() {
     Swal.fire({
         title: <?= json_encode(t('Approve this RFQ?')) ?>,
-        text: <?= json_encode(sprintf(t('RFQ #%s will be marked as approved.'), safe_output($rfq['rfq_number']))) ?>,
+        text: <?= json_encode(sprintf(t('RFQ #%s will be marked as approved.'), caseFormat($rfq['rfq_number']))) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#198754',

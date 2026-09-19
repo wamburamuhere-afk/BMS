@@ -27,7 +27,7 @@ $fotApi = buildUrl('api/tender_form_of_tender.php');
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
         <div class="mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-primary"><i class="bi bi-printer me-2"></i>Preview &amp; Print</h2>
-            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= safe_output($tender['tender_no']) ?></span></p>
+            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= caseFormat($tender['tender_no']) ?></span></p>
         </div>
         <a href="<?= getUrl('tenders') ?>" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-left"></i> Back to List</a>
     </div>

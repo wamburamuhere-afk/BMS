@@ -76,7 +76,7 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="fw-bold"><i class="bi bi-cash-coin text-success"></i> Record Payment</h2>
-                    <p class="text-muted mb-0">Add payment for Invoice #<?= safe_output($invoice['invoice_number']) ?></p>
+                    <p class="text-muted mb-0">Add payment for Invoice #<?= caseFormat($invoice['invoice_number']) ?></p>
                 </div>
                 <div class="d-flex gap-2">
                     <a href="<?= getUrl('invoice_view') ?>?id=<?= $invoice_id ?>" class="btn btn-outline-secondary btn-sm shadow-sm">
@@ -142,7 +142,7 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
                                 <select class="form-select" name="wht_rate_id" id="pay-wht-rate">
                                     <option value="" data-rate="0">No withholding tax</option>
                                     <?php foreach ($pay_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                    <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                    <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                     <?php endforeach; ?>
                                 </select>
                                 <div class="form-text">If the customer withholds WHT, it's recorded as a receivable (tax credit). Computed on the VAT-exclusive amount.</div>
@@ -292,11 +292,11 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
                     <hr class="my-2">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted small">Invoice #:</span>
-                        <span class="fw-bold small"><?= safe_output($invoice['invoice_number']) ?></span>
+                        <span class="fw-bold small"><?= caseFormat($invoice['invoice_number']) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted small">Customer:</span>
-                        <span class="fw-bold small text-end" style="max-width:60%;"><?= safe_output($invoice['customer_name']) ?></span>
+                        <span class="fw-bold small text-end" style="max-width:60%;"><?= caseFormat($invoice['customer_name']) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted small">Invoice Date:</span>
@@ -313,12 +313,12 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted small">Grand Total:</span>
-                        <span class="small fw-bold font-monospace"><?= number_format($pc_gt, 2) ?> <?= safe_output($invoice['currency']) ?></span>
+                        <span class="small fw-bold font-monospace"><?= number_format($pc_gt, 2) ?> <?= caseFormat($invoice['currency']) ?></span>
                     </div>
                     <hr class="my-2">
                     <div class="d-flex justify-content-between">
                         <span class="fw-bold text-danger">Balance Due:</span>
-                        <span class="fw-bold text-danger font-monospace"><?= number_format($pc_bd, 2) ?> <?= safe_output($invoice['currency']) ?></span>
+                        <span class="fw-bold text-danger font-monospace"><?= number_format($pc_bd, 2) ?> <?= caseFormat($invoice['currency']) ?></span>
                     </div>
                 </div>
             </div>

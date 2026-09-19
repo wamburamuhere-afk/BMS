@@ -572,7 +572,7 @@ function generate_grn_number() {
                         <option value=""><?= t('All Suppliers') ?></option>
                         <?php foreach ($suppliers as $supplier): ?>
                             <option value="<?= $supplier['supplier_id'] ?>" <?= $supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($supplier['supplier_name']) ?>
+                                <?= caseFormat($supplier['supplier_name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -583,7 +583,7 @@ function generate_grn_number() {
                         <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>" <?= $warehouse_filter == $warehouse['warehouse_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($warehouse['warehouse_name']) ?>
+                                <?= caseFormat($warehouse['warehouse_name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -595,7 +595,7 @@ function generate_grn_number() {
                         <option value=""><?= t('All Projects') ?></option>
                         <?php foreach ($projects as $project): ?>
                             <option value="<?= $project['project_id'] ?>" <?= $project_filter == $project['project_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($project['project_name']) ?>
+                                <?= caseFormat($project['project_name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -668,8 +668,8 @@ function generate_grn_number() {
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . caseFormat($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . caseFormat($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
@@ -677,8 +677,8 @@ function generate_grn_number() {
         <p class="text-dark mb-1 small text-uppercase">
             <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . caseFormat($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . caseFormat($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>

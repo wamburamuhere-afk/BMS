@@ -60,7 +60,7 @@ $users     = $pdo->query("SELECT user_id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', fi
                         <select class="form-select select2-static" id="import_campaign_id">
                             <option value="">— None —</option>
                             <?php foreach ($campaigns as $c): ?>
-                            <option value="<?= $c['campaign_id'] ?>"><?= safe_output($c['campaign_name']) ?></option>
+                            <option value="<?= $c['campaign_id'] ?>"><?= caseFormat($c['campaign_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -69,7 +69,7 @@ $users     = $pdo->query("SELECT user_id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', fi
                         <select class="form-select select2-static" id="import_assigned_to">
                             <option value="">— None —</option>
                             <?php foreach ($users as $u): ?>
-                            <option value="<?= $u['user_id'] ?>"><?= safe_output($u['name']) ?></option>
+                            <option value="<?= $u['user_id'] ?>"><?= caseFormat($u['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

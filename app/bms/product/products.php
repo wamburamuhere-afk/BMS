@@ -699,7 +699,7 @@ function get_quick_actions($product) {
                             <?php foreach ($brands as $brand): ?>
                                 <option value="<?= $brand['brand_id'] ?>"
                                     <?= $brand_id == $brand['brand_id'] ? 'selected' : '' ?>>
-                                    <?= safe_output($brand['brand_name']) ?>
+                                    <?= caseFormat($brand['brand_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -711,7 +711,7 @@ function get_quick_actions($product) {
                             <?php foreach ($suppliers as $supplier): ?>
                                 <option value="<?= $supplier['supplier_id'] ?>"
                                     <?= $supplier_id == $supplier['supplier_id'] ? 'selected' : '' ?>>
-                                    <?= safe_output($supplier['supplier_name']) ?>
+                                    <?= caseFormat($supplier['supplier_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -856,7 +856,7 @@ function get_quick_actions($product) {
                                 </td>
                                 <?php if (!$simpleProductForm): ?>
                                 <td>
-                                    <code class="custom-code"><?= safe_output($product['sku']) ?></code>
+                                    <code class="custom-code"><?= caseFormat($product['sku']) ?></code>
                                 </td>
                                 <?php endif; ?>
                                 <td>
@@ -1040,13 +1040,13 @@ function get_quick_actions($product) {
                                 </div>
                                 <div class="text-end ms-2">
                                     <div class="fw-bold text-primary small"><?= format_currency($product['selling_price']) ?></div>
-                                    <code class="small text-muted" style="font-size: 0.65rem;"><?= safe_output($product['sku']) ?></code>
+                                    <code class="small text-muted" style="font-size: 0.65rem;"><?= caseFormat($product['sku']) ?></code>
                                 </div>
                             </div>
                             <div class="d-flex justify-content-between small mb-3">
                                 <span class="text-muted"><?= t('Stock') ?>:</span>
                                 <span class="fw-bold <?= $stock_status == 'out_of_stock' ? 'text-danger' : ($stock_status == 'low_stock' ? 'text-warning' : 'text-success') ?>">
-                                    <?= $available_stock ?> <?= safe_output($product['unit'] ?? 'pcs') ?>
+                                    <?= $available_stock ?> <?= caseFormat($product['unit'] ?? 'pcs') ?>
                                 </span>
                             </div>
                             <div class="d-flex gap-1 mt-auto">
@@ -2042,7 +2042,7 @@ function generate_barcode_local() {
                                     <select class="form-select select2-static" name="tax_id" id="modal_tax_id">
                                         <option value=""><?= t('No Tax') ?></option>
                                         <?php if ($vat18_rate): ?>
-                                            <option value="<?= $vat18_rate['rate_id'] ?>"><?= safe_output($vat18_rate['rate_name']) ?> (<?= $vat18_rate['rate_percentage'] ?>%)</option>
+                                            <option value="<?= $vat18_rate['rate_id'] ?>"><?= caseFormat($vat18_rate['rate_name']) ?> (<?= $vat18_rate['rate_percentage'] ?>%)</option>
                                         <?php endif; ?>
                                     </select>
                                     <div class="form-check mt-2">
@@ -2129,7 +2129,7 @@ function generate_barcode_local() {
                                                 <?php else: ?>
                                                     <?php foreach ($warehouses as $wh): ?>
                                                     <tr>
-                                                        <td class="align-middle fw-semibold"><?= safe_output($wh['warehouse_name']) ?></td>
+                                                        <td class="align-middle fw-semibold"><?= caseFormat($wh['warehouse_name']) ?></td>
                                                         <td>
                                                             <div class="input-group input-group-sm">
                                                                 <input type="number" class="form-control text-center" 

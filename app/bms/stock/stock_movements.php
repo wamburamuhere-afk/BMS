@@ -113,7 +113,7 @@ function getMovementBadge($type) {
                 <img src="<?= getUrl($c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
             </div>
         <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= safe_output($c_name) ?></h1>
+        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= caseFormat($c_name) ?></h1>
         
         <div class="mt-3 text-center">
             <h2 style="color: #000; font-weight: 700; text-transform: uppercase; margin: 5px 0; font-size: 18pt; letter-spacing: 1px;">STOCK MOVEMENT REPORT</h2>
@@ -128,7 +128,7 @@ function getMovementBadge($type) {
                 <i class="bi bi-arrow-left-right text-primary me-2"></i> 
                 Stock Movements
                 <?php if ($product_info): ?>
-                    <small class="text-muted fw-normal"> - <?= safe_output($product_info['product_name']) ?> (<?= safe_output($product_info['sku']) ?>)</small>
+                    <small class="text-muted fw-normal"> - <?= caseFormat($product_info['product_name']) ?> (<?= caseFormat($product_info['sku']) ?>)</small>
                 <?php endif; ?>
             </h2>
             <nav aria-label="breadcrumb">
@@ -241,15 +241,15 @@ function getMovementBadge($type) {
                                     <td><?= getMovementBadge($m['movement_type']) ?></td>
                                     <?php if (!$product_id): ?>
                                         <td>
-                                            <div class="fw-bold"><?= safe_output($m['product_name']) ?></div>
-                                            <code class="small"><?= safe_output($m['sku']) ?></code>
+                                            <div class="fw-bold"><?= caseFormat($m['product_name']) ?></div>
+                                            <code class="small"><?= caseFormat($m['sku']) ?></code>
                                         </td>
                                     <?php endif; ?>
-                                    <td><?= safe_output($m['warehouse_name']) ?></td>
+                                    <td><?= caseFormat($m['warehouse_name']) ?></td>
                                     <td>
-                                        <div class="small fw-bold text-dark"><?= safe_output($m['reference_number']) ?></div>
+                                        <div class="small fw-bold text-dark"><?= caseFormat($m['reference_number']) ?></div>
                                         <?php if (!empty($m['reason'])): ?>
-                                            <small class="text-muted d-block"><?= safe_output($m['reason']) ?></small>
+                                            <small class="text-muted d-block"><?= caseFormat($m['reason']) ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end fw-bold <?= $m['quantity'] > 0 ? 'text-success' : 'text-danger' ?>">
@@ -257,7 +257,7 @@ function getMovementBadge($type) {
                                     </td>
                                     <td class="text-end text-muted"><?= format_number($m['stock_before'], 3) ?></td>
                                     <td class="text-end fw-bold"><?= format_number($m['stock_after'], 3) ?></td>
-                                    <td><small class="text-muted"><?= safe_output($m['created_by_name']) ?></small></td>
+                                    <td><small class="text-muted"><?= caseFormat($m['created_by_name']) ?></small></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>

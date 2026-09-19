@@ -38,8 +38,8 @@ $sub_hub_cards = restaurantSubHubCards();
                 <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card">
                     <div class="text-center">
                         <div class="fs-2 text-primary mb-2"><i class="bi <?= safe_output($card['icon']) ?>"></i></div>
-                        <div class="fw-bold"><?= safe_output($card['label']) ?></div>
-                        <div class="small text-muted"><?= safe_output($card['description']) ?></div>
+                        <div class="fw-bold"><?= caseFormat($card['label']) ?></div>
+                        <div class="small text-muted"><?= caseFormat($card['description']) ?></div>
                     </div>
                 </div>
             </a>

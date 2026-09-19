@@ -102,7 +102,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= getUrl('assets') ?>">Assets</a></li>
-            <li class="breadcrumb-item active"><?= safe_output($asset['asset_code']) ?></li>
+            <li class="breadcrumb-item active"><?= caseFormat($asset['asset_code']) ?></li>
         </ol>
     </nav>
 
@@ -111,10 +111,10 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
-                    <h3 class="fw-bold mb-1"><?= safe_output($asset['asset_name']) ?></h3>
+                    <h3 class="fw-bold mb-1"><?= caseFormat($asset['asset_name']) ?></h3>
                     <div class="text-muted">
-                        <span class="badge bg-dark-subtle text-dark border me-2"><?= safe_output($asset['asset_code']) ?></span>
-                        <?= safe_output($asset['category_name'] ?: $asset['category']) ?>
+                        <span class="badge bg-dark-subtle text-dark border me-2"><?= caseFormat($asset['asset_code']) ?></span>
+                        <?= caseFormat($asset['category_name'] ?: $asset['category']) ?>
                         <span class="badge bg-<?= $statusColors[$asset['status']] ?? 'secondary' ?> ms-2"><?= ucfirst($asset['status']) ?></span>
                         <?php if ($asset['condition']): ?>
                         <span class="badge bg-<?= $condColors[$asset['condition']] ?? 'secondary' ?>-subtle text-<?= $condColors[$asset['condition']] ?? 'secondary' ?>-emphasis border ms-1"><?= ucfirst($asset['condition']) ?></span>
@@ -141,7 +141,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
     <?php if ($disposal): ?>
     <div class="card border-0 shadow-sm mb-4 border-start border-danger border-4">
         <div class="card-body">
-            <h6 class="fw-bold text-danger mb-3"><i class="bi bi-box-arrow-right me-1"></i> Disposed (<?= ucfirst(str_replace('_',' ',$disposal['method'])) ?>) on <?= safe_output($disposal['disposal_date']) ?></h6>
+            <h6 class="fw-bold text-danger mb-3"><i class="bi bi-box-arrow-right me-1"></i> Disposed (<?= ucfirst(str_replace('_',' ',$disposal['method'])) ?>) on <?= caseFormat($disposal['disposal_date']) ?></h6>
             <div class="row g-3 text-center">
                 <div class="col-6 col-md-2"><div class="small text-muted">Original Cost</div><div class="fw-bold"><?= tzs($disposal['original_cost']) ?></div></div>
                 <div class="col-6 col-md-2"><div class="small text-muted">Accum Dep (Book)</div><div class="fw-bold"><?= tzs($disposal['accum_dep_book_at_disposal']) ?></div></div>
@@ -150,7 +150,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                 <div class="col-6 col-md-2"><div class="small text-muted">Gain / (Loss)</div><div class="fw-bold <?= $disposal['gain_loss'] >= 0 ? 'text-success' : 'text-danger' ?>"><?= tzs($disposal['gain_loss']) ?></div></div>
                 <div class="col-6 col-md-2"><div class="small text-muted">Accum Dep (Tax)</div><div class="fw-bold"><?= tzs($disposal['accum_dep_tax_at_disposal']) ?></div></div>
             </div>
-            <?php if ($disposal['notes']): ?><div class="small text-muted mt-2"><i class="bi bi-sticky me-1"></i><?= safe_output($disposal['notes']) ?></div><?php endif; ?>
+            <?php if ($disposal['notes']): ?><div class="small text-muted mt-2"><i class="bi bi-sticky me-1"></i><?= caseFormat($disposal['notes']) ?></div><?php endif; ?>
             <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Gain/loss is recognised in the P&amp;L and is <strong>not</strong> part of the PPE movement schedule.</div>
         </div>
     </div>
@@ -163,20 +163,20 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                 <div class="card-header bg-white fw-bold"><i class="bi bi-info-circle me-1"></i> Details</div>
                 <div class="card-body">
                     <table class="table table-sm mb-0">
-                        <tr><th class="text-muted">Serial No.</th><td><?= safe_output($asset['serial_number'], '—') ?></td></tr>
-                        <tr><th class="text-muted">Location</th><td><?= safe_output($asset['location'], '—') ?></td></tr>
-                        <tr><th class="text-muted">Custodian</th><td><?= safe_output(trim($asset['custodian_name']) ?: $asset['custodian_username'], '—') ?></td></tr>
-                        <tr><th class="text-muted">Supplier</th><td><?= safe_output($asset['supplier_name'], '—') ?></td></tr>
-                        <tr><th class="text-muted">Invoice Ref</th><td><?= safe_output($asset['invoice_ref'], '—') ?></td></tr>
-                        <tr><th class="text-muted">Purchase Date</th><td><?= safe_output($asset['purchase_date'], '—') ?></td></tr>
-                        <tr><th class="text-muted">Capitalization</th><td><?= safe_output($asset['capitalization_date'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Serial No.</th><td><?= caseFormat($asset['serial_number'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Location</th><td><?= caseFormat($asset['location'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Custodian</th><td><?= caseFormat(trim($asset['custodian_name']) ?: $asset['custodian_username'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Supplier</th><td><?= caseFormat($asset['supplier_name'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Invoice Ref</th><td><?= caseFormat($asset['invoice_ref'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Purchase Date</th><td><?= caseFormat($asset['purchase_date'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Capitalization</th><td><?= caseFormat($asset['capitalization_date'], '—') ?></td></tr>
                         <?php if ($asset['acquisition_type'] === 'existing'): ?>
-                        <tr><th class="text-muted">Take-on Date</th><td><?= safe_output($asset['take_on_date'], '—') ?></td></tr>
+                        <tr><th class="text-muted">Take-on Date</th><td><?= caseFormat($asset['take_on_date'], '—') ?></td></tr>
                         <?php endif; ?>
                         <tr><th class="text-muted">Cost</th><td class="fw-bold"><?= tzs($cost) ?></td></tr>
                     </table>
                     <?php if ($asset['description']): ?>
-                    <hr><div class="small text-muted"><?= nl2br(safe_output($asset['description'], '')) ?></div>
+                    <hr><div class="small text-muted"><?= nl2br(caseFormat($asset['description'], '')) ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -185,7 +185,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                 <div class="card-header bg-white fw-bold"><i class="bi bi-qr-code me-1"></i> Tag &amp; Photo</div>
                 <div class="card-body text-center">
                     <div id="qrcode" class="d-inline-block mb-2"></div>
-                    <div class="small text-muted mb-3"><?= safe_output($asset['asset_code']) ?></div>
+                    <div class="small text-muted mb-3"><?= caseFormat($asset['asset_code']) ?></div>
                     <?php if ($asset['photo_path']): ?>
                         <img src="<?= getUrl($asset['photo_path']) ?>" alt="Asset photo" class="img-fluid rounded border">
                     <?php else: ?>
@@ -217,7 +217,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                                     <tr><th class="text-muted">Rate</th><td><?= $a['rate'] !== null ? rtrim(rtrim((string)$a['rate'],'0'),'.') . '%' : '—' ?></td></tr>
                                     <?php endif; ?>
                                     <tr><th class="text-muted">Salvage</th><td><?= tzs($a['salvage_value']) ?></td></tr>
-                                    <tr><th class="text-muted">Start</th><td><?= safe_output($a['start_date'], '—') ?></td></tr>
+                                    <tr><th class="text-muted">Start</th><td><?= caseFormat($a['start_date'], '—') ?></td></tr>
                                     <?php if ((float)$a['opening_accum_bf'] > 0): ?>
                                     <tr><th class="text-muted">Opening b/f</th><td><?= tzs($a['opening_accum_bf']) ?></td></tr>
                                     <?php endif; ?>
@@ -233,7 +233,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                                         <thead class="table-light"><tr><th>Period End</th><th class="text-end">Charge</th><th class="text-end">Accum.</th><th class="text-end">Closing NBV</th></tr></thead>
                                         <tbody>
                                         <?php foreach ($entries[$area] as $e): ?>
-                                            <tr><td><?= safe_output($e['period_end']) ?></td><td class="text-end"><?= number_format($e['charge'],0) ?></td><td class="text-end"><?= number_format($e['accumulated'],0) ?></td><td class="text-end"><?= number_format($e['closing_nbv'],0) ?></td></tr>
+                                            <tr><td><?= caseFormat($e['period_end']) ?></td><td class="text-end"><?= number_format($e['charge'],0) ?></td><td class="text-end"><?= number_format($e['accumulated'],0) ?></td><td class="text-end"><?= number_format($e['closing_nbv'],0) ?></td></tr>
                                         <?php endforeach; ?>
                                         </tbody>
                                     </table>
@@ -263,12 +263,12 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                                 $mCls = $mStatusCls[$m['status']] ?? 'secondary';
                             ?>
                                 <tr>
-                                    <td class="ps-3"><?= safe_output($m['maintenance_date']) ?></td>
-                                    <td><?= safe_output($m['description'], '—') ?></td>
+                                    <td class="ps-3"><?= caseFormat($m['maintenance_date']) ?></td>
+                                    <td><?= caseFormat($m['description'], '—') ?></td>
                                     <td class="text-end"><?= tzs($m['cost']) ?></td>
-                                    <td><?= safe_output($m['performed_by'], '—') ?></td>
-                                    <td><span class="badge bg-<?= $mCls ?>"><?= safe_output(str_replace('_', ' ', $m['status'])) ?></span></td>
-                                    <td><?= safe_output($m['next_due_date'], '—') ?></td>
+                                    <td><?= caseFormat($m['performed_by'], '—') ?></td>
+                                    <td><span class="badge bg-<?= $mCls ?>"><?= caseFormat(str_replace('_', ' ', $m['status'])) ?></span></td>
+                                    <td><?= caseFormat($m['next_due_date'], '—') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -291,11 +291,11 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                             <tbody>
                             <?php foreach ($auditLog as $l): ?>
                                 <tr>
-                                    <td class="ps-3 small text-muted"><?= safe_output($l['changed_at']) ?></td>
-                                    <td><span class="badge bg-secondary-subtle text-secondary-emphasis border"><?= safe_output($l['action']) ?></span></td>
-                                    <td class="small"><?= safe_output($l['field_changed'], '—') ?></td>
-                                    <td class="small"><?= $l['field_changed'] ? safe_output($l['old_value'], '—') . ' → ' . safe_output($l['new_value'], '—') : safe_output($l['new_value'], '') ?></td>
-                                    <td class="small"><?= safe_output(trim($l['changed_name']) ?: $l['username'], '—') ?></td>
+                                    <td class="ps-3 small text-muted"><?= caseFormat($l['changed_at']) ?></td>
+                                    <td><span class="badge bg-secondary-subtle text-secondary-emphasis border"><?= caseFormat($l['action']) ?></span></td>
+                                    <td class="small"><?= caseFormat($l['field_changed'], '—') ?></td>
+                                    <td class="small"><?= $l['field_changed'] ? caseFormat($l['old_value'], '—') . ' → ' . caseFormat($l['new_value'], '—') : caseFormat($l['new_value'], '') ?></td>
+                                    <td class="small"><?= caseFormat(trim($l['changed_name']) ?: $l['username'], '—') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -338,7 +338,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                                 require_once __DIR__ . '/../../../core/payment_source.php';
                                 foreach (expenseAccounts($pdo) as $acc):
                                 ?>
-                                <option value="<?= $acc['account_id'] ?>"><?= safe_output($acc['account_code']) ?> — <?= safe_output($acc['account_name']) ?></option>
+                                <option value="<?= $acc['account_id'] ?>"><?= caseFormat($acc['account_code']) ?> — <?= caseFormat($acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text small text-muted">Posts Dr Expense / Cr Accrued Expenses immediately. Mark it Paid later from the main Maintenance page.</div>

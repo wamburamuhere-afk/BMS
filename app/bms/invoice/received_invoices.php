@@ -468,7 +468,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                         <select class="form-select" name="wht_rate_id" id="pay-wht-rate" onchange="recalcPayNet()">
                             <option value="" data-rate="0">No withholding tax</option>
                             <?php foreach ($ri_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                            <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                            <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                             <?php endforeach; ?>
                         </select>
                         <small class="text-muted">Deducted from the supplier and remitted to TRA. Computed on the VAT-exclusive amount.</small>
@@ -502,7 +502,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                         <select class="form-select" name="payment_account_id" required>
                             <option value="">Select account…</option>
                             <?php foreach ($ri_cash_accounts as $acc): ?>
-                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= caseFormat(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <small class="text-muted">Cash/bank account the money is paid from.</small>

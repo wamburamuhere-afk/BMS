@@ -115,7 +115,7 @@ $can_create_cn = canCreate('credit_notes');
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-0 text-gray-800">Return #<?= safe_output($return['return_number']) ?></h1>
+            <h1 class="h3 mb-0 text-gray-800">Return #<?= caseFormat($return['return_number']) ?></h1>
             <div class="mt-2">
                 <span class="badge bg-<?= $status_color ?> fs-6"><?= ucfirst($return['status']) ?></span>
                 <span class="text-muted ms-2">Created on <?= date('d M, Y', strtotime($return['return_date'])) ?></span>
@@ -135,7 +135,7 @@ $can_create_cn = canCreate('credit_notes');
             <?php if ($return['status'] == 'approved'): ?>
                 <?php if ($existing_cn): ?>
                     <a href="<?= getUrl('credit_note_view') ?>?id=<?= (int)$existing_cn['credit_note_id'] ?>" class="btn btn-primary me-2">
-                        <i class="bi bi-receipt"></i> View Credit Note <?= safe_output($existing_cn['credit_note_number']) ?>
+                        <i class="bi bi-receipt"></i> View Credit Note <?= caseFormat($existing_cn['credit_note_number']) ?>
                     </a>
                 <?php else: ?>
                     <?php if ($can_create_cn): ?>
@@ -194,8 +194,8 @@ $can_create_cn = canCreate('credit_notes');
                                 <?php foreach ($items as $item): ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
-                                        <div class="small text-muted">SKU: <?= safe_output($item['sku']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
+                                        <div class="small text-muted">SKU: <?= caseFormat($item['sku']) ?></div>
                                     </td>
                                     <td class="text-center"><?= format_number($item['quantity'], 2) ?></td>
                                     <td class="text-end"><?= number_format($item['unit_price'], 2) ?></td>
@@ -235,7 +235,7 @@ $can_create_cn = canCreate('credit_notes');
                     <h6 class="m-0 font-weight-bold text-secondary">Return Reason</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted"><?= nl2br(safe_output($return['reason'])) ?></p>
+                    <p class="mb-0 text-muted"><?= nl2br(caseFormat($return['reason'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -249,9 +249,9 @@ $can_create_cn = canCreate('credit_notes');
                     <h6 class="m-0 font-weight-bold text-info">Customer Details</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="h6 fw-bold mb-1"><?= safe_output($return['customer_name']) ?></h5>
+                    <h5 class="h6 fw-bold mb-1"><?= caseFormat($return['customer_name']) ?></h5>
                     <?php if ($return['company_name']): ?>
-                        <p class="text-muted small mb-2"><?= safe_output($return['company_name']) ?></p>
+                        <p class="text-muted small mb-2"><?= caseFormat($return['company_name']) ?></p>
                     <?php endif; ?>
                     
                     <hr class="my-3">
@@ -259,14 +259,14 @@ $can_create_cn = canCreate('credit_notes');
                     <?php if ($return['customer_email']): ?>
                         <div class="d-flex align-items-center mb-2">
                             <i class="bi bi-envelope me-2 text-muted"></i>
-                            <span><?= safe_output($return['customer_email']) ?></span>
+                            <span><?= caseFormat($return['customer_email']) ?></span>
                         </div>
                     <?php endif; ?>
                     
                     <?php if ($return['customer_phone']): ?>
                         <div class="d-flex align-items-center">
                             <i class="bi bi-phone me-2 text-muted"></i>
-                            <span><?= safe_output($return['customer_phone']) ?></span>
+                            <span><?= caseFormat($return['customer_phone']) ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -281,17 +281,17 @@ $can_create_cn = canCreate('credit_notes');
                     <div class="d-flex justify-content-between mb-2">
                         <span>Original Order:</span>
                         <a href="<?= getUrl('sales_order_view') ?>?id=<?= $return['sales_order_id'] ?>" class="text-decoration-none fw-bold">
-                            #<?= safe_output($return['order_number']) ?>
+                            #<?= caseFormat($return['order_number']) ?>
                         </a>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span>Processed By:</span>
-                        <span class="text-muted"><?= safe_output($return['created_by_name']) ?></span>
+                        <span class="text-muted"><?= caseFormat($return['created_by_name']) ?></span>
                     </div>
                     <?php if (!empty($return['warehouse_name'])): ?>
                     <div class="d-flex justify-content-between mt-2">
                         <span>Warehouse:</span>
-                        <span class="text-muted"><?= safe_output($return['warehouse_name']) ?></span>
+                        <span class="text-muted"><?= caseFormat($return['warehouse_name']) ?></span>
                     </div>
                     <?php endif; ?>
                 </div>

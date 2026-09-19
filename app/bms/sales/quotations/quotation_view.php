@@ -100,7 +100,7 @@ includeHeader();
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
             <h1 class="h3 mb-0 text-gray-800">Quotation Details</h1>
-            <p class="text-muted mb-0">View details for Quotation #<?= safe_output($quote['order_number']) ?></p>
+            <p class="text-muted mb-0">View details for Quotation #<?= caseFormat($quote['order_number']) ?></p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <?php if ($enable_projects && !empty($quote['project_id'])): ?>
@@ -171,13 +171,13 @@ includeHeader();
             <div class="row text-center g-3">
                 <div class="col-md-4">
                     <div class="fw-bold text-uppercase small text-muted mb-1"><i class="bi bi-pencil-square me-1"></i> Created By</div>
-                    <div class="fw-bold"><?= safe_output($creator_label) ?></div>
+                    <div class="fw-bold"><?= caseFormat($creator_label) ?></div>
                     <div class="text-muted small"><?= !empty($quote['created_at']) ? date('M d, Y H:i', strtotime($quote['created_at'])) : '—' ?></div>
                 </div>
                 <div class="col-md-4 border-start">
                     <div class="fw-bold text-uppercase small text-muted mb-1"><i class="bi bi-clipboard-check me-1"></i> Reviewed By</div>
                     <?php if (!empty($quote['reviewed_by'])): ?>
-                        <div class="fw-bold text-info"><?= safe_output($reviewer_label) ?></div>
+                        <div class="fw-bold text-info"><?= caseFormat($reviewer_label) ?></div>
                         <div class="text-muted small"><?= !empty($quote['reviewed_at']) ? date('M d, Y H:i', strtotime($quote['reviewed_at'])) : '' ?></div>
                     <?php else: ?>
                         <div class="text-muted fst-italic">Awaiting review</div>
@@ -186,7 +186,7 @@ includeHeader();
                 <div class="col-md-4 border-start">
                     <div class="fw-bold text-uppercase small text-muted mb-1"><i class="bi bi-check2-circle me-1"></i> Approved By</div>
                     <?php if (!empty($quote['approved_by'])): ?>
-                        <div class="fw-bold text-success"><?= safe_output($approver_label) ?></div>
+                        <div class="fw-bold text-success"><?= caseFormat($approver_label) ?></div>
                         <div class="text-muted small"><?= !empty($quote['approved_at']) ? date('M d, Y H:i', strtotime($quote['approved_at'])) : '' ?></div>
                     <?php else: ?>
                         <div class="text-muted fst-italic">Awaiting approval</div>
@@ -206,9 +206,9 @@ includeHeader();
                         <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-box me-1"></i><?= count($items) ?> item<?= count($items) !== 1 ? 's' : '' ?></span>
                         <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1"></i><?= number_format(array_sum(array_column($items, 'quantity')), 0) ?> units</span>
                         <?php if ((float)($quote['tax_amount'] ?? 0) > 0): ?>
-                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= safe_output($quote['currency']) ?> <?= number_format($quote['tax_amount'], 2) ?></span>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= caseFormat($quote['currency']) ?> <?= number_format($quote['tax_amount'], 2) ?></span>
                         <?php endif; ?>
-                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= safe_output($quote['currency']) ?> <?= number_format($quote['grand_total'], 2) ?></span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= caseFormat($quote['currency']) ?> <?= number_format($quote['grand_total'], 2) ?></span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -236,9 +236,9 @@ includeHeader();
                                 ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
                                         <?php if ($item['sku']): ?>
-                                            <small class="text-muted">SKU: <?= safe_output($item['sku']) ?></small>
+                                            <small class="text-muted">SKU: <?= caseFormat($item['sku']) ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
@@ -286,7 +286,7 @@ includeHeader();
                     <h6 class="mb-0 fw-bold">Quotation Notes</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted"><?= nl2br(safe_output($quote['notes'])) ?></p>
+                    <p class="mb-0 text-muted"><?= nl2br(caseFormat($quote['notes'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -297,7 +297,7 @@ includeHeader();
                     <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($quote['terms_conditions'])) ?></p>
+                    <p class="mb-0 text-muted small"><?= nl2br(caseFormat($quote['terms_conditions'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -310,21 +310,21 @@ includeHeader();
                     <h6 class="mb-0 fw-bold">Customer Information</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="fw-bold mb-1"><?= safe_output($quote['customer_name']) ?></h5>
+                    <h5 class="fw-bold mb-1"><?= caseFormat($quote['customer_name']) ?></h5>
                     <?php if (!empty($quote['company_name'])): ?>
-                        <div class="text-muted mb-2"><?= safe_output($quote['company_name']) ?></div>
+                        <div class="text-muted mb-2"><?= caseFormat($quote['company_name']) ?></div>
                     <?php endif; ?>
                     <hr class="my-3">
                     <?php if (!empty($quote['customer_email'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-envelope text-muted me-2"></i>
-                            <span><?= safe_output($quote['customer_email']) ?></span>
+                            <span><?= caseFormat($quote['customer_email']) ?></span>
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($quote['customer_phone'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-telephone text-muted me-2"></i>
-                            <span><?= safe_output($quote['customer_phone']) ?></span>
+                            <span><?= caseFormat($quote['customer_phone']) ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -368,29 +368,29 @@ includeHeader();
                     <?php if (!empty($quote['project_name'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Project:</span>
-                        <span class="fw-medium text-primary"><?= safe_output($quote['project_name']) ?></span>
+                        <span class="fw-medium text-primary"><?= caseFormat($quote['project_name']) ?></span>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($quote['warehouse_name'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Warehouse:</span>
-                        <span class="fw-medium text-success"><?= safe_output($quote['warehouse_name']) ?></span>
+                        <span class="fw-medium text-success"><?= caseFormat($quote['warehouse_name']) ?></span>
                     </div>
                     <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Salesperson:</span>
-                        <span class="fw-medium"><?= safe_output($quote['salesperson_name'] ?? 'N/A') ?></span>
+                        <span class="fw-medium"><?= caseFormat($quote['salesperson_name'] ?? 'N/A') ?></span>
                     </div>
                     <?php if (!empty($quote['payment_terms'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Payment Terms:</span>
-                        <span class="fw-medium"><?= safe_output($quote['payment_terms']) ?></span>
+                        <span class="fw-medium"><?= caseFormat($quote['payment_terms']) ?></span>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($quote['reference'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Reference:</span>
-                        <span class="fw-medium text-info"><?= safe_output($quote['reference']) ?></span>
+                        <span class="fw-medium text-info"><?= caseFormat($quote['reference']) ?></span>
                     </div>
                     <?php endif; ?>
                 </div>

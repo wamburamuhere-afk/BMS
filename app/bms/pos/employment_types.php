@@ -72,8 +72,8 @@ foreach ($rows as $r) { $r['status'] === 'active' ? $stat_active++ : $stat_inact
                     <tbody>
                         <?php foreach ($rows as $r): ?>
                         <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($r['type_name']) ?></td>
-                            <td><?= safe_output($r['description'], '—') ?></td>
+                            <td class="ps-3 fw-semibold"><?= caseFormat($r['type_name']) ?></td>
+                            <td><?= caseFormat($r['description'], '—') ?></td>
                             <td class="text-center">
                                 <?php if ((int)$r['employee_count'] > 0): ?>
                                 <a href="<?= getUrl('employees') ?>?employment_type_id=<?= (int)$r['type_id'] ?>" class="badge bg-primary text-decoration-none"><?= (int)$r['employee_count'] ?></a>

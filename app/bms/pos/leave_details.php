@@ -339,7 +339,7 @@ require_once 'header.php';
 
         <!-- Print-only header (mirrors leaves.php) -->
         <div class="d-none d-print-block text-center mb-1" id="printHeader" style="margin-top: 15px !important;">
-            <h4 style="color:#333;font-weight:700;margin:2px 0;font-size:12pt;letter-spacing:1px;"><?= safe_output($c_name) ?></h4>
+            <h4 style="color:#333;font-weight:700;margin:2px 0;font-size:12pt;letter-spacing:1px;"><?= caseFormat($c_name) ?></h4>
             <h2 style="color:#333;font-weight:700;text-transform:uppercase;margin:2px 0;font-size:15pt;letter-spacing:2px;">LEAVE APPLICATION</h2>
             <p class="text-muted mb-1" style="font-size:9pt;">Reference: <span class="fw-bold text-dark">LEV-<?= (int)$leave['leave_id'] ?></span></p>
             <div style="border-bottom:3px solid #0d6efd;width:100px;margin:10px auto;"></div>
@@ -387,7 +387,7 @@ require_once 'header.php';
                     </div>
                     <div>
                         <div class="info-label">Leave Type</div>
-                        <h4 class="mb-0 fw-bold"><?= safe_output($leave['official_type'] ?? '', '—') ?></h4>
+                        <h4 class="mb-0 fw-bold"><?= caseFormat($leave['official_type'] ?? '', '—') ?></h4>
                     </div>
                 </div>
                 <div class="stat-mini-card">
@@ -479,14 +479,14 @@ require_once 'header.php';
                     </div>
                     <div class="col-md-6 col-lg-3">
                         <div class="info-label">Contact During Leave</div>
-                        <div class="info-value"><?= safe_output($leave['contact_during_leave'] ?? '', '—') ?></div>
+                        <div class="info-value"><?= caseFormat($leave['contact_during_leave'] ?? '', '—') ?></div>
                     </div>
                     <div class="col-md-6 col-lg-3">
                         <div class="info-label">Handover To</div>
                         <div class="info-value">
                             <?php if (!empty($leave['handover_name'])): ?>
-                                <?= safe_output($leave['handover_name']) ?>
-                                <div class="text-muted small"><?= safe_output($leave['handover_number'] ?? '') ?></div>
+                                <?= caseFormat($leave['handover_name']) ?>
+                                <div class="text-muted small"><?= caseFormat($leave['handover_number'] ?? '') ?></div>
                             <?php else: ?>
                                 <span class="text-muted">—</span>
                             <?php endif; ?>

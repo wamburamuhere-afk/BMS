@@ -235,7 +235,7 @@ $recruitment = [
                             <tbody>
                                 <?php foreach ($dept_headcount as $d): $pct = $maxHeadcount > 0 ? round(((int)$d['headcount'] / $maxHeadcount) * 100) : 0; ?>
                                 <tr>
-                                    <td class="ps-3" style="width:35%"><?= safe_output($d['department_name']) ?></td>
+                                    <td class="ps-3" style="width:35%"><?= caseFormat($d['department_name']) ?></td>
                                     <td>
                                         <div class="progress" style="height:10px;">
                                             <div class="progress-bar bg-primary" style="width:<?= $pct ?>%"></div>
@@ -304,15 +304,15 @@ $recruitment = [
                             <tbody>
                                 <?php foreach ($expiring_contracts as $c): ?>
                                 <tr>
-                                    <td class="ps-3"><a href="<?= getUrl('employee_details') ?>?id=<?= (int)$c['employee_id'] ?>" class="text-decoration-none"><?= safe_output(trim($c['first_name'] . ' ' . $c['last_name'])) ?></a></td>
-                                    <td>Contract <small class="text-muted">(<?= safe_output($c['contract_type'], '—') ?>)</small></td>
+                                    <td class="ps-3"><a href="<?= getUrl('employee_details') ?>?id=<?= (int)$c['employee_id'] ?>" class="text-decoration-none"><?= caseFormat(trim($c['first_name'] . ' ' . $c['last_name'])) ?></a></td>
+                                    <td>Contract <small class="text-muted">(<?= caseFormat($c['contract_type'], '—') ?>)</small></td>
                                     <td><?= date('d M Y', strtotime($c['end_date'])) ?></td>
                                     <td class="text-end pe-3"><span class="badge <?= (int)$c['days_remaining'] <= 7 ? 'bg-danger' : 'bg-warning text-dark' ?>"><?= (int)$c['days_remaining'] ?>d</span></td>
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php foreach ($ending_probation as $p): ?>
                                 <tr>
-                                    <td class="ps-3"><a href="<?= getUrl('employee_details') ?>?id=<?= (int)$p['employee_id'] ?>" class="text-decoration-none"><?= safe_output(trim($p['first_name'] . ' ' . $p['last_name'])) ?></a></td>
+                                    <td class="ps-3"><a href="<?= getUrl('employee_details') ?>?id=<?= (int)$p['employee_id'] ?>" class="text-decoration-none"><?= caseFormat(trim($p['first_name'] . ' ' . $p['last_name'])) ?></a></td>
                                     <td>Probation ends</td>
                                     <td><?= date('d M Y', strtotime($p['probation_end_date'])) ?></td>
                                     <td class="text-end pe-3"><span class="badge <?= (int)$p['days_remaining'] <= 7 ? 'bg-danger' : 'bg-warning text-dark' ?>"><?= (int)$p['days_remaining'] ?>d</span></td>

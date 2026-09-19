@@ -266,7 +266,7 @@ foreach ($transfers as $tr) {
                     <img src="<?= getUrl($c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
                 </div>
             <?php endif; ?>
-            <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= safe_output($c_name) ?></h1>
+            <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= caseFormat($c_name) ?></h1>
             <h2 style="font-weight: 700; color: #000; text-transform: uppercase; margin: 10px 0; font-size: 18pt;">STOCK TRANSFER REPORT</h2>
             <div style="font-size: 12pt; color: #555;">Generated At: <?= date('d M Y, h:i A') ?></div>
         </div>

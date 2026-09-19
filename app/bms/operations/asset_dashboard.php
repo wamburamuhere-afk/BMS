@@ -156,7 +156,7 @@ $viewUrl = getUrl('asset_view');
                         <div class="text-muted small">No active assets.</div>
                     <?php else: foreach ($nbvByCategory as $cat => $v): $w = $maxCatNbv > 0 ? round($v / $maxCatNbv * 100) : 0; ?>
                         <div class="mb-2">
-                            <div class="d-flex justify-content-between small"><span><?= safe_output($cat) ?></span><span class="fw-semibold"><?= tzs0($v) ?></span></div>
+                            <div class="d-flex justify-content-between small"><span><?= caseFormat($cat) ?></span><span class="fw-semibold"><?= tzs0($v) ?></span></div>
                             <div class="progress" style="height:8px"><div class="progress-bar bg-primary" style="width:<?= $w ?>%"></div></div>
                         </div>
                     <?php endforeach; endif; ?>
@@ -184,8 +184,8 @@ $viewUrl = getUrl('asset_view');
                             <ul class="list-group list-group-flush small">
                                 <?php foreach (array_slice($list, 0, 5) as $it): ?>
                                 <li class="list-group-item d-flex justify-content-between px-0 py-1">
-                                    <a href="<?= $viewUrl ?>?id=<?= (int)$it['asset_id'] ?>"><?= safe_output($it['asset_code']) ?> — <?= safe_output($it['asset_name']) ?></a>
-                                    <?php if ($dateKey && !empty($it[$dateKey])): ?><span class="text-muted"><?= safe_output($it[$dateKey]) ?></span><?php endif; ?>
+                                    <a href="<?= $viewUrl ?>?id=<?= (int)$it['asset_id'] ?>"><?= caseFormat($it['asset_code']) ?> — <?= caseFormat($it['asset_name']) ?></a>
+                                    <?php if ($dateKey && !empty($it[$dateKey])): ?><span class="text-muted"><?= caseFormat($it[$dateKey]) ?></span><?php endif; ?>
                                 </li>
                                 <?php endforeach; ?>
                                 <?php if (count($list) > 5): ?><li class="list-group-item px-0 py-1 text-muted">…and <?= count($list)-5 ?> more</li><?php endif; ?>

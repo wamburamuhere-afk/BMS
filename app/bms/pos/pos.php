@@ -440,7 +440,7 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                     <select class="form-select form-select-sm" id="posPriceGroupId">
                         <?php foreach ($price_groups as $pg): ?>
                         <option value="<?= (int)$pg['price_group_id'] ?>" <?= $pg['is_default'] ? 'selected' : '' ?>>
-                            <?= safe_output($pg['name']) ?>
+                            <?= caseFormat($pg['name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>

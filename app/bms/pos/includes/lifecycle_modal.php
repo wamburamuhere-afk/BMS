@@ -89,7 +89,7 @@ if (projectsModuleActive()) {
                             <select class="form-select select2-static" name="new_designation_id" id="lc_new_designation">
                                 <option value="">-- Select --</option>
                                 <?php foreach ($lc_designations as $d): ?>
-                                <option value="<?= (int)$d['designation_id'] ?>"><?= safe_output($d['designation_name']) ?></option>
+                                <option value="<?= (int)$d['designation_id'] ?>"><?= caseFormat($d['designation_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -106,7 +106,7 @@ if (projectsModuleActive()) {
                             <select class="form-select select2-static" name="new_department_id" id="lc_new_department">
                                 <option value="">-- Keep current --</option>
                                 <?php foreach ($lc_departments as $d): ?>
-                                <option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option>
+                                <option value="<?= (int)$d['department_id'] ?>"><?= caseFormat($d['department_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <?php if (!projectsModuleActive()): ?>
@@ -119,7 +119,7 @@ if (projectsModuleActive()) {
                             <select class="form-select select2-static" name="new_project_id" id="lc_new_project">
                                 <option value="">-- Keep current --</option>
                                 <?php foreach ($lc_projects as $p): ?>
-                                <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                                <option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text">Pick a department, a project, or both.</div>
@@ -212,7 +212,7 @@ if (projectsModuleActive()) {
                             <select class="form-select select2-static" name="new_department_id" id="lc_ldr_department">
                                 <option value="">-- Select --</option>
                                 <?php foreach ($lc_departments as $d): ?>
-                                <option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option>
+                                <option value="<?= (int)$d['department_id'] ?>"><?= caseFormat($d['department_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

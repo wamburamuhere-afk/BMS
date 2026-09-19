@@ -153,10 +153,10 @@ $total_customers = $pdo->query("SELECT COUNT(*) as total FROM customers")->fetch
                                     <div class="d-flex align-items-center">
                                         <div class="group-color me-2" 
                                              style="width: 16px; height: 16px; background-color: <?= safe_output($group['color'] ?? '#007bff') ?>; border-radius: 3px;"></div>
-                                        <strong><?= safe_output($group['group_name']) ?></strong>
+                                        <strong><?= caseFormat($group['group_name']) ?></strong>
                                     </div>
                                 </td>
-                                <td><?= safe_output($group['description']) ?></td>
+                                <td><?= caseFormat($group['description']) ?></td>
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <span class="badge bg-primary rounded-pill me-2">
@@ -181,7 +181,7 @@ $total_customers = $pdo->query("SELECT COUNT(*) as total FROM customers")->fetch
                                         <?= ucfirst($group['status']) ?>
                                     </span>
                                 </td>
-                                <td><?= safe_output($group['created_by_name']) ?></td>
+                                <td><?= caseFormat($group['created_by_name']) ?></td>
                                 <td><?= date('M d, Y', strtotime($group['created_at'])) ?></td>
                                 <td>
                                     <div class="dropdown action-dropdown">

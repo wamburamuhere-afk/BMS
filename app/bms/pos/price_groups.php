@@ -76,7 +76,7 @@ if ($pos_advanced_entitled) {
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td>
-                        <?= safe_output($g['name']) ?>
+                        <?= caseFormat($g['name']) ?>
                         <?php if ($g['is_default']): ?><span class="badge" style="background:#0d6efd;"><?= t('Default') ?></span><?php endif; ?>
                     </td>
                     <td>
