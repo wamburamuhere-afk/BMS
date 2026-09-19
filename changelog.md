@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-18 — POS Restock: permission-controlled, no longer admin-only
+
+**Files:** `app/bms/pos/pos.php`, `migrations/tenant/2026_09_18_pos_restock_permission.php`
+
+Added `pos_restock` to the `permissions` table via migration. Changed the Restock Product button gate from `hasPermission('adjust_stock') || isAdmin()` (where `adjust_stock` had no permission row — effectively admin-only) to `canView('pos_restock')`. Admins can now grant Restock to any role via Roles & Permissions.
+
+---
+
 ## 2026-09-18 — Stat cards: universal digit no-wrap + sentence-case labels
 
 **File:** `header.php`
