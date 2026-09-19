@@ -1468,7 +1468,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                     </ul>
 
                     <!-- User Account (right side of bottom nav — matches Vikundi) -->
-                    <ul class="navbar-nav align-items-center">
+                    <ul class="navbar-nav align-items-center flex-row">
                         <!-- Language toggle pill — switches between EN and SW instantly -->
                         <li class="nav-item me-1">
                             <button class="btn btn-sm btn-outline-light" onclick="bmsToggleLang()" title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>" style="font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:700;letter-spacing:0.5px;line-height:1.6;">
