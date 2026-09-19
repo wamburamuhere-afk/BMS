@@ -153,7 +153,7 @@ $export_qs = http_build_query(array_filter([
                     <select class="form-select form-select-sm select2-filter" name="stage_id">
                         <option value="">All Stages</option>
                         <?php foreach ($stages as $s): ?>
-                        <option value="<?= $s['stage_id'] ?>" <?= $f_stage == $s['stage_id'] ? 'selected' : '' ?>><?= safe_output($s['stage_name']) ?></option>
+                        <option value="<?= $s['stage_id'] ?>" <?= $f_stage == $s['stage_id'] ? 'selected' : '' ?>><?= caseFormat($s['stage_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -171,7 +171,7 @@ $export_qs = http_build_query(array_filter([
                     <select class="form-select form-select-sm select2-filter" name="assigned_to">
                         <option value="">All Users</option>
                         <?php foreach ($users as $u): ?>
-                        <option value="<?= $u['user_id'] ?>" <?= $f_assigned == $u['user_id'] ? 'selected' : '' ?>><?= safe_output($u['name']) ?></option>
+                        <option value="<?= $u['user_id'] ?>" <?= $f_assigned == $u['user_id'] ? 'selected' : '' ?>><?= caseFormat($u['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -212,15 +212,15 @@ $export_qs = http_build_query(array_filter([
             </select>
             <select class="form-select form-select-sm d-none" id="bulkStage" style="max-width:180px">
                 <option value="">Select stage…</option>
-                <?php foreach ($stages as $s): ?><option value="<?= $s['stage_id'] ?>"><?= safe_output($s['stage_name']) ?></option><?php endforeach; ?>
+                <?php foreach ($stages as $s): ?><option value="<?= $s['stage_id'] ?>"><?= caseFormat($s['stage_name']) ?></option><?php endforeach; ?>
             </select>
             <select class="form-select form-select-sm d-none" id="bulkUser" style="max-width:180px">
                 <option value="">Select user…</option>
-                <?php foreach ($users as $u): ?><option value="<?= $u['user_id'] ?>"><?= safe_output($u['name']) ?></option><?php endforeach; ?>
+                <?php foreach ($users as $u): ?><option value="<?= $u['user_id'] ?>"><?= caseFormat($u['name']) ?></option><?php endforeach; ?>
             </select>
             <select class="form-select form-select-sm d-none" id="bulkLabel" style="max-width:180px">
                 <option value="">Select label…</option>
-                <?php foreach ($labels as $l): ?><option value="<?= $l['label_id'] ?>"><?= safe_output($l['label_name']) ?></option><?php endforeach; ?>
+                <?php foreach ($labels as $l): ?><option value="<?= $l['label_id'] ?>"><?= caseFormat($l['label_name']) ?></option><?php endforeach; ?>
             </select>
             <button class="btn btn-primary btn-sm" onclick="runBulk()"><i class="bi bi-check2 me-1"></i>Apply</button>
             <button class="btn btn-secondary btn-sm" onclick="clearSelection()">Cancel</button>
@@ -253,14 +253,14 @@ $export_qs = http_build_query(array_filter([
                         <?php if ($can_bulk): ?>
                         <td><input type="checkbox" class="form-check-input lead-check" value="<?= $row['lead_id'] ?>"></td>
                         <?php endif; ?>
-                        <td><span class="fw-semibold text-primary" data-lead-id="<?= $row['lead_id'] ?>"><?= safe_output($row['lead_code']) ?></span></td>
-                        <td><?= safe_output(trim($row['first_name'] . ' ' . ($row['last_name'] ?? ''))) ?></td>
-                        <td><?= safe_output($row['company_name'], '—') ?></td>
+                        <td><span class="fw-semibold text-primary" data-lead-id="<?= $row['lead_id'] ?>"><?= caseFormat($row['lead_code']) ?></span></td>
+                        <td><?= caseFormat(trim($row['first_name'] . ' ' . ($row['last_name'] ?? ''))) ?></td>
+                        <td><?= caseFormat($row['company_name'], '—') ?></td>
                         <td><?= $lead_sources[$row['lead_source']] ?? ucfirst($row['lead_source']) ?></td>
-                        <td><span class="badge" style="background:<?= safe_output($row['stage_color'], '#6c757d') ?>;color:#fff;"><?= safe_output($row['stage_name'], '—') ?></span></td>
+                        <td><span class="badge" style="background:<?= safe_output($row['stage_color'], '#6c757d') ?>;color:#fff;"><?= caseFormat($row['stage_name'], '—') ?></span></td>
                         <td class="text-end"><?= number_format($row['lead_value'], 0) ?></td>
-                        <td><?= safe_output($row['assigned_name'], '—') ?></td>
-                        <td><?= safe_output($row['expected_close_date'], '—') ?></td>
+                        <td><?= caseFormat($row['assigned_name'], '—') ?></td>
+                        <td><?= caseFormat($row['expected_close_date'], '—') ?></td>
                         <td>
                             <?php if ((int)$row['converted'] === 1): ?>
                             <span class="badge" style="background:#052c65;color:#fff;">Converted</span>
@@ -368,7 +368,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             <label class="form-label">Pipeline Stage</label>
             <select class="form-select select2-static" name="pipeline_stage_id" id="<?= $prefix ?>_pipeline_stage_id">
                 <?php foreach ($stages as $i => $s): ?>
-                <option value="<?= $s['stage_id'] ?>" <?= $i === 0 ? 'selected' : '' ?>><?= safe_output($s['stage_name']) ?></option>
+                <option value="<?= $s['stage_id'] ?>" <?= $i === 0 ? 'selected' : '' ?>><?= caseFormat($s['stage_name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -377,7 +377,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             <select class="form-select select2-static" name="assigned_to" id="<?= $prefix ?>_assigned_to">
                 <option value="">-- Select --</option>
                 <?php foreach ($users as $u): ?>
-                <option value="<?= $u['user_id'] ?>"><?= safe_output($u['name']) ?></option>
+                <option value="<?= $u['user_id'] ?>"><?= caseFormat($u['name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -398,7 +398,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             <label class="form-label">Labels</label>
             <select class="form-select select2-static" name="labels[]" id="<?= $prefix ?>_labels" multiple>
                 <?php foreach ($labels as $l): ?>
-                <option value="<?= $l['label_id'] ?>"><?= safe_output($l['label_name']) ?></option>
+                <option value="<?= $l['label_id'] ?>"><?= caseFormat($l['label_name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>

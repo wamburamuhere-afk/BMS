@@ -49,7 +49,7 @@ $stages = $pdo->query("
             <?php if ($can_edit): ?><i class="bi bi-grip-vertical stage-grip"></i><?php endif; ?>
             <span class="stage-dot" style="background:<?= htmlspecialchars($s['color']) ?>"></span>
             <div class="flex-grow-1">
-                <span class="fw-semibold"><?= safe_output($s['stage_name']) ?></span>
+                <span class="fw-semibold"><?= caseFormat($s['stage_name']) ?></span>
                 <?php if ($s['is_won']): ?><span class="badge bg-success ms-1" style="font-size:.68rem">Won</span><?php endif; ?>
                 <?php if ($s['is_lost']): ?><span class="badge bg-danger ms-1" style="font-size:.68rem">Lost</span><?php endif; ?>
                 <span class="text-muted small ms-2"><?= (int)$s['lead_count'] ?> lead<?= $s['lead_count'] != 1 ? 's' : '' ?></span>
