@@ -759,10 +759,20 @@ $(document).ready(function () {
         const $input = $('<input type="text" class="form-control form-control-sm" readonly>').val(url);
         const $btn = $('<button type="button" class="btn btn-sm btn-outline-primary"></button>').html('<i class="bi bi-clipboard"></i> ' + <?= json_encode(t('Copy')) ?>);
         $btn.on('click', function () {
-            navigator.clipboard.writeText(url).then(function () {
+            const markCopied = function () {
                 $btn.html('<i class="bi bi-check2"></i> ' + <?= json_encode(t('Copied!')) ?>);
                 setTimeout(function () { $btn.html('<i class="bi bi-clipboard"></i> ' + <?= json_encode(t('Copy')) ?>); }, 1500);
-            });
+            };
+            const fallback = function () {
+                $input.select();
+                document.execCommand('copy');
+                markCopied();
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url).then(markCopied).catch(fallback);
+            } else {
+                fallback();
+            }
         });
         $box.append($input).append($btn);
         $wrap.append($box);
