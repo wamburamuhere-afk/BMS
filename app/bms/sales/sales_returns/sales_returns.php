@@ -485,7 +485,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                         <option value="">All Customers</option>
                         <?php foreach ($customers as $c): ?>
                             <option value="<?= $c['customer_id'] ?>">
-                                <?= safe_output($c['customer_name']) ?>
+                                <?= caseFormat($c['customer_name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

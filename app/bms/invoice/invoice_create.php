@@ -299,8 +299,8 @@ function generate_invoice_number() {
     <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2 mb-3 py-2">
         <i class="bi bi-link-45deg fs-5"></i>
         <div>
-            Pre-filling from <strong>Sales Order <?= safe_output($order['order_number']) ?></strong>
-            &mdash; <?= safe_output($order['customer_name'] ?? '') ?>
+            Pre-filling from <strong>Sales Order <?= caseFormat($order['order_number']) ?></strong>
+            &mdash; <?= caseFormat($order['customer_name'] ?? '') ?>
             <?php if (!empty($order_items)): ?>
             &mdash; <span class="badge bg-primary"><?= count($order_items) ?> item(s) loaded</span>
             <?php else: ?>
@@ -317,8 +317,8 @@ function generate_invoice_number() {
     <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2 mb-3 py-2">
         <i class="bi bi-link-45deg fs-5"></i>
         <div>
-            Pre-filling from <strong>Delivery Note <?= safe_output($delivery['delivery_number']) ?></strong>
-            &mdash; <?= safe_output($customer['customer_name'] ?? '') ?>
+            Pre-filling from <strong>Delivery Note <?= caseFormat($delivery['delivery_number']) ?></strong>
+            &mdash; <?= caseFormat($customer['customer_name'] ?? '') ?>
             <?php if (!empty($delivery_items_prefill)): ?>
             &mdash; <span class="badge bg-primary"><?= count($delivery_items_prefill) ?> item(s) loaded</span>
             <?php else: ?>
@@ -368,7 +368,7 @@ function generate_invoice_number() {
                             <option value="">Select Customer</option>
                             <?php foreach ($customers as $cust): ?>
                                 <option value="<?= $cust['customer_id'] ?>" <?= ($customer_id > 0 && $cust['customer_id'] == $customer_id) ? 'selected' : '' ?>>
-                                    <?= safe_output($cust['customer_name']) ?> <?= !empty($cust['company_name']) ? '('.safe_output($cust['company_name']).')' : '' ?>
+                                    <?= caseFormat($cust['customer_name']) ?> <?= !empty($cust['company_name']) ? '('.caseFormat($cust['company_name']).')' : '' ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -379,7 +379,7 @@ function generate_invoice_number() {
                         <select class="form-select select2" id="order_id" name="order_id" onchange="loadOrderItems()">
                             <option value="">Select Sales Order</option>
                             <?php if ($order): ?>
-                                <option value="<?= $order['sales_order_id'] ?>" selected><?= safe_output($order['order_number']) ?></option>
+                                <option value="<?= $order['sales_order_id'] ?>" selected><?= caseFormat($order['order_number']) ?></option>
                             <?php endif; ?>
                         </select>
                     </div>
@@ -392,7 +392,7 @@ function generate_invoice_number() {
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
                                     <?= (($order && $order['project_id'] == $proj['project_id']) || ($project_id == $proj['project_id'])) ? 'selected' : '' ?>>
-                                    <?= safe_output($proj['project_name']) ?>
+                                    <?= caseFormat($proj['project_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -433,7 +433,7 @@ function generate_invoice_number() {
                             <option value="">-- None --</option>
                             <?php foreach ($delivery_notes_for_select as $d): ?>
                                 <option value="<?= $d['delivery_id'] ?>" <?= ($delivery && $delivery['delivery_id'] == $d['delivery_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($d['delivery_number']) ?>
+                                    <?= caseFormat($d['delivery_number']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -445,7 +445,7 @@ function generate_invoice_number() {
                             <option value="">-- None --</option>
                             <?php foreach ($customer_lpos_for_select as $l): ?>
                                 <option value="<?= $l['lpo_id'] ?>" <?= ($delivery_lpo_id == $l['lpo_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($l['lpo_number']) ?>
+                                    <?= caseFormat($l['lpo_number']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -944,7 +944,7 @@ $(document).ready(function() {
     Swal.fire({
         icon: 'success', toast: true, position: 'top-end',
         showConfirmButton: false, timer: 3000,
-        title: 'SO <?= safe_output($order['order_number']) ?> loaded',
+        title: 'SO <?= caseFormat($order['order_number']) ?> loaded',
         text: '<?= count($order_items) ?> item(s) pre-filled — review and save'
     });
 });
@@ -954,7 +954,7 @@ $(document).ready(function() {
         icon: 'warning', toast: true, position: 'top-end',
         showConfirmButton: false, timer: 5000,
         title: 'No uninvoiced items',
-        text: 'All items on SO <?= safe_output($order['order_number']) ?> have already been fully invoiced.'
+        text: 'All items on SO <?= caseFormat($order['order_number']) ?> have already been fully invoiced.'
     });
 });
 <?php endif; ?>
@@ -977,7 +977,7 @@ $(document).ready(function() {
     Swal.fire({
         icon: 'success', toast: true, position: 'top-end',
         showConfirmButton: false, timer: 3000,
-        title: 'DN <?= safe_output($delivery['delivery_number']) ?> loaded',
+        title: 'DN <?= caseFormat($delivery['delivery_number']) ?> loaded',
         text: '<?= count($delivery_items_prefill) ?> item(s) pre-filled — review and save'
     });
 });
@@ -987,7 +987,7 @@ $(document).ready(function() {
         icon: 'warning', toast: true, position: 'top-end',
         showConfirmButton: false, timer: 5000,
         title: 'No items found',
-        text: 'Delivery Note <?= safe_output($delivery['delivery_number']) ?> has no recorded items.'
+        text: 'Delivery Note <?= caseFormat($delivery['delivery_number']) ?> has no recorded items.'
     });
 });
 <?php endif; ?>

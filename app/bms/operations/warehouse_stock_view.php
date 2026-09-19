@@ -354,13 +354,13 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                                     <?php $avClass = $item['available_quantity'] > 0 ? 'text-success' : 'text-danger'; ?>
                                     <tr>
                                         <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
-                                        <td><div class="fw-bold small"><?= safe_output($item['product_name']) ?></div></td>
-                                        <td><code class="small"><?= safe_output($item['sku'], '—') ?></code></td>
-                                        <td><small class="text-muted"><?= safe_output($item['category_name'], '—') ?></small></td>
+                                        <td><div class="fw-bold small"><?= caseFormat($item['product_name']) ?></div></td>
+                                        <td><code class="small"><?= caseFormat($item['sku'], '—') ?></code></td>
+                                        <td><small class="text-muted"><?= caseFormat($item['category_name'], '—') ?></small></td>
                                         <td class="text-center fw-bold"><?= number_format((float)$item['stock_quantity'], 3) ?></td>
                                         <td class="text-center text-warning"><?= number_format((float)($item['reserved_quantity'] ?? 0), 3) ?></td>
                                         <td class="text-center fw-bold <?= $avClass ?>"><?= number_format((float)$item['available_quantity'], 3) ?></td>
-                                        <td><span class="badge bg-light text-dark border small"><?= safe_output($item['unit'], 'pcs') ?></span></td>
+                                        <td><span class="badge bg-light text-dark border small"><?= caseFormat($item['unit'], 'pcs') ?></span></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -411,14 +411,14 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                                     ?>
                                     <tr>
                                         <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
-                                        <td><div class="fw-bold small"><?= safe_output($item['product_name']) ?></div></td>
-                                        <td><code class="small"><?= safe_output($item['sku'], '—') ?></code></td>
-                                        <td><span class="badge bg-light text-dark border small"><?= safe_output($item['receipt_number']) ?></span></td>
+                                        <td><div class="fw-bold small"><?= caseFormat($item['product_name']) ?></div></td>
+                                        <td><code class="small"><?= caseFormat($item['sku'], '—') ?></code></td>
+                                        <td><span class="badge bg-light text-dark border small"><?= caseFormat($item['receipt_number']) ?></span></td>
                                         <td><small><?= $item['receipt_date'] ? date('d M Y', strtotime($item['receipt_date'])) : '—' ?></small></td>
                                         <td class="text-center fw-bold text-success">+<?= number_format((float)$item['quantity_received'], 3) ?></td>
-                                        <td><small><?= safe_output($item['unit'], '—') ?></small></td>
-                                        <td><small><?= safe_output($item['supplier_name'], 'N/A') ?></small></td>
-                                        <td><span class="badge bg-<?= $stc ?> small"><?= safe_output($st) ?></span></td>
+                                        <td><small><?= caseFormat($item['unit'], '—') ?></small></td>
+                                        <td><small><?= caseFormat($item['supplier_name'], 'N/A') ?></small></td>
+                                        <td><span class="badge bg-<?= $stc ?> small"><?= caseFormat($st) ?></span></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -469,14 +469,14 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                                     ?>
                                     <tr>
                                         <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
-                                        <td><div class="fw-bold small"><?= safe_output($item['product_name']) ?></div></td>
-                                        <td><code class="small"><?= safe_output($item['sku'], '—') ?></code></td>
-                                        <td><span class="badge bg-light text-primary border small"><?= safe_output($item['delivery_number']) ?></span></td>
+                                        <td><div class="fw-bold small"><?= caseFormat($item['product_name']) ?></div></td>
+                                        <td><code class="small"><?= caseFormat($item['sku'], '—') ?></code></td>
+                                        <td><span class="badge bg-light text-primary border small"><?= caseFormat($item['delivery_number']) ?></span></td>
                                         <td><small><?= $item['delivery_date'] ? date('d M Y', strtotime($item['delivery_date'])) : '—' ?></small></td>
                                         <td class="text-center fw-bold text-danger">-<?= number_format((float)$item['quantity_delivered'], 3) ?></td>
-                                        <td><small><?= safe_output($item['unit'], '—') ?></small></td>
-                                        <td><small><?= safe_output($item['supplier_name'], 'N/A') ?></small></td>
-                                        <td><span class="badge bg-<?= $stc ?> small"><?= safe_output($dn_st) ?></span></td>
+                                        <td><small><?= caseFormat($item['unit'], '—') ?></small></td>
+                                        <td><small><?= caseFormat($item['supplier_name'], 'N/A') ?></small></td>
+                                        <td><span class="badge bg-<?= $stc ?> small"><?= caseFormat($dn_st) ?></span></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -530,13 +530,13 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                                     <tr>
                                         <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
                                         <td><small><?= $dt ? date('d M Y', strtotime($dt)) : '—' ?></small></td>
-                                        <td><div class="fw-bold small"><?= safe_output($item['product_name']) ?></div></td>
-                                        <td><code class="small"><?= safe_output($item['sku'], '—') ?></code></td>
+                                        <td><div class="fw-bold small"><?= caseFormat($item['product_name']) ?></div></td>
+                                        <td><code class="small"><?= caseFormat($item['sku'], '—') ?></code></td>
                                         <td><?= moveBadge($item['movement_type']) ?></td>
                                         <td class="text-center fw-bold <?= $qClass ?>"><?= $qSign ?><?= number_format((float)$item['quantity'], 3) ?></td>
-                                        <td><small><?= safe_output($item['unit'], '—') ?></small></td>
-                                        <td><small class="text-muted"><?= safe_output($item['adjusted_by'], 'System') ?></small></td>
-                                        <td><small class="text-muted"><?= safe_output($item['notes'], '—') ?></small></td>
+                                        <td><small><?= caseFormat($item['unit'], '—') ?></small></td>
+                                        <td><small class="text-muted"><?= caseFormat($item['adjusted_by'], 'System') ?></small></td>
+                                        <td><small class="text-muted"><?= caseFormat($item['notes'], '—') ?></small></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -588,12 +588,12 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                                     <tr>
                                         <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
                                         <td><small><?= $item['created_at'] ? date('d M Y H:i', strtotime($item['created_at'])) : '—' ?></small></td>
-                                        <td><div class="small fw-bold"><?= safe_output($item['product_name']) ?></div></td>
-                                        <td><code class="small"><?= safe_output($item['sku'], '—') ?></code></td>
+                                        <td><div class="small fw-bold"><?= caseFormat($item['product_name']) ?></div></td>
+                                        <td><code class="small"><?= caseFormat($item['sku'], '—') ?></code></td>
                                         <td><?= moveBadge($item['movement_type']) ?></td>
                                         <td class="text-center fw-bold <?= $qClass ?>"><?= $qSign ?><?= number_format((float)$item['quantity'], 3) ?></td>
-                                        <td><small><?= safe_output($item['unit'], '—') ?></small></td>
-                                        <td><small class="text-primary"><?= safe_output($item['reference_number'], 'N/A') ?></small></td>
+                                        <td><small><?= caseFormat($item['unit'], '—') ?></small></td>
+                                        <td><small class="text-primary"><?= caseFormat($item['reference_number'], 'N/A') ?></small></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

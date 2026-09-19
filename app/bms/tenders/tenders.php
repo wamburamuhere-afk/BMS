@@ -78,8 +78,8 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         <p class="text-dark mb-1 small text-uppercase text-center">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = "Web: " . caseFormat($c_web);
+            if (!empty($c_email)) $web_email[] = "Email: " . caseFormat($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
@@ -87,8 +87,8 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         <p class="text-dark mb-1 small text-uppercase text-center">
             <?php 
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . caseFormat($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . caseFormat($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>

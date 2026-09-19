@@ -83,8 +83,8 @@ if (empty($items)) {
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-0 text-gray-800">Edit Sales Return #<?= safe_output($return['return_number']) ?></h1>
-            <p class="text-muted mb-0">Original Order: <span class="fw-bold">#<?= safe_output($return['order_number']) ?></span> | Customer: <span class="fw-bold"><?= safe_output($return['customer_name']) ?></span></p>
+            <h1 class="h3 mb-0 text-gray-800">Edit Sales Return #<?= caseFormat($return['return_number']) ?></h1>
+            <p class="text-muted mb-0">Original Order: <span class="fw-bold">#<?= caseFormat($return['order_number']) ?></span> | Customer: <span class="fw-bold"><?= caseFormat($return['customer_name']) ?></span></p>
         </div>
         <a href="<?= getUrl('sales_returns') ?>" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back to Returns
@@ -103,7 +103,7 @@ if (empty($items)) {
                 <div class="card shadow mb-4">
                     <div class="card-header bg-white py-3 d-flex justify-content-between">
                         <h6 class="m-0 font-weight-bold text-primary">Return Items</h6>
-                        <span class="badge bg-primary">Editing #<?= safe_output($return['return_number']) ?></span>
+                        <span class="badge bg-primary">Editing #<?= caseFormat($return['return_number']) ?></span>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
@@ -130,9 +130,9 @@ if (empty($items)) {
                                 <tr class="<?= $is_part_of_return ? 'table-light' : '' ?>">
                                     <td class="text-center fw-bold text-muted"><?= $sn++ ?></td>
                                     <td>
-                                        <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
                                         <div class="small text-muted">
-                                            SKU: <?= safe_output($item['sku']) ?> |
+                                            SKU: <?= caseFormat($item['sku']) ?> |
                                             Price: <?= number_format($item['original_price'], 2) ?>
                                         </div>
                                         <?php if (!$is_part_of_return): ?>

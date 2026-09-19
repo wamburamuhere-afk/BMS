@@ -80,7 +80,7 @@ $cust_label = $cn['customer_name'] . (!empty($cn['company_name']) ? ' — ' . $c
                             <div class="col-md-6">
                                 <label class="form-label">Customer <span class="text-danger">*</span></label>
                                 <select class="form-select" id="f_customer" required style="width:100%">
-                                    <option value="<?= (int)$cn['customer_id'] ?>" selected><?= safe_output($cust_label) ?></option>
+                                    <option value="<?= (int)$cn['customer_id'] ?>" selected><?= caseFormat($cust_label) ?></option>
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -132,7 +132,7 @@ $cust_label = $cn['customer_name'] . (!empty($cn['company_name']) ? ' — ' . $c
                                 $file_url = '../../../../' . $att['file_path'];
                             ?>
                             <div class="list-group-item d-flex align-items-center justify-content-between py-2 px-0">
-                                <span class="small"><i class="bi bi-paperclip text-muted me-1"></i><?= safe_output($att['file_name']) ?> <span class="text-muted">(<?= strtoupper($ext) ?>)</span></span>
+                                <span class="small"><i class="bi bi-paperclip text-muted me-1"></i><?= caseFormat($att['file_name']) ?> <span class="text-muted">(<?= strtoupper($ext) ?>)</span></span>
                                 <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-arrow-down"></i></a>
                             </div>
                             <?php endforeach; ?>

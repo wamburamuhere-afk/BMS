@@ -140,11 +140,11 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php if (count($tax_brackets) > 0): ?>
                                     <?php foreach ($tax_brackets as $bracket): ?>
                                     <tr>
-                                        <td><?= safe_output($bracket['bracket_name']) ?></td>
+                                        <td><?= caseFormat($bracket['bracket_name']) ?></td>
                                         <td><?= format_currency($bracket['min_income']) ?></td>
                                         <td><?= $bracket['max_income'] ? format_currency($bracket['max_income']) : '<span class="badge bg-secondary">No Limit</span>' ?></td>
                                         <td><strong><?= number_format($bracket['tax_rate'], 2) ?>%</strong></td>
-                                        <td><?= safe_output($bracket['country']) ?></td>
+                                        <td><?= caseFormat($bracket['country']) ?></td>
                                         <td><?= date('d M Y', strtotime($bracket['effective_from'])) ?></td>
                                         <td>
                                             <span class="badge bg-<?= $bracket['is_active'] ? 'success' : 'secondary' ?>">
@@ -194,7 +194,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
                                        name="<?= $setting['setting_key'] ?>" 
                                        value="<?= safe_output($setting['setting_value']) ?>"
                                        data-setting-id="<?= $setting['setting_id'] ?>">
-                                <small class="text-muted"><?= safe_output($setting['description']) ?></small>
+                                <small class="text-muted"><?= caseFormat($setting['description']) ?></small>
                             </div>
                             <?php endforeach; ?>
                             </div>
@@ -232,7 +232,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
                                            data-setting-id="<?= $setting['setting_id'] ?>">
                                     <span class="input-group-text bg-light border-0">%</span>
                                 </div>
-                                <small class="text-muted"><?= safe_output($setting['description']) ?></small>
+                                <small class="text-muted"><?= caseFormat($setting['description']) ?></small>
                             </div>
                             <?php endforeach; ?>
                             </div>

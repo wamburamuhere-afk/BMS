@@ -124,7 +124,7 @@ $wf = [
         <div>
             <h4 class="fw-bold mb-1">
                 <i class="bi <?= $is_inbound ? 'bi-box-arrow-in-down' : 'bi-box-arrow-up-right' ?> text-primary me-2"></i>
-                Delivery Note — <span class="text-primary"><?= safe_output($dn_display) ?></span>
+                Delivery Note — <span class="text-primary"><?= caseFormat($dn_display) ?></span>
                 <span class="badge bg-<?= $is_inbound ? 'primary' : 'info' ?>-subtle text-<?= $is_inbound ? 'primary' : 'info' ?> border border-<?= $is_inbound ? 'primary' : 'info' ?> ms-1" style="font-size:.65rem;">
                     <?= $is_inbound ? 'INBOUND' : 'OUTBOUND' ?>
                 </span>
@@ -132,7 +132,7 @@ $wf = [
             </h4>
             <p class="text-muted small mb-0">
                 <?= $is_inbound ? 'Goods received from' : 'Goods sent to' ?>
-                <strong><?= safe_output($dn['party_name']) ?></strong> (<?= $party_label ?>)
+                <strong><?= caseFormat($dn['party_name']) ?></strong> (<?= $party_label ?>)
             </p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
@@ -240,9 +240,9 @@ $wf = [
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">DN Number</div>
-                                <div class="fw-bold text-primary"><?= safe_output($dn_display) ?></div>
+                                <div class="fw-bold text-primary"><?= caseFormat($dn_display) ?></div>
                                 <?php if ($is_inbound): ?>
-                                <small class="text-muted">System Ref: <?= safe_output($dn['delivery_number']) ?></small>
+                                <small class="text-muted">System Ref: <?= caseFormat($dn['delivery_number']) ?></small>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -255,18 +255,18 @@ $wf = [
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1"><?= $party_label ?></div>
-                                <div class="fw-bold"><?= safe_output($dn['party_name']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($dn['party_name']) ?></div>
                                 <?php if (!empty($dn['party_company'])): ?>
-                                <small class="text-muted"><?= safe_output($dn['party_company']) ?></small>
+                                <small class="text-muted"><?= caseFormat($dn['party_company']) ?></small>
                                 <?php endif; ?>
                             </div>
                         </div>
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1"><?= wLabel('Warehouse', 'Shop') ?></div>
-                                <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i><?= safe_output($dn['warehouse_name']) ?></div>
+                                <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i><?= caseFormat($dn['warehouse_name']) ?></div>
                                 <?php if (!empty($dn['warehouse_location'])): ?>
-                                <small class="text-muted"><?= safe_output($dn['warehouse_location']) ?></small>
+                                <small class="text-muted"><?= caseFormat($dn['warehouse_location']) ?></small>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -274,7 +274,7 @@ $wf = [
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Project</div>
-                                <div class="fw-bold"><?= safe_output($dn['project_name']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($dn['project_name']) ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -283,7 +283,7 @@ $wf = [
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Customer LPO Reference</div>
                                 <a href="<?= getUrl('lpo_view') ?>?id=<?= (int)$dn['customer_lpo_id'] ?>" class="fw-bold text-decoration-none">
-                                    <i class="bi bi-file-earmark-text me-1"></i><?= safe_output($dn['lpo_number']) ?>
+                                    <i class="bi bi-file-earmark-text me-1"></i><?= caseFormat($dn['lpo_number']) ?>
                                 </a>
                             </div>
                         </div>
@@ -301,7 +301,7 @@ $wf = [
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Linked Invoice</div>
                                 <a href="<?= getUrl('invoice_view') ?>?id=<?= (int)$linked_invoice['invoice_id'] ?>" class="fw-bold text-decoration-none">
-                                    <i class="bi bi-receipt me-1"></i><?= safe_output($linked_invoice['invoice_number']) ?>
+                                    <i class="bi bi-receipt me-1"></i><?= caseFormat($linked_invoice['invoice_number']) ?>
                                 </a>
                                 <span class="badge bg-<?= $inv_badge ?> ms-1"><?= strtoupper($linked_invoice['status']) ?></span>
                             </div>
@@ -311,9 +311,9 @@ $wf = [
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Contact Person</div>
-                                <div class="fw-bold"><?= safe_output($dn['contact_person']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($dn['contact_person']) ?></div>
                                 <?php if (!empty($dn['contact_phone'])): ?>
-                                <small class="text-muted"><i class="bi bi-telephone me-1"></i><?= safe_output($dn['contact_phone']) ?></small>
+                                <small class="text-muted"><i class="bi bi-telephone me-1"></i><?= caseFormat($dn['contact_phone']) ?></small>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -322,7 +322,7 @@ $wf = [
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Delivery Address</div>
-                                <div class="fw-bold"><?= safe_output($dn['delivery_address']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($dn['delivery_address']) ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -334,19 +334,19 @@ $wf = [
                                     <?php if (!empty($dn['vehicle_number'])): ?>
                                     <div class="col-sm-4">
                                         <small class="text-muted d-block">Vehicle / Truck</small>
-                                        <span class="fw-bold"><?= safe_output($dn['vehicle_number']) ?></span>
+                                        <span class="fw-bold"><?= caseFormat($dn['vehicle_number']) ?></span>
                                     </div>
                                     <?php endif; ?>
                                     <?php if (!empty($dn['driver_name'])): ?>
                                     <div class="col-sm-4">
                                         <small class="text-muted d-block">Driver</small>
-                                        <span class="fw-bold"><?= safe_output($dn['driver_name']) ?></span>
+                                        <span class="fw-bold"><?= caseFormat($dn['driver_name']) ?></span>
                                     </div>
                                     <?php endif; ?>
                                     <?php if (!empty($dn['shipping_method'])): ?>
                                     <div class="col-sm-4">
                                         <small class="text-muted d-block">Shipping Method</small>
-                                        <span class="fw-bold"><?= safe_output($dn['shipping_method']) ?></span>
+                                        <span class="fw-bold"><?= caseFormat($dn['shipping_method']) ?></span>
                                     </div>
                                     <?php endif; ?>
                                 </div>
@@ -358,7 +358,7 @@ $wf = [
                         <div class="col-12">
                             <div class="border rounded p-3 bg-light">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Notes</div>
-                                <div><?= safe_output($dn['notes']) ?></div>
+                                <div><?= caseFormat($dn['notes']) ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -391,10 +391,10 @@ $wf = [
                                 ?>
                                 <tr>
                                     <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
-                                    <td><div class="fw-bold"><?= safe_output($item['product_name']) ?></div></td>
-                                    <td><code><?= safe_output($item['sku'] ?? 'N/A') ?></code></td>
+                                    <td><div class="fw-bold"><?= caseFormat($item['product_name']) ?></div></td>
+                                    <td><code><?= caseFormat($item['sku'] ?? 'N/A') ?></code></td>
                                     <td class="text-center fw-bold text-primary fs-6"><?= number_format($item['quantity_delivered'], 3) ?></td>
-                                    <td><span class="badge bg-light text-dark border"><?= safe_output($item['unit'] ?? 'pcs') ?></span></td>
+                                    <td><span class="badge bg-light text-dark border"><?= caseFormat($item['unit'] ?? 'pcs') ?></span></td>
                                     <td class="text-center"><span class="badge bg-<?= $cond_color ?>"><?= ucfirst($cond) ?></span></td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -429,7 +429,7 @@ $wf = [
                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <span class="text-truncate">
                                 <i class="bi bi-file-earmark-text text-primary me-2"></i>
-                                <strong><?= safe_output($a['file_name']) ?></strong>
+                                <strong><?= caseFormat($a['file_name']) ?></strong>
                             </span>
                             <span class="badge bg-primary-subtle text-primary border border-primary">
                                 <i class="bi bi-eye me-1"></i>View
@@ -463,13 +463,13 @@ $wf = [
                     <hr>
                     <div class="mb-2">
                         <div class="text-muted small fw-bold text-uppercase mb-1">Created By</div>
-                        <div class="fw-bold"><?= safe_output($dn['created_by_name'] ?? 'N/A') ?></div>
+                        <div class="fw-bold"><?= caseFormat($dn['created_by_name'] ?? 'N/A') ?></div>
                         <small class="text-muted"><?= format_date($dn['created_at']) ?></small>
                     </div>
                     <?php if ($dn['approved_by']): ?>
                     <div class="mb-2">
                         <div class="text-muted small fw-bold text-uppercase mb-1">Approved By</div>
-                        <div class="fw-bold text-success"><?= safe_output($dn['approved_by_name'] ?? 'N/A') ?></div>
+                        <div class="fw-bold text-success"><?= caseFormat($dn['approved_by_name'] ?? 'N/A') ?></div>
                         <small class="text-muted"><?= format_date($dn['approved_at']) ?></small>
                     </div>
                     <?php endif; ?>

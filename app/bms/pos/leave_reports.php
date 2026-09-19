@@ -249,7 +249,7 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
                     <option value="">Full Organization</option>
                     <?php foreach ($departments as $dept): ?>
                         <option value="<?= $dept['department_id'] ?>" <?= $department_id == $dept['department_id'] ? 'selected' : '' ?>>
-                            <?= safe_output($dept['department_name']) ?>
+                            <?= caseFormat($dept['department_name']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -354,7 +354,7 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
                             <tbody>
                                 <?php foreach ($dept_data as $dept_name => $count): ?>
                                 <tr>
-                                    <td class="fw-bold"><?= safe_output($dept_name) ?></td>
+                                    <td class="fw-bold"><?= caseFormat($dept_name) ?></td>
                                     <td class="text-center"><span class="badge bg-slate-100 text-slate-700 px-3 py-2"><?= $count ?></span></td>
                                     <td>
                                         <div class="progress" style="height: 8px;">

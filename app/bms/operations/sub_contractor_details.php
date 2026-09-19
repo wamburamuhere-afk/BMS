@@ -648,7 +648,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                             <select class="form-select select2-static" name="project_id" id="risc_project_id" required>
                                 <option value="">-- Select Project --</option>
                                 <?php foreach ($sc_projects as $proj): ?>
-                                <option value="<?= $proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
+                                <option value="<?= $proj['project_id'] ?>"><?= caseFormat($proj['project_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -717,7 +717,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <select class="form-select select2-static" id="scRpProject">
                             <option value="">-- Select Project --</option>
                             <?php foreach ($sc_projects as $proj): ?>
-                            <option value="<?= (int)$proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
+                            <option value="<?= (int)$proj['project_id'] ?>"><?= caseFormat($proj['project_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <?php if (empty($sc_projects)): ?>
@@ -752,7 +752,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <select class="form-select" id="scRpAccount">
                             <option value="">Select account…</option>
                             <?php foreach ($bank_accounts as $acc): ?>
-                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= caseFormat($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <small class="text-muted">Cash/bank account the money is paid from.</small>
@@ -863,7 +863,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                     <label class="form-label">Category</label>
                                     <select class="form-select" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
-                                        <?php foreach ($categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option><?php endforeach; ?>
+                                        <?php foreach ($categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option><?php endforeach; ?>
                                         <option value="other">Other...</option>
                                     </select>
                                     <div id="edit_category_id_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_category_id_other" name="category_other" placeholder="Enter category"></div>

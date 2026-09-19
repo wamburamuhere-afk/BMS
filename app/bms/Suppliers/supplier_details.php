@@ -220,7 +220,7 @@ global $company_name, $company_logo;
 <div class="container-fluid mt-2 mt-md-4 px-2 px-md-4 mb-5">
     <?php if ($proj_ctx_id > 0): ?>
     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3 d-print-none">
-        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Viewing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Viewing within project: <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
             <i class="bi bi-arrow-left me-1"></i> Back to Project
         </a>
@@ -1370,7 +1370,7 @@ global $company_name, $company_logo;
                             <div class="row g-3">
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Supplier Code</label>
-                                    <p class="mb-0 fw-semibold"><code><?= safe_output($supplier['supplier_code']) ?></code></p>
+                                    <p class="mb-0 fw-semibold"><code><?= caseFormat($supplier['supplier_code']) ?></code></p>
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1">Status</label>
@@ -1428,9 +1428,9 @@ global $company_name, $company_logo;
                                         <tr>
                                             <td class="text-muted"><?= $i + 1 ?></td>
                                             <td><?= !empty($a['created_at']) ? date('d M Y H:i', strtotime($a['created_at'])) : '—' ?></td>
-                                            <td><span class="badge bg-light text-dark border"><?= safe_output($a['action'] ?: $a['activity_type'], '—') ?></span></td>
-                                            <td><?= safe_output($a['user_name'] ?: $a['username'], '—') ?></td>
-                                            <td><?= safe_output($a['description'], '—') ?></td>
+                                            <td><span class="badge bg-light text-dark border"><?= caseFormat($a['action'] ?: $a['activity_type'], '—') ?></span></td>
+                                            <td><?= caseFormat($a['user_name'] ?: $a['username'], '—') ?></td>
+                                            <td><?= caseFormat($a['description'], '—') ?></td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>

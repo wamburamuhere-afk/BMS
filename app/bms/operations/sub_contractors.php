@@ -263,7 +263,7 @@ function sc_status_label($status) {
                             <select class="form-select select2-static" id="categoryFilter">
                                 <option value=""><?= t('All Categories') ?></option>
                                 <?php foreach ($categories as $category): ?>
-                                    <option value="<?= safe_output($category['category_name']) ?>"><?= safe_output($category['category_name']) ?></option>
+                                    <option value="<?= safe_output($category['category_name']) ?>"><?= caseFormat($category['category_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -363,17 +363,17 @@ function sc_status_label($status) {
                                 <?php $sn = 1; foreach ($sub_contractors as $sc): ?>
                                 <tr>
                                     <td class="text-center"><?= $sn++ ?></td>
-                                    <td><span class="custom-code"><?= safe_output($sc['supplier_code']) ?></span></td>
+                                    <td><span class="custom-code"><?= caseFormat($sc['supplier_code']) ?></span></td>
                                     <td><strong><?= caseFormat($sc['supplier_name']) ?></strong></td>
                                     <td>
                                         <div class="small">
                                             <?= caseFormat($sc['contact_person'] ?? '') ?><br>
-                                            <i class="bi bi-telephone"></i> <?= safe_output($sc['phone'] ?? '') ?>
+                                            <i class="bi bi-telephone"></i> <?= caseFormat($sc['phone'] ?? '') ?>
                                         </div>
                                     </td>
                                     <td>
                                         <div class="small">
-                                            <?= safe_output(substr($sc['address'] ?? '', 0, 30)) ?>...<br>
+                                            <?= caseFormat(substr($sc['address'] ?? '', 0, 30)) ?>...<br>
                                             <strong><?= caseFormat($sc['city'] ?? '') ?></strong>
                                         </div>
                                     </td>
@@ -446,14 +446,14 @@ function sc_status_label($status) {
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
                                             <div class="fw-bold" style="font-size:0.9rem"><?= caseFormat($sc['supplier_name']) ?></div>
-                                            <small class="text-muted"><?= safe_output($sc['supplier_code']) ?> &bull; <?= !empty($sc['category_name']) ? caseFormat($sc['category_name']) : t('General') ?></small>
+                                            <small class="text-muted"><?= caseFormat($sc['supplier_code']) ?> &bull; <?= !empty($sc['category_name']) ? caseFormat($sc['category_name']) : t('General') ?></small>
                                         </div>
                                         <span class="badge bg-<?= get_status_badge($sc['status']) ?>" style="font-size:0.65rem"><?= sc_status_label($sc['status']) ?></span>
                                     </div>
                                     <?php if (!empty($sc['contact_person']) || !empty($sc['phone'])): ?>
                                     <div class="small text-muted mb-1">
                                         <?php if (!empty($sc['contact_person'])): ?><i class="bi bi-person me-1"></i><?= caseFormat($sc['contact_person']) ?><?php endif; ?>
-                                        <?php if (!empty($sc['phone'])): ?> &bull; <i class="bi bi-telephone me-1"></i><?= safe_output($sc['phone']) ?><?php endif; ?>
+                                        <?php if (!empty($sc['phone'])): ?> &bull; <i class="bi bi-telephone me-1"></i><?= caseFormat($sc['phone']) ?><?php endif; ?>
                                     </div>
                                     <?php endif; ?>
                                     <?php if (!empty($sc['city'])): ?>
@@ -505,7 +505,7 @@ function sc_status_label($status) {
                     <div id="add-sc-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Adding to project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Adding to project:') ?> <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
                             <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
@@ -583,7 +583,7 @@ function sc_status_label($status) {
                                     <select class="form-select select2-enable" id="project_id" name="project_id">
                                         <option value="">-- <?= t('General Sub-Contractor (No Project)') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
-                                        <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
+                                        <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                     <div class="form-text"><?= t('Associate this sub-contractor with a specific project context.') ?></div>
@@ -689,7 +689,7 @@ function sc_status_label($status) {
                                     <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
                                         <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sc_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
                                     <div class="form-text"><?= t("Auto-fills WHT when recording this sub-contractor's invoice payments.") ?></div>
@@ -743,7 +743,7 @@ function sc_status_label($status) {
                     <div id="edit-sc-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Editing within project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Editing within project:') ?> <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
                             <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
@@ -826,7 +826,7 @@ function sc_status_label($status) {
                                     <select class="form-select select2-enable" id="edit_project_id" name="project_id">
                                         <option value="">-- <?= t('General Sub-Contractor (No Project)') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
-                                        <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
+                                        <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -934,7 +934,7 @@ function sc_status_label($status) {
                                     <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
                                         <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sc_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
                                     <div class="form-text"><?= t("Auto-fills WHT when recording this sub-contractor's invoice payments.") ?></div>

@@ -98,13 +98,13 @@ if ($order_id) {
                 <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
             </div>
         <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= safe_output($c_name) ?></h1>
+        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= caseFormat($c_name) ?></h1>
         
         <p class="text-dark mb-1 small text-uppercase text-center">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . caseFormat($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . caseFormat($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
@@ -112,8 +112,8 @@ if ($order_id) {
         <p class="text-dark mb-1 small text-uppercase text-center">
             <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . caseFormat($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . caseFormat($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>

@@ -391,8 +391,8 @@ foreach ($orders as $order) {
             <p class="text-dark mb-1 small text-uppercase">
                 <?php 
                 $web_email = [];
-                if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-                if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+                if (!empty($c_web)) $web_email[] = "Web: " . caseFormat($c_web);
+                if (!empty($c_email)) $web_email[] = "Email: " . caseFormat($c_email);
                 if (!empty($web_email)) echo implode(" | ", $web_email);
                 ?>
             </p>
@@ -400,8 +400,8 @@ foreach ($orders as $order) {
             <p class="text-dark mb-1 small text-uppercase">
                 <?php 
                 $tin_vrn = [];
-                if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-                if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+                if (!empty($c_tin)) $tin_vrn[] = "TIN: " . caseFormat($c_tin);
+                if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . caseFormat($c_vrn);
                 if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
                 ?>
             </p>
@@ -474,7 +474,7 @@ foreach ($orders as $order) {
                             <div class="row g-3">
                                 <div class="col-md-3">
                                     <label class="text-muted small fw-bold text-uppercase d-block mb-1">Customer Code</label>
-                                    <span class="fw-bold fs-5 custom-code"><?= safe_output($filtered_customer['customer_code']) ?></span>
+                                    <span class="fw-bold fs-5 custom-code"><?= caseFormat($filtered_customer['customer_code']) ?></span>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="text-muted small fw-bold text-uppercase d-block mb-1">Name & Company</label>
@@ -485,19 +485,19 @@ foreach ($orders as $order) {
                                 </div>
                                 <div class="col-md-2">
                                     <label class="text-muted small fw-bold text-uppercase d-block mb-1">Tax ID (TIN)</label>
-                                    <span class="badge bg-info text-dark fw-bold"><?= !empty($filtered_customer['tax_id']) ? safe_output($filtered_customer['tax_id']) : 'N/A' ?></span>
+                                    <span class="badge bg-info text-dark fw-bold"><?= !empty($filtered_customer['tax_id']) ? caseFormat($filtered_customer['tax_id']) : 'N/A' ?></span>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="text-muted small fw-bold text-uppercase d-block mb-1">Contact Info</label>
                                     <div class="d-flex flex-wrap gap-3">
                                         <?php if (!empty($filtered_customer['email'])): ?>
-                                            <span><i class="bi bi-envelope text-primary me-1"></i> <?= safe_output($filtered_customer['email']) ?></span>
+                                            <span><i class="bi bi-envelope text-primary me-1"></i> <?= caseFormat($filtered_customer['email']) ?></span>
                                         <?php endif; ?>
                                         <?php if (!empty($filtered_customer['phone'])): ?>
-                                            <span><i class="bi bi-telephone text-success me-1"></i> <?= safe_output($filtered_customer['phone']) ?></span>
+                                            <span><i class="bi bi-telephone text-success me-1"></i> <?= caseFormat($filtered_customer['phone']) ?></span>
                                         <?php endif; ?>
                                         <?php if (!empty($filtered_customer['mobile'])): ?>
-                                            <span><i class="bi bi-phone text-info me-1"></i> <?= safe_output($filtered_customer['mobile']) ?></span>
+                                            <span><i class="bi bi-phone text-info me-1"></i> <?= caseFormat($filtered_customer['mobile']) ?></span>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -600,7 +600,7 @@ foreach ($orders as $order) {
                         <option value="">All Salespeople</option>
                         <?php foreach ($salespeople as $salesperson): ?>
                             <option value="<?= $salesperson['user_id'] ?>" <?= $salesperson_filter == $salesperson['user_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($salesperson['username']) ?>
+                                <?= caseFormat($salesperson['username']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

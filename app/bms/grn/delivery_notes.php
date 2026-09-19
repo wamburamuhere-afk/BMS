@@ -193,7 +193,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <select class="form-select select2-static" name="supplier" id="dn_filter_supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $supplier): ?>
-                            <option value="<?= $supplier['supplier_id'] ?>" <?= $dn_supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>><?= safe_output($supplier['supplier_name']) ?></option>
+                            <option value="<?= $supplier['supplier_id'] ?>" <?= $dn_supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>><?= caseFormat($supplier['supplier_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -213,7 +213,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <select class="form-select select2-static" name="warehouse" id="dn_filter_warehouse">
                         <option value="">All Warehouses</option>
                         <?php foreach ($warehouses as $warehouse): ?>
-                            <option value="<?= $warehouse['warehouse_id'] ?>"><?= safe_output($warehouse['warehouse_name']) ?></option>
+                            <option value="<?= $warehouse['warehouse_id'] ?>"><?= caseFormat($warehouse['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

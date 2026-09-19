@@ -75,7 +75,7 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                 </button>
                 <?php if ($existing_dn): ?>
                 <a href="<?= getUrl('debit_note_view') ?>?id=<?= (int)$existing_dn['debit_note_id'] ?>" class="btn btn-primary px-4 shadow-sm">
-                    <i class="bi bi-receipt-cutoff"></i> <?= t('View Debit Note') ?> <?= safe_output($existing_dn['debit_note_number']) ?>
+                    <i class="bi bi-receipt-cutoff"></i> <?= t('View Debit Note') ?> <?= caseFormat($existing_dn['debit_note_number']) ?>
                 </a>
                 <?php elseif ($can_create_dn): ?>
                 <a id="btnCreateDebitNote" href="<?= getUrl('debit_note_create') ?>?purchase_return_id=<?= $return_id ?><?= $dn_create_qs ?>" class="btn btn-primary px-4 shadow-sm" style="display:none;">

@@ -307,7 +307,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         
         <div class="mt-4 text-center">
             <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 18pt; letter-spacing: 2px;"><?= $doc_label ?></h2>
-            <h4 style="color: #000; margin: 0; font-size: 14pt;"><?= $doc_short ?> #<?= safe_output($grn['receipt_number']) ?></h4>
+            <h4 style="color: #000; margin: 0; font-size: 14pt;"><?= $doc_short ?> #<?= caseFormat($grn['receipt_number']) ?></h4>
             <p style="color: #000; margin: 0; font-size: 11pt;"><?= t('Date:') ?> <?= date('d M Y', strtotime($grn['receipt_date'])) ?></p>
         </div>
         <div style="border-bottom: 3px solid #000; margin-top: 15px; margin-bottom: 25px;"></div>
@@ -328,21 +328,21 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
             <div class="row">
                 <div class="col-6">
                     <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Supplier') ?></h5>
-                    <div class="fw-bold"><?= safe_output($grn['supplier_name']) ?></div>
+                    <div class="fw-bold"><?= caseFormat($grn['supplier_name']) ?></div>
                     <?php if (!empty($grn['company_name'])): ?>
-                        <div><?= safe_output($grn['company_name']) ?></div>
+                        <div><?= caseFormat($grn['company_name']) ?></div>
                     <?php endif; ?>
                     <?php if (!empty($grn['supplier_phone'])): ?>
-                        <div><?= t('Tel:') ?> <?= safe_output($grn['supplier_phone']) ?></div>
+                        <div><?= t('Tel:') ?> <?= caseFormat($grn['supplier_phone']) ?></div>
                     <?php endif; ?>
                 </div>
                 <div class="col-6 text-end">
                     <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Details') ?></h5>
-                    <div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
+                    <div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($grn['warehouse_name']) ?></div>
                     <?php if (!empty($grn['order_number'])): ?>
-                        <div><strong><?= t('PO Ref:') ?></strong> <?= safe_output($grn['order_number']) ?></div>
+                        <div><strong><?= t('PO Ref:') ?></strong> <?= caseFormat($grn['order_number']) ?></div>
                     <?php endif; ?>
-                    <div><strong><?= t('Received By:') ?></strong> <?= safe_output($grn['received_by_name'] ?? t('N/A')) ?></div>
+                    <div><strong><?= t('Received By:') ?></strong> <?= caseFormat($grn['received_by_name'] ?? t('N/A')) ?></div>
                 </div>
             </div>
         </div>
@@ -377,14 +377,14 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                                 <tr>
                                     <td class="ps-4 text-muted fw-bold"><?= $index + 1 ?></td>
                                     <td>
-                                        <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
                                         <?php if($item['sku']): ?>
-                                            <small class="text-muted"><?= t('SKU:') ?> <?= safe_output($item['sku']) ?></small>
+                                            <small class="text-muted"><?= t('SKU:') ?> <?= caseFormat($item['sku']) ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-light text-dark border">
-                                            <?= $item['quantity_received'] ?> <?= safe_output($item['unit'] ?? '') ?>
+                                            <?= $item['quantity_received'] ?> <?= caseFormat($item['unit'] ?? '') ?>
                                         </span>
                                     </td>
                                     <?php if (!$is_dn): ?>
@@ -436,7 +436,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                             <div class="d-flex align-items-center flex-grow-1 overflow-hidden">
                                 <i class="bi <?= $icon ?> fs-4 <?= $icon_color ?> me-3"></i>
                                 <div class="text-truncate me-3">
-                                    <span class="fw-bold text-dark"><?= safe_output($att['file_name']) ?></span>
+                                    <span class="fw-bold text-dark"><?= caseFormat($att['file_name']) ?></span>
                                     <span class="text-muted small ms-2">(<?= strtoupper($ext) ?>)</span>
                                 </div>
                             </div>
@@ -457,7 +457,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     <h6 class="mb-0 fw-bold"><?= t('GRN Notes') ?></h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted"><?= nl2br(safe_output($grn['notes'])) ?></p>
+                    <p class="mb-0 text-muted"><?= nl2br(caseFormat($grn['notes'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -476,9 +476,9 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     <h6 class="mb-0 fw-bold"><?= t('Supplier Information') ?></h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="fw-bold mb-1"><?= safe_output($grn['supplier_name']) ?></h5>
+                    <h5 class="fw-bold mb-1"><?= caseFormat($grn['supplier_name']) ?></h5>
                     <?php if (!empty($grn['company_name'])): ?>
-                        <div class="text-muted mb-2"><?= safe_output($grn['company_name']) ?></div>
+                        <div class="text-muted mb-2"><?= caseFormat($grn['company_name']) ?></div>
                     <?php endif; ?>
                     
                     <hr class="my-3">
@@ -486,21 +486,21 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                     <?php if (!empty($grn['supplier_email'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-envelope text-muted me-2"></i>
-                            <span><?= safe_output($grn['supplier_email']) ?></span>
+                            <span><?= caseFormat($grn['supplier_email']) ?></span>
                         </div>
                     <?php endif; ?>
                     
                     <?php if (!empty($grn['supplier_phone'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-telephone text-muted me-2"></i>
-                            <span><?= safe_output($grn['supplier_phone']) ?></span>
+                            <span><?= caseFormat($grn['supplier_phone']) ?></span>
                         </div>
                     <?php endif; ?>
                     
                     <?php if (!empty($grn['supplier_address'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-geo-alt text-muted me-2"></i>
-                            <span><?= safe_output($grn['supplier_address']) ?></span>
+                            <span><?= caseFormat($grn['supplier_address']) ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -521,22 +521,22 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                         <span class="text-muted"><?= t('Purchase Order:') ?></span>
                         <span class="fw-medium">
                             <a href="purchase_order_view.php?id=<?= $grn['purchase_order_id'] ?>" class="text-decoration-none">
-                                <?= safe_output($grn['order_number']) ?>
+                                <?= caseFormat($grn['order_number']) ?>
                             </a>
                         </span>
                     </div>
                     <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span>
-                        <span class="fw-medium"><?= safe_output($grn['warehouse_name']) ?></span>
+                        <span class="fw-medium"><?= caseFormat($grn['warehouse_name']) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted"><?= t('Received By:') ?></span>
-                        <span class="fw-medium"><?= safe_output($grn['received_by_name'] ?? t('N/A')) ?></span>
+                        <span class="fw-medium"><?= caseFormat($grn['received_by_name'] ?? t('N/A')) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted"><?= t('Created By:') ?></span>
-                        <span class="fw-medium"><?= safe_output($grn['created_by_name'] ?? t('N/A')) ?></span>
+                        <span class="fw-medium"><?= caseFormat($grn['created_by_name'] ?? t('N/A')) ?></span>
                     </div>
                 </div>
             </div>
@@ -547,21 +547,21 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
             <div class="row">
                 <div class="col-6">
                     <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Supplier') ?></h5>
-                    <div class="fw-bold"><?= safe_output($grn['supplier_name']) ?></div>
+                    <div class="fw-bold"><?= caseFormat($grn['supplier_name']) ?></div>
                     <?php if (!empty($grn['company_name'])): ?>
-                        <div><?= safe_output($grn['company_name']) ?></div>
+                        <div><?= caseFormat($grn['company_name']) ?></div>
                     <?php endif; ?>
                     <?php if (!empty($grn['supplier_phone'])): ?>
-                        <div><?= t('Tel:') ?> <?= safe_output($grn['supplier_phone']) ?></div>
+                        <div><?= t('Tel:') ?> <?= caseFormat($grn['supplier_phone']) ?></div>
                     <?php endif; ?>
                 </div>
                 <div class="col-6 text-end">
                     <h5 class="fw-bold mb-2 text-decoration-underline"><?= t('Details') ?></h5>
-                    <div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= safe_output($grn['warehouse_name']) ?></div>
+                    <div><strong><?= wLabel('Warehouse:', 'Shop:') ?></strong> <?= caseFormat($grn['warehouse_name']) ?></div>
                     <?php if (!empty($grn['order_number'])): ?>
-                        <div><strong><?= t('PO Ref:') ?></strong> <?= safe_output($grn['order_number']) ?></div>
+                        <div><strong><?= t('PO Ref:') ?></strong> <?= caseFormat($grn['order_number']) ?></div>
                     <?php endif; ?>
-                    <div><strong><?= t('Received By:') ?></strong> <?= safe_output($grn['received_by_name'] ?? t('N/A')) ?></div>
+                    <div><strong><?= t('Received By:') ?></strong> <?= caseFormat($grn['received_by_name'] ?? t('N/A')) ?></div>
                 </div>
             </div>
         </div>

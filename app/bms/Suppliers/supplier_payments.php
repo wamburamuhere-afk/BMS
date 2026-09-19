@@ -87,7 +87,7 @@ if (!empty($filter_supplier_id)) {
             <li class="breadcrumb-item"><a href="<?= getUrl('suppliers') ?>">Suppliers</a></li>
             <?php if (!empty($breadcrumb_supplier)): ?>
             <li class="breadcrumb-item">
-                <a href="<?= getUrl('suppliers/view') ?>?id=<?= (int)$filter_supplier_id ?>"><?= safe_output($breadcrumb_supplier) ?></a>
+                <a href="<?= getUrl('suppliers/view') ?>?id=<?= (int)$filter_supplier_id ?>"><?= caseFormat($breadcrumb_supplier) ?></a>
             </li>
             <?php endif; ?>
             <li class="breadcrumb-item active">Payments</li>
@@ -147,7 +147,7 @@ if (!empty($filter_supplier_id)) {
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $s): ?>
                         <option value="<?= $s['supplier_id'] ?>" <?= $filter_supplier_id == $s['supplier_id'] ? 'selected' : '' ?>>
-                            <?= safe_output($s['supplier_name']) ?>
+                            <?= caseFormat($s['supplier_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -206,36 +206,36 @@ if (!empty($filter_supplier_id)) {
                             <?php $sno = 0; foreach ($payments as $payment): $sno++; ?>
                             <tr data-payment-id="<?= $payment['payment_id'] ?>">
                                 <td><?= $sno ?></td>
-                                <td><?= safe_output(format_date($payment['payment_date'])) ?></td>
+                                <td><?= caseFormat(format_date($payment['payment_date'])) ?></td>
                                 <td>
-                                    <div class="fw-bold"><?= safe_output($payment['supplier_name']) ?></div>
+                                    <div class="fw-bold"><?= caseFormat($payment['supplier_name']) ?></div>
                                     <?php if (!empty($payment['company_name'])): ?>
-                                    <small class="text-muted"><?= safe_output($payment['company_name']) ?></small>
+                                    <small class="text-muted"><?= caseFormat($payment['company_name']) ?></small>
                                     <?php endif; ?>
                                 </td>
-                                <td><code><?= safe_output($payment['reference_number'] ?: '—') ?></code></td>
+                                <td><code><?= caseFormat($payment['reference_number'] ?: '—') ?></code></td>
                                 <td>
                                     <?php if (!empty($payment['order_number'])): ?>
                                     <a href="<?= getUrl('purchase_order_details') ?>?id=<?= $payment['purchase_order_id'] ?>" class="text-decoration-none">
-                                        <?= safe_output($payment['order_number']) ?>
+                                        <?= caseFormat($payment['order_number']) ?>
                                     </a>
                                     <?php else: ?>
                                     <span class="text-muted">—</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <span class="fw-bold text-success"><?= safe_output(format_currency($payment['amount'])) ?></span>
-                                    <br><small class="text-muted"><?= safe_output($payment['currency']) ?></small>
+                                    <span class="fw-bold text-success"><?= caseFormat(format_currency($payment['amount'])) ?></span>
+                                    <br><small class="text-muted"><?= caseFormat($payment['currency']) ?></small>
                                 </td>
                                 <td>
                                     <span class="badge bg-info text-dark">
-                                        <?= safe_output(ucfirst(str_replace('_', ' ', $payment['payment_method']))) ?>
+                                        <?= caseFormat(ucfirst(str_replace('_', ' ', $payment['payment_method']))) ?>
                                     </span>
                                 </td>
                                 <td>
                                     <small class="text-muted">
                                         <?php if (!empty($payment['notes'])): ?>
-                                            <?= safe_output(mb_substr($payment['notes'], 0, 45)) ?><?= mb_strlen($payment['notes']) > 45 ? '…' : '' ?>
+                                            <?= caseFormat(mb_substr($payment['notes'], 0, 45)) ?><?= mb_strlen($payment['notes']) > 45 ? '…' : '' ?>
                                         <?php else: ?>—<?php endif; ?>
                                     </small>
                                 </td>
@@ -290,7 +290,7 @@ if (!empty($filter_supplier_id)) {
                                 <option value="">Select Supplier</option>
                                 <?php foreach ($suppliers as $s): ?>
                                 <option value="<?= $s['supplier_id'] ?>" <?= $filter_supplier_id == $s['supplier_id'] ? 'selected' : '' ?>>
-                                    <?= safe_output($s['supplier_name']) ?>
+                                    <?= caseFormat($s['supplier_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -314,7 +314,7 @@ if (!empty($filter_supplier_id)) {
                             <select class="form-select" name="wht_rate_id" id="add_wht_rate" onchange="recalcAddNet()">
                                 <option value="" data-rate="0">No withholding tax</option>
                                 <?php foreach ($ps_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Withheld from the supplier and remitted to TRA.</small>
@@ -353,7 +353,7 @@ if (!empty($filter_supplier_id)) {
                             <select class="form-select select2-static" name="paid_from_account_id" required>
                                 <option value="">Select account…</option>
                                 <?php foreach ($ps_cash_accounts as $acc): ?>
-                                <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                <option value="<?= (int)$acc['account_id'] ?>"><?= caseFormat($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Cash/bank account the money is paid from.</small>
@@ -398,7 +398,7 @@ if (!empty($filter_supplier_id)) {
                             <select class="form-select select2-static" name="supplier_id" id="edit_supplier_id" required>
                                 <option value="">Select Supplier</option>
                                 <?php foreach ($suppliers as $s): ?>
-                                <option value="<?= $s['supplier_id'] ?>"><?= safe_output($s['supplier_name']) ?></option>
+                                <option value="<?= $s['supplier_id'] ?>"><?= caseFormat($s['supplier_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -421,7 +421,7 @@ if (!empty($filter_supplier_id)) {
                             <select class="form-select" name="wht_rate_id" id="edit_wht_rate" onchange="recalcEditNet()">
                                 <option value="" data-rate="0">No withholding tax</option>
                                 <?php foreach ($ps_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Withheld from the supplier and remitted to TRA.</small>
@@ -460,7 +460,7 @@ if (!empty($filter_supplier_id)) {
                             <select class="form-select select2-static" name="paid_from_account_id" id="edit_paid_from" required>
                                 <option value="">Select account…</option>
                                 <?php foreach ($ps_cash_accounts as $acc): ?>
-                                <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                <option value="<?= (int)$acc['account_id'] ?>"><?= caseFormat($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Cash/bank account the money is paid from.</small>
@@ -501,14 +501,14 @@ if (!empty($filter_supplier_id)) {
                         <?php if (!empty($company_logo)): ?>
                         <img src="<?= getUrl($company_logo) ?>" height="60" class="mb-2 d-block mx-auto">
                         <?php endif; ?>
-                        <div class="fw-bold" style="font-size:1.1rem;text-transform:uppercase;"><?= safe_output($company_name) ?></div>
+                        <div class="fw-bold" style="font-size:1.1rem;text-transform:uppercase;"><?= caseFormat($company_name) ?></div>
                         <?php if (!empty($company_address)): ?>
-                        <div style="font-size:0.8rem;color:#555;"><?= safe_output($company_address) ?></div>
+                        <div style="font-size:0.8rem;color:#555;"><?= caseFormat($company_address) ?></div>
                         <?php endif; ?>
                         <?php if (!empty($company_phone) || !empty($company_email)): ?>
                         <div style="font-size:0.8rem;color:#555;">
-                            <?= !empty($company_phone) ? 'Tel: '.safe_output($company_phone) : '' ?>
-                            <?= !empty($company_email) ? ' &nbsp;|&nbsp; '.safe_output($company_email) : '' ?>
+                            <?= !empty($company_phone) ? 'Tel: '.caseFormat($company_phone) : '' ?>
+                            <?= !empty($company_email) ? ' &nbsp;|&nbsp; '.caseFormat($company_email) : '' ?>
                         </div>
                         <?php endif; ?>
                     </div>

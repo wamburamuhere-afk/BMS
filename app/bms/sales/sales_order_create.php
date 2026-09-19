@@ -256,9 +256,9 @@ $is_quote = isset($_GET['quote']) ? true : false;
                                     data-payment-terms="<?= $cust['payment_terms'] ?? '' ?>"
                                     data-currency="<?= $cust['currency'] ?? 'TZS' ?>"
                                     data-credit-limit="<?= $cust['credit_limit'] ?? 0 ?>">
-                                    <?= safe_output($cust['customer_name']) ?>
+                                    <?= caseFormat($cust['customer_name']) ?>
                                     <?php if (!empty($cust['company_name'])): ?>
-                                        (<?= safe_output($cust['company_name']) ?>)
+                                        (<?= caseFormat($cust['company_name']) ?>)
                                     <?php endif; ?>
                                 </option>
                             <?php endforeach; ?>
@@ -293,7 +293,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
                                     <?= (($sales_order && isset($sales_order['project_id']) && $sales_order['project_id'] == $proj['project_id']) || ($project_id == $proj['project_id'])) ? 'selected' : '' ?>>
-                                    <?= safe_output($proj['project_name']) ?>
+                                    <?= caseFormat($proj['project_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

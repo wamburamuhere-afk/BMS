@@ -394,7 +394,7 @@ $sr_status_badge = [
 <div class="container-fluid mt-4">
     <?php if ($proj_ctx_id > 0): ?>
     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3 d-print-none">
-        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Viewing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Viewing within project: <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
             <i class="bi bi-arrow-left me-1"></i> Back to Project
         </a>
@@ -535,13 +535,13 @@ $sr_status_badge = [
                         <li class="mb-3">
                             <i class="bi bi-telephone text-primary me-2"></i>
                             <strong>Phone:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['phone']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['phone']) ?></span>
                         </li>
                         <?php if (!empty($employee['alternate_phone'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-telephone-plus text-primary me-2"></i>
                             <strong>Alternate Phone:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['alternate_phone']) ?></span>
+                            <span class="ms-4"><?= caseFormat($employee['alternate_phone']) ?></span>
                         </li>
                         <?php endif; ?>
                         <li class="mb-3">
@@ -606,7 +606,7 @@ $sr_status_badge = [
                     <div class="row g-3">
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Employee ID</label>
-                            <p class="fw-bold"><?= safe_output($employee['employee_number']) ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['employee_number']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Department</label>
@@ -657,7 +657,7 @@ $sr_status_badge = [
                         </div>
                          <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">NIDA / ID Number</label>
-                            <p class="fw-bold"><?= safe_output($employee['national_id'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['national_id'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Marital Status</label>
@@ -665,7 +665,7 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Passport Number</label>
-                            <p class="fw-bold"><?= safe_output($employee['passport_number'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['passport_number'] ?? 'N/A') ?></p>
                         </div>
 
                         <div class="col-12"><hr class="my-2"></div>
@@ -684,7 +684,7 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Account</label>
-                            <p class="fw-bold"><?= safe_output($employee['bank_account'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['bank_account'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Branch</label>
@@ -692,11 +692,11 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Identifier Code <small>(SWIFT/routing)</small></label>
-                            <p class="fw-bold"><?= safe_output($employee['bank_swift_code'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['bank_swift_code'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Mobile Money</label>
-                            <p class="fw-bold"><?= safe_output($employee['mobile_money'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['mobile_money'] ?? 'N/A') ?></p>
                         </div>
                     </div>
                 </div>
@@ -715,7 +715,7 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Currency</label>
-                            <p class="fw-bold"><?= safe_output($employee['currency'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['currency'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Payment Frequency</label>
@@ -727,11 +727,11 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Tax ID (TIN)</label>
-                            <p class="fw-bold"><?= safe_output($employee['tax_id'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['tax_id'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Social Security Number</label>
-                            <p class="fw-bold"><?= safe_output($employee['social_security_number'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['social_security_number'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-12">
                             <label class="text-muted small text-uppercase">Benefits</label>
@@ -764,26 +764,26 @@ $sr_status_badge = [
                         </div>
                         <div class="col-sm-6 col-md-3">
                             <label class="text-muted small text-uppercase">Relationship</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_relationship'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['emergency_contact_relationship'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-3">
                             <label class="text-muted small text-uppercase">Phone Number</label>
-                            <p class="fw-bold text-primary"><?= safe_output($employee['emergency_contact_phone'] ?? 'N/A') ?></p>
+                            <p class="fw-bold text-primary"><?= caseFormat($employee['emergency_contact_phone'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-3">
                             <label class="text-muted small text-uppercase">Email Address</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_email'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['emergency_contact_email'] ?? 'N/A') ?></p>
                         </div>
 
                         <div class="col-12"><hr class="my-2"></div>
 
                         <div class="col-sm-6 col-md-6">
                             <label class="text-muted small text-uppercase">Postal Address</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_postal_address'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['emergency_contact_postal_address'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-6">
                             <label class="text-muted small text-uppercase">Physical Address</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_physical_address'] ?? 'N/A') ?></p>
+                            <p class="fw-bold"><?= caseFormat($employee['emergency_contact_physical_address'] ?? 'N/A') ?></p>
                         </div>
                     </div>
                 </div>
@@ -833,20 +833,20 @@ $sr_status_badge = [
                             switch ($ev['event_type']) {
                                 case 'promotion':
                                 case 'demotion':
-                                    $change = safe_output($ev['old_designation_name'], '—') . ' → ' . safe_output($ev['new_designation_name'], '—');
+                                    $change = caseFormat($ev['old_designation_name'], '—') . ' → ' . caseFormat($ev['new_designation_name'], '—');
                                     if ($ev['new_salary'] !== null) $change .= ' · salary ' . number_format((float)$ev['old_salary'], 0) . ' → ' . number_format((float)$ev['new_salary'], 0);
                                     break;
                                 case 'transfer':
                                     $bits = [];
-                                    if ($ev['new_department_id']) $bits[] = safe_output($ev['old_department_name'], '—') . ' → ' . safe_output($ev['new_department_name'], '—');
-                                    if ($ev['new_project_id']) $bits[] = safe_output($ev['old_project_name'], 'No project') . ' → ' . safe_output($ev['new_project_name'], '—');
+                                    if ($ev['new_department_id']) $bits[] = caseFormat($ev['old_department_name'], '—') . ' → ' . caseFormat($ev['new_department_name'], '—');
+                                    if ($ev['new_project_id']) $bits[] = caseFormat($ev['old_project_name'], 'No project') . ' → ' . caseFormat($ev['new_project_name'], '—');
                                     $change = implode(' · ', $bits);
                                     break;
-                                case 'award':       $change = safe_output($ev['award_type'], '—') . ($ev['award_amount'] ? ' · ' . number_format((float)$ev['award_amount'], 0) : ''); break;
+                                case 'award':       $change = caseFormat($ev['award_type'], '—') . ($ev['award_amount'] ? ' · ' . number_format((float)$ev['award_amount'], 0) : ''); break;
                                 case 'warning':     $change = $ev['severity'] ? ucfirst($ev['severity']) . ' warning' : ''; break;
-                                case 'complaint':   $change = 'By: ' . safe_output($ev['complainant'], '—'); break;
-                                case 'resignation': $change = 'Last working day: ' . safe_output($ev['end_date'], '—'); break;
-                                case 'termination': $change = safe_output($ev['termination_type'], '—'); break;
+                                case 'complaint':   $change = 'By: ' . caseFormat($ev['complainant'], '—'); break;
+                                case 'resignation': $change = 'Last working day: ' . caseFormat($ev['end_date'], '—'); break;
+                                case 'termination': $change = caseFormat($ev['termination_type'], '—'); break;
                             }
                         ?>
                         <div class="d-flex gap-3 pb-3 mb-1 border-start ms-2 ps-3 position-relative" style="border-color:#b6ccfe!important;">
@@ -856,7 +856,7 @@ $sr_status_badge = [
                             </span>
                             <div class="flex-grow-1 ms-2">
                                 <div class="d-flex justify-content-between flex-wrap gap-1">
-                                    <strong><?= safe_output($ev['title']) ?></strong>
+                                    <strong><?= caseFormat($ev['title']) ?></strong>
                                     <span>
                                         <span class="badge" style="background:<?= $sbg ?>;color:<?= $sfg ?>"><?= ucfirst($ev['status']) ?></span>
                                         <small class="text-muted ms-1"><?= date('d M Y', strtotime($ev['event_date'])) ?></small>
@@ -864,23 +864,23 @@ $sr_status_badge = [
                                 </div>
                                 <?php if ($change): ?><div class="small text-muted"><?= $change ?></div><?php endif; ?>
                                 <?php if (!empty($ev['description'])): ?>
-                                <div class="small mt-1"><?= safe_output($ev['description']) ?></div>
+                                <div class="small mt-1"><?= caseFormat($ev['description']) ?></div>
                                 <?php endif; ?>
                                 <div class="small text-muted mt-1">
-                                    Recorded by <?= safe_output($ev['created_by_name'], '—') ?>
+                                    Recorded by <?= caseFormat($ev['created_by_name'], '—') ?>
                                     <?php if ($ev['approved_by_name']): ?>
-                                        · <?= $ev['status'] === 'rejected' ? 'Rejected' : 'Approved' ?> by <?= safe_output($ev['approved_by_name']) ?><?= $ev['approved_at'] ? ' on ' . date('d M Y', strtotime($ev['approved_at'])) : '' ?>
+                                        · <?= $ev['status'] === 'rejected' ? 'Rejected' : 'Approved' ?> by <?= caseFormat($ev['approved_by_name']) ?><?= $ev['approved_at'] ? ' on ' . date('d M Y', strtotime($ev['approved_at'])) : '' ?>
                                     <?php endif; ?>
                                     <?php if (!empty($ev['reject_reason'])): ?>
-                                        · <span class="text-danger">Reason: <?= safe_output($ev['reject_reason']) ?></span>
+                                        · <span class="text-danger">Reason: <?= caseFormat($ev['reject_reason']) ?></span>
                                     <?php endif; ?>
                                     <?php if (!empty($ev['attachment_path'])): ?>
-                                        · <a href="<?= buildUrl('api/download_lifecycle_attachment.php') ?>?event_id=<?= (int)$ev['event_id'] ?>" class="d-print-none"><i class="bi bi-paperclip"></i> <?= safe_output($ev['attachment_name'], 'Attachment') ?></a>
+                                        · <a href="<?= buildUrl('api/download_lifecycle_attachment.php') ?>?event_id=<?= (int)$ev['event_id'] ?>" class="d-print-none"><i class="bi bi-paperclip"></i> <?= caseFormat($ev['attachment_name'], 'Attachment') ?></a>
                                     <?php endif; ?>
                                     <?php if (in_array($ev['event_type'], ['warning', 'complaint'], true) && $ev['status'] === 'approved'): ?>
                                         <?php if (!empty($ev['acknowledged_at'])): ?>
                                         · <span class="text-success"><i class="bi bi-check-circle-fill"></i> Acknowledged by employee on <?= date('d M Y', strtotime($ev['acknowledged_at'])) ?></span>
-                                        <?php if (!empty($ev['acknowledgment_note'])): ?><div class="fst-italic">"<?= safe_output($ev['acknowledgment_note']) ?>"</div><?php endif; ?>
+                                        <?php if (!empty($ev['acknowledgment_note'])): ?><div class="fst-italic">"<?= caseFormat($ev['acknowledgment_note']) ?>"</div><?php endif; ?>
                                         <?php else: ?>
                                         · <span class="text-warning"><i class="bi bi-exclamation-circle-fill"></i> Not yet acknowledged by employee</span>
                                         <?php endif; ?>
@@ -923,7 +923,7 @@ $sr_status_badge = [
                                     $isDed = $r['component_type'] === 'deduction'; ?>
                                 <tr>
                                     <td class="ps-3"><?= $sn++ ?></td>
-                                    <td class="fw-semibold"><?= safe_output($r['component_name']) ?></td>
+                                    <td class="fw-semibold"><?= caseFormat($r['component_name']) ?></td>
                                     <td><span class="badge-status" style="background:<?= $isDed ? '#dc3545' : '#0d6efd' ?>;color:#fff;font-size:.62rem;padding:.3em .55em;border-radius:6px;"><?= strtoupper($r['component_type']) ?></span></td>
                                     <td class="small"><?= $r['calculation_type'] === 'percentage' ? number_format((float)$r['amount'], 2) . '% of basic' : 'Fixed' ?></td>
                                     <td class="text-end <?= $isDed ? 'text-danger' : '' ?>"><?= ($isDed ? '−' : '') . number_format($val, 2) ?></td>
@@ -966,7 +966,7 @@ $sr_status_badge = [
                                         <option value="">Select a component…</option>
                                         <?php foreach ($sc_master as $c): ?>
                                             <option value="<?= (int)$c['component_id'] ?>" data-calc="<?= htmlspecialchars($c['calculation_type']) ?>" data-default="<?= htmlspecialchars($c['default_amount']) ?>" data-type="<?= htmlspecialchars($c['component_type']) ?>">
-                                                <?= safe_output($c['component_name']) ?> (<?= ucfirst($c['component_type']) ?>)
+                                                <?= caseFormat($c['component_name']) ?> (<?= ucfirst($c['component_type']) ?>)
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -1029,10 +1029,10 @@ $sr_status_badge = [
                                 ?>
                                     <tr>
                                         <td><?= $sn++ ?></td>
-                                        <td><?= safe_output($d['type_name']) ?></td>
-                                        <td><?= safe_output($d['document_name']) ?></td>
-                                        <td><?= safe_output($d['issue_date'], '—') ?></td>
-                                        <td><?= safe_output($d['expire_date'], '—') ?></td>
+                                        <td><?= caseFormat($d['type_name']) ?></td>
+                                        <td><?= caseFormat($d['document_name']) ?></td>
+                                        <td><?= caseFormat($d['issue_date'], '—') ?></td>
+                                        <td><?= caseFormat($d['expire_date'], '—') ?></td>
                                         <td><?= $chip ?></td>
                                         <td class="text-end d-print-none">
                                             <div class="dropdown">
@@ -1125,7 +1125,7 @@ $sr_status_badge = [
                                         <option value=""></option>
                                         <?php foreach ($doc_types as $dt): ?>
                                         <option value="<?= (int)$dt['doc_type_id'] ?>" data-requires-expiry="<?= (int)$dt['requires_expiry'] ?>">
-                                            <?= safe_output($dt['type_name']) ?>
+                                            <?= caseFormat($dt['type_name']) ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -1198,9 +1198,9 @@ $sr_status_badge = [
                             ?>
                                 <tr <?= $isActive ? 'class="table-primary"' : '' ?>>
                                     <td><?= $sn++ ?></td>
-                                    <td><?= safe_output($c['contract_type']) ?></td>
-                                    <td><?= safe_output($c['start_date']) ?></td>
-                                    <td><?= safe_output($c['end_date'], 'Open-ended') ?> <?= $chip ?></td>
+                                    <td><?= caseFormat($c['contract_type']) ?></td>
+                                    <td><?= caseFormat($c['start_date']) ?></td>
+                                    <td><?= caseFormat($c['end_date'], 'Open-ended') ?> <?= $chip ?></td>
                                     <td><span class="badge bg-<?= $status_color ?>"><?= ucfirst($c['status']) ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -1238,13 +1238,13 @@ $sr_status_badge = [
                     <div class="mb-3 p-3 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe">
                         <div class="d-flex justify-content-between align-items-start flex-wrap">
                             <div>
-                                <div class="small text-muted">Latest — <?= safe_output($latest_appraisal['cycle_name']) ?></div>
+                                <div class="small text-muted">Latest — <?= caseFormat($latest_appraisal['cycle_name']) ?></div>
                                 <div class="fs-5"><?= $starRow($latest_appraisal['overall_rating']) ?>
                                     <strong class="ms-1"><?= number_format((float)$latest_appraisal['overall_rating'], 2) ?>/5</strong></div>
                             </div>
                             <div class="small text-muted text-end">
-                                <?= safe_output($latest_appraisal['appraisal_date']) ?><br>
-                                <?php if (!empty($latest_appraisal['approved_by_name'])): ?>Approved by <?= safe_output($latest_appraisal['approved_by_name']) ?><?php endif; ?>
+                                <?= caseFormat($latest_appraisal['appraisal_date']) ?><br>
+                                <?php if (!empty($latest_appraisal['approved_by_name'])): ?>Approved by <?= caseFormat($latest_appraisal['approved_by_name']) ?><?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -1253,7 +1253,7 @@ $sr_status_badge = [
                     <ul class="list-unstyled mb-0">
                         <?php foreach (array_slice($appraisal_history, 1) as $h): ?>
                         <li class="d-flex justify-content-between py-1 border-bottom">
-                            <span><?= safe_output($h['cycle_name']) ?></span>
+                            <span><?= caseFormat($h['cycle_name']) ?></span>
                             <span><?= $starRow($h['overall_rating']) ?> <small class="text-muted"><?= number_format((float)$h['overall_rating'], 2) ?></small></span>
                         </li>
                         <?php endforeach; ?>
@@ -1269,7 +1269,7 @@ $sr_status_badge = [
                     ?>
                     <div class="mb-2">
                         <div class="d-flex justify-content-between small">
-                            <span><?= safe_output($g['subject']) ?><?php if ($g_overdue): ?> <span class="badge bg-danger">Overdue</span><?php endif; ?></span>
+                            <span><?= caseFormat($g['subject']) ?><?php if ($g_overdue): ?> <span class="badge bg-danger">Overdue</span><?php endif; ?></span>
                             <span class="text-muted"><?= (int)$g['progress'] ?>%</span>
                         </div>
                         <div class="progress" style="height:8px">
@@ -1313,9 +1313,9 @@ $sr_status_badge = [
                             ?>
                                 <tr>
                                     <td><?= $sn++ ?></td>
-                                    <td><?= safe_output($th['title']) ?></td>
-                                    <td><?= safe_output($th['type_name'], '—') ?></td>
-                                    <td><?= safe_output($th['start_date']) ?></td>
+                                    <td><?= caseFormat($th['title']) ?></td>
+                                    <td><?= caseFormat($th['type_name'], '—') ?></td>
+                                    <td><?= caseFormat($th['start_date']) ?></td>
                                     <td><span class="badge bg-<?= $pcolor ?>"><?= ucfirst($th['part_status']) ?></span></td>
                                     <td class="d-print-none">
                                         <?php if (!empty($th['certificate_path'])): ?>
@@ -1379,8 +1379,8 @@ $sr_status_badge = [
                     <ul class="list-unstyled mb-3">
                         <?php foreach ($emp_meetings as $m): ?>
                         <li class="d-flex justify-content-between py-1 border-bottom">
-                            <span><?= safe_output($m['title']) ?></span>
-                            <span class="text-muted small"><?= safe_output($m['meeting_date']) ?><?php if (!empty($m['start_time'])): ?> <?= safe_output(substr($m['start_time'], 0, 5)) ?><?php endif; ?></span>
+                            <span><?= caseFormat($m['title']) ?></span>
+                            <span class="text-muted small"><?= caseFormat($m['meeting_date']) ?><?php if (!empty($m['start_time'])): ?> <?= caseFormat(substr($m['start_time'], 0, 5)) ?><?php endif; ?></span>
                         </li>
                         <?php endforeach; ?>
                     </ul>
@@ -1393,7 +1393,7 @@ $sr_status_badge = [
                             $tc = $tmap[$t['status']] ?? 'secondary';
                         ?>
                         <li class="d-flex justify-content-between py-1 border-bottom">
-                            <span><?= safe_output($t['destination']) ?> <small class="text-muted"><?= safe_output($t['start_date']) ?></small></span>
+                            <span><?= caseFormat($t['destination']) ?> <small class="text-muted"><?= caseFormat($t['start_date']) ?></small></span>
                             <span class="badge bg-<?= $tc ?>"><?= ucfirst($t['status']) ?></span>
                         </li>
                         <?php endforeach; ?>
@@ -1414,10 +1414,10 @@ $sr_status_badge = [
                 </div>
                 <div class="card-body">
                     <?php if (!empty($employee['notes'])): ?>
-                    <p class="mb-2"><?= nl2br(safe_output($employee['notes'])) ?></p>
+                    <p class="mb-2"><?= nl2br(caseFormat($employee['notes'])) ?></p>
                     <?php endif; ?>
                     <?php if (!empty($employee['additional_notes'])): ?>
-                    <p class="mb-0 text-muted"><strong>Additional:</strong> <?= nl2br(safe_output($employee['additional_notes'])) ?></p>
+                    <p class="mb-0 text-muted"><strong>Additional:</strong> <?= nl2br(caseFormat($employee['additional_notes'])) ?></p>
                     <?php endif; ?>
                 </div>
             </div>
@@ -1671,7 +1671,7 @@ $sr_status_badge = [
                                 <td class="text-end text-muted"><?= format_currency($pay['tax_amount'] ?? 0) ?></td>
                                 <td class="text-end fw-bold"><?= format_currency($pay['net_salary']) ?></td>
                                 <td><?= $statusBadge($pay['payment_status'] ?? 'pending') ?></td>
-                                <td><?= !empty($pay['paid_from_name']) ? safe_output($pay['paid_from_name']) : '<span class="text-muted">—</span>' ?></td>
+                                <td><?= !empty($pay['paid_from_name']) ? caseFormat($pay['paid_from_name']) : '<span class="text-muted">—</span>' ?></td>
                                 <td class="d-print-none">
                                     <div class="dropdown">
                                         <button class="btn btn-sm btn-light border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -1746,7 +1746,7 @@ $sr_status_badge = [
                             ?>
                             <tr>
                                 <td class="ps-3"><?= $sn++ ?></td>
-                                <td><?= safe_output($lv['official_type'] ?? '', '—') ?></td>
+                                <td><?= caseFormat($lv['official_type'] ?? '', '—') ?></td>
                                 <td><?= date('d M Y', strtotime($lv['start_date'])) ?></td>
                                 <td><?= date('d M Y', strtotime($lv['end_date'])) ?></td>
                                 <td class="text-end"><?= $lv['total_days'] ?></td>
@@ -1803,7 +1803,7 @@ $sr_status_badge = [
                                                     data-max-days="<?= (int)$type['max_days_per_year'] ?>"
                                                     data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                                     data-is-paid="<?= (int)$type['is_paid'] ?>">
-                                                <?= safe_output($type['type_name']) ?> (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
+                                                <?= caseFormat($type['type_name']) ?> (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                             </option>
                                             <?php endforeach; ?>
                                         </select>

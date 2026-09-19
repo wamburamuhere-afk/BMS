@@ -247,7 +247,7 @@ includeHeader();
                                 require_once __DIR__ . '/../../../core/payment_source.php';
                                 foreach (expenseAccounts($pdo) as $acc):
                                 ?>
-                                <option value="<?= $acc['account_id'] ?>"><?= safe_output($acc['account_code']) ?> — <?= safe_output($acc['account_name']) ?></option>
+                                <option value="<?= $acc['account_id'] ?>"><?= caseFormat($acc['account_code']) ?> — <?= caseFormat($acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -266,7 +266,7 @@ includeHeader();
                             <select class="form-select select2-static" name="paid_from_account_id" id="paidFromAccountSelect">
                                 <option value="">— Select the account money left from —</option>
                                 <?php foreach (cashBankAccounts($pdo) as $acc): ?>
-                                <option value="<?= $acc['account_id'] ?>"><?= safe_output($acc['account_code']) ?> — <?= safe_output($acc['account_name']) ?></option>
+                                <option value="<?= $acc['account_id'] ?>"><?= caseFormat($acc['account_code']) ?> — <?= caseFormat($acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

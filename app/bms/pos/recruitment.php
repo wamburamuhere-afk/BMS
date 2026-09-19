@@ -67,8 +67,8 @@ $departments  = $pdo->query("SELECT department_id, department_name FROM departme
             <div class="col-md-3 mb-3"><label class="form-label">Close Date</label><input type="date" class="form-control" name="close_date" id="op_close"></div>
         </div>
         <div class="row">
-            <div class="col-md-6 mb-3"><label class="form-label">Designation</label><select class="form-select" name="designation_id" id="op_desig"><option value="">—</option><?php foreach ($designations as $d): ?><option value="<?= (int)$d['designation_id'] ?>"><?= safe_output($d['designation_name']) ?></option><?php endforeach; ?></select></div>
-            <div class="col-md-6 mb-3"><label class="form-label">Department</label><select class="form-select" name="department_id" id="op_dept"><option value="">—</option><?php foreach ($departments as $d): ?><option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Designation</label><select class="form-select" name="designation_id" id="op_desig"><option value="">—</option><?php foreach ($designations as $d): ?><option value="<?= (int)$d['designation_id'] ?>"><?= caseFormat($d['designation_name']) ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Department</label><select class="form-select" name="department_id" id="op_dept"><option value="">—</option><?php foreach ($departments as $d): ?><option value="<?= (int)$d['department_id'] ?>"><?= caseFormat($d['department_name']) ?></option><?php endforeach; ?></select></div>
         </div>
         <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" id="op_desc" rows="2"></textarea></div>
         <div class="mb-3"><label class="form-label">Requirements</label><textarea class="form-control" name="requirements" id="op_req" rows="2"></textarea></div>

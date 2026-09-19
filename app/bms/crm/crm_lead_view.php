@@ -117,7 +117,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
             <ol class="breadcrumb mb-0 small">
                 <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
                 <li class="breadcrumb-item"><a href="<?= getUrl('crm/leads') ?>">Leads</a></li>
-                <li class="breadcrumb-item active"><?= safe_output($lead['lead_code']) ?></li>
+                <li class="breadcrumb-item active"><?= caseFormat($lead['lead_code']) ?></li>
             </ol>
         </nav>
         <div class="d-flex gap-2 flex-wrap">
@@ -148,15 +148,15 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
             <div class="lv-section" style="border-top:4px solid <?= htmlspecialchars($lead['stage_color'] ?? '#0d6efd') ?>">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                     <div>
-                        <div class="text-muted small"><?= safe_output($lead['lead_code']) ?></div>
-                        <h4 class="fw-bold mb-1"><?= safe_output(trim($lead['first_name'].' '.($lead['last_name']??''))) ?></h4>
+                        <div class="text-muted small"><?= caseFormat($lead['lead_code']) ?></div>
+                        <h4 class="fw-bold mb-1"><?= caseFormat(trim($lead['first_name'].' '.($lead['last_name']??''))) ?></h4>
                         <?php if ($lead['company_name']): ?>
-                        <div class="text-muted"><i class="bi bi-building me-1"></i><?= safe_output($lead['company_name']) ?></div>
+                        <div class="text-muted"><i class="bi bi-building me-1"></i><?= caseFormat($lead['company_name']) ?></div>
                         <?php endif; ?>
                     </div>
                     <div class="text-end d-flex flex-column gap-1 align-items-end">
                         <span class="badge" style="background:<?= htmlspecialchars($lead['stage_color'] ?? '#6c757d') ?>;color:#fff;font-size:.78rem">
-                            <?= safe_output($lead['stage_name'] ?? '—') ?>
+                            <?= caseFormat($lead['stage_name'] ?? '—') ?>
                         </span>
                         <?php if ($lead['converted']): ?>
                         <span class="badge" style="background:#052c65;color:#fff;font-size:.75rem"><i class="bi bi-check2-circle me-1"></i>Converted</span>
@@ -173,7 +173,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                 <!-- Stage progress bar -->
                 <?php if ($stage_total > 0 && !$lead['is_lost']): ?>
                 <div class="mt-3">
-                    <div class="lv-label">Pipeline Progress — <?= safe_output($lead['stage_name'] ?? '—') ?> (<?= $stage_index ?>/<?= $stage_total ?>)</div>
+                    <div class="lv-label">Pipeline Progress — <?= caseFormat($lead['stage_name'] ?? '—') ?> (<?= $stage_index ?>/<?= $stage_total ?>)</div>
                     <div class="prob-bar" style="height:8px"><div class="prob-fill" style="width:<?= $stage_progress_pct ?>%;background:<?= htmlspecialchars($lead['stage_color'] ?? '#0d6efd') ?>"></div></div>
                 </div>
                 <?php endif; ?>
@@ -211,7 +211,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     <div id="labelPills" class="d-flex flex-wrap gap-1">
                         <?php foreach ($lead_labels as $lbl): ?>
                         <span class="badge" style="background:<?= htmlspecialchars($lbl['color']) ?>;font-size:.72rem">
-                            <?= safe_output($lbl['label_name']) ?>
+                            <?= caseFormat($lbl['label_name']) ?>
                             <?php if ($can_label): ?>
                             <span style="cursor:pointer;margin-left:4px" onclick="removeLabel(<?= $lbl['label_id'] ?>)">&times;</span>
                             <?php endif; ?>
@@ -246,7 +246,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     <?php if ($lead['mobile']): ?>
                     <div class="col-sm-6">
                         <div class="lv-label">Mobile</div>
-                        <div class="lv-value"><?= safe_output($lead['mobile']) ?></div>
+                        <div class="lv-value"><?= caseFormat($lead['mobile']) ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if ($lead['website']): ?>
@@ -257,19 +257,19 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     <?php endif; ?>
                     <div class="col-sm-6">
                         <div class="lv-label">Source</div>
-                        <div class="lv-value"><?= safe_output($source_label) ?></div>
+                        <div class="lv-value"><?= caseFormat($source_label) ?></div>
                     </div>
                     <?php if ($lead['assigned_user_name']): ?>
                     <div class="col-sm-6">
                         <div class="lv-label">Assigned To</div>
-                        <div class="lv-value"><i class="bi bi-person me-1 text-muted"></i><?= safe_output($lead['assigned_user_name']) ?></div>
+                        <div class="lv-value"><i class="bi bi-person me-1 text-muted"></i><?= caseFormat($lead['assigned_user_name']) ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if ($lead['expected_close_date']): ?>
                     <div class="col-sm-6">
                         <div class="lv-label">Expected Close</div>
                         <div class="lv-value <?= $is_overdue_close ? 'text-danger' : '' ?>">
-                            <?= safe_output($lead['expected_close_date']) ?>
+                            <?= caseFormat($lead['expected_close_date']) ?>
                             <?php if ($is_overdue_close): ?><span class="badge bg-danger ms-1" style="font-size:.65rem">Overdue</span><?php endif; ?>
                         </div>
                     </div>
@@ -277,37 +277,37 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     <?php if ($lead['city'] || $lead['address']): ?>
                     <div class="col-sm-6">
                         <div class="lv-label">Location</div>
-                        <div class="lv-value"><?= safe_output(implode(', ', array_filter([$lead['city'], $lead['country']]))) ?></div>
+                        <div class="lv-value"><?= caseFormat(implode(', ', array_filter([$lead['city'], $lead['country']]))) ?></div>
                     </div>
                     <?php endif; ?>
                     <div class="col-sm-6">
                         <div class="lv-label">Created By</div>
-                        <div class="lv-value"><?= safe_output($lead['created_by_name'] ?? '—') ?></div>
+                        <div class="lv-value"><?= caseFormat($lead['created_by_name'] ?? '—') ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="lv-label">Created At</div>
-                        <div class="lv-value"><?= safe_output(date('d M Y', strtotime($lead['created_at']))) ?></div>
+                        <div class="lv-value"><?= caseFormat(date('d M Y', strtotime($lead['created_at']))) ?></div>
                     </div>
                 </div>
 
                 <?php if ($lead['product_interest']): ?>
                 <div class="mt-3">
                     <div class="lv-label">Product Interest</div>
-                    <div class="lv-value" style="white-space:pre-wrap;font-weight:400"><?= safe_output($lead['product_interest']) ?></div>
+                    <div class="lv-value" style="white-space:pre-wrap;font-weight:400"><?= caseFormat($lead['product_interest']) ?></div>
                 </div>
                 <?php endif; ?>
 
                 <?php if ($lead['notes']): ?>
                 <div class="mt-3">
                     <div class="lv-label">Notes</div>
-                    <div class="lv-value" style="white-space:pre-wrap;font-weight:400"><?= safe_output($lead['notes']) ?></div>
+                    <div class="lv-value" style="white-space:pre-wrap;font-weight:400"><?= caseFormat($lead['notes']) ?></div>
                 </div>
                 <?php endif; ?>
 
                 <?php if ($lead['is_lost'] && $lead['lost_reason']): ?>
                 <div class="mt-3">
                     <div class="lv-label text-danger">Lost Reason</div>
-                    <div class="lv-value text-danger" style="font-weight:400"><?= safe_output($lead['lost_reason']) ?></div>
+                    <div class="lv-value text-danger" style="font-weight:400"><?= caseFormat($lead['lost_reason']) ?></div>
                 </div>
                 <?php endif; ?>
             </div>
@@ -319,10 +319,10 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                 <?php foreach ($stage_history as $h): ?>
                 <div class="d-flex align-items-center gap-2 mb-2" style="font-size:.82rem">
                     <span class="text-muted" style="min-width:130px"><?= date('d M Y H:i', strtotime($h['changed_at'])) ?></span>
-                    <span class="text-muted"><?= safe_output($h['from_stage'] ?? '—') ?></span>
+                    <span class="text-muted"><?= caseFormat($h['from_stage'] ?? '—') ?></span>
                     <i class="bi bi-arrow-right text-muted"></i>
-                    <span class="fw-semibold"><?= safe_output($h['to_stage'] ?? '—') ?></span>
-                    <span class="text-muted ms-auto">by <?= safe_output($h['changed_by_name'] ?? '—') ?></span>
+                    <span class="fw-semibold"><?= caseFormat($h['to_stage'] ?? '—') ?></span>
+                    <span class="text-muted ms-auto">by <?= caseFormat($h['changed_by_name'] ?? '—') ?></span>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -336,14 +336,14 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     <?php if ($lead['customer_id']): ?>
                     <div class="col-6">
                         <a href="<?= getUrl('customers') ?>?view=<?= (int)$lead['customer_id'] ?>" class="btn btn-outline-success btn-sm w-100">
-                            <i class="bi bi-person-check me-1"></i><?= safe_output($lead['customer_code'] ?? 'Customer') ?>
+                            <i class="bi bi-person-check me-1"></i><?= caseFormat($lead['customer_code'] ?? 'Customer') ?>
                         </a>
                     </div>
                     <?php endif; ?>
                     <?php if ($lead['quotation_id']): ?>
                     <div class="col-6">
                         <a href="<?= getUrl('quotations') ?>?view=<?= (int)$lead['quotation_id'] ?>" class="btn btn-outline-primary btn-sm w-100">
-                            <i class="bi bi-file-earmark-text me-1"></i><?= safe_output($lead['quote_code'] ?? 'Quotation') ?>
+                            <i class="bi bi-file-earmark-text me-1"></i><?= caseFormat($lead['quote_code'] ?? 'Quotation') ?>
                         </a>
                     </div>
                     <?php endif; ?>

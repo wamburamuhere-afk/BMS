@@ -96,7 +96,7 @@ foreach ($shifts as $s) {
                 <?php $sno = 0; foreach ($shifts as $s): $sno++; $diff = (float)$s['cash_difference']; ?>
                 <tr>
                     <td class="text-center"><?= $sno ?></td>
-                    <td><?= safe_output($s['shift_code']) ?></td>
+                    <td><?= caseFormat($s['shift_code']) ?></td>
                     <td><?= caseFormat($s['register_name'], '—') ?></td>
                     <td><?= caseFormat($s['warehouse_name'], '—') ?></td>
                     <?php if ($can_view_all): ?><td><?= caseFormat($s['cashier_name']) ?></td><?php endif; ?>
@@ -106,7 +106,7 @@ foreach ($shifts as $s) {
                     <td class="text-end <?= $s['status'] === 'closed' ? (abs($diff) < 0.01 ? 'text-success' : 'text-danger fw-bold') : 'text-muted' ?>">
                         <?= $s['status'] === 'closed' ? number_format($diff, 2) : '—' ?>
                     </td>
-                    <td><span class="badge bg-<?= $s['status'] === 'active' ? 'success' : 'secondary' ?>"><?= safe_output(ucfirst($s['status'])) ?></span></td>
+                    <td><span class="badge bg-<?= $s['status'] === 'active' ? 'success' : 'secondary' ?>"><?= caseFormat(ucfirst($s['status'])) ?></span></td>
                     <td class="text-end">
                         <div class="dropdown d-flex justify-content-end">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">

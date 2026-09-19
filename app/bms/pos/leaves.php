@@ -246,7 +246,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <option value="">All Types</option>
                                 <?php foreach ($leave_types as $type): ?>
                                 <option value="<?= (int)$type['type_id'] ?>" <?= ((int)$selected_type === (int)$type['type_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($type['type_name']) ?>
+                                    <?= caseFormat($type['type_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -257,7 +257,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <option value="">All Departments</option>
                                 <?php foreach ($departments as $dept): ?>
                                 <option value="<?= $dept['department_id'] ?>" <?= ($selected_department == $dept['department_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($dept['department_name']) ?>
+                                    <?= caseFormat($dept['department_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -268,7 +268,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <option value="">All Employees</option>
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['employee_id'] ?>" <?= ($selected_employee == $emp['employee_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($emp['first_name'] . ' ' . $emp['last_name']) ?> (<?= safe_output($emp['employee_number']) ?>)
+                                    <?= caseFormat($emp['first_name'] . ' ' . $emp['last_name']) ?> (<?= caseFormat($emp['employee_number']) ?>)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -457,9 +457,9 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <small class="text-muted">LEV-<?= $leave['leave_id'] ?></small>
                                 </td>
                                 <td>
-                                    <div class="fw-bold text-wrap" style="max-width: 150px;"><?= safe_output($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
+                                    <div class="fw-bold text-wrap" style="max-width: 150px;"><?= caseFormat($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
                                     <div class="d-md-none mt-1">
-                                        <span class="badge bg-secondary" style="font-size: 0.6rem;"><?= safe_output(leaveTypeLabel($leave)) ?></span>
+                                        <span class="badge bg-secondary" style="font-size: 0.6rem;"><?= caseFormat(leaveTypeLabel($leave)) ?></span>
                                         <?php
                                         $status_class = [
                                             'pending' => 'bg-warning',
@@ -470,14 +470,14 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         ?>
                                         <span class="badge <?= $status_class ?>" style="font-size: 0.6rem;"><?= ucfirst($leave['status']) ?></span>
                                     </div>
-                                    <small class="text-muted d-block" style="font-size: 0.7rem;">#<?= safe_output($leave['employee_number']) ?></small>
+                                    <small class="text-muted d-block" style="font-size: 0.7rem;">#<?= caseFormat($leave['employee_number']) ?></small>
                                 </td>
                                 <td class="d-none d-md-table-cell">
-                                    <small><?= safe_output($leave['department_name']) ?></small>
+                                    <small><?= caseFormat($leave['department_name']) ?></small>
                                 </td>
                                 <td class="d-none d-md-table-cell">
                                     <span class="badge bg-secondary text-wrap" style="font-size: 0.7rem;">
-                                        <?= safe_output(leaveTypeLabel($leave)) ?>
+                                        <?= caseFormat(leaveTypeLabel($leave)) ?>
                                     </span>
                                 </td>
                                 <td class="d-none d-md-table-cell">
@@ -495,7 +495,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <span class="badge <?= $status_class ?> p-1" style="font-size: 0.65rem;"><?= ucfirst($leave['status']) ?></span>
                                 </td>
                                 <td class="d-none d-md-table-cell text-muted small">
-                                    <?= safe_output($leave['applied_by_name']) ?>
+                                    <?= caseFormat($leave['applied_by_name']) ?>
                                 </td>
                                 <td class="text-end">
                                     <div class="dropdown">
@@ -523,19 +523,19 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                             <div class="row g-2 mb-3">
                                                 <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">S/NO</small><?= $sn - 1 ?></div>
                                                 <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">Ref</small><span class="fw-bold">LEV-<?= $leave['leave_id'] ?></span></div>
-                                                <div class="col-12 border-bottom pb-1"><small class="text-muted d-block">Employee</small><span class="fw-bold"><?= safe_output($leave['first_name'] . ' ' . $leave['last_name']) ?></span></div>
-                                                <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">Dept</small><?= safe_output($leave['department_name']) ?></div>
+                                                <div class="col-12 border-bottom pb-1"><small class="text-muted d-block">Employee</small><span class="fw-bold"><?= caseFormat($leave['first_name'] . ' ' . $leave['last_name']) ?></span></div>
+                                                <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">Dept</small><?= caseFormat($leave['department_name']) ?></div>
                                                 <div class="col-6 border-bottom pb-1">
                                                     <small class="text-muted d-block">Type</small>
-                                                    <span class="badge bg-secondary"><?= safe_output(leaveTypeLabel($leave)) ?></span>
+                                                    <span class="badge bg-secondary"><?= caseFormat(leaveTypeLabel($leave)) ?></span>
                                                 </div>
                                                 <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">Days</small><span class="badge bg-info"><?= $leave['total_days'] ?> Days</span></div>
                                                 <div class="col-6 border-bottom pb-1">
                                                     <small class="text-muted d-block">Status</small>
                                                     <span class="badge <?= $status_class ?>"><?= ucfirst($leave['status']) ?></span>
                                                 </div>
-                                                <div class="col-12 border-bottom pb-1"><small class="text-muted d-block">Applied By</small><?= safe_output($leave['applied_by_name']) ?></div>
-                                                <div class="col-12 mt-2"><small class="text-muted d-block mb-1">Reason</small><div class="p-2 bg-light rounded shadow-sm small italic"><?= safe_output($leave['reason']) ?></div></div>
+                                                <div class="col-12 border-bottom pb-1"><small class="text-muted d-block">Applied By</small><?= caseFormat($leave['applied_by_name']) ?></div>
+                                                <div class="col-12 mt-2"><small class="text-muted d-block mb-1">Reason</small><div class="p-2 bg-light rounded shadow-sm small italic"><?= caseFormat($leave['reason']) ?></div></div>
                                             </div>
                                             <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
                                                 <button class="btn btn-sm btn-outline-primary" onclick="viewLeave(<?= $leave['leave_id'] ?>)"><i class="bi bi-eye"></i> View</button>
@@ -575,14 +575,14 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <div class="card h-100 border-0 shadow-sm rounded-3">
                                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
                                     <div>
-                                        <div class="fw-bold" style="font-size:0.85rem;"><?= safe_output($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
-                                        <small class="text-muted">#<?= safe_output($leave['employee_number']) ?></small>
+                                        <div class="fw-bold" style="font-size:0.85rem;"><?= caseFormat($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
+                                        <small class="text-muted">#<?= caseFormat($leave['employee_number']) ?></small>
                                     </div>
                                     <span class="badge bg-<?= $sc ?>"><?= ucfirst($leave['status']) ?></span>
                                 </div>
                                 <div class="card-body py-2 px-3" style="font-size:0.8rem;">
-                                    <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i><?= safe_output(leaveTypeLabel($leave)) ?></div>
-                                    <div class="mb-1"><i class="bi bi-building text-muted me-1"></i><?= safe_output($leave['department_name'] ?? '—') ?></div>
+                                    <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i><?= caseFormat(leaveTypeLabel($leave)) ?></div>
+                                    <div class="mb-1"><i class="bi bi-building text-muted me-1"></i><?= caseFormat($leave['department_name'] ?? '—') ?></div>
                                     <div class="mb-1"><i class="bi bi-calendar-range text-muted me-1"></i><?= date('d M', strtotime($leave['start_date'])) ?> – <?= date('d M Y', strtotime($leave['end_date'])) ?></div>
                                     <div><span class="badge bg-info"><?= $leave['total_days'] ?> day<?= $leave['total_days'] != 1 ? 's' : '' ?></span></div>
                                 </div>
@@ -691,7 +691,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 <div class="col-sm-6 col-lg-3 mb-3">
                     <div class="card custom-stat-card">
                         <div class="card-body">
-                            <h6 class="card-title"><?= safe_output($balance['type_name']) ?> Leave</h6>
+                            <h6 class="card-title"><?= caseFormat($balance['type_name']) ?> Leave</h6>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <div>
                                     <h4 class="mb-0 text-primary"><?= $remaining ?></h4>
@@ -750,15 +750,15 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 $current_employee = $user_emp->fetch();
                                 ?>
                                 <option value="<?= $current_employee['employee_id'] ?>" selected>
-                                    <?= safe_output($current_employee['first_name'] . ' ' . $current_employee['last_name']) ?> 
-                                    (<?= safe_output($current_employee['employee_number']) ?>)
+                                    <?= caseFormat($current_employee['first_name'] . ' ' . $current_employee['last_name']) ?> 
+                                    (<?= caseFormat($current_employee['employee_number']) ?>)
                                 </option>
                                 <input type="hidden" name="employee_id" value="<?= $current_employee['employee_id'] ?>">
                                 <?php else: ?>
                                 <option value="">Select Employee</option>
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['employee_id'] ?>">
-                                    <?= safe_output($emp['first_name'] . ' ' . $emp['last_name']) ?> (<?= safe_output($emp['employee_number']) ?>)
+                                    <?= caseFormat($emp['first_name'] . ' ' . $emp['last_name']) ?> (<?= caseFormat($emp['employee_number']) ?>)
                                 </option>
                                 <?php endforeach; ?>
                                 <?php endif; ?>
@@ -775,7 +775,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                         data-is-paid="<?= (int)$type['is_paid'] ?>"
                                         data-working-days-only="<?= (int)$type['count_working_days_only'] ?>">
-                                    <?= safe_output($type['type_name']) ?>
+                                    <?= caseFormat($type['type_name']) ?>
                                     (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
                                 <?php endforeach; ?>
@@ -823,7 +823,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <option value="">Select Colleague</option>
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['employee_id'] ?>">
-                                    <?= safe_output($emp['first_name'] . ' ' . $emp['last_name']) ?>
+                                    <?= caseFormat($emp['first_name'] . ' ' . $emp['last_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -954,7 +954,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                         data-is-paid="<?= (int)$type['is_paid'] ?>"
                                         data-working-days-only="<?= (int)$type['count_working_days_only'] ?>">
-                                    <?= safe_output($type['type_name']) ?>
+                                    <?= caseFormat($type['type_name']) ?>
                                     (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
                                 <?php endforeach; ?>
@@ -1002,7 +1002,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <option value="">Select Colleague</option>
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['employee_id'] ?>">
-                                    <?= safe_output($emp['first_name'] . ' ' . $emp['last_name']) ?>
+                                    <?= caseFormat($emp['first_name'] . ' ' . $emp['last_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>

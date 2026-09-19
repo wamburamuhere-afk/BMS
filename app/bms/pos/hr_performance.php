@@ -124,7 +124,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <div class="col-6 col-md-3">
                         <label class="form-label small mb-1">Type</label>
                         <select class="form-select form-select-sm" id="gf_type"><option value="">All types</option>
-                            <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= safe_output($gt['type_name']) ?></option><?php endforeach; ?>
+                            <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= caseFormat($gt['type_name']) ?></option><?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-6 col-md-3">
@@ -182,7 +182,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                                 <select id="matrix_designation" class="form-select">
                                     <option value="">Select a designation…</option>
                                     <?php foreach ($designations as $d): ?>
-                                    <option value="<?= (int)$d['designation_id'] ?>"><?= safe_output($d['designation_name']) ?></option>
+                                    <option value="<?= (int)$d['designation_id'] ?>"><?= caseFormat($d['designation_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -369,7 +369,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Type <span class="text-danger">*</span></label>
                         <select class="form-select" name="goal_type_id" required>
-                            <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= safe_output($gt['type_name']) ?></option><?php endforeach; ?>
+                            <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= caseFormat($gt['type_name']) ?></option><?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-6 mb-3">

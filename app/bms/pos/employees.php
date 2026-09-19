@@ -284,7 +284,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <select class="form-select border-0 shadow-sm select2-static" id="departmentFilter" style="border-radius: 8px;">
                         <option value="">All Departments</option>
                         <?php foreach ($departments as $dept): ?>
-                            <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
+                            <option value="<?= $dept['department_id'] ?>"><?= caseFormat($dept['department_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -293,7 +293,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <select class="form-select border-0 shadow-sm select2-static" id="designationFilter" style="border-radius: 8px;">
                         <option value="">All Designations</option>
                         <?php foreach ($designations as $designation): ?>
-                            <option value="<?= $designation['designation_id'] ?>"><?= safe_output($designation['designation_name']) ?></option>
+                            <option value="<?= $designation['designation_id'] ?>"><?= caseFormat($designation['designation_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -302,7 +302,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <select class="form-select border-0 shadow-sm select2-static" id="employmentTypeFilter" style="border-radius: 8px;">
                         <option value="">All Types</option>
                         <?php foreach ($employment_types as $type): ?>
-                            <option value="<?= $type['type_id'] ?>"><?= safe_output($type['type_name']) ?></option>
+                            <option value="<?= $type['type_id'] ?>"><?= caseFormat($type['type_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -432,7 +432,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-0"><?= caseFormat($employee['first_name'] . ' ' . $employee['last_name']) ?></h6>
-                                    <small class="text-muted"><?= safe_output($employee['employee_number']) ?></small>
+                                    <small class="text-muted"><?= caseFormat($employee['employee_number']) ?></small>
                                 </div>
                                 <span class="badge bg-<?= get_status_badge($employee['employment_status']) ?>">
                                     <?= ucfirst(substr($employee['employment_status'], 0, 1)) ?>
@@ -455,10 +455,10 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 
                                 <div class="mb-2">
                                     <?php if (!empty($employee['email'])): ?>
-                                    <small><i class="bi bi-envelope"></i> <?= safe_output($employee['email']) ?></small><br>
+                                    <small><i class="bi bi-envelope"></i> <?= caseFormat($employee['email']) ?></small><br>
                                     <?php endif; ?>
                                     <?php if (!empty($employee['phone'])): ?>
-                                    <small><i class="bi bi-telephone"></i> <?= safe_output($employee['phone']) ?></small>
+                                    <small><i class="bi bi-telephone"></i> <?= caseFormat($employee['phone']) ?></small>
                                     <?php endif; ?>
                                 </div>
                                 
@@ -546,7 +546,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <div id="add-employee-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
                             <i class="bi bi-arrow-left me-1"></i> Back to Project
                         </a>
@@ -640,7 +640,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <select class="form-select select2-static" id="department_id" name="department_id" required>
                                         <option value="">Select Department</option>
                                         <?php foreach ($departments as $dept): ?>
-                                        <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
+                                        <option value="<?= $dept['department_id'] ?>"><?= caseFormat($dept['department_name']) ?></option>
                                         <?php endforeach; ?>
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
@@ -654,7 +654,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <select class="form-select select2-static" id="designation_id" name="designation_id" required>
                                         <option value="">Select Designation</option>
                                         <?php foreach ($designations as $designation): ?>
-                                        <option value="<?= $designation['designation_id'] ?>" data-department-id="<?= $designation['department_id'] ?>"><?= safe_output($designation['designation_name']) ?></option>
+                                        <option value="<?= $designation['designation_id'] ?>" data-department-id="<?= $designation['department_id'] ?>"><?= caseFormat($designation['designation_name']) ?></option>
                                         <?php endforeach; ?>
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
@@ -668,7 +668,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <select class="form-select select2-static" id="employment_type_id" name="employment_type_id" required>
                                         <option value="">Select Type</option>
                                         <?php foreach ($employment_types as $type): ?>
-                                        <option value="<?= $type['type_id'] ?>"><?= safe_output($type['type_name']) ?></option>
+                                        <option value="<?= $type['type_id'] ?>"><?= caseFormat($type['type_name']) ?></option>
                                         <?php endforeach; ?>
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
@@ -710,7 +710,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <option value="">No Project / General</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>" <?= ($url_project_id == $project['project_id']) ? 'selected' : '' ?>>
-                                            <?= safe_output($project['project_name']) ?>
+                                            <?= caseFormat($project['project_name']) ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>

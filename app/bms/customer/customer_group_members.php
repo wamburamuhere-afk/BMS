@@ -95,9 +95,9 @@ if ($group['group_type'] === 'static') {
 // Format customer name
 function formatCustomerName($customer) {
     if ($customer['entity_type'] === 'company') {
-        return safe_output($customer['company_name']);
+        return caseFormat($customer['company_name']);
     } else {
-        return safe_output(trim($customer['first_name'] . ' ' . $customer['last_name']));
+        return caseFormat(trim($customer['first_name'] . ' ' . $customer['last_name']));
     }
 }
 ?>
@@ -108,7 +108,7 @@ function formatCustomerName($customer) {
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="<?= getUrl('customers/groups') ?>">Customer Groups</a></li>
-                    <li class="breadcrumb-item"><a href="<?= getUrl('customers/group_details') ?>?id=<?= $group_id ?>"><?= safe_output($group['group_name']) ?></a></li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('customers/group_details') ?>?id=<?= $group_id ?>"><?= caseFormat($group['group_name']) ?></a></li>
                     <li class="breadcrumb-item active" aria-current="page">Manage Members</li>
                 </ol>
             </nav>
@@ -116,7 +116,7 @@ function formatCustomerName($customer) {
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2><i class="bi bi-people"></i> Group Members</h2>
-                    <p class="text-muted mb-0">Manage members of <strong><?= safe_output($group['group_name']) ?></strong> group</p>
+                    <p class="text-muted mb-0">Manage members of <strong><?= caseFormat($group['group_name']) ?></strong> group</p>
                 </div>
                 <div>
                     <a href="<?= getUrl('customers/group_details') ?>?id=<?= $group_id ?>" class="btn btn-outline-secondary btn-sm">
@@ -174,8 +174,8 @@ function formatCustomerName($customer) {
     <div class="alert alert-info d-flex align-items-center">
         <i class="bi bi-info-circle me-2" style="font-size: 1.2rem;"></i>
         <div>
-            <strong><?= safe_output($group['group_name']) ?></strong> - 
-            <?= safe_output($group['description']) ?>
+            <strong><?= caseFormat($group['group_name']) ?></strong> - 
+            <?= caseFormat($group['description']) ?>
             <?php if ($group['group_type'] === 'dynamic'): ?>
                 <br><small class="text-muted">This is a dynamic group. Members are automatically managed based on group rules.</small>
             <?php else: ?>
@@ -248,20 +248,20 @@ function formatCustomerName($customer) {
                                 <td>
                                     <div>
                                         <i class="bi bi-telephone text-muted me-1"></i>
-                                        <?= safe_output($member['phone_number']) ?>
+                                        <?= caseFormat($member['phone_number']) ?>
                                         <br>
                                         <i class="bi bi-envelope text-muted me-1"></i>
-                                        <?= safe_output($member['email_address']) ?>
+                                        <?= caseFormat($member['email_address']) ?>
                                     </div>
                                 </td>
                                 <td>
                                     <div>
-                                        <strong><?= safe_output($member['occupation_business']) ?></strong>
+                                        <strong><?= caseFormat($member['occupation_business']) ?></strong>
                                         <?php if (!empty($member['office_business_location'])): ?>
                                         <br>
                                         <small class="text-muted">
                                             <i class="bi bi-geo-alt"></i>
-                                            <?= safe_output($member['office_business_location']) ?>
+                                            <?= caseFormat($member['office_business_location']) ?>
                                         </small>
                                         <?php endif; ?>
                                     </div>
@@ -275,7 +275,7 @@ function formatCustomerName($customer) {
                                     <small class="text-muted"><?= date('h:i A', strtotime($member['added_at'])) ?></small>
                                 </td>
                                 <td>
-                                    <?= safe_output($member['added_by_name']) ?>
+                                    <?= caseFormat($member['added_by_name']) ?>
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
@@ -379,12 +379,12 @@ function formatCustomerName($customer) {
                                             </div>
                                         </td>
                                         <td>
-                                            <small class="text-muted"><?= safe_output($customer['phone_number']) ?></small>
+                                            <small class="text-muted"><?= caseFormat($customer['phone_number']) ?></small>
                                             <br>
-                                            <small class="text-muted"><?= safe_output($customer['email_address']) ?></small>
+                                            <small class="text-muted"><?= caseFormat($customer['email_address']) ?></small>
                                         </td>
                                         <td>
-                                            <small class="text-muted"><?= safe_output($customer['occupation_business']) ?></small>
+                                            <small class="text-muted"><?= caseFormat($customer['occupation_business']) ?></small>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -449,13 +449,13 @@ $(document).ready(function() {
                 extend: 'excelHtml5',
                 text: '<i class="bi bi-file-excel"></i> Excel',
                 titleAttr: 'Export to Excel',
-                title: 'Group_Members_<?= safe_output($group['group_name']) ?>_' + new Date().toISOString().slice(0,10)
+                title: 'Group_Members_<?= caseFormat($group['group_name']) ?>_' + new Date().toISOString().slice(0,10)
             },
             {
                 extend: 'csvHtml5',
                 text: '<i class="bi bi-file-text"></i> CSV',
                 titleAttr: 'Export to CSV',
-                title: 'Group_Members_<?= safe_output($group['group_name']) ?>_' + new Date().toISOString().slice(0,10)
+                title: 'Group_Members_<?= caseFormat($group['group_name']) ?>_' + new Date().toISOString().slice(0,10)
             }
         ]
     });
