@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-18 — Simple POS: fix credit sales bugs (Wanaodaiwa empty + credit limit blocks + cash balance negative)
+
+**Files:** `app/bms/pos/pos_scripts_new.php`, `core/pos_credit_limit.php`, `api/pos/process_sale.php`
+
+**Bug 1 (Wanaodaiwa empty / payment_status wrongly 'paid'):** When the cashier switched from cash → credit, `#amountTendered` retained its cash value. `completeSale()` sent that as `amount_paid`, which matched the total and set `payment_status = 'paid'`. `posCreditOpenSales()` excludes paid sales, so nothing appeared on the Wanaodaiwa page or dashboard card. Fix: reset `#amountTendered` to `'0'` (and re-run `calculateChange()`) whenever the payment method switches to `'credit'`.
+
+**Bug 2 (credit limit = 0 blocks all credit sales):** `assertPosCreditLimitPermitted()` compared projected outstanding against `$creditLimit + 0.01`. Since all new customers default to `credit_limit = 0`, the check blocked every credit sale. Fix: added early return when `$creditLimit <= 0` (zero = no limit set = unlimited credit).
+
+**Bug 3 (negative cash balance):** Root cause was Bug 1 — the incorrect `amount_paid_now = total` on a credit sale passed the `($is_credit && $amount_paid_now > 0)` guard in `process_sale.php`, recording the full credit amount as a cash drawer transaction. Later returns with cash refund method then caused refunds to exceed real cash_sales, producing a negative balance. Fix: Bug 1 fix prevents recurrence; added defensive guard in `process_sale.php` so a credit deposit is only recorded as cash when it is strictly a partial payment (< calculated_total).
+
+---
+
 ## 2026-09-19 — products.php: fix mobile nav turning white
 
 **File:** `app/bms/product/products.php`
