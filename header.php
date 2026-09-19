@@ -361,6 +361,25 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         });
     });
 
+    // Mobile marquee: only scroll when the company name is actually wider than the
+    // available space. Short names (e.g. "BJP SHOP") stay static and centred.
+    $(document).ready(function () {
+        var $ct = $('.marquee-container');
+        var $tx = $('.marquee-text');
+        if (!$ct.length || !$tx.length) return;
+        // Neutralise the marquee CSS so we can measure the raw text width
+        $tx.css({ animation: 'none', paddingLeft: '0' });
+        var textW  = $tx[0].scrollWidth;
+        var contW  = $ct[0].offsetWidth;
+        if (textW <= contW) {
+            // Text fits — keep it static and centred
+            $tx.css({ textAlign: 'center', width: '100%' });
+        } else {
+            // Text overflows — restore the scrolling marquee
+            $tx.css({ animation: '', paddingLeft: '' });
+        }
+    });
+
     // Global helper for logging activities moved to header.php
     function logReportAction(action, description) {
         if (navigator.sendBeacon) {
