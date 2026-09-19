@@ -532,31 +532,31 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                                 <label class="form-label fw-bold">Tracking</label>
                                                 <div class="form-check form-switch p-3 bg-light rounded-3">
                                                     <input class="form-check-input" type="checkbox" id="track_inventory" name="track_inventory" checked>
-                                                    <label class="form-check-label fw-bold ms-2" for="track_inventory">Track Stock Levels</label>
+                                                    <label class="form-check-label fw-bold ms-2" for="track_inventory"><?= t('Track Stock Levels') ?></label>
                                                 </div>
                                             </div>
 
                                             <div class="col-md-4 mt-4">
-                                                <label for="reorder_level" class="form-label fw-bold small text-muted">Reorder Alert Level</label>
+                                                <label for="reorder_level" class="form-label fw-bold small text-muted"><?= t('Reorder Alert Level') ?></label>
                                                 <input type="number" class="form-control bg-light border-0 py-2" id="reorder_level" name="reorder_level" 
                                                        min="0" step="0.001" value="0">
                                             </div>
                                             
                                             <div class="col-md-4 mt-4">
-                                                <label for="min_stock_level" class="form-label fw-bold small text-muted">Safety Stock (Min)</label>
+                                                <label for="min_stock_level" class="form-label fw-bold small text-muted"><?= t('Safety Stock (Min)') ?></label>
                                                 <input type="number" class="form-control bg-light border-0 py-2" id="min_stock_level" name="min_stock_level" 
                                                        min="0" step="0.001" value="0">
                                             </div>
                                             
                                             <div class="col-md-4 mt-4">
-                                                <label for="max_stock_level" class="form-label fw-bold small text-muted">Max Stock Level</label>
+                                                <label for="max_stock_level" class="form-label fw-bold small text-muted"><?= t('Max Stock Level') ?></label>
                                                 <input type="number" class="form-control bg-light border-0 py-2" id="max_stock_level" name="max_stock_level" 
                                                        min="0" step="0.001" value="0">
                                             </div>
                                         </div>
 
                                         <div class="mt-5 pt-3 border-top">
-                                            <h6 class="fw-bold mb-3"><i class="bi bi-geo-alt me-2 text-warning"></i> Opening Stock (Optional)</h6>
+                                            <h6 class="fw-bold mb-3"><i class="bi bi-geo-alt me-2 text-warning"></i> <?= t('Opening Stock (Optional)') ?></h6>
                                             <div class="row g-2" id="initialStockSection">
                                                 <?php if (!empty($warehouses)): ?>
                                                     <?php foreach ($warehouses as $warehouse): ?>

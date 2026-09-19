@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-18 — Header: company name truncates instead of overlapping date/location
+
+**File:** `header.php`
+
+Added CSS so the desktop company name (`<h5>`) truncates with ellipsis (`text-overflow: ellipsis`) when it is too long to fit alongside the date/location box. Short names display fully with no change. The logo+name flex child can now shrink (`min-width: 0; flex-shrink: 1`), while the date-location box stays fixed (`flex-shrink: 0`).
+
+---
+
+## 2026-09-18 — POS: cap default product grid at 20 (desktop + mobile)
+
+**File:** `app/bms/pos/pos_scripts_new.php`
+
+Previously the 20-product cap only applied on mobile. Now the default grid (no search, no specific category) shows only the first 20 products on all screen sizes. Typing a search term or tapping a category button loads the full matching set. A "Showing first 20 of N products" hint is appended when the cap applies.
+
+---
+
+## 2026-09-18 — i18n: fix English/Swahili mix on product create/edit pages
+
+**Files:** `app/bms/product/product_create.php`, `lang/sw.php`
+
+Five labels in the advanced product form had no `t()` wrapper — `Track Stock Levels`, `Reorder Alert Level`, `Safety Stock (Min)`, `Max Stock Level`, `Opening Stock (Optional)` — now wrapped. Four translation entries missing from `lang/sw.php` added: `Opening Stock`, `Opening Stock (Optional)`, `Track Stock Levels`, and `Get notified when stock falls to or below this level. Leave 0 for no alert.`. `product_edit.php` already had `t()` on all of these; the new sw.php entries cover it automatically.
+
+---
+
 ## 2026-09-18 — Text Display Case: apply caseFormat/caseFormatJs to product categories everywhere
 
 **Files:** `app/bms/product/categories.php`, `app/bms/product/products.php`, `app/bms/pos/pos_scripts_new.php`
