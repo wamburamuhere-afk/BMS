@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-19 — Header: language toggle pill in navbar (EN ↔ SW one-click switch)
+
+**Files:** `header.php`, `api/set_language.php`
+
+Added a compact globe + language code pill (e.g. `🌐 EN`) to the right side of the bottom navigation bar, just before the user account dropdown. Clicking it instantly switches between English and Swahili via a AJAX POST to the new `api/set_language.php` endpoint (saves `user_language_{user_id}` setting + updates session), then reloads the page in the new language. The preference page still works as before — the pill is just a quicker path that is always visible.
+
+---
+
 ## 2026-09-19 — Header: mobile marquee only scrolls when company name is too long to fit
 
 **File:** `header.php`
