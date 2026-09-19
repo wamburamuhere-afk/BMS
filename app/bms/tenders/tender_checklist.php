@@ -58,7 +58,7 @@ $tenderNavActive = 'checklist';
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
         <div class="mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-primary"><i class="bi bi-check2-square me-2"></i>Compliance Checklist</h2>
-            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= safe_output($tender['tender_no']) ?></span></p>
+            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= caseFormat($tender['tender_no']) ?></span></p>
         </div>
         <a href="<?= getUrl('tenders') ?>" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-left"></i> Back to List</a>
     </div>
@@ -80,11 +80,11 @@ $tenderNavActive = 'checklist';
                     <input class="form-check-input checklist-toggle" type="checkbox" id="chk<?= $item['item_id'] ?>"
                            <?= $item['is_ready'] ? 'checked' : '' ?> <?= $can_edit ? '' : 'disabled' ?>>
                     <label class="form-check-label <?= $item['is_ready'] ? 'text-decoration-line-through text-muted' : '' ?>" for="chk<?= $item['item_id'] ?>">
-                        <?= safe_output($item['item_text']) ?>
+                        <?= caseFormat($item['item_text']) ?>
                         <?php if ($item['is_custom']): ?><span class="badge bg-light text-dark border ms-1">custom</span><?php endif; ?>
                     </label>
                     <?php if ($hint): ?>
-                        <br><a href="<?= getUrl($hint['route']) ?>?id=<?= $id ?>" class="small text-decoration-none"><i class="bi bi-info-circle"></i> <?= safe_output($hint['label']) ?> — View</a>
+                        <br><a href="<?= getUrl($hint['route']) ?>?id=<?= $id ?>" class="small text-decoration-none"><i class="bi bi-info-circle"></i> <?= caseFormat($hint['label']) ?> — View</a>
                     <?php endif; ?>
                 </div>
                 <?php if ($can_edit && $item['is_custom']): ?>

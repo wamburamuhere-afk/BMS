@@ -33,7 +33,7 @@ $tenderNavActive = 'materials';
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
         <div class="mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-primary"><i class="bi bi-boxes me-2"></i>Materials Schedule</h2>
-            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= safe_output($tender['tender_no']) ?></span></p>
+            <p class="text-muted small mb-0">Tender No: <span class="fw-bold text-dark"><?= caseFormat($tender['tender_no']) ?></span></p>
         </div>
         <a href="<?= getUrl('tenders') ?>" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-left"></i> Back to List</a>
     </div>
@@ -74,7 +74,7 @@ $tenderNavActive = 'materials';
                             <td>
                                 <select class="form-select form-select-sm material-select2" style="width:100%" data-material-id="<?= $mid ?>">
                                     <?php if ($item['material'] !== ''): ?>
-                                    <option value="<?= (int)$item['product_id'] ?>" selected><?= safe_output($item['material']) ?></option>
+                                    <option value="<?= (int)$item['product_id'] ?>" selected><?= caseFormat($item['material']) ?></option>
                                     <?php endif; ?>
                                 </select>
                                 <input type="hidden" name="items[<?= $mid ?>][product_id]" class="material-product-id" value="<?= (int)$item['product_id'] ?>">

@@ -218,7 +218,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
             <?php $tenderNavActive = 'edit'; require __DIR__ . '/_tender_nav.php'; ?>
             <div class="card border-0 shadow-lg overflow-hidden" style="border-radius:15px;">
                 <div class="card-header bg-primary text-white p-4">
-                    <h5 class="fw-bold mb-0 text-white"><i class="bi bi-pencil-square me-2"></i>Edit Tender: <?= safe_output($tender['tender_no']) ?></h5>
+                    <h5 class="fw-bold mb-0 text-white"><i class="bi bi-pencil-square me-2"></i>Edit Tender: <?= caseFormat($tender['tender_no']) ?></h5>
                     <!-- Phase indicator -->
                     <div class="d-flex gap-2 mt-3" id="phase-indicator">
                         <span class="badge bg-white text-primary px-3 py-2" id="ind-1"></span>
@@ -250,7 +250,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                             <option value="<?= safe_output($customer['customer_name']) ?>"
                                                     data-customer-id="<?= $customer['customer_id'] ?>"
                                                     <?= ($tender['customer_id'] == $customer['customer_id']) ? 'selected' : '' ?>>
-                                                <?= safe_output($customer['customer_name']) ?><?= !empty($customer['company_name']) ? ' (' . safe_output($customer['company_name']) . ')' : '' ?>
+                                                <?= caseFormat($customer['customer_name']) ?><?= !empty($customer['company_name']) ? ' (' . caseFormat($customer['company_name']) . ')' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                         <option value="ADD_NEW_CUSTOMER" class="fw-bold text-primary">--- CREATE NEW CUSTOMER ---</option>
