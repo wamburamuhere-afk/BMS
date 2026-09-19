@@ -61,6 +61,9 @@ function assertPosCreditLimitPermitted(PDO $pdo, int $customerId, float $newBala
     $stmt->execute([$customerId]);
     $creditLimit = (float)($stmt->fetchColumn() ?: 0);
 
+    // credit_limit = 0 means no limit has been set → allow unlimited credit
+    if ($creditLimit <= 0) return;
+
     $existingOutstanding = customerOutstandingBalance($pdo, $customerId);
     $projected = round($existingOutstanding + $newBalanceDue, 2);
 
