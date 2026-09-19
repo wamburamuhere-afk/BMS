@@ -302,7 +302,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             <select class="form-select select2-asset" name="parent_asset_id" id="parent_asset_id">
                                 <option value="">— None —</option>
                                 <?php foreach ($asset_parents as $p): ?>
-                                <option value="<?= (int)$p['asset_id'] ?>"><?= safe_output(($p['asset_code'] ? $p['asset_code'] . ' — ' : '') . $p['asset_name']) ?></option>
+                                <option value="<?= (int)$p['asset_id'] ?>"><?= caseFormat(($p['asset_code'] ? $p['asset_code'] . ' — ' : '') . $p['asset_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Only for sub-assets / components</small>
@@ -342,7 +342,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             <select class="form-select select2-asset" name="supplier_id" id="supplier_id">
                                 <option value="">— None —</option>
                                 <?php foreach ($asset_suppliers as $s): ?>
-                                <option value="<?= (int)$s['supplier_id'] ?>"><?= safe_output($s['supplier_name']) ?></option>
+                                <option value="<?= (int)$s['supplier_id'] ?>"><?= caseFormat($s['supplier_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
