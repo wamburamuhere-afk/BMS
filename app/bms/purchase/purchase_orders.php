@@ -58,8 +58,8 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = t('Web:') . " " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = t('Email:') . " " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = t('Web:') . " " . caseFormat($c_web);
+            if (!empty($c_email)) $web_email[] = t('Email:') . " " . caseFormat($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
@@ -67,8 +67,8 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <p class="text-dark mb-1 small text-uppercase">
             <?php
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = t('TIN:') . " " . caseFormat($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = t('VRN:') . " " . caseFormat($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>

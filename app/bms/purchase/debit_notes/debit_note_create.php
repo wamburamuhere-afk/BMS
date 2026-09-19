@@ -60,7 +60,7 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
     </nav>
 
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h4 class="mb-0 fw-bold"><i class="bi bi-receipt-cutoff text-primary me-2"></i>New Debit Note<?php if ($project_ctx): ?> <span class="badge bg-primary fs-6 align-middle"><i class="bi bi-kanban me-1"></i><?= safe_output($project_name) ?></span><?php endif; ?></h4>
+        <h4 class="mb-0 fw-bold"><i class="bi bi-receipt-cutoff text-primary me-2"></i>New Debit Note<?php if ($project_ctx): ?> <span class="badge bg-primary fs-6 align-middle"><i class="bi bi-kanban me-1"></i><?= caseFormat($project_name) ?></span><?php endif; ?></h4>
         <div class="d-flex gap-2">
             <?php if ($project_ctx): ?>
             <a href="<?= getUrl('project_view') ?>?id=<?= $project_ctx ?>&tab=proc-debit-notes" class="btn btn-outline-primary"><i class="bi bi-kanban me-1"></i> Back to Project</a>

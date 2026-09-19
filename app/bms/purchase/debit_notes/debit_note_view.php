@@ -144,7 +144,7 @@ $badge = [
                         <tbody>
                             <?php foreach ($items as $it): ?>
                             <tr>
-                                <td><?= safe_output($it['description']) ?></td>
+                                <td><?= caseFormat($it['description']) ?></td>
                                 <td class="text-center"><?= rtrim(rtrim(number_format($it['quantity'], 2), '0'), '.') ?></td>
                                 <td class="text-end"><?= number_format($it['unit_price'], 2) ?></td>
                                 <td class="text-center"><?= ((float)$it['tax_rate'] == 18) ? '18%' : '—' ?></td>
@@ -164,8 +164,8 @@ $badge = [
             <?php if (!empty($dn['reason']) || !empty($dn['notes'])): ?>
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-body">
-                    <?php if (!empty($dn['reason'])): ?><p class="mb-1"><strong>Reason:</strong> <?= safe_output($dn['reason']) ?></p><?php endif; ?>
-                    <?php if (!empty($dn['notes'])): ?><p class="mb-0 text-muted"><strong>Notes:</strong> <?= nl2br(safe_output($dn['notes'])) ?></p><?php endif; ?>
+                    <?php if (!empty($dn['reason'])): ?><p class="mb-1"><strong>Reason:</strong> <?= caseFormat($dn['reason']) ?></p><?php endif; ?>
+                    <?php if (!empty($dn['notes'])): ?><p class="mb-0 text-muted"><strong>Notes:</strong> <?= nl2br(caseFormat($dn['notes'])) ?></p><?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -175,14 +175,14 @@ $badge = [
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-primary text-white py-2"><i class="bi bi-building me-1"></i> Supplier</div>
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><?= safe_output($dn['supplier_name']) ?></h6>
-                    <?php if (!empty($dn['company_name'])): ?><p class="text-muted small mb-2"><?= safe_output($dn['company_name']) ?></p><?php endif; ?>
-                    <?php if (!empty($dn['s_email'])): ?><div class="small"><i class="bi bi-envelope text-muted me-1"></i><?= safe_output($dn['s_email']) ?></div><?php endif; ?>
-                    <?php if (!empty($dn['s_phone'])): ?><div class="small"><i class="bi bi-telephone text-muted me-1"></i><?= safe_output($dn['s_phone']) ?></div><?php endif; ?>
+                    <h6 class="fw-bold mb-1"><?= caseFormat($dn['supplier_name']) ?></h6>
+                    <?php if (!empty($dn['company_name'])): ?><p class="text-muted small mb-2"><?= caseFormat($dn['company_name']) ?></p><?php endif; ?>
+                    <?php if (!empty($dn['s_email'])): ?><div class="small"><i class="bi bi-envelope text-muted me-1"></i><?= caseFormat($dn['s_email']) ?></div><?php endif; ?>
+                    <?php if (!empty($dn['s_phone'])): ?><div class="small"><i class="bi bi-telephone text-muted me-1"></i><?= caseFormat($dn['s_phone']) ?></div><?php endif; ?>
                     <hr>
                     <div class="small"><strong>Origin:</strong>
                         <?php if (!empty($dn['purchase_return_id'])): ?>
-                            <a href="<?= getUrl('purchase_return_view') ?>?id=<?= (int)$dn['purchase_return_id'] ?>" class="text-decoration-none"><?= safe_output($dn['return_number'] ?: ('Return #' . $dn['purchase_return_id'])) ?></a>
+                            <a href="<?= getUrl('purchase_return_view') ?>?id=<?= (int)$dn['purchase_return_id'] ?>" class="text-decoration-none"><?= caseFormat($dn['return_number'] ?: ('Return #' . $dn['purchase_return_id'])) ?></a>
                         <?php elseif (!empty($dn['purchase_order_id'])): ?>
                             PO #<?= (int)$dn['purchase_order_id'] ?>
                         <?php else: ?>
@@ -190,7 +190,7 @@ $badge = [
                         <?php endif; ?>
                     </div>
                     <?php if (!empty($dn['warehouse_name'])): ?>
-                    <div class="small mt-1"><strong>Returned From:</strong> <i class="bi bi-house-gear text-muted me-1"></i><?= safe_output($dn['warehouse_name']) ?></div>
+                    <div class="small mt-1"><strong>Returned From:</strong> <i class="bi bi-house-gear text-muted me-1"></i><?= caseFormat($dn['warehouse_name']) ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -210,7 +210,7 @@ $badge = [
                         <div class="list-group-item d-flex align-items-center justify-content-between py-2">
                             <div class="d-flex align-items-center text-truncate me-2">
                                 <i class="bi <?= $icon ?> fs-5 <?= $icol ?> me-2"></i>
-                                <span class="fw-semibold text-truncate"><?= safe_output($att['file_name']) ?></span>
+                                <span class="fw-semibold text-truncate"><?= caseFormat($att['file_name']) ?></span>
                                 <span class="text-muted small ms-2">(<?= strtoupper($ext) ?>)</span>
                             </div>
                             <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-arrow-down"></i></a>
@@ -224,17 +224,17 @@ $badge = [
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-shield-check text-primary me-1"></i> Approval Trail</div>
                 <div class="card-body small">
-                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Created</span><span><?= safe_output($dn['created_by_name'] ?: '—') ?><?= $dn['created_at'] ? ' · ' . date('d M', strtotime($dn['created_at'])) : '' ?></span></div>
-                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Reviewed</span><span><?= $dn['reviewed_by'] ? safe_output($dn['reviewer_name']) . ($dn['reviewed_at'] ? ' · ' . date('d M', strtotime($dn['reviewed_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
-                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Approved</span><span><?= $dn['approved_by'] ? safe_output($dn['approver_name']) . ($dn['approved_at'] ? ' · ' . date('d M', strtotime($dn['approved_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
-                    <div class="d-flex justify-content-between"><span class="text-muted">Refund In</span><span><?php if ($status === 'paid'): ?><?= safe_output($dn['received_into_name'] ?: 'Received') ?><?= $dn['paid_at'] ? ' · ' . date('d M', strtotime($dn['paid_at'])) : '' ?><?php else: ?><span class="text-muted">—</span><?php endif; ?></span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Created</span><span><?= caseFormat($dn['created_by_name'] ?: '—') ?><?= $dn['created_at'] ? ' · ' . date('d M', strtotime($dn['created_at'])) : '' ?></span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Reviewed</span><span><?= $dn['reviewed_by'] ? caseFormat($dn['reviewer_name']) . ($dn['reviewed_at'] ? ' · ' . date('d M', strtotime($dn['reviewed_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Approved</span><span><?= $dn['approved_by'] ? caseFormat($dn['approver_name']) . ($dn['approved_at'] ? ' · ' . date('d M', strtotime($dn['approved_at'])) : '') : '<span class="text-muted">Pending</span>' ?></span></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted">Refund In</span><span><?php if ($status === 'paid'): ?><?= caseFormat($dn['received_into_name'] ?: 'Received') ?><?= $dn['paid_at'] ? ' · ' . date('d M', strtotime($dn['paid_at'])) : '' ?><?php else: ?><span class="text-muted">—</span><?php endif; ?></span></div>
                 </div>
             </div>
 
             <?php if ($status === 'paid'): ?>
             <div class="alert" style="background:#052c65;color:#fff;border:0;">
-                <i class="bi bi-check-circle me-1"></i> Refund of <strong>TZS <?= number_format($dn['grand_total'], 2) ?></strong> received into <strong><?= safe_output($dn['received_into_name'] ?: 'account') ?></strong>.
-                <?php if (!empty($dn['payment_reference'])): ?><div class="small mt-1">Ref: <?= safe_output($dn['payment_reference']) ?></div><?php endif; ?>
+                <i class="bi bi-check-circle me-1"></i> Refund of <strong>TZS <?= number_format($dn['grand_total'], 2) ?></strong> received into <strong><?= caseFormat($dn['received_into_name'] ?: 'account') ?></strong>.
+                <?php if (!empty($dn['payment_reference'])): ?><div class="small mt-1">Ref: <?= caseFormat($dn['payment_reference']) ?></div><?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
@@ -253,7 +253,7 @@ $badge = [
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="debit_note_id" value="<?= $id ?>">
-                    <p class="mb-3">Record <strong class="text-primary">TZS <?= number_format($dn['grand_total'], 2) ?></strong> received from <strong><?= safe_output($dn['supplier_name']) ?></strong>.</p>
+                    <p class="mb-3">Record <strong class="text-primary">TZS <?= number_format($dn['grand_total'], 2) ?></strong> received from <strong><?= caseFormat($dn['supplier_name']) ?></strong>.</p>
                     <div class="mb-3">
                         <label class="form-label">Received Into <span class="text-danger">*</span></label>
                         <select class="form-select" name="received_into_account_id" id="pay_account" required style="width:100%">
