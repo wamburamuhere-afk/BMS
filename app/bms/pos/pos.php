@@ -292,8 +292,8 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="col-md-7">
-                        <div class="d-flex gap-2 flex-wrap" id="categoryButtons">
+                    <div class="col-12 mt-2">
+                        <div class="category-scroll-strip" id="categoryButtons">
                             <button type="button" class="btn btn-sm btn-outline-primary active" onclick="loadProductsByCategory('all')">
                                 <?= t('All Products') ?>
                             </button>
@@ -624,11 +624,25 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
     background: #94a3b8;
 }
 
-/* Category Buttons */
-#categoryButtons .btn {
+/* Category scroll strip — single horizontal row, scroll sideways on overflow */
+.category-scroll-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;          /* Firefox */
+    padding-bottom: 4px;
+    padding-top: 2px;
+}
+.category-scroll-strip::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+.category-scroll-strip .btn {
+    flex-shrink: 0;
     border-radius: 20px;
-    padding: 4px 15px;
+    padding: 4px 16px;
     font-weight: 500;
+    white-space: nowrap;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

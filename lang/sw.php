@@ -1678,6 +1678,7 @@ return [
     'Network (IP) thermal printer' => 'Printa ya Mtandao (IP) ya Joto',
     'Network mode sends the receipt directly to a printer with its own IP address on your shop network — no print dialog, real auto-cut and drawer-kick.' => 'Hali ya mtandao hutuma risiti moja kwa moja kwenye printa yenye anwani yake ya IP kwenye mtandao wa duka lako — hakuna dirisha la kuchapisha, ukataji wa kiotomatiki halisi na ufunguzi wa droo.',
     'No registers yet' => 'Hakuna rejista bado',
+    'No registers configured yet — a default register will be created automatically.' => 'Hakuna rejista iliyowekwa bado — rejista ya msingi itaundwa kiotomatiki.',
     'POS Advanced' => 'POS ya Kina',
     'POS settings updated successfully' => 'Mipangilio ya POS imesasishwa kwa mafanikio',
     'Percentage (%)' => 'Asilimia (%)',

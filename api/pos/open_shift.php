@@ -48,17 +48,32 @@ try {
         }
     }
 
-    // Register (till) selection — Phase 8 (pos_upgrade_plan.md §7). Falls back to
-    // register #1 ("Main Counter", the schema's seed row) when the terminal is
-    // still on the pre-register UI, so this never breaks an un-migrated client.
-    $register_id = isset($_POST['register_id']) ? (int)$_POST['register_id'] : 1;
-    $reg = $pdo->prepare("SELECT register_id, register_name, warehouse_id FROM pos_registers WHERE register_id = ? AND status = 'active'");
-    $reg->execute([$register_id]);
-    $register = $reg->fetch(PDO::FETCH_ASSOC);
-    if (!$register) {
-        echo json_encode(['success' => false, 'message' => t('Selected register is not available. Please choose an active register.')]);
-        exit();
+    // Register (till) selection — Phase 8 (pos_upgrade_plan.md §7).
+    // If no register_id is posted (or the posted one is not found / not active),
+    // fall back to the first active register in the tenant's DB. If no registers
+    // exist at all (common for fresh Simple POS tenants that never configured
+    // tills), auto-create a "Main Register" so the cashier can start selling
+    // immediately without needing to visit settings first.
+    $register_id = isset($_POST['register_id']) ? (int)$_POST['register_id'] : 0;
+    $register = null;
+    if ($register_id > 0) {
+        $reg = $pdo->prepare("SELECT register_id, register_name, warehouse_id FROM pos_registers WHERE register_id = ? AND status = 'active'");
+        $reg->execute([$register_id]);
+        $register = $reg->fetch(PDO::FETCH_ASSOC) ?: null;
     }
+    if (!$register) {
+        // Try the first available active register
+        $any = $pdo->query("SELECT register_id, register_name, warehouse_id FROM pos_registers WHERE status = 'active' ORDER BY register_id ASC LIMIT 1");
+        $register = $any->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+    if (!$register) {
+        // No registers exist — auto-create a default one so Simple POS works out of the box
+        $pdo->exec("INSERT INTO pos_registers (register_name, register_code, status, opening_cash, created_at)
+                    VALUES ('Main Register', 'REG-001', 'active', 0, NOW())");
+        $newId = (int)$pdo->lastInsertId();
+        $register = ['register_id' => $newId, 'register_name' => 'Main Register', 'warehouse_id' => null];
+    }
+    $register_id = (int)$register['register_id'];
 
     // Shop scope (2026-09-16): a register tied to a shop can only be staffed
     // by a cashier actually granted that shop via Settings > Admin > Project &
