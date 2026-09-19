@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-18 — i18n: fix English/Swahili mix on product create/edit pages
+
+**Files:** `app/bms/product/product_create.php`, `lang/sw.php`
+
+Five labels in the advanced product form had no `t()` wrapper — `Track Stock Levels`, `Reorder Alert Level`, `Safety Stock (Min)`, `Max Stock Level`, `Opening Stock (Optional)` — now wrapped. Four translation entries missing from `lang/sw.php` added: `Opening Stock`, `Opening Stock (Optional)`, `Track Stock Levels`, and `Get notified when stock falls to or below this level. Leave 0 for no alert.`. `product_edit.php` already had `t()` on all of these; the new sw.php entries cover it automatically.
+
+---
+
 ## 2026-09-18 — Text Display Case: apply caseFormat/caseFormatJs to product categories everywhere
 
 **Files:** `app/bms/product/categories.php`, `app/bms/product/products.php`, `app/bms/pos/pos_scripts_new.php`
