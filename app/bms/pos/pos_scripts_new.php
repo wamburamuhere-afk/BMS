@@ -109,6 +109,7 @@ const PT = {
     failedToDeleteSale: <?= json_encode(t('Failed to delete sale')) ?>,
     loadingRegisters: <?= json_encode(t('Loading registers...')) ?>,
     inUseBySince: <?= json_encode(t('in use by %s since %s')) ?>,
+    noRegistersNote: <?= json_encode(t('No registers configured yet — a default register will be created automatically.')) ?>,
     starting: <?= json_encode(t('Starting...')) ?>,
     shiftStarted: <?= json_encode(t('Shift Started')) ?>,
     shiftStartedText: <?= json_encode(t('Shift %s started on %s.')) ?>,
@@ -2238,12 +2239,19 @@ function startShift() {
             const firstFree = $reg.find('option:not(:disabled)').first().val();
             if (firstFree) $reg.val(firstFree);
         } else {
-            $reg.append('<option value="1">Main Counter</option>');
+            // No registers configured yet — hide the field; open_shift.php will
+            // auto-create a default "Main Register" on the server side.
+            $reg.closest('.mb-3, .row, div').first().hide();
+            $('#startShiftModal').find('.no-register-note').remove();
+            $reg.closest('form, .modal-body').prepend(
+                '<p class="text-muted small no-register-note mb-3"><i class="bi bi-info-circle me-1"></i>' + PT.noRegistersNote + '</p>'
+            );
         }
         $reg.select2({ theme: 'bootstrap-5', dropdownParent: $('#startShiftModal'), width: '100%' });
         $('#startShiftModal').modal('show');
     }).fail(function () {
-        $reg.html('<option value="1">Main Counter</option>');
+        // On network failure also hide the register row — server will auto-assign
+        $reg.closest('.mb-3, .row, div').first().hide();
         $reg.select2({ theme: 'bootstrap-5', dropdownParent: $('#startShiftModal'), width: '100%' });
         $('#startShiftModal').modal('show');
     });
