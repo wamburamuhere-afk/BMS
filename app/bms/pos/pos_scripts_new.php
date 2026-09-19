@@ -605,10 +605,10 @@ function loadCategories() {
                 // Add category buttons with data-category attribute
                 categories.slice(0, 8).forEach(category => {
                     container.append(`
-                        <button type="button" class="btn btn-sm btn-outline-secondary" 
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
                                 data-category="${category.category_id}"
                                 onclick="loadProductsByCategory(${category.category_id})">
-                            ${category.category_name}
+                            ${caseFormatJs(category.category_name)}
                         </button>
                     `);
                 });
