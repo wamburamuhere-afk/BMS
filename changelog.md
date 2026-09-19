@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-09-19 — Simple POS: remove register dropdown from Start Shift; cashier-identity shift model
+
+**Files:** `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/open_shift.php`, `api/pos/print_receipt.php`
+
+In Simple POS the register concept is irrelevant — there is one till and shifts are the cashier's accountability period. Four changes:
+
+1. **Modal** (`pos_modals_new.php`) — Register/Till field hidden in Simple POS mode (`posSimpleModeEnabled()`). Cashier only enters Opening Cash.
+2. **JS** (`pos_scripts_new.php`) — `startShift()` in Simple POS skips the register AJAX fetch entirely and opens the modal directly. `confirmStartShift()` omits `register_id` from the POST payload (server auto-assigns). New `PT.posSimpleMode` flag drives both.
+3. **Blocked message** (`open_shift.php`) — when the default register already has an active shift, the error now reads *"[Full Name] has an active shift since [date, time]. They must close it before you can start."* instead of the generic register-busy message.
+4. **Receipt** (`print_receipt.php`) — Register line suppressed in Simple POS; only Cashier name shows.
+
+Advanced POS (multi-register) is completely unaffected.
+
+---
+
 ## 2026-09-18 — POS: category buttons replaced with horizontal scrollable strip
 
 **File:** `app/bms/pos/pos.php`

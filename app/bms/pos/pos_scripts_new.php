@@ -110,6 +110,7 @@ const PT = {
     loadingRegisters: <?= json_encode(t('Loading registers...')) ?>,
     inUseBySince: <?= json_encode(t('in use by %s since %s')) ?>,
     noRegistersNote: <?= json_encode(t('No registers configured yet — a default register will be created automatically.')) ?>,
+    posSimpleMode: <?= json_encode(posSimpleModeEnabled()) ?>,
     starting: <?= json_encode(t('Starting...')) ?>,
     shiftStarted: <?= json_encode(t('Shift Started')) ?>,
     shiftStartedText: <?= json_encode(t('Shift %s started on %s.')) ?>,
@@ -2213,6 +2214,14 @@ function performDelete(holdId, silent) {
 }
 
 function startShift() {
+    if (PT.posSimpleMode) {
+        // Simple POS — no register dropdown; server auto-assigns the one default
+        // register. Just open the modal directly with no AJAX prefetch.
+        $('#startShiftModal').modal('show');
+        return;
+    }
+
+    // Full POS — fetch available registers and populate the dropdown.
     const $reg = $('#startShiftRegister');
     if ($reg.hasClass('select2-hidden-accessible')) $reg.select2('destroy');
     $reg.html('<option value="">' + PT.loadingRegisters + '</option>');
@@ -2296,7 +2305,8 @@ function renderDenomGrid(containerId) {
 
 function confirmStartShift() {
     const openingCash = parseFloat($('#openingCash').val()) || 0;
-    const registerId = $('#startShiftRegister').val() || 1;
+    // Simple POS has no register dropdown — server auto-assigns
+    const registerId = PT.posSimpleMode ? null : ($('#startShiftRegister').val() || null);
 
     console.log('=== STARTING SHIFT ===');
     console.log('Opening Cash:', openingCash, 'Register:', registerId);
@@ -2308,13 +2318,11 @@ function confirmStartShift() {
     $.ajax({
         url: '<?= buildUrl('/api/pos/open_shift.php') ?>',
         type: 'POST',
-        data: {
-            opening_cash: openingCash,
-            register_id: registerId,
-            // Phase 20 (pos_upgrade_plan.md §8) — only sent if the cashier
-            // actually used the optional denomination grid.
-            denominations: JSON.stringify($('#openDenomGrid').data('breakdown') || [])
-        },
+        data: Object.assign(
+            { opening_cash: openingCash,
+              denominations: JSON.stringify($('#openDenomGrid').data('breakdown') || []) },
+            registerId ? { register_id: registerId } : {}
+        ),
         dataType: 'json',
         success: function(response) {
             console.log('=== SHIFT RESPONSE ===');

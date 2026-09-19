@@ -247,10 +247,12 @@ if ($can_restock_product ?? false) {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <?php if (!posSimpleModeEnabled()): ?>
                 <div class="mb-3">
                     <label class="form-label"><?= t('Register / Till') ?></label>
                     <select class="form-select" id="startShiftRegister" style="width:100%"></select>
                 </div>
+                <?php endif; ?>
                 <div class="mb-3">
                     <label class="form-label"><?= t('Opening Cash Amount') ?></label>
                     <input type="number" class="form-control" id="openingCash"
