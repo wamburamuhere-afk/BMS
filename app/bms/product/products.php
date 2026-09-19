@@ -569,7 +569,6 @@ function get_quick_actions($product) {
             position: sticky;
             top: 0;
             z-index: 1020;
-            background: #fff;
         }
     }
     </style>
