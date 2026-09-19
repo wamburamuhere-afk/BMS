@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-18 — Text Display Case: apply caseFormat/caseFormatJs to product categories everywhere
+
+**Files:** `app/bms/product/categories.php`, `app/bms/product/products.php`, `app/bms/pos/pos_scripts_new.php`
+
+- `categories.php` line 107: description column changed from `htmlspecialchars()` to `caseFormat()` (name column and parent dropdown already used `caseFormat()`).
+- `products.php` line 690: category filter dropdown label changed from `safe_output()` to `caseFormat()`.
+- `pos_scripts_new.php` line 611: POS category filter buttons changed from raw `${category.category_name}` to `${caseFormatJs(category.category_name)}`.
+
+---
+
 ## 2026-09-18 — Simple POS: fix credit sales bugs (Wanaodaiwa empty + credit limit blocks + cash balance negative)
 
 **Files:** `app/bms/pos/pos_scripts_new.php`, `core/pos_credit_limit.php`, `api/pos/process_sale.php`

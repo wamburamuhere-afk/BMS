@@ -687,7 +687,7 @@ function get_quick_actions($product) {
                             <?php foreach ($categories as $category): ?>
                                 <option value="<?= $category['category_id'] ?>"
                                     <?= $category_id == $category['category_id'] ? 'selected' : '' ?>>
-                                    <?= safe_output($category['category_name']) ?>
+                                    <?= caseFormat($category['category_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

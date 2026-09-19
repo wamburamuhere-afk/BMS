@@ -104,7 +104,7 @@ $category_tree = get_category_tree($all_categories);
                                             <?php if ($cat['depth'] > 0): ?><i class="bi bi-arrow-return-right text-muted me-1"></i><?php endif; ?>
                                             <strong><?= caseFormat($cat['category_name']) ?></strong>
                                         </td>
-                                        <td><small class="text-muted"><?= $cat['description'] ? htmlspecialchars($cat['description']) : t('N/A') ?></small></td>
+                                        <td><small class="text-muted"><?= $cat['description'] ? caseFormat($cat['description']) : t('N/A') ?></small></td>
                                         <td>
                                             <span class="badge rounded-pill bg-<?= ($cat['status'] ?? 'active') == 'active' ? 'success' : 'danger' ?> bg-opacity-10 py-2 px-3" style="min-width: 80px; color: currentcolor !important;">
                                                 <?= mb_strtoupper(($cat['status'] ?? 'active') == 'active' ? t('Active') : t('Inactive')) ?>
