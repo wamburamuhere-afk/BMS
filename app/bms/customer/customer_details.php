@@ -78,7 +78,7 @@ $isCompany = ($customer['customer_type'] === 'business');
 
 // Format names
 // applyCaseMode() (transform only, no escaping) — not caseFormat() — because
-// every use site below already wraps these in safe_output() itself; using
+// every use site below already wraps these in caseFormat() itself; using
 // caseFormat() here would escape twice (e.g. "Tom & Jerry" -> "Tom &amp;
 // Jerry" -> re-escaped to "Tom &amp;amp; Jerry").
 if ($isCompany && !empty($customer['company_name'])) {
@@ -319,7 +319,7 @@ global $company_name, $company_logo;
     <div class="d-none d-print-block text-center mb-4" style="margin-top: 0 !important; padding-top: 0 !important;">
         
         <h4 class="fw-bold text-dark text-uppercase">CUSTOMER INFORMATION REPORT</h4>
-        <h5 class="text-muted"><?= safe_output($customer_name) ?> (ID: <?= $customer_id ?>)</h5>
+        <h5 class="text-muted"><?= caseFormat($customer_name) ?> (ID: <?= $customer_id ?>)</h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
 
@@ -328,7 +328,7 @@ global $company_name, $company_logo;
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= getUrl('customers') ?>">Customers</a></li>
-            <li class="breadcrumb-item active"><?= safe_output($customer_name) ?></li>
+            <li class="breadcrumb-item active"><?= caseFormat($customer_name) ?></li>
         </ol>
     </nav>
 
@@ -338,7 +338,7 @@ global $company_name, $company_logo;
                 <div>
                     <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-<?= $isCompany ? 'building' : 'person-badge' ?>"></i> <?= $isCompany ? 'Company' : 'Customer' ?> View</h2>
                     <p class="text-muted mb-0 small mt-1 header-desc">
-                        Detailed information for <?= safe_output($customer_name) ?> • Code: <code><?= safe_output($customer['customer_code'] ?? 'N/A') ?></code>
+                        Detailed information for <?= caseFormat($customer_name) ?> • Code: <code><?= caseFormat($customer['customer_code'] ?? 'N/A') ?></code>
                     </p>
                 </div>
                 <!-- Desktop Actions (Hidden on mobile) -->
@@ -490,16 +490,16 @@ global $company_name, $company_logo;
                     <table class="table table-sm table-borderless">
                         <tr>
                             <td><strong>Customer ID:</strong></td>
-                            <td>#<?= safe_output($customer['customer_id']) ?></td>
+                            <td>#<?= caseFormat($customer['customer_id']) ?></td>
                         </tr>
                         <tr>
                             <td><strong><?= $isCompany ? 'Company Name' : 'Name' ?>:</strong></td>
-                            <td><?= safe_output($customer_name) ?></td>
+                            <td><?= caseFormat($customer_name) ?></td>
                         </tr>
                         <?php if ($isCompany): ?>
                         <tr>
                             <td><strong>Representative:</strong></td>
-                            <td><?= safe_output($representative_name) ?></td>
+                            <td><?= caseFormat($representative_name) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!$simpleCustomerForm): ?>
@@ -514,12 +514,12 @@ global $company_name, $company_logo;
                         <?php endif; ?>
                         <tr>
                             <td><strong>Phone:</strong></td>
-                            <td><?= safe_output($customer['phone']) ?></td>
+                            <td><?= caseFormat($customer['phone']) ?></td>
                         </tr>
                         <?php if (!$simpleCustomerForm): ?>
                         <tr>
                             <td><strong>Email:</strong></td>
-                            <td><?= safe_output($customer['email']) ?></td>
+                            <td><?= caseFormat($customer['email']) ?></td>
                         </tr>
                         <tr>
                             <td><strong>Category:</strong></td>
@@ -527,7 +527,7 @@ global $company_name, $company_logo;
                         </tr>
                         <tr>
                             <td><strong>Year:</strong></td>
-                            <td><?= !empty($customer['year']) ? safe_output($customer['year']) : '<span class="text-muted">N/A</span>' ?></td>
+                            <td><?= !empty($customer['year']) ? caseFormat($customer['year']) : '<span class="text-muted">N/A</span>' ?></td>
                         </tr>
                         <?php endif; ?>
                         <tr>
@@ -550,7 +550,7 @@ global $company_name, $company_logo;
                         <?php if (!$isCompany && !empty($customer['tax_id'])): ?>
                         <tr>
                             <td><strong>Tax ID (TIN):</strong></td>
-                            <td><?= safe_output($customer['tax_id']) ?></td>
+                            <td><?= caseFormat($customer['tax_id']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <tr>
@@ -684,11 +684,11 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Phone') ?></label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['phone']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['phone']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Credit Limit') ?></label>
-                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= safe_output($customer['currency'] ?? 'TZS') ?></p>
+                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
@@ -719,11 +719,11 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Company Email</label>
-                            <p class="mb-0 fw-semibold fs-7 text-truncate"><?= !empty($customer['company_email']) ? safe_output($customer['company_email']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7 text-truncate"><?= !empty($customer['company_email']) ? caseFormat($customer['company_email']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Phone Number</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['phone']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['phone']) ?></p>
                         </div>
                         <?php if (!empty($customer['website'])): ?>
                         <div class="col-6 col-md-6 mb-3">
@@ -738,19 +738,19 @@ global $company_name, $company_logo;
                         <?php if (!empty($customer['registration_number'])): ?>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Reg Number</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['registration_number']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['registration_number']) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($customer['tin_number'])): ?>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">TIN Number</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['tin_number']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['tin_number']) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($customer['vat_number'])): ?>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">VAT Number</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['vat_number']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['vat_number']) ?></p>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -773,7 +773,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Phone</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['phone']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['phone']) ?></p>
                         </div>
                         <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-6 mb-3">
@@ -782,15 +782,15 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Contact Email</label>
-                            <p class="mb-0 fw-semibold fs-7 text-truncate"><?= !empty($customer['email']) ? safe_output($customer['email']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7 text-truncate"><?= !empty($customer['email']) ? caseFormat($customer['email']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                          <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Mobile</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['mobile']) ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['mobile']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Fax</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['fax']) ? safe_output($customer['fax']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['fax']) ? caseFormat($customer['fax']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-12 col-md-12 mb-3">
                             <label class="form-label text-muted small mb-1">Linked Project</label>
@@ -855,7 +855,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">Postal Code</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['postal_code']) ? safe_output($customer['postal_code']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['postal_code']) ? caseFormat($customer['postal_code']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                     </div>
                 </div>
@@ -873,7 +873,7 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1">Credit Limit</label>
-                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= safe_output($customer['currency'] ?? 'TZS') ?></p>
+                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
                         </div>
                         <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-4 mb-3">
@@ -882,7 +882,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1">Currency</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= safe_output($customer['currency'] ?? 'TZS') ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Bank Name</label>
@@ -890,7 +890,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1">Bank Account</label>
-                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_account']) ? safe_output($customer['bank_account']) : '<span class="text-muted">N/A</span>' ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_account']) ? caseFormat($customer['bank_account']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-12 mb-3">
                             <label class="form-label text-muted small mb-1">Bank Address</label>
@@ -916,7 +916,7 @@ global $company_name, $company_logo;
                         <?php foreach ($companyAttachments as $attachment): ?>
                         <div class="col-md-6 mb-3">
                             <div class="border rounded p-3 attachment-card">
-                                <h6 class="mb-2"><?= safe_output($attachment['label']) ?></h6>
+                                <h6 class="mb-2"><?= caseFormat($attachment['label']) ?></h6>
                                 <?php if (!empty($attachment['path']) && file_exists($attachment['path'])): ?>
                                     <?php
                                     $file_ext = pathinfo($attachment['path'], PATHINFO_EXTENSION);
@@ -924,7 +924,7 @@ global $company_name, $company_logo;
                                         <img src="<?= getUrl($attachment['path']) ?>" 
                                              class="img-fluid rounded border mb-2" 
                                              style="max-height: 150px; width: auto;" 
-                                             alt="<?= safe_output($attachment['label']) ?>">
+                                             alt="<?= caseFormat($attachment['label']) ?>">
                                     <?php elseif (strtolower($file_ext) === 'pdf'): ?>
                                         <div class="text-center">
                                             <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 2.5rem;"></i>
@@ -971,7 +971,7 @@ global $company_name, $company_logo;
                         <?php foreach ($businessAttachments as $attachment): ?>
                         <div class="col-md-6 mb-3">
                             <div class="border rounded p-3 attachment-card">
-                                <h6 class="mb-2"><?= safe_output($attachment['label']) ?></h6>
+                                <h6 class="mb-2"><?= caseFormat($attachment['label']) ?></h6>
                                 <?php if (!empty($attachment['path']) && file_exists($attachment['path'])): ?>
                                     <?php
                                     $file_ext = pathinfo($attachment['path'], PATHINFO_EXTENSION);
@@ -979,7 +979,7 @@ global $company_name, $company_logo;
                                         <img src="<?= getUrl($attachment['path']) ?>" 
                                              class="img-fluid rounded border mb-2" 
                                              style="max-height: 150px; width: auto;" 
-                                             alt="<?= safe_output($attachment['label']) ?>">
+                                             alt="<?= caseFormat($attachment['label']) ?>">
                                     <?php elseif (strtolower($file_ext) === 'pdf'): ?>
                                         <div class="text-center">
                                             <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 2.5rem;"></i>
@@ -1026,7 +1026,7 @@ global $company_name, $company_logo;
                         <?php foreach ($dynamicAttachments as $attachment): ?>
                         <div class="col-md-6 mb-3">
                             <div class="border rounded p-3 attachment-card">
-                                <h6 class="mb-2"><?= safe_output($attachment['label']) ?></h6>
+                                <h6 class="mb-2"><?= caseFormat($attachment['label']) ?></h6>
                                 <?php if (!empty($attachment['path']) && file_exists($attachment['path'])): ?>
                                     <?php
                                     $file_ext = pathinfo($attachment['path'], PATHINFO_EXTENSION);
@@ -1034,7 +1034,7 @@ global $company_name, $company_logo;
                                         <img src="<?= getUrl($attachment['path']) ?>" 
                                              class="img-fluid rounded border mb-2" 
                                              style="max-height: 150px; width: auto;" 
-                                             alt="<?= safe_output($attachment['label']) ?>">
+                                             alt="<?= caseFormat($attachment['label']) ?>">
                                     <?php elseif (strtolower($file_ext) === 'pdf'): ?>
                                         <div class="text-center">
                                             <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 2.5rem;"></i>
@@ -1155,9 +1155,9 @@ global $company_name, $company_logo;
                                     elseif ($os == 'partially_delivered') { $ob = 'info'; }
                                 ?>
                                     <tr>
-                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($order['order_number']) ?></td>
+                                        <td class="ps-3 fw-bold text-primary"><?= caseFormat($order['order_number']) ?></td>
                                         <td><?= format_date($order['order_date']) ?></td>
-                                        <td class="text-end fw-bold"><?= number_format((float)$order['grand_total']) ?> <?= safe_output($order['currency'] ?? '') ?></td>
+                                        <td class="text-end fw-bold"><?= number_format((float)$order['grand_total']) ?> <?= caseFormat($order['currency'] ?? '') ?></td>
                                         <td class="text-center"><span class="badge bg-light text-dark border"><?= (int)$order['total_items'] ?> items</span></td>
                                         <td><span class="badge bg-<?= $ob ?>"><?= strtoupper(str_replace('_',' ',$os)) ?></span></td>
                                         <td class="text-end pe-3 d-print-none">
@@ -1220,10 +1220,10 @@ global $company_name, $company_logo;
                                     elseif ($qs == 'shipped' || $qs == 'delivered') { $qb = 'info'; }
                                 ?>
                                     <tr>
-                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($quo['order_number']) ?></td>
+                                        <td class="ps-3 fw-bold text-primary"><?= caseFormat($quo['order_number']) ?></td>
                                         <td><?= format_date($quo['order_date']) ?></td>
                                         <td><?= !empty($quo['quote_valid_until']) ? format_date($quo['quote_valid_until']) : '—' ?></td>
-                                        <td class="text-end fw-bold"><?= number_format((float)$quo['grand_total']) ?> <?= safe_output($quo['currency'] ?? '') ?></td>
+                                        <td class="text-end fw-bold"><?= number_format((float)$quo['grand_total']) ?> <?= caseFormat($quo['currency'] ?? '') ?></td>
                                         <td><span class="badge bg-<?= $qb ?>"><?= strtoupper(str_replace('_',' ',$qs)) ?></span></td>
                                         <td class="text-end pe-3 d-print-none">
                                             <a href="<?= getUrl('quotation_view') ?>?id=<?= $quo['sales_order_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
@@ -1249,12 +1249,12 @@ global $company_name, $company_logo;
                             <div class="card border-0 shadow-sm" style="border-radius:10px;">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($quo['order_number']) ?></span>
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= caseFormat($quo['order_number']) ?></span>
                                         <span class="badge bg-<?= $qb ?>"><?= strtoupper(str_replace('_',' ',$qs)) ?></span>
                                     </div>
                                     <div style="font-size:0.8rem;color:#555;">
                                         <small class="text-muted">Date:</small> <?= format_date($quo['order_date']) ?><br>
-                                        <small class="text-muted">Amount:</small> <strong><?= number_format((float)$quo['grand_total']) ?> <?= safe_output($quo['currency'] ?? '') ?></strong>
+                                        <small class="text-muted">Amount:</small> <strong><?= number_format((float)$quo['grand_total']) ?> <?= caseFormat($quo['currency'] ?? '') ?></strong>
                                     </div>
                                 </div>
                                 <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
@@ -1316,7 +1316,7 @@ global $company_name, $company_logo;
                                     }
                                 ?>
                                     <tr>
-                                        <td class="ps-3 fw-bold text-dark"><?= safe_output($inv['invoice_number']) ?></td>
+                                        <td class="ps-3 fw-bold text-dark"><?= caseFormat($inv['invoice_number']) ?></td>
                                         <td><?= format_date($inv['invoice_date']) ?></td>
                                         <td class="text-end fw-bold"><?= format_number($inv['grand_total']) ?></td>
                                         <td class="text-end text-success"><?= format_number($inv['paid_amount']) ?></td>
@@ -1388,11 +1388,11 @@ global $company_name, $company_logo;
                                     $appliedTo = $appliedTo ?: '—';
                                 ?>
                                     <tr>
-                                        <td class="ps-3 fw-bold text-dark"><?= safe_output($pay['payment_number']) ?></td>
+                                        <td class="ps-3 fw-bold text-dark"><?= caseFormat($pay['payment_number']) ?></td>
                                         <td><?= format_date($pay['payment_date']) ?></td>
                                         <td class="text-end fw-bold text-success"><?= format_number($pay['amount']) ?></td>
                                         <td><span class="badge bg-light text-dark border"><?= ucwords(str_replace('_',' ', $pay['payment_method'] ?? '')) ?></span></td>
-                                        <td class="small"><?= safe_output($appliedTo) ?></td>
+                                        <td class="small"><?= caseFormat($appliedTo) ?></td>
                                         <td class="text-center"><span class="badge bg-<?= $pb ?>"><?= strtoupper($ps) ?></span></td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1413,13 +1413,13 @@ global $company_name, $company_logo;
                             <div class="card border-0 shadow-sm" style="border-radius:10px;">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <span class="fw-bold text-dark" style="font-size:0.9rem;"><?= safe_output($pay['payment_number']) ?></span>
+                                        <span class="fw-bold text-dark" style="font-size:0.9rem;"><?= caseFormat($pay['payment_number']) ?></span>
                                         <span class="badge bg-<?= $pb ?>"><?= strtoupper($ps) ?></span>
                                     </div>
                                     <div style="font-size:0.8rem;color:#555;">
                                         <small class="text-muted">Date:</small> <?= format_date($pay['payment_date']) ?><br>
                                         <small class="text-muted">Amount:</small> <strong class="text-success"><?= format_number($pay['amount']) ?></strong><br>
-                                        <small class="text-muted">Applied to:</small> <?= safe_output($appliedTo) ?>
+                                        <small class="text-muted">Applied to:</small> <?= caseFormat($appliedTo) ?>
                                     </div>
                                 </div>
                             </div>
@@ -1465,10 +1465,10 @@ global $company_name, $company_logo;
                                     $db = ['draft' => 'secondary', 'ready' => 'info', 'in_transit' => 'primary', 'delivered' => 'success', 'cancelled' => 'danger'][$ds] ?? 'secondary';
                                 ?>
                                     <tr>
-                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($dn['delivery_number']) ?></td>
-                                        <td><?= safe_output($dn['order_number'], '—') ?></td>
+                                        <td class="ps-3 fw-bold text-primary"><?= caseFormat($dn['delivery_number']) ?></td>
+                                        <td><?= caseFormat($dn['order_number'], '—') ?></td>
                                         <td><?= format_date($dn['delivery_date']) ?></td>
-                                        <td><?= safe_output($dn['received_by'], '—') ?></td>
+                                        <td><?= caseFormat($dn['received_by'], '—') ?></td>
                                         <td><span class="badge bg-<?= $db ?>"><?= strtoupper(str_replace('_',' ',$ds)) ?></span></td>
                                         <td class="text-end pe-3 d-print-none">
                                             <a href="<?= getUrl('dn_view') ?>?id=<?= $dn['delivery_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
@@ -1489,11 +1489,11 @@ global $company_name, $company_logo;
                             <div class="card border-0 shadow-sm" style="border-radius:10px;">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($dn['delivery_number']) ?></span>
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= caseFormat($dn['delivery_number']) ?></span>
                                         <span class="badge bg-<?= $db ?>"><?= strtoupper(str_replace('_',' ',$ds)) ?></span>
                                     </div>
                                     <div style="font-size:0.8rem;color:#555;">
-                                        <small class="text-muted">Order:</small> <?= safe_output($dn['order_number'], '—') ?><br>
+                                        <small class="text-muted">Order:</small> <?= caseFormat($dn['order_number'], '—') ?><br>
                                         <small class="text-muted">Date:</small> <?= format_date($dn['delivery_date']) ?>
                                     </div>
                                 </div>
@@ -1580,10 +1580,10 @@ global $company_name, $company_logo;
                                 ?>
                                 <tr>
                                     <td class="text-muted"><?= $lpo_idx + 1 ?></td>
-                                    <td class="fw-semibold"><?= safe_output($lpo['lpo_number']) ?></td>
+                                    <td class="fw-semibold"><?= caseFormat($lpo['lpo_number']) ?></td>
                                     <td><?= date('d M Y', strtotime($lpo['issue_date'])) ?></td>
                                     <td><?= $lpo['expiry_date'] ? date('d M Y', strtotime($lpo['expiry_date'])) : '—' ?></td>
-                                    <td class="text-end"><?= safe_output($lpo['currency']) ?> <?= number_format((float)$lpo['amount'], 2) ?></td>
+                                    <td class="text-end"><?= caseFormat($lpo['currency']) ?> <?= number_format((float)$lpo['amount'], 2) ?></td>
                                     <td><span class="badge <?= $lpo_badge ?>"><?= $lpo_label ?></span></td>
                                     <?php if ($can_edit_lpos || $can_delete_lpos): ?>
                                     <td class="text-end pe-3">
@@ -1626,13 +1626,13 @@ global $company_name, $company_logo;
                             <div class="card border-0 shadow-sm" style="border-radius:10px;">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($lpo['lpo_number']) ?></span>
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= caseFormat($lpo['lpo_number']) ?></span>
                                         <span class="badge <?= $lpo_badge ?>"><?= $lpo_label ?></span>
                                     </div>
                                     <div style="font-size:0.8rem;color:#555;">
                                         <small class="text-muted">Issue:</small> <?= date('d M Y', strtotime($lpo['issue_date'])) ?>
                                         <?php if ($lpo['expiry_date']): ?>&nbsp;<small class="text-muted">Expiry:</small> <?= date('d M Y', strtotime($lpo['expiry_date'])) ?><?php endif; ?><br>
-                                        <small class="text-muted">Amount:</small> <strong><?= safe_output($lpo['currency']) ?> <?= number_format((float)$lpo['amount'], 2) ?></strong>
+                                        <small class="text-muted">Amount:</small> <strong><?= caseFormat($lpo['currency']) ?> <?= number_format((float)$lpo['amount'], 2) ?></strong>
                                     </div>
                                 </div>
                                 <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
@@ -1719,9 +1719,9 @@ global $company_name, $company_logo;
                                     $cb = ['pending' => 'warning', 'reviewed' => 'info', 'approved' => 'primary', 'paid' => 'success', 'rejected' => 'danger', 'cancelled' => 'secondary'][$cs] ?? 'secondary';
                                 ?>
                                     <tr>
-                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($cn['credit_note_number']) ?></td>
+                                        <td class="ps-3 fw-bold text-primary"><?= caseFormat($cn['credit_note_number']) ?></td>
                                         <td><?= format_date($cn['credit_date']) ?></td>
-                                        <td class="small"><?= safe_output($cn['reason'], '—') ?></td>
+                                        <td class="small"><?= caseFormat($cn['reason'], '—') ?></td>
                                         <td class="text-end fw-bold"><?= format_number($cn['grand_total']) ?></td>
                                         <td><span class="badge bg-<?= $cb ?>"><?= strtoupper($cs) ?></span></td>
                                         <td class="text-end pe-3 d-print-none">
@@ -1743,7 +1743,7 @@ global $company_name, $company_logo;
                             <div class="card border-0 shadow-sm" style="border-radius:10px;">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($cn['credit_note_number']) ?></span>
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= caseFormat($cn['credit_note_number']) ?></span>
                                         <span class="badge bg-<?= $cb ?>"><?= strtoupper($cs) ?></span>
                                     </div>
                                     <div style="font-size:0.8rem;color:#555;">
@@ -2825,7 +2825,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                     <select class="form-select select2-static" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $cat): ?>
-                                        <option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option>
+                                        <option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -2863,7 +2863,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                     <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                         <option value="">-- No Project --</option>
                                         <?php foreach ($projects as $proj): ?>
-                                        <option value="<?= $proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
+                                        <option value="<?= $proj['project_id'] ?>"><?= caseFormat($proj['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>

@@ -442,7 +442,7 @@ function supplier_status_label($status) {
                             <tr>
                                 <td class="text-center text-muted small fw-bold"><?= $sn++ ?></td>
                                 <td>
-                                    <span class="custom-code"><?= safe_output($supplier['supplier_code']) ?></span>
+                                    <span class="custom-code"><?= caseFormat($supplier['supplier_code']) ?></span>
                                 </td>
                                 <td>
                                     <strong><?= caseFormat($supplier['supplier_name']) ?></strong>
@@ -453,7 +453,7 @@ function supplier_status_label($status) {
                                         <span class="text-dark fw-bold"><?= caseFormat($supplier['contact_person']) ?></span><br>
                                         <?php endif; ?>
                                         <?php if (!empty($supplier['phone'])): ?>
-                                        <i class="bi bi-telephone small"></i> <?= safe_output($supplier['phone']) ?>
+                                        <i class="bi bi-telephone small"></i> <?= caseFormat($supplier['phone']) ?>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -461,7 +461,7 @@ function supplier_status_label($status) {
                                 <td>
                                     <div class="small text-muted" style="max-width: 150px; line-height: 1.2;">
                                         <?php if (!empty($supplier['address'])): ?>
-                                        <?= safe_output(substr($supplier['address'], 0, 40)) ?><br>
+                                        <?= caseFormat(substr($supplier['address'], 0, 40)) ?><br>
                                         <?php endif; ?>
                                         <span class="fw-bold text-dark"><?= caseFormat($supplier['city'] ?? '') ?></span>
                                     </div>
@@ -564,7 +564,7 @@ function supplier_status_label($status) {
                             </div>
                             <div class="card-body">
                                 <div class="mb-2">
-                                    <small class="text-muted"><?= t('Code') ?>: <?= safe_output($supplier['supplier_code']) ?></small><br>
+                                    <small class="text-muted"><?= t('Code') ?>: <?= caseFormat($supplier['supplier_code']) ?></small><br>
                                     <?php if (!empty($supplier['company_name'])): ?>
                                     <strong><?= caseFormat($supplier['company_name']) ?></strong><br>
                                     <?php endif; ?>
@@ -575,10 +575,10 @@ function supplier_status_label($status) {
                                 
                                 <div class="mb-2">
                                     <?php if (!empty($supplier['email'])): ?>
-                                    <small><i class="bi bi-envelope"></i> <?= safe_output($supplier['email']) ?></small><br>
+                                    <small><i class="bi bi-envelope"></i> <?= caseFormat($supplier['email']) ?></small><br>
                                     <?php endif; ?>
                                     <?php if (!empty($supplier['phone'])): ?>
-                                    <small><i class="bi bi-telephone"></i> <?= safe_output($supplier['phone']) ?></small>
+                                    <small><i class="bi bi-telephone"></i> <?= caseFormat($supplier['phone']) ?></small>
                                     <?php endif; ?>
                                 </div>
                                 
@@ -683,7 +683,7 @@ function supplier_status_label($status) {
                     <div id="add-supplier-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Adding to project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Adding to project:') ?> <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
                             <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
@@ -789,7 +789,7 @@ function supplier_status_label($status) {
                                     <select class="form-select select2-enable" id="project_id" name="project_id">
                                         <option value="">-- <?= t('No Project') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
-                                        <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
+                                        <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -897,7 +897,7 @@ function supplier_status_label($status) {
                                     <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
                                         <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sup_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
                                     <div class="form-text"><?= t("Auto-fills the WHT rate when recording this supplier's payments.") ?></div>
@@ -1013,7 +1013,7 @@ function supplier_status_label($status) {
                     <div id="edit-supplier-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Editing within project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Editing within project:') ?> <strong><?= caseFormat($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
                             <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
@@ -1159,7 +1159,7 @@ function supplier_status_label($status) {
                                     <select class="form-select select2-enable" id="edit_project_id" name="project_id">
                                         <option value="">-- <?= t('No Project') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
-                                        <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
+                                        <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -1267,7 +1267,7 @@ function supplier_status_label($status) {
                                     <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
                                         <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sup_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
                                     <div class="form-text"><?= t("Auto-fills the WHT rate when recording this supplier's payments.") ?></div>

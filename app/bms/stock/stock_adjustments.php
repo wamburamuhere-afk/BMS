@@ -194,7 +194,7 @@ function get_pagination_url($page) {
     <div class="print-footer d-none d-print-block">
         <p class="mb-1" style="font-size:8pt;">
             This document was Printed by
-            <strong><?= safe_output($print_user) ?> - <?= safe_output($print_role) ?></strong>
+            <strong><?= caseFormat($print_user) ?> - <?= caseFormat($print_role) ?></strong>
             on <strong><?= $print_date ?></strong>
         </p>
         <p class="mb-0 fw-bold text-primary" style="font-size:9pt;letter-spacing:0.5px;"><?= str_replace('%d', date('Y'), t('Powered by BJP Technologies © %d, All Rights Reserved.')) ?></p>
@@ -270,7 +270,7 @@ function get_pagination_url($page) {
                     <select class="form-select form-select-sm" name="warehouse_id">
                         <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?>
-                        <option value="<?= $w['warehouse_id'] ?>" <?= $warehouse_id==$w['warehouse_id']?'selected':'' ?>><?= safe_output($w['warehouse_name']) ?></option>
+                        <option value="<?= $w['warehouse_id'] ?>" <?= $warehouse_id==$w['warehouse_id']?'selected':'' ?>><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -297,7 +297,7 @@ function get_pagination_url($page) {
                     <select class="form-select form-select-sm" name="project_id">
                         <option value=""><?= t('All Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
-                        <option value="<?= $p['project_id'] ?>" <?= $project_id_filter==$p['project_id']?'selected':'' ?>><?= safe_output($p['project_name']) ?></option>
+                        <option value="<?= $p['project_id'] ?>" <?= $project_id_filter==$p['project_id']?'selected':'' ?>><?= caseFormat($p['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -361,23 +361,23 @@ function get_pagination_url($page) {
                             <td>
                                 <div class="fw-bold small"><?= format_date($adjustment['created_at']) ?></div>
                                 <?php if (!empty($adjustment['reference_number'])): ?>
-                                <small class="text-muted"><?= t('Ref:') ?> <?= safe_output($adjustment['reference_number']) ?></small>
+                                <small class="text-muted"><?= t('Ref:') ?> <?= caseFormat($adjustment['reference_number']) ?></small>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <div class="fw-bold text-primary small"><?= safe_output($adjustment['product_name']) ?></div>
-                                <code class="custom-code small"><?= safe_output($adjustment['sku']) ?></code>
+                                <div class="fw-bold text-primary small"><?= caseFormat($adjustment['product_name']) ?></div>
+                                <code class="custom-code small"><?= caseFormat($adjustment['sku']) ?></code>
                             </td>
                             <td>
-                                <div class="fw-bold small"><?= safe_output($adjustment['warehouse_name']) ?></div>
+                                <div class="fw-bold small"><?= caseFormat($adjustment['warehouse_name']) ?></div>
                                 <?php if (!empty($adjustment['location_name'])): ?>
-                                <small class="text-muted"><?= t('Loc:') ?> <?= safe_output($adjustment['location_name']) ?></small>
+                                <small class="text-muted"><?= t('Loc:') ?> <?= caseFormat($adjustment['location_name']) ?></small>
                                 <?php endif; ?>
                             </td>
                             <?php if ($enable_projects): ?>
                             <td>
                                 <?php if (!empty($adjustment['project_name'])): ?>
-                                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small"><?= safe_output($adjustment['project_name']) ?></span>
+                                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small"><?= caseFormat($adjustment['project_name']) ?></span>
                                 <?php else: ?>
                                 <span class="text-muted small"><?= t('N/A') ?></span>
                                 <?php endif; ?>
@@ -391,8 +391,8 @@ function get_pagination_url($page) {
                             </td>
                             <td class="text-end fw-bold small"><?= format_currency($total_value) ?></td>
                             <td>
-                                <span class="badge bg-light text-dark border small"><?= safe_output($adjustment['reason']) ?></span>
-                                <div class="small text-muted"><?= safe_output($adjustment['adjusted_by_name']) ?></div>
+                                <span class="badge bg-light text-dark border small"><?= caseFormat($adjustment['reason']) ?></span>
+                                <div class="small text-muted"><?= caseFormat($adjustment['adjusted_by_name']) ?></div>
                             </td>
                             <td class="text-center d-print-none pe-2">
                                 <div class="dropdown">
@@ -518,7 +518,7 @@ function get_pagination_url($page) {
                                 <?php foreach ($projects as $p): ?>
                                 <option value="<?= $p['project_id'] ?>"
                                     <?= ($p['project_id'] == $project_id_filter) ? 'selected' : '' ?>>
-                                    <?= safe_output($p['project_name']) ?>
+                                    <?= caseFormat($p['project_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -542,7 +542,7 @@ function get_pagination_url($page) {
                                 <option value=""><?= t('-- Select Product --') ?></option>
                                 <?php foreach ($products as $product): ?>
                                 <option value="<?= $product['product_id'] ?>">
-                                    <?= safe_output($product['product_name']) ?> (<?= safe_output($product['sku']) ?>)
+                                    <?= caseFormat($product['product_name']) ?> (<?= caseFormat($product['sku']) ?>)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -678,7 +678,7 @@ function get_pagination_url($page) {
                     <label class="form-label"><?= wLabel('Default Warehouse', 'Default Shop') ?></label>
                     <select class="form-select" id="bulkWarehouse">
                         <?php foreach ($warehouses as $wh): ?>
-                        <option value="<?= $wh['warehouse_id'] ?>"><?= safe_output($wh['warehouse_name']) ?></option>
+                        <option value="<?= $wh['warehouse_id'] ?>"><?= caseFormat($wh['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

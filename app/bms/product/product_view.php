@@ -427,7 +427,7 @@ global $company_logo, $company_name;
     <div class="d-none d-print-block text-center mb-4">
        
         <h4 class="fw-bold text-dark text-uppercase">PRODUCT DETAILS REPORT</h4>
-        <h5 class="text-muted"><?= caseFormat($product['product_name']) ?><?= $simpleProductForm ? '' : ' (' . safe_output($product['sku']) . ')' ?></h5>
+        <h5 class="text-muted"><?= caseFormat($product['product_name']) ?><?= $simpleProductForm ? '' : ' (' . caseFormat($product['sku']) . ')' ?></h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
 
@@ -448,7 +448,7 @@ global $company_logo, $company_name;
                     <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> Product View</h2>
                     <p class="text-muted mb-0 small mt-1 d-none d-md-block">View comprehensive information about this product</p>
                     <?php if (!$simpleProductForm): ?>
-                    <p class="text-muted mb-0 small mt-1 d-md-none">Product: <?= safe_output($product['sku']) ?></p>
+                    <p class="text-muted mb-0 small mt-1 d-md-none">Product: <?= caseFormat($product['sku']) ?></p>
                     <?php endif; ?>
                 </div>
                 
@@ -572,13 +572,13 @@ global $company_logo, $company_name;
                                 <?php if (!$simpleProductForm): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">SKU:</small>
-                                    <span class="custom-badge mt-1"><?= safe_output($product['sku']) ?></span>
+                                    <span class="custom-badge mt-1"><?= caseFormat($product['sku']) ?></span>
                                 </div>
 
                                 <?php if (!empty($product['barcode'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Barcode:</small>
-                                    <span class="custom-badge mt-1"><?= safe_output($product['barcode']) ?></span>
+                                    <span class="custom-badge mt-1"><?= caseFormat($product['barcode']) ?></span>
                                 </div>
                                 <?php endif; ?>
                                 <?php endif; ?>
@@ -604,7 +604,7 @@ global $company_logo, $company_name;
                                 
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Unit:</small> 
-                                    <span class="custom-badge mt-1"><?= safe_output($product['unit']) ?></span>
+                                    <span class="custom-badge mt-1"><?= caseFormat($product['unit']) ?></span>
                                 </div>
                             </div>
                         </div>
@@ -853,8 +853,8 @@ global $company_logo, $company_name;
                                                         foreach ($warehouse_stock as $stock): ?>
                                                         <tr>
                                                             <td><?= $sn++ ?></td>
-                                                            <td><?= safe_output($stock['warehouse_name']) ?></td>
-                                                            <td><?= safe_output($stock['location_name'] ?? 'N/A') ?></td>
+                                                            <td><?= caseFormat($stock['warehouse_name']) ?></td>
+                                                            <td><?= caseFormat($stock['location_name'] ?? 'N/A') ?></td>
                                                             <td><?= format_number($stock['stock_quantity'], 3) ?></td>
                                                             <td>
                                                                 <?= format_number($stock['stock_quantity'] - $stock['reserved_quantity'], 3) ?>
@@ -916,8 +916,8 @@ global $company_logo, $company_name;
                                                             }
                                                         ?>
                                                         <tr>
-                                                            <td><?= safe_output($b['batch_number'] ?? '—') ?></td>
-                                                            <td><?= safe_output($b['warehouse_name'] ?? 'N/A') ?></td>
+                                                            <td><?= caseFormat($b['batch_number'] ?? '—') ?></td>
+                                                            <td><?= caseFormat($b['warehouse_name'] ?? 'N/A') ?></td>
                                                             <td><?= $b['created_at'] ? date('d M Y', strtotime($b['created_at'])) : '—' ?></td>
                                                             <td><?= !empty($b['manufacturing_date']) ? date('d M Y', strtotime($b['manufacturing_date'])) : '—' ?></td>
                                                             <td class="<?= $expiredClass ?>">
@@ -930,7 +930,7 @@ global $company_logo, $company_name;
                                                             <td><?= format_number($b['quantity_remaining'], 3) ?></td>
                                                             <td><?= $statusBadge ?></td>
                                                             <td><?= format_currency($b['unit_cost']) ?></td>
-                                                            <td><?= safe_output($b['receipt_number'] ?? '—') ?></td>
+                                                            <td><?= caseFormat($b['receipt_number'] ?? '—') ?></td>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
@@ -1064,10 +1064,10 @@ global $company_logo, $company_name;
                                                     <td><?= format_date($sale['sale_date']) ?></td>
                                                     <td>
                                                         <a href="<?= getUrl('sales_order_view') ?>?id=<?= $sale['sale_id'] ?>" class="text-decoration-none">
-                                                            <?= safe_output($sale['receipt_number']) ?>
+                                                            <?= caseFormat($sale['receipt_number']) ?>
                                                         </a>
                                                     </td>
-                                                    <td><?= safe_output($sale['customer_name'] ?? 'Walk-in') ?></td>
+                                                    <td><?= caseFormat($sale['customer_name'] ?? 'Walk-in') ?></td>
                                                     <td><?= format_number($sale['quantity'], 3) ?></td>
                                                     <td><?= format_currency($sale['unit_price']) ?></td>
                                                     <td><?= format_currency($sale['line_total']) ?></td>
@@ -1120,10 +1120,10 @@ global $company_logo, $company_name;
                                                 <tr>
                                                     <td><?= format_date($movement['created_at'], 'd M Y, h:i A') ?></td>
                                                     <td><?= get_movement_type_badge($movement['movement_type']) ?></td>
-                                                    <td><?= safe_output($movement['warehouse_name']) ?></td>
+                                                    <td><?= caseFormat($movement['warehouse_name']) ?></td>
                                                     <td>
                                                         <?php if (!empty($movement['reference_number'])): ?>
-                                                        <small class="text-muted"><?= safe_output($movement['reference_number']) ?></small>
+                                                        <small class="text-muted"><?= caseFormat($movement['reference_number']) ?></small>
                                                         <?php else: ?>
                                                         <span class="text-muted">N/A</span>
                                                         <?php endif; ?>
@@ -1133,10 +1133,10 @@ global $company_logo, $company_name;
                                                     </td>
                                                     <td><?= format_number($movement['stock_before'] ?? 0, 3) ?></td>
                                                     <td><?= format_number($movement['stock_after'] ?? 0, 3) ?></td>
-                                                    <td><?= safe_output($movement['adjusted_by_name']) ?></td>
+                                                    <td><?= caseFormat($movement['adjusted_by_name']) ?></td>
                                                     <td>
                                                         <?php if (!empty($movement['reason'])): ?>
-                                                        <small><?= safe_output($movement['reason']) ?></small>
+                                                        <small><?= caseFormat($movement['reason']) ?></small>
                                                         <?php else: ?>
                                                         <span class="text-muted">No reason provided</span>
                                                         <?php endif; ?>
@@ -1481,7 +1481,7 @@ global $company_logo, $company_name;
                                         <small><?= format_date($order['order_date']) ?></small>
                                     </div>
                                     <p class="mb-1">
-                                        <small>Supplier: <?= safe_output($order['supplier_name']) ?></small>
+                                        <small>Supplier: <?= caseFormat($order['supplier_name']) ?></small>
                                     </p>
                                     <small>Status: 
                                         <span class="badge bg-<?= 
@@ -1516,8 +1516,8 @@ global $company_logo, $company_name;
                                     </div>
                                     <div class="mb-2 p-2 bg-light rounded border">
                                         <small class="d-flex flex-column gap-1">
-                                            <span class="text-secondary"><i class="bi bi-box-arrow-right text-danger"></i> From: <span class="fw-medium text-dark"><?= safe_output($transfer['from_warehouse']) ?></span></span>
-                                            <span class="text-secondary"><i class="bi bi-box-arrow-in-right text-success"></i> To: <span class="fw-medium text-dark"><?= safe_output($transfer['to_warehouse']) ?></span></span>
+                                            <span class="text-secondary"><i class="bi bi-box-arrow-right text-danger"></i> From: <span class="fw-medium text-dark"><?= caseFormat($transfer['from_warehouse']) ?></span></span>
+                                            <span class="text-secondary"><i class="bi bi-box-arrow-in-right text-success"></i> To: <span class="fw-medium text-dark"><?= caseFormat($transfer['to_warehouse']) ?></span></span>
                                         </small>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">

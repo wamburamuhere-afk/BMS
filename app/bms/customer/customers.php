@@ -541,7 +541,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                     <select class="form-select select2-static" id="project_id" name="project_id">
                                         <option value="">-- <?= t('No Project') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
-                                        <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
+                                        <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -556,7 +556,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                     <select class="form-select select2-static" id="default_price_group_id" name="default_price_group_id">
                                         <option value=""><?= t('None') ?></option>
                                         <?php foreach ($cust_price_groups as $pg): ?>
-                                        <option value="<?= (int)$pg['price_group_id'] ?>"><?= safe_output($pg['name']) ?></option>
+                                        <option value="<?= (int)$pg['price_group_id'] ?>"><?= caseFormat($pg['name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -660,7 +660,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                     <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
                                         <option value=""><?= t('None') ?></option>
                                         <?php foreach ($cust_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
                                     <div class="form-text"><?= t("Auto-fills WHT when recording this customer's payments.") ?></div>
@@ -904,7 +904,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                         <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                             <option value="">-- <?= t('No Project') ?> --</option>
                                             <?php foreach ($projects as $project): ?>
-                                            <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
+                                            <option value="<?= $project['project_id'] ?>"><?= caseFormat($project['project_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
@@ -919,7 +919,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                         <select class="form-select select2-static" id="edit_default_price_group_id" name="default_price_group_id">
                                             <option value=""><?= t('None') ?></option>
                                             <?php foreach ($cust_price_groups as $pg): ?>
-                                            <option value="<?= (int)$pg['price_group_id'] ?>"><?= safe_output($pg['name']) ?></option>
+                                            <option value="<?= (int)$pg['price_group_id'] ?>"><?= caseFormat($pg['name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
@@ -1023,7 +1023,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                         <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
                                             <option value=""><?= t('None') ?></option>
                                             <?php foreach ($cust_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
-                                            <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                            <option value="<?= (int)$w['rate_id'] ?>"><?= caseFormat($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                             <?php endforeach; ?>
                                         </select>
                                         <div class="form-text"><?= t("Auto-fills WHT when recording this customer's payments.") ?></div>
