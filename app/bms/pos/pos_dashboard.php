@@ -77,11 +77,11 @@ $company_logo = getSetting('company_logo', '');
                 <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card">
                     <div class="d-flex align-items-center gap-3">
                         <div class="fs-3 text-white">
-                            <i class="bi <?= safe_output($pos_nav_icons[$navCard['key']] ?? 'bi-grid') ?>"></i>
+                            <i class="bi <?= caseFormat($pos_nav_icons[$navCard['key']] ?? 'bi-grid') ?>"></i>
                         </div>
                         <div>
-                            <div class="fw-bold text-white"><?= safe_output($navCard['label']) ?></div>
-                            <div class="small text-white-50"><?= safe_output($navCard['description']) ?></div>
+                            <div class="fw-bold text-white"><?= caseFormat($navCard['label']) ?></div>
+                            <div class="small text-white-50"><?= caseFormat($navCard['description']) ?></div>
                         </div>
                     </div>
                 </div>
@@ -107,9 +107,9 @@ $company_logo = getSetting('company_logo', '');
                             <a href="<?= getUrl($subCard['url']) ?>" class="text-decoration-none">
                                 <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card">
                                     <div class="text-center">
-                                        <div class="fs-2 text-white mb-2"><i class="bi <?= safe_output($subCard['icon']) ?>"></i></div>
-                                        <div class="fw-bold text-white"><?= safe_output($subCard['label']) ?></div>
-                                        <div class="small text-white-50"><?= safe_output($subCard['description']) ?></div>
+                                        <div class="fs-2 text-white mb-2"><i class="bi <?= caseFormat($subCard['icon']) ?>"></i></div>
+                                        <div class="fw-bold text-white"><?= caseFormat($subCard['label']) ?></div>
+                                        <div class="small text-white-50"><?= caseFormat($subCard['description']) ?></div>
                                     </div>
                                 </div>
                             </a>

@@ -153,8 +153,8 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = "Web: " . caseFormat($c_web);
+            if (!empty($c_email)) $web_email[] = "Email: " . caseFormat($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
@@ -162,8 +162,8 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . caseFormat($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . caseFormat($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>
@@ -267,7 +267,7 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                     <div class="row g-3">
                         <div class="col-md-3">
                             <label class="text-muted small fw-bold text-uppercase d-block mb-1">Customer Code</label>
-                            <span class="fw-bold fs-5 text-primary"><?= safe_output($filtered_customer['customer_code']) ?></span>
+                            <span class="fw-bold fs-5 text-primary"><?= caseFormat($filtered_customer['customer_code']) ?></span>
                         </div>
                         <div class="col-md-3">
                             <label class="text-muted small fw-bold text-uppercase d-block mb-1">Name & Company</label>
@@ -280,16 +280,16 @@ $enable_projects = projectsModuleActive() ? 1 : 0;
                         </div>
                         <div class="col-md-2">
                             <label class="text-muted small fw-bold text-uppercase d-block mb-1">Tax ID (TIN)</label>
-                            <span class="badge bg-light text-dark border fw-bold"><?= !empty($filtered_customer['tax_id']) ? safe_output($filtered_customer['tax_id']) : 'N/A' ?></span>
+                            <span class="badge bg-light text-dark border fw-bold"><?= !empty($filtered_customer['tax_id']) ? caseFormat($filtered_customer['tax_id']) : 'N/A' ?></span>
                         </div>
                         <div class="col-md-4">
                             <label class="text-muted small fw-bold text-uppercase d-block mb-1">Contact Details</label>
                             <div class="small">
                                 <?php if (!empty($filtered_customer['email'])): ?>
-                                    <div class="mb-1"><i class="bi bi-envelope text-primary me-2"></i><?= safe_output($filtered_customer['email']) ?></div>
+                                    <div class="mb-1"><i class="bi bi-envelope text-primary me-2"></i><?= caseFormat($filtered_customer['email']) ?></div>
                                 <?php endif; ?>
                                 <?php if (!empty($filtered_customer['phone']) || !empty($filtered_customer['mobile'])): ?>
-                                    <div><i class="bi bi-telephone text-success me-2"></i><?= safe_output($filtered_customer['phone'] ?: $filtered_customer['mobile']) ?></div>
+                                    <div><i class="bi bi-telephone text-success me-2"></i><?= caseFormat($filtered_customer['phone'] ?: $filtered_customer['mobile']) ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>
