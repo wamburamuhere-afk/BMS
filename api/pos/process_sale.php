@@ -709,9 +709,13 @@ try {
     // Record cash transaction if shift exists — only the CASH actually received.
     // For credit sales, only count a genuine partial deposit (less than the total);
     // a full-amount payment on a credit sale means cash was not actually tendered.
-    $cash_received = ($payment_method === 'cash') ? $amount_paid_now :
-                     ($is_credit && $amount_paid_now > 0 && $amount_paid_now < $calculated_total - 0.01) ? $amount_paid_now :
-                     0.0;
+    if ($payment_method === 'cash') {
+        $cash_received = $amount_paid_now;
+    } elseif ($is_credit && $amount_paid_now > 0 && $amount_paid_now < $calculated_total - 0.01) {
+        $cash_received = $amount_paid_now;
+    } else {
+        $cash_received = 0.0;
+    }
     if ($shift_id) {
         if ($cash_received > 0) {
             $pdo->prepare("
