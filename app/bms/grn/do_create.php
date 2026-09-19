@@ -38,7 +38,7 @@ $check = $pdo->prepare("SELECT do_id, do_number FROM delivery_orders WHERE dn_id
 $check->execute([$dn_id]);
 $existing_do = $check->fetch(PDO::FETCH_ASSOC);
 if ($existing_do) {
-    echo '<div class="alert alert-info m-4"><i class="bi bi-info-circle me-2"></i>A Delivery Order <strong>' . safe_output($existing_do['do_number']) . '</strong> already exists for this DN. <a href="' . getUrl('do_view') . '?id=' . $existing_do['do_id'] . '" class="alert-link">View it here</a>.</div>';
+    echo '<div class="alert alert-info m-4"><i class="bi bi-info-circle me-2"></i>A Delivery Order <strong>' . caseFormat($existing_do['do_number']) . '</strong> already exists for this DN. <a href="' . getUrl('do_view') . '?id=' . $existing_do['do_id'] . '" class="alert-link">View it here</a>.</div>';
     includeFooter(); exit;
 }
 
@@ -64,7 +64,7 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= $return_url ?>">Procurement</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('dn_view') ?>?id=<?= $dn_id ?>">DN — <?= safe_output($dn['delivery_number']) ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dn_view') ?>?id=<?= $dn_id ?>">DN — <?= caseFormat($dn['delivery_number']) ?></a></li>
             <li class="breadcrumb-item active">Create Delivery Order</li>
         </ol>
     </nav>
@@ -74,8 +74,8 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
         <div>
             <h4 class="fw-bold mb-1"><i class="bi bi-file-earmark-check text-primary me-2"></i>Create Delivery Order</h4>
             <p class="text-muted small mb-0">
-                Based on DN: <strong class="text-primary"><?= safe_output($dn['delivery_number']) ?></strong>
-                — Project: <strong><?= safe_output($dn['project_name']) ?></strong>
+                Based on DN: <strong class="text-primary"><?= caseFormat($dn['delivery_number']) ?></strong>
+                — Project: <strong><?= caseFormat($dn['project_name']) ?></strong>
             </p>
         </div>
         <a href="<?= getUrl('dn_view') ?>?id=<?= $dn_id ?>" class="btn btn-outline-secondary btn-sm">
@@ -99,9 +99,9 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
                     </div>
                     <div class="card-body p-3">
                         <div class="row g-2 small">
-                            <div class="col-sm-4"><span class="text-muted">DN Number:</span> <strong><?= safe_output($dn['delivery_number']) ?></strong></div>
-                            <div class="col-sm-4"><span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span> <strong><?= safe_output($dn['warehouse_name']) ?></strong></div>
-                            <div class="col-sm-4"><span class="text-muted">Supplier:</span> <strong><?= safe_output($dn['supplier_name']) ?></strong></div>
+                            <div class="col-sm-4"><span class="text-muted">DN Number:</span> <strong><?= caseFormat($dn['delivery_number']) ?></strong></div>
+                            <div class="col-sm-4"><span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span> <strong><?= caseFormat($dn['warehouse_name']) ?></strong></div>
+                            <div class="col-sm-4"><span class="text-muted">Supplier:</span> <strong><?= caseFormat($dn['supplier_name']) ?></strong></div>
                             <div class="col-sm-4"><span class="text-muted">DN Date:</span> <strong><?= format_date($dn['delivery_date']) ?></strong></div>
                             <div class="col-sm-4"><span class="text-muted">Total Items:</span> <strong><?= count($dn_items) ?></strong></div>
                             <div class="col-sm-4"><span class="text-muted">Total Qty:</span> <strong class="text-primary"><?= number_format($total_qty, 3) ?></strong></div>
@@ -174,10 +174,10 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
                                     <?php foreach ($dn_items as $idx => $item): ?>
                                     <tr>
                                         <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
-                                        <td><div class="fw-bold"><?= safe_output($item['product_name']) ?></div></td>
-                                        <td><code><?= safe_output($item['sku'] ?? 'N/A') ?></code></td>
+                                        <td><div class="fw-bold"><?= caseFormat($item['product_name']) ?></div></td>
+                                        <td><code><?= caseFormat($item['sku'] ?? 'N/A') ?></code></td>
                                         <td class="text-center fw-bold text-primary"><?= number_format($item['quantity_delivered'], 3) ?></td>
-                                        <td><span class="badge bg-light text-dark border"><?= safe_output($item['unit'] ?? 'pcs') ?></span></td>
+                                        <td><span class="badge bg-light text-dark border"><?= caseFormat($item['unit'] ?? 'pcs') ?></span></td>
                                     </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -203,17 +203,17 @@ $total_qty    = array_sum(array_column($dn_items, 'quantity_delivered'));
                     <div class="card-body p-4">
                         <div class="alert alert-info small py-2 mb-3">
                             <i class="bi bi-info-circle me-1"></i>
-                            This will create a Delivery Order referencing DN <strong><?= safe_output($dn['delivery_number']) ?></strong>.
+                            This will create a Delivery Order referencing DN <strong><?= caseFormat($dn['delivery_number']) ?></strong>.
                             Stock will be deducted when DO status is marked as <strong>Delivered</strong>.
                         </div>
                         <div class="mb-3 p-3 bg-light rounded border">
                             <div class="d-flex justify-content-between small mb-1">
                                 <span class="text-muted"><?= wLabel('Warehouse:', 'Shop:') ?></span>
-                                <span class="fw-bold"><?= safe_output($dn['warehouse_name']) ?></span>
+                                <span class="fw-bold"><?= caseFormat($dn['warehouse_name']) ?></span>
                             </div>
                             <div class="d-flex justify-content-between small mb-1">
                                 <span class="text-muted">Supplier:</span>
-                                <span class="fw-bold"><?= safe_output($dn['supplier_name']) ?></span>
+                                <span class="fw-bold"><?= caseFormat($dn['supplier_name']) ?></span>
                             </div>
                             <div class="d-flex justify-content-between small">
                                 <span class="text-muted">Total Qty:</span>

@@ -68,7 +68,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= $return_url ?>">Procurement</a></li>
-            <li class="breadcrumb-item active">DO — <?= safe_output($do['do_number']) ?></li>
+            <li class="breadcrumb-item active">DO — <?= caseFormat($do['do_number']) ?></li>
         </ol>
     </nav>
 
@@ -77,10 +77,10 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
         <div>
             <h4 class="fw-bold mb-1">
                 <i class="bi bi-file-earmark-check text-primary me-2"></i>
-                Delivery Order — <span class="text-primary"><?= safe_output($do['do_number']) ?></span>
+                Delivery Order — <span class="text-primary"><?= caseFormat($do['do_number']) ?></span>
                 <span class="badge bg-<?= $status_color ?> ms-2" style="font-size:.7rem;"><?= strtoupper(str_replace('_',' ',$do['status'])) ?></span>
             </h4>
-            <p class="text-muted small mb-0">Project: <strong><?= safe_output($do['project_name']) ?></strong></p>
+            <p class="text-muted small mb-0">Project: <strong><?= caseFormat($do['project_name']) ?></strong></p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <?php if ($do['status'] === 'draft'): ?>
@@ -125,13 +125,13 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">DO Number</div>
-                                <div class="fw-bold text-primary"><?= safe_output($do['do_number']) ?></div>
+                                <div class="fw-bold text-primary"><?= caseFormat($do['do_number']) ?></div>
                             </div>
                         </div>
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">Project</div>
-                                <div class="fw-bold"><?= safe_output($do['project_name']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($do['project_name']) ?></div>
                             </div>
                         </div>
                         <div class="col-sm-6">
@@ -149,15 +149,15 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1"><?= wLabel('Warehouse', 'Shop') ?></div>
-                                <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i><?= safe_output($do['warehouse_name']) ?></div>
+                                <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i><?= caseFormat($do['warehouse_name']) ?></div>
                             </div>
                         </div>
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">Supplier</div>
-                                <div class="fw-bold"><?= safe_output($do['supplier_name']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($do['supplier_name']) ?></div>
                                 <?php if (!empty($do['company_name'])): ?>
-                                <small class="text-muted"><?= safe_output($do['company_name']) ?></small>
+                                <small class="text-muted"><?= caseFormat($do['company_name']) ?></small>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -165,7 +165,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">Driver</div>
-                                <div class="fw-bold"><i class="bi bi-person me-1"></i><?= safe_output($do['driver_name']) ?></div>
+                                <div class="fw-bold"><i class="bi bi-person me-1"></i><?= caseFormat($do['driver_name']) ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -173,7 +173,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">Vehicle</div>
-                                <div class="fw-bold"><i class="bi bi-truck me-1"></i><?= safe_output($do['vehicle_number']) ?></div>
+                                <div class="fw-bold"><i class="bi bi-truck me-1"></i><?= caseFormat($do['vehicle_number']) ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -181,9 +181,9 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         <div class="col-sm-6">
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">Contact</div>
-                                <div class="fw-bold"><?= safe_output($do['contact_person']) ?></div>
+                                <div class="fw-bold"><?= caseFormat($do['contact_person']) ?></div>
                                 <?php if (!empty($do['contact_phone'])): ?>
-                                <small class="text-muted"><?= safe_output($do['contact_phone']) ?></small>
+                                <small class="text-muted"><?= caseFormat($do['contact_phone']) ?></small>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -192,7 +192,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                         <div class="col-12">
                             <div class="border rounded p-3 bg-light">
                                 <div class="text-muted small fw-bold text-uppercase mb-1">Notes</div>
-                                <div><?= safe_output($do['notes']) ?></div>
+                                <div><?= caseFormat($do['notes']) ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -221,9 +221,9 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                                 <?php foreach ($do_items as $i => $item): ?>
                                 <tr>
                                     <td class="ps-3 text-muted fw-bold"><?= $i + 1 ?></td>
-                                    <td class="fw-bold"><?= safe_output($item['product_name']) ?></td>
+                                    <td class="fw-bold"><?= caseFormat($item['product_name']) ?></td>
                                     <td class="text-center fw-bold text-primary"><?= number_format($item['qty_to_issue'], 3) ?></td>
-                                    <td class="text-center"><?= safe_output($item['unit']) ?></td>
+                                    <td class="text-center"><?= caseFormat($item['unit']) ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -254,7 +254,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                                 <?php foreach ($linked_dns as $dn): ?>
                                 <?php $dnsc = ['draft'=>'secondary','review'=>'warning','approved'=>'success'][$dn['status']] ?? 'secondary'; ?>
                                 <tr>
-                                    <td class="ps-3 fw-bold text-primary"><?= safe_output($dn['delivery_number']) ?></td>
+                                    <td class="ps-3 fw-bold text-primary"><?= caseFormat($dn['delivery_number']) ?></td>
                                     <td><small><?= format_date($dn['delivery_date']) ?></small></td>
                                     <td><span class="badge bg-<?= $dnsc ?>"><?= strtoupper($dn['status']) ?></span></td>
                                     <td class="d-print-none"><a href="<?= getUrl('dn_view') ?>?id=<?= $dn['delivery_id'] ?>" class="btn btn-sm btn-outline-primary py-0 px-2">View</a></td>
@@ -282,7 +282,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                             <div class="d-flex align-items-center gap-2 p-2 border rounded bg-light">
                                 <i class="bi bi-file-earmark fs-5 text-primary"></i>
                                 <div>
-                                    <div class="small text-muted"><?= safe_output($att['attachment_name'] ?: 'Attachment') ?></div>
+                                    <div class="small text-muted"><?= caseFormat($att['attachment_name'] ?: 'Attachment') ?></div>
                                     <a href="<?= getUrl($att['file_path']) ?>" target="_blank" class="btn btn-sm btn-primary py-0 px-2 mt-1">View Attachment</a>
                                 </div>
                             </div>
@@ -308,7 +308,7 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                     <hr>
                     <div class="mb-2">
                         <div class="text-muted small fw-bold text-uppercase mb-1">Created By</div>
-                        <div class="fw-bold"><?= safe_output($do['created_by_name'] ?? 'N/A') ?></div>
+                        <div class="fw-bold"><?= caseFormat($do['created_by_name'] ?? 'N/A') ?></div>
                         <small class="text-muted"><?= format_date($do['created_at']) ?></small>
                     </div>
                     <hr>
