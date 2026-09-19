@@ -668,16 +668,14 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 const grid = $('#productGrid');
                 grid.empty();
 
-                // Mobile-only render cap: a phone screen never benefits from
-                // rendering hundreds of tiles at once (slow, mostly scrolled
-                // past unseen) — cap the DEFAULT (no active search) grid at
-                // 20 tiles there; typing a search reveals the real matches
-                // immediately, same server-side result set as before. Desktop
-                // is completely unaffected (window.innerWidth check below).
-                const MOBILE_BREAKPOINT = 768;
-                const isMobileView = window.innerWidth < MOBILE_BREAKPOINT;
-                const cappedForMobile = isMobileView && !searchTerm && response.data.length > 20;
-                const renderList = cappedForMobile ? response.data.slice(0, 20) : response.data;
+                // Default render cap: show only the first 20 products when
+                // no search term and no specific category is active (both
+                // mobile and desktop). Typing a search or tapping a category
+                // reveals the full matching set immediately.
+                const DEFAULT_DISPLAY_LIMIT = 20;
+                const isDefaultView = !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined);
+                const capped = isDefaultView && response.data.length > DEFAULT_DISPLAY_LIMIT;
+                const renderList = capped ? response.data.slice(0, DEFAULT_DISPLAY_LIMIT) : response.data;
 
                 console.log('Rendering', renderList.length, 'of', products.length, 'products...');
 
@@ -731,7 +729,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                     grid.append(card);
                 });
 
-                if (cappedForMobile) {
+                if (capped) {
                     grid.append(`
                         <div class="col-12 text-center py-2">
                             <small class="text-muted">${PT.showingFirstNProducts.replace('%shown%', renderList.length).replace('%total%', response.data.length)}</small>

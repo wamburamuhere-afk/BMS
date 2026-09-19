@@ -680,6 +680,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             vertical-align: middle;
         }
 
+        /* Top bar: company name truncates instead of pushing date-location off-screen */
+        .top-header .container-fluid > a {
+            min-width: 0;
+            flex-shrink: 1;
+            overflow: hidden;
+        }
+        .top-header .container-fluid > a > h5 {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .date-location-box {
+            flex-shrink: 0;
+        }
+
         /* Mobile scrolling marquee for company name */
         @media (max-width: 576px) {
             .top-header { padding: 4px 0; }
