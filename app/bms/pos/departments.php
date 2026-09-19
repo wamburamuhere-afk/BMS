@@ -97,11 +97,11 @@ foreach ($rows as $r) { $r['status'] === 'active' ? $stat_active++ : $stat_inact
                             $asstName = trim(($r['asst_first'] ?? '') . ' ' . ($r['asst_last'] ?? ''));
                         ?>
                         <tr>
-                            <td class="ps-3"><?= safe_output($r['department_code'], '—') ?></td>
-                            <td class="fw-semibold"><?= safe_output($r['department_name']) ?></td>
-                            <td><?= safe_output($r['parent_name'], '—') ?></td>
-                            <td><?= $mgrName !== '' ? safe_output($mgrName) : '<span class="text-muted">—</span>' ?></td>
-                            <td><?= $asstName !== '' ? safe_output($asstName) : '<span class="text-muted">—</span>' ?></td>
+                            <td class="ps-3"><?= caseFormat($r['department_code'], '—') ?></td>
+                            <td class="fw-semibold"><?= caseFormat($r['department_name']) ?></td>
+                            <td><?= caseFormat($r['parent_name'], '—') ?></td>
+                            <td><?= $mgrName !== '' ? caseFormat($mgrName) : '<span class="text-muted">—</span>' ?></td>
+                            <td><?= $asstName !== '' ? caseFormat($asstName) : '<span class="text-muted">—</span>' ?></td>
                             <td class="text-center">
                                 <?php if ((int)$r['employee_count'] > 0): ?>
                                 <a href="<?= getUrl('employees') ?>?department_id=<?= (int)$r['department_id'] ?>" class="badge bg-primary text-decoration-none"><?= (int)$r['employee_count'] ?></a>
@@ -161,7 +161,7 @@ foreach ($rows as $r) { $r['status'] === 'active' ? $stat_active++ : $stat_inact
                             <select class="form-select select2-static" name="parent_department_id" id="f-parent">
                                 <option value="">None (top-level)</option>
                                 <?php foreach ($rows as $d): ?>
-                                <option value="<?= $d['department_id'] ?>" data-name="<?= safe_output($d['department_name']) ?>"><?= safe_output($d['department_name']) ?></option>
+                                <option value="<?= $d['department_id'] ?>" data-name="<?= safe_output($d['department_name']) ?>"><?= caseFormat($d['department_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text text-muted">Makes this a sub-department of another.</div>
@@ -171,7 +171,7 @@ foreach ($rows as $r) { $r['status'] === 'active' ? $stat_active++ : $stat_inact
                             <select class="form-select select2-static" name="manager_id" id="f-manager">
                                 <option value="">Unassigned</option>
                                 <?php foreach ($active_employees as $e): ?>
-                                <option value="<?= $e['employee_id'] ?>"><?= safe_output($e['full_name']) ?></option>
+                                <option value="<?= $e['employee_id'] ?>"><?= caseFormat($e['full_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -180,7 +180,7 @@ foreach ($rows as $r) { $r['status'] === 'active' ? $stat_active++ : $stat_inact
                             <select class="form-select select2-static" name="assistant_manager_id" id="f-asst">
                                 <option value="">Unassigned</option>
                                 <?php foreach ($active_employees as $e): ?>
-                                <option value="<?= $e['employee_id'] ?>"><?= safe_output($e['full_name']) ?></option>
+                                <option value="<?= $e['employee_id'] ?>"><?= caseFormat($e['full_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

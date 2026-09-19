@@ -74,10 +74,10 @@ if (projectsModuleActive()) {
                 <div class="col-md-4 mb-3"><label class="form-label">Audience</label>
                     <select class="form-select" name="audience_type" id="an_audience"><option value="all">Everyone</option><option value="department">Department</option><?php if (projectsModuleActive()): ?><option value="project">Project</option><?php endif; ?></select></div>
                 <div class="col-md-4 mb-3" id="an_dept_wrap" style="display:none"><label class="form-label">Department</label>
-                    <select class="form-select" name="department_id" id="an_dept"><option value="">Select…</option><?php foreach ($departments as $d): ?><option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option><?php endforeach; ?></select></div>
+                    <select class="form-select" name="department_id" id="an_dept"><option value="">Select…</option><?php foreach ($departments as $d): ?><option value="<?= (int)$d['department_id'] ?>"><?= caseFormat($d['department_name']) ?></option><?php endforeach; ?></select></div>
                 <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4 mb-3" id="an_proj_wrap" style="display:none"><label class="form-label">Project</label>
-                    <select class="form-select" name="project_id" id="an_proj"><option value="">Select…</option><?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?></select></div>
+                    <select class="form-select" name="project_id" id="an_proj"><option value="">Select…</option><?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?></select></div>
                 <?php endif; ?>
             </div>
             <div class="row">

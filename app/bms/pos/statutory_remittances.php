@@ -179,17 +179,17 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
                             ?>
                                 <tr>
                                     <td class="ps-3"><?= $sn++ ?></td>
-                                    <td class="fw-semibold"><?= safe_output(date('M Y', strtotime($r['period'] . '-01'))) ?></td>
-                                    <td><?= safe_output($labels[$r['tax_type']] ?? strtoupper($r['tax_type'])) ?></td>
+                                    <td class="fw-semibold"><?= caseFormat(date('M Y', strtotime($r['period'] . '-01'))) ?></td>
+                                    <td><?= caseFormat($labels[$r['tax_type']] ?? strtoupper($r['tax_type'])) ?></td>
                                     <td class="text-end fw-bold">TSh <?= number_format($amount, 0) ?></td>
                                     <td>
-                                        <?= $due ? safe_output($due->format('d M Y')) : '—' ?>
+                                        <?= $due ? caseFormat($due->format('d M Y')) : '—' ?>
                                         <?php if (!$isPaid && $due): ?>
                                             <div class="small <?= $overdue ? 'text-danger' : 'text-muted' ?>">
                                                 <?= $overdue ? abs($daysLeft) . ' day(s) overdue' : ($daysLeft . ' day(s) left') ?>
                                             </div>
                                         <?php elseif ($isPaid && !empty($r['paid_date'])): ?>
-                                            <div class="small text-muted">paid <?= safe_output(date('d M Y', strtotime($r['paid_date']))) ?><?= $r['paid_from_name'] ? ' · ' . safe_output($r['paid_from_name']) : '' ?></div>
+                                            <div class="small text-muted">paid <?= caseFormat(date('d M Y', strtotime($r['paid_date']))) ?><?= $r['paid_from_name'] ? ' · ' . caseFormat($r['paid_from_name']) : '' ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center"><span class="badge" style="<?= $badge ?>padding:6px 12px;border-radius:20px;"><?= $statusTxt ?></span></td>
@@ -215,7 +215,7 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
 
                 <!-- Tab 2: Summary by Tax -->
                 <div class="tab-pane fade" id="tab-summary" role="tabpanel">
-                    <p class="small text-muted mb-2">PAYE / NSSF / SDL — <?= safe_output(date('M Y', strtotime($f_from.'-01'))) ?> to <?= safe_output(date('M Y', strtotime($f_to.'-01'))) ?></p>
+                    <p class="small text-muted mb-2">PAYE / NSSF / SDL — <?= caseFormat(date('M Y', strtotime($f_from.'-01'))) ?> to <?= caseFormat(date('M Y', strtotime($f_to.'-01'))) ?></p>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
@@ -231,7 +231,7 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
                             <?php $sn = 1; foreach (['paye','nssf','sdl'] as $t): $tot=$byTax[$t]['total']; $pd=$byTax[$t]['paid']; ?>
                                 <tr>
                                     <td class="ps-3"><?= $sn++ ?></td>
-                                    <td><?= safe_output($labels[$t]) ?></td>
+                                    <td><?= caseFormat($labels[$t]) ?></td>
                                     <td class="text-end">TSh <?= number_format($tot,0) ?></td>
                                     <td class="text-end" style="color:#052c65;">TSh <?= number_format($pd,0) ?></td>
                                     <td class="text-end pe-3 fw-bold <?= ($tot-$pd)>0?'text-danger':'' ?>">TSh <?= number_format($tot-$pd,0) ?></td>

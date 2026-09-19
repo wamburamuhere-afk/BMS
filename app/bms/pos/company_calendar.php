@@ -104,11 +104,11 @@ $weekdays = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5
                     <tbody>
                         <?php foreach ($holidays as $h): ?>
                         <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($h['holiday_name']) ?></td>
+                            <td class="ps-3 fw-semibold"><?= caseFormat($h['holiday_name']) ?></td>
                             <td><?= date('d M Y', strtotime($h['holiday_date'])) ?></td>
-                            <td><span class="text-capitalize"><?= safe_output($h['holiday_type'], 'national') ?></span></td>
+                            <td><span class="text-capitalize"><?= caseFormat($h['holiday_type'], 'national') ?></span></td>
                             <td class="text-center"><?= (int)$h['recurring'] === 1 ? '<i class="bi bi-arrow-repeat text-info" title="Repeats every year"></i>' : '<span class="text-muted">—</span>' ?></td>
-                            <td><?= safe_output(trim(($h['region'] ? $h['region'] . ', ' : '') . $h['country']), '—') ?></td>
+                            <td><?= caseFormat(trim(($h['region'] ? $h['region'] . ', ' : '') . $h['country']), '—') ?></td>
                             <td class="text-center"><span class="badge-status" style="background:<?= $h['status'] === 'active' ? '#198754' : '#6c757d' ?>;color:#fff;"><?= strtoupper($h['status']) ?></span></td>
                             <td class="text-end pe-3">
                                 <div class="dropdown d-flex justify-content-end">

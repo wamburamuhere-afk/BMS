@@ -85,7 +85,7 @@ $current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($curr
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Organizer</label>
-                        <div class="form-control-plaintext fw-bold py-1" id="mt_host_display"><i class="bi bi-person-check text-primary me-1"></i><?= safe_output($current_user_name) ?> (you)</div>
+                        <div class="form-control-plaintext fw-bold py-1" id="mt_host_display"><i class="bi bi-person-check text-primary me-1"></i><?= caseFormat($current_user_name) ?> (you)</div>
                         <input type="hidden" id="mt_host" value="<?= (int)($_SESSION['user_id'] ?? 0) ?>">
                         <div class="form-text">The BMS record shows whoever creates it as organizer. On Zoom, every meeting is hosted under the one shared company Zoom account (Settings -> Zoom Integration) — no personal Zoom login needed.</div>
                     </div>

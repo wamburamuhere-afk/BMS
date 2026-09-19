@@ -38,7 +38,7 @@ $training_types = $pdo->query("SELECT training_type_id, type_name FROM training_
             <div class="col-6 col-md-3">
                 <label class="form-label small mb-1">Type</label>
                 <select class="form-select form-select-sm" id="tf_type"><option value="">All types</option>
-                    <?php foreach ($training_types as $tt): ?><option value="<?= (int)$tt['training_type_id'] ?>"><?= safe_output($tt['type_name']) ?></option><?php endforeach; ?>
+                    <?php foreach ($training_types as $tt): ?><option value="<?= (int)$tt['training_type_id'] ?>"><?= caseFormat($tt['type_name']) ?></option><?php endforeach; ?>
                 </select>
             </div>
             <div class="col-6 col-md-3">
@@ -90,7 +90,7 @@ $training_types = $pdo->query("SELECT training_type_id, type_name FROM training_
                     <div class="col-md-8 mb-3"><label class="form-label">Title <span class="text-danger">*</span></label><input class="form-control" name="title" id="tr_title" required></div>
                     <div class="col-md-4 mb-3"><label class="form-label">Type <span class="text-danger">*</span></label>
                         <select class="form-select" name="training_type_id" id="tr_type" required>
-                            <?php foreach ($training_types as $tt): ?><option value="<?= (int)$tt['training_type_id'] ?>"><?= safe_output($tt['type_name']) ?></option><?php endforeach; ?>
+                            <?php foreach ($training_types as $tt): ?><option value="<?= (int)$tt['training_type_id'] ?>"><?= caseFormat($tt['type_name']) ?></option><?php endforeach; ?>
                         </select>
                     </div>
                 </div>

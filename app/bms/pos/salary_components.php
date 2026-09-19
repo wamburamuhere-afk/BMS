@@ -74,9 +74,9 @@ function sc_type_badge(string $t): string {
                     <tbody>
                         <?php foreach ($rows as $r): ?>
                         <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($r['component_name']) ?></td>
+                            <td class="ps-3 fw-semibold"><?= caseFormat($r['component_name']) ?></td>
                             <td><?= sc_type_badge($r['component_type']) ?></td>
-                            <td><span class="text-capitalize"><?= safe_output($r['calculation_type']) ?></span><?= $r['calculation_type'] === 'percentage' ? ' of basic' : '' ?></td>
+                            <td><span class="text-capitalize"><?= caseFormat($r['calculation_type']) ?></span><?= $r['calculation_type'] === 'percentage' ? ' of basic' : '' ?></td>
                             <td class="text-end"><?= $r['calculation_type'] === 'percentage' ? number_format((float)$r['default_amount'], 2) . '%' : number_format((float)$r['default_amount'], 2) ?></td>
                             <td class="text-center"><?= $r['tax_applicable'] ? '<i class="bi bi-check-circle-fill text-primary"></i>' : '<span class="text-muted">—</span>' ?></td>
                             <td class="text-center"><span class="badge-status" style="background:<?= $r['status'] === 'active' ? '#0d6efd' : '#6c757d' ?>;color:#fff;"><?= strtoupper($r['status']) ?></span></td>
