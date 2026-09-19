@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-09-18 — POS: category buttons replaced with horizontal scrollable strip
+
+**File:** `app/bms/pos/pos.php`
+
+The category filter area was a wrapping flex row (`d-flex gap-2 flex-wrap`), which broke the layout with many categories (30+ buttons stacking into multiple rows). Replaced with a single-row horizontal scrollable strip (`.category-scroll-strip`): `display:flex; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none`. Buttons are `flex-shrink:0; white-space:nowrap` pills so they never wrap. The strip is hidden on touch/mobile devices — swiping exposes off-screen categories. The category container was moved from `col-md-7` into a `col-12 mt-2` block above the product grid for better responsiveness.
+
+---
+
+## 2026-09-18 — POS Start Shift: auto-create default register when none exist
+
+**Files:** `api/pos/open_shift.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`
+
+Fresh Simple POS tenants had no rows in `pos_registers`, so the Start Shift modal showed no till options and clicking "Start Shift" returned "Selected register is not available." Three-layer fix:
+
+1. **`open_shift.php`** — if no register_id is posted (or the posted one isn't active), fall back to the first active register. If none exist, auto-create a "Main Register" (`REG-001`) so the cashier can start immediately without visiting Settings.
+2. **`pos_scripts_new.php`** — `startShift()` now hides the register dropdown row when the API returns zero registers, and shows an informational note instead of hardcoding `register_id=1`.
+3. **`lang/sw.php`** — added Swahili translation for the no-registers info note.
+
+---
+
 ## 2026-09-18 — Header: company name truncates instead of overlapping date/location
 
 **File:** `header.php`
