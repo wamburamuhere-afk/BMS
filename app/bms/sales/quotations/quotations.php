@@ -182,8 +182,8 @@ $can_approve = canApprove('sales_orders');
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($c_web)) $web_email[] = "Web: " . caseFormat($c_web);
+            if (!empty($c_email)) $web_email[] = "Email: " . caseFormat($c_email);
             if (!empty($web_email)) echo implode(" | ", $web_email);
             ?>
         </p>
@@ -191,8 +191,8 @@ $can_approve = canApprove('sales_orders');
         <p class="text-dark mb-1 small text-uppercase">
             <?php 
             $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . caseFormat($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . caseFormat($c_vrn);
             if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
             ?>
         </p>
@@ -347,7 +347,7 @@ $can_approve = canApprove('sales_orders');
                         <option value="">All Customers</option>
                         <?php foreach ($customers as $c): ?>
                             <option value="<?= $c['customer_id'] ?>" <?= $customer_filter == $c['customer_id'] ? 'selected' : '' ?>>
-                                <?= safe_output($c['customer_name']) ?>
+                                <?= caseFormat($c['customer_name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -467,12 +467,12 @@ $can_approve = canApprove('sales_orders');
                                 ?>
                                     <tr>
                                         <td class="ps-4 text-muted small fw-bold"><?= $sn++ ?></td>
-                                        <td class="ps-4 fw-bold text-primary"><?= safe_output($q['order_number']) ?></td>
+                                        <td class="ps-4 fw-bold text-primary"><?= caseFormat($q['order_number']) ?></td>
                                         <td><?= date('d M, Y', strtotime($q['order_date'])) ?><?= $age_html ?></td>
                                         <td>
-                                            <div class="fw-bold"><?= safe_output($q['customer_name']) ?></div>
+                                            <div class="fw-bold"><?= caseFormat($q['customer_name']) ?></div>
                                             <?php if ($q['company_name']): ?>
-                                                <small class="text-muted"><?= safe_output($q['company_name']) ?></small>
+                                                <small class="text-muted"><?= caseFormat($q['company_name']) ?></small>
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-center">

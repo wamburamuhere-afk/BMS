@@ -137,7 +137,7 @@ require_once 'header.php';
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 mb-0 text-gray-800"><?= $doc_label ?> Details</h1>
-            <p class="text-muted mb-0">View details for <?= $doc_label ?> #<?= safe_output($order['order_number']) ?></p>
+            <p class="text-muted mb-0">View details for <?= $doc_label ?> #<?= caseFormat($order['order_number']) ?></p>
         </div>
         <div class="d-flex gap-2">
             <?php if ($enable_projects && !empty($order['project_id'])): ?>
@@ -269,9 +269,9 @@ require_once 'header.php';
                         <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-box me-1"></i><?= count($orderItems) ?> item<?= count($orderItems) !== 1 ? 's' : '' ?></span>
                         <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1"></i><?= number_format(array_sum(array_column($orderItems, 'quantity')), 0) ?> units</span>
                         <?php if ((float)($order['tax_amount'] ?? 0) > 0): ?>
-                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= safe_output($order['currency'] ?? 'TZS') ?> <?= number_format($order['tax_amount'], 2) ?></span>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= caseFormat($order['currency'] ?? 'TZS') ?> <?= number_format($order['tax_amount'], 2) ?></span>
                         <?php endif; ?>
-                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= safe_output($order['currency'] ?? 'TZS') ?> <?= number_format($order['grand_total'], 2) ?></span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= caseFormat($order['currency'] ?? 'TZS') ?> <?= number_format($order['grand_total'], 2) ?></span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -301,9 +301,9 @@ require_once 'header.php';
                                 ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
                                         <?php if($item['sku']): ?>
-                                            <small class="text-muted">SKU: <?= safe_output($item['sku']) ?></small>
+                                            <small class="text-muted">SKU: <?= caseFormat($item['sku']) ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
@@ -382,7 +382,7 @@ require_once 'header.php';
                     <h6 class="mb-0 fw-bold">Order Notes</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted"><?= nl2br(safe_output($order['notes'])) ?></p>
+                    <p class="mb-0 text-muted"><?= nl2br(caseFormat($order['notes'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -393,7 +393,7 @@ require_once 'header.php';
                     <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($order['terms_conditions'])) ?></p>
+                    <p class="mb-0 text-muted small"><?= nl2br(caseFormat($order['terms_conditions'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -407,9 +407,9 @@ require_once 'header.php';
                     <h6 class="mb-0 fw-bold">Customer Information</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="fw-bold mb-1"><?= safe_output($order['customer_name']) ?></h5>
+                    <h5 class="fw-bold mb-1"><?= caseFormat($order['customer_name']) ?></h5>
                     <?php if (!empty($order['company_name'])): ?>
-                        <div class="text-muted mb-2"><?= safe_output($order['company_name']) ?></div>
+                        <div class="text-muted mb-2"><?= caseFormat($order['company_name']) ?></div>
                     <?php endif; ?>
                     
                     <hr class="my-3">
@@ -417,14 +417,14 @@ require_once 'header.php';
                     <?php if (!empty($order['customer_email'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-envelope text-muted me-2"></i>
-                            <span><?= safe_output($order['customer_email']) ?></span>
+                            <span><?= caseFormat($order['customer_email']) ?></span>
                         </div>
                     <?php endif; ?>
                     
                     <?php if (!empty($order['customer_phone'])): ?>
                         <div class="d-flex mb-2">
                             <i class="bi bi-telephone text-muted me-2"></i>
-                            <span><?= safe_output($order['customer_phone']) ?></span>
+                            <span><?= caseFormat($order['customer_phone']) ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -444,7 +444,7 @@ require_once 'header.php';
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Source Quote:</span>
                         <a href="<?= getUrl('quotation_view') ?>?id=<?= $source_quote['sales_order_id'] ?>" class="fw-medium text-primary text-decoration-none">
-                            <?= safe_output($source_quote['order_number']) ?> <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i>
+                            <?= caseFormat($source_quote['order_number']) ?> <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -457,18 +457,18 @@ require_once 'header.php';
                     <?php if (!empty($order['project_name'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Project:</span>
-                        <span class="fw-medium text-primary"><?= safe_output($order['project_name']) ?></span>
+                        <span class="fw-medium text-primary"><?= caseFormat($order['project_name']) ?></span>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($order['warehouse_name'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Warehouse:</span>
-                        <span class="fw-medium text-success"><?= safe_output($order['warehouse_name']) ?></span>
+                        <span class="fw-medium text-success"><?= caseFormat($order['warehouse_name']) ?></span>
                     </div>
                     <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Salesperson:</span>
-                        <span class="fw-medium"><?= safe_output($order['salesperson_name'] ?? 'N/A') ?></span>
+                        <span class="fw-medium"><?= caseFormat($order['salesperson_name'] ?? 'N/A') ?></span>
                     </div>
                     <?php if (!empty($order['delivery_date'])):
                         $del_today_ts  = strtotime(date('Y-m-d'));
@@ -491,19 +491,19 @@ require_once 'header.php';
                     <?php if (!empty($order['payment_terms'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Payment Terms:</span>
-                        <span class="fw-medium"><?= safe_output($order['payment_terms']) ?></span>
+                        <span class="fw-medium"><?= caseFormat($order['payment_terms']) ?></span>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($order['reference'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Reference:</span>
-                        <span class="fw-medium text-info"><?= safe_output($order['reference']) ?></span>
+                        <span class="fw-medium text-info"><?= caseFormat($order['reference']) ?></span>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($order['currency'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Currency:</span>
-                        <span class="fw-medium"><?= safe_output($order['currency']) ?></span>
+                        <span class="fw-medium"><?= caseFormat($order['currency']) ?></span>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -536,7 +536,7 @@ require_once 'header.php';
                         ?>
                         <li class="list-group-item px-3 py-2 d-flex justify-content-between align-items-center">
                             <div>
-                                <a href="<?= getUrl('invoice_view') ?>?id=<?= $inv['invoice_id'] ?>" class="fw-medium text-decoration-none small"><?= safe_output($inv['invoice_number']) ?></a>
+                                <a href="<?= getUrl('invoice_view') ?>?id=<?= $inv['invoice_id'] ?>" class="fw-medium text-decoration-none small"><?= caseFormat($inv['invoice_number']) ?></a>
                                 <div class="text-muted" style="font-size:0.7rem;"><?= !empty($inv['invoice_date']) ? date('M d, Y', strtotime($inv['invoice_date'])) : '' ?></div>
                             </div>
                             <div class="text-end">

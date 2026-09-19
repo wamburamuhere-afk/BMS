@@ -152,7 +152,7 @@ sort($filter_customers);
                     <select id="filterCustomer" class="form-select">
                         <option value="">All Customers</option>
                         <?php foreach ($filter_customers as $cust): ?>
-                            <option value="<?= htmlspecialchars($cust, ENT_QUOTES) ?>"><?= safe_output($cust) ?></option>
+                            <option value="<?= htmlspecialchars($cust, ENT_QUOTES) ?>"><?= caseFormat($cust) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

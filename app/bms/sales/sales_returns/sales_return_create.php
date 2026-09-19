@@ -83,7 +83,7 @@ if ($order_id) {
                         <select name="order_id" class="form-select select2-ajax" required>
                             <?php if ($order_data): ?>
                                 <option value="<?= $order_data['sales_order_id'] ?>" selected>
-                                    #<?= safe_output($order_data['order_number']) ?> - <?= safe_output($order_data['customer_name']) ?>
+                                    #<?= caseFormat($order_data['order_number']) ?> - <?= caseFormat($order_data['customer_name']) ?>
                                 </option>
                             <?php endif; ?>
                         </select>
@@ -108,7 +108,7 @@ if ($order_id) {
                 <div class="card shadow mb-4">
                     <div class="card-header bg-white py-3 d-flex justify-content-between">
                         <h6 class="m-0 font-weight-bold text-primary">2. Select Items to Return</h6>
-                        <span class="badge bg-info">Order #<?= safe_output($order_data['order_number']) ?></span>
+                        <span class="badge bg-info">Order #<?= caseFormat($order_data['order_number']) ?></span>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
@@ -132,9 +132,9 @@ if ($order_id) {
                                 <tr>
                                     <td class="text-center fw-bold text-muted"><?= $sn++ ?></td>
                                     <td>
-                                        <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
                                         <div class="small text-muted">
-                                            SKU: <?= safe_output($item['sku']) ?> |
+                                            SKU: <?= caseFormat($item['sku']) ?> |
                                             Price: <?= number_format($item['unit_price'], 2) ?>
                                         </div>
                                     </td>
@@ -210,7 +210,7 @@ if ($order_id) {
     </form>
     <?php elseif ($order_id): ?>
         <div class="alert alert-warning">
-            Sales Order #<?= safe_output($_GET['order_id']) ?> not found or not in 'Approved/Completed' status.
+            Sales Order #<?= caseFormat($_GET['order_id']) ?> not found or not in 'Approved/Completed' status.
         </div>
     <?php endif; ?>
 
