@@ -361,6 +361,15 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         });
     });
 
+    // Language toggle pill — flip between EN and SW without going to preferences
+    function bmsToggleLang() {
+        var current = '<?= $__bms_lang_pref ?>';
+        var next    = current === 'sw' ? 'en' : 'sw';
+        $.post('<?= buildUrl('api/set_language.php') ?>', { lang: next, _csrf: CSRF_TOKEN }, function (res) {
+            if (res.success) location.reload();
+        }, 'json');
+    }
+
     // Mobile marquee: only scroll when the company name is actually wider than the
     // available space. Short names (e.g. "BJP SHOP") stay static and centred.
     $(document).ready(function () {
@@ -1459,7 +1468,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                     </ul>
 
                     <!-- User Account (right side of bottom nav — matches Vikundi) -->
-                    <ul class="navbar-nav">
+                    <ul class="navbar-nav align-items-center">
+                        <!-- Language toggle pill — switches between EN and SW instantly -->
+                        <li class="nav-item me-1">
+                            <button class="btn btn-sm btn-outline-light" onclick="bmsToggleLang()" title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>" style="font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:700;letter-spacing:0.5px;line-height:1.6;">
+                                <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
+                            </button>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle py-2 px-3 d-flex align-items-center fw-bold" href="#" id="userDrop" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle fs-5 me-2"></i>
