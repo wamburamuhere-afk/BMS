@@ -102,7 +102,7 @@ $restaurant_pos_enabled = canView('restaurant_pos');
 // the Products page's own stock-adjustment action already requires (it's a
 // stock/pricing action reachable from POS, not a sales action).
 $can_add_new_product = canCreate('products');
-$can_restock_product  = hasPermission('adjust_stock') || isAdmin();
+$can_restock_product  = canView('pos_restock');
 ?>
 <script>
 // Phase 30 (pos_upgrade_plan.md §9) — populated once from PHP, never fetched
