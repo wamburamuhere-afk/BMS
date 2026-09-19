@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-18 — Header: company name truncates instead of overlapping date/location
+
+**File:** `header.php`
+
+Added CSS so the desktop company name (`<h5>`) truncates with ellipsis (`text-overflow: ellipsis`) when it is too long to fit alongside the date/location box. Short names display fully with no change. The logo+name flex child can now shrink (`min-width: 0; flex-shrink: 1`), while the date-location box stays fixed (`flex-shrink: 0`).
+
+---
+
+## 2026-09-18 — POS: cap default product grid at 20 (desktop + mobile)
+
+**File:** `app/bms/pos/pos_scripts_new.php`
+
+Previously the 20-product cap only applied on mobile. Now the default grid (no search, no specific category) shows only the first 20 products on all screen sizes. Typing a search term or tapping a category button loads the full matching set. A "Showing first 20 of N products" hint is appended when the cap applies.
+
+---
+
 ## 2026-09-18 — i18n: fix English/Swahili mix on product create/edit pages
 
 **Files:** `app/bms/product/product_create.php`, `lang/sw.php`
