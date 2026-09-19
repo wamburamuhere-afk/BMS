@@ -496,6 +496,10 @@ $(document).ready(function() {
         $('#cashPaymentSection').toggle(method === 'cash');
         if (method === 'cash') {
             calculateChange();
+        } else if (method === 'credit') {
+            // Clear any cash amount so credit sales are never recorded as cash receipts
+            $('#amountTendered').val('0');
+            calculateChange();
         }
     });
     
