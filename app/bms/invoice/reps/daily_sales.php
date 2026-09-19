@@ -226,7 +226,7 @@ if (isset($_GET['ajax'])) {
     <?php if(!empty($c_logo)): ?>
         <div class="mb-3"><img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 100px; width: auto;"></div>
     <?php endif; ?>
-    <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= safe_output($c_name) ?></h1>
+    <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= caseFormat($c_name) ?></h1>
     <h2 style="font-weight: 800; text-transform: uppercase; margin-top: 10px;"><?= strtoupper($group_by) ?> SALES REPORT</h2>
     <hr style="border: 2px solid #0d6efd; width: 50%; margin: 15px auto;">
 </div>

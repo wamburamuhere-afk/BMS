@@ -101,11 +101,11 @@ if (!function_exists('gl_fmt')) {
     <?php if (!empty($c_logo)): ?>
         <div class="mb-2"><img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 70px;"></div>
     <?php endif; ?>
-    <h2 style="margin:0; font-size: 18pt;"><?= safe_output($c_name) ?></h2>
+    <h2 style="margin:0; font-size: 18pt;"><?= caseFormat($c_name) ?></h2>
     <h3 style="margin-top: 10px; font-size: 13pt; text-transform: uppercase; letter-spacing: 2px;">General Ledger</h3>
     <?php if ($ok): ?>
-        <p style="margin:0; font-size: 10pt;">Account: <?= safe_output($gl['data']['account']['account_name']) ?>
-            <small>(<?= safe_output($gl['data']['account']['account_code']) ?>)</small></p>
+        <p style="margin:0; font-size: 10pt;">Account: <?= caseFormat($gl['data']['account']['account_name']) ?>
+            <small>(<?= caseFormat($gl['data']['account']['account_code']) ?>)</small></p>
         <p style="margin:0; font-size: 9pt;">
             Period <?= date('d M Y', strtotime($start_date)) ?> – <?= date('d M Y', strtotime($end_date)) ?>
         </p>

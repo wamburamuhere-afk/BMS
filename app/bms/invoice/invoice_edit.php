@@ -115,7 +115,7 @@ $warehouses = warehousesForSelect($pdo);
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="fw-bold"><i class="bi bi-pencil-square text-primary"></i> Edit Invoice</h2>
-                    <p class="text-muted mb-0">Modify invoice #<?= safe_output($invoice['invoice_number']) ?></p>
+                    <p class="text-muted mb-0">Modify invoice #<?= caseFormat($invoice['invoice_number']) ?></p>
                 </div>
                 <div class="d-flex gap-2">
                     <?php if ($enable_projects && !empty($invoice['project_id'])): ?>
@@ -164,7 +164,7 @@ $warehouses = warehousesForSelect($pdo);
                             <option value="">Select Customer</option>
                             <?php foreach ($customers as $cust): ?>
                                 <option value="<?= $cust['customer_id'] ?>" <?= ($cust['customer_id'] == $invoice['customer_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($cust['customer_name']) ?> <?= !empty($cust['company_name']) ? '('.safe_output($cust['company_name']).')' : '' ?>
+                                    <?= caseFormat($cust['customer_name']) ?> <?= !empty($cust['company_name']) ? '('.caseFormat($cust['company_name']).')' : '' ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -177,7 +177,7 @@ $warehouses = warehousesForSelect($pdo);
                             <option value="">Select Project</option>
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>" <?= (isset($invoice['project_id']) && $invoice['project_id'] == $proj['project_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($proj['project_name']) ?>
+                                    <?= caseFormat($proj['project_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
