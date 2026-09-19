@@ -53,7 +53,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select id="whSelect" class="form-select form-select-sm select2-static" style="min-width:220px;">
                         <?php foreach ($warehouses as $w): ?>
-                        <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
+                        <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
