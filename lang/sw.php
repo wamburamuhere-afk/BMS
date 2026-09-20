@@ -4469,4 +4469,7 @@ return [
     'available' => 'zilizopo',
     'Nothing to show here yet.' => 'Hakuna kitu cha kuonyesha hapa bado.',
     'No products match your search.' => 'Hakuna bidhaa zinazolingana na utafutaji wako.',
+    // Simple POS phone bottom navigation bar (header.php)
+    'Main Menu' => 'Menyu Kuu',
+    'All Menus' => 'Menyu Zote',
 ];
