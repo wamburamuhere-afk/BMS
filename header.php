@@ -908,6 +908,22 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
+                <?php if (posSimpleModeEnabled()): ?>
+                <!-- Simple POS mobile: Language + 3-dots (Settings & Account). Desktop: hidden. -->
+                <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-2 ms-auto">
+                    <button type="button" class="btn btn-sm btn-outline-light"
+                        onclick="event.stopPropagation();bmsToggleLang();"
+                        title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>"
+                        style="font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:700;letter-spacing:0.5px;line-height:1.6;">
+                        <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light px-2"
+                        data-bs-toggle="offcanvas" data-bs-target="#bmsAccountSheet" aria-controls="bmsAccountSheet"
+                        title="<?= htmlspecialchars(t('Settings')) ?>">
+                        <i class="bi bi-three-dots-vertical fs-5"></i>
+                    </button>
+                </div>
+                <?php endif; ?>
 
                 <!-- Bottom Row: Navigation Modules -->
                 <div class="header-nav-bar w-100">
@@ -1445,7 +1461,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         $_set_biz_visible = canView('tax_settings');
                         ?>
                         <?php if ($_set_sys_visible || $_set_biz_visible): ?>
-                        <li class="nav-item dropdown bms-settings-nav">
+                        <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-sliders"></i> <?= t('Settings') ?>
                             </a>
@@ -1547,23 +1563,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         .bms-sheet .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
         @media (max-width: 991.98px) {
             body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
+            /* Hamburger and full nav area hidden on mobile; bottom bar + Language/3-dots toolbar handle navigation. */
             .bottom-header .navbar-toggler { display: none !important; }
-            .bottom-header .header-nav-bar { padding: 0; }
+            .bottom-header .header-nav-bar { display: none !important; }
             body.bms-kb-open .bms-bnav { display: none !important; }
-            /* Keep Settings + Language + User always visible in the top bar on mobile.
-               Bootstrap hides #navbarNav on mobile; override that and strip out the
-               left-side nav links (they live in the bottom bar), leaving only the
-               Settings dropdown, the language pill and the user dropdown. */
-            .bottom-header #navbarNav {
-                display: flex !important;
-                flex-direction: row;
-                justify-content: flex-end;
-                align-items: center;
-                flex-wrap: nowrap;
-            }
-            .bottom-header #navbarNav ul.navbar-nav.me-auto li:not(.bms-settings-nav) {
-                display: none !important;
-            }
         }
     </style>
 
@@ -1605,6 +1608,32 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- Account sheet — Settings items + User section; opened by the 3-dots button in the top bar. -->
+    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1" id="bmsAccountSheet" aria-labelledby="bmsAccountSheetLabel">
+        <div class="offcanvas-header pb-0">
+            <h6 class="offcanvas-title fw-bold" id="bmsAccountSheetLabel"><?= htmlspecialchars($username) ?></h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-0">
+            <?php if ($_set_sys_visible || $_set_biz_visible): ?>
+            <div class="bn-group"><?= t('Settings') ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (isAdmin()): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i><?= t('Admin') ?></a><?php endif; ?>
+                <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= t('POS Settings') ?></a><?php endif; ?>
+                <?php if (canView('color_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>
+                <?php if (canView('tax_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i><?= t('Tax') ?></a><?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (!empty($_SESSION['employee_id'])): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace"></i><?= t('My HR') ?></a><?php endif; ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>"><i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle"></i><?= t('Help') ?></a>
+                <a class="list-group-item list-group-item-action text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right text-danger"></i><?= t('Logout') ?></a>
+            </div>
+        </div>
+    </div>
 
     <!-- More — quick access to Customers, Suppliers and Services on mobile. -->
     <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1" id="bmsMoreSheet" aria-labelledby="bmsMoreSheetLabel">
