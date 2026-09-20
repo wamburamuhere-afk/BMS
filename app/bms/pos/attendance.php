@@ -561,7 +561,7 @@ if ($employees) {
                             <?php endif; ?>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Department</label>
+                            <label class="form-label"><?= t('Department') ?></label>
                             <select class="form-select" id="department" name="department">
                                 <option value="">All Departments</option>
                                 <?php foreach ($departments as $dept): ?>
@@ -573,7 +573,7 @@ if ($employees) {
                         </div>
                         <?php if ($view_mode == 'day'): ?>
                         <div class="col-md-3">
-                            <label class="form-label">Attendance Status</label>
+                            <label class="form-label"><?= t('Attendance Status') ?></label>
                             <select class="form-select" id="status" name="status">
                                 <option value="">All Status</option>
                                 <option value="present" <?= ($selected_status == 'present') ? 'selected' : '' ?>>Present</option>
@@ -585,8 +585,8 @@ if ($employees) {
                         </div>
                         <?php endif; ?>
                         <div class="col-md-3 col-6">
-                            <label class="form-label">Search Employee</label>
-                            <input type="text" class="form-control" id="searchEmployee" name="search" placeholder="Name or ID...">
+                            <label class="form-label"><?= t('Search Employee') ?></label>
+                            <input type="text" class="form-control" id="searchEmployee" name="search" placeholder="<?= t('Name or ID...') ?>">
                         </div>
                         <?php if ($view_mode != 'day'): ?>
                         <div class="col-md-4 d-flex align-items-end">
@@ -646,7 +646,7 @@ if ($employees) {
 
                 <div class="input-group input-group-sm shadow-sm flex-grow-1 flex-md-grow-0" style="width: auto; max-width: 250px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">
                     <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" class="form-control border-0 p-2" placeholder="Search..." onkeyup="$('#attendanceTable').DataTable().search(this.value).draw();">
+                    <input type="text" class="form-control border-0 p-2" placeholder="<?= t('Search...') ?>" onkeyup="$('#attendanceTable').DataTable().search(this.value).draw();">
                 </div>
             </div>
             
@@ -681,25 +681,25 @@ if ($employees) {
                     <table id="attendanceTable" class="table table-hover align-middle mb-0" style="width:100%">
                         <thead>
                             <tr class="text-uppercase small text-muted">
-                                <th style="width: 50px;">S/NO</th>
-                                <th>Employee ID</th>
+                                <th style="width: 50px;"><?= t('S/NO') ?></th>
+                                <th><?= t('Employee ID') ?></th>
                                 <th>(Name) Employee Name</th>
-                                <th>Department</th>
+                                <th><?= t('Department') ?></th>
                                 
                                 <?php if ($view_mode == 'day'): ?>
-                                <th>Check In</th>
-                                <th>Check Out</th>
-                                <th>Total Hours</th>
-                                <th class="text-center">Status</th>
-                                <th>Notes</th>
-                                <th class="text-end">Actions</th>
+                                <th><?= t('Check In') ?></th>
+                                <th><?= t('Check Out') ?></th>
+                                <th><?= t('Total Hours') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
+                                <th><?= t('Notes') ?></th>
+                                <th class="text-end"><?= t('Actions') ?></th>
                                 <?php else: ?>
-                                <th>Total Hours</th>
-                                <th>Avg Daily Hours</th>
-                                <th>Days Present</th>
-                                <th>Late</th>
-                                <th>Absent</th>
-                                <th class="text-end">Actions</th>
+                                <th><?= t('Total Hours') ?></th>
+                                <th><?= t('Avg Daily Hours') ?></th>
+                                <th><?= t('Days Present') ?></th>
+                                <th><?= t('Late') ?></th>
+                                <th><?= t('Absent') ?></th>
+                                <th class="text-end"><?= t('Actions') ?></th>
                                 <?php endif; ?>
                             </tr>
                         </thead>
@@ -805,7 +805,7 @@ if ($employees) {
                                         <input type="text" class="form-control form-control-sm attendance-notes" 
                                                data-employee-id="<?= $record['employee_id'] ?>"
                                                value="<?= safe_output($record['notes']) ?>"
-                                               placeholder="Add notes"
+                                               placeholder="<?= t('Add notes') ?>"
                                                onchange="updateAttendanceNotes(<?= $record['employee_id'] ?>, this.value)">
                                         <?php else: ?>
                                         <small><?= caseFormat($record['notes']) ?></small>
@@ -897,7 +897,7 @@ if ($employees) {
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h6>Attendance Statistics</h6>
+                                    <h6><?= t('Attendance Statistics') ?></h6>
                                     <?php 
                                         // Calculate dynamic denominator for rates
                                         $total_emp = $attendance_summary['total_employees'];
@@ -924,7 +924,7 @@ if ($employees) {
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
-                                    <h6>Working Hours Summary</h6>
+                                    <h6><?= t('Working Hours Summary') ?></h6>
                                     <ul class="list-group list-group-flush">
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
                                             Standard Hours
@@ -951,7 +951,7 @@ if ($employees) {
             <?php else: ?>
                 <div class="text-center py-5">
                     <i class="bi bi-people" style="font-size: 4rem; color: #6c757d;"></i>
-                    <h4 class="mt-3 text-muted">No Employees Found</h4>
+                    <h4 class="mt-3 text-muted"><?= t('No Employees Found') ?></h4>
                     <p class="text-muted">No active employees found for the selected filters.</p>
                     <button type="button" class="btn btn-primary mt-2" onclick="clearFilters()">
                         <i class="bi bi-arrow-clockwise"></i> Clear Filters
@@ -1004,11 +1004,11 @@ if ($employees) {
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="mark_check_in" class="form-label">Check In Time</label>
+                            <label for="mark_check_in" class="form-label"><?= t('Check In Time') ?></label>
                             <input type="time" class="form-control" id="mark_check_in" name="check_in_time">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="mark_check_out" class="form-label">Check Out Time</label>
+                            <label for="mark_check_out" class="form-label"><?= t('Check Out Time') ?></label>
                             <input type="time" class="form-control" id="mark_check_out" name="check_out_time">
                         </div>
                         <div class="col-md-6 mb-3">
@@ -1025,8 +1025,8 @@ if ($employees) {
                         </div>
                         
                         <div class="col-12 mb-3">
-                            <label for="mark_notes" class="form-label">Notes</label>
-                            <textarea class="form-control" id="mark_notes" name="notes" rows="3" placeholder="Any notes about attendance"></textarea>
+                            <label for="mark_notes" class="form-label"><?= t('Notes') ?></label>
+                            <textarea class="form-control" id="mark_notes" name="notes" rows="3" placeholder="<?= t('Any notes about attendance') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -1074,7 +1074,7 @@ if ($employees) {
                     </div>
                     
                     <div class="mb-3">
-                        <label for="bulk_action" class="form-label">Import Action</label>
+                        <label for="bulk_action" class="form-label"><?= t('Import Action') ?></label>
                         <select class="form-select" id="bulk_action" name="bulk_action">
                             <option value="add_new">Add New Records Only</option>
                             <option value="update_existing">Update Existing Records</option>

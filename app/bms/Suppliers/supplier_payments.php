@@ -142,7 +142,7 @@ if (!empty($filter_supplier_id)) {
         <div class="card-body py-2">
             <form method="GET" class="row g-2 align-items-end">
                 <div class="col-md-3 col-12">
-                    <label class="form-label small mb-1">Supplier</label>
+                    <label class="form-label small mb-1"><?= t('Supplier') ?></label>
                     <select class="form-select select2-static" name="id" id="filter_supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $s): ?>
@@ -153,7 +153,7 @@ if (!empty($filter_supplier_id)) {
                     </select>
                 </div>
                 <div class="col-md-2 col-6">
-                    <label class="form-label small mb-1">Method</label>
+                    <label class="form-label small mb-1"><?= t('Method') ?></label>
                     <select class="form-select select2-static" name="payment_method" id="filter_method">
                         <option value="">All Methods</option>
                         <option value="cash"          <?= $filter_payment_method === 'cash'          ? 'selected' : '' ?>>Cash</option>
@@ -164,11 +164,11 @@ if (!empty($filter_supplier_id)) {
                     </select>
                 </div>
                 <div class="col-md-2 col-6">
-                    <label class="form-label small mb-1">Date From</label>
+                    <label class="form-label small mb-1"><?= t('Date From') ?></label>
                     <input type="date" class="form-control" name="date_from" value="<?= safe_output($filter_date_from) ?>">
                 </div>
                 <div class="col-md-2 col-6">
-                    <label class="form-label small mb-1">Date To</label>
+                    <label class="form-label small mb-1"><?= t('Date To') ?></label>
                     <input type="date" class="form-control" name="date_to" value="<?= safe_output($filter_date_to) ?>">
                 </div>
                 <div class="col-md-3 col-6 d-flex gap-2">
@@ -191,15 +191,15 @@ if (!empty($filter_supplier_id)) {
                     <table id="paymentsTable" class="table table-hover align-middle w-100 mb-0">
                         <thead style="background-color:#fff;border-bottom:2px solid #dee2e6;">
                             <tr>
-                                <th style="color:#333;">S/No</th>
-                                <th style="color:#333;">Date</th>
-                                <th style="color:#333;">Supplier</th>
-                                <th style="color:#333;">Reference</th>
-                                <th style="color:#333;">Order #</th>
-                                <th style="color:#333;">Amount</th>
-                                <th style="color:#333;">Method</th>
-                                <th style="color:#333;">Notes</th>
-                                <th class="text-end d-print-none" style="color:#333;">Actions</th>
+                                <th style="color:#333;"><?= t('S/No') ?></th>
+                                <th style="color:#333;"><?= t('Date') ?></th>
+                                <th style="color:#333;"><?= t('Supplier') ?></th>
+                                <th style="color:#333;"><?= t('Reference') ?></th>
+                                <th style="color:#333;"><?= t('Order #') ?></th>
+                                <th style="color:#333;"><?= t('Amount') ?></th>
+                                <th style="color:#333;"><?= t('Method') ?></th>
+                                <th style="color:#333;"><?= t('Notes') ?></th>
+                                <th class="text-end d-print-none" style="color:#333;"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -310,7 +310,7 @@ if (!empty($filter_supplier_id)) {
                             <input type="number" class="form-control" name="amount" id="add_amount" step="0.01" min="0.01" required placeholder="0.00" oninput="recalcAddNet()">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Withholding Tax (WHT)</label>
+                            <label class="form-label"><?= t('Withholding Tax (WHT)') ?></label>
                             <select class="form-select" name="wht_rate_id" id="add_wht_rate" onchange="recalcAddNet()">
                                 <option value="" data-rate="0">No withholding tax</option>
                                 <?php foreach ($ps_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
@@ -320,15 +320,15 @@ if (!empty($filter_supplier_id)) {
                             <small class="text-muted">Withheld from the supplier and remitted to TRA.</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Withheld (−)</label>
+                            <label class="form-label"><?= t('Withheld (−)') ?></label>
                             <input type="text" class="form-control" id="add_wht_amount" readonly value="0.00">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Net to Pay</label>
+                            <label class="form-label"><?= t('Net to Pay') ?></label>
                             <input type="text" class="form-control fw-bold text-primary" id="add_net" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Currency</label>
+                            <label class="form-label"><?= t('Currency') ?></label>
                             <select class="form-select select2-static" name="currency">
                                 <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                 <option value="USD">US Dollar (USD)</option>
@@ -359,12 +359,12 @@ if (!empty($filter_supplier_id)) {
                             <small class="text-muted">Cash/bank account the money is paid from.</small>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Reference Number</label>
-                            <input type="text" class="form-control" name="reference_number" placeholder="Transaction ID, cheque number, etc.">
+                            <label class="form-label"><?= t('Reference Number') ?></label>
+                            <input type="text" class="form-control" name="reference_number" placeholder="<?= t('Transaction ID, cheque number, etc.') ?>">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Notes</label>
-                            <textarea class="form-control" name="notes" rows="2" placeholder="Payment notes or description"></textarea>
+                            <label class="form-label"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Payment notes or description') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -417,7 +417,7 @@ if (!empty($filter_supplier_id)) {
                             <input type="number" class="form-control" name="amount" id="edit_amount" step="0.01" min="0.01" required oninput="recalcEditNet()">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Withholding Tax (WHT)</label>
+                            <label class="form-label"><?= t('Withholding Tax (WHT)') ?></label>
                             <select class="form-select" name="wht_rate_id" id="edit_wht_rate" onchange="recalcEditNet()">
                                 <option value="" data-rate="0">No withholding tax</option>
                                 <?php foreach ($ps_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
@@ -427,15 +427,15 @@ if (!empty($filter_supplier_id)) {
                             <small class="text-muted">Withheld from the supplier and remitted to TRA.</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Withheld (−)</label>
+                            <label class="form-label"><?= t('Withheld (−)') ?></label>
                             <input type="text" class="form-control" id="edit_wht_amount" readonly value="0.00">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Net to Pay</label>
+                            <label class="form-label"><?= t('Net to Pay') ?></label>
                             <input type="text" class="form-control fw-bold text-primary" id="edit_net" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Currency</label>
+                            <label class="form-label"><?= t('Currency') ?></label>
                             <select class="form-select select2-static" name="currency" id="edit_currency">
                                 <option value="TZS">Tanzanian Shilling (TZS)</option>
                                 <option value="USD">US Dollar (USD)</option>
@@ -466,11 +466,11 @@ if (!empty($filter_supplier_id)) {
                             <small class="text-muted">Cash/bank account the money is paid from.</small>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Reference Number</label>
+                            <label class="form-label"><?= t('Reference Number') ?></label>
                             <input type="text" class="form-control" name="reference_number" id="edit_reference">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Notes</label>
+                            <label class="form-label"><?= t('Notes') ?></label>
                             <textarea class="form-control" name="notes" id="edit_notes" rows="2"></textarea>
                         </div>
                     </div>
@@ -515,7 +515,7 @@ if (!empty($filter_supplier_id)) {
 
                     <!-- Slip Title + Number (always visible) -->
                     <div class="text-center mb-4">
-                        <h5 class="fw-bold text-uppercase" style="letter-spacing:2px;">Payment Voucher</h5>
+                        <h5 class="fw-bold text-uppercase" style="letter-spacing:2px;"><?= t('Payment Voucher') ?></h5>
                     </div>
                     <div class="d-flex justify-content-between mb-3">
                         <div><span class="text-muted small">Voucher No:</span> <strong id="slip_number" class="text-primary"></strong></div>
@@ -526,27 +526,27 @@ if (!empty($filter_supplier_id)) {
                     <table class="table table-bordered table-sm mb-4" style="font-size:0.9rem;">
                         <tbody>
                             <tr>
-                                <th class="bg-light" style="width:38%;">Paid To (Supplier)</th>
+                                <th class="bg-light" style="width:38%;"><?= t('Paid To (Supplier)') ?></th>
                                 <td><strong id="slip_supplier"></strong><br><span id="slip_company" class="text-muted small"></span></td>
                             </tr>
                             <tr>
-                                <th class="bg-light">Amount</th>
+                                <th class="bg-light"><?= t('Amount') ?></th>
                                 <td><span id="slip_amount" class="fw-bold text-success" style="font-size:1.1rem;"></span> <span id="slip_currency" class="text-muted small"></span></td>
                             </tr>
                             <tr>
-                                <th class="bg-light">Payment Method</th>
+                                <th class="bg-light"><?= t('Payment Method') ?></th>
                                 <td id="slip_method"></td>
                             </tr>
                             <tr id="slip_ref_row">
-                                <th class="bg-light">Reference No.</th>
+                                <th class="bg-light"><?= t('Reference No.') ?></th>
                                 <td id="slip_ref"></td>
                             </tr>
                             <tr id="slip_po_row">
-                                <th class="bg-light">Purchase Order</th>
+                                <th class="bg-light"><?= t('Purchase Order') ?></th>
                                 <td id="slip_po"></td>
                             </tr>
                             <tr id="slip_notes_row">
-                                <th class="bg-light">Notes / Description</th>
+                                <th class="bg-light"><?= t('Notes / Description') ?></th>
                                 <td id="slip_notes"></td>
                             </tr>
                         </tbody>

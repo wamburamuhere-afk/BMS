@@ -36,27 +36,27 @@ $training_types = $pdo->query("SELECT training_type_id, type_name FROM training_
     <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
         <div class="row g-2 align-items-end">
             <div class="col-6 col-md-3">
-                <label class="form-label small mb-1">Type</label>
+                <label class="form-label small mb-1"><?= t('Type') ?></label>
                 <select class="form-select form-select-sm" id="tf_type"><option value="">All types</option>
                     <?php foreach ($training_types as $tt): ?><option value="<?= (int)$tt['training_type_id'] ?>"><?= caseFormat($tt['type_name']) ?></option><?php endforeach; ?>
                 </select>
             </div>
             <div class="col-6 col-md-3">
-                <label class="form-label small mb-1">Status</label>
+                <label class="form-label small mb-1"><?= t('Status') ?></label>
                 <select class="form-select form-select-sm" id="tf_status"><option value="">All statuses</option>
                     <option value="planned">Planned</option><option value="in_progress">In progress</option>
                     <option value="completed">Completed</option><option value="cancelled">Cancelled</option>
                 </select>
             </div>
-            <div class="col-6 col-md-2"><label class="form-label small mb-1">From</label><input type="date" class="form-control form-control-sm" id="tf_from"></div>
-            <div class="col-6 col-md-2"><label class="form-label small mb-1">To</label><input type="date" class="form-control form-control-sm" id="tf_to"></div>
+            <div class="col-6 col-md-2"><label class="form-label small mb-1"><?= t('From') ?></label><input type="date" class="form-control form-control-sm" id="tf_from"></div>
+            <div class="col-6 col-md-2"><label class="form-label small mb-1"><?= t('To') ?></label><input type="date" class="form-control form-control-sm" id="tf_to"></div>
             <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-secondary w-100" id="tf_reset"><i class="bi bi-arrow-clockwise"></i></button></div>
         </div>
     </div></div>
 
     <div id="trTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="trainingsTable" class="table table-hover align-middle w-100">
-            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Title</th><th>Type</th><th>Dates</th><th>Participants</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center"><?= t('S/NO') ?></th><th><?= t('Title') ?></th><th><?= t('Type') ?></th><th><?= t('Dates') ?></th><th><?= t('Participants') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -95,23 +95,23 @@ $training_types = $pdo->query("SELECT training_type_id, type_name FROM training_
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3"><label class="form-label">Trainer</label>
+                    <div class="col-md-4 mb-3"><label class="form-label"><?= t('Trainer') ?></label>
                         <select class="form-select" name="trainer_kind" id="tr_trainer_kind"><option value="internal">Internal (employee)</option><option value="external">External</option></select>
                     </div>
                     <div class="col-md-8 mb-3">
-                        <div id="tr_internal_wrap"><label class="form-label">Internal Trainer</label><select class="form-select" name="trainer_employee_id" id="tr_trainer_emp"></select></div>
+                        <div id="tr_internal_wrap"><label class="form-label"><?= t('Internal Trainer') ?></label><select class="form-select" name="trainer_employee_id" id="tr_trainer_emp"></select></div>
                         <div id="tr_external_wrap" class="d-none"><label class="form-label">External Trainer <span class="text-danger">*</span></label><input class="form-control" name="trainer_name" id="tr_trainer_name"></div>
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3"><label class="form-label">Venue</label><input class="form-control" name="venue" id="tr_venue"></div>
+                    <div class="col-md-4 mb-3"><label class="form-label"><?= t('Venue') ?></label><input class="form-control" name="venue" id="tr_venue"></div>
                     <div class="col-md-4 mb-3"><label class="form-label">Start <span class="text-danger">*</span></label><input type="date" class="form-control" name="start_date" id="tr_start" value="<?= date('Y-m-d') ?>" required></div>
-                    <div class="col-md-4 mb-3"><label class="form-label">End</label><input type="date" class="form-control" name="end_date" id="tr_end"></div>
+                    <div class="col-md-4 mb-3"><label class="form-label"><?= t('End') ?></label><input type="date" class="form-control" name="end_date" id="tr_end"></div>
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3"><label class="form-label">Cost</label><input type="number" min="0" step="0.01" class="form-control" name="cost" id="tr_cost">
+                    <div class="col-md-4 mb-3"><label class="form-label"><?= t('Cost') ?></label><input type="number" min="0" step="0.01" class="form-control" name="cost" id="tr_cost">
                         <div class="form-text">Informational only — record actual payment through Expenses as usual.</div></div>
-                    <div class="col-md-8 mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" id="tr_desc" rows="2"></textarea></div>
+                    <div class="col-md-8 mb-3"><label class="form-label"><?= t('Description') ?></label><textarea class="form-control" name="description" id="tr_desc" rows="2"></textarea></div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -214,7 +214,7 @@ function viewTraining(id) {
                 <strong>Participants</strong>
                 ${TR_CAN_EDIT ? `<button class="btn btn-sm btn-primary" onclick="openAddParticipants(${t.training_id})"><i class="bi bi-person-plus"></i> Add</button>` : ''}
             </div>
-            <table class="table table-sm align-middle"><thead><tr><th>Employee</th><th>Status</th><th>Score</th><th>Certificate</th><th></th></tr></thead><tbody>${prows}</tbody></table>`);
+            <table class="table table-sm align-middle"><thead><tr><th><?= t('Employee') ?></th><th><?= t('Status') ?></th><th><?= t('Score') ?></th><th><?= t('Certificate') ?></th><th></th></tr></thead><tbody>${prows}</tbody></table>`);
         new bootstrap.Modal(document.getElementById('trainingViewModal')).show();
     });
 }
@@ -263,8 +263,8 @@ window.editParticipant = function (pid) {
                 <option value="enrolled">Enrolled</option><option value="attended">Attended</option>
                 <option value="completed">Completed</option><option value="failed">Failed</option><option value="withdrawn">Withdrawn</option>
             </select>
-            <input id="pScore" class="form-control mb-2" placeholder="Score (e.g. 87%, Pass)">
-            <input id="pRemarks" class="form-control mb-2" placeholder="Remarks">
+            <input id="pScore" class="form-control mb-2" placeholder="<?= t('Score (e.g. 87%, Pass)') ?>">
+            <input id="pRemarks" class="form-control mb-2" placeholder="<?= t('Remarks') ?>">
             <div class="text-start small text-muted mb-1">Certificate (optional):</div>
             <input id="pCert" type="file" class="form-control mb-2">
             <input id="pCertExp" type="date" class="form-control" title="Certificate expiry (optional)">`,

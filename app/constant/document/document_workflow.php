@@ -110,7 +110,7 @@ $workflow_stats = $pdo->query("
                         <?php if (isAdmin() || $user_role == 'CFO'): ?>
                         <div class="form-check form-switch mb-0 mx-2">
                             <input class="form-check-input" type="checkbox" id="toggleAllTasks" onchange="loadMyTasks()">
-                            <label class="form-check-label small text-muted" for="toggleAllTasks">All</label>
+                            <label class="form-check-label small text-muted" for="toggleAllTasks"><?= t('All') ?></label>
                         </div>
                         <?php endif; ?>
                         <ul class="nav nav-pills nav-pills-sm" id="taskTabs" role="tablist">
@@ -138,7 +138,7 @@ $workflow_stats = $pdo->query("
         <div class="col-lg-8 mb-4">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between">
-                    <h5 class="mb-0" id="workflowsCardHeading">Active Workflows</h5>
+                    <h5 class="mb-0" id="workflowsCardHeading"><?= t('Active Workflows') ?></h5>
                     <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-secondary active" onclick="loadWorkflows('active')">Active</button>
                         <button class="btn btn-outline-secondary" onclick="loadWorkflows('completed')">Archive</button>
@@ -149,12 +149,12 @@ $workflow_stats = $pdo->query("
                         <table id="workflowsTable" class="table table-hover align-middle" style="width:100%">
                             <thead class="bg-light text-muted small uppercase">
                                 <tr>
-                                    <th>Workflow Name</th>
-                                    <th>Priority</th>
-                                    <th>Progress</th>
-                                    <th>Status</th>
-                                    <th>Users</th>
-                                    <th class="text-end">Actions</th>
+                                    <th><?= t('Workflow Name') ?></th>
+                                    <th><?= t('Priority') ?></th>
+                                    <th><?= t('Progress') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th><?= t('Users') ?></th>
+                                    <th class="text-end"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody class="small">
@@ -179,16 +179,16 @@ $workflow_stats = $pdo->query("
             <form id="createWorkflowForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Workflow Name</label>
+                        <label class="form-label fw-bold"><?= t('Workflow Name') ?></label>
                         <input type="text" class="form-control" name="name" required placeholder="e.g. Q3 Audit Review">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Description</label>
-                        <textarea class="form-control" name="description" rows="2" placeholder="Describe the purpose of this workflow..."></textarea>
+                        <label class="form-label fw-bold"><?= t('Description') ?></label>
+                        <textarea class="form-control" name="description" rows="2" placeholder="<?= t('Describe the purpose of this workflow...') ?>"></textarea>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Category</label>
+                            <label class="form-label fw-bold"><?= t('Category') ?></label>
                             <select class="form-select" name="category">
                                 <option value="General">General</option>
                                 <option value="Finance">Finance</option>
@@ -198,7 +198,7 @@ $workflow_stats = $pdo->query("
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Priority</label>
+                            <label class="form-label fw-bold"><?= t('Priority') ?></label>
                             <select class="form-select" name="priority">
                                 <option value="low">Low</option>
                                 <option value="medium" selected>Medium</option>
@@ -211,18 +211,18 @@ $workflow_stats = $pdo->query("
                     <h6 class="fw-bold mb-3"><i class="bi bi-list-ol"></i> Initial Workflow Step</h6>
                     <div class="bg-light p-3 rounded">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Step Name</label>
+                            <label class="form-label small fw-bold"><?= t('Step Name') ?></label>
                             <input type="text" class="form-control form-control-sm" name="step_name" required placeholder="e.g. Initial Document Review">
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label small fw-bold">Assign To</label>
+                                <label class="form-label small fw-bold"><?= t('Assign To') ?></label>
                                 <select class="form-select form-select-sm" name="assigned_to" id="userListSelect" required>
                                     <!-- Loaded via AJAX -->
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label small fw-bold">Due Date</label>
+                                <label class="form-label small fw-bold"><?= t('Due Date') ?></label>
                                 <input type="date" class="form-control form-control-sm" name="due_date" required>
                             </div>
                         </div>
@@ -248,13 +248,13 @@ $workflow_stats = $pdo->query("
             <form id="assignDocForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Select Workflow</label>
+                        <label class="form-label fw-bold"><?= t('Select Workflow') ?></label>
                         <select class="form-select" name="workflow_id" id="activeWorkflowsSelect" required>
                             <!-- Loaded via AJAX -->
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Select Document(s)</label>
+                        <label class="form-label fw-bold"><?= t('Select Document(s)') ?></label>
                         <select class="form-select" name="document_ids[]" id="documentListSelect" multiple required style="height: 150px;">
                             <!-- Loaded via AJAX -->
                         </select>
@@ -302,16 +302,16 @@ $workflow_stats = $pdo->query("
                 <input type="hidden" name="id" id="editWorkflowId">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Workflow Name</label>
+                        <label class="form-label fw-bold"><?= t('Workflow Name') ?></label>
                         <input type="text" class="form-control" name="name" id="editWorkflowName" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Description</label>
+                        <label class="form-label fw-bold"><?= t('Description') ?></label>
                         <textarea class="form-control" name="description" id="editWorkflowDesc" rows="2"></textarea>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Category</label>
+                            <label class="form-label fw-bold"><?= t('Category') ?></label>
                             <select class="form-select" name="category" id="editWorkflowCat">
                                 <option value="General">General</option>
                                 <option value="Finance">Finance</option>
@@ -321,7 +321,7 @@ $workflow_stats = $pdo->query("
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Priority</label>
+                            <label class="form-label fw-bold"><?= t('Priority') ?></label>
                             <select class="form-select" name="priority" id="editWorkflowPri">
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
@@ -331,7 +331,7 @@ $workflow_stats = $pdo->query("
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Status</label>
+                        <label class="form-label fw-bold"><?= t('Status') ?></label>
                         <select class="form-select" name="status" id="editWorkflowStatus">
                             <option value="draft">Draft (Inactive)</option>
                             <option value="active">Active</option>
@@ -538,39 +538,39 @@ function viewTask(taskId) {
         
         let html = `
             <div class="mb-4">
-                <label class="small text-muted text-uppercase fw-bold">Workflow</label>
+                <label class="small text-muted text-uppercase fw-bold"><?= t('Workflow') ?></label>
                 <div class="h5 fw-bold text-dark">${escapeHtml(task.workflow_name)}</div>
             </div>
             <div class="row mb-4">
                 <div class="col-6">
-                    <label class="small text-muted text-uppercase fw-bold">Step Name</label>
+                    <label class="small text-muted text-uppercase fw-bold"><?= t('Step Name') ?></label>
                     <div class="fw-bold">${escapeHtml(task.step_name)}</div>
                 </div>
                 <div class="col-6 text-end">
-                    <label class="small text-muted text-uppercase fw-bold">Priority</label>
+                    <label class="small text-muted text-uppercase fw-bold"><?= t('Priority') ?></label>
                     <div><span class="badge bg-${task.priority === 'high' ? 'danger' : 'primary'}-subtle text-${task.priority === 'high' ? 'danger' : 'primary'} text-uppercase">${task.priority}</span></div>
                 </div>
             </div>
             <div class="mb-4 p-3 bg-light rounded">
-                <label class="small text-muted text-uppercase fw-bold">Instruction / Description</label>
+                <label class="small text-muted text-uppercase fw-bold"><?= t('Instruction / Description') ?></label>
                 <p class="mb-0 text-dark">${escapeHtml(task.description || 'No detailed instructions.')}</p>
             </div>
             ${task.status === 'completed' ? `
             <div class="mb-4 p-3 border border-success rounded bg-success-subtle">
-                <label class="small text-success text-uppercase fw-bold">Completion Comments</label>
+                <label class="small text-success text-uppercase fw-bold"><?= t('Completion Comments') ?></label>
                 <p class="mb-0 text-dark italic">${escapeHtml(task.comments || 'No comments left.')}</p>
             </div>` : `
             <div class="mb-0">
-                <label class="form-label small text-muted text-uppercase fw-bold">Add Completion Comments</label>
-                <textarea class="form-control" id="taskCompletionComments" rows="3" placeholder="Enter any notes or findings..."></textarea>
+                <label class="form-label small text-muted text-uppercase fw-bold"><?= t('Add Completion Comments') ?></label>
+                <textarea class="form-control" id="taskCompletionComments" rows="3" placeholder="<?= t('Enter any notes or findings...') ?>"></textarea>
             </div>`}
             <div class="row g-3 mt-2">
                 <div class="col-6">
-                    <label class="small text-muted text-uppercase fw-bold">Assigned By</label>
+                    <label class="small text-muted text-uppercase fw-bold"><?= t('Assigned By') ?></label>
                     <div class="small"><i class="bi bi-person"></i> ${escapeHtml(task.assigner_name)}</div>
                 </div>
                 <div class="col-6 text-end">
-                    <label class="small text-muted text-uppercase fw-bold">Due Date</label>
+                    <label class="small text-muted text-uppercase fw-bold"><?= t('Due Date') ?></label>
                     <div class="small ${isOverdue ? 'text-danger fw-bold' : ''}"><i class="bi bi-calendar-event"></i> ${task.due_date || 'None'}</div>
                 </div>
             </div>`;
