@@ -119,7 +119,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
         <div class="card-body p-3">
             <div class="row g-2 align-items-end">
                 <div class="col-6 col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Type</label>
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1"><?= t('Type') ?></label>
                     <select id="f-type" class="form-select form-select-sm">
                         <option value="">All Types</option>
                         <option value="supplier">Supplier</option>
@@ -127,7 +127,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Status</label>
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1"><?= t('Status') ?></label>
                     <select id="f-status" class="form-select form-select-sm">
                         <option value="">All Statuses</option>
                         <option value="pending">Pending</option>
@@ -138,11 +138,11 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">From Date</label>
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1"><?= t('From Date') ?></label>
                     <input type="date" id="f-from" class="form-control form-control-sm">
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">To Date</label>
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1"><?= t('To Date') ?></label>
                     <input type="date" id="f-to" class="form-control form-control-sm">
                 </div>
                 <div class="col-12 col-md-4 d-flex gap-2">
@@ -167,16 +167,16 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                     <table id="invoiceTable" class="table table-hover align-middle mb-0 w-100">
                         <thead class="bg-white small text-uppercase" style="border-bottom:2px solid #dee2e6;">
                             <tr>
-                                <th class="ps-3">S/No</th>
-                                <th>Invoice Ref</th>
-                                <th>Type</th>
-                                <th>From</th>
-                                <th>Date Raised</th>
-                                <th>Due Date</th>
-                                <th>PO / Project</th>
-                                <th class="text-end">Amount (TZS)</th>
-                                <th>Status</th>
-                                <th class="text-end pe-3">Actions</th>
+                                <th class="ps-3"><?= t('S/No') ?></th>
+                                <th><?= t('Invoice Ref') ?></th>
+                                <th><?= t('Type') ?></th>
+                                <th><?= t('From') ?></th>
+                                <th><?= t('Date Raised') ?></th>
+                                <th><?= t('Due Date') ?></th>
+                                <th><?= t('PO / Project') ?></th>
+                                <th class="text-end"><?= t('Amount (TZS)') ?></th>
+                                <th><?= t('Status') ?></th>
+                                <th class="text-end pe-3"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -230,7 +230,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Invoice Reference No. <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="text" class="form-control" name="invoice_ref" id="f-ref" placeholder="Auto-generating..." required>
+                                <input type="text" class="form-control" name="invoice_ref" id="f-ref" placeholder="<?= t('Auto-generating...') ?>" required>
                                 <button type="button" class="btn btn-outline-secondary" id="btnRefresh" onclick="generateInvoiceRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
                             </div>
                             <div id="dup-alert" class="d-none mt-1" style="font-size:0.85rem"></div>
@@ -250,7 +250,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
 
                         <!-- Payment Terms -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Payment Terms</label>
+                            <label class="form-label fw-bold"><?= t('Payment Terms') ?></label>
                             <!-- Hidden field — always carries the POSTed value -->
                             <input type="hidden" name="payment_terms" id="f-payment-terms-value">
                             <!-- Dropdown mode (default) -->
@@ -301,7 +301,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
 
                         <!-- 4. Supplier: PO Reference (filtered by supplier + project + warehouse) -->
                         <div class="col-12 supplier-only" id="supplier-fields">
-                            <label class="form-label fw-bold">PO Reference</label>
+                            <label class="form-label fw-bold"><?= t('PO Reference') ?></label>
                             <select name="po_id" id="f-po" class="form-select select2-static">
                                 <option value="">— Select PO (optional) —</option>
                             </select>
@@ -347,17 +347,17 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
 
                         <!-- 5. Items table (supplier only) — same money math as invoice_create -->
                         <div class="col-12 both-types" id="items-wrap">
-                            <label class="form-label fw-bold mb-1">Items</label>
+                            <label class="form-label fw-bold mb-1"><?= t('Items') ?></label>
                             <div class="table-responsive border rounded">
                                 <table class="table table-sm align-middle mb-0" id="itemsTable">
                                     <thead class="table-light">
                                         <tr>
-                                            <th style="min-width:200px" class="ps-2">Product/Item</th>
-                                            <th style="width:90px" class="text-end">Quantity</th>
-                                            <th style="width:90px">Unit</th>
-                                            <th style="width:130px" class="text-end">Unit Price</th>
-                                            <th style="width:80px">Tax</th>
-                                            <th style="width:130px" class="text-end">Total</th>
+                                            <th style="min-width:200px" class="ps-2"><?= t('Product/Item') ?></th>
+                                            <th style="width:90px" class="text-end"><?= t('Quantity') ?></th>
+                                            <th style="width:90px"><?= t('Unit') ?></th>
+                                            <th style="width:130px" class="text-end"><?= t('Unit Price') ?></th>
+                                            <th style="width:80px"><?= t('Tax') ?></th>
+                                            <th style="width:130px" class="text-end"><?= t('Total') ?></th>
                                             <th style="width:40px"></th>
                                         </tr>
                                     </thead>
@@ -399,8 +399,8 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
 
                         <!-- Notes -->
                         <div class="col-12">
-                            <label class="form-label fw-bold">Notes</label>
-                            <textarea class="form-control" name="notes" id="f-notes" rows="2" placeholder="Optional notes..."></textarea>
+                            <label class="form-label fw-bold"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" id="f-notes" rows="2" placeholder="<?= t('Optional notes...') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -450,11 +450,11 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                     <input type="hidden" name="invoice_id" id="pay-id">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Invoice</label>
+                        <label class="form-label fw-bold"><?= t('Invoice') ?></label>
                         <input type="text" class="form-control" id="pay-ref" readonly>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Remaining Balance (TZS)</label>
+                        <label class="form-label fw-bold"><?= t('Remaining Balance (TZS)') ?></label>
                         <input type="text" class="form-control" id="pay-balance" readonly>
                     </div>
                     <div class="mb-3">
@@ -464,7 +464,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                         <small class="text-muted" id="pay-amount-hint">Enter the amount you are paying now. Can be less than the full balance.</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Withholding Tax (WHT)</label>
+                        <label class="form-label fw-bold"><?= t('Withholding Tax (WHT)') ?></label>
                         <select class="form-select" name="wht_rate_id" id="pay-wht-rate" onchange="recalcPayNet()">
                             <option value="" data-rate="0">No withholding tax</option>
                             <?php foreach ($ri_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
@@ -475,11 +475,11 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                     </div>
                     <div class="mb-3 row g-2">
                         <div class="col-6">
-                            <label class="form-label fw-bold small">Withheld (−)</label>
+                            <label class="form-label fw-bold small"><?= t('Withheld (−)') ?></label>
                             <input type="text" class="form-control" id="pay-wht-amount" readonly value="0.00">
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold small">Net to Pay</label>
+                            <label class="form-label fw-bold small"><?= t('Net to Pay') ?></label>
                             <input type="text" class="form-control fw-bold text-primary" id="pay-net" readonly>
                         </div>
                     </div>
@@ -508,7 +508,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                         <small class="text-muted">Cash/bank account the money is paid from.</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Payment Reference</label>
+                        <label class="form-label fw-bold"><?= t('Payment Reference') ?></label>
                         <input type="text" class="form-control" name="payment_ref" placeholder="e.g. transaction no., cheque no.">
                     </div>
                 </div>
@@ -1063,7 +1063,7 @@ function viewRow(id) {
             });
             itemsHtml = `<div class="col-12"><div class="text-muted small mb-1">Items</div>
                 <div class="table-responsive border rounded"><table class="table table-sm mb-0">
-                <thead class="table-light"><tr><th>Product/Item</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit Price</th><th class="text-end">Tax</th><th class="text-end">Total</th></tr></thead>
+                <thead class="table-light"><tr><th><?= t('Product/Item') ?></th><th class="text-end"><?= t('Qty') ?></th><th><?= t('Unit') ?></th><th class="text-end"><?= t('Unit Price') ?></th><th class="text-end"><?= t('Tax') ?></th><th class="text-end"><?= t('Total') ?></th></tr></thead>
                 <tbody>${rows}</tbody>
                 <tfoot>
                     <tr><td colspan="5" class="text-end fw-semibold">Subtotal</td><td class="text-end fw-semibold">${formatCurrency(sub)}</td></tr>
@@ -1261,10 +1261,10 @@ function riAddItemRow(item) {
         <tr>
             <td class="ps-2">
                 <input type="hidden" name="items[${idx}][product_id]" value="${item ? (item.product_id || '') : ''}">
-                <input type="text" class="form-control form-control-sm ri-item-name" name="items[${idx}][item_name]" value="${item ? safeOutput(item.item_name) : ''}" placeholder="Product / item" required>
+                <input type="text" class="form-control form-control-sm ri-item-name" name="items[${idx}][item_name]" value="${item ? safeOutput(item.item_name) : ''}" placeholder="<?= t('Product / item') ?>" required>
             </td>
             <td><input type="number" class="form-control form-control-sm text-end ri-item-qty" name="items[${idx}][quantity]" value="${item ? item.quantity : 1}" min="0" step="0.01" oninput="riCalcTotals()"></td>
-            <td><input type="text" class="form-control form-control-sm ri-item-unit" name="items[${idx}][unit]" value="${item ? safeOutput(item.unit || '') : ''}" placeholder="Unit"></td>
+            <td><input type="text" class="form-control form-control-sm ri-item-unit" name="items[${idx}][unit]" value="${item ? safeOutput(item.unit || '') : ''}" placeholder="<?= t('Unit') ?>"></td>
             <td><input type="number" class="form-control form-control-sm text-end ri-item-price" name="items[${idx}][unit_price]" value="${item ? item.unit_price : 0}" min="0" step="0.01" oninput="riCalcTotals()"></td>
             <td>
                 <select class="form-select form-select-sm ri-item-tax" name="items[${idx}][tax_rate]" onchange="riCalcTotals()">

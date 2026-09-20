@@ -149,7 +149,7 @@ $export_qs = http_build_query(array_filter([
         <div class="card-body py-3">
             <form method="get" action="<?= getUrl('crm/leads') ?>" class="row g-2 align-items-end">
                 <div class="col-6 col-md-2">
-                    <label class="form-label small mb-1">Stage</label>
+                    <label class="form-label small mb-1"><?= t('Stage') ?></label>
                     <select class="form-select form-select-sm select2-filter" name="stage_id">
                         <option value="">All Stages</option>
                         <?php foreach ($stages as $s): ?>
@@ -158,7 +158,7 @@ $export_qs = http_build_query(array_filter([
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small mb-1">Source</label>
+                    <label class="form-label small mb-1"><?= t('Source') ?></label>
                     <select class="form-select form-select-sm select2-filter" name="lead_source">
                         <option value="">All Sources</option>
                         <?php foreach ($lead_sources as $key => $lbl): ?>
@@ -167,7 +167,7 @@ $export_qs = http_build_query(array_filter([
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small mb-1">Assigned To</label>
+                    <label class="form-label small mb-1"><?= t('Assigned To') ?></label>
                     <select class="form-select form-select-sm select2-filter" name="assigned_to">
                         <option value="">All Users</option>
                         <?php foreach ($users as $u): ?>
@@ -176,11 +176,11 @@ $export_qs = http_build_query(array_filter([
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small mb-1">From</label>
+                    <label class="form-label small mb-1"><?= t('From') ?></label>
                     <input type="date" class="form-control form-control-sm" name="date_from" value="<?= safe_output($f_from, '') ?>">
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small mb-1">To</label>
+                    <label class="form-label small mb-1"><?= t('To') ?></label>
                     <input type="date" class="form-control form-control-sm" name="date_to" value="<?= safe_output($f_to, '') ?>">
                 </div>
                 <div class="col-6 col-md-2 d-flex gap-2">
@@ -194,7 +194,7 @@ $export_qs = http_build_query(array_filter([
     <!-- Search (DataTable dom has no built-in box) -->
     <div class="row mb-2">
         <div class="col-md-4 ms-auto">
-            <input type="text" id="leadSearch" class="form-control" placeholder="Search leads...">
+            <input type="text" id="leadSearch" class="form-control" placeholder="<?= t('Search leads...') ?>">
         </div>
     </div>
 
@@ -235,16 +235,16 @@ $export_qs = http_build_query(array_filter([
                 <thead class="table-light">
                     <tr>
                         <?php if ($can_bulk): ?><th style="width:36px"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th><?php endif; ?>
-                        <th>Code</th>
-                        <th>Name</th>
-                        <th>Company</th>
-                        <th>Source</th>
-                        <th>Stage</th>
-                        <th class="text-end">Value (TZS)</th>
-                        <th>Assigned To</th>
-                        <th>Expected Close</th>
-                        <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th><?= t('Code') ?></th>
+                        <th><?= t('Name') ?></th>
+                        <th><?= t('Company') ?></th>
+                        <th><?= t('Source') ?></th>
+                        <th><?= t('Stage') ?></th>
+                        <th class="text-end"><?= t('Value (TZS)') ?></th>
+                        <th><?= t('Assigned To') ?></th>
+                        <th><?= t('Expected Close') ?></th>
+                        <th><?= t('Status') ?></th>
+                        <th class="text-end"><?= t('Actions') ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -314,39 +314,39 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             <input type="text" class="form-control" name="first_name" id="<?= $prefix ?>_first_name" required>
         </div>
         <div class="col-md-4">
-            <label class="form-label">Last Name</label>
+            <label class="form-label"><?= t('Last Name') ?></label>
             <input type="text" class="form-control" name="last_name" id="<?= $prefix ?>_last_name">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Company</label>
+            <label class="form-label"><?= t('Company') ?></label>
             <input type="text" class="form-control" name="company_name" id="<?= $prefix ?>_company_name">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Email</label>
+            <label class="form-label"><?= t('Email') ?></label>
             <input type="email" class="form-control" name="email" id="<?= $prefix ?>_email">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Phone</label>
+            <label class="form-label"><?= t('Phone') ?></label>
             <input type="text" class="form-control" name="phone" id="<?= $prefix ?>_phone">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Mobile</label>
+            <label class="form-label"><?= t('Mobile') ?></label>
             <input type="text" class="form-control" name="mobile" id="<?= $prefix ?>_mobile">
         </div>
         <div class="col-md-4">
-            <label class="form-label">City</label>
+            <label class="form-label"><?= t('City') ?></label>
             <input type="text" class="form-control" name="city" id="<?= $prefix ?>_city">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Country</label>
+            <label class="form-label"><?= t('Country') ?></label>
             <input type="text" class="form-control" name="country" id="<?= $prefix ?>_country" value="Tanzania">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Website</label>
+            <label class="form-label"><?= t('Website') ?></label>
             <input type="text" class="form-control" name="website" id="<?= $prefix ?>_website" placeholder="https://">
         </div>
         <div class="col-12">
-            <label class="form-label">Address</label>
+            <label class="form-label"><?= t('Address') ?></label>
             <input type="text" class="form-control" name="address" id="<?= $prefix ?>_address">
         </div>
     </div>
@@ -357,7 +357,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
     </p>
     <div class="row g-3 mb-3">
         <div class="col-md-4">
-            <label class="form-label">Source</label>
+            <label class="form-label"><?= t('Source') ?></label>
             <select class="form-select select2-static" name="lead_source" id="<?= $prefix ?>_lead_source">
                 <?php foreach ($lead_sources as $key => $lbl): ?>
                 <option value="<?= $key ?>" <?= $key === 'other' ? 'selected' : '' ?>><?= $lbl ?></option>
@@ -365,7 +365,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             </select>
         </div>
         <div class="col-md-4">
-            <label class="form-label">Pipeline Stage</label>
+            <label class="form-label"><?= t('Pipeline Stage') ?></label>
             <select class="form-select select2-static" name="pipeline_stage_id" id="<?= $prefix ?>_pipeline_stage_id">
                 <?php foreach ($stages as $i => $s): ?>
                 <option value="<?= $s['stage_id'] ?>" <?= $i === 0 ? 'selected' : '' ?>><?= caseFormat($s['stage_name']) ?></option>
@@ -373,7 +373,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             </select>
         </div>
         <div class="col-md-4">
-            <label class="form-label">Assigned To</label>
+            <label class="form-label"><?= t('Assigned To') ?></label>
             <select class="form-select select2-static" name="assigned_to" id="<?= $prefix ?>_assigned_to">
                 <option value="">-- Select --</option>
                 <?php foreach ($users as $u): ?>
@@ -382,20 +382,20 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             </select>
         </div>
         <div class="col-md-4">
-            <label class="form-label">Lead Value (TZS)</label>
+            <label class="form-label"><?= t('Lead Value (TZS)') ?></label>
             <input type="number" class="form-control" name="lead_value" id="<?= $prefix ?>_lead_value" min="0" step="0.01" value="0">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Probability (%)</label>
+            <label class="form-label"><?= t('Probability (%)') ?></label>
             <input type="number" class="form-control" name="probability" id="<?= $prefix ?>_probability" min="0" max="100" value="20">
         </div>
         <div class="col-md-4">
-            <label class="form-label">Expected Close Date</label>
+            <label class="form-label"><?= t('Expected Close Date') ?></label>
             <input type="date" class="form-control" name="expected_close_date" id="<?= $prefix ?>_expected_close_date">
         </div>
         <?php if ($labels): ?>
         <div class="col-12">
-            <label class="form-label">Labels</label>
+            <label class="form-label"><?= t('Labels') ?></label>
             <select class="form-select select2-static" name="labels[]" id="<?= $prefix ?>_labels" multiple>
                 <?php foreach ($labels as $l): ?>
                 <option value="<?= $l['label_id'] ?>"><?= caseFormat($l['label_name']) ?></option>
@@ -411,11 +411,11 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
     </p>
     <div class="row g-3">
         <div class="col-12">
-            <label class="form-label">Product / Service Interest</label>
+            <label class="form-label"><?= t('Product / Service Interest') ?></label>
             <textarea class="form-control" name="product_interest" id="<?= $prefix ?>_product_interest" rows="2" placeholder="Which products or services is this lead interested in?"></textarea>
         </div>
         <div class="col-12">
-            <label class="form-label">Notes</label>
+            <label class="form-label"><?= t('Notes') ?></label>
             <textarea class="form-control" name="notes" id="<?= $prefix ?>_notes" rows="2" placeholder="Any additional notes about this lead..."></textarea>
         </div>
     </div>

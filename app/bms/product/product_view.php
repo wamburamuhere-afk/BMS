@@ -426,7 +426,7 @@ global $company_logo, $company_name;
     <!-- Print-only Header -->
     <div class="d-none d-print-block text-center mb-4">
        
-        <h4 class="fw-bold text-dark text-uppercase">PRODUCT DETAILS REPORT</h4>
+        <h4 class="fw-bold text-dark text-uppercase"><?= t('PRODUCT DETAILS REPORT') ?></h4>
         <h5 class="text-muted"><?= caseFormat($product['product_name']) ?><?= $simpleProductForm ? '' : ' (' . caseFormat($product['sku']) . ')' ?></h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
@@ -839,12 +839,12 @@ global $company_logo, $company_name;
                                                 <table class="table table-sm">
                                                     <thead>
                                                         <tr>
-                                                            <th>S/NO</th>
+                                                            <th><?= t('S/NO') ?></th>
                                                             <th><?= wLabel('Warehouse', 'Shop') ?></th>
-                                                            <th>Location</th>
-                                                            <th>Total Stock</th>
-                                                            <th>Available</th>
-                                                            <th>Reserved</th>
+                                                            <th><?= t('Location') ?></th>
+                                                            <th><?= t('Total Stock') ?></th>
+                                                            <th><?= t('Available') ?></th>
+                                                            <th><?= t('Reserved') ?></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -887,16 +887,16 @@ global $company_logo, $company_name;
                                                 <table class="table table-sm">
                                                     <thead>
                                                         <tr>
-                                                            <th>Batch #</th>
+                                                            <th><?= t('Batch #') ?></th>
                                                             <th><?= wLabel('Warehouse', 'Shop') ?></th>
-                                                            <th>Date Received</th>
-                                                            <th>Manufactured</th>
-                                                            <th>Expiry Date</th>
-                                                            <th>Received</th>
-                                                            <th>Remaining</th>
-                                                            <th>Status</th>
-                                                            <th>Unit Cost</th>
-                                                            <th>Source GRN</th>
+                                                            <th><?= t('Date Received') ?></th>
+                                                            <th><?= t('Manufactured') ?></th>
+                                                            <th><?= t('Expiry Date') ?></th>
+                                                            <th><?= t('Received') ?></th>
+                                                            <th><?= t('Remaining') ?></th>
+                                                            <th><?= t('Status') ?></th>
+                                                            <th><?= t('Unit Cost') ?></th>
+                                                            <th><?= t('Source GRN') ?></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -958,10 +958,10 @@ global $company_logo, $company_name;
                                                 <table class="table table-sm">
                                                     <thead>
                                                         <tr>
-                                                            <th>Month</th>
-                                                            <th>Quantity Sold</th>
-                                                            <th>Revenue</th>
-                                                            <th>Avg Price</th>
+                                                            <th><?= t('Month') ?></th>
+                                                            <th><?= t('Quantity Sold') ?></th>
+                                                            <th><?= t('Revenue') ?></th>
+                                                            <th><?= t('Avg Price') ?></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -1049,13 +1049,13 @@ global $company_logo, $company_name;
                                         <table class="table table-sm">
                                             <thead>
                                                 <tr>
-                                                    <th>Date</th>
-                                                    <th>Receipt #</th>
-                                                    <th>Customer</th>
-                                                    <th>Quantity</th>
-                                                    <th>Unit Price</th>
-                                                    <th>Total</th>
-                                                    <th>Payment</th>
+                                                    <th><?= t('Date') ?></th>
+                                                    <th><?= t('Receipt #') ?></th>
+                                                    <th><?= t('Customer') ?></th>
+                                                    <th><?= t('Quantity') ?></th>
+                                                    <th><?= t('Unit Price') ?></th>
+                                                    <th><?= t('Total') ?></th>
+                                                    <th><?= t('Payment') ?></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1104,15 +1104,15 @@ global $company_logo, $company_name;
                                         <table class="table table-sm table-hover">
                                             <thead>
                                                 <tr>
-                                                    <th>Date</th>
-                                                    <th>Type</th>
+                                                    <th><?= t('Date') ?></th>
+                                                    <th><?= t('Type') ?></th>
                                                     <th><?= wLabel('Warehouse', 'Shop') ?></th>
-                                                    <th>Reference</th>
-                                                    <th>Quantity</th>
-                                                    <th>Previous</th>
-                                                    <th>New</th>
-                                                    <th>Adjusted By</th>
-                                                    <th>Reason</th>
+                                                    <th><?= t('Reference') ?></th>
+                                                    <th><?= t('Quantity') ?></th>
+                                                    <th><?= t('Previous') ?></th>
+                                                    <th><?= t('New') ?></th>
+                                                    <th><?= t('Adjusted By') ?></th>
+                                                    <th><?= t('Reason') ?></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1318,7 +1318,7 @@ global $company_logo, $company_name;
                                                 <input type="hidden" name="product_id" value="<?= $product_id ?>">
                                                 
                                                 <div class="mb-3">
-                                                    <label for="adjustment_type" class="form-label">Adjustment Type</label>
+                                                    <label for="adjustment_type" class="form-label"><?= t('Adjustment Type') ?></label>
                                                     <select class="form-select" id="adjustment_type" name="movement_type" required>
                                                         <option value="adjustment_in">Stock In (Increase)</option>
                                                         <option value="adjustment_out">Stock Out (Decrease)</option>
@@ -1343,15 +1343,15 @@ global $company_logo, $company_name;
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label for="quantity" class="form-label">Quantity</label>
+                                                    <label for="quantity" class="form-label"><?= t('Quantity') ?></label>
                                                     <input type="number" class="form-control" id="quantity" name="quantity" 
-                                                           step="0.001" min="0.001" required placeholder="Enter quantity">
+                                                           step="0.001" min="0.001" required placeholder="<?= t('Enter quantity') ?>">
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label for="reason" class="form-label">Reason/Notes</label>
+                                                    <label for="reason" class="form-label"><?= t('Reason/Notes') ?></label>
                                                     <textarea class="form-control" id="reason" name="reason" rows="3" 
-                                                              placeholder="Enter reason for adjustment"></textarea>
+                                                              placeholder="<?= t('Enter reason for adjustment') ?>"></textarea>
                                                 </div>
 
                                                 <div class="d-grid gap-2">
@@ -1417,19 +1417,19 @@ global $company_logo, $company_name;
                                                 <input type="hidden" name="product_id" value="<?= $product_id ?>">
                                                 
                                                 <div class="mb-3">
-                                                    <label for="reorder_level" class="form-label">Reorder Level</label>
+                                                    <label for="reorder_level" class="form-label"><?= t('Reorder Level') ?></label>
                                                     <input type="number" class="form-control" id="reorder_level" name="reorder_level"
                                                            value="<?= $product['min_stock_level'] ?>" step="0.001" min="0">
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label for="min_stock_level" class="form-label">Minimum Stock Level</label>
+                                                    <label for="min_stock_level" class="form-label"><?= t('Minimum Stock Level') ?></label>
                                                     <input type="number" class="form-control" id="min_stock_level" name="min_stock_level"
                                                            value="<?= $product['min_stock_level'] ?>" step="0.001" min="0">
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label for="max_stock_level" class="form-label">Maximum Stock Level</label>
+                                                    <label for="max_stock_level" class="form-label"><?= t('Maximum Stock Level') ?></label>
                                                     <input type="number" class="form-control" id="max_stock_level" name="max_stock_level"
                                                            value="<?= $product['max_stock_level'] ?>" step="0.001" min="0">
                                                 </div>
@@ -1612,7 +1612,7 @@ global $company_logo, $company_name;
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="viewTransferModalLabel">Transfer Details</h5>
+                <h5 class="modal-title" id="viewTransferModalLabel"><?= t('Transfer Details') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="viewTransferModalBody">

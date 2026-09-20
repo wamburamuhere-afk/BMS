@@ -208,7 +208,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 <div class="col-12 col-md-4">
                     <div class="input-group input-group-sm mb-1">
                         <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Search NO, Entity...">
+                        <input type="text" id="searchInput" class="form-control border-start-0" placeholder="<?= t('Search NO, Entity...') ?>">
                     </div>
                 </div>
                 <div class="col-6 col-md-2">
@@ -299,15 +299,15 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 <table class="table table-hover align-middle mb-0 text-nowrap" id="tenderTable" style="width: 100%; min-width: 800px;">
                     <thead class="bg-light d-print-table-header">
                         <tr class="text-nowrap">
-                            <th class="ps-2 text-center" style="font-size:0.78rem;">S/NO</th>
-                            <th style="font-size:0.82rem;">Tender NO</th>
-                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;">NeST Ref</th>
-                            <th style="font-size:0.82rem;">Procuring Entity</th>
-                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;">Acronym</th>
-                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;">Category</th>
-                            <th style="font-size:0.82rem;">Deadline</th>
-                            <th style="font-size:0.82rem;">Status</th>
-                            <th class="text-center" style="font-size:0.82rem;">Action</th>
+                            <th class="ps-2 text-center" style="font-size:0.78rem;"><?= t('S/NO') ?></th>
+                            <th style="font-size:0.82rem;"><?= t('Tender NO') ?></th>
+                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;"><?= t('NeST Ref') ?></th>
+                            <th style="font-size:0.82rem;"><?= t('Procuring Entity') ?></th>
+                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;"><?= t('Acronym') ?></th>
+                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;"><?= t('Category') ?></th>
+                            <th style="font-size:0.82rem;"><?= t('Deadline') ?></th>
+                            <th style="font-size:0.82rem;"><?= t('Status') ?></th>
+                            <th class="text-center" style="font-size:0.82rem;"><?= t('Action') ?></th>
                         </tr>
                     </thead>
                     <tbody id="tenderTableBody"></tbody>
@@ -352,7 +352,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
 
                     <!-- Currency Type -->
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-muted text-uppercase small">Currency Type</label>
+                        <label class="form-label fw-bold text-muted text-uppercase small"><?= t('Currency Type') ?></label>
                         <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-3">
                             <i class="bi bi-currency-exchange fs-4 text-primary"></i>
                             <span id="open_display_currency" class="fs-5 fw-bold text-dark">&mdash;</span>
@@ -368,14 +368,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <div class="card-body p-3">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Amount</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Amount') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span class="text-muted fw-bold me-1">Tshs</span>
                                             <span id="open_display_amount_tzs" class="fs-5 fw-bold text-dark">&mdash;</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Submission Document</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Submission Document') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span id="open_display_doc_tzs">&mdash;</span>
                                         </div>
@@ -394,14 +394,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <div class="card-body p-3">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Amount</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Amount') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span class="text-muted fw-bold me-1">USD</span>
                                             <span id="open_display_amount_usd" class="fs-5 fw-bold text-dark">&mdash;</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Submission Document</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Submission Document') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span id="open_display_doc_usd">&mdash;</span>
                                         </div>
@@ -436,7 +436,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                     <div class="mb-3">
                         <i class="bi bi-check2-circle text-primary display-4"></i>
                     </div>
-                    <h5 class="fw-bold mb-3">Approve Tender Invitation</h5>
+                    <h5 class="fw-bold mb-3"><?= t('Approve Tender Invitation') ?></h5>
                     <p class="text-muted mb-0">Note: This action will officially approve the tender to proceed to the next stage.</p>
                 </div>
                 <div class="modal-footer justify-content-center border-0 pb-4">
@@ -464,7 +464,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         <i class="bi bi-info-circle me-1"></i> If a participation fee is payable to the procuring entity, record it here — it will be paid immediately from the account you choose below and posted to the books. Leave the amount at 0 if no fee applies.
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Participation Fee (Tshs)</label>
+                        <label class="form-label fw-bold"><?= t('Participation Fee (Tshs)') ?></label>
                         <input type="number" step="0.01" min="0" class="form-control" name="fee_amount" id="fee_amount_input" required placeholder="e.g. 50000">
                     </div>
                     <div id="fee_payment_fields">
@@ -510,22 +510,22 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 <input type="hidden" name="tender_id" class="tender-id-input">
                 <input type="hidden" name="action" value="SUBMISSION_PROCESS">
                 <div class="modal-body p-4">
-                    <h5 class="fw-bold text-primary border-bottom pb-2 mb-4">FINANCIAL SUBMISSION</h5>
+                    <h5 class="fw-bold text-primary border-bottom pb-2 mb-4"><?= t('FINANCIAL SUBMISSION') ?></h5>
                     
                     <div class="mb-4">
                         <label class="form-label fw-bold">Select Submission Currency <span class="text-danger">*</span></label>
                         <div class="d-flex gap-4 p-3 bg-light rounded-3 border">
                             <div class="form-check">
                                 <input class="form-check-input cur-selector" type="radio" name="sub_currency_choice" id="sub_cur_tzs" value="Tshs" checked>
-                                <label class="form-check-label fw-bold" for="sub_cur_tzs">TZS</label>
+                                <label class="form-check-label fw-bold" for="sub_cur_tzs"><?= t('TZS') ?></label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input cur-selector" type="radio" name="sub_currency_choice" id="sub_cur_usd" value="USD">
-                                <label class="form-check-label fw-bold" for="sub_cur_usd">USD</label>
+                                <label class="form-check-label fw-bold" for="sub_cur_usd"><?= t('USD') ?></label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input cur-selector" type="radio" name="sub_currency_choice" id="sub_cur_both" value="Both">
-                                <label class="form-check-label fw-bold" for="sub_cur_both">BOTH TZS & USD</label>
+                                <label class="form-check-label fw-bold" for="sub_cur_both"><?= t('BOTH TZS & USD') ?></label>
                             </div>
                         </div>
                     </div>
@@ -567,7 +567,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                     </div>
 
                     <!-- TECHNICAL SUBMISSION -->
-                    <h5 class="fw-bold text-primary border-bottom pb-2 my-4">TECHNICAL SUBMISSION</h5>
+                    <h5 class="fw-bold text-primary border-bottom pb-2 my-4"><?= t('TECHNICAL SUBMISSION') ?></h5>
                     <div class="card border-primary border-opacity-25 shadow-sm mb-4">
                         <div class="card-header bg-primary bg-opacity-10 text-primary fw-bold py-2 d-flex justify-content-between align-items-center">
                             <span>Assign Technical Staff</span>
@@ -579,11 +579,11 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         <div class="card-body p-3">
                             <div id="staff_selection_row" class="row g-3 d-none mb-3 bg-light p-3 rounded-3 border">
                                 <div class="col-md-5">
-                                    <label class="form-label fw-bold small text-muted text-uppercase">Select Employee</label>
+                                    <label class="form-label fw-bold small text-muted text-uppercase"><?= t('Select Employee') ?></label>
                                     <select id="staff_select_input" class="form-select select2-basic"></select>
                                 </div>
                                 <div class="col-md-5">
-                                    <label class="form-label fw-bold small text-muted text-uppercase">Assign Role</label>
+                                    <label class="form-label fw-bold small text-muted text-uppercase"><?= t('Assign Role') ?></label>
                                     <input type="text" id="staff_role_input" class="form-control" placeholder="e.g. Project Manager, Lead Engineer">
                                 </div>
                                 <div class="col-md-2 d-flex align-items-end">
@@ -595,11 +595,11 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                                 <table class="table table-sm table-hover align-middle mb-0" id="tender_staff_table">
                                     <thead class="bg-light">
                                         <tr class="small text-uppercase">
-                                            <th width="50" class="ps-3">S/NO</th>
-                                            <th>Staff Name</th>
-                                            <th>Designation</th>
-                                            <th>Role in Tender</th>
-                                            <th class="text-center" width="80">Action</th>
+                                            <th width="50" class="ps-3"><?= t('S/NO') ?></th>
+                                            <th><?= t('Staff Name') ?></th>
+                                            <th><?= t('Designation') ?></th>
+                                            <th><?= t('Role in Tender') ?></th>
+                                            <th class="text-center" width="80"><?= t('Action') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody id="tender_staff_body">
@@ -638,7 +638,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <input type="text" class="form-control" name="first_name" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">Middle Name</label>
+                            <label class="form-label fw-bold"><?= t('Middle Name') ?></label>
                             <input type="text" class="form-control" name="middle_name">
                         </div>
                         <div class="col-md-4">
@@ -733,7 +733,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
 
                     <!-- Currency Type -->
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-muted text-uppercase small">Currency Type</label>
+                        <label class="form-label fw-bold text-muted text-uppercase small"><?= t('Currency Type') ?></label>
                         <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-3">
                             <i class="bi bi-currency-exchange fs-4 text-primary"></i>
                             <span id="eval_display_currency" class="fs-5 fw-bold text-dark">&mdash;</span>
@@ -749,14 +749,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <div class="card-body p-3">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Amount</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Amount') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span class="text-muted fw-bold me-1">Tshs</span>
                                             <span id="eval_display_amount_tzs" class="fs-5 fw-bold text-dark">&mdash;</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Submission Document</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Submission Document') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span id="eval_display_doc_tzs">&mdash;</span>
                                         </div>
@@ -775,14 +775,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <div class="card-body p-3">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Amount</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Amount') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span class="text-muted fw-bold me-1">USD</span>
                                             <span id="eval_display_amount_usd" class="fs-5 fw-bold text-dark">&mdash;</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Submission Document</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Submission Document') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span id="eval_display_doc_usd">&mdash;</span>
                                         </div>
@@ -831,7 +831,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         <input type="number" step="0.01" class="form-control" name="tender_sum">
                     </div>
                     <div class="mb-3 d-none" id="awardLetterBlock">
-                        <label class="form-label">Award Letter / Contract Document</label>
+                        <label class="form-label"><?= t('Award Letter / Contract Document') ?></label>
                         <input type="file" class="form-control" name="award_letter_document">
                         <small class="text-muted fst-italic">Optional: Upload the award letter or final contract if available.</small>
                     </div>
@@ -861,7 +861,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
 
                     <!-- Registered Currency Type -->
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-muted text-uppercase small">Currency Type</label>
+                        <label class="form-label fw-bold text-muted text-uppercase small"><?= t('Currency Type') ?></label>
                         <div class="p-3 bg-light rounded-3 border d-flex align-items-center gap-3">
                             <i class="bi bi-currency-exchange fs-4 text-info"></i>
                             <span id="neg_display_currency" class="fs-5 fw-bold text-dark">&mdash;</span>
@@ -877,14 +877,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <div class="card-body p-3">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Amount</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Amount') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span class="text-muted fw-bold me-1">Tshs</span>
                                             <span id="neg_display_amount_tzs" class="fs-5 fw-bold text-dark">&mdash;</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Document</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Document') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span id="neg_display_doc_tzs">&mdash;</span>
                                         </div>
@@ -903,14 +903,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <div class="card-body p-3">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Amount</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Amount') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span class="text-muted fw-bold me-1">USD</span>
                                             <span id="neg_display_amount_usd" class="fs-5 fw-bold text-dark">&mdash;</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted small text-uppercase">Document</label>
+                                        <label class="form-label fw-bold text-muted small text-uppercase"><?= t('Document') ?></label>
                                         <div class="p-3 bg-light rounded-3 border">
                                             <span id="neg_display_doc_usd">&mdash;</span>
                                         </div>
@@ -927,18 +927,18 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         <h6 class="fw-bold mb-3 text-info"><i class="bi bi-pencil-square me-1"></i> Negotiation Details</h6>
                         <div class="row g-3">
                             <div class="col-md-12">
-                                <label class="form-label fw-bold small">Confirmed / Negotiated Amount</label>
+                                <label class="form-label fw-bold small"><?= t('Confirmed / Negotiated Amount') ?></label>
                                 <div class="input-group">
                                     <select name="confirmed_currency" id="confirmed_currency" class="form-select border-info" style="max-width: 120px;">
                                         <option value="Tshs">Tshs</option>
                                         <option value="USD">USD</option>
                                     </select>
-                                    <input type="number" step="0.01" name="confirmed_tender_sum" class="form-control border-info" placeholder="Enter final negotiated amount" required>
+                                    <input type="number" step="0.01" name="confirmed_tender_sum" class="form-control border-info" placeholder="<?= t('Enter final negotiated amount') ?>" required>
                                 </div>
                             </div>
                             <div class="col-md-12">
-                                <label class="form-label fw-bold small">Negotiation Notes (Optional)</label>
-                                <textarea class="form-control border-info" name="negotiation_notes" rows="3" placeholder="Briefly summarize the outcome of negotiations..."></textarea>
+                                <label class="form-label fw-bold small"><?= t('Negotiation Notes (Optional)') ?></label>
+                                <textarea class="form-control border-info" name="negotiation_notes" rows="3" placeholder="<?= t('Briefly summarize the outcome of negotiations...') ?>"></textarea>
                             </div>
                         </div>
                     </div>
@@ -965,10 +965,10 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 <div class="modal-body">
                     <div class="mb-3 text-center">
                         <i class="bi bi-award text-primary display-4"></i>
-                        <h6 class="fw-bold mt-2">Proceed to Post-Qualification Status?</h6>
+                        <h6 class="fw-bold mt-2"><?= t('Proceed to Post-Qualification Status?') ?></h6>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Attach Post-Qualification Document (Optional)</label>
+                        <label class="form-label fw-bold"><?= t('Attach Post-Qualification Document (Optional)') ?></label>
                         <input type="file" class="form-control" name="post_qual_document">
                         <small class="text-muted">You can skip this if you don't have a document to attach.</small>
                     </div>
