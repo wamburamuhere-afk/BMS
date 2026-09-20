@@ -910,17 +910,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 </button>
                 <?php if (posSimpleModeEnabled()): ?>
                 <!-- Simple POS mobile: Language + 3-dots (Settings & Account). Desktop: hidden. -->
-                <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-2 ms-auto">
-                    <button type="button" class="btn btn-sm btn-outline-light"
+                <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
+                    <button type="button" class="btn btn-outline-light"
                         onclick="event.stopPropagation();bmsToggleLang();"
                         title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>"
-                        style="font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:700;letter-spacing:0.5px;line-height:1.6;">
+                        style="font-size:0.65rem;padding:1px 7px;border-radius:14px;font-weight:700;letter-spacing:0.3px;line-height:1.4;">
                         <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light px-2"
+                    <button type="button" class="btn btn-outline-light"
                         data-bs-toggle="offcanvas" data-bs-target="#bmsAccountSheet" aria-controls="bmsAccountSheet"
-                        title="<?= htmlspecialchars(t('Settings')) ?>">
-                        <i class="bi bi-list fs-5"></i>
+                        title="<?= htmlspecialchars(t('Settings')) ?>"
+                        style="font-size:0.8rem;padding:2px 6px;line-height:1.4;">
+                        <i class="bi bi-list"></i>
                     </button>
                 </div>
                 <?php endif; ?>
