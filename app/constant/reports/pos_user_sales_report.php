@@ -150,14 +150,14 @@ $currency  = get_setting('currency', 'TZS');
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0 w-100" id="userTable">
-                    <thead class="table-light">
+                    <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;">
                         <tr>
-                            <th class="ps-3"><?= t('S/No') ?></th>
+                            <th class="ps-3 no-sort" style="width:56px;"><?= t('S/No') ?></th>
                             <th><?= t('Cashier') ?></th>
                             <th class="text-end"><?= t('Transactions') ?></th>
                             <th class="text-end"><?= t('Items Sold') ?></th>
                             <th class="text-end"><?= t('Total Value') ?></th>
-                            <th class="pe-3 text-center d-print-none"><?= t('View') ?></th>
+                            <th class="pe-3 text-end no-sort no-export d-print-none"><?= t('Actions') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -167,25 +167,18 @@ $currency  = get_setting('currency', 'TZS');
     </div>
 </div>
 
-<!-- Items-sold drill-down modal -->
-<div class="modal fade d-print-none" id="itemsModal" tabindex="-1">
+<!-- Sales Summary modal (Z-Report style, shown per cashier on action click) -->
+<div class="modal fade d-print-none" id="summaryModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="itemsModalTitle"><?= t('Items Sold') ?></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header" style="background:#0d6efd;">
+                <h5 class="modal-title text-white fw-bold">
+                    <i class="bi bi-file-earmark-bar-graph me-2"></i><span id="summaryModalCashier"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0">
-                <table class="table table-hover align-middle mb-0 w-100">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3"><?= t('Product') ?></th>
-                            <th class="text-end"><?= t('Qty Sold') ?></th>
-                            <th class="text-end pe-3"><?= t('Total Value') ?></th>
-                        </tr>
-                    </thead>
-                    <tbody id="itemsModalBody"></tbody>
-                </table>
+            <div class="modal-body" id="summaryModalBody">
+                <div class="text-center py-4 text-muted">…</div>
             </div>
         </div>
     </div>
@@ -217,7 +210,18 @@ $(function () {
         couldNotLoadReport: <?= json_encode(t('Could not load the report.')) ?>,
         serverErrorLoadingReport: <?= json_encode(t('Server error loading the report.')) ?>,
         noItemsFound: <?= json_encode(t('No items found for this cashier in this period.')) ?>,
-        itemsSoldBy: <?= json_encode(t('Items Sold by')) ?>,
+        viewSummary: <?= json_encode(t('View Sales Summary')) ?>,
+        cashier: <?= json_encode(t('Cashier')) ?>,
+        period: <?= json_encode(t('Period')) ?>,
+        transactions: <?= json_encode(t('Transactions')) ?>,
+        salesByPaymentMethod: <?= json_encode(t('Sales by Payment Method')) ?>,
+        paymentMethod: <?= json_encode(t('Payment Method')) ?>,
+        total: <?= json_encode(t('Total')) ?>,
+        grandTotal: <?= json_encode(t('Grand Total')) ?>,
+        itemsSold: <?= json_encode(t('Items Sold')) ?>,
+        product: <?= json_encode(t('Product')) ?>,
+        qty: <?= json_encode(t('Qty')) ?>,
+        value: <?= json_encode(t('Value')) ?>,
     };
     const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
     const DATA_URL = '<?= buildUrl('api/account/get_user_sales_report.php') ?>';
@@ -230,7 +234,11 @@ $(function () {
 
     const table = $('#userTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[4, 'desc']],
-        dom: 'rtip', columnDefs: [{ targets: [2,3,4], className: 'text-end' }, { targets: 5, className: 'text-center', orderable: false }],
+        dom: 'rtip',
+        columnDefs: [
+            { targets: [2,3,4], className: 'text-end' },
+            { targets: 5, className: 'text-end', orderable: false }
+        ],
         language: { emptyTable: PT.noRecordsFound, zeroRecords: PT.noMatchingRecords }
     });
 
@@ -275,39 +283,109 @@ $(function () {
                     Number(r.sales_count).toLocaleString(),
                     fmtQty(r.qty_sold),
                     fmt(r.total_value),
-                    `<button type="button" class="btn btn-sm btn-outline-primary" data-user-id="${r.user_id}" data-user-name="${caseFormatJs(r.name)}" onclick="viewCashierItems(${r.user_id}, '${caseFormatJs(r.name).replace(/'/g, "\\'")}')"><i class="bi bi-list-ul"></i></button>`
+                    `<div class="dropdown d-flex justify-content-end">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="viewCashierDetail(${r.user_id},'${caseFormatJs(r.name).replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">
+                                <i class="bi bi-file-earmark-bar-graph text-primary me-2"></i>${PT.viewSummary}
+                            </button></li>
+                        </ul>
+                    </div>`
                 ]));
                 table.draw();
             })
             .fail(() => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverErrorLoadingReport }));
     }
 
-    window.viewCashierItems = function (userId, userName) {
-        $('#itemsModalTitle').text(PT.itemsSoldBy + ' ' + userName);
-        $('#itemsModalBody').html('<tr><td colspan="3" class="text-center text-muted py-3">…</td></tr>');
-        const modal = new bootstrap.Modal(document.getElementById('itemsModal'));
+    window.viewCashierDetail = function (userId, userName) {
+        $('#summaryModalCashier').text(userName);
+        $('#summaryModalBody').html('<div class="text-center py-4 text-muted">…</div>');
+        const modal = new bootstrap.Modal(document.getElementById('summaryModal'));
         modal.show();
 
         const params = currentParams();
         params.user_id = userId;
-        params.mode = 'items';
+        params.mode = 'detail';
         $.getJSON(DATA_URL, params)
             .done(function (res) {
                 if (!res || !res.success) {
-                    $('#itemsModalBody').html('<tr><td colspan="3" class="text-center text-danger py-3">' + PT.couldNotLoadReport + '</td></tr>');
+                    $('#summaryModalBody').html('<div class="text-center text-danger py-3">' + PT.couldNotLoadReport + '</div>');
                     return;
                 }
-                if (!res.items.length) {
-                    $('#itemsModalBody').html('<tr><td colspan="3" class="text-center text-muted py-3">' + PT.noItemsFound + '</td></tr>');
-                    return;
-                }
-                let html = '';
-                res.items.forEach(it => {
-                    html += `<tr><td class="ps-3">${caseFormatJs(it.product_name)}</td><td class="text-end">${fmtQty(it.qty_sold)}</td><td class="text-end pe-3">${fmt(it.total_value)}</td></tr>`;
+
+                // Info bar
+                let html = `<div class="row g-3 mb-3 text-center">
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold mb-1">${PT.cashier}</div>
+                        <div class="fw-bold">${esc(userName)}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold mb-1">${PT.period}</div>
+                        <div class="fw-bold">${esc($('#f-from').val())} – ${esc($('#f-to').val())}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold mb-1">${PT.transactions}</div>
+                        <div class="fw-bold fs-4 text-primary">${Number(res.totals.tx_count).toLocaleString()}</div>
+                    </div>
+                </div><hr class="my-2">`;
+
+                // Payment method breakdown
+                html += `<h6 class="fw-bold text-muted text-uppercase small mb-2">${PT.salesByPaymentMethod}</h6>
+                <div class="table-responsive mb-3">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead style="background:#e7f0ff;">
+                        <tr>
+                            <th>${PT.paymentMethod}</th>
+                            <th class="text-end">${PT.transactions}</th>
+                            <th class="text-end">${PT.total}</th>
+                        </tr>
+                    </thead><tbody>`;
+                res.payment_breakdown.forEach(pb => {
+                    html += `<tr>
+                        <td class="text-capitalize">${esc(pb.payment_method || '—')}</td>
+                        <td class="text-end">${Number(pb.tx_count).toLocaleString()}</td>
+                        <td class="text-end">${fmt(pb.total)}</td>
+                    </tr>`;
                 });
-                $('#itemsModalBody').html(html);
+                html += `</tbody>
+                    <tfoot class="fw-bold" style="background:#e7f0ff;">
+                        <tr>
+                            <td>${PT.grandTotal}</td>
+                            <td class="text-end">${Number(res.totals.tx_count).toLocaleString()}</td>
+                            <td class="text-end">${fmt(res.totals.total_value)}</td>
+                        </tr>
+                    </tfoot>
+                </table></div>`;
+
+                // Items sold
+                html += `<h6 class="fw-bold text-muted text-uppercase small mb-2">${PT.itemsSold}</h6>`;
+                if (res.items.length) {
+                    html += `<div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead style="background:#e7f0ff;">
+                            <tr>
+                                <th class="ps-2">${PT.product}</th>
+                                <th class="text-end">${PT.qty}</th>
+                                <th class="text-end pe-2">${PT.value}</th>
+                            </tr>
+                        </thead><tbody>`;
+                    res.items.forEach(it => {
+                        html += `<tr>
+                            <td class="ps-2">${caseFormatJs(it.product_name)}</td>
+                            <td class="text-end">${fmtQty(it.qty_sold)}</td>
+                            <td class="text-end pe-2">${fmt(it.total_value)}</td>
+                        </tr>`;
+                    });
+                    html += `</tbody></table></div>`;
+                } else {
+                    html += `<p class="text-muted text-center py-2 mb-0">${PT.noItemsFound}</p>`;
+                }
+
+                $('#summaryModalBody').html(html);
             })
-            .fail(() => $('#itemsModalBody').html('<tr><td colspan="3" class="text-center text-danger py-3">' + PT.serverErrorLoadingReport + '</td></tr>'));
+            .fail(() => $('#summaryModalBody').html('<div class="text-center text-danger py-3">' + PT.serverErrorLoadingReport + '</div>'));
     };
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
