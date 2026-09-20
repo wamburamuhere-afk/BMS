@@ -133,12 +133,22 @@ $baseDom = tenantBaseDomain();
         <div class="row g-2 mb-3">
             <div class="col-md-6">
                 <label for="owner_password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="owner_password" name="owner_password" required>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="owner_password" name="owner_password" required>
+                    <button type="button" class="btn btn-outline-secondary" onclick="togglePw('owner_password',this)" tabindex="-1" title="Show/hide password">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
                 <div class="form-text">At least 8 characters, with a letter and a number.</div>
             </div>
             <div class="col-md-6">
                 <label for="owner_password_confirm" class="form-label">Confirm password</label>
-                <input type="password" class="form-control" id="owner_password_confirm" name="owner_password_confirm" required>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="owner_password_confirm" name="owner_password_confirm" required>
+                    <button type="button" class="btn btn-outline-secondary" onclick="togglePw('owner_password_confirm',this)" tabindex="-1" title="Show/hide password">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -249,6 +259,13 @@ $('#registerForm').on('submit', function (e) {
         }
     });
 });
+
+function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    const showing = inp.type === 'text';
+    inp.type = showing ? 'password' : 'text';
+    btn.querySelector('i').className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
+}
 
 function showFormError(msg) {
     $('#settingUp').addClass('d-none');
