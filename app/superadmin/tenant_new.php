@@ -132,14 +132,24 @@ $startingPlans = planTablesReady()
 
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Owner password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" name="owner_password" required
-                                       autocomplete="new-password">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="f-pw" name="owner_password" required
+                                           autocomplete="new-password">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="togglePw('f-pw',this)" tabindex="-1" title="Show/hide password">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                                 <div class="form-text">At least 8 characters, including a letter and a number.</div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Confirm password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" name="owner_password_confirm" required
-                                       autocomplete="new-password">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="f-pw2" name="owner_password_confirm" required
+                                           autocomplete="new-password">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="togglePw('f-pw2',this)" tabindex="-1" title="Show/hide password">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
 
                         </div>
@@ -191,6 +201,13 @@ $('#f-sub').on('input', function () {
             });
     }, 350);
 });
+
+function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    const showing = inp.type === 'text';
+    inp.type = showing ? 'password' : 'text';
+    btn.querySelector('i').className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
+}
 
 $('#newTenantForm').on('submit', function (e) {
     e.preventDefault();

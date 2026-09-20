@@ -31,9 +31,20 @@ require_once __DIR__ . '/tenant_provisioner.php';
 require_once __DIR__ . '/platform_settings.php';
 require_once __DIR__ . '/plans.php';
 
-/** Throttle policy. Generous for real humans, ruinous for a script. */
-const REGISTRATION_MAX_PER_IP_HOUR  = 3;
-const REGISTRATION_MAX_PER_IP_DAY   = 6;
+/**
+ * Throttle policy.
+ *
+ * Per-IP counts exclude trivial validation rejections (outcome='rejected') —
+ * a mistyped email or short password should not burn a registration slot.
+ * Only real provisioning attempts (success / failed / throttled) count toward
+ * the per-IP cap so a team signing up from the same office NAT is not blocked
+ * after three typos between them.
+ *
+ * The global hourly cap already counts only successes (a distributed flood of
+ * failures would slip past it, but would hit the per-IP limit instead).
+ */
+const REGISTRATION_MAX_PER_IP_HOUR  = 10;   // was 3 — raised for shared-NAT offices
+const REGISTRATION_MAX_PER_IP_DAY   = 20;   // was 6
 const REGISTRATION_MAX_GLOBAL_HOUR  = 40;
 
 if (!function_exists('selfRegistrationOpen')) {
@@ -116,22 +127,27 @@ if (!function_exists('registrationThrottleCheck')) {
         try {
             $pdo = getControlPdo();
 
+            // Count only real provisioning attempts (not trivial form-validation
+            // rejections) so a team on the same office NAT is not blocked because
+            // one member mistyped their password three times.
             $perIpHour = $pdo->prepare("
                 SELECT COUNT(*) FROM registration_attempts
-                WHERE ip_address = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                WHERE ip_address = ? AND outcome <> 'rejected'
+                  AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
             ");
             $perIpHour->execute([$ip]);
             if ((int)$perIpHour->fetchColumn() >= REGISTRATION_MAX_PER_IP_HOUR) {
-                return 'Too many registration attempts. Please try again in an hour.';
+                return 'Too many registration attempts from your network. Please try again in an hour.';
             }
 
             $perIpDay = $pdo->prepare("
                 SELECT COUNT(*) FROM registration_attempts
-                WHERE ip_address = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+                WHERE ip_address = ? AND outcome <> 'rejected'
+                  AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
             ");
             $perIpDay->execute([$ip]);
             if ((int)$perIpDay->fetchColumn() >= REGISTRATION_MAX_PER_IP_DAY) {
-                return 'Too many registration attempts. Please try again tomorrow.';
+                return 'Too many registrations from your network today. Please try again tomorrow.';
             }
 
             // A distributed flood would slip past the per-IP limits; this caps the
@@ -262,12 +278,61 @@ if (!function_exists('registerTenant')) {
 
         logRegistrationAttempt($ip, $email, $sub, 'success', null, $r['tenant_id']);
 
+        // Notify all superadmins by email — best-effort, never fatal.
+        try {
+            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $email, $company);
+        } catch (Throwable $_notifyE) {
+            error_log('notifySuperadminsOfNewRegistration threw: ' . $_notifyE->getMessage());
+        }
+
         return [
             'ok' => true, 'error' => null,
             'tenant_id' => $r['tenant_id'],
             'subdomain' => $sub,
             'login_url' => tenantLoginUrl($sub),
         ];
+    }
+}
+
+if (!function_exists('notifySuperadminsOfNewRegistration')) {
+    /**
+     * Email every superadmin when a new company self-registers.
+     * Best-effort — never fatal to the registration itself.
+     * Same pattern as notifySuperadminsOfModuleRequest() in core/module_requests.php.
+     */
+    function notifySuperadminsOfNewRegistration(
+        int $tenantId, string $subdomain, string $ownerEmail, string $companyName
+    ): void {
+        require_once __DIR__ . '/platform_settings.php';
+        require_once __DIR__ . '/mailer.php';
+
+        $mailer = platformMailerOpts();
+        if (!$mailer['configured']) return;   // SMTP not set up yet — silently skip
+
+        $safeCompany = htmlspecialchars($companyName,  ENT_QUOTES, 'UTF-8');
+        $safeEmail   = htmlspecialchars($ownerEmail,   ENT_QUOTES, 'UTF-8');
+        $safeSub     = htmlspecialchars($subdomain,    ENT_QUOTES, 'UTF-8');
+        $ts          = date('Y-m-d H:i:s T');
+
+        $subject = "New company registered: {$companyName}";
+        $body    = "<p>A new company has registered on the platform.</p>"
+                 . "<ul>"
+                 . "<li><strong>Company:</strong> {$safeCompany}</li>"
+                 . "<li><strong>Subdomain:</strong> {$safeSub}</li>"
+                 . "<li><strong>Owner email:</strong> {$safeEmail}</li>"
+                 . "<li><strong>Tenant ID:</strong> {$tenantId}</li>"
+                 . "<li><strong>Registered at:</strong> {$ts}</li>"
+                 . "</ul>"
+                 . "<p>View details in the platform admin panel under <strong>Companies</strong>.</p>";
+
+        try {
+            $emails = getControlPdo()->query("SELECT email FROM superadmins")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($emails as $to) {
+                sendEmail((string)$to, $subject, $body, $mailer['opts']);
+            }
+        } catch (Throwable $e) {
+            error_log('notifySuperadminsOfNewRegistration: ' . $e->getMessage());
+        }
     }
 }
 
