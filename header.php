@@ -1533,9 +1533,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             box-shadow: 0 -2px 10px rgba(0,0,0,0.10);
             padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
         .bms-bnav .bn-item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
-            padding: 4px 2px; background: none; border: 0; text-decoration: none;
-            color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; font-size: 0.68rem; font-weight: 500; line-height: 1.15; }
-        .bms-bnav .bn-item i { font-size: 1.3rem; line-height: 1; }
+            padding: 4px 1px; background: none; border: 0; text-decoration: none;
+            color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; font-size: clamp(0.54rem, 2.1vw, 0.68rem); font-weight: 500; line-height: 1.15; }
+        .bms-bnav .bn-item i { font-size: clamp(1.05rem, 3.8vw, 1.3rem); line-height: 1; }
         .bms-bnav .bn-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .bms-bnav .bn-item.active { color: #0d6efd; font-weight: 700; }
         .bms-sheet { height: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0;
@@ -1568,6 +1568,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </style>
 
     <nav class="bms-bnav d-flex d-lg-none d-print-none" aria-label="<?= htmlspecialchars(t('Main Menu')) ?>">
+        <?php if (canView('dashboard')): ?>
+        <a class="bn-item<?= $__bn_on('dashboard') ? ' active' : '' ?>" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i><span><?= t('Dashboard') ?></span></a>
+        <?php endif; ?>
         <?php if (canView('pos')): ?>
         <a class="bn-item<?= $__bn_on('pos') ? ' active' : '' ?>" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i><span><?= t('POS') ?></span></a>
         <?php endif; ?>
