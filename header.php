@@ -920,7 +920,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                     <button type="button" class="btn btn-sm btn-outline-light px-2"
                         data-bs-toggle="offcanvas" data-bs-target="#bmsAccountSheet" aria-controls="bmsAccountSheet"
                         title="<?= htmlspecialchars(t('Settings')) ?>">
-                        <i class="bi bi-three-dots-vertical fs-5"></i>
+                        <i class="bi bi-list fs-5"></i>
                     </button>
                 </div>
                 <?php endif; ?>
