@@ -1445,7 +1445,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         $_set_biz_visible = canView('tax_settings');
                         ?>
                         <?php if ($_set_sys_visible || $_set_biz_visible): ?>
-                        <li class="nav-item dropdown">
+                        <li class="nav-item dropdown bms-settings-nav">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-sliders"></i> <?= t('Settings') ?>
                             </a>
@@ -1546,14 +1546,24 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         .bms-sheet .bn-group { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: #6c757d; padding: 0.9rem 0.25rem 0.2rem; }
         .bms-sheet .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
         @media (max-width: 991.98px) {
-            /* Room for the bar so page content is never hidden behind it. */
             body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
-            /* The ☰ button is replaced by the bar; it comes back only while the
-               full menu is open (opened from More > All Menus) so it can be closed. */
             .bottom-header .navbar-toggler { display: none !important; }
-            body.bms-menu-open .bottom-header .navbar-toggler { display: block !important; }
             .bottom-header .header-nav-bar { padding: 0; }
             body.bms-kb-open .bms-bnav { display: none !important; }
+            /* Keep Settings + Language + User always visible in the top bar on mobile.
+               Bootstrap hides #navbarNav on mobile; override that and strip out the
+               left-side nav links (they live in the bottom bar), leaving only the
+               Settings dropdown, the language pill and the user dropdown. */
+            .bottom-header #navbarNav {
+                display: flex !important;
+                flex-direction: row;
+                justify-content: flex-end;
+                align-items: center;
+                flex-wrap: nowrap;
+            }
+            .bottom-header #navbarNav ul.navbar-nav.me-auto li:not(.bms-settings-nav) {
+                display: none !important;
+            }
         }
     </style>
 
@@ -1593,8 +1603,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </div>
     <?php endif; ?>
 
-    <!-- More — the Core, Shop and Settings items plus the account/language items that live
-         inside the ☰ menu on a phone. "All Menus" opens that full menu, so nothing else is lost. -->
+    <!-- More — quick access to Customers, Suppliers and Services on mobile. -->
     <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1" id="bmsMoreSheet" aria-labelledby="bmsMoreSheetLabel">
         <div class="offcanvas-header pb-0">
             <h6 class="offcanvas-title fw-bold" id="bmsMoreSheetLabel"><?= t('More') ?></h6>
@@ -1602,29 +1611,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         </div>
         <div class="offcanvas-body pt-0">
             <div class="list-group list-group-flush">
-                <?php if(canView('dashboard')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i><?= t('Dashboard') ?></a><?php endif; ?>
                 <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
                 <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
-                <?php if(canView('warehouses')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i><?= htmlspecialchars(wLabel('Inventory', 'Shop')) ?></a><?php endif; ?>
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
-            </div>
-            <?php if ($_set_sys_visible || $_set_biz_visible): ?>
-            <div class="bn-group"><?= t('Settings') ?></div>
-            <div class="list-group list-group-flush">
-                <?php if (isAdmin()): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i><?= t('Admin') ?></a><?php endif; ?>
-                <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= t('POS Settings') ?></a><?php endif; ?>
-                <?php if (canView('color_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>
-                <?php if (canView('tax_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i><?= t('Tax') ?></a><?php endif; ?>
-            </div>
-            <?php endif; ?>
-            <div class="bn-group"><?= htmlspecialchars($username) ?> · <?= htmlspecialchars(t($user_role)) ?></div>
-            <div class="list-group list-group-flush">
-                <?php if (!empty($_SESSION['employee_id'])): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace"></i><?= t('My HR') ?></a><?php endif; ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>"><i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle"></i><?= t('Help') ?></a>
-                <button type="button" class="list-group-item list-group-item-action" onclick="bmsToggleLang()"><i class="bi bi-globe2"></i><?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?> (<?= strtoupper($__bms_lang_pref) ?>)</button>
-                <button type="button" class="list-group-item list-group-item-action" id="bmsAllMenusBtn"><i class="bi bi-list"></i><?= t('All Menus') ?></button>
-                <a class="list-group-item list-group-item-action text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right text-danger"></i><?= t('Logout') ?></a>
             </div>
         </div>
     </div>
