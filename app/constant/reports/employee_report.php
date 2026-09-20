@@ -39,18 +39,18 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
                 <?php if (projectsModuleActive()): ?>
-                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Project') ?></label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <?php endif; ?>
-                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Department</label>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Department') ?></label>
                     <select name="department_id" id="f-dept" class="form-select" style="width:100%">
                         <option value="">All Departments</option>
                         <?php foreach ($departments as $d): ?><option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option><?php endforeach; ?>
                     </select></div>
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Status</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Status') ?></label>
                     <select name="status" id="f-status" class="form-select" style="width:100%">
                         <option value="">All Statuses</option>
                         <option value="active">Active</option>
@@ -90,8 +90,8 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="empTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Name</th><th>Department</th><th>Position</th>
-                    <th>Hire Date</th><th class="text-center">Status</th><th class="pe-3 text-end">Basic Salary</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Name') ?></th><th><?= t('Department') ?></th><th><?= t('Position') ?></th>
+                    <th><?= t('Hire Date') ?></th><th class="text-center"><?= t('Status') ?></th><th class="pe-3 text-end"><?= t('Basic Salary') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>

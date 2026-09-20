@@ -170,7 +170,7 @@ function getMovementBadge($type) {
                 </div>
                 
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold">Type</label>
+                    <label class="form-label small fw-bold"><?= t('Type') ?></label>
                     <select class="form-select form-select-sm" name="movement_type">
                         <option value="">All Types</option>
                         <option value="purchase_in" <?= $movement_type == 'purchase_in' ? 'selected' : '' ?>>Purchase In</option>
@@ -182,12 +182,12 @@ function getMovementBadge($type) {
                 </div>
                 
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold">From</label>
+                    <label class="form-label small fw-bold"><?= t('From') ?></label>
                     <input type="date" class="form-control form-control-sm" name="date_from" value="<?= $date_from ?>">
                 </div>
                 
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold">To</label>
+                    <label class="form-label small fw-bold"><?= t('To') ?></label>
                     <input type="date" class="form-control form-control-sm" name="date_to" value="<?= $date_to ?>">
                 </div>
                 
@@ -210,17 +210,17 @@ function getMovementBadge($type) {
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-3">Date</th>
-                            <th>Type</th>
+                            <th class="ps-3"><?= t('Date') ?></th>
+                            <th><?= t('Type') ?></th>
                             <?php if (!$product_id): ?>
-                                <th>Product</th>
+                                <th><?= t('Product') ?></th>
                             <?php endif; ?>
                             <th><?= wLabel('Warehouse', 'Shop') ?></th>
-                            <th>Reference</th>
-                            <th class="text-end">Quantity</th>
-                            <th class="text-end">Stock Before</th>
-                            <th class="text-end">Stock After</th>
-                            <th>By</th>
+                            <th><?= t('Reference') ?></th>
+                            <th class="text-end"><?= t('Quantity') ?></th>
+                            <th class="text-end"><?= t('Stock Before') ?></th>
+                            <th class="text-end"><?= t('Stock After') ?></th>
+                            <th><?= t('By') ?></th>
                         </tr>
                     </thead>
                     <tbody>

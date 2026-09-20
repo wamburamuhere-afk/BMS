@@ -112,7 +112,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="tab-pane fade show active" id="tax" role="tabpanel">
             <div class="card settings-card border-0">
                 <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0">Tax Brackets</h5>
+                    <h5 class="fw-bold mb-0"><?= t('Tax Brackets') ?></h5>
                     <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addTaxBracketModal">
                         <i class="bi bi-plus-lg me-2"></i>Add Bracket
                     </button>
@@ -126,14 +126,14 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
-                                    <th>Bracket Name</th>
-                                    <th>Min Income</th>
-                                    <th>Max Income</th>
-                                    <th>Tax Rate (%)</th>
-                                    <th>Country</th>
-                                    <th>Effective From</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th><?= t('Bracket Name') ?></th>
+                                    <th><?= t('Min Income') ?></th>
+                                    <th><?= t('Max Income') ?></th>
+                                    <th><?= t('Tax Rate (%)') ?></th>
+                                    <th><?= t('Country') ?></th>
+                                    <th><?= t('Effective From') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -179,7 +179,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="tab-pane fade" id="general" role="tabpanel">
             <div class="card settings-card border-0">
                 <div class="card-header bg-transparent border-0 pt-4 px-4">
-                    <h5 class="fw-bold mb-0">General Configurations</h5>
+                    <h5 class="fw-bold mb-0"><?= t('General Configurations') ?></h5>
                 </div>
                 <div class="card-body p-4">
                     <form id="generalSettingsForm">
@@ -214,7 +214,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="tab-pane fade" id="statutory" role="tabpanel">
             <div class="card settings-card border-0">
                 <div class="card-header bg-transparent border-0 pt-4 px-4">
-                    <h5 class="fw-bold mb-0">Statutory Deduction Rules</h5>
+                    <h5 class="fw-bold mb-0"><?= t('Statutory Deduction Rules') ?></h5>
                 </div>
                 <div class="card-body p-4">
                     <form id="statutorySettingsForm">
@@ -255,7 +255,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
             <div class="modal-header border-0 pb-0 pt-4 px-4">
-                <h5 class="fw-bold">New Tax Bracket</h5>
+                <h5 class="fw-bold"><?= t('New Tax Bracket') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="addTaxBracketForm">
@@ -265,7 +265,7 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="text" class="form-control" name="bracket_name" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Country</label>
+                        <label class="form-label"><?= t('Country') ?></label>
                         <input type="text" class="form-control" name="country" value="Tanzania">
                     </div>
                     <div class="row">
@@ -274,8 +274,8 @@ $tax_brackets = $tax_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="number" step="0.01" class="form-control" name="min_income" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Max Income</label>
-                            <input type="number" step="0.01" class="form-control" name="max_income" placeholder="Leave empty for highest bracket">
+                            <label class="form-label"><?= t('Max Income') ?></label>
+                            <input type="number" step="0.01" class="form-control" name="max_income" placeholder="<?= t('Leave empty for highest bracket') ?>">
                         </div>
                     </div>
                     <div class="mb-3">

@@ -116,44 +116,44 @@ try {
     <div class="details">
         <table>
             <tr>
-                <th>Product</th>
+                <th><?= t('Product') ?></th>
                 <td><?= htmlspecialchars($adjustment['product_name']) ?> (<?= htmlspecialchars($adjustment['sku']) ?>)</td>
             </tr>
             <tr>
-                <th>Barcode</th>
+                <th><?= t('Barcode') ?></th>
                 <td><?= htmlspecialchars($adjustment['barcode']) ?></td>
             </tr>
             <tr>
-                <th>Warehouse</th>
+                <th><?= t('Warehouse') ?></th>
                 <td><?= htmlspecialchars($adjustment['warehouse_name']) ?></td>
             </tr>
             <?php if ($adjustment['location_name']): ?>
             <tr>
-                <th>Location</th>
+                <th><?= t('Location') ?></th>
                 <td><?= htmlspecialchars($adjustment['location_name']) ?></td>
             </tr>
             <?php endif; ?>
             <tr>
-                <th>Type</th>
+                <th><?= t('Type') ?></th>
                 <td><?= ucwords(str_replace('_', ' ', $adjustment['movement_type'])) ?></td>
             </tr>
             <tr>
-                <th>Quantity</th>
+                <th><?= t('Quantity') ?></th>
                 <td>
                     <?= $adjustment['quantity'] > 0 ? '+' : '' ?><?= $adjustment['quantity'] ?>
                 </td>
             </tr>
             <tr>
-                <th>Reason</th>
+                <th><?= t('Reason') ?></th>
                 <td><?= htmlspecialchars($adjustment['reason']) ?></td>
             </tr>
             <tr>
-                <th>Adjusted By</th>
+                <th><?= t('Adjusted By') ?></th>
                 <td><?= htmlspecialchars($adjustment['adjusted_by_name']) ?></td>
             </tr>
             <?php if ($adjustment['notes']): ?>
             <tr>
-                <th>Notes</th>
+                <th><?= t('Notes') ?></th>
                 <td><?= nl2br(htmlspecialchars($adjustment['notes'])) ?></td>
             </tr>
             <?php endif; ?>

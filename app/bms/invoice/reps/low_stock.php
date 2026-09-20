@@ -100,11 +100,11 @@ try {
         <table class="table table-hover align-middle mb-0">
             <thead class="bg-light text-uppercase small fw-bold">
                 <tr>
-                    <th class="ps-4">Product Details</th>
-                    <th class="text-center">Current Stock</th>
-                    <th class="text-center">Reorder Level</th>
-                    <th class="text-center">Status</th>
-                    <th class="text-end pe-4 no-print">Actions</th>
+                    <th class="ps-4"><?= t('Product Details') ?></th>
+                    <th class="text-center"><?= t('Current Stock') ?></th>
+                    <th class="text-center"><?= t('Reorder Level') ?></th>
+                    <th class="text-center"><?= t('Status') ?></th>
+                    <th class="text-end pe-4 no-print"><?= t('Actions') ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -184,11 +184,11 @@ try {
                     
                     <div class="row g-2 mb-3">
                         <div class="col-md-8">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Product</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Product') ?></label>
                             <input type="text" class="form-control bg-light border-0 fw-bold" id="adjust_product_name" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Current Total</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Current Total') ?></label>
                             <input type="text" class="form-control bg-light border-0 fw-bold text-primary" id="current_stock_display" readonly title="<?= wLabel('Total stock across all warehouses', 'Total stock across all shops') ?>">
                         </div>
                     </div>
@@ -205,7 +205,7 @@ try {
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Adjustment Type</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Adjustment Type') ?></label>
                             <select class="form-select border-0 bg-light shadow-sm" id="movement_type" name="movement_type" required>
                                 <option value="adjustment_in">Add (+)</option>
                                 <option value="adjustment_out">Remove (-)</option>
@@ -213,14 +213,14 @@ try {
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Quantity</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Quantity') ?></label>
                             <input type="number" class="form-control border-0 bg-light shadow-sm fw-bold" id="adjustment_quantity" 
-                                   name="quantity" min="0.001" step="0.001" required placeholder="Enter amount">
+                                   name="quantity" min="0.001" step="0.001" required placeholder="<?= t('Enter amount') ?>">
                         </div>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-uppercase text-muted">Reason</label>
+                        <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Reason') ?></label>
                         <select class="form-select border-0 bg-light" id="adjustment_reason" name="reason" required>
                             <option value="found" selected>Stock Found / New Arrival</option>
                             <option value="correction">Stock Correction</option>

@@ -59,7 +59,7 @@ if ($err === null) {
         <form method="get" class="d-flex align-items-end gap-2">
             <input type="hidden" name="page" value="books_health">
             <div>
-                <label class="form-label small mb-1">As of date</label>
+                <label class="form-label small mb-1"><?= t('As of date') ?></label>
                 <input type="date" name="as_of_date" value="<?= safe_output($as_of_date) ?>" class="form-control form-control-sm">
             </div>
             <button class="btn btn-sm btn-primary"><i class="bi bi-arrow-repeat me-1"></i>Re-run</button>
@@ -132,7 +132,7 @@ if ($err === null) {
                 <p class="small text-muted">These accounts were deactivated but still hold real postings. The reports include them (so the books still balance), but they should be reactivated or merged into the live chart.</p>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Code</th><th>Account</th><th>Category</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Balance</th></tr></thead>
+                        <thead class="table-light"><tr><th><?= t('Code') ?></th><th><?= t('Account') ?></th><th><?= t('Category') ?></th><th class="text-end"><?= t('Debit') ?></th><th class="text-end"><?= t('Credit') ?></th><th class="text-end"><?= t('Balance') ?></th></tr></thead>
                         <tbody>
                         <?php foreach ($stranded as $s): ?>
                             <tr><td><?= safe_output($s['account_code']) ?></td><td><?= safe_output($s['account_name']) ?></td>
@@ -160,7 +160,7 @@ if ($err === null) {
                 <p class="small text-muted">The opening-balance field does not balance (debit-side <?= $money($obi['debit_side']) ?> vs credit-side <?= $money($obi['credit_side']) ?>). The statements ignore this field, but it should be corrected — post a real opening journal entry, then zero the field.</p>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Code</th><th>Account</th><th>Status</th><th>Side</th><th class="text-end">Opening balance</th></tr></thead>
+                        <thead class="table-light"><tr><th><?= t('Code') ?></th><th><?= t('Account') ?></th><th><?= t('Status') ?></th><th><?= t('Side') ?></th><th class="text-end"><?= t('Opening balance') ?></th></tr></thead>
                         <tbody>
                         <?php foreach (array_slice($obi['accounts'], 0, 30) as $a): ?>
                             <tr><td><?= safe_output($a['account_code']) ?></td><td><?= safe_output($a['account_name']) ?></td>
@@ -187,7 +187,7 @@ if ($err === null) {
                 <p class="small text-muted">These accounts hold a balance but have no account-type category, so they can't be placed on the Balance Sheet — classify them in Settings → Account Types.</p>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Code</th><th>Account</th><th class="text-end">Balance</th></tr></thead>
+                        <thead class="table-light"><tr><th><?= t('Code') ?></th><th><?= t('Account') ?></th><th class="text-end"><?= t('Balance') ?></th></tr></thead>
                         <tbody>
                         <?php foreach ($unclassed as $u): ?>
                             <tr><td><?= safe_output($u['account_code']) ?></td><td><?= safe_output($u['account_name']) ?></td><td class="text-end"><?= $money($u['amount']) ?></td></tr>
