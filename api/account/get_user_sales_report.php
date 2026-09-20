@@ -39,7 +39,8 @@ $date_to      = $_GET['date_to']   ?? date('Y-12-31');
 $user_filter  = (isset($_GET['user_id']) && $_GET['user_id'] !== '') ? (int)$_GET['user_id'] : null;
 $project_id   = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
 $warehouse_id = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ? (int)$_GET['warehouse_id'] : null;
-$mode         = ($_GET['mode'] ?? '') === 'items' ? 'items' : 'summary';
+$mode_raw = $_GET['mode'] ?? '';
+$mode     = in_array($mode_raw, ['items', 'detail'], true) ? $mode_raw : 'summary';
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success' => false, 'message' => 'Invalid date range']);
@@ -68,6 +69,55 @@ try {
     else                        { $scope  .= scopeFilterSqlNullable('warehouse', 'ps'); }
     if ($user_filter !== null) { $where[] = "ps.user_id = ?"; $params[] = $user_filter; }
     $where_sql = implode(' AND ', $where) . $scope;
+
+    if ($mode === 'detail') {
+        // Full sales-summary drill-down for one cashier: payment-method breakdown
+        // + grand totals + items sold. Displayed in a Z-Report style modal.
+        if ($user_filter === null) {
+            echo json_encode(['success' => false, 'message' => 'user_id is required']);
+            return;
+        }
+        $stmt = $pdo->prepare("
+            SELECT payment_method,
+                   COUNT(*)                        AS tx_count,
+                   COALESCE(SUM(grand_total), 0)   AS total
+              FROM pos_sales ps
+             WHERE $where_sql
+          GROUP BY payment_method
+          ORDER BY total DESC
+        ");
+        $stmt->execute($params);
+        $payment_breakdown = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) AS tx_count, COALESCE(SUM(grand_total), 0) AS total_value
+              FROM pos_sales ps
+             WHERE $where_sql
+        ");
+        $stmt->execute($params);
+        $totals = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['tx_count' => 0, 'total_value' => 0];
+
+        $stmt = $pdo->prepare("
+            SELECT psi.product_name,
+                   SUM(psi.quantity - COALESCE(psi.returned_quantity, 0)) AS qty_sold,
+                   SUM(psi.line_total)                                     AS total_value
+              FROM pos_sale_items psi
+              JOIN pos_sales ps ON psi.sale_id = ps.sale_id
+             WHERE $where_sql
+          GROUP BY psi.product_id, psi.product_name
+          ORDER BY total_value DESC
+        ");
+        $stmt->execute($params);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success'           => true,
+            'totals'            => $totals,
+            'payment_breakdown' => $payment_breakdown,
+            'items'             => $items,
+        ]);
+        return;
+    }
 
     if ($mode === 'items') {
         if ($user_filter === null) {

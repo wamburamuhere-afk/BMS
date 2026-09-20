@@ -23,13 +23,20 @@ $user_id      = $_SESSION['user_id'];
 $where  = $can_view_all ? "1=1" : "sh.user_id = :uid";
 $params = $can_view_all ? [] : ['uid' => $user_id];
 
+// Show the Shop column only when the tenant has more than one shop.
+// A single-shop business never needs to see which shop every shift belongs to.
+$warehouse_count = (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status = 'active'")->fetchColumn();
+$show_shop = $warehouse_count > 1;
+
 $stmt = $pdo->prepare("
     SELECT sh.*, u.username AS cashier_name, r.register_name, r.register_code,
            w.warehouse_name
       FROM cash_register_shifts sh
-      LEFT JOIN users u ON sh.user_id = u.user_id
+      LEFT JOIN users u  ON sh.user_id    = u.user_id
       LEFT JOIN pos_registers r ON sh.register_id = r.register_id
-      LEFT JOIN warehouses w ON w.warehouse_id = sh.warehouse_id
+      -- sh.warehouse_id was added 2026-09-16; fall back to the register's own
+      -- warehouse so existing shifts opened before that date still show a name.
+      LEFT JOIN warehouses w ON w.warehouse_id = COALESCE(sh.warehouse_id, r.warehouse_id)
      WHERE $where
      ORDER BY sh.start_time DESC
      LIMIT 200
@@ -88,7 +95,7 @@ foreach ($shifts as $s) {
             <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;">
                 <tr>
                     <th class="text-center no-sort" style="width:56px;">S/No</th>
-                    <th><?= t('Shift') ?></th><th><?= t('Register') ?></th><th><?= wLabel('Warehouse', 'Shop') ?></th><?php if ($can_view_all): ?><th><?= t('Cashier') ?></th><?php endif; ?>
+                    <th><?= t('Shift') ?></th><th><?= t('Register') ?></th><?php if ($show_shop): ?><th><?= wLabel('Warehouse', 'Shop') ?></th><?php endif; ?><?php if ($can_view_all): ?><th><?= t('Cashier') ?></th><?php endif; ?>
                     <th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Total Sales') ?></th><th class="text-end"><?= t('Difference') ?></th><th><?= t('Status') ?></th><th class="text-end no-sort no-export"><?= t('Actions') ?></th>
                 </tr>
             </thead>
@@ -98,7 +105,7 @@ foreach ($shifts as $s) {
                     <td class="text-center"><?= $sno ?></td>
                     <td><?= caseFormat($s['shift_code']) ?></td>
                     <td><?= caseFormat($s['register_name'], '—') ?></td>
-                    <td><?= caseFormat($s['warehouse_name'], '—') ?></td>
+                    <?php if ($show_shop): ?><td><?= caseFormat($s['warehouse_name'], '—') ?></td><?php endif; ?>
                     <?php if ($can_view_all): ?><td><?= caseFormat($s['cashier_name']) ?></td><?php endif; ?>
                     <td><?= date('d/m/Y H:i', strtotime($s['start_time'])) ?></td>
                     <td><?= $s['end_time'] ? date('d/m/Y H:i', strtotime($s['end_time'])) : '—' ?></td>
@@ -157,6 +164,7 @@ const T_NO_SHIFTS_FOUND = <?= json_encode(t('No shifts found')) ?>;
 const T_TOTAL_LABEL     = <?= json_encode(t('Total:')) ?>;
 const T_DIFF_LABEL      = <?= json_encode(t('Diff:')) ?>;
 const T_ZREPORT_LABEL   = <?= json_encode(t('Z-Report')) ?>;
+const SHOW_SHOP         = <?= $show_shop ? 'true' : 'false' ?>;
 
 function renderShiftCards(rows) {
     const cardView = document.getElementById('cardView');
@@ -165,7 +173,7 @@ function renderShiftCards(rows) {
     rows.forEach(r => {
         html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
             <div class="d-flex justify-content-between"><span class="fw-bold">${r.code}</span><span class="badge bg-${r.status === 'active' ? 'success' : 'secondary'}">${r.status}</span></div>
-            <small class="text-muted">${r.register ? caseFormatJs(r.register) : '—'}${r.warehouse ? ' · ' + caseFormatJs(r.warehouse) : ''} · ${r.opened}</small>
+            <small class="text-muted">${r.register ? caseFormatJs(r.register) : '—'}${(SHOW_SHOP && r.warehouse) ? ' · ' + caseFormatJs(r.warehouse) : ''} · ${r.opened}</small>
             <div class="mt-2 small">${T_TOTAL_LABEL} ${r.total} ${r.diff ? '· ' + T_DIFF_LABEL + ' ' + r.diff : ''}</div>
             <a href="${r.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-file-earmark-text"></i> ${T_ZREPORT_LABEL}</a>
         </div></div></div>`;
