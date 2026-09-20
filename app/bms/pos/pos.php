@@ -122,6 +122,38 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
            style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"
            tabindex="-1">
 
+    <!-- Critical mobile CSS hoisted above posHeaderBar to prevent FOUC:
+         without this, the browser renders posHeaderBar in the desktop horizontal
+         layout first, then reflows when it reaches the full <style> block at the
+         bottom of this file. Duplicating just the layout-changing rules here so
+         the first paint is already correct on phones. -->
+    <style>
+    @media (max-width: 767.98px) {
+        #posHeaderBar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px;
+            padding: 14px 14px !important;
+        }
+        #posHeaderBar > .d-flex.align-items-center.gap-3 {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch !important;
+            gap: 10px !important;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,.2);
+        }
+        #posShiftButtons {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+        #posShiftButtons .btn {
+            flex: 1 1 0;
+            margin-right: 0 !important;
+        }
+    }
+    </style>
     <!-- POS Header -->
     <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
