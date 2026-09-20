@@ -1,453 +1,595 @@
 <?php
-// File: reps/cash_flow.php
-// Phase 3.4 — Cash Flow UI rewrite:
-//   • Tabs for Direct / Indirect method toggle
-//   • Three amount columns: Current | Comparative | Variance
-//   • IFRS for SMEs §7.19A + §7.19B-C disclosure cards
-// Included by app/bms/invoice/reports.php (gates 'reports') AND by the canonical
-// Cash Flow route app/constant/reports/cash_flow.php (gates 'financial_reports');
-// accept either so both entry points work.
-require_once __DIR__ . '/../../../../roots.php';
-if (!canView('reports') && !canView('financial_reports')) {
-    http_response_code(403);
-    die("Access Denied");
+/**
+ * Professional Cash Flow Statement
+ * Indirect Method - Premium UI Design
+ */
+ob_start();
+require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
+
+includeHeader();
+
+if (function_exists('autoEnforcePermission')) {
+    autoEnforcePermission('financial_reports');
 }
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
-$end_date   = $_GET['end_date']   ?? date('Y-m-t');
-$project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0
-    ? (int)$_GET['project_id']
-    : null;
-$method = (isset($_GET['method']) && $_GET['method'] === 'indirect') ? 'indirect' : 'direct';
+$end_date   = $_GET['end_date']   ?? date('Y-m-d');
+$company_name = get_setting('company_name') ?: 'Business Management System';
 
-// Consume the Cash Flow API internally so all rules (scope, project filter,
-// canonical helpers) stay in a single place.
-$saved_get = $_GET;
-$_GET = ['start_date' => $start_date, 'end_date' => $end_date, 'method' => $method];
-if ($project_id !== null) $_GET['project_id'] = (string)$project_id;
-ob_start();
-require __DIR__ . '/../../../../api/account/get_cash_flow.php';
-$cf_raw = ob_get_clean();
-$_GET = $saved_get;
+// 2026-09-11: Project + Warehouse filtering (security.md §23) — this report used
+// to read the WHOLE ledger with no project/warehouse boundary at all, unlike
+// every other GL-derived report. A specific choice binds je.project_id/
+// warehouse_id = N; otherwise non-admins default-scope to "assigned OR untagged".
+$project_id   = isset($_GET['project_id'])   && $_GET['project_id']   !== '' ? (int)$_GET['project_id']   : null;
+$warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' ? (int)$_GET['warehouse_id'] : null;
+// A switched-off Projects module must win over even a hand-crafted
+// ?project_id= — neutralise it here so the data itself stops being
+// filterable by project, not just the dropdown that offers it.
+if (!projectsModuleActive()) $project_id = null;
+if ($project_id !== null && !userCan('project', $project_id)) {
+    http_response_code(403);
+    die('Access denied: this project is not in your assigned scope.');
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
+}
+$cf_je_scope = ($project_id !== null ? " AND je.project_id = " . (int)$project_id : scopeFilterSqlNullable('project', 'je'))
+             . ($warehouse_id !== null ? " AND je.warehouse_id = " . (int)$warehouse_id : scopeFilterSqlNullable('warehouse', 'je'));
 
-$cf = json_decode($cf_raw, true);
-$cf_ok = $cf && !empty($cf['success']);
-$cf_data = $cf_ok ? $cf['data'] : null;
-$cf_error = $cf_ok ? '' : ($cf['message'] ?? 'Failed to load report');
+// Empty when Projects isn't active for this tenant — see
+// projectsModuleActive() (core/project_scope.php).
+$cf_projects = projectsForSelect($pdo);
+$cf_warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
+    "SELECT warehouse_id, warehouse_name, project_id FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
-$_GET = [];
-ob_start();
-require_once __DIR__ . '/../../../../api/account/get_projects_for_filter.php';
-$proj_raw = ob_get_clean();
-$_GET = $saved_get;
-$proj_resp = json_decode($proj_raw, true);
-$projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['projects'] : [];
+// Load canonical classification helper (Phase 1).
+require_once __DIR__ . '/../../../core/financial_classification.php';
 
-// The two APIs included above each set a JSON Content-Type when headers aren't yet
-// sent (roots.php buffers all output, so headers_sent() is false here). Left as-is,
-// the whole page would be served as application/json and the browser would show the
-// HTML as raw code. Reset to HTML now — header() replaces the field and the last call
-// wins when the buffer flushes — so this partial renders as a page under any caller
-// (the reports hub and the canonical /cash_flow route alike).
-if (!headers_sent()) {
-    header('Content-Type: text/html; charset=UTF-8');
+// Defensive defaults — if anything in the try block throws (e.g. the
+// account_types classification migration hasn't run on this server),
+// the page still renders the error banner instead of dumping
+// "Undefined variable" warnings.
+$net_income           = 0.0;
+$depreciation_addback = 0.0;
+$operating_activities = [];
+$investing_activities = [];
+$financing_activities = [];
+$cash_movement        = 0.0;
+$total_operating      = 0.0;
+$total_investing      = 0.0;
+$total_financing      = 0.0;
+$net_increase_cash    = 0.0;
+$cash_start           = 0.0;
+$cash_end_actual      = 0.0;
+$cash_end_computed    = 0.0;
+$cash_reconciles      = true;   // assume balanced when no data
+$cash_recon_diff      = 0.0;
+$missing_classification = [];
+$error_message        = null;
+
+// Guard: classification columns must exist on this server (see migration
+// 2026_05_27). Show a clear banner instead of an SQL error if they're missing.
+if (!fc_classification_ready($pdo)) {
+    echo fc_classification_missing_banner('Cash Flow Statement');
+    includeFooter();
+    ob_end_flush();
+    return;
 }
 
-// Helper: build a URL preserving the current filter params but swapping `method`.
-if (!function_exists('cf_tab_url')) {
-    function cf_tab_url(string $new_method, string $start_date, string $end_date, ?int $project_id): string {
-        $params = [
-            'report'     => 'cash_flow',
-            'start_date' => $start_date,
-            'end_date'   => $end_date,
-            'method'     => $new_method,
-        ];
-        if ($project_id !== null) $params['project_id'] = (string)$project_id;
-        return getUrl('reports') . '?' . http_build_query($params);
+try {
+    // ── 1. Net Income (Indirect Method starting point) ─────────────────
+    // Pull P&L categories via the canonical helper and aggregate them on
+    // their natural side using fc_balance(). Net Profit = Revenue − COGS
+    // − Expenses (the same identity used by the Balance Sheet's Retained
+    // Earnings — guarantees the two reports never disagree).
+    $is_type_ids = fc_type_ids_for_categories($pdo, ['revenue', 'expense', 'cogs']);
+    $net_income = 0.0;
+    if (!empty($is_type_ids)) {
+        $ph = implode(',', array_fill(0, count($is_type_ids), '?'));
+        $is_sql = "
+            SELECT at.category AS category,
+                   COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS cr
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+         LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+         LEFT JOIN journal_entries je
+                ON je.entry_id = jei.entry_id
+               AND je.entry_date BETWEEN ? AND ?
+               AND je.status = 'posted'
+               $cf_je_scope
+             WHERE a.account_type_id IN ($ph)
+               AND a.status = 'active'
+          GROUP BY at.category
+        ";
+        $stmt = $pdo->prepare($is_sql);
+        $stmt->execute(array_merge([$start_date, $end_date], $is_type_ids));
+        $cat_totals = ['revenue' => 0.0, 'expense' => 0.0, 'cogs' => 0.0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
+        }
+        $net_income = $cat_totals['revenue'] - $cat_totals['cogs'] - $cat_totals['expense'];
     }
-}
 
-// Helper: signed-amount renderer for the table cells.
-if (!function_exists('cf_fmt')) {
-    function cf_fmt(float $v): string {
-        return number_format($v, 2);
+    // ── 2. Period changes in Balance Sheet accounts ────────────────────
+    // Pulls all asset / liability / equity accounts and the net change
+    // during the period. We use the account_types.cash_flow_category
+    // (populated by Phase 1 migration) to route each account to the
+    // correct section — no more account-name LIKE heuristics.
+    $changes_sql = "
+        SELECT
+            a.account_id,
+            a.account_name,
+            a.account_code,
+            at.category              AS category,
+            COALESCE(a.cash_flow_category, at.cash_flow_category) AS cf_category,
+            LOWER(at.type_name)      AS type_name,
+            COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
+        FROM accounts a
+        JOIN account_types at ON a.account_type_id = at.type_id
+        LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+        LEFT JOIN journal_entries je
+               ON je.entry_id = jei.entry_id
+              AND je.entry_date BETWEEN ? AND ?
+              AND je.status = 'posted'
+              $cf_je_scope
+        WHERE a.status = 'active'
+          AND at.category IN ('asset','liability','equity')
+        GROUP BY a.account_id, a.account_name, a.account_code, at.category, a.cash_flow_category, at.cash_flow_category, at.type_name
+        HAVING ABS(total_debit) > 0.001 OR ABS(total_credit) > 0.001
+        ORDER BY a.account_code
+    ";
+    $stmt = $pdo->prepare($changes_sql);
+    $stmt->execute([$start_date, $end_date]);
+    $changes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $operating_activities = [];
+    $investing_activities = [];
+    $financing_activities = [];
+    $cash_movement        = 0.0;
+
+    foreach ($changes as $acc) {
+        $category = $acc['category'];
+        $cf       = $acc['cf_category'];
+        $debit    = (float)$acc['total_debit'];
+        $credit   = (float)$acc['total_credit'];
+
+        // Natural-side balance change. For an asset account, positive
+        // = balance went up (debit > credit). For a liability/equity,
+        // positive = balance went up (credit > debit).
+        $change = fc_balance($category, $debit, $credit);
+        if (abs($change) < 0.001) continue;
+
+        // Cash-and-equivalents accounts feed the bottom reconciliation.
+        if ($cf === 'cash') {
+            $cash_movement += $change;
+            continue;
+        }
+
+        // Cash-flow impact rule (indirect method):
+        //   - When an asset goes UP, cash went DOWN (paid to buy it)
+        //     → cf_impact = -change
+        //   - When a liability goes UP, cash went UP (received cash)
+        //     → cf_impact = +change
+        //   - When equity goes UP (capital injection), cash went UP
+        //     → cf_impact = +change
+        $cf_impact = ($category === 'asset') ? -$change : $change;
+        $acc['cf_impact'] = $cf_impact;
+        $acc['change']    = $change;
+
+        if ($cf === 'investing') {
+            $investing_activities[] = $acc;
+        } elseif ($cf === 'financing') {
+            $financing_activities[] = $acc;
+        } else { // 'operating' or NULL → default to Operating
+            $operating_activities[] = $acc;
+        }
     }
-    function cf_class(float $v): string {
-        if ($v < 0) return 'text-danger';
-        if ($v > 0) return 'text-success';
-        return '';
+
+    // ── 3. Depreciation add-back (non-cash adjustment) ─────────────────
+    // Identify the expense incurred during the period that came from
+    // accounts whose type_name contains "depreciation". This is the
+    // classic indirect-method non-cash add-back.
+    // NOTE: the depreciation-name match MUST be wrapped in parentheses. Without
+    // them, SQL's AND-before-OR precedence parsed this as
+    //   (type_name LIKE '%depreciation%') OR (account_name LIKE '…' AND date… AND posted)
+    // so the type_name branch ignored the date + posted filters and summed
+    // depreciation across ALL periods and ALL statuses (drafts included),
+    // overstating the add-back and breaking the cash reconciliation.
+    $dep_sql = "
+        SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
+          FROM accounts a
+          JOIN account_types at ON a.account_type_id = at.type_id
+          JOIN journal_entry_items jei ON jei.account_id = a.account_id
+          JOIN journal_entries je      ON je.entry_id    = jei.entry_id
+         WHERE (LOWER(at.type_name) LIKE '%depreciation%'
+             OR LOWER(a.account_name) LIKE '%depreciation expense%')
+           AND je.entry_date BETWEEN ? AND ?
+           AND je.status = 'posted'
+           $cf_je_scope
+    ";
+    $stmt = $pdo->prepare($dep_sql);
+    $stmt->execute([$start_date, $end_date]);
+    $depreciation_addback = (float)($stmt->fetchColumn() ?: 0);
+
+    // ── 4. Totals per section ──────────────────────────────────────────
+    $total_operating = $net_income + $depreciation_addback;
+    foreach ($operating_activities as $act) $total_operating += $act['cf_impact'];
+
+    $total_investing = 0.0;
+    foreach ($investing_activities as $act) $total_investing += $act['cf_impact'];
+
+    $total_financing = 0.0;
+    foreach ($financing_activities as $act) $total_financing += $act['cf_impact'];
+
+    $net_increase_cash = $total_operating + $total_investing + $total_financing;
+
+    // ── 5. Opening / closing cash balances (for reconciliation) ────────
+    // Uses cash_flow_category = 'cash' from account_types — replaces the
+    // account_name LIKE '%cash%' / '%bank%' / '%petty%' heuristics that
+    // could misclassify e.g. "Petty Cash Vehicle Allowance".
+    // Cash & cash equivalents — identified by each account's EFFECTIVE
+    // cash_flow_category (the account-level override set per the canonical
+    // IAS 7 mapping, else the type's value). Opening / closing cash include
+    // the brought-forward accounts.opening_balance so they tie to the ledger
+    // (the Trial Balance / Balance Sheet / General Ledger all include it).
+    $cash_account_ids = fc_account_ids_for_cash_flow_category($pdo, 'cash');
+    $cash_start = 0.0;
+    $cash_end_actual = 0.0;
+    if (!empty($cash_account_ids)) {
+        $cph = implode(',', array_fill(0, count($cash_account_ids), '?'));
+
+        // Brought-forward opening on the cash accounts (cash is debit-natural).
+        $obStmt = $pdo->prepare("SELECT COALESCE(SUM(opening_balance), 0) FROM accounts WHERE account_id IN ($cph)");
+        $obStmt->execute($cash_account_ids);
+        $cash_open_col = (float)$obStmt->fetchColumn();
+
+        // Opening cash = opening_balance + posted movements BEFORE start_date.
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON je.entry_id = jei.entry_id
+             WHERE jei.account_id IN ($cph)
+               AND je.entry_date < ?
+               AND je.status = 'posted'
+               $cf_je_scope
+        ");
+        $stmt->execute(array_merge($cash_account_ids, [$start_date]));
+        $cash_start = $cash_open_col + (float)($stmt->fetchColumn() ?: 0);
+
+        // Actual cash on end_date = opening_balance + posted movements <= end.
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON je.entry_id = jei.entry_id
+             WHERE jei.account_id IN ($cph)
+               AND je.entry_date <= ?
+               AND je.status = 'posted'
+               $cf_je_scope
+        ");
+        $stmt->execute(array_merge($cash_account_ids, [$end_date]));
+        $cash_end_actual = $cash_open_col + (float)($stmt->fetchColumn() ?: 0);
     }
+    $cash_end_computed = $cash_start + $net_increase_cash;
+
+    // Reconciliation: do the indirect method's computed ending cash and
+    // the actual cash balance from journal entries agree?
+    $cash_reconciles = abs($cash_end_computed - $cash_end_actual) < 0.01;
+    $cash_recon_diff = $cash_end_computed - $cash_end_actual;
+
+    // Surface any unclassified account_types.
+    $missing_classification = fc_unclassified_types($pdo);
+
+} catch (Exception $e) {
+    $error_message = $e->getMessage();
 }
 ?>
 
-<!-- Print-only Header — company logo + name come from the global print header
-     (renderPrintHeader() in header.php, already output via includeHeader() in
-     cash_flow_gl.php); do NOT repeat them here or they print twice. -->
-<div class="d-none d-print-block text-center mb-4">
-    <div class="mt-3">
-        <h3 class="fw-bold text-primary text-uppercase">STATEMENT OF CASH FLOWS</h3>
-        <h6 class="text-muted">
-            <?= date('d M Y', strtotime($start_date)) ?> – <?= date('d M Y', strtotime($end_date)) ?>
-            <span class="ms-2">(<?= $method === 'indirect' ? 'Indirect Method' : 'Direct Method' ?>)</span>
-        </h6>
-        <?php if ($cf_ok && !empty($cf_data['meta']['comparative_start'])): ?>
-            <div class="small text-muted">
-                With comparative period:
-                <?= date('d M Y', strtotime($cf_data['meta']['comparative_start'])) ?>
-                – <?= date('d M Y', strtotime($cf_data['meta']['comparative_end'])) ?>
-            </div>
-        <?php endif; ?>
-        <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 100px; margin: 0 auto;"></div>
-    </div>
-</div>
-
-<div class="card shadow-sm border-0 mb-4 print-flow-card">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center d-print-none">
-        <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-stack me-2"></i> Cash Flow Statement</h5>
-        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
-            <i class="bi bi-printer"></i> Print
-        </button>
-    </div>
-    <div class="card-body border-bottom bg-light d-print-none">
-        <form method="GET" action="<?= getUrl('reports') ?>" class="row g-3 align-items-end">
-            <input type="hidden" name="report" value="cash_flow">
-            <input type="hidden" name="method" value="<?= htmlspecialchars($method) ?>">
-            <div class="col-md-3">
-                <label class="form-label small fw-bold">Period Start</label>
-                <input type="date" class="form-control form-control-sm" name="start_date" value="<?= htmlspecialchars($start_date) ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small fw-bold">Period End</label>
-                <input type="date" class="form-control form-control-sm" name="end_date" value="<?= htmlspecialchars($end_date) ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small fw-bold">Project</label>
-                <select class="form-select form-select-sm" name="project_id">
-                    <option value=""><?= ($cf_ok && empty($cf_data['meta']['is_admin'])) ? 'All My Projects' : 'All Projects (Consolidated)' ?></option>
-                    <?php foreach ($projects_list as $p): ?>
-                        <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($p['project_name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-3 d-grid">
-                <button type="submit" class="btn btn-primary btn-sm text-white">
-                    <i class="bi bi-filter"></i> Generate Report
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <?php if (!$cf_ok): ?>
-        <div class="alert alert-danger m-3"><?= htmlspecialchars($cf_error) ?></div>
-    <?php else:
-        $meta    = $cf_data['meta'];
-        $sec     = $cf_data['sections'];
-        $totals  = $cf_data['totals'];
-        $discl   = $cf_data['disclosures'] ?? null;
-
-        $cur_total_net = (float)$totals['net_change_in_cash'];
-        $cmp_total_net = (float)($totals['comparative']['net_change_in_cash'] ?? 0);
-        $var_total_net = $cur_total_net - $cmp_total_net;
-    ?>
-
-    <!-- Method tabs -->
-    <ul class="nav nav-tabs px-3 pt-3 d-print-none" id="cf-method-tabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <a class="nav-link <?= $method === 'direct' ? 'active fw-bold' : '' ?>"
-               href="<?= htmlspecialchars(cf_tab_url('direct', $start_date, $end_date, $project_id)) ?>">
-                <i class="bi bi-arrow-down-up me-1"></i> Direct Method
-            </a>
-        </li>
-        <li class="nav-item" role="presentation">
-            <a class="nav-link <?= $method === 'indirect' ? 'active fw-bold' : '' ?>"
-               href="<?= htmlspecialchars(cf_tab_url('indirect', $start_date, $end_date, $project_id)) ?>">
-                <i class="bi bi-shuffle me-1"></i> Indirect Method
-            </a>
-        </li>
-    </ul>
-
-    <?php if (!empty($meta['project_filter_active'])): ?>
-        <div class="alert alert-info border-0 mx-3 mt-3 py-2 d-print-none" style="font-size: 0.85rem;">
-            <i class="bi bi-info-circle me-2"></i>
-            Project filter active. Salaries, opening/closing cash, and asset purchases are <strong>company-wide</strong> and shown as 0 here.
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($meta['is_admin']) && $meta['is_admin'] === false): ?>
-        <div class="alert alert-secondary border-0 mx-3 mt-3 py-2 d-print-none" style="font-size: 0.85rem;">
-            <i class="bi bi-shield-lock me-2"></i>
-            Showing your scoped view: <?= count($meta['scoped_project_ids'] ?? []) ?> assigned project(s) plus untagged company-wide activity.
-        </div>
-    <?php endif; ?>
-
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light text-uppercase small fw-bold text-muted">
-                    <tr>
-                        <th width="40%" class="ps-4">Line</th>
-                        <th width="20%" class="text-end">
-                            Current<br>
-                            <span class="text-secondary text-nowrap fw-normal" style="font-size:0.7rem;">
-                                <?= htmlspecialchars($meta['current_start'] ?? $start_date) ?>
-                                — <?= htmlspecialchars($meta['current_end'] ?? $end_date) ?>
-                            </span>
-                        </th>
-                        <th width="20%" class="text-end">
-                            Comparative<br>
-                            <span class="text-secondary text-nowrap fw-normal" style="font-size:0.7rem;">
-                                <?= htmlspecialchars($meta['comparative_start'] ?? '—') ?>
-                                — <?= htmlspecialchars($meta['comparative_end'] ?? '—') ?>
-                            </span>
-                        </th>
-                        <th width="20%" class="text-end pe-4">
-                            Variance<br>
-                            <span class="text-secondary text-nowrap fw-normal" style="font-size:0.7rem;">(Current − Comparative)</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- OPENING CASH -->
-                    <tr class="bg-light">
-                        <td class="ps-4 fw-semibold">Opening Cash &amp; Bank Balance</td>
-                        <td class="text-end fw-semibold"><?= cf_fmt((float)$meta['opening_cash']) ?></td>
-                        <td class="text-end fw-semibold"><?= cf_fmt((float)($meta['comparative_opening_cash'] ?? 0)) ?></td>
-                        <td class="text-end pe-4 fw-semibold text-muted"><?= cf_fmt((float)$meta['opening_cash'] - (float)($meta['comparative_opening_cash'] ?? 0)) ?></td>
-                    </tr>
-
-                    <?php
-                    // Render a section block: header + lines + subtotal row.
-                    $renderSection = function (string $title, string $colorClass, array $sec, string $emptyMsg) {
-                        $cur = (float)$sec['total'];
-                        $cmp = (float)($sec['comparative_total'] ?? 0);
-                        $var = $cur - $cmp;
-                    ?>
-                        <tr class="<?= $colorClass ?> fw-bold">
-                            <td colspan="4" class="ps-4"><?= htmlspecialchars($title) ?></td>
-                        </tr>
-                        <?php if (empty($sec['lines'])): ?>
-                            <tr>
-                                <td class="ps-5 text-muted small fst-italic" colspan="4"><?= htmlspecialchars($emptyMsg) ?></td>
-                            </tr>
-                        <?php else: foreach ($sec['lines'] as $l):
-                            $line_cur = (float)$l['amount'];
-                            $line_cmp = (float)($l['comparative_amount'] ?? 0);
-                            $line_var = $line_cur - $line_cmp;
-                        ?>
-                            <tr>
-                                <td class="ps-5"><?= htmlspecialchars($l['name']) ?></td>
-                                <td class="text-end <?= cf_class($line_cur) ?>"><?= cf_fmt($line_cur) ?></td>
-                                <td class="text-end <?= cf_class($line_cmp) ?>"><?= cf_fmt($line_cmp) ?></td>
-                                <td class="text-end pe-4 <?= cf_class($line_var) ?>"><?= cf_fmt($line_var) ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                        <tr class="fw-bold bg-light">
-                            <td class="ps-4">Net cash from <?= strtolower(str_replace(' ACTIVITIES', '', $title)) ?> activities</td>
-                            <td class="text-end <?= cf_class($cur) ?>"><?= cf_fmt($cur) ?></td>
-                            <td class="text-end <?= cf_class($cmp) ?>"><?= cf_fmt($cmp) ?></td>
-                            <td class="text-end pe-4 <?= cf_class($var) ?>"><?= cf_fmt($var) ?></td>
-                        </tr>
-                    <?php };
-
-                    $operatingEmpty = ($method === 'indirect')
-                        ? 'No indirect-method operating data in this period'
-                        : 'No operating cash activity in this period';
-
-                    $renderSection('OPERATING ACTIVITIES', 'table-info', $sec['operating'], $operatingEmpty);
-                    $renderSection('INVESTING ACTIVITIES', 'table-warning', $sec['investing'], 'No investing activity in this period');
-                    $renderSection('FINANCING ACTIVITIES', 'table-secondary', $sec['financing'], 'No financing activity tracked (no borrowing / equity / dividend records in this system)');
-                    ?>
-
-                    <!-- NET CHANGE + CLOSING CASH -->
-                    <tr class="fw-bold border-top-2">
-                        <td class="ps-4">NET CHANGE IN CASH</td>
-                        <td class="text-end <?= cf_class($cur_total_net) ?>"><?= cf_fmt($cur_total_net) ?></td>
-                        <td class="text-end <?= cf_class($cmp_total_net) ?>"><?= cf_fmt($cmp_total_net) ?></td>
-                        <td class="text-end pe-4 <?= cf_class($var_total_net) ?>"><?= cf_fmt($var_total_net) ?></td>
-                    </tr>
-                    <tr class="fw-bold bg-light fs-5">
-                        <td class="ps-4">Closing Cash &amp; Bank Balance</td>
-                        <td class="text-end"><?= cf_fmt((float)$meta['closing_cash']) ?></td>
-                        <td class="text-end"><?= cf_fmt((float)($meta['comparative_closing_cash'] ?? 0)) ?></td>
-                        <td class="text-end pe-4 text-muted"><?= cf_fmt((float)$meta['closing_cash'] - (float)($meta['comparative_closing_cash'] ?? 0)) ?></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="card-footer bg-white py-3">
-        <small class="text-muted">
-            <i class="bi bi-info-circle me-1"></i>
-            <?php if ($method === 'indirect'): ?>
-                Indirect method: starts from Net Profit and adds back non-cash items + working-capital movements. Reconciles to the direct-method operating total once auto-posting is enabled.
-            <?php else: ?>
-                Direct method: shows actual cash inflows and outflows by operating activity. Closing cash is read from your bank/cash chart accounts; opening cash is back-calculated.
-            <?php endif; ?>
-        </small>
-    </div>
-
-    <?php
-    // ═══════════════════════════════════════════════════════════════════════
-    // IFRS for SMEs §7.19A + §7.19B-C — disclosure cards (always-visible)
-    // ═══════════════════════════════════════════════════════════════════════
-    if ($discl):
-        $fin_cur = $discl['financing_liabilities_reconciliation']['current']   ?? null;
-        $fin_cmp = $discl['financing_liabilities_reconciliation']['comparative'] ?? null;
-        $sup_cur = $discl['supplier_finance_arrangements']['current']          ?? null;
-        $sup_cmp = $discl['supplier_finance_arrangements']['comparative']      ?? null;
-    ?>
-    <div class="card-body border-top bg-light">
-        <h6 class="fw-bold text-uppercase text-secondary mb-3">
-            <i class="bi bi-journal-text me-1"></i> IFRS for SMEs — Required Disclosures
-        </h6>
-
-        <?php if ($fin_cur): ?>
-        <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>§7.19A — Reconciliation of Liabilities Arising from Financing Activities</strong>
+<div class="container py-4">
+    <!-- Action Bar -->
+    <div class="row mb-5 d-print-none">
+        <div class="col-12">
+            <div class="glass-action-bar p-3 shadow-sm rounded-4 d-flex flex-wrap justify-content-between align-items-center bg-white border">
+                <div class="filter-section d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="icon-circle bg-primary-subtle text-primary">
+                            <i class="bi bi-calendar-range"></i>
+                        </div>
+                        <h6 class="mb-0 fw-bold text-dark d-none d-lg-block"><?= t('Analysis Range') ?></h6>
+                    </div>
+                    <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white border-end-0 text-muted">From</span>
+                            <input type="date" name="start_date" class="form-control border-start-0 ps-0" value="<?= $start_date ?>" style="width: 140px;">
+                            <span class="input-group-text bg-white border-x-0 text-muted">To</span>
+                            <input type="date" name="end_date" class="form-control border-start-0 ps-0" value="<?= $end_date ?>" style="width: 140px;">
+                        </div>
+                        <?php if (!empty($cf_projects)): ?>
+                        <select name="project_id" id="cf-project" class="form-select form-select-sm" style="width: 170px;" onchange="cfFilterWarehouses()">
+                            <option value="">All Projects</option>
+                            <?php foreach ($cf_projects as $p): ?>
+                            <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>><?= caseFormat($p['project_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <?php if (!empty($cf_warehouses)): ?>
+                        <select name="warehouse_id" id="cf-warehouse" class="form-select form-select-sm" style="width: 170px;">
+                            <option value=""><?= wLabel('All Warehouses', 'All Shops') ?></option>
+                            <?php foreach ($cf_warehouses as $w): ?>
+                            <option value="<?= (int)$w['warehouse_id'] ?>" data-project="<?= (int)($w['project_id'] ?? 0) ?>" <?= $warehouse_id === (int)$w['warehouse_id'] ? 'selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <button type="submit" class="btn btn-primary px-3 fw-bold">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Update
+                        </button>
+                    </form>
                 </div>
-                <span class="badge bg-<?= !empty($fin_cur['applicable']) ? 'success' : 'secondary' ?>">
-                    <?= !empty($fin_cur['applicable']) ? 'Applicable' : 'Not Applicable' ?>
-                </span>
+                <div class="action-buttons d-flex gap-2">
+                    <button class="btn btn-sm btn-light border text-dark fw-bold px-3 d-flex align-items-center gap-2" onclick="window.print()">
+                        <i class="bi bi-printer fs-6 text-primary"></i> <span>Print</span>
+                    </button>
+                    <button class="btn btn-sm btn-dark fw-bold px-3 d-flex align-items-center gap-2" onclick="exportToPDF()">
+                        <i class="bi bi-file-earmark-pdf fs-6 text-warning"></i> <span>Save PDF</span>
+                    </button>
+                </div>
             </div>
-            <div class="card-body py-2 small">
-                <p class="text-muted mb-2"><?= htmlspecialchars($fin_cur['note']) ?></p>
-                <table class="table table-sm mb-0 small">
-                    <thead class="text-uppercase text-muted" style="font-size:0.7rem;">
-                        <tr>
-                            <th>Item</th>
-                            <th class="text-end">Current</th>
-                            <th class="text-end">Comparative</th>
+        </div>
+    </div>
+
+ 
+
+    <!-- Cash-reconciliation banner — accountant's first sanity check.
+         Compares the indirect-method computed ending cash against the
+         actual cash balance from journal entries on end_date. -->
+    <?php if (!isset($error_message) || $error_message === null): ?>
+        <?php if (!$cash_reconciles): ?>
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center d-print-none" style="font-size: 0.9rem;">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>
+                <strong>CASH FLOW DOES NOT RECONCILE.</strong>
+                Computed: <span class="font-monospace"><?= number_format($cash_end_computed, 2) ?></span>
+                vs Actual: <span class="font-monospace"><?= number_format($cash_end_actual, 2) ?></span>
+                — difference <span class="font-monospace fw-bold"><?= number_format(abs($cash_recon_diff), 2) ?></span>.
+                Check the Trial Balance and any draft / unposted entries before relying on this report.
+            </div>
+        </div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($missing_classification ?? [])): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <strong><?= count($missing_classification) ?> account type(s) are unclassified.</strong>
+        Their changes may default into the Operating section — classify them via
+        Settings → Account Types so they're routed to the correct cash-flow bucket.
+    </div>
+    <?php endif; ?>
+
+    <!-- REPORT BODY -->
+    <div class="report-paper shadow mb-5" id="reportContent">
+    <!-- Professional Print Header -->
+    <div class="print-header d-none d-print-block text-center mb-4">
+        <div class="mt-3 text-center">
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">CASH FLOW STATEMENT</h2>
+            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Detailed analysis of cash inflows and outflows from operating, investing, and financing activities.</p>
+            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Period: <?= date('d M Y', strtotime($start_date)) ?> - <?= date('d M Y', strtotime($end_date)) ?></p>
+            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
+        </div>
+        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+    </div>
+
+        <!-- Screen Header -->
+        <div class="text-center mb-5 pb-3 border-bottom-double d-print-none">
+            <h2 class="company-title mb-0"><?= htmlspecialchars((string)($company_name ?? '')) ?></h2>
+            <h1 class="report-type mb-1">CASH FLOW</h1>
+            <p class="report-date mb-0"><?= date('F d, Y', strtotime($start_date)) ?> to <?= date('F d, Y', strtotime($end_date)) ?></p>
+        </div>
+
+        <?php if (isset($error_message)): ?>
+            <div class="alert alert-danger mx-4"><?= htmlspecialchars($error_message) ?></div>
+        <?php endif; ?>
+
+        <div class="px-4">
+            <div class="table-responsive">
+                <table class="table table-sm cf-table">
+                        <!-- OPERATING -->
+                        <tr class="bg-light bg-opacity-50">
+                            <td colspan="2" class="ps-3 py-3 fw-bold text-primary text-uppercase ls-1">
+                                <i class="bi bi-lightning-charge-fill me-2"></i>Cash flows from operating activities
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
                         <tr>
-                            <td>Opening balance</td>
-                            <td class="text-end"><?= cf_fmt((float)$fin_cur['opening_balance']) ?></td>
-                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['opening_balance'] ?? 0)) ?></td>
+                            <td class="ps-5 py-2">Net Profit (from Income Statement)</td>
+                            <td class="text-end pe-3 py-2 fw-bold"><?= format_currency($net_income) ?></td>
+                        </tr>
+                        <?php if (abs($depreciation_addback) > 0.001): ?>
+                        <tr>
+                            <td class="ps-5 small text-muted fst-italic py-1">Add: Depreciation (non-cash expense)</td>
+                            <td class="text-end pe-3 small py-1"><?= format_currency($depreciation_addback) ?></td>
+                        </tr>
+                        <?php endif; ?>
+                        <?php if (!empty($operating_activities)): ?>
+                            <tr><td colspan="2" class="ps-5 small text-muted fst-italic py-1">Adjustments for changes in working capital:</td></tr>
+                            <?php foreach ($operating_activities as $act): ?>
+                            <tr>
+                                <td class="ps-5 border-0 py-2">
+                                    <span class="text-muted small me-2"><?= $act['cf_impact'] >= 0 ? '<i class="bi bi-plus-circle text-success"></i>' : '<i class="bi bi-dash-circle text-danger"></i>' ?></span>
+                                    <?= htmlspecialchars(ucwords((string)($act['account_name'] ?? ''))) ?>
+                                </td>
+                                <td class="text-end pe-3 border-0 py-2"><?= format_currency($act['cf_impact']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        <tr class="subtotal-row border-top">
+                            <td class="ps-4 fw-bold py-2">Net Cash provided by Operating Activities</td>
+                            <td class="text-end pe-3 py-2 fw-bold text-primary border-bottom border-primary"><?= format_currency($total_operating) ?></td>
+                        </tr>
+
+                        <!-- INVESTING -->
+                        <tr class="bg-light bg-opacity-50 mt-4">
+                            <td colspan="2" class="ps-3 py-3 fw-bold text-info text-uppercase ls-1">
+                                <i class="bi bi-building-up me-2"></i>Cash flows from investing activities
+                            </td>
+                        </tr>
+                        <?php if (!empty($investing_activities)): ?>
+                            <?php foreach ($investing_activities as $act): ?>
+                            <tr>
+                                <td class="ps-5 border-0 py-2">
+                                    <span class="text-muted small me-2"><?= $act['cf_impact'] >= 0 ? '<i class="bi bi-arrow-up text-success"></i>' : '<i class="bi bi-arrow-down text-danger"></i>' ?></span>
+                                    <?= ($act['cf_impact'] < 0 ? 'Purchase of ' : 'Sale of ') . htmlspecialchars(ucwords((string)($act['account_name'] ?? ''))) ?>
+                                </td>
+                                <td class="text-end pe-3 border-0 py-2"><?= format_currency($act['cf_impact']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="2" class="ps-5 text-muted fst-italic py-2 small">No investing activities captured.</td></tr>
+                        <?php endif; ?>
+                        <tr class="subtotal-row border-top">
+                            <td class="ps-4 fw-bold py-2">Net Cash provided by Investing Activities</td>
+                            <td class="text-end pe-3 py-2 fw-bold text-info border-bottom border-info"><?= format_currency($total_investing) ?></td>
+                        </tr>
+
+                        <!-- FINANCING -->
+                        <tr class="bg-light bg-opacity-50 mt-4">
+                            <td colspan="2" class="ps-3 py-3 fw-bold text-warning-emphasis text-uppercase ls-1">
+                                <i class="bi bi-bank2 me-2"></i>Cash flows from financing activities
+                            </td>
+                        </tr>
+                        <?php if (!empty($financing_activities)): ?>
+                            <?php foreach ($financing_activities as $act): ?>
+                            <tr>
+                                <td class="ps-5 border-0 py-2">
+                                    <span class="text-muted small me-2"><?= $act['cf_impact'] >= 0 ? '<i class="bi bi-graph-up text-success"></i>' : '<i class="bi bi-graph-down text-danger"></i>' ?></span>
+                                    Change in <?= htmlspecialchars(ucwords((string)($act['account_name'] ?? ''))) ?>
+                                </td>
+                                <td class="text-end pe-3 border-0 py-2"><?= format_currency($act['cf_impact']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="2" class="ps-5 text-muted fst-italic py-2 small">No financing activities captured.</td></tr>
+                        <?php endif; ?>
+                        <tr class="subtotal-row border-top">
+                            <td class="ps-4 fw-bold py-2">Net Cash provided by Financing Activities</td>
+                            <td class="text-end pe-3 py-2 fw-bold text-warning-emphasis border-bottom border-warning"><?= format_currency($total_financing) ?></td>
+                        </tr>
+
+                        <!-- FINAL RECONCILIATION -->
+                        <tr class="bg-dark text-white mt-5">
+                            <td class="ps-3 py-3 fw-bold h5 mb-0">NET INCREASE/DECREASE IN CASH</td>
+                            <td class="text-end pe-3 py-3 fw-bold h5 mb-0"><?= format_currency($net_increase_cash) ?></td>
                         </tr>
                         <tr>
-                            <td>Cash changes</td>
-                            <td class="text-end"><?= cf_fmt((float)$fin_cur['cash_changes']) ?></td>
-                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['cash_changes'] ?? 0)) ?></td>
+                            <td class="ps-3 py-3 text-muted">Cash and cash equivalents at beginning of period</td>
+                            <td class="text-end pe-3 py-3"><?= format_currency($cash_start) ?></td>
                         </tr>
-                        <tr>
-                            <td>Non-cash changes</td>
-                            <td class="text-end"><?= cf_fmt((float)$fin_cur['non_cash_changes']) ?></td>
-                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['non_cash_changes'] ?? 0)) ?></td>
-                        </tr>
-                        <tr class="fw-bold bg-light">
-                            <td>Closing balance</td>
-                            <td class="text-end"><?= cf_fmt((float)$fin_cur['closing_balance']) ?></td>
-                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['closing_balance'] ?? 0)) ?></td>
+                        <tr class="bg-primary text-white">
+                            <td class="ps-3 py-3 fw-bold h4 mb-0 text-uppercase">Cash and cash equivalents at end of period</td>
+                            <td class="text-end pe-3 py-3 fw-bold h4 mb-0 border-bottom-double"><?= format_currency($cash_end_computed) ?></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
-        <?php endif; ?>
 
-        <?php if ($sup_cur): ?>
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>§7.19B-C — Supplier Finance Arrangements</strong>
+        <!-- Footer Note -->
+        <div class="footer-note mt-5 px-4 pt-5 border-top d-print-none">
+            <div class="row">
+                <div class="col-6">
+                    <p class="small text-muted mb-0">Generated by: <?= htmlspecialchars($_SESSION['username'] ?? 'System') ?></p>
+                    <p class="small text-muted">Period: <?= $start_date ?> to <?= $end_date ?></p>
                 </div>
-                <span class="badge bg-<?= !empty($sup_cur['applicable']) ? 'success' : 'secondary' ?>">
-                    <?= !empty($sup_cur['applicable']) ? 'Applicable' : 'Proxy Disclosure' ?>
-                </span>
-            </div>
-            <div class="card-body py-2 small">
-                <p class="text-muted mb-2"><?= htmlspecialchars($sup_cur['note']) ?></p>
-                <table class="table table-sm mb-0 small">
-                    <thead class="text-uppercase text-muted" style="font-size:0.7rem;">
-                        <tr>
-                            <th>Metric</th>
-                            <th class="text-end">Current</th>
-                            <th class="text-end">Comparative</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Unpaid approved invoices (count)</td>
-                            <td class="text-end"><?= (int)$sup_cur['invoice_count'] ?></td>
-                            <td class="text-end"><?= (int)($sup_cmp['invoice_count'] ?? 0) ?></td>
-                        </tr>
-                        <tr>
-                            <td>… of which have parseable payment terms</td>
-                            <td class="text-end"><?= (int)$sup_cur['invoices_with_terms'] ?></td>
-                            <td class="text-end"><?= (int)($sup_cmp['invoices_with_terms'] ?? 0) ?></td>
-                        </tr>
-                        <tr class="fw-bold bg-light">
-                            <td>Total unpaid amount (TZS)</td>
-                            <td class="text-end"><?= cf_fmt((float)$sup_cur['total_unpaid_amount']) ?></td>
-                            <td class="text-end"><?= cf_fmt((float)($sup_cmp['total_unpaid_amount'] ?? 0)) ?></td>
-                        </tr>
-                        <tr>
-                            <td>Earliest computed due date</td>
-                            <td class="text-end"><?= $sup_cur['earliest_due_date'] ? htmlspecialchars($sup_cur['earliest_due_date']) : '—' ?></td>
-                            <td class="text-end"><?= !empty($sup_cmp['earliest_due_date']) ? htmlspecialchars($sup_cmp['earliest_due_date']) : '—' ?></td>
-                        </tr>
-                        <tr>
-                            <td>Latest computed due date</td>
-                            <td class="text-end"><?= $sup_cur['latest_due_date'] ? htmlspecialchars($sup_cur['latest_due_date']) : '—' ?></td>
-                            <td class="text-end"><?= !empty($sup_cmp['latest_due_date']) ? htmlspecialchars($sup_cmp['latest_due_date']) : '—' ?></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="col-6 text-end">
+                    <p class="small text-muted mb-0">Verification Method: Indirect</p>
+                    <p class="small text-muted">ID: <?= session_id() ?></p>
+                </div>
             </div>
         </div>
-        <?php endif; ?>
     </div>
-    <?php endif; ?>
-
-    <?php endif; ?>
 </div>
 
 <style>
+:root { --border-double: 3px double #000; }
+.report-paper { background: #fff; min-height: 1000px; padding: 60px 40px; font-family: 'Inter', 'Segoe UI', serif; color: #333; border: 1px solid #ddd; border-radius: 12px; }
+.company-title { font-size: 1.4rem; font-weight: 800; color: #111; letter-spacing: 0.5px; }
+.report-type { font-size: 2.2rem; font-weight: 300; color: #555; }
+.report-date { font-size: 1.1rem; font-style: italic; color: #777; }
+.border-bottom-double { border-bottom: var(--border-double); }
+.ls-1 { letter-spacing: 1px; }
+.cf-table { width: 100%; border-collapse: separate; border-spacing: 0 2px; }
+.cf-table td { padding: 10px 8px; border-bottom: 1px solid #f8f9fa; }
+.glass-action-bar { background: rgba(255,255,255,0.9) !important; backdrop-filter: blur(10px); border-radius: 1.25rem !important; border: 1px solid rgba(0,0,0,0.05) !important; }
+.icon-circle { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 1.2rem; }
+.text-warning-emphasis { color: #856404 !important; }
 @media print {
-    /* Table wasn't starting on the first printed page — same shared-rule
-       cause fixed across every list/report page: the global responsive.css
-       rule `.card { page-break-inside: avoid }` applies to every .card on
-       every printed page. This report's card can grow tall with many line
-       items, so "never break inside it" pushed the whole card to page 2,
-       leaving page 1 with just the header. Scoped override so only this
-       page's card is affected — the shared rule and every other page stay
-       untouched. */
-    .print-flow-card {
-        page-break-inside: auto !important;
-        break-inside: auto !important;
-    }
-
-    /* Closing Cash & Bank Balance used Bootstrap's .fs-5 (~20px) for emphasis —
-       far larger than the rest of the 9pt print table, so its amount didn't fit
-       the column width and wrapped onto a second line. The taller row also
-       landed right at the page's bottom margin, colliding with the fixed print
-       footer on shorter screens/printers. Print gets its emphasis from
-       bold + shading only, not a screen-scale font jump; this fixes both
-       symptoms for direct and indirect methods alike (the row is method-agnostic
-       markup, rendered once regardless of which tab is active). */
-    .print-flow-card table.table .fs-5 {
-        font-size: 10.5pt !important;
-    }
-    .print-flow-card table.table {
-        table-layout: fixed !important;
-    }
-    .print-flow-card table.table td.text-end,
-    .print-flow-card table.table th.text-end {
-        white-space: nowrap !important;
-    }
+    .glass-action-bar, .d-print-none { display: none !important; }
+    body { background: #fff !important; }
+    /* Zero only TOP spacing — never touch padding-bottom; print_footer_css.php
+       reserves it so the fixed footer can't sit on the last content row. */
+    body { padding-top: 0 !important; margin-top: 0 !important; }
+    /* Keep a bottom clearance so final rows never render under the fixed
+       footer (i_e_print.md §2/§3). */
+    .report-paper { border: none !important; padding: 0 0 18mm 0 !important; margin: 0 !important; border-radius: 0; }
+    .container { width: 100% !important; max-width: 100% !important; }
 }
+/* Canonical I/E Print margin — see i_e_print.md §1 */
+@page { margin: 10mm 8mm 16mm 8mm; }
 </style>
 
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
+// Narrows the Warehouse dropdown to the chosen project's own linked warehouses
+// + any warehouse not tied to a project — client-side only, mirrors
+// balance_sheet.php's bsFilterWarehouses().
+function cfFilterWarehouses() {
+    const projectSel = document.getElementById('cf-project');
+    const whSel = document.getElementById('cf-warehouse');
+    if (!projectSel || !whSel) return;
+    const chosen = projectSel.value;
+    let sawSelected = false;
+    Array.from(whSel.options).forEach(opt => {
+        if (!opt.value) { opt.hidden = false; return; }
+        const optProject = opt.getAttribute('data-project') || '0';
+        const visible = !chosen || optProject === '0' || optProject === chosen;
+        opt.hidden = !visible;
+        if (visible && opt.selected) sawSelected = true;
+    });
+    if (!sawSelected) whSel.value = '';
+}
+document.addEventListener('DOMContentLoaded', cfFilterWarehouses);
+
+function exportToPDF() {
+    const element = document.getElementById('reportContent');
+    const opt = {
+        margin: [0.5, 0.5],
+        filename: 'Cash_Flow_Statement_<?= date('Y-m-d') ?>.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+
 $(document).ready(function() {
-    if (typeof logReportAction === 'function') {
-        logReportAction('Viewed Cash Flow', 'method=<?= $method ?>, period <?= $start_date ?> to <?= $end_date ?>');
+    if(typeof logReportAction === 'function') {
+        logReportAction('Viewed Cash Flow (Premium)', 'User analyzed the cash flow statement from <?= $start_date ?> to <?= $end_date ?>');
     }
 });
 </script>
+
+<?php 
+includeFooter(); 
+ob_end_flush();
+?>

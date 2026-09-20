@@ -105,12 +105,12 @@ try {
         <table class="table table-hover align-middle mb-0">
             <thead class="bg-light text-uppercase small fw-bold">
                 <tr>
-                    <th class="ps-4">Product Info</th>
-                    <th class="text-center">On Hand</th>
-                    <th class="text-end">Avg Cost</th>
-                    <th class="text-end">Total Cost Value</th>
-                    <th class="text-end">Retail Price</th>
-                    <th class="text-end pe-4">Total Retail Value</th>
+                    <th class="ps-4"><?= t('Product Info') ?></th>
+                    <th class="text-center"><?= t('On Hand') ?></th>
+                    <th class="text-end"><?= t('Avg Cost') ?></th>
+                    <th class="text-end"><?= t('Total Cost Value') ?></th>
+                    <th class="text-end"><?= t('Retail Price') ?></th>
+                    <th class="text-end pe-4"><?= t('Total Retail Value') ?></th>
                 </tr>
             </thead>
             <tbody>

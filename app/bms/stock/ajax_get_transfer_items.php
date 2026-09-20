@@ -37,10 +37,10 @@ if (empty($items)) {
     <table class="table table-bordered table-striped">
         <thead class="table-light">
             <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th class="text-center">Quantity</th>
-                <th class="text-center">Unit</th>
+                <th><?= t('Product') ?></th>
+                <th><?= t('SKU') ?></th>
+                <th class="text-center"><?= t('Quantity') ?></th>
+                <th class="text-center"><?= t('Unit') ?></th>
             </tr>
         </thead>
         <tbody>

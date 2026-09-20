@@ -44,14 +44,14 @@ $currency = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Window</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Window') ?></label>
                     <select name="months" id="f-months" class="form-select" style="width:100%">
                         <option value="6">Last 6 months</option>
                         <option value="12" selected>Last 12 months</option>
                         <option value="24">Last 24 months</option>
                     </select></div>
                 <?php if (projectsModuleActive()): ?>
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Project') ?></label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
@@ -89,8 +89,8 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="trendTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Month</th>
-                    <th class="text-end">Sales</th><th class="text-end">Expenses</th><th class="pe-3 text-end">Profit / Loss</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Month') ?></th>
+                    <th class="text-end"><?= t('Sales') ?></th><th class="text-end"><?= t('Expenses') ?></th><th class="pe-3 text-end"><?= t('Profit / Loss') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>

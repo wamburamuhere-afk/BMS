@@ -51,12 +51,12 @@ $currency  = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('From') ?></label>
                     <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>"></div>
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('To') ?></label>
                     <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>"></div>
                 <?php if (projectsModuleActive()): ?>
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Project') ?></label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
@@ -116,12 +116,12 @@ $currency  = get_setting('currency', 'TZS');
                 <table class="table table-hover align-middle mb-0 w-100" id="custTable">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">S/No</th>
-                            <th>Customer</th>
-                            <th class="text-end">Orders</th>
-                            <th class="text-end">Avg Order</th>
-                            <th>Last Order</th>
-                            <th class="pe-3 text-end">Total Spent</th>
+                            <th class="ps-3"><?= t('S/No') ?></th>
+                            <th><?= t('Customer') ?></th>
+                            <th class="text-end"><?= t('Orders') ?></th>
+                            <th class="text-end"><?= t('Avg Order') ?></th>
+                            <th><?= t('Last Order') ?></th>
+                            <th class="pe-3 text-end"><?= t('Total Spent') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>

@@ -86,7 +86,7 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
         <div class="col-md-4">
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 border-bottom">
-                    <h6 class="mb-0 fw-bold">Shift Summary</h6>
+                    <h6 class="mb-0 fw-bold"><?= t('Shift Summary') ?></h6>
                 </div>
                 <div class="card-body">
                     <ul class="list-group list-group-flush">
@@ -118,7 +118,7 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
 
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 border-bottom">
-                    <h6 class="mb-0 fw-bold">Financial Reconciliation</h6>
+                    <h6 class="mb-0 fw-bold"><?= t('Financial Reconciliation') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="p-3 bg-light rounded text-center mb-3">
@@ -171,7 +171,7 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
             <?php if($shift['notes']): ?>
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-2">Shift Notes:</h6>
+                    <h6 class="fw-bold mb-2"><?= t('Shift Notes:') ?></h6>
                     <p class="text-muted mb-0 small"><?= nl2br(htmlspecialchars($shift['notes'] ?? '')) ?></p>
                 </div>
             </div>
@@ -190,11 +190,11 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th class="ps-4">TIME</th>
-                                    <th>TYPE</th>
-                                    <th>REFERENCE</th>
-                                    <th>METHOD</th>
-                                    <th class="text-end pe-4">AMOUNT</th>
+                                    <th class="ps-4"><?= t('TIME') ?></th>
+                                    <th><?= t('TYPE') ?></th>
+                                    <th><?= t('REFERENCE') ?></th>
+                                    <th><?= t('METHOD') ?></th>
+                                    <th class="text-end pe-4"><?= t('AMOUNT') ?></th>
                                 </tr>
                             </thead>
                             <tbody>

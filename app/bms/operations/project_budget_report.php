@@ -232,12 +232,12 @@ try {
         <table class="table">
             <thead>
                 <tr>
-                    <th style="width: 50px;">S/NO</th>
-                    <th>Expense Category</th>
-                    <th class="text-end">Allocated</th>
-                    <th class="text-end">Actual Spent</th>
-                    <th class="text-end">Variance</th>
-                    <th class="text-end" style="width: 200px;">Utilization Level</th>
+                    <th style="width: 50px;"><?= t('S/NO') ?></th>
+                    <th><?= t('Expense Category') ?></th>
+                    <th class="text-end"><?= t('Allocated') ?></th>
+                    <th class="text-end"><?= t('Actual Spent') ?></th>
+                    <th class="text-end"><?= t('Variance') ?></th>
+                    <th class="text-end" style="width: 200px;"><?= t('Utilization Level') ?></th>
                 </tr>
             </thead>
             <tbody>

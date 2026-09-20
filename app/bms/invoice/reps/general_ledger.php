@@ -146,15 +146,15 @@ if (!function_exists('gl_fmt')) {
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label small fw-bold">Start Date</label>
+                <label class="form-label small fw-bold"><?= t('Start Date') ?></label>
                 <input type="date" class="form-control form-control-sm" name="start_date" value="<?= htmlspecialchars($start_date) ?>">
             </div>
             <div class="col-md-2">
-                <label class="form-label small fw-bold">End Date</label>
+                <label class="form-label small fw-bold"><?= t('End Date') ?></label>
                 <input type="date" class="form-control form-control-sm" name="end_date" value="<?= htmlspecialchars($end_date) ?>">
             </div>
             <div class="col-md-3">
-                <label class="form-label small fw-bold">Project</label>
+                <label class="form-label small fw-bold"><?= t('Project') ?></label>
                 <select class="form-select form-select-sm" name="project_id">
                     <option value=""><?= ($ok && empty($gl['data']['meta']['is_admin'])) ? 'All My Projects' : 'All Projects (Consolidated)' ?></option>
                     <?php foreach ($projects_list as $p): ?>
@@ -241,13 +241,13 @@ if (!function_exists('gl_fmt')) {
             <table class="table align-middle mb-0 gl-table">
                 <thead class="bg-light text-uppercase small fw-bold text-muted">
                     <tr>
-                        <th class="ps-4" style="width:11%">Date</th>
-                        <th style="width:25%">Description</th>
-                        <th style="width:13%">Reference</th>
-                        <th style="width:14%">Source</th>
-                        <th class="text-end" style="width:12%">Debit</th>
-                        <th class="text-end" style="width:12%">Credit</th>
-                        <th class="text-end pe-4" style="width:13%">Running</th>
+                        <th class="ps-4" style="width:11%"><?= t('Date') ?></th>
+                        <th style="width:25%"><?= t('Description') ?></th>
+                        <th style="width:13%"><?= t('Reference') ?></th>
+                        <th style="width:14%"><?= t('Source') ?></th>
+                        <th class="text-end" style="width:12%"><?= t('Debit') ?></th>
+                        <th class="text-end" style="width:12%"><?= t('Credit') ?></th>
+                        <th class="text-end pe-4" style="width:13%"><?= t('Running') ?></th>
                     </tr>
                 </thead>
                 <tbody>

@@ -262,7 +262,7 @@ function getProgressColor($p) {
         </div>
         <div class="col-md-7">
             <div class="ps-md-4">
-                <h6 class="fw-bold mb-3">Completion Metrics Analysis</h6>
+                <h6 class="fw-bold mb-3"><?= t('Completion Metrics Analysis') ?></h6>
                 <p class="text-muted small mb-4">
                     The overall progress is calculated based on a weighted average of financial invoicing (40%), 
                     timeline elapsed (30%), and budget utilization (30%). 
@@ -331,10 +331,10 @@ function getProgressColor($p) {
 
     <div class="section-title"><i class="bi bi-card-text"></i> EXECUTIVE SUMMARY</div>
     <div class="p-4 bg-light rounded-3 mb-4">
-        <h6 class="fw-bold small mb-2 text-uppercase">Description / Scope</h6>
+        <h6 class="fw-bold small mb-2 text-uppercase"><?= t('Description / Scope') ?></h6>
         <p class="small text-muted mb-4"><?= nl2br(htmlspecialchars($project['description'] ?: 'No description provided.')) ?></p>
         
-        <h6 class="fw-bold small mb-2 text-uppercase">Progress Assessment</h6>
+        <h6 class="fw-bold small mb-2 text-uppercase"><?= t('Progress Assessment') ?></h6>
         <p class="small text-dark mb-0">
             As of <?= date('d/m/Y') ?>, the project is <strong><?= $status_label ?></strong>. 
             The team has achieved a <strong><?= round($display_progress) ?>%</strong> completion rate. 

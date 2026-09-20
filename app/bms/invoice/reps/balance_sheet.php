@@ -70,11 +70,11 @@ $cmp_label = $ok ? date('d M Y', strtotime($d['meta']['comparative_date'])) : ''
         <form method="GET" action="<?= getUrl('reports') ?>" class="row g-3 align-items-end">
             <input type="hidden" name="report" value="balance_sheet">
             <div class="col-md-5">
-                <label class="form-label small fw-bold">As of Date</label>
+                <label class="form-label small fw-bold"><?= t('As of Date') ?></label>
                 <input type="date" class="form-control form-control-sm" name="as_of_date" value="<?= htmlspecialchars($as_of_date) ?>">
             </div>
             <div class="col-md-4">
-                <label class="form-label small fw-bold">Project</label>
+                <label class="form-label small fw-bold"><?= t('Project') ?></label>
                 <select class="form-select form-select-sm" name="project_id">
                     <option value=""><?= ($ok && empty($d['meta']['is_admin'])) ? 'All My Projects' : 'All Projects (Consolidated)' ?></option>
                     <?php foreach ($projects_list as $p): ?>
@@ -112,7 +112,7 @@ $cmp_label = $ok ? date('d M Y', strtotime($d['meta']['comparative_date'])) : ''
             <table class="table align-middle mb-0 bs-table">
                 <thead class="bg-light text-uppercase small fw-bold text-muted">
                     <tr>
-                        <th class="ps-4" style="width:50%">Description</th>
+                        <th class="ps-4" style="width:50%"><?= t('Description') ?></th>
                         <th class="text-end" style="width:25%"><?= $cur_label ?></th>
                         <th class="text-end pe-4" style="width:25%"><?= $cmp_label ?></th>
                     </tr>
