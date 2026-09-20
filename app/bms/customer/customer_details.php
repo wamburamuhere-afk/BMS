@@ -318,7 +318,7 @@ global $company_name, $company_logo;
     <!-- Print-only Header -->
     <div class="d-none d-print-block text-center mb-4" style="margin-top: 0 !important; padding-top: 0 !important;">
         
-        <h4 class="fw-bold text-dark text-uppercase">CUSTOMER INFORMATION REPORT</h4>
+        <h4 class="fw-bold text-dark text-uppercase"><?= t('CUSTOMER INFORMATION REPORT') ?></h4>
         <h5 class="text-muted"><?= caseFormat($customer_name) ?> (ID: <?= $customer_id ?>)</h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
@@ -714,20 +714,20 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <div class="row">
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Company Name</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Company Name') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['company_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Company Email</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Company Email') ?></label>
                             <p class="mb-0 fw-semibold fs-7 text-truncate"><?= !empty($customer['company_email']) ? caseFormat($customer['company_email']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Phone Number</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Phone Number') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['phone']) ?></p>
                         </div>
                         <?php if (!empty($customer['website'])): ?>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Website</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Website') ?></label>
                             <p class="mb-0 fw-semibold fs-7 text-truncate">
                                 <a href="<?= safe_output($customer['website']) ?>" target="_blank">
                                     <?= safe_output($customer['website']) ?>
@@ -737,19 +737,19 @@ global $company_name, $company_logo;
                         <?php endif; ?>
                         <?php if (!empty($customer['registration_number'])): ?>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Reg Number</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Reg Number') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['registration_number']) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($customer['tin_number'])): ?>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">TIN Number</label>
+                            <label class="form-label text-muted small mb-1"><?= t('TIN Number') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['tin_number']) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($customer['vat_number'])): ?>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">VAT Number</label>
+                            <label class="form-label text-muted small mb-1"><?= t('VAT Number') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['vat_number']) ?></p>
                         </div>
                         <?php endif; ?>
@@ -768,32 +768,32 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <div class="row">
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Full Name</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Full Name') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['customer_name']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Phone</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Phone') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['phone']) ?></p>
                         </div>
                         <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Title</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Title') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['contact_title']) ? caseFormat($customer['contact_title']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Contact Email</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Contact Email') ?></label>
                             <p class="mb-0 fw-semibold fs-7 text-truncate"><?= !empty($customer['email']) ? caseFormat($customer['email']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                          <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Mobile</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Mobile') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['mobile']) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Fax</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Fax') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['fax']) ? caseFormat($customer['fax']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-12 col-md-12 mb-3">
-                            <label class="form-label text-muted small mb-1">Linked Project</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Linked Project') ?></label>
                             <p class="mb-0 fw-semibold fs-7">
                                 <?php if (!empty($customer['linked_project_name'])): ?>
                                     <span class="badge bg-primary-soft text-primary border border-primary">
@@ -830,31 +830,31 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <div class="row">
                         <div class="col-12 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Postal Address</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Postal Address') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['address']) ? caseFormat($customer['address']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">District</label>
+                            <label class="form-label text-muted small mb-1"><?= t('District') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['city']) ? caseFormat($customer['city']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">State/Region</label>
+                            <label class="form-label text-muted small mb-1"><?= t('State/Region') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['state']) ? caseFormat($customer['state']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">Ward</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Ward') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['ward']) ? caseFormat($customer['ward']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">Street/Village</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Street/Village') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['village']) ? caseFormat($customer['village']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">Country</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Country') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['country']) ? caseFormat($customer['country']) : 'Tanzania' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">Postal Code</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Postal Code') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['postal_code']) ? caseFormat($customer['postal_code']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                     </div>
@@ -872,28 +872,28 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <div class="row">
                         <div class="col-6 col-md-4 mb-3">
-                            <label class="form-label text-muted small mb-1">Credit Limit</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Credit Limit') ?></label>
                             <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
                         </div>
                         <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-4 mb-3">
-                            <label class="form-label text-muted small mb-1">Payment Terms</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Payment Terms') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['payment_terms']) ? ucwords(str_replace('_', ' ', $customer['payment_terms'])) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-4 mb-3">
-                            <label class="form-label text-muted small mb-1">Currency</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Currency') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Bank Name</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Bank Name') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_name']) ? caseFormat($customer['bank_name']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Bank Account</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Bank Account') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_account']) ? caseFormat($customer['bank_account']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-12 mb-3">
-                            <label class="form-label text-muted small mb-1">Bank Address</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Bank Address') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['bank_address']) ? nl2br(caseFormat($customer['bank_address'])) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <?php endif; ?>
@@ -1136,12 +1136,12 @@ global $company_name, $company_logo;
                         <table id="customerOrdersTable" class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
-                                    <th class="ps-3">Order #</th>
-                                    <th>Date</th>
-                                    <th class="text-end">Amount</th>
-                                    <th class="text-center">Items</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                    <th class="ps-3"><?= t('Order #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th class="text-end"><?= t('Amount') ?></th>
+                                    <th class="text-center"><?= t('Items') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end pe-3 d-print-none"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1201,12 +1201,12 @@ global $company_name, $company_logo;
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
-                                    <th class="ps-3">Quote #</th>
-                                    <th>Date</th>
-                                    <th>Valid Until</th>
-                                    <th class="text-end">Amount</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                    <th class="ps-3"><?= t('Quote #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Valid Until') ?></th>
+                                    <th class="text-end"><?= t('Amount') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end pe-3 d-print-none"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1291,13 +1291,13 @@ global $company_name, $company_logo;
                         <table id="customerInvoicesTable" class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
-                                    <th class="ps-3">Invoice #</th>
-                                    <th>Date</th>
-                                    <th class="text-end">Total Amount</th>
-                                    <th class="text-end">Paid</th>
-                                    <th class="text-end">Balance</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                    <th class="ps-3"><?= t('Invoice #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th class="text-end"><?= t('Total Amount') ?></th>
+                                    <th class="text-end"><?= t('Paid') ?></th>
+                                    <th class="text-end"><?= t('Balance') ?></th>
+                                    <th class="text-center"><?= t('Status') ?></th>
+                                    <th class="text-end pe-3 d-print-none"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1369,12 +1369,12 @@ global $company_name, $company_logo;
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
-                                    <th class="ps-3">Payment #</th>
-                                    <th>Date</th>
-                                    <th class="text-end">Amount</th>
-                                    <th>Method</th>
-                                    <th>Applied To</th>
-                                    <th class="text-center">Status</th>
+                                    <th class="ps-3"><?= t('Payment #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th class="text-end"><?= t('Amount') ?></th>
+                                    <th><?= t('Method') ?></th>
+                                    <th><?= t('Applied To') ?></th>
+                                    <th class="text-center"><?= t('Status') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1451,12 +1451,12 @@ global $company_name, $company_logo;
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
-                                    <th class="ps-3">DN #</th>
-                                    <th>Order #</th>
-                                    <th>Delivery Date</th>
-                                    <th>Received By</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                    <th class="ps-3"><?= t('DN #') ?></th>
+                                    <th><?= t('Order #') ?></th>
+                                    <th><?= t('Delivery Date') ?></th>
+                                    <th><?= t('Received By') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end pe-3 d-print-none"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1561,14 +1561,14 @@ global $company_name, $company_logo;
                         <table id="customerLposTable" class="table table-hover align-middle w-100">
                             <thead style="background:#fff;border-bottom:2px solid #dee2e6;">
                                 <tr>
-                                    <th style="color:#212529;">S/NO</th>
-                                    <th style="color:#212529;">LPO #</th>
-                                    <th style="color:#212529;">Issue Date</th>
-                                    <th style="color:#212529;">Expiry Date</th>
-                                    <th class="text-end" style="color:#212529;">Amount</th>
-                                    <th style="color:#212529;">Status</th>
+                                    <th style="color:#212529;"><?= t('S/NO') ?></th>
+                                    <th style="color:#212529;"><?= t('LPO #') ?></th>
+                                    <th style="color:#212529;"><?= t('Issue Date') ?></th>
+                                    <th style="color:#212529;"><?= t('Expiry Date') ?></th>
+                                    <th class="text-end" style="color:#212529;"><?= t('Amount') ?></th>
+                                    <th style="color:#212529;"><?= t('Status') ?></th>
                                     <?php if ($can_edit_lpos || $can_delete_lpos): ?>
-                                    <th class="text-end" style="color:#212529;">Actions</th>
+                                    <th class="text-end" style="color:#212529;"><?= t('Actions') ?></th>
                                     <?php endif; ?>
                                 </tr>
                             </thead>
@@ -1705,12 +1705,12 @@ global $company_name, $company_logo;
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
-                                    <th class="ps-3">Credit Note #</th>
-                                    <th>Date</th>
-                                    <th>Reason</th>
-                                    <th class="text-end">Amount</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                    <th class="ps-3"><?= t('Credit Note #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Reason') ?></th>
+                                    <th class="text-end"><?= t('Amount') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end pe-3 d-print-none"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2168,12 +2168,12 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <div class="row">
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Date Created</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Date Created') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= date('M d, Y', strtotime($customer['created_at'])) ?></p>
                         </div>
                         <?php if (!empty($customer['updated_at'])): ?>
                         <div class="col-6 col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Last Updated</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Last Updated') ?></label>
                             <p class="mb-0 fw-semibold fs-7"><?= date('M d, Y', strtotime($customer['updated_at'])) ?></p>
                         </div>
                         <?php endif; ?>
@@ -2736,10 +2736,10 @@ function deleteLpo(lpoId, lpoNumber) {
                     <div class="row">
                         <div class="col-md-7 mb-3">
                             <label for="edit_customer_name" class="form-label fw-bold">Customer Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control form-control-lg" id="edit_customer_name" name="customer_name" required placeholder="Enter customer name">
+                            <input type="text" class="form-control form-control-lg" id="edit_customer_name" name="customer_name" required placeholder="<?= t('Enter customer name') ?>">
                         </div>
                         <div class="col-md-5 mb-3">
-                            <label for="edit_phone" class="form-label fw-bold">Phone Number</label>
+                            <label for="edit_phone" class="form-label fw-bold"><?= t('Phone Number') ?></label>
                             <input type="text" class="form-control form-control-lg" id="edit_phone" name="phone" placeholder="+255 123 456 789">
                         </div>
                         <div class="col-md-5 mb-3">
@@ -2748,7 +2748,7 @@ function deleteLpo(lpoId, lpoNumber) {
                         </div>
                         <div class="col-md-12 mb-3">
                             <label for="edit_description" class="form-label">Notes <span class="text-muted small">(optional)</span></label>
-                            <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="Anything worth remembering — where they live, how to reach them, etc."></textarea>
+                            <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Anything worth remembering — where they live, how to reach them, etc.') ?>"></textarea>
                         </div>
                     </div>
                     <input type="hidden" id="edit_company_name" name="company_name">
@@ -2801,18 +2801,18 @@ function deleteLpo(lpoId, lpoNumber) {
                             <div class="row">
                                 <div class="col-6 mb-3">
                                     <label for="edit_customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="edit_customer_name" name="customer_name" required placeholder="Enter customer name">
+                                    <input type="text" class="form-control" id="edit_customer_name" name="customer_name" required placeholder="<?= t('Enter customer name') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_company_name" class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="Company name (if different)">
+                                    <label for="edit_company_name" class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="<?= t('Company name (if different)') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_acronym" class="form-label">Acronym</label>
-                                    <input type="text" class="form-control" id="edit_acronym" name="acronym" placeholder="Enter acronym">
+                                    <label for="edit_acronym" class="form-label"><?= t('Acronym') ?></label>
+                                    <input type="text" class="form-control" id="edit_acronym" name="acronym" placeholder="<?= t('Enter acronym') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_logo" class="form-label">Company Logo</label>
+                                    <label for="edit_logo" class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
                                     <div id="logo_container" class="mt-2" style="display:none;">
                                         <img id="edit_logo_preview" src="" alt="Logo" class="img-thumbnail" style="height:50px;">
@@ -2821,7 +2821,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                     </div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_category_id" class="form-label">Category</label>
+                                    <label for="edit_category_id" class="form-label"><?= t('Category') ?></label>
                                     <select class="form-select select2-static" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $cat): ?>
@@ -2830,7 +2830,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_customer_type" class="form-label">Customer Type</label>
+                                    <label for="edit_customer_type" class="form-label"><?= t('Customer Type') ?></label>
                                     <select class="form-select" id="edit_customer_type" name="customer_type">
                                         <option value="individual">Individual</option>
                                         <option value="business">Business</option>
@@ -2839,7 +2839,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_status" class="form-label">Status</label>
+                                    <label for="edit_status" class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="edit_status" name="status">
                                         <option value="active">Active</option>
                                         <option value="inactive">Inactive</option>
@@ -2859,7 +2859,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                 </div>
                                 <?php if (projectsModuleActive()): ?>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
+                                    <label for="edit_project_id" class="form-label"><?= t('Linked Project (Optional)') ?></label>
                                     <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                         <option value="">-- No Project --</option>
                                         <?php foreach ($projects as $proj): ?>
@@ -2869,12 +2869,12 @@ function deleteLpo(lpoId, lpoNumber) {
                                 </div>
                                 <?php endif; ?>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_credit_limit" class="form-label">Credit Limit</label>
+                                    <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_description" class="form-label">Description</label>
-                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="Customer description or notes"></textarea>
+                                    <label for="edit_description" class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Customer description or notes') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -2882,35 +2882,35 @@ function deleteLpo(lpoId, lpoNumber) {
                         <div class="tab-pane fade" id="edit-contact" role="tabpanel">
                             <div class="row">
                                 <div class="col-6 mb-3">
-                                    <label for="edit_contact_person" class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="Primary contact person">
+                                    <label for="edit_contact_person" class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="<?= t('Primary contact person') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_contact_title" class="form-label">Contact Title</label>
+                                    <label for="edit_contact_title" class="form-label"><?= t('Contact Title') ?></label>
                                     <input type="text" class="form-control" id="edit_contact_title" name="contact_title" placeholder="e.g., Manager, Director">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_email" class="form-label">Contact Email</label>
+                                    <label for="edit_email" class="form-label"><?= t('Contact Email') ?></label>
                                     <input type="email" class="form-control" id="edit_email" name="email" placeholder="contact@example.com">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_company_email" class="form-label">Company Email</label>
+                                    <label for="edit_company_email" class="form-label"><?= t('Company Email') ?></label>
                                     <input type="email" class="form-control" id="edit_company_email" name="company_email" placeholder="company@example.com">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_phone" class="form-label">Phone Number</label>
+                                    <label for="edit_phone" class="form-label"><?= t('Phone Number') ?></label>
                                     <input type="text" class="form-control" id="edit_phone" name="phone" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_mobile" class="form-label">Mobile Number</label>
+                                    <label for="edit_mobile" class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" id="edit_mobile" name="mobile" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_fax" class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="Fax number">
+                                    <label for="edit_fax" class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_website" class="form-label">Website</label>
+                                    <label for="edit_website" class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" id="edit_website" name="website" placeholder="https://www.example.com">
                                 </div>
                             </div>
@@ -2919,36 +2919,36 @@ function deleteLpo(lpoId, lpoNumber) {
                         <div class="tab-pane fade" id="edit-address" role="tabpanel">
                             <div class="row">
                                 <div class="col-6 mb-3">
-                                    <label for="edit_country" class="form-label">Country</label>
-                                    <input type="text" class="form-control" id="edit_country" name="country" placeholder="Country">
+                                    <label for="edit_country" class="form-label"><?= t('Country') ?></label>
+                                    <input type="text" class="form-control" id="edit_country" name="country" placeholder="<?= t('Country') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_state" class="form-label">Region</label>
-                                    <input type="text" class="form-control" id="edit_state" name="state" placeholder="Region">
+                                    <label for="edit_state" class="form-label"><?= t('Region') ?></label>
+                                    <input type="text" class="form-control" id="edit_state" name="state" placeholder="<?= t('Region') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_city" class="form-label">District</label>
-                                    <input type="text" class="form-control" id="edit_city" name="city" placeholder="District">
+                                    <label for="edit_city" class="form-label"><?= t('District') ?></label>
+                                    <input type="text" class="form-control" id="edit_city" name="city" placeholder="<?= t('District') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_ward" class="form-label">Ward</label>
-                                    <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="Ward">
+                                    <label for="edit_ward" class="form-label"><?= t('Ward') ?></label>
+                                    <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="<?= t('Ward') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_village" class="form-label">Street/Village</label>
-                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="Street/Village">
+                                    <label for="edit_village" class="form-label"><?= t('Street/Village') ?></label>
+                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="<?= t('Street/Village') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_postal_code" class="form-label">Postal Code</label>
-                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="Postal code">
+                                    <label for="edit_postal_code" class="form-label"><?= t('Postal Code') ?></label>
+                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="<?= t('Postal code') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_address" class="form-label">Physical Address</label>
-                                    <textarea class="form-control" id="edit_address" name="address" rows="2" placeholder="Physical / street address"></textarea>
+                                    <label for="edit_address" class="form-label"><?= t('Physical Address') ?></label>
+                                    <textarea class="form-control" id="edit_address" name="address" rows="2" placeholder="<?= t('Physical / street address') ?>"></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_postal_address" class="form-label">Postal Address</label>
-                                    <input type="text" class="form-control" id="edit_postal_address" name="postal_address" placeholder="P.O. Box or postal address">
+                                    <label for="edit_postal_address" class="form-label"><?= t('Postal Address') ?></label>
+                                    <input type="text" class="form-control" id="edit_postal_address" name="postal_address" placeholder="<?= t('P.O. Box or postal address') ?>">
                                 </div>
                             </div>
                         </div>
@@ -2956,15 +2956,15 @@ function deleteLpo(lpoId, lpoNumber) {
                         <div class="tab-pane fade" id="edit-financial" role="tabpanel">
                             <div class="row">
                                 <div class="col-6 mb-3">
-                                    <label for="edit_tax_id" class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                    <label for="edit_tax_id" class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="<?= t('Tax Identification Number') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_vat_number" class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
+                                    <label for="edit_vat_number" class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_payment_terms" class="form-label">Payment Terms</label>
+                                    <label for="edit_payment_terms" class="form-label"><?= t('Payment Terms') ?></label>
                                     <select class="form-select" id="edit_payment_terms" name="payment_terms">
                                         <option value="">Select Terms</option>
                                         <option value="cash">Cash</option>
@@ -2976,7 +2976,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_currency" class="form-label">Currency</label>
+                                    <label for="edit_currency" class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="edit_currency" name="currency">
                                         <option value="TZS">Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
@@ -2986,16 +2986,16 @@ function deleteLpo(lpoId, lpoNumber) {
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_bank_name" class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="Bank name">
+                                    <label for="edit_bank_name" class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_bank_account" class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label for="edit_bank_account" class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_bank_address" class="form-label">Bank Address</label>
-                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label for="edit_bank_address" class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>

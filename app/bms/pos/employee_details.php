@@ -600,47 +600,47 @@ $sr_status_badge = [
         <div class="col-md-8 col-xl-9">
             <div class="card shadow-sm mb-4" id="personalInfoCard">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h5 class="mb-0">Personal & Employment Information</h5>
+                    <h5 class="mb-0"><?= t('Personal & Employment Information') ?></h5>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Employee ID</label>
+                            <label class="text-muted small text-uppercase"><?= t('Employee ID') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['employee_number']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Department</label>
+                            <label class="text-muted small text-uppercase"><?= t('Department') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['department_name']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Employment Type</label>
+                            <label class="text-muted small text-uppercase"><?= t('Employment Type') ?></label>
                             <p class="fw-bold"><?= !empty($employee['employment_type']) ? caseFormat($employee['employment_type']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Join Date</label>
+                            <label class="text-muted small text-uppercase"><?= t('Join Date') ?></label>
                             <p class="fw-bold"><?= !empty($employee['hire_date']) ? date('M d, Y', strtotime($employee['hire_date'])) : '-' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Reporting To</label>
+                            <label class="text-muted small text-uppercase"><?= t('Reporting To') ?></label>
                             <p class="fw-bold"><?= !empty($employee['reporting_to']) ? caseFormat($employee['reporting_to']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Work Location</label>
+                            <label class="text-muted small text-uppercase"><?= t('Work Location') ?></label>
                             <p class="fw-bold"><?= !empty($employee['work_location']) ? caseFormat($employee['work_location']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Project</label>
+                            <label class="text-muted small text-uppercase"><?= t('Project') ?></label>
                             <p class="fw-bold"><?= !empty($employee['project_name']) ? caseFormat($employee['project_name']) : 'N/A' ?></p>
                         </div>
                         <?php if ($employee['employment_status'] === 'probation' && !empty($employee['probation_end_date'])): ?>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Probation End Date</label>
+                            <label class="text-muted small text-uppercase"><?= t('Probation End Date') ?></label>
                             <p class="fw-bold"><?= date('M d, Y', strtotime($employee['probation_end_date'])) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if ($employee['employment_status'] === 'contract' && !empty($employee['contract_end_date'])): ?>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Contract End Date</label>
+                            <label class="text-muted small text-uppercase"><?= t('Contract End Date') ?></label>
                             <p class="fw-bold"><?= date('M d, Y', strtotime($employee['contract_end_date'])) ?></p>
                         </div>
                         <?php endif; ?>
@@ -648,46 +648,46 @@ $sr_status_badge = [
                         <div class="col-12"><hr class="my-2"></div>
 
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Date of Birth</label>
+                            <label class="text-muted small text-uppercase"><?= t('Date of Birth') ?></label>
                             <p class="fw-bold"><?= !empty($employee['date_of_birth']) ? date('M d, Y', strtotime($employee['date_of_birth'])) : '-' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Gender</label>
+                            <label class="text-muted small text-uppercase"><?= t('Gender') ?></label>
                             <p class="fw-bold"><?= ucfirst($employee['gender']) ?></p>
                         </div>
                          <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">NIDA / ID Number</label>
+                            <label class="text-muted small text-uppercase"><?= t('NIDA / ID Number') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['national_id'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Marital Status</label>
+                            <label class="text-muted small text-uppercase"><?= t('Marital Status') ?></label>
                             <p class="fw-bold"><?= !empty($employee['marital_status']) ? ucfirst($employee['marital_status']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Passport Number</label>
+                            <label class="text-muted small text-uppercase"><?= t('Passport Number') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['passport_number'] ?? 'N/A') ?></p>
                         </div>
 
                         <div class="col-12"><hr class="my-2"></div>
 
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Basic Salary</label>
+                            <label class="text-muted small text-uppercase"><?= t('Basic Salary') ?></label>
                             <p class="fw-bold text-success"><?= format_currency($employee['basic_salary']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Bank Name</label>
+                            <label class="text-muted small text-uppercase"><?= t('Bank Name') ?></label>
                             <p class="fw-bold"><?= !empty($employee['bank_name']) ? caseFormat($employee['bank_name']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Account Holder Name</label>
+                            <label class="text-muted small text-uppercase"><?= t('Account Holder Name') ?></label>
                             <p class="fw-bold"><?= !empty($employee['account_holder_name']) ? caseFormat($employee['account_holder_name']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Bank Account</label>
+                            <label class="text-muted small text-uppercase"><?= t('Bank Account') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['bank_account'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Bank Branch</label>
+                            <label class="text-muted small text-uppercase"><?= t('Bank Branch') ?></label>
                             <p class="fw-bold"><?= !empty($employee['bank_branch']) ? caseFormat($employee['bank_branch']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
@@ -695,7 +695,7 @@ $sr_status_badge = [
                             <p class="fw-bold"><?= caseFormat($employee['bank_swift_code'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Mobile Money</label>
+                            <label class="text-muted small text-uppercase"><?= t('Mobile Money') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['mobile_money'] ?? 'N/A') ?></p>
                         </div>
                     </div>
@@ -710,31 +710,31 @@ $sr_status_badge = [
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Hourly Rate</label>
+                            <label class="text-muted small text-uppercase"><?= t('Hourly Rate') ?></label>
                             <p class="fw-bold"><?= !empty($employee['hourly_rate']) ? format_currency($employee['hourly_rate']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Currency</label>
+                            <label class="text-muted small text-uppercase"><?= t('Currency') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['currency'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Payment Frequency</label>
+                            <label class="text-muted small text-uppercase"><?= t('Payment Frequency') ?></label>
                             <p class="fw-bold"><?= !empty($employee['payment_frequency']) ? ucfirst(str_replace('_', ' ', $employee['payment_frequency'])) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Payment Method</label>
+                            <label class="text-muted small text-uppercase"><?= t('Payment Method') ?></label>
                             <p class="fw-bold"><?= !empty($employee['payment_method']) ? ucfirst(str_replace('_', ' ', $employee['payment_method'])) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Tax ID (TIN)</label>
+                            <label class="text-muted small text-uppercase"><?= t('Tax ID (TIN)') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['tax_id'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Social Security Number</label>
+                            <label class="text-muted small text-uppercase"><?= t('Social Security Number') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['social_security_number'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-12">
-                            <label class="text-muted small text-uppercase">Benefits</label>
+                            <label class="text-muted small text-uppercase"><?= t('Benefits') ?></label>
                             <p class="fw-bold">
                                 <?php
                                 $benefits = !empty($employee['benefits']) ? json_decode($employee['benefits'], true) : [];
@@ -759,30 +759,30 @@ $sr_status_badge = [
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Contact Name</label>
+                            <label class="text-muted small text-uppercase"><?= t('Contact Name') ?></label>
                             <p class="fw-bold"><?= !empty($employee['emergency_contact']) ? caseFormat($employee['emergency_contact']) : 'N/A' ?></p>
                         </div>
                         <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Relationship</label>
+                            <label class="text-muted small text-uppercase"><?= t('Relationship') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['emergency_contact_relationship'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Phone Number</label>
+                            <label class="text-muted small text-uppercase"><?= t('Phone Number') ?></label>
                             <p class="fw-bold text-primary"><?= caseFormat($employee['emergency_contact_phone'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Email Address</label>
+                            <label class="text-muted small text-uppercase"><?= t('Email Address') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['emergency_contact_email'] ?? 'N/A') ?></p>
                         </div>
 
                         <div class="col-12"><hr class="my-2"></div>
 
                         <div class="col-sm-6 col-md-6">
-                            <label class="text-muted small text-uppercase">Postal Address</label>
+                            <label class="text-muted small text-uppercase"><?= t('Postal Address') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['emergency_contact_postal_address'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-6">
-                            <label class="text-muted small text-uppercase">Physical Address</label>
+                            <label class="text-muted small text-uppercase"><?= t('Physical Address') ?></label>
                             <p class="fw-bold"><?= caseFormat($employee['emergency_contact_physical_address'] ?? 'N/A') ?></p>
                         </div>
                     </div>
@@ -915,7 +915,7 @@ $sr_status_badge = [
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0" id="salaryStructureTable">
                             <thead class="table-light">
-                                <tr><th class="ps-3 no-sort">S/NO</th><th>Component</th><th>Type</th><th>Basis</th><th class="text-end">Value</th><th class="text-end pe-3 d-print-none no-sort">Action</th></tr>
+                                <tr><th class="ps-3 no-sort"><?= t('S/NO') ?></th><th><?= t('Component') ?></th><th><?= t('Type') ?></th><th><?= t('Basis') ?></th><th class="text-end"><?= t('Value') ?></th><th class="text-end pe-3 d-print-none no-sort"><?= t('Action') ?></th></tr>
                             </thead>
                             <tbody>
                                 <?php $sn = 1; foreach ($sc_rows as $r):
@@ -981,7 +981,7 @@ $sr_status_badge = [
                                     <div class="form-text text-muted">Defaults from the component; override per employee. A % resolves against basic salary.</div>
                                 </div>
                                 <div class="mb-2">
-                                    <label class="form-label small fw-bold">Effective Date</label>
+                                    <label class="form-label small fw-bold"><?= t('Effective Date') ?></label>
                                     <input type="date" class="form-control" name="effective_date" value="<?= date('Y-m-d') ?>">
                                 </div>
                             </div>
@@ -1000,7 +1000,7 @@ $sr_status_badge = [
             <!-- Documents Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Employee Documents</h5>
+                    <h5 class="mb-0"><?= t('Employee Documents') ?></h5>
                     <?php if ($can_create_documents): ?>
                     <button class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#uploadDocModal">
                         <i class="bi bi-cloud-upload me-1"></i> Upload Document
@@ -1013,8 +1013,8 @@ $sr_status_badge = [
                             <table class="table table-sm align-middle" id="empDocsTable">
                                 <thead>
                                     <tr>
-                                        <th class="no-sort">S/NO</th><th>Type</th><th>Name</th><th>Issued</th><th>Expires</th><th></th>
-                                        <th class="text-end d-print-none no-sort">Actions</th>
+                                        <th class="no-sort"><?= t('S/NO') ?></th><th><?= t('Type') ?></th><th><?= t('Name') ?></th><th><?= t('Issued') ?></th><th><?= t('Expires') ?></th><th></th>
+                                        <th class="text-end d-print-none no-sort"><?= t('Actions') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1136,16 +1136,16 @@ $sr_status_badge = [
                                 </div>
                                 <div class="row">
                                     <div class="col-6 mb-3">
-                                        <label class="form-label">Issue Date</label>
+                                        <label class="form-label"><?= t('Issue Date') ?></label>
                                         <input type="date" class="form-control" name="issue_date">
                                     </div>
                                     <div class="col-6 mb-3">
-                                        <label class="form-label" id="upload_expiry_label">Expiry Date</label>
+                                        <label class="form-label" id="upload_expiry_label"><?= t('Expiry Date') ?></label>
                                         <input type="date" class="form-control" name="expire_date" id="upload_expire_date">
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Notes</label>
+                                    <label class="form-label"><?= t('Notes') ?></label>
                                     <textarea class="form-control" name="notes" rows="2"></textarea>
                                 </div>
                                 <div class="mb-3">
@@ -1170,7 +1170,7 @@ $sr_status_badge = [
             <!-- Contracts Card (Tier 2, Phase 2.3) -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Contracts</h5>
+                    <h5 class="mb-0"><?= t('Contracts') ?></h5>
                     <a href="<?= getUrl('employee_contracts') ?>" class="btn btn-sm btn-outline-primary d-print-none">
                         <i class="bi bi-arrow-repeat me-1"></i> Manage Contracts
                     </a>
@@ -1182,7 +1182,7 @@ $sr_status_badge = [
                     <div class="table-responsive">
                         <table class="table table-sm align-middle" id="empContractsTable">
                             <thead>
-                                <tr><th class="no-sort">S/NO</th><th>Type</th><th>Start</th><th>End</th><th>Status</th></tr>
+                                <tr><th class="no-sort"><?= t('S/NO') ?></th><th><?= t('Type') ?></th><th><?= t('Start') ?></th><th><?= t('End') ?></th><th><?= t('Status') ?></th></tr>
                             </thead>
                             <tbody>
                             <?php $sn = 1; foreach ($emp_contracts as $c):
@@ -1299,7 +1299,7 @@ $sr_status_badge = [
                     <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle" id="empTrainingTable">
-                            <thead><tr><th class="no-sort">S/NO</th><th>Training</th><th>Type</th><th>Date</th><th>Result</th><th class="d-print-none no-sort">Certificate</th></tr></thead>
+                            <thead><tr><th class="no-sort"><?= t('S/NO') ?></th><th><?= t('Training') ?></th><th><?= t('Type') ?></th><th><?= t('Date') ?></th><th><?= t('Result') ?></th><th class="d-print-none no-sort"><?= t('Certificate') ?></th></tr></thead>
                             <tbody>
                             <?php $sn = 1; foreach ($training_history as $th):
                                 $pmap = ['enrolled'=>'secondary','attended'=>'info','completed'=>'success','failed'=>'danger','withdrawn'=>'dark'];
@@ -1517,13 +1517,13 @@ $sr_status_badge = [
                     <table class="table table-hover align-middle mb-0" id="attendanceHistoryTable">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3 no-sort">S/NO</th>
-                                <th>Date</th>
-                                <th>Check In</th>
-                                <th>Check Out</th>
-                                <th class="text-end">Hours</th>
-                                <th class="text-end">Overtime</th>
-                                <th>Status</th>
+                                <th class="ps-3 no-sort"><?= t('S/NO') ?></th>
+                                <th><?= t('Date') ?></th>
+                                <th><?= t('Check In') ?></th>
+                                <th><?= t('Check Out') ?></th>
+                                <th class="text-end"><?= t('Hours') ?></th>
+                                <th class="text-end"><?= t('Overtime') ?></th>
+                                <th><?= t('Status') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1573,11 +1573,11 @@ $sr_status_badge = [
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label small fw-bold">Check In</label>
+                                        <label class="form-label small fw-bold"><?= t('Check In') ?></label>
                                         <input type="time" class="form-control" id="mea_check_in" name="check_in_time">
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label small fw-bold">Check Out</label>
+                                        <label class="form-label small fw-bold"><?= t('Check Out') ?></label>
                                         <input type="time" class="form-control" id="mea_check_out" name="check_out_time">
                                     </div>
                                 </div>
@@ -1595,7 +1595,7 @@ $sr_status_badge = [
                                     </select>
                                 </div>
                                 <div class="mb-2">
-                                    <label class="form-label small fw-bold">Notes</label>
+                                    <label class="form-label small fw-bold"><?= t('Notes') ?></label>
                                     <textarea class="form-control" id="mea_notes" name="notes" rows="2"></textarea>
                                 </div>
                                 <div class="form-text text-muted">If a record already exists for the selected date, it will be updated instead of duplicated.</div>
@@ -1645,16 +1645,16 @@ $sr_status_badge = [
                     <table class="table table-hover align-middle mb-0" id="payrollHistoryTable">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3 no-sort">S/NO</th>
-                                <th>Period</th>
-                                <th>Date Paid</th>
-                                <th class="text-end">Gross</th>
-                                <th class="text-end">NSSF</th>
-                                <th class="text-end">PAYE</th>
-                                <th class="text-end">Net Salary</th>
-                                <th>Status</th>
-                                <th>Paid From</th>
-                                <th class="d-print-none no-sort">Action</th>
+                                <th class="ps-3 no-sort"><?= t('S/NO') ?></th>
+                                <th><?= t('Period') ?></th>
+                                <th><?= t('Date Paid') ?></th>
+                                <th class="text-end"><?= t('Gross') ?></th>
+                                <th class="text-end"><?= t('NSSF') ?></th>
+                                <th class="text-end"><?= t('PAYE') ?></th>
+                                <th class="text-end"><?= t('Net Salary') ?></th>
+                                <th><?= t('Status') ?></th>
+                                <th><?= t('Paid From') ?></th>
+                                <th class="d-print-none no-sort"><?= t('Action') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1730,13 +1730,13 @@ $sr_status_badge = [
                     <table class="table table-hover align-middle mb-0" id="leaveHistoryTable">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3 no-sort">S/NO</th>
-                                <th>Type</th>
-                                <th>Start</th>
-                                <th>End</th>
-                                <th class="text-end">Days</th>
-                                <th>Status</th>
-                                <th class="d-print-none no-sort">Action</th>
+                                <th class="ps-3 no-sort"><?= t('S/NO') ?></th>
+                                <th><?= t('Type') ?></th>
+                                <th><?= t('Start') ?></th>
+                                <th><?= t('End') ?></th>
+                                <th class="text-end"><?= t('Days') ?></th>
+                                <th><?= t('Status') ?></th>
+                                <th class="d-print-none no-sort"><?= t('Action') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1818,11 +1818,11 @@ $sr_status_badge = [
                                         <input type="date" class="form-control" id="ael_end_date" name="end_date" required onchange="calculateEmpLeaveDays()">
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <label class="form-label small fw-bold">Total Days</label>
+                                        <label class="form-label small fw-bold"><?= t('Total Days') ?></label>
                                         <input type="number" class="form-control" id="ael_total_days" name="total_days" readonly>
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <label class="form-label small fw-bold">Half Day</label>
+                                        <label class="form-label small fw-bold"><?= t('Half Day') ?></label>
                                         <select class="form-select" id="ael_half_day" name="half_day" onchange="calculateEmpLeaveDays()">
                                             <option value="none">No</option>
                                             <option value="first_half">First Half</option>
@@ -1830,11 +1830,11 @@ $sr_status_badge = [
                                         </select>
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <label class="form-label small fw-bold">Contact During Leave</label>
-                                        <input type="text" class="form-control" name="contact_during_leave" placeholder="Phone number or email">
+                                        <label class="form-label small fw-bold"><?= t('Contact During Leave') ?></label>
+                                        <input type="text" class="form-control" name="contact_during_leave" placeholder="<?= t('Phone number or email') ?>">
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label small fw-bold">Handover To</label>
+                                        <label class="form-label small fw-bold"><?= t('Handover To') ?></label>
                                         <select class="form-select select2-static" name="handover_to">
                                             <option value="">Select Colleague</option>
                                             <?php foreach ($handover_candidates as $hc): ?>
@@ -1844,14 +1844,14 @@ $sr_status_badge = [
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <div id="ael_documentSection" style="display:none;">
-                                            <label class="form-label small fw-bold">Supporting Document</label>
+                                            <label class="form-label small fw-bold"><?= t('Supporting Document') ?></label>
                                             <input type="file" class="form-control" name="document" accept=".pdf,.jpg,.jpeg,.png">
                                             <small class="text-muted">e.g. medical certificate</small>
                                         </div>
                                     </div>
                                     <div class="col-12 mb-2">
                                         <label class="form-label small fw-bold">Reason <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" name="reason" rows="3" required placeholder="Please provide a reason for this leave"></textarea>
+                                        <textarea class="form-control" name="reason" rows="3" required placeholder="<?= t('Please provide a reason for this leave') ?>"></textarea>
                                     </div>
                                     <div class="col-12">
                                         <div class="card">
