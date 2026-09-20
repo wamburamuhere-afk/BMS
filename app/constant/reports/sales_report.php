@@ -26,9 +26,10 @@ $warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
       WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
       ORDER BY warehouse_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC) : [];
-$date_from = $_GET['date_from'] ?? date('Y-01-01');
-$date_to   = $_GET['date_to']   ?? date('Y-12-31');
-$currency  = get_setting('currency', 'TZS');
+$date_from   = $_GET['date_from'] ?? date('Y-01-01');
+$date_to     = $_GET['date_to']   ?? date('Y-12-31');
+$currency    = get_setting('currency', 'TZS');
+$isSimplePOS = get_setting('pos_simple_mode', '0') === '1';
 ?>
 
 <div class="container-fluid py-4">
@@ -108,6 +109,9 @@ $currency  = get_setting('currency', 'TZS');
                         <option value="overdue"><?= t('Overdue') ?></option>
                     </select>
                 </div>
+                <?php if ($isSimplePOS): ?>
+                <input type="hidden" id="f-source" value="pos">
+                <?php else: ?>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Source') ?></label>
                     <select name="source" id="f-source" class="form-select" style="width:100%">
@@ -116,6 +120,7 @@ $currency  = get_setting('currency', 'TZS');
                         <option value="pos"><?= t('POS Only') ?></option>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-1">
                     <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter"></i></button>
                 </div>
@@ -234,7 +239,8 @@ $(function () {
     };
     const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
     const DATA_URL = '<?= buildUrl('api/account/get_sales_report.php') ?>';
-    const CUST_URL = '<?= buildUrl('api/account/search_customers.php') ?>';
+    const CUST_URL    = '<?= buildUrl('api/account/search_customers.php') ?>';
+    const IS_SIMPLE_POS = <?= $isSimplePOS ? 'true' : 'false' ?>;
     const BLUE = '#0d6efd';
     const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -257,7 +263,7 @@ $(function () {
         theme: 'bootstrap-5', placeholder: PT.allCustomers, allowClear: true, width: '100%',
         ajax: { url: CUST_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
-    $('#f-project, #f-warehouse, #f-salesperson, #f-status, #f-source').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+    $('#f-project, #f-warehouse, #f-salesperson, #f-status' + (IS_SIMPLE_POS ? '' : ', #f-source')).select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     // ── DataTable (per §UI-2) ─────────────────────────────────────────────
     const table = $('#salesTable').DataTable({
@@ -342,16 +348,20 @@ $(function () {
     }
 
     // Show/hide columns that are irrelevant for the active source.
-    // col 3 = Due Date (invoices only), col 8 = Payment Method (POS only),
+    // col 3 = Due Date, col 8 = Payment Method (POS only),
     // col 9 = Source badge (only useful when both sources are mixed).
     function adjustColumns(src) {
-        table.column(3).visible(src !== 'pos');     // Due Date — hide for POS-only
-        table.column(8).visible(src !== 'invoice'); // Payment Method — hide for Invoice-only
-        table.column(9).visible(src === '');        // Source badge — only when both are shown
+        // In Simple POS mode, credit sales carry a due date — always show the column.
+        // In mixed/invoice views, hide Due Date when only POS rows are displayed.
+        table.column(3).visible(IS_SIMPLE_POS || src !== 'pos');
+        table.column(8).visible(src !== 'invoice');
+        // Source badge is meaningless when only one source is ever shown.
+        table.column(9).visible(!IS_SIMPLE_POS && src === '');
     }
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
-    $('#f-project, #f-warehouse, #f-customer, #f-salesperson, #f-status, #f-source').on('change', loadReport);
+    const $filters = $('#f-project, #f-warehouse, #f-customer, #f-salesperson, #f-status' + (IS_SIMPLE_POS ? '' : ', #f-source'));
+    $filters.on('change', loadReport);
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Sales Report', 'Loaded sales report');

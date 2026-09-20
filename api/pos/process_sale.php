@@ -38,8 +38,20 @@ if (!canCreate('pos')) {
 
 try {
     global $pdo;
+
+    // Ensure pos_sales.due_date exists before opening the transaction — MySQL
+    // DDL triggers an implicit commit, so this must stay outside beginTransaction().
+    // Self-heals tenants that haven't run the 2026_09_16_pos_sales_due_date
+    // migration without needing a CLI step.
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'due_date'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN due_date DATE NULL AFTER payment_date");
+            try { $pdo->exec("ALTER TABLE pos_sales ADD INDEX idx_pos_sales_due_date (due_date)"); } catch (PDOException $_ddlE) {}
+        }
+    } catch (PDOException $_ddlE) {}
+
     $pdo->beginTransaction();
-    
+
     // Read JSON input
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) {
@@ -224,14 +236,14 @@ try {
                 receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,
                 subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
                 payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
-                sale_type, sale_status, payment_status, sale_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+                sale_type, sale_status, payment_status, due_date, sale_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', ?, NOW(), NOW())
         ");
         $stmt->execute([
             $receipt_number, $shift_id, $user_id, $customer_id, $warehouse_id, $project_id,
             $subtotal, $discount_percentage, $discount_amount, $tax, $total,
             $db_payment_method, $amount_tendered, $change, $payment_details_json, $register_id, $register_name,
-            $sale_type_in
+            $sale_type_in, $due_date
         ]);
     }
 
