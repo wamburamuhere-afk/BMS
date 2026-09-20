@@ -40,6 +40,10 @@ $warehouse_id   = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '')
 // Sanitise source to known values only
 if (!in_array($source, ['', 'invoice', 'pos'], true)) $source = '';
 
+// Simple POS tenants only sell through the POS terminal — invoices are not
+// part of their workflow. Enforce POS-only regardless of what the client sends.
+if (get_setting('pos_simple_mode', '0') === '1') $source = 'pos';
+
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success' => false, 'message' => 'Invalid date range']);
     exit;
@@ -58,6 +62,16 @@ if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
 
 $include_inv = ($source !== 'pos');
 $include_pos = ($source !== 'invoice');
+
+// Check whether pos_sales.due_date has been added by the 2026-09-16 migration.
+// If the column is missing we fall back to NULL rather than crashing the query.
+$pos_has_due_date = false;
+try {
+    global $pdo;
+    $chk = $pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'due_date'");
+    $pos_has_due_date = (bool)$chk->fetch();
+} catch (Throwable $_e) {}
+$pos_due_date_expr = $pos_has_due_date ? 'ps.due_date' : 'NULL';
 
 try {
     global $pdo;
@@ -204,20 +218,21 @@ try {
               LEFT JOIN users u         ON so.salesperson_id = u.user_id
              WHERE $eff_inv_where
             UNION ALL
-            SELECT ps.receipt_number                                                        AS ref_number,
-                   DATE(ps.sale_date)                                                       AS sale_date,
-                   NULL                                                                     AS due_date,
-                   COALESCE(ps.customer_name, c2.customer_name, 'Walk-in')                 AS customer_name,
+            SELECT ps.receipt_number                                                           AS ref_number,
+                   DATE(ps.sale_date)                                                        AS sale_date,
+                   $pos_due_date_expr                                                        AS due_date,
+                   COALESCE(ps.customer_name, c2.customer_name, 'Walk-in')                  AS customer_name,
                    ps.grand_total,
-                   ps.grand_total                                                           AS paid_amount,
-                   0                                                                        AS balance_due,
+                   ps.grand_total                                                            AS paid_amount,
+                   0                                                                         AS balance_due,
                    ps.discount_amount, ps.tax_amount,
-                   ps.payment_status                                                        AS status,
+                   ps.payment_status                                                         AS status,
                    ps.payment_method,
-                   ps.cashier_name                                                          AS salesperson,
-                   'POS'                                                                    AS source
+                   TRIM(CONCAT(COALESCE(u_pos.first_name,''), ' ', COALESCE(u_pos.last_name,''))) AS salesperson,
+                   'POS'                                                                     AS source
               FROM pos_sales ps
-              LEFT JOIN customers c2 ON ps.customer_id = c2.customer_id
+              LEFT JOIN customers c2  ON ps.customer_id = c2.customer_id
+              LEFT JOIN users u_pos   ON ps.user_id     = u_pos.user_id
              WHERE $eff_pos_where
           ) AS combined
       ORDER BY sale_date DESC, ref_number DESC
