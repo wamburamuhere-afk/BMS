@@ -1506,6 +1506,161 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
     </div><!-- /.header-wrapper -->
 
+    <?php if (posSimpleModeEnabled()): ?>
+    <?php
+    // ── Simple POS · phone bottom navigation bar ───────────────────────────
+    // On phones the header menu sits behind the ☰ button, so every action
+    // costs 2–3 taps. For a Simple POS tenant only, the everyday destinations
+    // are shown directly in a bar fixed to the bottom: POS, Products,
+    // Expenses, Reports (opens a short list) and More (the rest of the menu).
+    // Desktop (>= 992px) is untouched: the bar is d-lg-none and the CSS below
+    // is scoped to max-width 991.98px. Same canView()/getUrl() gates as the
+    // header items above — this only changes where they are reachable from.
+    $__bn_dark = (($_SESSION['theme'] ?? 'light') === 'dark');
+    $__bn_cur  = rtrim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+    $__bn_on   = function (string $page) use ($__bn_cur): bool {
+        $p = rtrim((string)parse_url(getUrl($page), PHP_URL_PATH), '/');
+        return $p !== '' && ($__bn_cur === $p || str_starts_with($__bn_cur, $p . '/'));
+    };
+    $__bn_report_keys = ['sales_report', 'purchase_report', 'inventory_report', 'expense_report', 'pos_user_sales_report', 'pos_profit_report'];
+    $__bn_reports_on  = false;
+    foreach ($__bn_report_keys as $__k) { if ($__bn_on($__k)) { $__bn_reports_on = true; break; } }
+    ?>
+    <style>
+        .bms-bnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
+            background: <?= $__bn_dark ? '#24282d' : '#ffffff' ?>;
+            border-top: 1px solid <?= $__bn_dark ? '#3a3f45' : '#dee2e6' ?>;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.10);
+            padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
+        .bms-bnav .bn-item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+            padding: 4px 2px; background: none; border: 0; text-decoration: none;
+            color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; font-size: 0.68rem; font-weight: 500; line-height: 1.15; }
+        .bms-bnav .bn-item i { font-size: 1.3rem; line-height: 1; }
+        .bms-bnav .bn-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bms-bnav .bn-item.active { color: #0d6efd; font-weight: 700; }
+        .bms-sheet { height: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0;
+            <?= $__bn_dark ? 'background:#24282d;color:#e1e7ec;' : '' ?> }
+        .bms-sheet .list-group-item { display: flex; align-items: center; gap: 10px; padding: 0.8rem 0.25rem; font-size: 0.95rem;
+            <?= $__bn_dark ? 'background:transparent;color:#e1e7ec;border-color:#3a3f45;' : 'background:transparent;' ?> }
+        .bms-sheet .list-group-item i { width: 1.4rem; text-align: center; color: #0d6efd; }
+        .bms-sheet .bn-group { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: #6c757d; padding: 0.9rem 0.25rem 0.2rem; }
+        .bms-sheet .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
+        @media (max-width: 991.98px) {
+            /* Room for the bar so page content is never hidden behind it. */
+            body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
+            /* The ☰ button is replaced by the bar; it comes back only while the
+               full menu is open (opened from More > All Menus) so it can be closed. */
+            .bottom-header .navbar-toggler { display: none !important; }
+            body.bms-menu-open .bottom-header .navbar-toggler { display: block !important; }
+            .bottom-header .header-nav-bar { padding: 0; }
+            body.bms-kb-open .bms-bnav { display: none !important; }
+        }
+    </style>
+
+    <nav class="bms-bnav d-flex d-lg-none d-print-none" aria-label="<?= htmlspecialchars(t('Main Menu')) ?>">
+        <?php if (canView('pos')): ?>
+        <a class="bn-item<?= $__bn_on('pos') ? ' active' : '' ?>" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i><span><?= t('POS') ?></span></a>
+        <?php endif; ?>
+        <?php if (canView('products')): ?>
+        <a class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" href="<?= getUrl('products') ?>"><i class="bi bi-box"></i><span><?= t('Products') ?></span></a>
+        <?php endif; ?>
+        <?php if (canView('expenses')): ?>
+        <a class="bn-item<?= $__bn_on('expenses') ? ' active' : '' ?>" href="<?= getUrl('expenses') ?>"><i class="bi bi-receipt"></i><span><?= t('Expenses') ?></span></a>
+        <?php endif; ?>
+        <?php if (hasReportsAccess()): ?>
+        <button type="button" class="bn-item<?= $__bn_reports_on ? ' active' : '' ?>" data-bs-toggle="offcanvas" data-bs-target="#bmsReportsSheet" aria-controls="bmsReportsSheet"><i class="bi bi-graph-up"></i><span><?= t('Reports') ?></span></button>
+        <?php endif; ?>
+        <button type="button" class="bn-item" data-bs-toggle="offcanvas" data-bs-target="#bmsMoreSheet" aria-controls="bmsMoreSheet"><i class="bi bi-three-dots"></i><span><?= t('More') ?></span></button>
+    </nav>
+
+    <?php if (hasReportsAccess()): ?>
+    <!-- Reports list — same six reports and gates as the Simple Mode Reports dropdown -->
+    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1" id="bmsReportsSheet" aria-labelledby="bmsReportsSheetLabel">
+        <div class="offcanvas-header pb-0">
+            <h6 class="offcanvas-title fw-bold" id="bmsReportsSheetLabel"><?= t('Business Reports') ?></h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-1">
+            <div class="list-group list-group-flush">
+                <?php if(canView('sales_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i><?= t('Sales Report') ?></a><?php endif; ?>
+                <?php if(canView('purchase_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i><?= t('Purchase Report') ?></a><?php endif; ?>
+                <?php if(canView('inventory_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i><?= t('Inventory Report') ?></a><?php endif; ?>
+                <?php if(canView('expense_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i><?= t('Expense Report') ?></a><?php endif; ?>
+                <?php if(canView('pos') && canView('pos_user_sales_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i><?= t('Sales by User Report') ?></a><?php endif; ?>
+                <?php if(canView('pos') && canView('pos_profit_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i><?= t('Profit Report') ?></a><?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- More — the Core, Shop and Settings items plus the account/language items that live
+         inside the ☰ menu on a phone. "All Menus" opens that full menu, so nothing else is lost. -->
+    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1" id="bmsMoreSheet" aria-labelledby="bmsMoreSheetLabel">
+        <div class="offcanvas-header pb-0">
+            <h6 class="offcanvas-title fw-bold" id="bmsMoreSheetLabel"><?= t('More') ?></h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-0">
+            <div class="list-group list-group-flush">
+                <?php if(canView('dashboard')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i><?= t('Dashboard') ?></a><?php endif; ?>
+                <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
+                <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
+                <?php if(canView('warehouses')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i><?= htmlspecialchars(wLabel('Inventory', 'Shop')) ?></a><?php endif; ?>
+                <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
+            </div>
+            <?php if ($_set_sys_visible || $_set_biz_visible): ?>
+            <div class="bn-group"><?= t('Settings') ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (isAdmin()): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i><?= t('Admin') ?></a><?php endif; ?>
+                <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= t('POS Settings') ?></a><?php endif; ?>
+                <?php if (canView('color_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>
+                <?php if (canView('tax_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i><?= t('Tax') ?></a><?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <div class="bn-group"><?= htmlspecialchars($username) ?> · <?= htmlspecialchars(t($user_role)) ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (!empty($_SESSION['employee_id'])): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace"></i><?= t('My HR') ?></a><?php endif; ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>"><i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle"></i><?= t('Help') ?></a>
+                <button type="button" class="list-group-item list-group-item-action" onclick="bmsToggleLang()"><i class="bi bi-globe2"></i><?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?> (<?= strtoupper($__bms_lang_pref) ?>)</button>
+                <button type="button" class="list-group-item list-group-item-action" id="bmsAllMenusBtn"><i class="bi bi-list"></i><?= t('All Menus') ?></button>
+                <a class="list-group-item list-group-item-action text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right text-danger"></i><?= t('Logout') ?></a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        // "All Menus": close the More sheet, then open the original ☰ menu.
+        document.addEventListener('DOMContentLoaded', function () {
+            var btn   = document.getElementById('bmsAllMenusBtn');
+            var sheet = document.getElementById('bmsMoreSheet');
+            var menu  = document.getElementById('navbarNav');
+            if (!btn || !sheet || !menu || !window.bootstrap) return;
+            btn.addEventListener('click', function () {
+                sheet.addEventListener('hidden.bs.offcanvas', function () {
+                    bootstrap.Collapse.getOrCreateInstance(menu, { toggle: false }).show();
+                    window.scrollTo(0, 0);
+                }, { once: true });
+                bootstrap.Offcanvas.getOrCreateInstance(sheet).hide();
+            });
+            menu.addEventListener('show.bs.collapse', function () { document.body.classList.add('bms-menu-open'); });
+            menu.addEventListener('hidden.bs.collapse', function () { document.body.classList.remove('bms-menu-open'); });
+        });
+        // Hide the bar while the on-screen keyboard is open so it never floats above it.
+        if (window.visualViewport) {
+            var maxH = window.innerHeight;
+            var check = function () {
+                maxH = Math.max(maxH, window.innerHeight);
+                document.body.classList.toggle('bms-kb-open', window.visualViewport.height < maxH * 0.75);
+            };
+            window.visualViewport.addEventListener('resize', check);
+            window.addEventListener('orientationchange', function () { maxH = 0; setTimeout(function () { maxH = window.innerHeight; check(); }, 300); });
+        }
+    })();
+    </script>
+    <?php endif; // posSimpleModeEnabled() bottom bar ?>
+
     <script>
     /* Runs synchronously — header is in the DOM, body content not yet rendered */
     (function() {
