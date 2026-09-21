@@ -276,6 +276,14 @@ if (!function_exists('registerTenant')) {
             }
         }
 
+        // Apply self-registration defaults: Simple Mode ON + only POS/Warehouses.
+        // Best-effort — logged but never fatal to registration itself.
+        try {
+            applySelfRegistrationDefaults((int)$r['tenant_id']);
+        } catch (Throwable $_defaultsE) {
+            error_log('applySelfRegistrationDefaults threw: ' . $_defaultsE->getMessage());
+        }
+
         logRegistrationAttempt($ip, $email, $sub, 'success', null, $r['tenant_id']);
 
         // Notify all superadmins by email — best-effort, never fatal.
@@ -291,6 +299,45 @@ if (!function_exists('registerTenant')) {
             'subdomain' => $sub,
             'login_url' => tenantLoginUrl($sub),
         ];
+    }
+}
+
+if (!function_exists('applySelfRegistrationDefaults')) {
+    /**
+     * Applied once, right after self-registration, to set the new tenant's
+     * default experience: Simple Mode ON (locked so the tenant cannot toggle
+     * it themselves), with only POS and Warehouses enabled. All other modules
+     * start denied; a superadmin must explicitly grant them from the tenant panel.
+     *
+     * Best-effort — a failure here is logged but never fails the registration
+     * itself. The owner can already sign in, and a superadmin can fix the
+     * module/mode state manually.
+     */
+    function applySelfRegistrationDefaults(int $tenantId): void
+    {
+        // Turn off every module except 'pos' and 'warehouses'.
+        // 'warehouses' must stay on because 'pos' depends on it.
+        $desired = [];
+        foreach ([
+            'sales', 'procurement', 'tenders', 'hr', 'assets', 'projects',
+            'ai_assistant', 'esignature', 'crm', 'communication', 'documents',
+            'compliance', 'finance',
+        ] as $key) {
+            $desired[$key] = false;
+        }
+        $fr = setTenantFeatures($tenantId, $desired);
+        if (!$fr['ok']) {
+            error_log('applySelfRegistrationDefaults: setTenantFeatures failed for tenant '
+                . $tenantId . ': ' . $fr['error']);
+        }
+
+        // Simple Mode ON and locked — only a superadmin can change it from
+        // the tenant detail panel; the tenant's own admin cannot toggle it.
+        $sr = setTenantPosSimpleMode($tenantId, true, true);
+        if (!$sr['ok']) {
+            error_log('applySelfRegistrationDefaults: setTenantPosSimpleMode failed for tenant '
+                . $tenantId . ': ' . $sr['error']);
+        }
     }
 }
 
