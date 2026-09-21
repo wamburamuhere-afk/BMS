@@ -14,6 +14,15 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Language detection (mirrors login.php)
+$pageLang = 'en';
+if (!empty($_GET['lang']) && in_array($_GET['lang'], ['en', 'sw'], true)) {
+    $pageLang = $_GET['lang'];
+    setcookie('bms_lang', $pageLang, time() + 365 * 24 * 3600, '/');
+} elseif (!empty($_COOKIE['bms_lang']) && in_array($_COOKIE['bms_lang'], ['en', 'sw'], true)) {
+    $pageLang = $_COOKIE['bms_lang'];
+}
+
 $r = resolveTenantFromRequest();
 if (in_array($r['status'] ?? '', ['found', 'unknown'], true)) {
     http_response_code(404);
@@ -29,7 +38,7 @@ $baseDom = tenantBaseDomain();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Create your company account</title>
+<title><?= $pageLang === 'sw' ? 'Fungua Akaunti ya Kampuni' : 'Create your company account' ?></title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
@@ -45,10 +54,49 @@ $baseDom = tenantBaseDomain();
     .hp-field { position: absolute; left: -9999px; top: -9999px; height: 0; overflow: hidden; }
     .subdomain-hint { font-size: .875rem; min-height: 1.25rem; }
     .progress-note { background: #e7f0ff; border: 1px solid #b6ccfe; border-radius: 8px; }
+    .lang-switcher { position: absolute; top: 12px; right: 14px; }
+    .lang-btn {
+        background: white; border: 1px solid #dee2e6; border-radius: 20px;
+        padding: 4px 12px; font-size: .8rem; font-weight: 600; color: #555;
+        cursor: pointer; display: flex; align-items: center; gap: 5px;
+        transition: all .15s; box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .lang-btn:hover { border-color: #3498db; color: #3498db; }
+    .lang-menu {
+        position: absolute; right: 0; top: 34px; background: white;
+        border: 1px solid #e0e0e0; border-radius: 10px; min-width: 150px;
+        box-shadow: 0 6px 20px rgba(0,0,0,.12); overflow: hidden; z-index: 9999; display: none;
+    }
+    .lang-menu a {
+        display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+        font-size: .85rem; color: #333; text-decoration: none; transition: background .15s;
+    }
+    .lang-menu a:hover { background: #f4f8ff; color: #3498db; }
+    .lang-menu a.active { font-weight: 700; color: #3498db; }
 </style>
 </head>
 <body>
-<div class="signup-card">
+<div class="signup-card position-relative">
+
+    <!-- Language switcher -->
+    <div class="lang-switcher">
+        <button class="lang-btn" onclick="toggleLang()">
+            <i class="bi bi-globe"></i>
+            <?= $pageLang === 'sw' ? 'SW' : 'EN' ?>
+            <i class="bi bi-chevron-down" style="font-size:.6rem;"></i>
+        </button>
+        <div class="lang-menu" id="langMenu">
+            <a href="?lang=en" class="<?= $pageLang === 'en' ? 'active' : '' ?>">
+                <span>🇬🇧</span> English
+                <?= $pageLang === 'en' ? '<i class="bi bi-check ms-auto" style="font-size:.7rem;color:#3498db;"></i>' : '' ?>
+            </a>
+            <a href="?lang=sw" class="<?= $pageLang === 'sw' ? 'active' : '' ?>">
+                <span>🇹🇿</span> Kiswahili
+                <?= $pageLang === 'sw' ? '<i class="bi bi-check ms-auto" style="font-size:.7rem;color:#3498db;"></i>' : '' ?>
+            </a>
+        </div>
+    </div>
+
     <div class="brand">
         <i class="bi bi-building-add text-primary"></i>
         <h4 class="mt-2 mb-0">Create your company account</h4>
@@ -242,9 +290,11 @@ $('#registerForm').on('submit', function (e) {
             if (res && res.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Your account is ready',
-                    text: 'Taking you to your sign-in page…',
-                    timer: 2200,
+                    title: '<?= $pageLang === "sw" ? "Akaunti yako iko tayari! 🎉" : "Your account is ready! 🎉" ?>',
+                    html: '<?= $pageLang === "sw"
+                        ? "<strong>Majaribio ya bure yanaanza leo!</strong><br><small>Una siku 14 za kutumia mfumo bila malipo yoyote.</small>"
+                        : "<strong>Your free trial starts today!</strong><br><small>You have 14 days to use the system completely free.</small>" ?>',
+                    timer: 3000,
                     showConfirmButton: false
                 });
                 setTimeout(function () { window.location.href = res.login_url; }, 2200);
@@ -266,6 +316,17 @@ function togglePw(id, btn) {
     inp.type = showing ? 'password' : 'text';
     btn.querySelector('i').className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
 }
+
+function toggleLang() {
+    const menu = document.getElementById('langMenu');
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.lang-switcher')) {
+        const m = document.getElementById('langMenu');
+        if (m) m.style.display = 'none';
+    }
+});
 
 function showFormError(msg) {
     $('#settingUp').addClass('d-none');
