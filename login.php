@@ -210,6 +210,64 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         /* Pricing modal */
         .pricing-card { transition: all .2s; }
         .pricing-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.10); }
+
+        /* ── Mobile: login card ── */
+        @media (max-width: 575.98px) {
+            .login-container { margin: 2% auto !important; padding: 1.25rem !important; }
+            .logo-container { margin-bottom: 1.2rem !important; }
+            .company-logo, .logo-placeholder { width: 54px !important; height: 54px !important; }
+            .logo-placeholder i { font-size: 1.5rem !important; }
+            .company-name { font-size: .95rem !important; }
+        }
+
+        /* ── Mobile: pricing modal ── */
+        @media (max-width: 575.98px) {
+            /* Tighter modal margins so more content is visible */
+            #pricingModal .modal-dialog { margin: .3rem !important; }
+            #pricingModal .modal-content { border-radius: 12px !important; }
+
+            /* Header: logo + name in a compact horizontal row */
+            #pricingModal .modal-header { padding: .7rem .85rem 0 !important; }
+            #pricingModal .pm-header-inner { flex-direction: row !important; align-items: center !important; gap: .6rem; text-align: left !important; }
+            #pricingModal .pm-logo { width: 42px !important; height: 42px !important; margin-bottom: 0 !important; border-radius: 8px !important; flex-shrink: 0; }
+            #pricingModal .pm-logo-placeholder { width: 42px !important; height: 42px !important; min-width: 42px; margin-bottom: 0 !important; border-radius: 10px !important; flex-shrink: 0; }
+            #pricingModal .pm-logo-placeholder i { font-size: 1.2rem !important; }
+            #pricingModal .pm-name-group { text-align: left !important; }
+            #pricingModal .pm-company-name { font-size: .8rem !important; line-height: 1.25 !important; }
+            #pricingModal .pm-pos-badge { font-size: .6rem !important; margin-top: .12rem !important; display: inline-block; }
+
+            /* Body: tighter padding */
+            #pricingModal .modal-body { padding: .55rem .85rem .4rem !important; }
+
+            /* Welcome description: compact */
+            #pricingModal .pm-welcome { margin-bottom: .5rem !important; padding-left: 0 !important; padding-right: 0 !important; }
+            #pricingModal .pm-welcome h6 { font-size: .8rem !important; margin-bottom: .15rem !important; }
+            #pricingModal .pm-welcome p { font-size: .74rem !important; line-height: 1.45 !important; }
+
+            /* Free-trial banner: compact */
+            #pricingModal .pm-trial { padding: .5rem .8rem !important; margin-bottom: .55rem !important; }
+            #pricingModal .pm-trial-title { font-size: .86rem !important; margin-bottom: .12rem !important; }
+            #pricingModal .pm-trial-body { font-size: .73rem !important; }
+
+            /* Plans section heading */
+            #pricingModal .pm-plans-label { font-size: .73rem !important; margin-bottom: .4rem !important; }
+            #pricingModal .pm-cards-row { --bs-gutter-x: .45rem; --bs-gutter-y: .55rem; margin-bottom: .5rem !important; }
+
+            /* Pricing cards: smaller everything */
+            #pricingModal .pricing-card { padding: .4rem .28rem !important; }
+            #pricingModal .pm-card-icon { font-size: 1.1rem !important; }
+            #pricingModal .pm-card-icon-wrap { margin-bottom: .2rem !important; }
+            #pricingModal .pm-card-name { font-size: .68rem !important; }
+            #pricingModal .pm-card-price-wrap { margin-top: .2rem !important; margin-bottom: .2rem !important; }
+            #pricingModal .pm-price-num { font-size: .97rem !important; font-weight: 800 !important; }
+            #pricingModal .pm-price-cur { font-size: .58rem !important; }
+            #pricingModal .pm-price-per { font-size: .58rem !important; }
+            #pricingModal .pm-save-badge { font-size: .52rem !important; padding: .12em .4em !important; }
+
+            /* Footer buttons: smaller */
+            #pricingModal .modal-footer { padding: .4rem .85rem .75rem !important; }
+            #pricingModal .modal-footer .btn { padding: .4rem .55rem !important; font-size: .78rem !important; }
+        }
     </style>
 </head>
 <body>
@@ -302,19 +360,21 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
     <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
 
       <div class="modal-header border-0 pb-0 pt-4 px-4">
-        <div class="d-flex flex-column align-items-center w-100 text-center">
+        <div class="d-flex flex-column align-items-center w-100 text-center pm-header-inner">
           <?php if ($company_logo): ?>
             <img src="<?= htmlspecialchars($company_logo) ?>" alt="<?= htmlspecialchars($company_name) ?>"
-                 style="width:64px;height:64px;object-fit:contain;border-radius:10px;margin-bottom:.75rem;">
+                 class="pm-logo" style="width:64px;height:64px;object-fit:contain;border-radius:10px;margin-bottom:.75rem;">
           <?php else: ?>
-            <div style="width:64px;height:64px;background:linear-gradient(135deg,#3498db,#2980b9);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:.75rem;box-shadow:0 4px 14px rgba(52,152,219,.35);">
+            <div class="pm-logo-placeholder" style="width:64px;height:64px;background:linear-gradient(135deg,#3498db,#2980b9);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:.75rem;box-shadow:0 4px 14px rgba(52,152,219,.35);">
               <i class="fas fa-building text-white fs-3"></i>
             </div>
           <?php endif; ?>
-          <h5 class="fw-bold mb-0" style="color:#2c3e50;"><?= htmlspecialchars($company_name) ?></h5>
-          <span class="badge rounded-pill mt-1" style="background:#e8f4fd;color:#2980b9;font-size:.75rem;font-weight:600;">
-            <i class="fas fa-store me-1"></i>Simple POS
-          </span>
+          <div class="pm-name-group">
+            <h5 class="fw-bold mb-0 pm-company-name" style="color:#2c3e50;"><?= htmlspecialchars($company_name) ?></h5>
+            <span class="badge rounded-pill mt-1 pm-pos-badge" style="background:#e8f4fd;color:#2980b9;font-size:.75rem;font-weight:600;">
+              <i class="fas fa-store me-1"></i>Simple POS
+            </span>
+          </div>
         </div>
         <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -322,7 +382,7 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
       <div class="modal-body px-4 pt-3 pb-2">
 
         <!-- Welcome description -->
-        <div class="text-center mb-4 px-2">
+        <div class="text-center mb-4 px-2 pm-welcome">
           <h6 class="fw-bold mb-2" style="color:#2c3e50;font-size:1rem;">
             🛒 <?= htmlspecialchars($tr['modal_tagline']) ?>
           </h6>
@@ -332,37 +392,37 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         </div>
 
         <!-- Free-trial banner -->
-        <div class="text-center rounded-3 py-3 px-3 mb-4"
+        <div class="text-center rounded-3 py-3 px-3 mb-4 pm-trial"
              style="background:linear-gradient(135deg,#1abc9c,#16a085);color:#fff;">
-          <div class="fw-bold fs-5 mb-1"><i class="fas fa-gift me-2"></i><?= htmlspecialchars($tr['modal_trial_title']) ?></div>
-          <div style="font-size:.9rem;opacity:.92;"><?= $tr['modal_trial_body'] ?></div>
+          <div class="fw-bold pm-trial-title mb-1"><i class="fas fa-gift me-2"></i><?= htmlspecialchars($tr['modal_trial_title']) ?></div>
+          <div class="pm-trial-body" style="font-size:.9rem;opacity:.92;"><?= $tr['modal_trial_body'] ?></div>
         </div>
 
         <!-- Pricing cards -->
-        <h6 class="text-center fw-semibold mb-3" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['modal_plans']) ?></h6>
-        <div class="row g-3 mb-3">
+        <h6 class="text-center fw-semibold mb-3 pm-plans-label" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['modal_plans']) ?></h6>
+        <div class="row g-3 mb-3 pm-cards-row">
 
           <div class="col-6 col-md-3">
             <div class="pricing-card text-center p-3 h-100 rounded-3 border" style="border-color:#dee2e6!important;">
-              <div class="mb-2"><i class="fas fa-calendar-day" style="font-size:1.6rem;color:#3498db;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1m']) ?></div>
-              <div class="my-2">
-                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">10,000</span>
-                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              <div class="mb-2 pm-card-icon-wrap"><i class="fas fa-calendar-day pm-card-icon" style="font-size:1.6rem;color:#3498db;"></i></div>
+              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1m']) ?></div>
+              <div class="my-2 pm-card-price-wrap">
+                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">10,000</span>
+                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div style="font-size:.75rem;color:#888;"><?= htmlspecialchars($tr['per_month']) ?></div>
+              <div class="pm-price-per" style="font-size:.75rem;color:#888;"><?= htmlspecialchars($tr['per_month']) ?></div>
             </div>
           </div>
 
           <div class="col-6 col-md-3">
             <div class="pricing-card text-center p-3 h-100 rounded-3 border" style="border-color:#dee2e6!important;">
-              <div class="mb-2"><i class="fas fa-calendar-week" style="font-size:1.6rem;color:#9b59b6;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_3m']) ?></div>
-              <div class="my-2">
-                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">25,000</span>
-                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              <div class="mb-2 pm-card-icon-wrap"><i class="fas fa-calendar-week pm-card-icon" style="font-size:1.6rem;color:#9b59b6;"></i></div>
+              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_3m']) ?></div>
+              <div class="my-2 pm-card-price-wrap">
+                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">25,000</span>
+                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div class="badge rounded-pill" style="background:#f0e6ff;color:#9b59b6;font-size:.7rem;"><?= htmlspecialchars($tr['save_17']) ?></div>
+              <div class="badge rounded-pill pm-save-badge" style="background:#f0e6ff;color:#9b59b6;font-size:.7rem;"><?= htmlspecialchars($tr['save_17']) ?></div>
             </div>
           </div>
 
@@ -370,13 +430,13 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
             <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative" style="border-color:#1abc9c!important;">
               <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
                     style="background:#1abc9c;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['popular']) ?></span>
-              <div class="mb-2 mt-1"><i class="fas fa-calendar-alt" style="font-size:1.6rem;color:#1abc9c;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_6m']) ?></div>
-              <div class="my-2">
-                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">45,000</span>
-                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              <div class="mb-2 mt-1 pm-card-icon-wrap"><i class="fas fa-calendar-alt pm-card-icon" style="font-size:1.6rem;color:#1abc9c;"></i></div>
+              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_6m']) ?></div>
+              <div class="my-2 pm-card-price-wrap">
+                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">45,000</span>
+                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div class="badge rounded-pill" style="background:#e6faf5;color:#1abc9c;font-size:.7rem;"><?= htmlspecialchars($tr['save_25']) ?></div>
+              <div class="badge rounded-pill pm-save-badge" style="background:#e6faf5;color:#1abc9c;font-size:.7rem;"><?= htmlspecialchars($tr['save_25']) ?></div>
             </div>
           </div>
 
@@ -384,13 +444,13 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
             <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative" style="border-color:#f39c12!important;">
               <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
                     style="background:#f39c12;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['best']) ?></span>
-              <div class="mb-2 mt-1"><i class="fas fa-crown" style="font-size:1.6rem;color:#f39c12;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1y']) ?></div>
-              <div class="my-2">
-                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">85,000</span>
-                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              <div class="mb-2 mt-1 pm-card-icon-wrap"><i class="fas fa-crown pm-card-icon" style="font-size:1.6rem;color:#f39c12;"></i></div>
+              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1y']) ?></div>
+              <div class="my-2 pm-card-price-wrap">
+                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">85,000</span>
+                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div class="badge rounded-pill" style="background:#fff8e6;color:#f39c12;font-size:.7rem;"><?= htmlspecialchars($tr['save_29']) ?></div>
+              <div class="badge rounded-pill pm-save-badge" style="background:#fff8e6;color:#f39c12;font-size:.7rem;"><?= htmlspecialchars($tr['save_29']) ?></div>
             </div>
           </div>
 
