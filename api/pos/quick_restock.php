@@ -36,7 +36,7 @@ if (isset($_SESSION['user_lang'])) {
 }
 
 if (!isAuthenticated())        { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
-if (!hasPermission('adjust_stock') && !isAdmin()) {
+if (!hasPermission('adjust_stock') && !hasPermission('pos_restock') && !isAdmin()) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => t('Permission denied')]);
     exit;
