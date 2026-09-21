@@ -240,7 +240,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
 
                         <!-- ======== PHASE 1: Institution Details ======== -->
                         <div class="wizard-phase" id="phase-1">
-                            <div class="col-12"><h5 class="fw-bold text-primary mb-3">Institution Details</h5></div>
+                            <div class="col-12"><h5 class="fw-bold text-primary mb-3"><?= t('Institution Details') ?></h5></div>
                             <div class="row g-4">
                                 <div class="col-md-9">
                                     <label class="form-label fw-bold text-dark">Name of Procuring Entity <span class="text-danger">*</span></label>
@@ -258,7 +258,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                     <div class="invalid-feedback">Procuring entity is required.</div>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label fw-bold">Acronym</label>
+                                    <label class="form-label fw-bold"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" name="acronym" id="acronym_field" value="<?= safe_output($tender['acronym']) ?>" placeholder="e.g. TANROADS">
                                 </div>
                                 <input type="hidden" name="procuring_entity_id" id="procuring_entity_id" value="<?= $tender['customer_id'] ?>">
@@ -289,11 +289,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                     <input type="text" class="form-control" name="contact_number" id="contact_number" value="<?= safe_output($tender['contact_number']) ?>" required>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Physical Address</label>
+                                    <label class="form-label fw-bold"><?= t('Physical Address') ?></label>
                                     <input type="text" class="form-control" name="physical_address" value="<?= safe_output($tender['physical_address']) ?>">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Postal Address</label>
+                                    <label class="form-label fw-bold"><?= t('Postal Address') ?></label>
                                     <input type="text" class="form-control" name="postal_address" value="<?= safe_output($tender['postal_address']) ?>">
                                 </div>
                             </div>
@@ -301,7 +301,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
 
                         <!-- ======== PHASE 2: Tender Details ======== -->
                         <div class="wizard-phase d-none" id="phase-2">
-                            <div class="col-12"><h5 class="fw-bold text-primary mb-3">Tender Details</h5></div>
+                            <div class="col-12"><h5 class="fw-bold text-primary mb-3"><?= t('Tender Details') ?></h5></div>
                             <div class="row g-4">
                                 <div class="col-12">
                                     <label class="form-label fw-bold">Tender Description <span class="text-danger">*</span></label>
@@ -312,7 +312,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                     <input type="text" class="form-control" name="tender_no" value="<?= safe_output($tender['tender_no']) ?>" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">NeST Reference</label>
+                                    <label class="form-label fw-bold"><?= t('NeST Reference') ?></label>
                                     <input type="text" class="form-control" name="nest_reference" value="<?= safe_output($tender['nest_reference'], '') ?>" placeholder="reference on nest.go.tz, once listed">
                                 </div>
                                 <div class="col-md-6">
@@ -378,7 +378,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                 </div>
 
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Duration</label>
+                                    <label class="form-label fw-bold"><?= t('Duration') ?></label>
                                     <input type="text" class="form-control" name="duration" value="<?= safe_output($tender['duration']) ?>" placeholder="Total days">
                                 </div>
                                 <div class="col-md-4">
@@ -386,11 +386,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                     <input type="date" class="form-control" name="submission_deadline" value="<?= $tender['submission_deadline'] ?>" required>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Date of Invitation</label>
+                                    <label class="form-label fw-bold"><?= t('Date of Invitation') ?></label>
                                     <input type="date" class="form-control" name="publication_date" value="<?= $tender['publication_date'] ?>">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Bid Validity (days)</label>
+                                    <label class="form-label fw-bold"><?= t('Bid Validity (days)') ?></label>
                                     <input type="number" min="1" class="form-control" name="bid_validity_days" value="<?= safe_output($tender['bid_validity_days'], '90') ?>">
                                     <small class="text-muted fst-italic">Used in the Form of Tender letter's validity paragraph.</small>
                                 </div>
@@ -456,7 +456,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                 </div>
 
                                 <div class="col-12">
-                                    <label class="form-label fw-bold">Update Tender Docs / Others</label>
+                                    <label class="form-label fw-bold"><?= t('Update Tender Docs / Others') ?></label>
                                     <input type="file" class="form-control" name="tender_document">
                                     <?php if ($tender['tender_document']): ?>
                                         <div class="mt-2"><small class="text-success"><i class="bi bi-file-earmark-check"></i> Current: <a href="<?= buildUrl($tender['tender_document']) ?>" target="_blank" class="text-decoration-none">View Document</a></small></div>
@@ -478,15 +478,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                     <div class="d-flex gap-4 flex-wrap mt-1">
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="currency_choice" id="cur_tzs" value="Tshs" <?= ($tender['currency'] === 'Tshs') ? 'checked' : '' ?>>
-                                            <label class="form-check-label fw-semibold" for="cur_tzs">Tshs (Tanzanian Shillings)</label>
+                                            <label class="form-check-label fw-semibold" for="cur_tzs"><?= t('Tshs (Tanzanian Shillings)') ?></label>
                                         </div>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="currency_choice" id="cur_usd" value="USD" <?= ($tender['currency'] === 'USD') ? 'checked' : '' ?>>
-                                            <label class="form-check-label fw-semibold" for="cur_usd">USD (US Dollars)</label>
+                                            <label class="form-check-label fw-semibold" for="cur_usd"><?= t('USD (US Dollars)') ?></label>
                                         </div>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="currency_choice" id="cur_both" value="Tshs & USD" <?= ($tender['currency'] === 'Tshs & USD') ? 'checked' : '' ?>>
-                                            <label class="form-check-label fw-semibold" for="cur_both">Tshs &amp; USD (Both)</label>
+                                            <label class="form-check-label fw-semibold" for="cur_both"><?= t('Tshs &amp; USD (Both)') ?></label>
                                         </div>
                                     </div>
                                 </div>
@@ -499,7 +499,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Participation Fee (Tshs)</label>
+                                                    <label class="form-label fw-bold"><?= t('Participation Fee (Tshs)') ?></label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-primary text-white fw-bold">Tshs</span>
                                                         <input type="number" step="0.01" min="0" class="form-control" name="entrance_fee_tzs" id="entrance_fee_tzs" value="<?= $tender['entrance_fee_tzs'] ?>">
@@ -518,7 +518,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Participation Fee (USD)</label>
+                                                    <label class="form-label fw-bold"><?= t('Participation Fee (USD)') ?></label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-success text-white fw-bold">USD</span>
                                                         <input type="number" step="0.01" min="0" class="form-control" name="entrance_fee_usd" id="entrance_fee_usd" value="<?= $tender['entrance_fee_usd'] ?>">

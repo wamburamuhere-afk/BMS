@@ -268,7 +268,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-xl-2 col-md-4 col-sm-6">
-                    <label class="form-label small fw-bold text-muted">Employment Status</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Employment Status') ?></label>
                     <select class="form-select border-0 shadow-sm select2-static" id="statusFilter" style="border-radius: 8px;">
                         <option value="">All Status</option>
                         <option value="active">Active</option>
@@ -280,7 +280,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     </select>
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6">
-                    <label class="form-label small fw-bold text-muted">Department</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Department') ?></label>
                     <select class="form-select border-0 shadow-sm select2-static" id="departmentFilter" style="border-radius: 8px;">
                         <option value="">All Departments</option>
                         <?php foreach ($departments as $dept): ?>
@@ -289,7 +289,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     </select>
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6">
-                    <label class="form-label small fw-bold text-muted">Designation</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Designation') ?></label>
                     <select class="form-select border-0 shadow-sm select2-static" id="designationFilter" style="border-radius: 8px;">
                         <option value="">All Designations</option>
                         <?php foreach ($designations as $designation): ?>
@@ -298,7 +298,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     </select>
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6">
-                    <label class="form-label small fw-bold text-muted">Employment Type</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Employment Type') ?></label>
                     <select class="form-select border-0 shadow-sm select2-static" id="employmentTypeFilter" style="border-radius: 8px;">
                         <option value="">All Types</option>
                         <?php foreach ($employment_types as $type): ?>
@@ -354,7 +354,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                 <!-- Search Group -->
                 <div class="input-group input-group-sm shadow-sm flex-grow-1" style="min-width: 200px; max-width: 300px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">
                     <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" class="form-control border-0 p-2" id="searchEmployees" placeholder="Search employees..." onkeyup="$('#employeesTable').DataTable().search(this.value).draw();">
+                    <input type="text" class="form-control border-0 p-2" id="searchEmployees" placeholder="<?= t('Search employees...') ?>" onkeyup="$('#employeesTable').DataTable().search(this.value).draw();">
                 </div>
             </div>
 
@@ -379,7 +379,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
     <!-- Employees Table -->
     <div class="card border-0 shadow-sm print-flow-card">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
-            <h5 class="mb-0 fw-bold">Employees List</h5>
+            <h5 class="mb-0 fw-bold"><?= t('Employees List') ?></h5>
         </div>
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
@@ -390,18 +390,18 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <table id="employeesTable" class="table table-striped table-hover align-middle" style="width: 100%;" width="100%">
                         <thead>
                             <tr>
-                                <th style="width: 50px;">S/NO</th>
-                                <th>Employee #</th>
-                                <th>Name</th>
-                                <th>Department</th>
-                                <th>Designation</th>
-                                <th>Project</th>
-                                <th>Status</th>
-                                <th>Attendance</th>
-                                <th>Leaves</th>
-                                <th>Payrolls</th>
-                                <th>Joined</th>
-                                <th class="text-end">Actions</th>
+                                <th style="width: 50px;"><?= t('S/NO') ?></th>
+                                <th><?= t('Employee #') ?></th>
+                                <th><?= t('Name') ?></th>
+                                <th><?= t('Department') ?></th>
+                                <th><?= t('Designation') ?></th>
+                                <th><?= t('Project') ?></th>
+                                <th><?= t('Status') ?></th>
+                                <th><?= t('Attendance') ?></th>
+                                <th><?= t('Leaves') ?></th>
+                                <th><?= t('Payrolls') ?></th>
+                                <th><?= t('Joined') ?></th>
+                                <th class="text-end"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -514,7 +514,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
             <?php else: ?>
                 <div class="text-center py-5">
                     <i class="bi bi-people" style="font-size: 4rem; color: #6c757d;"></i>
-                    <h4 class="mt-3 text-muted">No Employees Found</h4>
+                    <h4 class="mt-3 text-muted"><?= t('No Employees Found') ?></h4>
                     <p class="text-muted">Get started by adding your first employee.</p>
                     <?php if ($can_edit_employees): ?>
                     <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
@@ -554,7 +554,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <?php endif; ?>
                     
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 id="stepIndicator" class="text-primary fw-bold mb-0">Step 1 of 5: Personal Info</h6>
+                        <h6 id="stepIndicator" class="text-primary fw-bold mb-0"><?= t('Step 1 of 5: Personal Info') ?></h6>
                         <div class="progress" style="width: 200px; height: 10px;">
                             <div id="wizardProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 20%;" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
@@ -565,7 +565,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                         <div class="wizard-step" id="step-0" style="display:block;">
                             <div class="row">
                                 <div class="col-12 mb-3 text-center">
-                                    <label class="form-label d-block">Profile Photo</label>
+                                    <label class="form-label d-block"><?= t('Profile Photo') ?></label>
                                     <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2" style="width:110px;height:110px;overflow:hidden;">
                                         <img id="photo_preview_img" src="" class="w-100 h-100 d-none" style="object-fit:cover;" alt="Profile photo preview">
                                         <i id="photo_preview_icon" class="bi bi-person-fill" style="font-size:3.5rem;color:#adb5bd;"></i>
@@ -575,15 +575,15 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="first_name" name="first_name" required placeholder="Enter first name">
+                                    <input type="text" class="form-control" id="first_name" name="first_name" required placeholder="<?= t('Enter first name') ?>">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="middle_name" class="form-label">Middle Name</label>
-                                    <input type="text" class="form-control" id="middle_name" name="middle_name" placeholder="Enter middle name">
+                                    <label for="middle_name" class="form-label"><?= t('Middle Name') ?></label>
+                                    <input type="text" class="form-control" id="middle_name" name="middle_name" placeholder="<?= t('Enter middle name') ?>">
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="last_name" name="last_name" required placeholder="Enter last name">
+                                    <input type="text" class="form-control" id="last_name" name="last_name" required placeholder="<?= t('Enter last name') ?>">
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="gender" class="form-label">Gender <span class="text-danger">*</span></label>
@@ -599,7 +599,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" required>
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="marital_status" class="form-label">Marital Status</label>
+                                    <label for="marital_status" class="form-label"><?= t('Marital Status') ?></label>
                                     <select class="form-select select2-static" id="marital_status" name="marital_status">
                                         <option value="">Select Status</option>
                                         <option value="single">Single</option>
@@ -609,16 +609,16 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="national_id" class="form-label">National ID Number</label>
-                                    <input type="text" class="form-control" id="national_id" name="national_id" placeholder="National ID">
+                                    <label for="national_id" class="form-label"><?= t('National ID Number') ?></label>
+                                    <input type="text" class="form-control" id="national_id" name="national_id" placeholder="<?= t('National ID') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="passport_number" class="form-label">Passport Number</label>
-                                    <input type="text" class="form-control" id="passport_number" name="passport_number" placeholder="Passport number">
+                                    <label for="passport_number" class="form-label"><?= t('Passport Number') ?></label>
+                                    <input type="text" class="form-control" id="passport_number" name="passport_number" placeholder="<?= t('Passport number') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="notes" class="form-label">Personal Notes</label>
-                                    <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="Any personal notes about employee"></textarea>
+                                    <label for="notes" class="form-label"><?= t('Personal Notes') ?></label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="<?= t('Any personal notes about employee') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -645,7 +645,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
                                     <div id="department_other_box" class="input-group mt-2 d-none">
-                                        <input type="text" class="form-control" id="department_other" name="department_other" placeholder="Type new department — it will be saved">
+                                        <input type="text" class="form-control" id="department_other" name="department_other" placeholder="<?= t('Type new department — it will be saved') ?>">
                                         <button type="button" class="btn btn-outline-secondary" id="department_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
                                     </div>
                                 </div>
@@ -659,7 +659,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
                                     <div id="designation_other_box" class="input-group mt-2 d-none">
-                                        <input type="text" class="form-control" id="designation_other" name="designation_other" placeholder="Type new designation — it will be saved">
+                                        <input type="text" class="form-control" id="designation_other" name="designation_other" placeholder="<?= t('Type new designation — it will be saved') ?>">
                                         <button type="button" class="btn btn-outline-secondary" id="designation_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
                                     </div>
                                 </div>
@@ -673,7 +673,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
                                     <div id="employment_type_other_box" class="input-group mt-2 d-none">
-                                        <input type="text" class="form-control" id="employment_type_other" name="employment_type_other" placeholder="Type new employment type — it will be saved">
+                                        <input type="text" class="form-control" id="employment_type_other" name="employment_type_other" placeholder="<?= t('Type new employment type — it will be saved') ?>">
                                         <button type="button" class="btn btn-outline-secondary" id="employment_type_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
                                     </div>
                                 </div>
@@ -687,25 +687,25 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="probation_end_date" class="form-label">Probation End Date</label>
+                                    <label for="probation_end_date" class="form-label"><?= t('Probation End Date') ?></label>
                                     <input type="date" class="form-control" id="probation_end_date" name="probation_end_date">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="contract_end_date" class="form-label">Contract End Date</label>
+                                    <label for="contract_end_date" class="form-label"><?= t('Contract End Date') ?></label>
                                     <input type="date" class="form-control" id="contract_end_date" name="contract_end_date">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="reporting_to_id" class="form-label">Reporting To</label>
+                                    <label for="reporting_to_id" class="form-label"><?= t('Reporting To') ?></label>
                                     <select class="form-select select2-employee-ajax" id="reporting_to_id" name="reporting_to_id" style="width:100%"></select>
                                     <div class="form-text" id="reporting_to_legacy_hint"></div>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="work_location" class="form-label">Work Location</label>
-                                    <input type="text" class="form-control" id="work_location" name="work_location" placeholder="Office location">
+                                    <label for="work_location" class="form-label"><?= t('Work Location') ?></label>
+                                    <input type="text" class="form-control" id="work_location" name="work_location" placeholder="<?= t('Office location') ?>">
                                 </div>
                                 <?php if (projectsModuleActive()): ?>
                                 <div class="col-md-6 mb-3">
-                                    <label for="project_id" class="form-label">Assign to Project</label>
+                                    <label for="project_id" class="form-label"><?= t('Assign to Project') ?></label>
                                     <select class="form-select select2-static" id="project_id" name="project_id">
                                         <option value="">No Project / General</option>
                                         <?php foreach ($projects as $project): ?>
@@ -744,16 +744,16 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="number" class="form-control" id="basic_salary" name="basic_salary" step="0.01" required placeholder="0.00">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="hourly_rate" class="form-label">Hourly Rate</label>
-                                    <input type="number" class="form-control" id="hourly_rate" name="hourly_rate" step="0.01" placeholder="Hourly rate if applicable">
+                                    <label for="hourly_rate" class="form-label"><?= t('Hourly Rate') ?></label>
+                                    <input type="number" class="form-control" id="hourly_rate" name="hourly_rate" step="0.01" placeholder="<?= t('Hourly rate if applicable') ?>">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="standard_working_hours" class="form-label">Working Hours (per day)</label>
+                                    <label for="standard_working_hours" class="form-label"><?= t('Working Hours (per day)') ?></label>
                                     <input type="number" class="form-control" id="standard_working_hours" name="standard_working_hours" step="0.5" min="0" value="8" placeholder="8">
                                     <small class="text-muted">Attendance overtime is measured against this employee's own hours, not one company-wide number.</small>
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="currency" class="form-label">Currency</label>
+                                    <label for="currency" class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select select2-static" id="currency" name="currency">
                                         <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
@@ -762,7 +762,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="payment_frequency" class="form-label">Payment Frequency</label>
+                                    <label for="payment_frequency" class="form-label"><?= t('Payment Frequency') ?></label>
                                     <select class="form-select select2-static" id="payment_frequency" name="payment_frequency">
                                         <option value="monthly" selected>Monthly</option>
                                         <option value="biweekly">Bi-Weekly</option>
@@ -777,7 +777,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="payment_method" class="form-label">Payment Method</label>
+                                    <label for="payment_method" class="form-label"><?= t('Payment Method') ?></label>
                                     <select class="form-select select2-static" id="payment_method" name="payment_method">
                                         <option value="bank">Bank Transfer</option>
                                         <option value="cash">Cash</option>
@@ -786,38 +786,38 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="tax_id" class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                    <label for="tax_id" class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="tax_id" name="tax_id" placeholder="<?= t('Tax Identification Number') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="social_security_number" class="form-label">Social Security Number</label>
-                                    <input type="text" class="form-control" id="social_security_number" name="social_security_number" placeholder="SSN/NIDA">
+                                    <label for="social_security_number" class="form-label"><?= t('Social Security Number') ?></label>
+                                    <input type="text" class="form-control" id="social_security_number" name="social_security_number" placeholder="<?= t('SSN/NIDA') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Benefits</label>
+                                    <label class="form-label"><?= t('Benefits') ?></label>
                                     <div class="row">
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="health_insurance" name="benefits[]" value="health_insurance">
-                                                <label class="form-check-label" for="health_insurance">Health Insurance</label>
+                                                <label class="form-check-label" for="health_insurance"><?= t('Health Insurance') ?></label>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="life_insurance" name="benefits[]" value="life_insurance">
-                                                <label class="form-check-label" for="life_insurance">Life Insurance</label>
+                                                <label class="form-check-label" for="life_insurance"><?= t('Life Insurance') ?></label>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="pension" name="benefits[]" value="pension">
-                                                <label class="form-check-label" for="pension">Pension</label>
+                                                <label class="form-check-label" for="pension"><?= t('Pension') ?></label>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="transport_allowance" name="benefits[]" value="transport_allowance">
-                                                <label class="form-check-label" for="transport_allowance">Transport Allowance</label>
+                                                <label class="form-check-label" for="transport_allowance"><?= t('Transport Allowance') ?></label>
                                             </div>
                                         </div>
                                     </div>
@@ -837,8 +837,8 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="text" class="form-control" id="phone" name="phone" required placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="alternate_phone" class="form-label">Alternate Phone</label>
-                                    <input type="text" class="form-control" id="alternate_phone" name="alternate_phone" placeholder="Alternate phone number">
+                                    <label for="alternate_phone" class="form-label"><?= t('Alternate Phone') ?></label>
+                                    <input type="text" class="form-control" id="alternate_phone" name="alternate_phone" placeholder="<?= t('Alternate phone number') ?>">
                                 </div>
 
 
@@ -847,27 +847,27 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <textarea class="form-control" id="physical_address" name="physical_address" rows="2" required placeholder="e.g. Msasani, Dar es Salaam"></textarea>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="postal_address" class="form-label">Postal Address</label>
+                                    <label for="postal_address" class="form-label"><?= t('Postal Address') ?></label>
                                     <textarea class="form-control" id="postal_address" name="postal_address" rows="2" placeholder="e.g. P.O. Box 1234, Dar es Salaam"></textarea>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="country" class="form-label">Country</label>
-                                    <input type="text" class="form-control" id="country" name="country" placeholder="Country" value="Tanzania">
+                                    <label for="country" class="form-label"><?= t('Country') ?></label>
+                                    <input type="text" class="form-control" id="country" name="country" placeholder="<?= t('Country') ?>" value="Tanzania">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="state" class="form-label">Region</label>
+                                    <label for="state" class="form-label"><?= t('Region') ?></label>
                                     <input type="text" class="form-control" id="state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="city" class="form-label">District</label>
+                                    <label for="city" class="form-label"><?= t('District') ?></label>
                                     <input type="text" class="form-control" id="city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="ward" class="form-label">Ward</label>
+                                    <label for="ward" class="form-label"><?= t('Ward') ?></label>
                                     <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="village" class="form-label">Street/Village</label>
+                                    <label for="village" class="form-label"><?= t('Street/Village') ?></label>
                                     <input type="text" class="form-control" id="village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
 
@@ -875,21 +875,21 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 <div class="col-12 mb-2 mt-3">
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="bi bi-person-exclamation text-primary"></i>
-                                        <h6 class="fw-bold text-primary mb-0" style="font-size: 0.9rem; letter-spacing: 0.5px; text-transform: uppercase;">Emergency Contact</h6>
+                                        <h6 class="fw-bold text-primary mb-0" style="font-size: 0.9rem; letter-spacing: 0.5px; text-transform: uppercase;"><?= t('Emergency Contact') ?></h6>
                                     </div>
                                     <hr class="mt-1 mb-2 border-primary border-opacity-25">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="emergency_contact" class="form-label">Contact Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="emergency_contact" name="emergency_contact" required placeholder="Full name of emergency contact">
+                                    <input type="text" class="form-control" id="emergency_contact" name="emergency_contact" required placeholder="<?= t('Full name of emergency contact') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="emergency_contact_relationship" class="form-label">Relationship with Employee</label>
+                                    <label for="emergency_contact_relationship" class="form-label"><?= t('Relationship with Employee') ?></label>
                                     <input type="text" class="form-control" id="emergency_contact_relationship" name="emergency_contact_relationship" placeholder="e.g. Spouse, Parent, Sibling">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="emergency_contact_phone" class="form-label">Phone Number <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="emergency_contact_phone" name="emergency_contact_phone" required placeholder="Phone number of emergency contact">
+                                    <input type="text" class="form-control" id="emergency_contact_phone" name="emergency_contact_phone" required placeholder="<?= t('Phone number of emergency contact') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="emergency_contact_email" class="form-label">Email Address <small class="text-muted">(if available)</small></label>
@@ -897,11 +897,11 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="emergency_contact_postal_address" class="form-label">Postal Address <small class="text-muted">(of Contact)</small></label>
-                                    <input type="text" class="form-control" id="emergency_contact_postal_address" name="emergency_contact_postal_address" placeholder="P.O. Box or postal address">
+                                    <input type="text" class="form-control" id="emergency_contact_postal_address" name="emergency_contact_postal_address" placeholder="<?= t('P.O. Box or postal address') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="emergency_contact_physical_address" class="form-label">Physical Address <small class="text-muted">(of Contact)</small></label>
-                                    <textarea class="form-control" id="emergency_contact_physical_address" name="emergency_contact_physical_address" rows="2" placeholder="Street, neighbourhood, town/city"></textarea>
+                                    <textarea class="form-control" id="emergency_contact_physical_address" name="emergency_contact_physical_address" rows="2" placeholder="<?= t('Street, neighbourhood, town/city') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -910,31 +910,31 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                         <div class="wizard-step" id="step-4" style="display:none;">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="bank_name" class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="Bank name">
+                                    <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="account_holder_name" class="form-label">Account Holder Name</label>
-                                    <input type="text" class="form-control" id="account_holder_name" name="account_holder_name" placeholder="Name on the bank account">
+                                    <label for="account_holder_name" class="form-label"><?= t('Account Holder Name') ?></label>
+                                    <input type="text" class="form-control" id="account_holder_name" name="account_holder_name" placeholder="<?= t('Name on the bank account') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="bank_account" class="form-label">Bank Account Number</label>
-                                    <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label for="bank_account" class="form-label"><?= t('Bank Account Number') ?></label>
+                                    <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="bank_swift_code" class="form-label">Bank Identifier Code <small class="text-muted">(SWIFT/routing)</small></label>
                                     <input type="text" class="form-control" id="bank_swift_code" name="bank_swift_code" placeholder="e.g. CORUTZTZ">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="bank_branch" class="form-label">Bank Branch</label>
-                                    <input type="text" class="form-control" id="bank_branch" name="bank_branch" placeholder="Bank branch">
+                                    <label for="bank_branch" class="form-label"><?= t('Bank Branch') ?></label>
+                                    <input type="text" class="form-control" id="bank_branch" name="bank_branch" placeholder="<?= t('Bank branch') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="mobile_money" class="form-label">Mobile Money Number</label>
-                                    <input type="text" class="form-control" id="mobile_money" name="mobile_money" placeholder="Mobile money number">
+                                    <label for="mobile_money" class="form-label"><?= t('Mobile Money Number') ?></label>
+                                    <input type="text" class="form-control" id="mobile_money" name="mobile_money" placeholder="<?= t('Mobile money number') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Required Documents</label>
+                                    <label class="form-label"><?= t('Required Documents') ?></label>
                                     <div class="row g-3">
                                         <!-- Compulsory Documents -->
                                         <div class="col-md-4">
@@ -961,14 +961,14 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
 
                                         <div class="col-12"><hr class="my-1"></div>
                                         <div class="col-12">
-                                            <label class="form-label small text-muted">Additional / Optional Documents (Tick to upload)</label>
+                                            <label class="form-label small text-muted"><?= t('Additional / Optional Documents (Tick to upload)') ?></label>
                                         </div>
                                         
                                         <!-- Optional Documents -->
                                         <div class="col-md-4">
                                             <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" id="intro_letter_attached" name="documents[]" value="intro_letter" onchange="toggleDocUpload('intro_letter')">
-                                                <label class="form-check-label" for="intro_letter_attached">Introduction Letter</label>
+                                                <label class="form-check-label" for="intro_letter_attached"><?= t('Introduction Letter') ?></label>
                                             </div>
                                             <div id="intro_letter_upload_div" class="d-none">
                                                 <input type="file" class="form-control form-control-sm" id="intro_letter_file" name="intro_letter_file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
@@ -977,7 +977,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <div class="col-md-4">
                                             <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" id="app_letter_attached" name="documents[]" value="app_letter" onchange="toggleDocUpload('app_letter')">
-                                                <label class="form-check-label" for="app_letter_attached">Application Letter</label>
+                                                <label class="form-check-label" for="app_letter_attached"><?= t('Application Letter') ?></label>
                                             </div>
                                             <div id="app_letter_upload_div" class="d-none">
                                                 <input type="file" class="form-control form-control-sm" id="app_letter_file" name="app_letter_file" accept=".pdf,.doc,.docx">
@@ -986,7 +986,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <div class="col-md-4">
                                             <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" id="other_doc_attached" onchange="toggleOtherDocs()">
-                                                <label class="form-check-label" for="other_doc_attached">Others</label>
+                                                <label class="form-check-label" for="other_doc_attached"><?= t('Others') ?></label>
                                             </div>
                                         </div>
 
@@ -1014,8 +1014,8 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </div>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="additional_notes" class="form-label">Additional Notes</label>
-                                    <textarea class="form-control" id="additional_notes" name="additional_notes" rows="3" placeholder="Any additional notes or information"></textarea>
+                                    <label for="additional_notes" class="form-label"><?= t('Additional Notes') ?></label>
+                                    <textarea class="form-control" id="additional_notes" name="additional_notes" rows="3" placeholder="<?= t('Any additional notes or information') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -1070,7 +1070,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     </div>
                     
                     <div class="mb-3">
-                        <label for="import_action" class="form-label">Import Action</label>
+                        <label for="import_action" class="form-label"><?= t('Import Action') ?></label>
                         <select class="form-select" id="import_action" name="import_action">
                             <option value="add_new">Add New Employees Only</option>
                             <option value="update_existing">Update Existing Employees</option>
@@ -1650,7 +1650,7 @@ window.addExtraDocRow = function() {
         <div class="row g-2 align-items-start mb-2 extra-doc-row" id="extra_doc_row_${i}">
             <div class="col-md-5">
                 <input type="text" class="form-control form-control-sm" name="extra_doc_name[]"
-                       placeholder="Document name (e.g. Guarantee Letter)" aria-label="Document name">
+                       placeholder="<?= t('Document name (e.g. Guarantee Letter)') ?>" aria-label="Document name">
             </div>
             <div class="col-md-6">
                 <input type="file" class="form-control form-control-sm" name="extra_doc_file[]"
@@ -2034,7 +2034,7 @@ function applyFilters() {
         const visibleCards = $('.employee-card:visible').length;
         if (visibleCards === 0 && $('#cardView:visible').length > 0) {
             if ($('#noCardsMsg').length === 0) {
-                $('#cardView').after('<div id="noCardsMsg" class="text-center py-5"><i class="bi bi-search" style="font-size: 3rem; color: #ccc;"></i><h5 class="mt-3 text-muted">No matching employees found</h5></div>');
+                $('#cardView').after('<div id="noCardsMsg" class="text-center py-5"><i class="bi bi-search" style="font-size: 3rem; color: #ccc;"></i><h5 class="mt-3 text-muted"><?= t('No matching employees found') ?></h5></div>');
             }
         } else {
             $('#noCardsMsg').remove();
@@ -2353,13 +2353,13 @@ function confirmInactivate(employeeId, employeeName) {
             '(attendance, leave, payroll, reporting). Nothing is deleted — every past record stays intact, ' +
             'and they can be reactivated later from Inactive Employees.</p>' +
             '<div class="text-start mb-2">' +
-            '  <label class="form-label small fw-bold">Reason</label>' +
+            '  <label class="form-label small fw-bold"><?= t('Reason') ?></label>' +
             '  <select id="inactivate_outcome" class="form-select form-select-sm mb-2">' +
             '    <option value="terminated">Contract Terminated</option>' +
             '    <option value="resigned">Resigned</option>' +
             '    <option value="failed_probation">Failed Probation</option>' +
             '  </select>' +
-            '  <textarea id="inactivate_reason" class="form-control form-control-sm" rows="2" placeholder="Optional note..."></textarea>' +
+            '  <textarea id="inactivate_reason" class="form-control form-control-sm" rows="2" placeholder="<?= t('Optional note...') ?>"></textarea>' +
             '</div>',
         icon: 'warning',
         showCancelButton: true,

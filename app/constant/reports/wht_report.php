@@ -78,9 +78,9 @@ $cf = fn($v) => $currency . ' ' . number_format((float)$v, 2);
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('From') ?></label>
                     <input type="date" name="date_from" class="form-control" value="<?= htmlspecialchars($date_from) ?>"></div>
-                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('To') ?></label>
                     <input type="date" name="date_to" class="form-control" value="<?= htmlspecialchars($date_to) ?>"></div>
                 <div class="col-md-4"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
@@ -103,8 +103,8 @@ $cf = fn($v) => $currency . ' ' . number_format((float)$v, 2);
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="whtTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Supplier</th><th>TIN</th>
-                    <th class="text-end">Taxable Base</th><th class="text-end">WHT Withheld</th><th class="pe-3 text-end">Docs</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Supplier') ?></th><th><?= t('TIN') ?></th>
+                    <th class="text-end"><?= t('Taxable Base') ?></th><th class="text-end"><?= t('WHT Withheld') ?></th><th class="pe-3 text-end"><?= t('Docs') ?></th>
                 </tr></thead>
                 <tbody>
                     <?php foreach ($rows as $i => $r): ?>

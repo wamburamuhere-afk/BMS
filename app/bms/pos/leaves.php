@@ -222,15 +222,15 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 <form id="leaveFilterForm" method="GET">
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <label class="form-label">Start Date</label>
+                            <label class="form-label"><?= t('Start Date') ?></label>
                             <input type="date" class="form-control" id="start_date" name="start_date" value="<?= $selected_start_date ?>">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">End Date</label>
+                            <label class="form-label"><?= t('End Date') ?></label>
                             <input type="date" class="form-control" id="end_date" name="end_date" value="<?= $selected_end_date ?>">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Leave Status</label>
+                            <label class="form-label"><?= t('Leave Status') ?></label>
                             <select class="form-select select2-static" id="status" name="status">
                                 <option value="">All Status</option>
                                 <option value="pending" <?= ($selected_status == 'pending') ? 'selected' : '' ?>>Pending</option>
@@ -241,7 +241,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Leave Type</label>
+                            <label class="form-label"><?= t('Leave Type') ?></label>
                             <select class="form-select select2-static" id="type" name="type">
                                 <option value="">All Types</option>
                                 <?php foreach ($leave_types as $type): ?>
@@ -252,7 +252,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Department</label>
+                            <label class="form-label"><?= t('Department') ?></label>
                             <select class="form-select select2-static" id="department" name="department">
                                 <option value="">All Departments</option>
                                 <?php foreach ($departments as $dept): ?>
@@ -263,7 +263,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Employee</label>
+                            <label class="form-label"><?= t('Employee') ?></label>
                             <select class="form-select select2-static" id="employee" name="employee">
                                 <option value="">All Employees</option>
                                 <?php foreach ($employees as $emp): ?>
@@ -335,7 +335,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         <div class="col-12 col-lg-auto ms-lg-auto">
             <div class="input-group input-group-sm shadow-sm" style="min-width: 250px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">
                 <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" class="form-control border-0 p-2" placeholder="Search leaves..." onkeyup="$('#leavesTable').DataTable().search(this.value).draw();">
+                <input type="text" class="form-control border-0 p-2" placeholder="<?= t('Search leaves...') ?>" onkeyup="$('#leavesTable').DataTable().search(this.value).draw();">
             </div>
         </div>
     </div>
@@ -343,7 +343,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <!-- Leaves List -->
     <div class="card">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Leaves List</h5>
+            <h5 class="mb-0"><?= t('Leaves List') ?></h5>
             <div class="d-flex">
                 <span class="badge bg-light text-dark me-2">
                     <?= $stats['total_leaves'] ?? 0 ?> leaves
@@ -428,15 +428,15 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)">
                                 </th>
                                 <?php endif; ?>
-                                <th style="width: 50px;">S/NO</th>
-                                <th class="d-none d-lg-table-cell" style="width: 100px;">Ref</th>
-                                <th>Employee</th>
-                                <th class="d-none d-md-table-cell">Dept</th>
-                                <th class="d-none d-md-table-cell">Type</th>
-                                <th class="d-none d-md-table-cell" style="width: 60px;">Days</th>
-                                <th class="d-none d-md-table-cell" style="width: 80px;">Status</th>
-                                <th class="d-none d-md-table-cell">Applied By</th>
-                                <th style="width: 60px;" class="text-end no-sort">Actions</th>
+                                <th style="width: 50px;"><?= t('S/NO') ?></th>
+                                <th class="d-none d-lg-table-cell" style="width: 100px;"><?= t('Ref') ?></th>
+                                <th><?= t('Employee') ?></th>
+                                <th class="d-none d-md-table-cell"><?= t('Dept') ?></th>
+                                <th class="d-none d-md-table-cell"><?= t('Type') ?></th>
+                                <th class="d-none d-md-table-cell" style="width: 60px;"><?= t('Days') ?></th>
+                                <th class="d-none d-md-table-cell" style="width: 80px;"><?= t('Status') ?></th>
+                                <th class="d-none d-md-table-cell"><?= t('Applied By') ?></th>
+                                <th style="width: 60px;" class="text-end no-sort"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -638,7 +638,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             <?php else: ?>
                 <div class="text-center py-5">
                     <i class="bi bi-calendar" style="font-size: 4rem; color: #6c757d;"></i>
-                    <h4 class="mt-3 text-muted">No Leaves Found</h4>
+                    <h4 class="mt-3 text-muted"><?= t('No Leaves Found') ?></h4>
                     <p class="text-muted">No leave records found for the selected filters.</p>
                     <?php if ($can_edit_leaves || $is_viewing_own): ?>
                     <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#applyLeaveModal">
@@ -798,11 +798,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" id="apply_end_date" name="end_date" required onchange="calculateDays()">
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="apply_total_days" class="form-label">Total Days</label>
+                            <label for="apply_total_days" class="form-label"><?= t('Total Days') ?></label>
                             <input type="number" class="form-control" id="apply_total_days" name="total_days" readonly>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="apply_half_day" class="form-label">Half Day</label>
+                            <label for="apply_half_day" class="form-label"><?= t('Half Day') ?></label>
                             <select class="form-select" id="apply_half_day" name="half_day" onchange="calculateDays();">
                                 <option value="none">No</option>
                                 <option value="first_half">First Half</option>
@@ -811,14 +811,14 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-12 mb-3">
                             <label for="apply_reason" class="form-label">Reason for Leave <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="apply_reason" name="reason" rows="3" required placeholder="Please provide a reason for your leave"></textarea>
+                            <textarea class="form-control" id="apply_reason" name="reason" rows="3" required placeholder="<?= t('Please provide a reason for your leave') ?>"></textarea>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="apply_contact_during_leave" class="form-label">Contact During Leave</label>
-                            <input type="text" class="form-control" id="apply_contact_during_leave" name="contact_during_leave" placeholder="Phone number or email">
+                            <label for="apply_contact_during_leave" class="form-label"><?= t('Contact During Leave') ?></label>
+                            <input type="text" class="form-control" id="apply_contact_during_leave" name="contact_during_leave" placeholder="<?= t('Phone number or email') ?>">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="apply_handover_to" class="form-label">Handover To</label>
+                            <label for="apply_handover_to" class="form-label"><?= t('Handover To') ?></label>
                             <select class="form-select select2-static" id="apply_handover_to" name="handover_to">
                                 <option value="">Select Colleague</option>
                                 <?php foreach ($employees as $emp): ?>
@@ -830,7 +830,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-12 mb-3">
                             <div id="documentSection" style="display: none;">
-                                <label for="apply_document" class="form-label">Supporting Document</label>
+                                <label for="apply_document" class="form-label"><?= t('Supporting Document') ?></label>
                                 <input type="file" class="form-control" id="apply_document" name="document" accept=".pdf,.jpg,.jpeg,.png">
                                 <small class="text-muted">Upload supporting document (e.g., medical certificate)</small>
                             </div>
@@ -895,7 +895,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     </div>
                     
                     <div class="mb-3">
-                        <label for="bulk_action" class="form-label">Import Action</label>
+                        <label for="bulk_action" class="form-label"><?= t('Import Action') ?></label>
                         <select class="form-select" id="bulk_action" name="bulk_action">
                             <option value="add_new">Add New Leaves Only</option>
                             <option value="update_existing">Update Existing Leaves</option>
@@ -977,11 +977,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" id="edit_end_date" name="end_date" required onchange="calculateDays()">
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="edit_total_days" class="form-label">Total Days</label>
+                            <label for="edit_total_days" class="form-label"><?= t('Total Days') ?></label>
                             <input type="number" class="form-control" id="edit_total_days" name="total_days" readonly>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="edit_half_day" class="form-label">Half Day</label>
+                            <label for="edit_half_day" class="form-label"><?= t('Half Day') ?></label>
                             <select class="form-select" id="edit_half_day" name="half_day" onchange="calculateDays();">
                                 <option value="none">No</option>
                                 <option value="first_half">First Half</option>
@@ -993,11 +993,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <textarea class="form-control" id="edit_reason" name="reason" rows="3" required></textarea>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="edit_contact_during_leave" class="form-label">Contact During Leave</label>
-                            <input type="text" class="form-control" id="edit_contact_during_leave" name="contact_during_leave" placeholder="Phone number or email">
+                            <label for="edit_contact_during_leave" class="form-label"><?= t('Contact During Leave') ?></label>
+                            <input type="text" class="form-control" id="edit_contact_during_leave" name="contact_during_leave" placeholder="<?= t('Phone number or email') ?>">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="edit_handover_to" class="form-label">Handover To</label>
+                            <label for="edit_handover_to" class="form-label"><?= t('Handover To') ?></label>
                             <select class="form-select select2-static" id="edit_handover_to" name="handover_to">
                                 <option value="">Select Colleague</option>
                                 <?php foreach ($employees as $emp): ?>

@@ -302,7 +302,7 @@ try {
                         <div class="icon-circle bg-primary-subtle text-primary">
                             <i class="bi bi-calendar-range"></i>
                         </div>
-                        <h6 class="mb-0 fw-bold text-dark d-none d-lg-block">Analysis Range</h6>
+                        <h6 class="mb-0 fw-bold text-dark d-none d-lg-block"><?= t('Analysis Range') ?></h6>
                     </div>
                     <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
                         <div class="input-group input-group-sm">

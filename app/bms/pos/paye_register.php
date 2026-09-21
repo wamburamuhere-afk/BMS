@@ -59,7 +59,7 @@ $statusBadge = function ($s) {
 <div class="container-fluid mt-4">
     <!-- Print header -->
     <div class="d-none d-print-block text-center mb-2">
-        <h4 style="margin:0;text-transform:uppercase;">PAYE Register</h4>
+        <h4 style="margin:0;text-transform:uppercase;"><?= t('PAYE Register') ?></h4>
         <div class="small text-muted">Period: <?= caseFormat($rangeLabel) ?> · Generated <?= date('d M Y') ?></div>
     </div>
 
@@ -80,15 +80,15 @@ $statusBadge = function ($s) {
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-6 col-md-3">
-                    <label class="form-label small fw-bold text-muted">From (month)</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('From (month)') ?></label>
                     <input type="month" name="from" value="<?= safe_output($f_from) ?>" class="form-control">
                 </div>
                 <div class="col-6 col-md-3">
-                    <label class="form-label small fw-bold text-muted">To (month)</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('To (month)') ?></label>
                     <input type="month" name="to" value="<?= safe_output($f_to) ?>" class="form-control">
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small fw-bold text-muted">Department</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Department') ?></label>
                     <select name="dept" class="form-select">
                         <option value="">All</option>
                         <?php foreach ($departments as $d): ?>
@@ -97,7 +97,7 @@ $statusBadge = function ($s) {
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <label class="form-label small fw-bold text-muted">Status</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Status') ?></label>
                     <select name="st" class="form-select">
                         <option value="">All</option>
                         <option value="pending"  <?= $f_status==='pending' ?'selected':'' ?>>Pending</option>
@@ -143,16 +143,16 @@ $statusBadge = function ($s) {
                 <table class="table table-hover align-middle" style="width:100%">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3" style="width:60px;">S/NO</th>
-                            <th>Employee</th>
-                            <th>Dept</th>
-                            <th>Period</th>
-                            <th class="text-end">Gross</th>
-                            <th class="text-end">NSSF</th>
-                            <th class="text-end">Taxable</th>
-                            <th class="text-end">PAYE</th>
-                            <th class="text-end">Net</th>
-                            <th class="text-center">Status</th>
+                            <th class="ps-3" style="width:60px;"><?= t('S/NO') ?></th>
+                            <th><?= t('Employee') ?></th>
+                            <th><?= t('Dept') ?></th>
+                            <th><?= t('Period') ?></th>
+                            <th class="text-end"><?= t('Gross') ?></th>
+                            <th class="text-end"><?= t('NSSF') ?></th>
+                            <th class="text-end"><?= t('Taxable') ?></th>
+                            <th class="text-end"><?= t('PAYE') ?></th>
+                            <th class="text-end"><?= t('Net') ?></th>
+                            <th class="text-center"><?= t('Status') ?></th>
                         </tr>
                     </thead>
                     <tbody>

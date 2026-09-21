@@ -180,11 +180,11 @@ $operator_display = [
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Group Name</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Group Name') ?></label>
                             <p class="mb-0 fw-semibold"><?= caseFormat($group['group_name']) ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Group Type</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Group Type') ?></label>
                             <p class="mb-0">
                                 <span class="badge bg-<?= $group['group_type'] === 'static' ? 'info' : 'warning' ?>">
                                     <?= caseFormat($group_type_display[$group['group_type']] ?? $group['group_type']) ?>
@@ -192,7 +192,7 @@ $operator_display = [
                             </p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Status</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
                             <p class="mb-0">
                                 <span class="badge bg-<?= $group['status'] === 'active' ? 'success' : 'secondary' ?>">
                                     <?= ucfirst($group['status']) ?>
@@ -200,7 +200,7 @@ $operator_display = [
                             </p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Group Color</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Group Color') ?></label>
                             <p class="mb-0">
                                 <span class="badge" style="background-color: <?= caseFormat($group['color']) ?>; color: white;">
                                     <?= caseFormat($group['color']) ?>
@@ -208,7 +208,7 @@ $operator_display = [
                             </p>
                         </div>
                         <div class="col-12 mb-3">
-                            <label class="form-label text-muted small mb-1">Description</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Description') ?></label>
                             <p class="mb-0 fw-semibold"><?= caseFormat($group['description']) ?></p>
                         </div>
                     </div>
@@ -224,15 +224,15 @@ $operator_display = [
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label class="form-label text-muted small mb-1">Field</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Field') ?></label>
                             <p class="mb-0 fw-semibold text-capitalize"><?= str_replace('_', ' ', $rules['field']) ?></p>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label text-muted small mb-1">Operator</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Operator') ?></label>
                             <p class="mb-0 fw-semibold"><?= caseFormat($operator_display[$rules['operator']] ?? $rules['operator']) ?></p>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label text-muted small mb-1">Value</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Value') ?></label>
                             <p class="mb-0 fw-semibold"><?= caseFormat($rules['value']) ?></p>
                         </div>
                     </div>
@@ -266,7 +266,7 @@ $operator_display = [
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Group Coverage</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Group Coverage') ?></label>
                             <div class="progress" style="height: 25px;">
                                 <div class="progress-bar" 
                                      role="progressbar" 
@@ -301,12 +301,12 @@ $operator_display = [
                             <table class="table table-sm table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Customer</th>
-                                        <th>Contact</th>
-                                        <th>Occupation</th>
-                                        <th>Added On</th>
-                                        <th>Added By</th>
-                                        <th>Actions</th>
+                                        <th><?= t('Customer') ?></th>
+                                        <th><?= t('Contact') ?></th>
+                                        <th><?= t('Occupation') ?></th>
+                                        <th><?= t('Added On') ?></th>
+                                        <th><?= t('Added By') ?></th>
+                                        <th><?= t('Actions') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -376,7 +376,7 @@ $operator_display = [
                     <?php else: ?>
                         <div class="text-center py-4">
                             <i class="bi bi-people" style="font-size: 3rem; color: #6c757d;"></i>
-                            <h5 class="mt-3 text-muted">No Members in Group</h5>
+                            <h5 class="mt-3 text-muted"><?= t('No Members in Group') ?></h5>
                             <p class="text-muted">
                                 <?php if ($group['group_type'] === 'dynamic'): ?>
                                     No customers match the current group rules.
@@ -400,20 +400,20 @@ $operator_display = [
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Created By</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Created By') ?></label>
                             <p class="mb-0 fw-semibold"><?= caseFormat($group['created_by_name']) ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Created Date</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Created Date') ?></label>
                             <p class="mb-0 fw-semibold"><?= date('M d, Y \a\t h:i A', strtotime($group['created_at'])) ?></p>
                         </div>
                         <?php if (!empty($group['updated_at'])): ?>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Last Updated By</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Last Updated By') ?></label>
                             <p class="mb-0 fw-semibold"><?= caseFormat($group['updated_by_name']) ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small mb-1">Last Updated</label>
+                            <label class="form-label text-muted small mb-1"><?= t('Last Updated') ?></label>
                             <p class="mb-0 fw-semibold"><?= date('M d, Y \a\t h:i A', strtotime($group['updated_at'])) ?></p>
                         </div>
                         <?php endif; ?>

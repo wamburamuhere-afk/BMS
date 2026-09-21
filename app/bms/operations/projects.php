@@ -195,7 +195,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
         <div class="card-body p-2 p-md-3">
             <div class="row g-2 g-md-3 align-items-center">
                 <div class="col-6 col-md-3">
-                    <label for="statusFilter" class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">Status Filter</label>
+                    <label for="statusFilter" class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;"><?= t('Status Filter') ?></label>
                     <select class="form-select bg-light border-0 form-select-sm" id="statusFilter" style="border-radius: 8px; height: 38px;">
                         <option value="">All Status</option>
                         <option value="planning">Planning</option>
@@ -206,10 +206,10 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                     </select>
                 </div>
                 <div class="col-6 col-md-4">
-                    <label for="searchFilter" class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">Quick Search</label>
+                    <label for="searchFilter" class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;"><?= t('Quick Search') ?></label>
                     <div class="input-group shadow-sm" style="border-radius: 8px; overflow: hidden; border: 1px solid #eee;">
                         <span class="input-group-text bg-white border-0 px-2"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" id="searchFilter" class="form-control border-0 p-2 form-control-sm" style="height: 38px;" placeholder="Search...">
+                        <input type="text" id="searchFilter" class="form-control border-0 p-2 form-control-sm" style="height: 38px;" placeholder="<?= t('Search...') ?>">
                     </div>
                 </div>
                 <div class="col-12 col-md-5 d-flex align-items-end gap-2 mt-2 mt-md-0">
@@ -266,16 +266,16 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                     <thead class="bg-light text-muted small text-uppercase">
                         <tr>
                             <th style="width:20px;"></th> <!-- Control Column -->
-                            <th style="width:50px;">S/NO</th>
-                            <th class="ps-4">Project Name</th>
-                            <th>Timeline</th>
-                            <th>Revenue</th>
-                            <th>Expense</th>
-                            <th>Budget</th>
-                            <th>Profit</th>
-                            <th>Progress</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th style="width:50px;"><?= t('S/NO') ?></th>
+                            <th class="ps-4"><?= t('Project Name') ?></th>
+                            <th><?= t('Timeline') ?></th>
+                            <th><?= t('Revenue') ?></th>
+                            <th><?= t('Expense') ?></th>
+                            <th><?= t('Budget') ?></th>
+                            <th><?= t('Profit') ?></th>
+                            <th><?= t('Progress') ?></th>
+                            <th><?= t('Status') ?></th>
+                            <th class="text-end pe-4"><?= t('Actions') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -307,7 +307,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="project_name" class="form-label fw-bold small">Project Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="project_name" id="project_name" required placeholder="Enter project name">
+                                <input type="text" class="form-control" name="project_name" id="project_name" required placeholder="<?= t('Enter project name') ?>">
                             </div>
                             <div class="col-md-6">
                                 <label for="customerSelect" class="form-label fw-bold small">Client/Employer <span class="text-danger">*</span></label>
@@ -336,8 +336,8 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                                     </select>
                                     <div class="modern-input-wrapper mt-2" style="display: none;">
                                         <div class="input-group">
-                                            <label for="discipline_other" class="visually-hidden">Specify Other Discipline</label>
-                                            <input type="text" class="form-control" name="discipline_other" id="discipline_other" placeholder="Type discipline...">
+                                            <label for="discipline_other" class="visually-hidden"><?= t('Specify Other Discipline') ?></label>
+                                            <input type="text" class="form-control" name="discipline_other" id="discipline_other" placeholder="<?= t('Type discipline...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="cancelModernOther(this)"><i class="bi bi-x"></i></button>
                                         </div>
                                     </div>
@@ -355,8 +355,8 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                                     </select>
                                     <div class="modern-input-wrapper mt-2" style="display: none;">
                                         <div class="input-group">
-                                            <label for="role_position_other" class="visually-hidden">Specify Other Position</label>
-                                            <input type="text" class="form-control" name="role_position_other" id="role_position_other" placeholder="Type position...">
+                                            <label for="role_position_other" class="visually-hidden"><?= t('Specify Other Position') ?></label>
+                                            <input type="text" class="form-control" name="role_position_other" id="role_position_other" placeholder="<?= t('Type position...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="cancelModernOther(this)"><i class="bi bi-x"></i></button>
                                         </div>
                                     </div>
@@ -372,15 +372,15 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                         </h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="contract_number" class="form-label fw-bold small">Contract Number</label>
-                                <input type="text" class="form-control" name="contract_number" id="contract_number" placeholder="Enter contract number">
+                                <label for="contract_number" class="form-label fw-bold small"><?= t('Contract Number') ?></label>
+                                <input type="text" class="form-control" name="contract_number" id="contract_number" placeholder="<?= t('Enter contract number') ?>">
                             </div>
                             <div class="col-md-6">
-                                <label for="contract_sum" class="form-label fw-bold small">Contract Sum</label>
+                                <label for="contract_sum" class="form-label fw-bold small"><?= t('Contract Sum') ?></label>
                                 <input type="number" step="0.01" class="form-control" name="contract_sum" id="contract_sum" placeholder="0.00">
                             </div>
                             <div class="col-md-6">
-                                <label for="prioritySelect" class="form-label fw-bold small">Priority</label>
+                                <label for="prioritySelect" class="form-label fw-bold small"><?= t('Priority') ?></label>
                                 <select class="form-select" name="priority" id="prioritySelect">
                                     <option value="low">Low</option>
                                     <option value="medium" selected>Medium</option>
@@ -398,11 +398,11 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                         </h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="project_manager" class="form-label fw-bold small">Project Manager</label>
-                                <input type="text" class="form-control" name="project_manager" id="project_manager" placeholder="Assign manager">
+                                <label for="project_manager" class="form-label fw-bold small"><?= t('Project Manager') ?></label>
+                                <input type="text" class="form-control" name="project_manager" id="project_manager" placeholder="<?= t('Assign manager') ?>">
                             </div>
                             <div class="col-md-6" id="project_status_container">
-                                <label for="statusSelect" class="form-label fw-bold small">Status</label>
+                                <label for="statusSelect" class="form-label fw-bold small"><?= t('Status') ?></label>
                                 <select class="form-select" name="status" id="statusSelect">
                                     <option value="draft">Draft</option>
                                     <option value="planning">Planning</option>
@@ -418,12 +418,12 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                             </div>
                             <div class="col-md-6">
                                 <label for="project_days_total" class="form-label fw-bold small">Duration <span class="text-muted">(Total Days)</span> <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" name="duration_days" id="project_days_total" placeholder="Enter number of days" required>
+                                <input type="number" class="form-control" name="duration_days" id="project_days_total" placeholder="<?= t('Enter number of days') ?>" required>
                                 <input type="hidden" name="deadline" id="project_deadline">
                             </div>
                             <div class="col-12">
-                                <label for="description" class="form-label fw-bold small">Description</label>
-                                <textarea class="form-control" name="description" id="description" rows="3" placeholder="Project details..."></textarea>
+                                <label for="description" class="form-label fw-bold small"><?= t('Description') ?></label>
+                                <textarea class="form-control" name="description" id="description" rows="3" placeholder="<?= t('Project details...') ?>"></textarea>
                             </div>
                             <div class="col-12 mt-3 p-3 bg-light border-dashed rounded-3">
                                 <label for="contractFile" class="form-label fw-bold small"><i class="bi bi-cloud-arrow-up me-1"></i> Contract Attachment <span class="text-danger">*</span></label>
@@ -447,7 +447,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-light p-4">
-                <h5 class="modal-title fw-bold">Project Details</h5>
+                <h5 class="modal-title fw-bold"><?= t('Project Details') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4" id="viewDetailsContent"></div>

@@ -235,12 +235,12 @@ try {
     <table class="table table-striped table-hover">
         <thead class="table-light">
             <tr>
-                <th style="width: 50px;">S/NO</th>
-                <th>Date</th>
-                <th>Invoice #</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th class="text-end">Amount</th>
+                <th style="width: 50px;"><?= t('S/NO') ?></th>
+                <th><?= t('Date') ?></th>
+                <th><?= t('Invoice #') ?></th>
+                <th><?= t('Customer') ?></th>
+                <th><?= t('Status') ?></th>
+                <th class="text-end"><?= t('Amount') ?></th>
             </tr>
         </thead>
         <tbody>
@@ -261,7 +261,7 @@ try {
         </tbody>
         <tfoot>
             <tr class="table-light">
-                <th colspan="5" class="text-end">Project Revenue Total:</th>
+                <th colspan="5" class="text-end"><?= t('Project Revenue Total:') ?></th>
                 <th class="text-end"><?= format_currency($total_revenue) ?></th>
             </tr>
         </tfoot>
@@ -271,12 +271,12 @@ try {
     <table class="table table-striped table-hover">
         <thead class="table-light">
             <tr>
-                <th style="width: 50px;">S/NO</th>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th class="text-end">Amount</th>
+                <th style="width: 50px;"><?= t('S/NO') ?></th>
+                <th><?= t('Date') ?></th>
+                <th><?= t('Category') ?></th>
+                <th><?= t('Description') ?></th>
+                <th><?= t('Status') ?></th>
+                <th class="text-end"><?= t('Amount') ?></th>
             </tr>
         </thead>
         <tbody>
@@ -304,7 +304,7 @@ try {
         </tbody>
         <tfoot>
             <tr class="table-light">
-                <th colspan="5" class="text-end">Project Expense Total:</th>
+                <th colspan="5" class="text-end"><?= t('Project Expense Total:') ?></th>
                 <th class="text-end"><?= format_currency($total_expense) ?></th>
             </tr>
         </tfoot>
@@ -314,12 +314,12 @@ try {
     <table class="table table-striped table-hover">
         <thead class="table-light">
             <tr>
-                <th style="width: 50px;">S/NO</th>
-                <th>Date</th>
-                <th>PO #</th>
-                <th>Supplier</th>
-                <th>Status</th>
-                <th class="text-end">Amount</th>
+                <th style="width: 50px;"><?= t('S/NO') ?></th>
+                <th><?= t('Date') ?></th>
+                <th><?= t('PO #') ?></th>
+                <th><?= t('Supplier') ?></th>
+                <th><?= t('Status') ?></th>
+                <th class="text-end"><?= t('Amount') ?></th>
             </tr>
         </thead>
         <tbody>
@@ -340,7 +340,7 @@ try {
         </tbody>
         <tfoot>
             <tr class="table-light">
-                <th colspan="5" class="text-end">Committed Costs Total:</th>
+                <th colspan="5" class="text-end"><?= t('Committed Costs Total:') ?></th>
                 <th class="text-end"><?= format_currency($total_po ?? 0) ?></th>
             </tr>
         </tfoot>

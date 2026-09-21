@@ -28,7 +28,7 @@ includeHeader();
         <div class="card-body">
             <div class="input-group input-group-lg mb-3">
                 <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
-                <input type="text" class="form-control" id="codeInput" placeholder="Asset code, e.g. COMP-0001" autofocus>
+                <input type="text" class="form-control" id="codeInput" placeholder="<?= t('Asset code, e.g. COMP-0001') ?>" autofocus>
                 <button class="btn btn-primary" onclick="verifyCode()"><i class="bi bi-search me-1"></i> Verify</button>
             </div>
             <div class="d-flex gap-2">

@@ -183,15 +183,15 @@ try {
         <div class="card-body">
             <form id="filterForm" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Period From</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Period From') ?></label>
                     <input type="date" class="form-control" id="filter_from_date">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Period To</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Period To') ?></label>
                     <input type="date" class="form-control" id="filter_to_date">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Expense Account</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Expense Account') ?></label>
                     <select class="form-select select2-static" id="filter_expense_account_id">
                         <option value="">All Expense Accounts</option>
                         <?php foreach ($expense_accounts as $ea): ?>
@@ -200,7 +200,7 @@ try {
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Type</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Type') ?></label>
                     <select class="form-select" id="filter_type">
                         <option value="">All Types</option>
                         <option value="deposit">Deposit (Top Up)</option>
@@ -208,8 +208,8 @@ try {
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Search</label>
-                    <input type="text" class="form-control" id="searchInput" placeholder="Search keywords...">
+                    <label class="form-label small fw-bold text-muted text-uppercase"><?= t('Search') ?></label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="<?= t('Search keywords...') ?>">
                 </div>
                 <div class="col-12 d-flex justify-content-end gap-2 mt-3">
                     <button type="button" class="btn btn-outline-secondary px-4" onclick="clearFilters()">
@@ -269,23 +269,23 @@ try {
 
     <div id="pcTableView" class="card border-0 shadow-sm print-flow-card">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
-            <h5 class="mb-0 fw-bold">Transactions History</h5>
+            <h5 class="mb-0 fw-bold"><?= t('Transactions History') ?></h5>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="transactionsTable">
                 <thead class="bg-light">
                     <tr>
-                        <th style="width:50px;" class="ps-4 text-center">S/NO</th>
-                        <th class="ps-4">Date</th>
-                        <th>Type</th>
-                        <th>Description</th>
-                        <th>Category</th>
-                        <th>Reference</th>
-                        <th>Received By</th>
-                        <th>User</th>
-                        <th class="text-end pe-4">Amount</th>
+                        <th style="width:50px;" class="ps-4 text-center"><?= t('S/NO') ?></th>
+                        <th class="ps-4"><?= t('Date') ?></th>
+                        <th><?= t('Type') ?></th>
+                        <th><?= t('Description') ?></th>
+                        <th><?= t('Category') ?></th>
+                        <th><?= t('Reference') ?></th>
+                        <th><?= t('Received By') ?></th>
+                        <th><?= t('User') ?></th>
+                        <th class="text-end pe-4"><?= t('Amount') ?></th>
                         <th class="text-center d-print-none">📎</th>
-                        <th class="text-end pe-4 d-print-none">Actions</th>
+                        <th class="text-end pe-4 d-print-none"><?= t('Actions') ?></th>
                     </tr>
                 </thead>
                 <tbody id="transactionsTableBody">
@@ -383,12 +383,12 @@ try {
                         <div class="form-text"><i class="bi bi-arrow-left-right"></i> Money moves OUT of this account and INTO petty cash — posted to the ledger so both balances update.</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Reference</label>
+                        <label class="form-label fw-bold"><?= t('Reference') ?></label>
                         <input type="text" class="form-control" name="reference" id="deposit_reference" placeholder="e.g. Bank Withdrawal Slip #">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Description</label>
-                        <textarea class="form-control" name="description" id="deposit_description" rows="2" placeholder="Source of funds..."></textarea>
+                        <label class="form-label fw-bold"><?= t('Description') ?></label>
+                        <textarea class="form-control" name="description" id="deposit_description" rows="2" placeholder="<?= t('Source of funds...') ?>"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0 bg-light">
@@ -442,34 +442,34 @@ try {
                             <small class="text-muted">The cost is booked here (Profit &amp; Loss) and paid from petty cash.</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Reference No.</label>
+                            <label class="form-label fw-bold"><?= t('Reference No.') ?></label>
                             <input type="text" class="form-control" name="reference" id="expense_reference" placeholder="e.g. Internal Ref #">
                         </div>
                         <!-- Received By & Department -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Received By <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="received_by" id="expense_received_by" placeholder="Name of person receiving cash" required>
+                            <input type="text" class="form-control" name="received_by" id="expense_received_by" placeholder="<?= t('Name of person receiving cash') ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Department</label>
+                            <label class="form-label fw-bold"><?= t('Department') ?></label>
                             <input type="text" class="form-control" name="department" id="expense_department" placeholder="e.g. Admin, Operations">
                         </div>
                         <!-- Payment Mode -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Payment Mode</label>
+                            <label class="form-label fw-bold"><?= t('Payment Mode') ?></label>
                             <select class="form-select" name="payment_mode" id="expense_payment_mode" onchange="toggleChequeField()">
                                 <option value="cash">Cash</option>
                                 <option value="cheque">Cheque</option>
                             </select>
                         </div>
                         <div class="col-md-6" id="cheque_number_group" style="display:none;">
-                            <label class="form-label fw-bold">Cheque Number</label>
+                            <label class="form-label fw-bold"><?= t('Cheque Number') ?></label>
                             <input type="text" class="form-control" name="cheque_number" id="expense_cheque_number" placeholder="e.g. CHQ-001234">
                         </div>
                         <!-- Supporting Document -->
                         <div class="col-12"><hr class="my-1"><p class="fw-bold small text-muted text-uppercase mb-0">Supporting Document</p></div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">Document Type</label>
+                            <label class="form-label fw-bold"><?= t('Document Type') ?></label>
                             <select class="form-select" name="receipt_type" id="expense_receipt_type">
                                 <option value="">-- None --</option>
                                 <option value="receipt">Receipt</option>
@@ -478,7 +478,7 @@ try {
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">Receipt / Invoice No.</label>
+                            <label class="form-label fw-bold"><?= t('Receipt / Invoice No.') ?></label>
                             <input type="text" class="form-control" name="receipt_number" id="expense_receipt_number" placeholder="e.g. RCP-0012">
                         </div>
                         <div class="col-md-4">
@@ -489,7 +489,7 @@ try {
                         <!-- Description -->
                         <div class="col-12">
                             <label class="form-label fw-bold">Description / Purpose <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" id="expense_description" rows="2" placeholder="Details of expense..." required></textarea>
+                            <textarea class="form-control" name="description" id="expense_description" rows="2" placeholder="<?= t('Details of expense...') ?>" required></textarea>
                         </div>
                     </div>
                 </div>
@@ -514,7 +514,7 @@ try {
                         <i class="bi bi-file-earmark-text text-info fs-4"></i>
                     </div>
                     <div>
-                        <h5 class="modal-title fw-bold mb-0">Transaction Voucher</h5>
+                        <h5 class="modal-title fw-bold mb-0"><?= t('Transaction Voucher') ?></h5>
                         <p class="text-muted small mb-0" id="detail_voucher_no">#PCV-00000</p>
                     </div>
                 </div>
@@ -524,19 +524,19 @@ try {
                 <div class="row g-4">
                     <div class="col-md-6">
                         <div class="bg-light p-3 rounded-3 h-100">
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Status & Type</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Status & Type') ?></label>
                             <div id="detail_type_badge" class="mb-3"></div>
                             
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Transaction Date</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Transaction Date') ?></label>
                             <p class="fw-bold fs-5 mb-3" id="detail_date"></p>
                             
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Category / Project</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Category / Project') ?></label>
                             <p class="fw-bold mb-0" id="detail_category"></p>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="bg-primary bg-opacity-10 p-4 rounded-3 text-center h-100 d-flex flex-column justify-content-center">
-                            <label class="small text-primary text-uppercase fw-bold d-block mb-2">Total Amount</label>
+                            <label class="small text-primary text-uppercase fw-bold d-block mb-2"><?= t('Total Amount') ?></label>
                             <h2 class="fw-bold text-primary mb-2" id="detail_amount">...</h2>
                             <p id="detail_amount_type" class="text-muted small mb-0"></p>
                         </div>
@@ -577,7 +577,7 @@ try {
                 </div>
 
                 <div class="mt-4 p-3 bg-light rounded-3">
-                    <label class="small text-muted text-uppercase fw-bold d-block mb-2">Description / Narration</label>
+                    <label class="small text-muted text-uppercase fw-bold d-block mb-2"><?= t('Description / Narration') ?></label>
                     <p class="mb-0 fs-6" id="detail_description" style="white-space: pre-wrap;"></p>
                 </div>
             </div>
@@ -781,7 +781,7 @@ try {
                     <td colspan="11" class="text-center py-5">
                         <div class="text-muted">
                             <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
-                            <h5>No transactions found</h5>
+                            <h5><?= t('No transactions found') ?></h5>
                             <p>Start by topping up your petty cash fund</p>
                         </div>
                     </td>
@@ -1166,7 +1166,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <?php endif; ?>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Account Code</label>
+                            <label class="form-label fw-bold"><?= t('Account Code') ?></label>
                             <div class="input-group">
                                 <input type="text" class="form-control<?= ((int)$petty_account['is_system'] === 1 && !isAdmin()) ? ' bg-light' : '' ?>" id="pc_account_code" name="account_code" <?= ((int)$petty_account['is_system'] === 1 && !isAdmin()) ? 'readonly' : '' ?> value="<?= htmlspecialchars($petty_account['account_code']) ?>">
                                 <button type="button" class="btn btn-outline-secondary" id="pcRegenBtn" onclick="pcRegenerateCode()" title="Regenerate code from parent"><i class="bi bi-arrow-clockwise"></i></button>
@@ -1174,17 +1174,17 @@ document.addEventListener('DOMContentLoaded', function() {
                             <small class="text-muted">Regenerate to match the chosen parent.</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Account Name</label>
+                            <label class="form-label fw-bold"><?= t('Account Name') ?></label>
                             <input type="text" class="form-control" id="pc_account_name" name="account_name" value="<?= htmlspecialchars($petty_account['account_name']) ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Parent Account (group)</label>
+                            <label class="form-label fw-bold"><?= t('Parent Account (group)') ?></label>
                             <div id="pc_parentCascade"></div>
                             <input type="hidden" id="pc_parent_account_id" name="parent_account_id" value="<?= (int)$petty_account['parent_account_id'] ?>">
                             <small class="text-muted">Pick a group, then drill into sub-accounts (▸) to nest under Cash On Hand.</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Account Type</label>
+                            <label class="form-label fw-bold"><?= t('Account Type') ?></label>
                             <select class="form-select" id="pc_account_type" name="account_type" required>
                                 <?php foreach ($pc_account_types as $t): ?>
                                 <option value="<?= htmlspecialchars($t['type_name']) ?>" <?= $t['type_name'] === $petty_account['account_type'] ? 'selected' : '' ?>><?= htmlspecialchars($t['display_name']) ?></option>
@@ -1192,18 +1192,18 @@ document.addEventListener('DOMContentLoaded', function() {
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Status</label>
+                            <label class="form-label fw-bold"><?= t('Status') ?></label>
                             <select class="form-select" name="status">
                                 <option value="active" <?= $petty_account['status']==='active'?'selected':'' ?>>Active</option>
                                 <option value="inactive" <?= $petty_account['status']==='inactive'?'selected':'' ?>>Inactive</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Opening Balance</label>
+                            <label class="form-label fw-bold"><?= t('Opening Balance') ?></label>
                             <input type="number" step="0.01" class="form-control" name="opening_balance" value="<?= htmlspecialchars($petty_account['opening_balance']) ?>">
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Description</label>
+                            <label class="form-label fw-bold"><?= t('Description') ?></label>
                             <textarea class="form-control" name="description" rows="2"><?= htmlspecialchars($petty_account['description'] ?? '') ?></textarea>
                         </div>
                     </div>

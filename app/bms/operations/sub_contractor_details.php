@@ -85,7 +85,7 @@ $stmt->execute([$supplier_id]);
 $sc = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$sc) {
-    echo "<div class='container mt-5'><div class='alert alert-danger'>Sub-Contractor not found</div></div>";
+    echo "<div class='container mt-5'><div class='alert alert-danger'>" . t('Sub-Contractor not found') . "</div></div>";
     includeFooter();
     exit();
 }
@@ -187,7 +187,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 <div class="container-fluid mt-2 mt-md-4 px-2 px-md-4 mb-5">
     <!-- Print-only Header -->
     <div class="d-none d-print-block text-center mb-4">
-        <h4 class="fw-bold text-dark text-uppercase">SUB-CONTRACTOR INFORMATION REPORT</h4>
+        <h4 class="fw-bold text-dark text-uppercase"><?= t('SUB-CONTRACTOR INFORMATION REPORT') ?></h4>
         <h5 class="text-muted"><?= caseFormat($sc['supplier_name']) ?> (<?= htmlspecialchars($sc['supplier_code']) ?>)</h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
@@ -436,13 +436,13 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                 <table class="table table-hover table-bordered mb-0" id="scProjectsTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width:50px">S/No</th>
-                                            <th>Project Name</th>
-                                            <th>Contract Value</th>
-                                            <th>Assigned On</th>
-                                            <th>Assigned By</th>
-                                            <th>Status</th>
-                                            <th class="text-end">Action</th>
+                                            <th style="width:50px"><?= t('S/No') ?></th>
+                                            <th><?= t('Project Name') ?></th>
+                                            <th><?= t('Contract Value') ?></th>
+                                            <th><?= t('Assigned On') ?></th>
+                                            <th><?= t('Assigned By') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Action') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody id="scProjectsBody">
@@ -528,15 +528,15 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                 <table class="table table-hover table-bordered mb-0" id="scRiTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width:50px">S/No</th>
-                                            <th>Invoice Ref</th>
-                                            <th>Date Raised</th>
-                                            <th>Date Recorded</th>
-                                            <th>Project</th>
-                                            <th>Basis</th>
-                                            <th>Amount</th>
-                                            <th>Status</th>
-                                            <th class="text-end">Actions</th>
+                                            <th style="width:50px"><?= t('S/No') ?></th>
+                                            <th><?= t('Invoice Ref') ?></th>
+                                            <th><?= t('Date Raised') ?></th>
+                                            <th><?= t('Date Recorded') ?></th>
+                                            <th><?= t('Project') ?></th>
+                                            <th><?= t('Basis') ?></th>
+                                            <th><?= t('Amount') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody id="scRiTableBody"></tbody>
@@ -571,13 +571,13 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                 <table class="table table-hover table-bordered mb-0" id="scPaymentsTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width:50px">S/No</th>
-                                            <th>Reference No</th>
-                                            <th>Payment Date</th>
-                                            <th>Amount</th>
-                                            <th>Currency</th>
-                                            <th>Method</th>
-                                            <th class="text-end">Actions</th>
+                                            <th style="width:50px"><?= t('S/No') ?></th>
+                                            <th><?= t('Reference No') ?></th>
+                                            <th><?= t('Payment Date') ?></th>
+                                            <th><?= t('Amount') ?></th>
+                                            <th><?= t('Currency') ?></th>
+                                            <th><?= t('Method') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -639,7 +639,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Invoice Reference <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="Auto-generating..." required>
+                                <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="<?= t('Auto-generating...') ?>" required>
                                 <button type="button" class="btn btn-outline-secondary" id="riScBtnRefresh" onclick="generateRiScRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
                             </div>
                         </div>
@@ -663,7 +663,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Basis Reference</label>
+                            <label class="form-label"><?= t('Basis Reference') ?></label>
                             <input type="text" class="form-control" name="sc_basis_ref" id="risc_basis_ref" placeholder="e.g. IPC-03, Milestone-2">
                         </div>
                         <div class="col-md-6 mb-3">
@@ -679,13 +679,13 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                             <input type="number" class="form-control" name="amount" id="risc_amount" step="0.01" min="0" placeholder="0.00" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Attachment</label>
+                            <label class="form-label"><?= t('Attachment') ?></label>
                             <input type="file" class="form-control" name="attachment" id="risc_attachment" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx">
                             <div id="risc_current_attachment" class="mt-1 small text-muted"></div>
                         </div>
                         <div class="col-12 mb-3">
-                            <label class="form-label">Notes</label>
-                            <textarea class="form-control" name="notes" id="risc_notes" rows="2" placeholder="Optional notes..."></textarea>
+                            <label class="form-label"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" id="risc_notes" rows="2" placeholder="<?= t('Optional notes...') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -733,7 +733,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <input type="number" class="form-control" id="scRpAmount" step="0.01" min="0.01" placeholder="0.00">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold small">Currency</label>
+                        <label class="form-label fw-bold small"><?= t('Currency') ?></label>
                         <input type="text" class="form-control" id="scRpCurrency" value="<?= htmlspecialchars($sc['currency'] ?: 'TZS') ?>">
                     </div>
                     <div class="col-md-6">
@@ -758,16 +758,16 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <small class="text-muted">Cash/bank account the money is paid from.</small>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold small">Reference Number</label>
+                        <label class="form-label fw-bold small"><?= t('Reference Number') ?></label>
                         <input type="text" class="form-control" id="scRpRef" placeholder="e.g. bank ref, cheque no...">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold small">Receipt Number <span class="text-muted small fw-normal">(from SC)</span></label>
-                        <input type="text" class="form-control" id="scRpReceipt" placeholder="Receipt no. provided by SC">
+                        <input type="text" class="form-control" id="scRpReceipt" placeholder="<?= t('Receipt no. provided by SC') ?>">
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Notes</label>
-                        <textarea class="form-control" id="scRpNotes" rows="2" placeholder="Optional notes..."></textarea>
+                        <label class="form-label fw-bold small"><?= t('Notes') ?></label>
+                        <textarea class="form-control" id="scRpNotes" rows="2" placeholder="<?= t('Optional notes...') ?>"></textarea>
                     </div>
                 </div>
             </div>
@@ -829,15 +829,15 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <div class="tab-pane fade show active" id="tab-edit-basic">
                             <div class="row">
                                 <div class="col-6 mb-3"><label class="form-label">Sub-Contractor Name <span class="text-danger">*</span></label><input type="text" class="form-control" id="edit_sc_name" name="supplier_name" required></div>
-                                <div class="col-6 mb-3"><label class="form-label">Company Name</label><input type="text" class="form-control" id="edit_company_name" name="company_name"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Acronym</label><input type="text" class="form-control" id="edit_acronym" name="acronym"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Company Name') ?></label><input type="text" class="form-control" id="edit_company_name" name="company_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Acronym') ?></label><input type="text" class="form-control" id="edit_acronym" name="acronym"></div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Company Logo</label>
+                                    <label class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
                                     <div id="current_logo_display" class="mt-2"></div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Sub-Contractor Type</label>
+                                    <label class="form-label"><?= t('Sub-Contractor Type') ?></label>
                                     <select class="form-select" id="edit_sc_type" name="supplier_type">
                                         <option value="">Select Type</option>
                                         <option value="Manufacturer">Manufacturer</option>
@@ -857,19 +857,19 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <?php $cy = date('Y'); for ($y = $cy; $y >= $cy - 10; $y--) echo "<option value='$y'>$y</option>"; ?>
                                         <option value="other">Other...</option>
                                     </select>
-                                    <div id="edit_sc_year_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_sc_year_other" name="year_other" placeholder="Enter year"></div>
+                                    <div id="edit_sc_year_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_sc_year_other" name="year_other" placeholder="<?= t('Enter year') ?>"></div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Category</label>
+                                    <label class="form-label"><?= t('Category') ?></label>
                                     <select class="form-select" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option><?php endforeach; ?>
                                         <option value="other">Other...</option>
                                     </select>
-                                    <div id="edit_category_id_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_category_id_other" name="category_other" placeholder="Enter category"></div>
+                                    <div id="edit_category_id_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_category_id_other" name="category_other" placeholder="<?= t('Enter category') ?>"></div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Status</label>
+                                    <label class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="edit_status" name="status">
                                         <option value="active">Active</option>
                                         <option value="inactive">Inactive</option>
@@ -879,7 +879,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                 </div>
                                 <?php if (projectsModuleActive()): ?>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Linked Project (Optional)</label>
+                                    <label class="form-label"><?= t('Linked Project (Optional)') ?></label>
                                     <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                         <option value="">-- No linked project --</option>
                                         <?php foreach ($all_projects as $proj): ?>
@@ -888,43 +888,43 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                     </select>
                                 </div>
                                 <?php endif; ?>
-                                <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Description</label><textarea class="form-control" id="edit_description" name="description" rows="2"></textarea></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Credit Limit') ?></label><input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Description') ?></label><textarea class="form-control" id="edit_description" name="description" rows="2"></textarea></div>
                             </div>
                         </div>
                         <!-- Contact Details -->
                         <div class="tab-pane fade" id="tab-edit-contact">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Contact Person</label><input type="text" class="form-control" id="edit_contact_person" name="contact_person"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Contact Title</label><input type="text" class="form-control" id="edit_contact_title" name="contact_title"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Contact Email</label><input type="email" class="form-control" id="edit_email" name="email"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Company Email</label><input type="email" class="form-control" id="edit_company_email" name="company_email"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Phone Number</label><input type="text" class="form-control" id="edit_phone" name="phone"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Mobile Number</label><input type="text" class="form-control" id="edit_mobile" name="mobile"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Fax Number</label><input type="text" class="form-control" id="edit_fax" name="fax"></div>
-                                <div class="col-md-12 mb-3"><label class="form-label">Website</label><input type="url" class="form-control" id="edit_website" name="website"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Contact Person') ?></label><input type="text" class="form-control" id="edit_contact_person" name="contact_person"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Contact Title') ?></label><input type="text" class="form-control" id="edit_contact_title" name="contact_title"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Contact Email') ?></label><input type="email" class="form-control" id="edit_email" name="email"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Company Email') ?></label><input type="email" class="form-control" id="edit_company_email" name="company_email"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Phone Number') ?></label><input type="text" class="form-control" id="edit_phone" name="phone"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Mobile Number') ?></label><input type="text" class="form-control" id="edit_mobile" name="mobile"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Fax Number') ?></label><input type="text" class="form-control" id="edit_fax" name="fax"></div>
+                                <div class="col-md-12 mb-3"><label class="form-label"><?= t('Website') ?></label><input type="url" class="form-control" id="edit_website" name="website"></div>
                             </div>
                         </div>
                         <!-- Address -->
                         <div class="tab-pane fade" id="tab-edit-address">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Country</label><input type="text" class="form-control" id="edit_country" name="country"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Region</label><input type="text" class="form-control" id="edit_state" name="state"></div>
-                                <div class="col-6 mb-3"><label class="form-label">District</label><input type="text" class="form-control" id="edit_city" name="city"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Ward</label><input type="text" class="form-control" id="edit_ward" name="ward"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Street/Village</label><input type="text" class="form-control" id="edit_village" name="village"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" id="edit_postal_code" name="postal_code"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Physical Address</label><textarea class="form-control" id="edit_address" name="address" rows="2"></textarea></div>
-                                <div class="col-12 mb-3"><label class="form-label">Postal Address</label><input type="text" class="form-control" id="edit_postal_address" name="postal_address"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Country') ?></label><input type="text" class="form-control" id="edit_country" name="country"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Region') ?></label><input type="text" class="form-control" id="edit_state" name="state"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('District') ?></label><input type="text" class="form-control" id="edit_city" name="city"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Ward') ?></label><input type="text" class="form-control" id="edit_ward" name="ward"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Street/Village') ?></label><input type="text" class="form-control" id="edit_village" name="village"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Zip Code') ?></label><input type="text" class="form-control" id="edit_postal_code" name="postal_code"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Physical Address') ?></label><textarea class="form-control" id="edit_address" name="address" rows="2"></textarea></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Postal Address') ?></label><input type="text" class="form-control" id="edit_postal_address" name="postal_address"></div>
                             </div>
                         </div>
                         <!-- Financial -->
                         <div class="tab-pane fade" id="tab-edit-financial">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Tax ID (TIN)</label><input type="text" class="form-control" id="edit_tax_id" name="tax_id"></div>
-                                <div class="col-6 mb-3"><label class="form-label">VAT Number</label><input type="text" class="form-control" id="edit_vat_number" name="vat_number"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Tax ID (TIN)') ?></label><input type="text" class="form-control" id="edit_tax_id" name="tax_id"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('VAT Number') ?></label><input type="text" class="form-control" id="edit_vat_number" name="vat_number"></div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Payment Terms</label>
+                                    <label class="form-label"><?= t('Payment Terms') ?></label>
                                     <select class="form-select" id="edit_payment_terms" name="payment_terms">
                                         <option value="">Select...</option>
                                         <option value="Cash">Cash</option>
@@ -934,10 +934,10 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <option value="Due on Receipt">Due on Receipt</option>
                                         <option value="other">Other...</option>
                                     </select>
-                                    <div id="edit_payment_terms_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_payment_terms_other" name="payment_terms_other" placeholder="Enter terms"></div>
+                                    <div id="edit_payment_terms_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_payment_terms_other" name="payment_terms_other" placeholder="<?= t('Enter terms') ?>"></div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Currency</label>
+                                    <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="edit_currency" name="currency">
                                         <option value="">Select...</option>
                                         <option value="TZS">TZS</option>
@@ -947,11 +947,11 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <option value="GBP">GBP</option>
                                         <option value="other">Other...</option>
                                     </select>
-                                    <div id="edit_currency_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_currency_other" name="currency_other" placeholder="Enter currency"></div>
+                                    <div id="edit_currency_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_currency_other" name="currency_other" placeholder="<?= t('Enter currency') ?>"></div>
                                 </div>
-                                <div class="col-6 mb-3"><label class="form-label">Bank Name</label><input type="text" class="form-control" id="edit_bank_name" name="bank_name"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Bank Account</label><input type="text" class="form-control" id="edit_bank_account" name="bank_account"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Bank Address</label><textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2"></textarea></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Name') ?></label><input type="text" class="form-control" id="edit_bank_name" name="bank_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Account') ?></label><input type="text" class="form-control" id="edit_bank_account" name="bank_account"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Bank Address') ?></label><textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2"></textarea></div>
                             </div>
                         </div>
                     </div>
@@ -1584,7 +1584,7 @@ function removeFromProject(projectId, projectName) {
             </div>
             <form id="assignProjectForm">
                 <div class="modal-body p-4">
-                    <label class="form-label fw-bold">Select Project</label>
+                    <label class="form-label fw-bold"><?= t('Select Project') ?></label>
                     <select class="form-select select2-static" id="assignProjectSelect" required>
                         <option value="">-- Choose a project --</option>
                         <?php foreach ($all_projects as $proj): ?>

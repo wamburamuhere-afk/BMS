@@ -132,7 +132,7 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
             <div class="card">
                 <div class="card-header custom-table-header bg-light">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">My Saved Signatures</h5>
+                        <h5 class="mb-0"><?= t('My Saved Signatures') ?></h5>
                         <span class="badge bg-light text-dark" id="stat-signatures-count">0 signatures</span>
                     </div>
                 </div>
@@ -141,12 +141,12 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                         <table id="signaturesTable" class="table table-hover align-middle" style="width:100%">
                             <thead class="bg-light text-muted small uppercase">
                                 <tr>
-                                    <th>S/NO</th>
-                                    <th>Preview</th>
-                                    <th>Type</th>
-                                    <th>Created At</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th><?= t('S/NO') ?></th>
+                                    <th><?= t('Preview') ?></th>
+                                    <th><?= t('Type') ?></th>
+                                    <th><?= t('Created At') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody class="small">
@@ -163,7 +163,7 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
             <div class="card">
                 <div class="card-header custom-table-header bg-light">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Documents Awaiting Your Signature</h5>
+                        <h5 class="mb-0"><?= t('Documents Awaiting Your Signature') ?></h5>
                         <span class="badge bg-light text-dark" id="stat-pending-count">0 documents</span>
                     </div>
                 </div>
@@ -172,13 +172,13 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                         <table id="pendingTable" class="table table-hover align-middle" style="width:100%">
                             <thead class="bg-light text-muted small uppercase">
                                 <tr>
-                                    <th>S/NO</th>
-                                    <th>Document</th>
-                                    <th>Requested By</th>
-                                    <th>Customer</th>
-                                    <th>Due Date</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th><?= t('S/NO') ?></th>
+                                    <th><?= t('Document') ?></th>
+                                    <th><?= t('Requested By') ?></th>
+                                    <th><?= t('Customer') ?></th>
+                                    <th><?= t('Due Date') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody class="small">
@@ -195,7 +195,7 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
             <div class="card">
                 <div class="card-header custom-table-header bg-light">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Signature History</h5>
+                        <h5 class="mb-0"><?= t('Signature History') ?></h5>
                         <span class="badge bg-light text-dark" id="stat-history-count">0 records</span>
                     </div>
                 </div>
@@ -204,13 +204,13 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                         <table id="historyTable" class="table table-hover align-middle" style="width:100%">
                             <thead class="bg-light text-muted small uppercase">
                                 <tr>
-                                    <th>S/NO</th>
-                                    <th>Document</th>
-                                    <th>Customer</th>
-                                    <th>Signed At</th>
-                                    <th>IP Address</th>
-                                    <th>Position</th>
-                                    <th class="text-end">Actions</th>
+                                    <th><?= t('S/NO') ?></th>
+                                    <th><?= t('Document') ?></th>
+                                    <th><?= t('Customer') ?></th>
+                                    <th><?= t('Signed At') ?></th>
+                                    <th><?= t('IP Address') ?></th>
+                                    <th><?= t('Position') ?></th>
+                                    <th class="text-end"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody class="small">
@@ -235,7 +235,7 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
             <form id="uploadSignatureForm" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="signature_file" class="form-label">Signature Image</label>
+                        <label for="signature_file" class="form-label"><?= t('Signature Image') ?></label>
                         <input type="file" class="form-control" id="signature_file" name="signature_file"
                                accept=".png,.jpg,.jpeg" required>
                         <div class="form-text">
@@ -307,13 +307,13 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                 <input type="hidden" name="signature_id" id="applySignatureId">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Select Your Signature</label>
+                        <label class="form-label"><?= t('Select Your Signature') ?></label>
                         <div id="signatureSelection" class="row">
                             <!-- Signatures will be loaded here -->
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Signature Position</label>
+                        <label class="form-label"><?= t('Signature Position') ?></label>
                         <select class="form-select" name="signature_position" id="signaturePosition">
                             <option value="bottom_right">Bottom Right</option>
                             <option value="bottom_left">Bottom Left</option>
@@ -392,7 +392,7 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                         <div class="tab-pane fade show active" id="existing-doc" role="tabpanel">
                             <div class="row mb-3">
                                 <div class="col-md-4">
-                                    <input type="text" class="form-control" id="docSearchInput" placeholder="Search documents...">
+                                    <input type="text" class="form-control" id="docSearchInput" placeholder="<?= t('Search documents...') ?>">
                                 </div>
                                 <div class="col-md-4">
                                     <select class="form-select" id="docCategoryFilter">
@@ -415,11 +415,11 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                                 <table class="table table-hover" id="documentsSelectTable">
                                     <thead class="bg-light sticky-top">
                                         <tr>
-                                            <th width="50">Select</th>
-                                            <th>Document Name</th>
-                                            <th>Category</th>
-                                            <th>Size</th>
-                                            <th>Uploaded</th>
+                                            <th width="50"><?= t('Select') ?></th>
+                                            <th><?= t('Document Name') ?></th>
+                                            <th><?= t('Category') ?></th>
+                                            <th><?= t('Size') ?></th>
+                                            <th><?= t('Uploaded') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody id="documentsSelectBody">
@@ -438,11 +438,11 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                             <form id="quickUploadForm">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label for="quick_document_name" class="form-label">Document Title *</label>
+                                        <label for="quick_document_name" class="form-label"><?= t('Document Title *') ?></label>
                                         <input type="text" class="form-control" id="quick_document_name" name="document_name" required>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="quick_category_id" class="form-label">Category</label>
+                                        <label for="quick_category_id" class="form-label"><?= t('Category') ?></label>
                                         <select class="form-select" id="quick_category_id" name="category_id">
                                             <option value="">Select Category</option>
                                             <?php foreach ($categories as $cat): ?>
@@ -451,11 +451,11 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                                         </select>
                                     </div>
                                     <div class="col-12">
-                                        <label for="quick_description" class="form-label">Description</label>
+                                        <label for="quick_description" class="form-label"><?= t('Description') ?></label>
                                         <textarea class="form-control" id="quick_description" name="description" rows="2"></textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label for="quick_document_file" class="form-label">File Selection *</label>
+                                        <label for="quick_document_file" class="form-label"><?= t('File Selection *') ?></label>
                                         <input type="file" class="form-control" id="quick_document_file" name="document_file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
                                         <div class="form-text">PDF, Word, Excel, Images. Max size: 50MB</div>
                                     </div>
@@ -475,14 +475,14 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i> Selected Document: <strong id="selectedDocName">-</strong>
                     </div>
-                    <h6 class="mb-3">Select Your Signature</h6>
+                    <h6 class="mb-3"><?= t('Select Your Signature') ?></h6>
                     <div class="row" id="signatureSelectionGrid">
                         <div class="col-12 text-center text-muted">
                             <i class="bi bi-hourglass-split"></i> Loading signatures...
                         </div>
                     </div>
                     <div class="mt-3">
-                        <label class="form-label">Signature Position</label>
+                        <label class="form-label"><?= t('Signature Position') ?></label>
                         <select class="form-select" id="finalSignaturePosition">
                             <option value="bottom_right">Bottom Right</option>
                             <option value="bottom_left">Bottom Left</option>
@@ -504,12 +504,12 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                             <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
                                 <span class="visually-hidden">Processing...</span>
                             </div>
-                            <h5>Processing your signed document...</h5>
+                            <h5><?= t('Processing your signed document...') ?></h5>
                             <p class="text-muted">Please wait while we apply your signature</p>
                         </div>
                         <div id="downloadReady" style="display: none;">
                             <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
-                            <h5 class="mt-3">Document Signed Successfully!</h5>
+                            <h5 class="mt-3"><?= t('Document Signed Successfully!') ?></h5>
                             <p class="text-muted">Your document is ready for download</p>
                             <button type="button" class="btn btn-success btn-lg mt-3" id="btnDownloadSigned">
                                 <i class="bi bi-download"></i> Download Signed Document

@@ -241,15 +241,15 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
         <table id="inactiveTable" class="table table-hover align-middle" style="width: 100% !important;">
             <thead class="table-light">
                 <tr>
-                    <th>Employee #</th>
-                    <th>Name</th>
-                    <th>Department</th>
-                    <th>Designation</th>
-                    <th>Reason</th>
-                    <th>Note</th>
-                    <th>Inactivated By</th>
-                    <th>Inactivated On</th>
-                    <th class="text-end d-print-none">Actions</th>
+                    <th><?= t('Employee #') ?></th>
+                    <th><?= t('Name') ?></th>
+                    <th><?= t('Department') ?></th>
+                    <th><?= t('Designation') ?></th>
+                    <th><?= t('Reason') ?></th>
+                    <th><?= t('Note') ?></th>
+                    <th><?= t('Inactivated By') ?></th>
+                    <th><?= t('Inactivated On') ?></th>
+                    <th class="text-end d-print-none"><?= t('Actions') ?></th>
                 </tr>
             </thead>
             <tbody>

@@ -37,19 +37,19 @@ $bank_accounts = cashBankAccounts($pdo);
 
     <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
         <div class="row g-2 align-items-end">
-            <div class="col-6 col-md-3"><label class="form-label small mb-1">Status</label>
+            <div class="col-6 col-md-3"><label class="form-label small mb-1"><?= t('Status') ?></label>
                 <select class="form-select form-select-sm" id="tpf_status"><option value="">All statuses</option>
                     <option value="pending">Pending</option><option value="approved">Approved</option>
                     <option value="completed">Completed</option><option value="paid">Paid</option>
                     <option value="rejected">Rejected</option><option value="cancelled">Cancelled</option></select></div>
-            <div class="col-12 col-md-4"><label class="form-label small mb-1">Employee</label><select class="form-select form-select-sm" id="tpf_employee"><option value="">All employees</option></select></div>
+            <div class="col-12 col-md-4"><label class="form-label small mb-1"><?= t('Employee') ?></label><select class="form-select form-select-sm" id="tpf_employee"><option value="">All employees</option></select></div>
             <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-secondary w-100" id="tpf_reset"><i class="bi bi-arrow-clockwise"></i></button></div>
         </div>
     </div></div>
 
     <div id="tpTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="tripsTable" class="table table-hover align-middle w-100">
-            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Employee</th><th>Destination</th><th>Dates</th><th>Est. cost</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center"><?= t('S/NO') ?></th><th><?= t('Employee') ?></th><th><?= t('Destination') ?></th><th><?= t('Dates') ?></th><th><?= t('Est. cost') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -78,9 +78,9 @@ $bank_accounts = cashBankAccounts($pdo);
                 <div class="col-md-6 mb-3"><label class="form-label">End <span class="text-danger">*</span></label><input type="date" class="form-control" name="end_date" required></div>
             </div>
             <div class="row">
-                <div class="col-md-4 mb-3"><label class="form-label">Estimated Cost</label><input type="number" min="0" step="0.01" class="form-control" name="estimated_cost"></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Requested Advance</label><input type="number" min="0" step="0.01" class="form-control" name="requested_advance"></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Expense Account</label>
+                <div class="col-md-4 mb-3"><label class="form-label"><?= t('Estimated Cost') ?></label><input type="number" min="0" step="0.01" class="form-control" name="estimated_cost"></div>
+                <div class="col-md-4 mb-3"><label class="form-label"><?= t('Requested Advance') ?></label><input type="number" min="0" step="0.01" class="form-control" name="requested_advance"></div>
+                <div class="col-md-4 mb-3"><label class="form-label"><?= t('Expense Account') ?></label>
                     <select class="form-select select2-static" name="expense_account_id" id="tp_expense_account">
                         <option value="">Select account…</option>
                         <?php foreach ($expense_accounts as $acc): ?>
@@ -89,9 +89,9 @@ $bank_accounts = cashBankAccounts($pdo);
                     </select>
                 </div>
             </div>
-            <div class="mb-3"><label class="form-label">Reference / Note</label><input class="form-control" name="expense_reference" placeholder="Optional note (e.g. petty-cash slip #)"></div>
+            <div class="mb-3"><label class="form-label"><?= t('Reference / Note') ?></label><input class="form-control" name="expense_reference" placeholder="<?= t('Optional note (e.g. petty-cash slip #)') ?>"></div>
             <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i> Once approved, the estimated cost is posted to the chosen Expense Account. Marking the trip Paid settles it against a Paid-From account.</div>
-            <div class="mb-3"><label class="form-label">Attachment</label><input type="file" class="form-control" name="attachment"><div class="form-text">PDF, Word, Excel or image. Max 10MB.</div></div>
+            <div class="mb-3"><label class="form-label"><?= t('Attachment') ?></label><input type="file" class="form-control" name="attachment"><div class="form-text">PDF, Word, Excel or image. Max 10MB.</div></div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Submit Request</button></div>
     </form>
@@ -171,15 +171,15 @@ function viewTrip(id){
         $('#tripViewBody').html(`
             <div class="d-flex justify-content-between flex-wrap mb-2"><div><div class="fs-5 fw-bold">${safeOutput(t.destination)}</div><div class="small text-muted">${safeOutput(t.first_name+' '+t.last_name)}</div></div><div>${tpStatusBadge(t.status)}</div></div>
             <table class="table table-sm">
-                <tr><th style="width:35%">Purpose</th><td>${safeOutput(t.purpose)}</td></tr>
-                <tr><th>Dates</th><td>${safeOutput(t.start_date)} → ${safeOutput(t.end_date)}</td></tr>
-                ${t.estimated_cost?`<tr><th>Estimated cost</th><td>${Number(t.estimated_cost).toLocaleString()}</td></tr>`:''}
-                ${t.requested_advance?`<tr><th>Requested advance</th><td>${Number(t.requested_advance).toLocaleString()} <span class="text-muted small">(informational)</span></td></tr>`:''}
-                ${t.expense_account_name?`<tr><th>Expense account</th><td>${safeOutput((t.expense_account_code?t.expense_account_code+' — ':'')+t.expense_account_name)}</td></tr>`:''}
-                ${t.expense_reference?`<tr><th>Reference / note</th><td>${safeOutput(t.expense_reference)}</td></tr>`:''}
-                ${t.status==='paid'?`<tr><th>Paid</th><td>${Number(t.paid_amount).toLocaleString()} from ${safeOutput((t.paid_from_account_code?t.paid_from_account_code+' — ':'')+t.paid_from_account_name)} on ${safeOutput(t.payment_date)}</td></tr>`:''}
-                ${t.report?`<tr><th>Trip report</th><td>${safeOutput(t.report)}</td></tr>`:''}
-                ${t.reject_reason?`<tr><th class="text-danger">Reject reason</th><td class="text-danger">${safeOutput(t.reject_reason)}</td></tr>`:''}
+                <tr><th style="width:35%"><?= t('Purpose') ?></th><td>${safeOutput(t.purpose)}</td></tr>
+                <tr><th><?= t('Dates') ?></th><td>${safeOutput(t.start_date)} → ${safeOutput(t.end_date)}</td></tr>
+                ${t.estimated_cost?`<tr><th><?= t('Estimated cost') ?></th><td>${Number(t.estimated_cost).toLocaleString()}</td></tr>`:''}
+                ${t.requested_advance?`<tr><th><?= t('Requested advance') ?></th><td>${Number(t.requested_advance).toLocaleString()} <span class="text-muted small">(informational)</span></td></tr>`:''}
+                ${t.expense_account_name?`<tr><th><?= t('Expense account') ?></th><td>${safeOutput((t.expense_account_code?t.expense_account_code+' — ':'')+t.expense_account_name)}</td></tr>`:''}
+                ${t.expense_reference?`<tr><th><?= t('Reference / note') ?></th><td>${safeOutput(t.expense_reference)}</td></tr>`:''}
+                ${t.status==='paid'?`<tr><th><?= t('Paid') ?></th><td>${Number(t.paid_amount).toLocaleString()} from ${safeOutput((t.paid_from_account_code?t.paid_from_account_code+' — ':'')+t.paid_from_account_name)} on ${safeOutput(t.payment_date)}</td></tr>`:''}
+                ${t.report?`<tr><th><?= t('Trip report') ?></th><td>${safeOutput(t.report)}</td></tr>`:''}
+                ${t.reject_reason?`<tr><th class="text-danger"><?= t('Reject reason') ?></th><td class="text-danger">${safeOutput(t.reject_reason)}</td></tr>`:''}
                 ${t.approved_by_name?`<tr><th>${t.status==='rejected'?'Rejected':'Approved'} by</th><td>${safeOutput(t.approved_by_name)}</td></tr>`:''}
                 ${t.attachment_path?`<tr><th>Attachment</th><td><a href="<?= buildUrl('api/download_trip_attachment.php') ?>?trip_id=${t.trip_id}" target="_blank"><i class="bi bi-download"></i> ${safeOutput(t.attachment_name||'Download')}</a></td></tr>`:''}
             </table>`);

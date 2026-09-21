@@ -1,311 +1,463 @@
 <?php
-// File: reps/trial_balance.php
-// Phase 1.2 — Trial Balance UI partial. Included by reports.php.
-//
-// Per Corporate Finance Institute the Trial Balance is NOT a formal
-// financial statement — it's an internal working document used to verify
-// the canonical ledger is internally consistent (Sum Dr = Sum Cr) before
-// formal BS / IS are produced. The page header explicitly says so.
-//
-// Drill-down to General Ledger is intentionally absent in Phase 1.2;
-// it will be wired in Phase 2 once GL exists. Shipping a deliberately
-// broken link would be worse than no link.
+/**
+ * Trial Balance Report
+ *
+ * Professional accountant layout:
+ *   - Section by account category (Assets, Liabilities, Equity, Revenue,
+ *     Expenses, COGS) with subtotals per section.
+ *   - Each account appears on its NATURAL side. Contra-balances (e.g.,
+ *     overdrawn bank) are flagged in red.
+ *   - Mandatory balance-check banner at the top.
+ *   - Warning banner if any account_type is unclassified (the migration
+ *     couldn't auto-map it).
+ *
+ * Data contract:
+ *   - Reads classification metadata (category, normal_side) from
+ *     account_types — populated by migration
+ *     2026_05_27_account_types_classification.php
+ *   - Uses fc_balance() from core/financial_classification.php to compute
+ *     natural-side balance and detect contra-balances.
+ *   - Filters journal_entries by status = 'posted' only.
+ */
+ob_start();
+require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/financial_classification.php';
 
-require_once __DIR__ . '/../../../../roots.php';
-if (!canView('reports')) {
-    http_response_code(403);
-    die("Access Denied");
+includeHeader();
+
+if (function_exists('autoEnforcePermission')) {
+    autoEnforcePermission('financial_reports');
 }
 
 $as_of_date = $_GET['as_of_date'] ?? date('Y-m-d');
-$project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0
-    ? (int)$_GET['project_id']
-    : null;
 
-// Consume the Trial Balance API internally — same pattern as BS partial.
-$saved_get = $_GET;
-$_GET = ['as_of_date' => $as_of_date];
-if ($project_id !== null) $_GET['project_id'] = (string)$project_id;
-ob_start();
-require __DIR__ . '/../../../../api/account/get_trial_balance.php';
-$tb_raw = ob_get_clean();
-$_GET = $saved_get;
-$tb  = json_decode($tb_raw, true);
-$ok  = $tb && !empty($tb['success']);
-$err = $ok ? '' : ($tb['message'] ?? 'Failed to load report');
-$d   = $ok ? $tb['data'] : null;
+// Section ordering — the accountant convention. Assets first (debit-natural),
+// then Liabilities + Equity (credit-natural), then P&L accounts.
+$SECTION_ORDER = ['asset', 'liability', 'equity', 'revenue', 'expense', 'cogs'];
+$SECTION_LABEL = [
+    'asset'     => 'ASSETS',
+    'liability' => 'LIABILITIES',
+    'equity'    => 'EQUITY',
+    'revenue'   => 'REVENUE',
+    'expense'   => 'EXPENSES',
+    'cogs'      => 'COST OF GOODS SOLD',
+];
 
-// Projects dropdown via the shared scoped endpoint.
-$_GET = [];
-ob_start();
-require_once __DIR__ . '/../../../../api/account/get_projects_for_filter.php';
-$proj_raw = ob_get_clean();
-$_GET = $saved_get;
-$proj_resp = json_decode($proj_raw, true);
-$projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['projects'] : [];
+$sections          = [];   // category → ['rows' => [...], 'subtotal_debit' => 0, 'subtotal_credit' => 0]
+$total_debits      = 0.0;
+$total_credits     = 0.0;
+$contra_count      = 0;    // accounts in unusual direction (asset with credit balance, etc.)
+$unclassified_rows = [];   // accounts whose type has no category
+// Defensive defaults — present even if the try block throws (e.g. the
+// account_types classification migration hasn't been run).
+$is_balanced       = true;
+$difference        = 0.0;
+$missing_classification = [];
+$error_message     = null;
 
-$cur_label = date('d M Y', strtotime($as_of_date));
-
-// Helper: format with negative-paren style? Use plain accountancy formatting.
-function tb_fmt(float $n): string {
-    return number_format($n, 2);
+// Guard: classification columns must exist on this server (see migration
+// 2026_05_27). Show a clear banner instead of an SQL error if they're missing.
+if (!fc_classification_ready($pdo)) {
+    echo fc_classification_missing_banner('Trial Balance');
+    includeFooter();
+    ob_end_flush();
+    return;
 }
 
-// Pre-group accounts by (statement, category) so the rendered table can
-// insert section headers + subtotals between groups.
-$grouped = [];     // [statement][category][] = account row
-if ($ok) {
-    foreach ($d['accounts'] as $a) {
-        $s = $a['statement'] ?? '?';
-        $c = $a['category']  ?? '?';
-        $grouped[$s][$c][] = $a;
+try {
+    // Query: posted entries up to and including the as-of date.
+    // Returns one row per account with the period's debit/credit totals,
+    // plus the account's classification metadata.
+    $sql = "
+        SELECT
+            a.account_id,
+            a.account_code,
+            a.account_name,
+            at.type_name        AS type_name,
+            at.category         AS category,
+            at.normal_side      AS normal_side,
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
+        FROM accounts a
+        LEFT JOIN account_types at ON a.account_type_id = at.type_id
+        LEFT JOIN journal_entry_items jei ON a.account_id = jei.account_id
+        LEFT JOIN journal_entries je
+               ON jei.entry_id = je.entry_id
+              AND je.entry_date <= ?
+              AND je.status = 'posted'
+              -- The SUM above guards `je.entry_id IS NOT NULL` so unmatched
+              -- (draft / future-dated) rows from this LEFT JOIN are not summed.
+        WHERE a.status = 'active'
+        GROUP BY a.account_id, a.account_code, a.account_name, at.type_name, at.category, at.normal_side
+        ORDER BY a.account_code ASC
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$as_of_date]);
+    $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($accounts as $acc) {
+        $debit  = (float)$acc['total_debit'];
+        $credit = (float)$acc['total_credit'];
+
+        // Skip dormant accounts (zero on both sides).
+        if (abs($debit) < 0.001 && abs($credit) < 0.001) continue;
+
+        $category    = $acc['category'] ?: null;
+        $normal_side = $acc['normal_side'] ?: null;
+
+        // Unclassified — accountant must fix the account_type via Settings.
+        // We still include the net difference in the totals so the TB
+        // arithmetic remains valid.
+        if (!$category) {
+            $net = $debit - $credit;
+            $row = [
+                'code'         => $acc['account_code'],
+                'name'         => $acc['account_name'],
+                'type_name'    => $acc['type_name'] ?: '— uncategorised —',
+                'category'     => null,
+                'normal_side'  => null,
+                'debit'        => $net > 0 ? $net : 0,
+                'credit'       => $net < 0 ? -$net : 0,
+                'is_contra'    => false,
+            ];
+            $unclassified_rows[] = $row;
+            if ($net > 0) $total_debits  += $net;
+            else          $total_credits += -$net;
+            continue;
+        }
+
+        // Natural-side balance: positive = on the natural side, negative = contra.
+        $bal       = fc_balance($category, $debit, $credit);
+        $is_contra = $bal < -0.001;
+        if ($is_contra) $contra_count++;
+
+        $abs_bal = abs($bal);
+        if ($abs_bal < 0.001) continue; // exact zero — skip
+
+        // Place the balance in the column matching the account's natural
+        // side. For a contra-balance we still place the amount on the
+        // natural side (so the TB still cross-foots) but flag it red.
+        $row = [
+            'code'         => $acc['account_code'],
+            'name'         => $acc['account_name'],
+            'type_name'    => $acc['type_name'],
+            'category'     => $category,
+            'normal_side'  => $normal_side,
+            'debit'        => 0.0,
+            'credit'       => 0.0,
+            'is_contra'    => $is_contra,
+        ];
+
+        if ($normal_side === 'debit') {
+            // For asset/expense/cogs accounts in their natural direction,
+            // the debit column gets debit-credit. Even a contra-balance
+            // (credit > debit) gets shown in the debit column with a flag,
+            // because moving it to the credit column would break the TB
+            // total when the contra is just a posting error.
+            $row['debit'] = $debit - $credit;
+            if ($row['debit'] >= 0) {
+                $total_debits += $row['debit'];
+            } else {
+                $total_debits += $row['debit']; // negative amount, keeps math correct
+            }
+        } else { // 'credit'
+            $row['credit'] = $credit - $debit;
+            $total_credits += $row['credit'];
+        }
+
+        $sections[$category]['rows'][] = $row;
+        $sections[$category]['subtotal_debit']  = ($sections[$category]['subtotal_debit']  ?? 0) + $row['debit'];
+        $sections[$category]['subtotal_credit'] = ($sections[$category]['subtotal_credit'] ?? 0) + $row['credit'];
     }
+
+    $is_balanced = (abs($total_debits - $total_credits) < 0.01);
+    $difference  = $total_debits - $total_credits;
+
+    // Surface any account_types the migration left unclassified (NULL category).
+    // The accountant should fix these via Settings before trusting the TB.
+    $missing_classification = fc_unclassified_types($pdo);
+
+} catch (Exception $e) {
+    $error_message = $e->getMessage();
 }
-
-// Canonical display order for the groups.
-$bs_order = [
-    'asset'     => 'Assets',
-    'liability' => 'Liabilities',
-    'equity'    => 'Equity',
-];
-$is_order = [
-    'revenue'   => 'Revenue',
-    'cogs'      => 'Cost of Goods Sold',
-    'expense'   => 'Expenses',
-];
-
-$catLabel = function (string $statement, string $category) use ($bs_order, $is_order): string {
-    if ($statement === 'BS' && isset($bs_order[$category])) return $bs_order[$category];
-    if ($statement === 'IS' && isset($is_order[$category])) return $is_order[$category];
-    return ucfirst($category);
-};
 ?>
 
-<!-- Print-only Header -->
-<div class="d-none d-print-block text-center mb-4">
-    <?php
-    $c_name = getSetting('company_name', 'BMS');
-    $c_logo = getSetting('company_logo', '');
-    $c_tin  = getSetting('company_tin', '');
-    $c_vrn  = getSetting('company_vrn', '');
-    ?>
-    <?php if(!empty($c_logo)): ?>
-        <div class="mb-2"><img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 70px;"></div>
-    <?php endif; ?>
-    <h2 style="margin:0; font-size: 18pt;"><?= caseFormat($c_name) ?></h2>
-    <?php if ($c_tin || $c_vrn): ?>
-        <p style="margin:2px 0; font-size: 9pt;">
-            <?= $c_tin ? 'TIN: ' . caseFormat($c_tin) : '' ?>
-            <?= $c_tin && $c_vrn ? '&nbsp;|&nbsp;' : '' ?>
-            <?= $c_vrn ? 'VRN: ' . caseFormat($c_vrn) : '' ?>
-        </p>
-    <?php endif; ?>
-    <h3 style="margin-top: 10px; font-size: 13pt; text-transform: uppercase; letter-spacing: 2px;">Trial Balance</h3>
-    <p style="margin:0; font-size: 9pt; font-style: italic;">Internal Working Document (not a formal financial statement)</p>
-    <p style="margin:0; font-size: 9pt;">As at <?= $cur_label ?></p>
-</div>
+<style>
+@media print {
+    .d-print-none, .btn, .breadcrumb, .navbar, .sidebar, .filter-card, .sticky-top { display: none !important; }
+    .container-fluid { width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+    .card-header { background-color: #f8f9fa !important; border-bottom: 2px solid #333 !important; padding: 10px 15px !important; -webkit-print-color-adjust: exact; }
+    body { background: white !important; font-size: 12px !important; }
+    .table thead th { background-color: #333 !important; color: white !important; padding: 10px !important; -webkit-print-color-adjust: exact; }
+    .print-header { display: block !important; text-align: center; margin-bottom: 12px; padding-bottom: 8px; }
+}
+/* Canonical I/E Print margin — see i_e_print.md §1 */
+@page { margin: 10mm 8mm 16mm 8mm; }
+</style>
 
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center d-print-none">
-        <div>
-            <h5 class="mb-0 fw-bold text-secondary"><i class="bi bi-calculator me-2"></i> Trial Balance</h5>
-            <small class="text-muted fst-italic">Internal Working Document — verifies the ledger is internally consistent before BS/IS are produced.</small>
+<div class="container-fluid py-4">
+    <!-- Professional Print Header -->
+    <div class="print-header d-none d-print-block text-center mb-2">
+        <div class="mt-2 text-center">
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 3px 0; font-size: 16pt; letter-spacing: 2px;">TRIAL BALANCE REPORT</h2>
+            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Verification report ensuring all debits and credits are accurately balanced across accounts.</p>
+            <p style="color: #444; margin: 3px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">As of: <?= date('d M Y', strtotime($as_of_date)) ?></p>
+            <p style="color: #444; margin: 3px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+        <div style="border-bottom: 3px solid #0d6efd; margin-top: 8px; margin-bottom: 10px;"></div>
     </div>
 
-    <div class="card-body border-bottom bg-light d-print-none">
-        <form method="GET" action="<?= getUrl('reports') ?>" class="row g-3 align-items-end">
-            <input type="hidden" name="report" value="trial_balance">
-            <div class="col-md-5">
-                <label class="form-label small fw-bold">As of Date</label>
-                <input type="date" class="form-control form-control-sm" name="as_of_date" value="<?= htmlspecialchars($as_of_date) ?>">
+    <!-- Print Summary Cards -->
+    <div class="d-none d-print-block mb-2">
+        <div class="row g-2">
+            <div class="col" style="flex: 1 0 0%;">
+                <div style="border: 1px solid #dee2e6; padding: 6px; border-radius: 0; text-align: center;">
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Debits</p>
+                    <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_debits) ?></h4>
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label small fw-bold">Project</label>
-                <select class="form-select form-select-sm" name="project_id">
-                    <option value=""><?= ($ok && empty($d['meta']['is_admin'])) ? 'All My Projects' : 'All Projects (Consolidated)' ?></option>
-                    <?php foreach ($projects_list as $p): ?>
-                        <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($p['project_name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+            <div class="col" style="flex: 1 0 0%;">
+                <div style="border: 1px solid #dee2e6; padding: 6px; border-radius: 0; text-align: center;">
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Credits</p>
+                    <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_credits) ?></h4>
+                </div>
             </div>
-            <div class="col-md-3 d-grid">
-                <button type="submit" class="btn btn-secondary btn-sm text-white"><i class="bi bi-filter"></i> Generate Report</button>
+            <div class="col" style="flex: 1 0 0%;">
+                <div style="border: 1px solid #dee2e6; padding: 6px; border-radius: 0; text-align: center;">
+                    <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Status</p>
+                    <h4 style="color: <?= $is_balanced ? '#2ecc71' : '#e74c3c' ?>; font-weight: 800; margin: 0; font-size: 14pt;"><?= $is_balanced ? 'BALANCED' : 'UNBALANCED' ?></h4>
+                </div>
             </div>
-        </form>
-    </div>
-
-    <?php if (!$ok): ?>
-        <div class="alert alert-danger m-3"><?= htmlspecialchars($err) ?></div>
-    <?php else: ?>
-
-    <?php if (!empty($d['meta']['project_filter_active'])): ?>
-        <div class="alert alert-info border-0 mx-3 mt-3 py-2 d-print-none" style="font-size: 0.85rem;">
-            <i class="bi bi-info-circle me-2"></i>
-            Project filter active. Only journal entries tagged to this project are included.
-        </div>
-    <?php endif; ?>
-    <?php if (isset($d['meta']['is_admin']) && $d['meta']['is_admin'] === false): ?>
-        <div class="alert alert-secondary border-0 mx-3 mt-3 py-2 d-print-none" style="font-size: 0.85rem;">
-            <i class="bi bi-shield-lock me-2"></i>
-            Showing your scoped view: <?= count($d['meta']['scoped_project_ids'] ?? []) ?> assigned project(s) + untagged company-wide entries.
-        </div>
-    <?php endif; ?>
-
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table align-middle mb-0 tb-table">
-                <thead class="bg-light text-uppercase small fw-bold text-muted">
-                    <tr>
-                        <th class="ps-4" style="width:12%">Account #</th>
-                        <th style="width:35%">Account Name</th>
-                        <th style="width:10%">Statement</th>
-                        <th style="width:15%">Type</th>
-                        <th class="text-end" style="width:14%">Debit (TZS)</th>
-                        <th class="text-end pe-4" style="width:14%">Credit (TZS)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($d['accounts'])): ?>
-                        <tr><td colspan="6" class="text-center py-5 text-muted fst-italic">
-                            No accounts have ledger activity or opening balances yet. Trial Balance will populate as journal entries are posted.
-                        </td></tr>
-                    <?php else:
-                        // Render in canonical order: BS-first, then IS.
-                        $sections = [
-                            ['statement' => 'BS', 'label' => 'BALANCE SHEET ACCOUNTS', 'order' => $bs_order],
-                            ['statement' => 'IS', 'label' => 'INCOME STATEMENT ACCOUNTS', 'order' => $is_order],
-                        ];
-                        foreach ($sections as $sect):
-                            $stmt = $sect['statement'];
-                            if (empty($grouped[$stmt])) continue;
-                    ?>
-                        <tr class="tb-section-head">
-                            <td colspan="6" class="ps-3 fw-bold text-uppercase text-secondary"><?= $sect['label'] ?></td>
-                        </tr>
-                        <?php foreach ($sect['order'] as $cat => $cat_label):
-                            if (empty($grouped[$stmt][$cat])) continue;
-                            $rows = $grouped[$stmt][$cat];
-                            $sub_dr = 0.0; $sub_cr = 0.0;
-                        ?>
-                            <?php
-                            // Phase 2.3 drill-down: clicking an account row opens the General
-                            // Ledger for that account with year-to-date window (Jan 1 of
-                            // as_of_date.year -> as_of_date) and same project filter.
-                            $gl_start = date('Y-01-01', strtotime($as_of_date));
-                            $gl_end   = $as_of_date;
-                            ?>
-                            <?php foreach ($rows as $a):
-                                $dr = (float)($a['current']['total_debit']  ?? 0);
-                                $cr = (float)($a['current']['total_credit'] ?? 0);
-                                $sub_dr += $dr; $sub_cr += $cr;
-                                $gl_query = http_build_query(array_filter([
-                                    'report'     => 'general_ledger',
-                                    'account_id' => (int)$a['account_id'],
-                                    'start_date' => $gl_start,
-                                    'end_date'   => $gl_end,
-                                    'project_id' => $project_id !== null ? (int)$project_id : null,
-                                ], fn($v) => $v !== null && $v !== ''));
-                                $gl_url = getUrl('reports') . '?' . $gl_query;
-                            ?>
-                                <tr>
-                                    <td class="ps-4 font-monospace small">
-                                        <a href="<?= htmlspecialchars($gl_url) ?>" class="tb-drilldown text-decoration-none"
-                                           title="Open General Ledger for this account (year-to-date)">
-                                            <?= htmlspecialchars($a['account_code'] ?? '') ?>
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <a href="<?= htmlspecialchars($gl_url) ?>" class="tb-drilldown text-decoration-none text-body"
-                                           title="Open General Ledger for this account (year-to-date)">
-                                            <?= htmlspecialchars($a['account_name'] ?? '') ?>
-                                        </a>
-                                    </td>
-                                    <td class="small text-muted"><?= htmlspecialchars($a['statement'] ?? '') ?></td>
-                                    <td class="small"><?= htmlspecialchars($cat_label) ?></td>
-                                    <td class="text-end font-monospace"><?= tb_fmt($dr) ?></td>
-                                    <td class="text-end pe-4 font-monospace"><?= tb_fmt($cr) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                            <tr class="tb-subtotal">
-                                <td colspan="4" class="ps-4 text-end fst-italic small text-muted">Subtotal — <?= htmlspecialchars($cat_label) ?></td>
-                                <td class="text-end font-monospace border-top"><?= tb_fmt($sub_dr) ?></td>
-                                <td class="text-end pe-4 font-monospace border-top"><?= tb_fmt($sub_cr) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endforeach; ?>
-
-                    <!-- GRAND TOTAL -->
-                    <tr class="tb-grand">
-                        <td colspan="4" class="ps-3 fw-bold text-uppercase">Grand Total</td>
-                        <td class="text-end fw-bold font-monospace border-top border-top-2"><?= tb_fmt($d['totals']['total_debit']) ?></td>
-                        <td class="text-end pe-4 fw-bold font-monospace border-top border-top-2"><?= tb_fmt($d['totals']['total_credit']) ?></td>
-                    </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
         </div>
     </div>
 
-    <!-- Balance status + Notes -->
-    <div class="card-footer bg-white py-3">
-        <?php if (!empty($d['totals']['balanced'])): ?>
-            <div class="alert alert-success d-flex align-items-center mb-2 border-0">
-                <i class="bi bi-check-circle-fill me-2"></i>
-                <div><strong>BALANCED</strong> &nbsp;—&nbsp; Total Debits = Total Credits. Ledger integrity confirmed.</div>
+    <!-- Page Header -->
+    <div class="row mb-4 align-items-center d-print-none">
+        <div class="col-md-6">
+            <h1 class="h3 mb-0 text-primary fw-bold" style="text-transform:uppercase;"><i class="bi bi-calculator me-2"></i>TRIAL BALANCE</h1>
+            <p class="text-muted mb-0 font-monospace small">Verification of financial position as of <?= date('F j, Y', strtotime($as_of_date)) ?></p>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-primary shadow-sm px-4" onclick="window.print()" style="border-radius:8px;font-weight:700;">
+                <i class="bi bi-printer me-2"></i> PRINT REPORT
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-4 d-print-none sticky-top" style="z-index:1020;top:10px;">
+        <div class="card-body py-3">
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1"><?= t('As Of Date') ?></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
+                        <input type="date" name="as_of_date" class="form-control" value="<?= $as_of_date ?>">
+                    </div>
+                </div>
+                <div class="col-md-2 mt-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-filter me-1"></i> Update Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4 d-print-none">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-4 border-info">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Total Debits</div>
+                    <h3 class="fw-bold text-dark mb-0"><?= format_currency($total_debits) ?></h3>
+                </div>
             </div>
-        <?php else: ?>
-            <div class="alert alert-warning d-flex align-items-start mb-2 border-0">
-                <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
-                <div>
-                    <strong>OUT OF BALANCE</strong> &nbsp;—&nbsp; difference: <?= tb_fmt(abs((float)$d['totals']['balance_difference'])) ?> TZS
-                    <?php if ((float)$d['totals']['balance_difference'] > 0): ?>
-                        (Debits exceed Credits)
-                    <?php else: ?>
-                        (Credits exceed Debits)
-                    <?php endif; ?>
-                    <div class="small text-muted mt-1">
-                        Common causes: opening balances entered without matching counterparts, manual journal entries not yet posted, or accounts mis-classified.
-                        Review draft entries and account classifications, then re-generate.
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Total Credits</div>
+                    <h3 class="fw-bold text-dark mb-0"><?= format_currency($total_credits) ?></h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-4 <?= $is_balanced ? 'border-success' : 'border-danger' ?>">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase fw-bold mb-1">Status</div>
+                            <h3 class="fw-bold <?= $is_balanced ? 'text-success' : 'text-danger' ?> mb-0">
+                                <?= $is_balanced ? 'Balanced' : 'Unbalanced' ?>
+                            </h3>
+                        </div>
+                        <?php if (!$is_balanced): ?>
+                            <small class="text-danger fw-bold">Diff: <?= format_currency(abs($difference)) ?></small>
+                        <?php else: ?>
+                            <i class="bi bi-check-circle-fill text-success fs-1 opacity-25"></i>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-        <?php endif; ?>
-
-        <div class="small text-muted">
-            <strong>Notes:</strong>
-            <ol class="mb-0 ps-3">
-                <li>The Trial Balance is an <strong>internal working document</strong>, not a formal financial statement. Its only job is to confirm the ledger is internally consistent (Sum Dr = Sum Cr) before producing the Balance Sheet and Income Statement.</li>
-                <li>Each account's totals include <code>accounts.opening_balance</code> (allocated by its natural side) plus every <code>posted</code> journal entry on or before the as-of date.</li>
-                <li>Empty accounts (no opening balance and no posted activity) are omitted from the listing.</li>
-                <li>Click any account row to drill down to its <strong>General Ledger</strong> (year-to-date window).</li>
-            </ol>
         </div>
     </div>
 
+    <!-- Failure-only balance-check banner. Per user request the success
+         state is implicit — only show a banner when something's wrong. -->
+    <?php if ((!isset($error_message) || $error_message === null) && !$is_balanced): ?>
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>
+                <strong>TRIAL BALANCE DOES NOT BALANCE.</strong>
+                Difference = <span class="font-monospace fw-bold"><?= format_currency(abs($difference)) ?></span>
+                (<?= $difference > 0 ? 'Debits exceed Credits' : 'Credits exceed Debits' ?>).
+                Investigate journal entries before relying on the Income Statement, Balance Sheet, or Cash Flow.
+            </div>
+        </div>
     <?php endif; ?>
+
+    <?php if (!empty($missing_classification ?? [])): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <strong><?= count($missing_classification) ?> account type(s) are unclassified.</strong>
+        Their accounts appear in the "Unclassified" section below — please classify them via
+        Settings → Account Types so they're rolled up to the correct section.
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($contra_count)): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-exclamation-circle-fill me-2"></i>
+        <strong><?= $contra_count ?> account(s) show contra-balances</strong>
+        (debit-natural accounts with credit balances, or vice versa) — flagged in red below.
+        Common causes: overdrawn bank, reversed journal posting, or wrong account type.
+    </div>
+    <?php endif; ?>
+
+    <!-- Report Table — sectioned by accounting category -->
+    <div class="card border-0 shadow-lg" id="report-content">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold text-uppercase ls-1"><?= t('Account Balances by Category') ?></h5>
+            <small class="text-muted">As of <?= htmlspecialchars(date('d M Y', strtotime($as_of_date))) ?></small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm tb-table mb-0 align-middle">
+                    <thead class="bg-dark text-white">
+                        <tr>
+                            <th class="ps-4 py-2" style="width:12%; font-size: 0.85rem;"><?= t('Code') ?></th>
+                            <th class="py-2" style="width:48%; font-size: 0.85rem;"><?= t('Account Name') ?></th>
+                            <th class="text-end py-2" style="width:20%; font-size: 0.85rem;"><?= t('Debit') ?></th>
+                            <th class="text-end pe-4 py-2" style="width:20%; font-size: 0.85rem;"><?= t('Credit') ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (isset($error_message)): ?>
+                            <tr><td colspan="4" class="text-center py-4 text-danger"><?= htmlspecialchars($error_message) ?></td></tr>
+                        <?php elseif (empty($sections) && empty($unclassified_rows)): ?>
+                            <tr><td colspan="4" class="text-center py-5 text-muted">No records found for this date.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($SECTION_ORDER as $cat):
+                                if (empty($sections[$cat]['rows'])) continue;
+                                $section = $sections[$cat];
+                            ?>
+                                <tr class="tb-section-header">
+                                    <td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.78rem; color: #495057;">
+                                        <?= htmlspecialchars($SECTION_LABEL[$cat]) ?>
+                                    </td>
+                                </tr>
+                                <?php foreach ($section['rows'] as $row):
+                                    $rowClass = $row['is_contra'] ? 'table-danger-subtle' : '';
+                                ?>
+                                    <tr class="<?= $rowClass ?>">
+                                        <td class="ps-4 fw-mono text-muted" style="font-size: 0.82rem;"><?= htmlspecialchars($row['code']) ?></td>
+                                        <td style="font-size: 0.88rem;">
+                                            <?= htmlspecialchars($row['name']) ?>
+                                            <?php if ($row['is_contra']): ?>
+                                                <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Contra-balance"></i>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end font-monospace <?= $row['debit'] < 0 ? 'text-danger' : '' ?>" style="font-size: 0.88rem;">
+                                            <?= abs($row['debit']) > 0.001 ? format_currency($row['debit']) : '—' ?>
+                                        </td>
+                                        <td class="text-end pe-4 font-monospace <?= $row['credit'] < 0 ? 'text-danger' : '' ?>" style="font-size: 0.88rem;">
+                                            <?= abs($row['credit']) > 0.001 ? format_currency($row['credit']) : '—' ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <tr class="tb-subtotal">
+                                    <td colspan="2" class="ps-4 fst-italic text-muted py-1" style="font-size: 0.8rem;">
+                                        Subtotal — <?= htmlspecialchars($SECTION_LABEL[$cat]) ?>
+                                    </td>
+                                    <td class="text-end font-monospace fw-semibold py-1" style="font-size: 0.85rem; border-top: 1px solid #dee2e6;">
+                                        <?= abs($section['subtotal_debit']) > 0.001 ? format_currency($section['subtotal_debit']) : '—' ?>
+                                    </td>
+                                    <td class="text-end pe-4 font-monospace fw-semibold py-1" style="font-size: 0.85rem; border-top: 1px solid #dee2e6;">
+                                        <?= abs($section['subtotal_credit']) > 0.001 ? format_currency($section['subtotal_credit']) : '—' ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+
+                            <?php if (!empty($unclassified_rows)): ?>
+                                <tr class="tb-section-header">
+                                    <td colspan="4" class="ps-3 py-2 bg-warning-subtle fw-bold text-uppercase text-warning-emphasis" style="letter-spacing: 1px; font-size: 0.78rem;">
+                                        UNCLASSIFIED (please assign category via Settings)
+                                    </td>
+                                </tr>
+                                <?php foreach ($unclassified_rows as $row): ?>
+                                    <tr>
+                                        <td class="ps-4 fw-mono text-muted" style="font-size: 0.82rem;"><?= htmlspecialchars($row['code']) ?></td>
+                                        <td style="font-size: 0.88rem;">
+                                            <?= htmlspecialchars($row['name']) ?>
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning small ms-2" style="font-size: 0.7rem;">
+                                                <?= htmlspecialchars($row['type_name']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-end font-monospace" style="font-size: 0.88rem;"><?= $row['debit']  > 0 ? format_currency($row['debit'])  : '—' ?></td>
+                                        <td class="text-end pe-4 font-monospace" style="font-size: 0.88rem;"><?= $row['credit'] > 0 ? format_currency($row['credit']) : '—' ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </tbody>
+                    <tfoot class="fw-bold">
+                        <tr class="border-top border-3 border-dark">
+                            <td colspan="2" class="ps-4 py-2 text-uppercase" style="font-size: 0.95rem; letter-spacing: 1px;">Grand Total</td>
+                            <td class="text-end py-2 font-monospace <?= $is_balanced ? 'text-success' : 'text-danger' ?>" style="font-size: 0.95rem;">
+                                <?= format_currency($total_debits) ?>
+                            </td>
+                            <td class="text-end pe-4 py-2 font-monospace <?= $is_balanced ? 'text-success' : 'text-danger' ?>" style="font-size: 0.95rem;">
+                                <?= format_currency($total_credits) ?>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4 text-muted small d-print-none">
+        <p>Report generated on <?= date('Y-m-d H:i:s') ?> | <?= htmlspecialchars($_SESSION['username'] ?? 'System') ?></p>
+    </div>
 </div>
 
 <style>
-.tb-table .tb-section-head td { background-color: #f1f3f5; font-size: 0.95rem; }
-.tb-table .tb-subtotal td     { background-color: #fafbfc; }
-.tb-table .tb-grand td        { background-color: #e9ecef; font-size: 1rem; }
-.tb-table a.tb-drilldown:hover { color: #0d6efd; text-decoration: underline !important; }
-@media print {
-    body { background: white !important; }
-    .card { border: none !important; box-shadow: none !important; }
-    .table { border: 1px solid #000 !important; font-size: 10pt; }
-    .table th { background-color: #f8f9fa !important; }
-}
+.fw-mono { font-family: 'Courier New', monospace; }
+.ls-1 { letter-spacing: 1px; }
+.card { border-radius: 10px; }
+.shadow-lg { box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important; }
 </style>
 
-<script>
-$(document).ready(function() {
-    if (typeof logReportAction === 'function') {
-        logReportAction('Viewed Trial Balance', 'as of <?= $as_of_date ?>'<?= $project_id !== null ? " + ', project ' + " . (int)$project_id : '' ?>);
-    }
-});
-</script>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
+
+<?php
+includeFooter();
+ob_end_flush();
+?>

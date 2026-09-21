@@ -146,13 +146,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label">Category</label>
+                    <label class="form-label"><?= t('Category') ?></label>
                     <select class="form-select" id="categoryFilter">
                         <option value="">All Categories</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label"><?= t('Status') ?></label>
                     <select class="form-select" id="statusFilter">
                         <option value="">All Status</option>
                         <option value="active">Active</option>
@@ -162,8 +162,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Location</label>
-                    <input type="text" class="form-control" id="locationFilter" placeholder="Any location">
+                    <label class="form-label"><?= t('Location') ?></label>
+                    <input type="text" class="form-control" id="locationFilter" placeholder="<?= t('Any location') ?>">
                 </div>
                 <div class="col-md-3 d-flex align-items-end">
                     <button type="button" class="btn btn-primary w-100" onclick="refreshTable()">
@@ -209,38 +209,38 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
 
             <div class="input-group input-group-sm shadow-sm" style="width: 250px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">
                 <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" class="form-control border-0 p-2" id="searchFilter" placeholder="Search assets..." onkeyup="$('#assetsTable').DataTable().ajax.reload()">
+                <input type="text" class="form-control border-0 p-2" id="searchFilter" placeholder="<?= t('Search assets...') ?>" onkeyup="$('#assetsTable').DataTable().ajax.reload()">
             </div>
         </div>
     </div>
     <!-- Assets Table -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-bottom">
-            <h5 class="mb-0 fw-bold">Asset Records</h5>
+            <h5 class="mb-0 fw-bold"><?= t('Asset Records') ?></h5>
         </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table id="assetsTable" class="table table-hover align-middle mb-0" style="width:100%">
                     <thead class="bg-light text-muted small text-uppercase">
                         <tr>
-                            <th class="ps-4" style="width: 50px;">S/NO</th>
-                            <th>Asset Details</th>
-                            <th>Code</th>
-                            <th>Make</th>
-                            <th>Category</th>
-                            <th>Purchase Date</th>
-                            <th>Capitalization</th>
-                            <th class="text-end">Cost</th>
-                            <th class="text-end">Accum. Dep. (Book)</th>
-                            <th class="text-end">NBV (Book)</th>
-                            <th class="text-end">Useful Life</th>
-                            <th>Dep. Method</th>
-                            <th>Condition</th>
-                            <th>Location</th>
-                            <th>Custodian</th>
-                            <th>Status</th>
-                            <th>Disposal Date</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th class="ps-4" style="width: 50px;"><?= t('S/NO') ?></th>
+                            <th><?= t('Asset Details') ?></th>
+                            <th><?= t('Code') ?></th>
+                            <th><?= t('Make') ?></th>
+                            <th><?= t('Category') ?></th>
+                            <th><?= t('Purchase Date') ?></th>
+                            <th><?= t('Capitalization') ?></th>
+                            <th class="text-end"><?= t('Cost') ?></th>
+                            <th class="text-end"><?= t('Accum. Dep. (Book)') ?></th>
+                            <th class="text-end"><?= t('NBV (Book)') ?></th>
+                            <th class="text-end"><?= t('Useful Life') ?></th>
+                            <th><?= t('Dep. Method') ?></th>
+                            <th><?= t('Condition') ?></th>
+                            <th><?= t('Location') ?></th>
+                            <th><?= t('Custodian') ?></th>
+                            <th><?= t('Status') ?></th>
+                            <th><?= t('Disposal Date') ?></th>
+                            <th class="text-end pe-4"><?= t('Actions') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -276,16 +276,16 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             <input type="text" class="form-control" name="asset_name" required placeholder="e.g. MacBook Pro M3">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Make / Manufacturer</label>
+                            <label class="form-label fw-semibold"><?= t('Make / Manufacturer') ?></label>
                             <input type="text" class="form-control" name="make" id="make" placeholder="e.g. Dell Inc., Toyota Motors">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Asset Code</label>
+                            <label class="form-label fw-semibold"><?= t('Asset Code') ?></label>
                             <input type="text" class="form-control" name="asset_code" id="asset_code" placeholder="auto">
                             <small class="text-muted">Auto from category — editable</small>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Warranty Expiry</label>
+                            <label class="form-label fw-semibold"><?= t('Warranty Expiry') ?></label>
                             <input type="date" class="form-control" name="warranty_expiry" id="warranty_expiry">
                         </div>
                         <div class="col-md-6">
@@ -298,7 +298,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             <small class="text-muted">Manage in <a href="<?= getUrl('asset_categories') ?>" target="_blank">Settings → Asset Categories</a></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Parent Asset (optional)</label>
+                            <label class="form-label fw-semibold"><?= t('Parent Asset (optional)') ?></label>
                             <select class="form-select select2-asset" name="parent_asset_id" id="parent_asset_id">
                                 <option value="">— None —</option>
                                 <?php foreach ($asset_parents as $p): ?>
@@ -308,8 +308,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             <small class="text-muted">Only for sub-assets / components</small>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" rows="2" placeholder="Model, accessories, notes…"></textarea>
+                            <label class="form-label fw-semibold"><?= t('Description') ?></label>
+                            <textarea class="form-control" name="description" rows="2" placeholder="<?= t('Model, accessories, notes…') ?>"></textarea>
                         </div>
                     </div>
 
@@ -324,21 +324,21 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Purchase Date</label>
+                            <label class="form-label fw-semibold"><?= t('Purchase Date') ?></label>
                             <input type="date" class="form-control" name="purchase_date" id="purchase_date" value="<?= date('Y-m-d') ?>" onchange="onPurchaseDateChange()">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Capitalization Date</label>
+                            <label class="form-label fw-semibold"><?= t('Capitalization Date') ?></label>
                             <input type="date" class="form-control" name="capitalization_date" id="capitalization_date" value="<?= date('Y-m-d') ?>" onchange="updatePreview()">
                             <small class="text-muted">Depreciation starts here</small>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Take-on Date</label>
+                            <label class="form-label fw-semibold"><?= t('Take-on Date') ?></label>
                             <input type="date" class="form-control" name="take_on_date" id="take_on_date" onchange="updatePreview()">
                             <small class="text-muted">Optional — only for an already-existing asset (go-live cut-off for b/f balances)</small>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Supplier</label>
+                            <label class="form-label fw-semibold"><?= t('Supplier') ?></label>
                             <select class="form-select select2-asset" name="supplier_id" id="supplier_id">
                                 <option value="">— None —</option>
                                 <?php foreach ($asset_suppliers as $s): ?>
@@ -347,11 +347,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Invoice / PO / GRN Ref</label>
+                            <label class="form-label fw-semibold"><?= t('Invoice / PO / GRN Ref') ?></label>
                             <input type="text" class="form-control" name="invoice_ref" placeholder="e.g. GRN-2026-0001">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Status</label>
+                            <label class="form-label fw-semibold"><?= t('Status') ?></label>
                             <select class="form-select" name="status" required>
                                 <option value="active">Active</option>
                                 <option value="maintenance">Maintenance</option>
@@ -365,11 +365,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                     <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-geo-alt me-1"></i> Assignment</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Location</label>
+                            <label class="form-label fw-semibold"><?= t('Location') ?></label>
                             <input type="text" class="form-control" name="location" placeholder="e.g. Headquarters - Room 204">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Custodian</label>
+                            <label class="form-label fw-semibold"><?= t('Custodian') ?></label>
                             <input type="hidden" name="custodian_id" id="custodian_id" value="<?= $current_user_id ?>">
                             <input type="text" class="form-control bg-light" id="custodian_display" value="<?= safe_output($current_user_label) ?>" readonly>
                             <small class="text-muted">Auto-set to the logged-in user when adding; unchanged when editing.</small>
@@ -386,26 +386,26 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                                     <div class="fw-bold mb-2"><i class="bi bi-journal-text me-1 text-primary"></i> Book Area <span class="text-muted small">(financial statements)</span></div>
                                     <div class="row g-2">
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0">Method</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Method') ?></label>
                                             <select class="form-select form-select-sm" name="book_method" id="book_method" onchange="updatePreview()">
                                                 <option value="straight_line">Straight Line</option>
                                                 <option value="reducing_balance">Reducing Balance</option>
                                             </select>
                                         </div>
                                         <div class="col-6" id="book_life_group">
-                                            <label class="form-label small fw-semibold mb-0">Useful Life (yrs)</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Useful Life (yrs)') ?></label>
                                             <input type="number" class="form-control form-control-sm" name="book_useful_life" id="book_useful_life" min="1" oninput="updatePreview()">
                                         </div>
                                         <div class="col-6 d-none" id="book_rate_group">
-                                            <label class="form-label small fw-semibold mb-0">RB Rate (%)</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('RB Rate (%)') ?></label>
                                             <input type="number" class="form-control form-control-sm" name="book_rate" id="book_rate" step="0.01" min="0" max="100" oninput="updatePreview()">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0">Salvage (TZS)</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Salvage (TZS)') ?></label>
                                             <input type="number" class="form-control form-control-sm" name="book_salvage" id="book_salvage" step="0.01" min="0" value="0" oninput="updatePreview()">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0">Opening Accum. b/f</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Opening Accum. b/f') ?></label>
                                             <input type="number" class="form-control form-control-sm" name="book_opening_accum_bf" id="book_opening_accum_bf" step="0.01" min="0" value="0" oninput="updatePreview()">
                                             <small class="text-muted">Existing assets only</small>
                                         </div>
@@ -422,15 +422,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                                     <div class="fw-bold mb-2"><i class="bi bi-bank me-1 text-success"></i> Tax Area <span class="text-muted small">(capital allowances)</span></div>
                                     <div class="row g-2">
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0">Method</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Method') ?></label>
                                             <input type="text" class="form-control form-control-sm" value="Reducing Balance" disabled>
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0">Tax Rate (%)</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Tax Rate (%)') ?></label>
                                             <input type="number" class="form-control form-control-sm" name="tax_rate" id="tax_rate" step="0.01" min="0" max="100" oninput="updatePreview()">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0">Opening Accum. b/f</label>
+                                            <label class="form-label small fw-semibold mb-0"><?= t('Opening Accum. b/f') ?></label>
                                             <input type="number" class="form-control form-control-sm" name="tax_opening_accum_bf" id="tax_opening_accum_bf" step="0.01" min="0" value="0" oninput="updatePreview()">
                                             <small class="text-muted">Existing assets only</small>
                                         </div>
@@ -480,7 +480,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
             <div class="modal-body p-4">
                 <div class="row g-3 align-items-end mb-3">
                     <div class="col-md-3">
-                        <label class="form-label fw-semibold">Scope</label>
+                        <label class="form-label fw-semibold"><?= t('Scope') ?></label>
                         <select id="dep_scope" class="form-select" onchange="onDepScopeChange()">
                             <option value="all">All assets</option>
                             <option value="category">One category</option>
@@ -488,15 +488,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                         </select>
                     </div>
                     <div class="col-md-4 d-none" id="dep_category_wrap">
-                        <label class="form-label fw-semibold">Category</label>
+                        <label class="form-label fw-semibold"><?= t('Category') ?></label>
                         <select id="dep_category" class="form-select"></select>
                     </div>
                     <div class="col-md-4 d-none" id="dep_asset_wrap">
-                        <label class="form-label fw-semibold">Asset</label>
+                        <label class="form-label fw-semibold"><?= t('Asset') ?></label>
                         <select id="dep_asset" class="form-select" style="width:100%"></select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label fw-semibold">Financial Year</label>
+                        <label class="form-label fw-semibold"><?= t('Financial Year') ?></label>
                         <input type="number" id="dep_fy" class="form-control" min="2000" max="2100" value="<?= date('Y') ?>">
                     </div>
                     <div class="col-md-2">
@@ -1251,10 +1251,10 @@ function renderDepProposal(p) {
     let html = `<div class="small text-muted mb-2">Financial year <strong>${p.fy_year}</strong> (${p.period_start} to ${p.period_end}) — book area, ${p.rows.length} asset(s)</div>
     <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0">
       <thead class="table-light"><tr>
-        <th>Code</th><th>Asset</th><th>Category</th><th>Method</th>
-        <th class="text-end">Cost</th><th class="text-end">Opening Accum.</th>
-        <th class="text-end">Charge for Year</th><th class="text-end">Closing Accum.</th>
-        <th class="text-end">NBV</th><th></th>
+        <th><?= t('Code') ?></th><th><?= t('Asset') ?></th><th><?= t('Category') ?></th><th><?= t('Method') ?></th>
+        <th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Opening Accum.') ?></th>
+        <th class="text-end"><?= t('Charge for Year') ?></th><th class="text-end"><?= t('Closing Accum.') ?></th>
+        <th class="text-end"><?= t('NBV') ?></th><th></th>
       </tr></thead><tbody>`;
     p.rows.forEach(r => {
         const m = r.method === 'straight_line' ? 'Straight Line' : 'Reducing Balance';

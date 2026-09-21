@@ -123,14 +123,14 @@ $depLines = [
                 <table class="table table-bordered table-sm mb-0 align-middle" style="min-width:680px">
                     <thead class="table-light">
                         <tr>
-                            <th rowspan="2" class="ps-3 align-middle text-start" style="min-width:200px">TZS</th>
+                            <th rowspan="2" class="ps-3 align-middle text-start" style="min-width:200px"><?= t('TZS') ?></th>
                             <th colspan="<?= $ncat + 1 ?>" class="text-center text-uppercase">Category</th>
                         </tr>
                         <tr>
                             <?php foreach ($rows as $r): ?>
                                 <th class="text-end"><?= safe_output($r['category']) ?><?= $r['is_depreciable'] ? '' : ' <span class="badge bg-info-subtle text-info-emphasis border">Land</span>' ?></th>
                             <?php endforeach; ?>
-                            <th class="text-end bg-light">TOTAL</th>
+                            <th class="text-end bg-light"><?= t('TOTAL') ?></th>
                         </tr>
                     </thead>
                     <tbody>

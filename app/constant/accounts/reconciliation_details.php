@@ -94,7 +94,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
-                    <h5 class="mb-0 fw-bold text-dark">Reconciliation Information</h5>
+                    <h5 class="mb-0 fw-bold text-dark"><?= t('Reconciliation Information') ?></h5>
                     <span class="badge rounded-pill bg-<?= $statusClass ?> px-3 py-2">
                         <i class="bi bi-circle-fill me-1 small"></i> <?= strtoupper($reconciliation['status']) ?>
                     </span>
@@ -103,7 +103,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                     <!-- Screen View (Original Layout) -->
                     <div class="row g-4 d-print-none">
                         <div class="col-md-12">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Bank Account</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Bank Account') ?></label>
                             <p class="fs-5 fw-semibold text-dark mb-0">
                                 <?= htmlspecialchars($reconciliation['bank_account_name']) ?> 
                                 <span class="text-muted small">(<?= htmlspecialchars($reconciliation['bank_account_code']) ?>)</span>
@@ -113,40 +113,40 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                         <div class="col-12"><hr class="my-0 opacity-10"></div>
 
                         <div class="col-md-4">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Reconciliation Date</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Reconciliation Date') ?></label>
                             <p class="mb-0 fw-medium text-dark"><i class="bi bi-calendar3 me-2 text-primary"></i><?= date('F d, Y', strtotime($reconciliation['reconciliation_date'])) ?></p>
                         </div>
                         <div class="col-md-4">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Period Start</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Period Start') ?></label>
                             <p class="mb-0 fw-medium text-dark"><i class="bi bi-calendar-range me-2 text-primary"></i><?= date('M d, Y', strtotime($reconciliation['period_start'])) ?></p>
                         </div>
                          <div class="col-md-4">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Period End</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Period End') ?></label>
                             <p class="mb-0 fw-medium text-dark"><i class="bi bi-calendar-range me-2 text-primary"></i><?= date('M d, Y', strtotime($reconciliation['period_end'])) ?></p>
                         </div>
 
                         <div class="col-12"><hr class="my-0 opacity-10"></div>
 
                         <div class="col-md-3">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Opening Balance</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Opening Balance') ?></label>
                             <p class="fs-5 fw-bold text-secondary mb-0">
                                 <?= number_format($reconciliation['opening_balance'] ?? 0, 2) ?>
                             </p>
                         </div>
                         <div class="col-md-3">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Statement Balance</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Statement Balance') ?></label>
                             <p class="fs-5 fw-bold text-dark mb-0">
                                 <?= number_format($reconciliation['statement_balance'], 2) ?>
                             </p>
                         </div>
                         <div class="col-md-3">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Book Balance</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Book Balance') ?></label>
                             <p class="fs-5 fw-bold text-primary mb-0">
                                 <?= number_format($reconciliation['book_balance'], 2) ?>
                             </p>
                         </div>
                         <div class="col-md-3">
-                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Difference</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block"><?= t('Difference') ?></label>
                             <p class="fs-5 fw-bold text-<?= $diffClass ?> mb-0">
                                 <?= number_format($diff, 2) ?>
                             </p>
@@ -157,7 +157,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                     <div class="reconciliation-grid d-none d-print-flex">
                         <!-- Account Info (Full Width) -->
                         <div class="col-12 grid-item border-bottom">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Bank Account</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Bank Account') ?></label>
                             <p class="fs-5 fw-bold text-dark mb-0">
                                 <?= htmlspecialchars($reconciliation['bank_account_name']) ?> 
                                 <span class="text-muted small">(<?= htmlspecialchars($reconciliation['bank_account_code']) ?>)</span>
@@ -166,29 +166,29 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                         
                         <!-- Dates Row -->
                         <div class="col-4 grid-item border-end">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Reconciliation Date</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Reconciliation Date') ?></label>
                             <p class="mb-0 fw-bold text-dark"><?= date('F d, Y', strtotime($reconciliation['reconciliation_date'])) ?></p>
                         </div>
                         <div class="col-4 grid-item border-end">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Period Start</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Period Start') ?></label>
                             <p class="mb-0 fw-bold text-dark"><?= date('M d, Y', strtotime($reconciliation['period_start'])) ?></p>
                         </div>
                         <div class="col-4 grid-item">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Period End</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Period End') ?></label>
                             <p class="mb-0 fw-bold text-dark"><?= date('M d, Y', strtotime($reconciliation['period_end'])) ?></p>
                         </div>
 
                         <!-- Balances Row -->
                         <div class="col-4 grid-item border-end no-border-bottom">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Statement Balance</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Statement Balance') ?></label>
                             <p class="fs-5 fw-bold text-dark mb-0"><?= number_format($reconciliation['statement_balance'], 2) ?></p>
                         </div>
                         <div class="col-4 grid-item border-end no-border-bottom">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Book Balance</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Book Balance') ?></label>
                             <p class="fs-5 fw-bold text-primary mb-0"><?= number_format($reconciliation['book_balance'], 2) ?></p>
                         </div>
                         <div class="col-4 grid-item no-border-bottom">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Status / Difference</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block"><?= t('Status / Difference') ?></label>
                             <p class="fs-5 fw-bold text-<?= $diffClass ?> mb-0">
                                 <?= $diff == 0 ? 'BALANCED' : number_format($diff, 2) ?>
                             </p>
@@ -200,7 +200,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
             <?php if (!empty($reconciliation['notes'])): ?>
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 fw-bold text-dark">Notes & Remarks</h5>
+                    <h5 class="mb-0 fw-bold text-dark"><?= t('Notes & Remarks') ?></h5>
                 </div>
                 <div class="card-body">
                     <div class="p-3 bg-light rounded border-start border-4 border-primary">
@@ -250,7 +250,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
             <!-- Two-column Reconciliation Statement (print-only) -->
             <div class="card border-0 mb-4 d-none d-print-block">
                 <div class="card-header bg-white border-bottom py-2">
-                    <h5 class="mb-0 fw-bold text-dark text-uppercase" style="font-size:11pt;letter-spacing:1px;">Reconciliation Statement</h5>
+                    <h5 class="mb-0 fw-bold text-dark text-uppercase" style="font-size:11pt;letter-spacing:1px;"><?= t('Reconciliation Statement') ?></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="row g-0">
@@ -312,13 +312,13 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                         <table class="table table-hover align-middle mb-0" id="matchTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="text-center" style="width:46px;">Clear</th>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Reference</th>
-                                    <th class="text-end">Money In</th>
-                                    <th class="text-end">Money Out</th>
-                                    <th class="text-center">Status</th>
+                                    <th class="text-center" style="width:46px;"><?= t('Clear') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Description') ?></th>
+                                    <th><?= t('Reference') ?></th>
+                                    <th class="text-end"><?= t('Money In') ?></th>
+                                    <th class="text-end"><?= t('Money Out') ?></th>
+                                    <th class="text-center"><?= t('Status') ?></th>
                                     <?php if ($reconciliation['status'] === 'pending'): ?>
                                     <th class="text-center" style="width:60px;"></th>
                                     <?php endif; ?>
@@ -367,11 +367,11 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                         <table class="table table-sm align-middle mb-0" id="adjTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Memo</th>
-                                    <th class="text-end">Amount</th>
-                                    <th class="text-center small text-muted">JE#</th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Type') ?></th>
+                                    <th><?= t('Memo') ?></th>
+                                    <th class="text-end"><?= t('Amount') ?></th>
+                                    <th class="text-center small text-muted"><?= t('JE#') ?></th>
                                 </tr>
                             </thead>
                             <tbody id="adjTableBody">
@@ -389,7 +389,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
             <!-- Quick Actions -->
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-header bg-white border-bottom py-3">
-                    <h6 class="mb-0 fw-bold text-dark">Quick Actions</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><?= t('Quick Actions') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
@@ -414,7 +414,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
             <!-- Financial Summary Card (Stat Card Style) -->
             <div class="card custom-stat-card mb-4">
                  <div class="card-body">
-                    <h5 class="card-title h6 text-uppercase text-muted mb-2">Reconciliation Status</h5>
+                    <h5 class="card-title h6 text-uppercase text-muted mb-2"><?= t('Reconciliation Status') ?></h5>
                     <div class="d-flex justify-content-between align-items-center">
                         <h3 class="mb-0 fw-bold <?= $diff == 0 ? 'text-success' : 'text-danger' ?>">
                              <?= $diff == 0 ? 'Balanced' : 'Unbalanced' ?>
@@ -436,7 +436,7 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
             <!-- System Info -->
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white border-bottom py-3">
-                    <h6 class="mb-0 fw-bold text-dark">System Metadata</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><?= t('System Metadata') ?></h6>
                 </div>
                 <div class="card-body p-0">
                      <ul class="list-group list-group-flush small">
@@ -823,8 +823,8 @@ $(document).ready(function () {
                             <div class="form-text text-muted small">Contra account (e.g. Bank Charges Expense, Interest Income, A/R)</div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Memo</label>
-                            <input type="text" class="form-control" name="memo" id="adj_memo" placeholder="Optional description">
+                            <label class="form-label fw-semibold"><?= t('Memo') ?></label>
+                            <input type="text" class="form-control" name="memo" id="adj_memo" placeholder="<?= t('Optional description') ?>">
                         </div>
                     </div>
                     <div class="alert alert-info mt-3 small mb-0">
@@ -870,7 +870,7 @@ $(document).ready(function () {
                         <div class="form-text small text-muted">The account this movement should post to (e.g. Expense, Income, A/R)</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Memo (override description)</label>
+                        <label class="form-label fw-semibold"><?= t('Memo (override description)') ?></label>
                         <input type="text" class="form-control" name="memo" id="cfl_memo">
                     </div>
                     <div class="alert alert-warning small mb-0">
@@ -910,7 +910,7 @@ $(document).ready(function () {
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Reason for unreconciling <span class="text-danger">*</span></label>
                         <textarea class="form-control" name="reason" id="unreconcile_reason" rows="3"
-                            placeholder="Provide a detailed reason (min 10 characters)" required></textarea>
+                            placeholder="<?= t('Provide a detailed reason (min 10 characters)') ?>" required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">

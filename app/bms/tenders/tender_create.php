@@ -200,7 +200,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
 
                         <!-- ======== PHASE 1: Institution Details ======== -->
                         <div class="wizard-phase" id="phase-1">
-                            <div class="col-12"><h5 class="fw-bold text-primary mb-3">Institution Details</h5></div>
+                            <div class="col-12"><h5 class="fw-bold text-primary mb-3"><?= t('Institution Details') ?></h5></div>
                             <div class="row g-4">
                                 <div class="col-md-9">
                                     <label class="form-label fw-bold text-dark">Name of Procuring Entity <span class="text-danger">*</span></label>
@@ -217,7 +217,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     <div class="invalid-feedback">Procuring entity is required.</div>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label fw-bold">Acronym</label>
+                                    <label class="form-label fw-bold"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" name="acronym" id="acronym_field" placeholder="e.g. TANROADS">
                                 </div>
                                 <!-- Hidden: tracks the linked customer ID for autofill -->
@@ -225,11 +225,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
 
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold">Country <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" name="country" id="country" placeholder="Your country" required>
+                                    <input type="text" class="form-control" name="country" id="country" placeholder="<?= t('Your country') ?>" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold">Region <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" name="region" id="region" placeholder="Your region" required>
+                                    <input type="text" class="form-control" name="region" id="region" placeholder="<?= t('Your region') ?>" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold">District <span class="text-danger">*</span> your district</label>
@@ -249,11 +249,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     <input type="text" class="form-control" name="contact_number" id="contact_number" placeholder="+255-765-272-200" required>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Physical Address</label>
+                                    <label class="form-label fw-bold"><?= t('Physical Address') ?></label>
                                     <input type="text" class="form-control" name="physical_address">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Postal Address</label>
+                                    <label class="form-label fw-bold"><?= t('Postal Address') ?></label>
                                     <input type="text" class="form-control" name="postal_address">
                                 </div>
                             </div>
@@ -261,18 +261,18 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
 
                         <!-- ======== PHASE 2: Tender Details ======== -->
                         <div class="wizard-phase d-none" id="phase-2">
-                            <div class="col-12"><h5 class="fw-bold text-primary mb-3">Tender Details</h5></div>
+                            <div class="col-12"><h5 class="fw-bold text-primary mb-3"><?= t('Tender Details') ?></h5></div>
                             <div class="row g-4">
                                 <div class="col-12">
                                     <label class="form-label fw-bold">Tender Description <span class="text-danger">*</span></label>
-                                    <textarea class="form-control" name="tender_description" rows="2" placeholder="Describe the tender scope..." required></textarea>
+                                    <textarea class="form-control" name="tender_description" rows="2" placeholder="<?= t('Describe the tender scope...') ?>" required></textarea>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Tender NO <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" name="tender_no" placeholder="TR/001/..." required>
+                                    <input type="text" class="form-control" name="tender_no" placeholder="<?= t('TR/001/...') ?>" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">NeST Reference</label>
+                                    <label class="form-label fw-bold"><?= t('NeST Reference') ?></label>
                                     <input type="text" class="form-control" name="nest_reference" placeholder="reference on nest.go.tz, once listed">
                                 </div>
                                 <div class="col-md-6">
@@ -287,7 +287,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     </select>
                                     <div id="tender_category_other_wrapper" class="d-none mt-1">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" name="tender_category_other" placeholder="Specify Category...">
+                                            <input type="text" class="form-control" name="tender_category_other" placeholder="<?= t('Specify Category...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetOther('tender_category','tender_category_other_wrapper')"><i class="bi bi-x-lg"></i></button>
                                         </div>
                                     </div>
@@ -305,7 +305,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     </select>
                                     <div id="tender_sub_category_other_wrapper" class="d-none mt-1">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" name="tender_sub_category_other" placeholder="Specify Sub Category...">
+                                            <input type="text" class="form-control" name="tender_sub_category_other" placeholder="<?= t('Specify Sub Category...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetOther('tender_sub_category','tender_sub_category_other_wrapper')"><i class="bi bi-x-lg"></i></button>
                                         </div>
                                     </div>
@@ -320,26 +320,26 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     </select>
                                     <div id="tender_type_other_wrapper" class="d-none mt-1">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" name="tender_type_other" placeholder="Specify Type...">
+                                            <input type="text" class="form-control" name="tender_type_other" placeholder="<?= t('Specify Type...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetOther('tender_type','tender_type_other_wrapper')"><i class="bi bi-x-lg"></i></button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Duration</label>
-                                    <input type="text" class="form-control" name="duration" placeholder="Total days">
+                                    <label class="form-label fw-bold"><?= t('Duration') ?></label>
+                                    <input type="text" class="form-control" name="duration" placeholder="<?= t('Total days') ?>">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Submission Deadline <span class="text-danger">*</span></label>
                                     <input type="date" class="form-control" name="submission_deadline" required>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Date of Invitation</label>
+                                    <label class="form-label fw-bold"><?= t('Date of Invitation') ?></label>
                                     <input type="date" class="form-control" name="publication_date">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold">Bid Validity (days)</label>
+                                    <label class="form-label fw-bold"><?= t('Bid Validity (days)') ?></label>
                                     <input type="number" min="1" class="form-control" name="bid_validity_days" value="90" placeholder="90">
                                     <small class="text-muted fst-italic">Used in the Form of Tender letter's validity paragraph.</small>
                                 </div>
@@ -358,7 +358,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     </select>
                                     <div id="discipline_other_wrapper" class="d-none mt-1">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" name="discipline_other" placeholder="Specify Discipline...">
+                                            <input type="text" class="form-control" name="discipline_other" placeholder="<?= t('Specify Discipline...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetOther('discipline','discipline_other_wrapper')"><i class="bi bi-x-lg"></i></button>
                                         </div>
                                     </div>
@@ -376,14 +376,14 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     </select>
                                     <div id="tender_role_other_wrapper" class="d-none mt-1">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" name="tender_role_other" placeholder="Specify Role...">
+                                            <input type="text" class="form-control" name="tender_role_other" placeholder="<?= t('Specify Role...') ?>">
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetOther('tender_role','tender_role_other_wrapper')"><i class="bi bi-x-lg"></i></button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="col-12">
-                                    <label class="form-label fw-bold">Attach Tender Docs / Others</label>
+                                    <label class="form-label fw-bold"><?= t('Attach Tender Docs / Others') ?></label>
                                     <input type="file" class="form-control" name="tender_document">
                                     <small class="text-muted fst-italic">Upload any additional documents related to this tender invitation.</small>
                                 </div>
@@ -404,15 +404,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                     <div class="d-flex gap-4 flex-wrap mt-1">
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="currency_choice" id="cur_tzs" value="Tshs" checked>
-                                            <label class="form-check-label fw-semibold" for="cur_tzs">Tshs (Tanzanian Shillings)</label>
+                                            <label class="form-check-label fw-semibold" for="cur_tzs"><?= t('Tshs (Tanzanian Shillings)') ?></label>
                                         </div>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="currency_choice" id="cur_usd" value="USD">
-                                            <label class="form-check-label fw-semibold" for="cur_usd">USD (US Dollars)</label>
+                                            <label class="form-check-label fw-semibold" for="cur_usd"><?= t('USD (US Dollars)') ?></label>
                                         </div>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="currency_choice" id="cur_both" value="Tshs & USD">
-                                            <label class="form-check-label fw-semibold" for="cur_both">Tshs &amp; USD (Both)</label>
+                                            <label class="form-check-label fw-semibold" for="cur_both"><?= t('Tshs &amp; USD (Both)') ?></label>
                                         </div>
                                     </div>
                                 </div>

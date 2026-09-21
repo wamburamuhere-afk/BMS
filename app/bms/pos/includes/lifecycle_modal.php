@@ -95,14 +95,14 @@ if (projectsModuleActive()) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">New Basic Salary <small class="text-muted">(optional)</small></label>
-                            <input type="number" class="form-control" name="new_salary" id="lc_new_salary" min="0" step="0.01" placeholder="Leave blank to keep current">
+                            <input type="number" class="form-control" name="new_salary" id="lc_new_salary" min="0" step="0.01" placeholder="<?= t('Leave blank to keep current') ?>">
                         </div>
                     </div>
 
                     <!-- Transfer -->
                     <div class="row g-3 mt-0 lc-group lc-transfer d-none">
                         <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
-                            <label class="form-label">New Department</label>
+                            <label class="form-label"><?= t('New Department') ?></label>
                             <select class="form-select select2-static" name="new_department_id" id="lc_new_department">
                                 <option value="">-- Keep current --</option>
                                 <?php foreach ($lc_departments as $d): ?>
@@ -115,7 +115,7 @@ if (projectsModuleActive()) {
                         </div>
                         <?php if (projectsModuleActive()): ?>
                         <div class="col-md-6">
-                            <label class="form-label">New Project</label>
+                            <label class="form-label"><?= t('New Project') ?></label>
                             <select class="form-select select2-static" name="new_project_id" id="lc_new_project">
                                 <option value="">-- Keep current --</option>
                                 <?php foreach ($lc_projects as $p): ?>
@@ -164,7 +164,7 @@ if (projectsModuleActive()) {
                     <div class="row g-3 mt-0 lc-group lc-complaint d-none">
                         <div class="col-md-6">
                             <label class="form-label">Complainant <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="complainant" id="lc_complainant" placeholder="Employee or external party" maxlength="255">
+                            <input type="text" class="form-control" name="complainant" id="lc_complainant" placeholder="<?= t('Employee or external party') ?>" maxlength="255">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Resolution <small class="text-muted">(optional)</small></label>
@@ -233,7 +233,7 @@ if (projectsModuleActive()) {
                     <div class="row g-3 mt-0">
                         <div class="col-12">
                             <label class="form-label">Reason / Details <small class="text-muted">(optional)</small></label>
-                            <textarea class="form-control" name="description" rows="2" placeholder="Narrative, citation or reason"></textarea>
+                            <textarea class="form-control" name="description" rows="2" placeholder="<?= t('Narrative, citation or reason') ?>"></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label"><i class="bi bi-paperclip me-1"></i>Attachment <small class="text-muted">(letter / certificate / evidence — optional)</small></label>

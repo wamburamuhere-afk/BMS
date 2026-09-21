@@ -302,10 +302,10 @@ $comp = [
         <thead>
             <tr>
                 <th class="text-center" style="width:38px;">#</th>
-                <th style="width:110px;">SKU</th>
-                <th>Product Name</th>
-                <th class="text-center" style="width:80px;">Unit</th>
-                <th class="text-right" style="width:100px;">Quantity</th>
+                <th style="width:110px;"><?= t('SKU') ?></th>
+                <th><?= t('Product Name') ?></th>
+                <th class="text-center" style="width:80px;"><?= t('Unit') ?></th>
+                <th class="text-right" style="width:100px;"><?= t('Quantity') ?></th>
             </tr>
         </thead>
         <tbody>

@@ -115,10 +115,10 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-9">
-                    <label class="form-label small fw-bold text-muted">Search</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Search') ?></label>
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" class="form-control border-start-0 ps-0" id="pvSearch" placeholder="Search Payee, PV No, Description...">
+                        <input type="text" class="form-control border-start-0 ps-0" id="pvSearch" placeholder="<?= t('Search Payee, PV No, Description...') ?>">
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -148,15 +148,15 @@ $currency = get_setting('currency', 'TZS');
         <table id="vouchersTable" class="table table-hover align-middle mb-0 w-100">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3" style="width:50px;">S/No</th>
-                    <th>PV No</th>
-                    <th>Date</th>
+                    <th class="ps-3" style="width:50px;"><?= t('S/No') ?></th>
+                    <th><?= t('PV No') ?></th>
+                    <th><?= t('Date') ?></th>
                     <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
-                    <th>Pay To</th>
-                    <th class="text-end">Amount</th>
-                    <th>Method</th>
-                    <th class="text-center">Status</th>
-                    <th class="text-end pe-3 d-print-none">Actions</th>
+                    <th><?= t('Pay To') ?></th>
+                    <th class="text-end"><?= t('Amount') ?></th>
+                    <th><?= t('Method') ?></th>
+                    <th class="text-center"><?= t('Status') ?></th>
+                    <th class="text-end pe-3 d-print-none"><?= t('Actions') ?></th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -199,11 +199,11 @@ $currency = get_setting('currency', 'TZS');
                             <input type="text" class="form-control" name="payee_name" id="voucher_payee" placeholder="e.g. Supplier Name, Staff Name" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">Amount in Words</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Amount in Words') ?></label>
                             <input type="text" class="form-control" name="amount_in_words" id="voucher_words" placeholder="e.g. Fifty Thousand Only">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted">Payment Method</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Payment Method') ?></label>
                             <select class="form-select" name="payment_method" id="voucher_method">
                                 <option value="cash">Cash</option>
                                 <option value="cheque">Cheque</option>
@@ -212,11 +212,11 @@ $currency = get_setting('currency', 'TZS');
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted">Reference (Cheque No, etc)</label>
-                            <input type="text" class="form-control" name="reference" id="voucher_ref" placeholder="Ref No.">
+                            <label class="form-label fw-bold small text-muted"><?= t('Reference (Cheque No, etc)') ?></label>
+                            <input type="text" class="form-control" name="reference" id="voucher_ref" placeholder="<?= t('Ref No.') ?>">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted">Expense Account</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Expense Account') ?></label>
                             <!-- §UI-3 DB-backed select → Select2 -->
                             <select class="form-select select2-static" name="expense_account_id" id="voucher_expense_account">
                                 <option value="">Select expense account</option>
@@ -228,7 +228,7 @@ $currency = get_setting('currency', 'TZS');
                         </div>
                         <?php if ($enable_projects): ?>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted">Project</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Project') ?></label>
                             <select class="form-select select2-static" name="project_id" id="voucher_project">
                                 <option value="">Select Project</option>
                                 <?php foreach ($projects as $proj): ?>
@@ -314,7 +314,7 @@ $currency = get_setting('currency', 'TZS');
                             <input type="date" class="form-control" name="payment_date" id="pay_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold small text-muted">Method</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Method') ?></label>
                             <select class="form-select" name="payment_method" id="pay_method">
                                 <option value="cash">Cash</option>
                                 <option value="cheque">Cheque</option>
@@ -323,11 +323,11 @@ $currency = get_setting('currency', 'TZS');
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">Reference (Cheque/Txn No.)</label>
-                            <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="Optional">
+                            <label class="form-label fw-bold small text-muted"><?= t('Reference (Cheque/Txn No.)') ?></label>
+                            <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="<?= t('Optional') ?>">
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">Payment Proof (optional)</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Payment Proof (optional)') ?></label>
                             <input type="file" class="form-control" name="attachment_file" accept=".pdf,.jpg,.jpeg,.png">
                         </div>
                     </div>
@@ -354,7 +354,7 @@ $currency = get_setting('currency', 'TZS');
                         <i class="bi bi-file-earmark-text text-primary fs-4"></i>
                     </div>
                     <div>
-                        <h5 class="modal-title fw-bold mb-0">Payment Voucher Details</h5>
+                        <h5 class="modal-title fw-bold mb-0"><?= t('Payment Voucher Details') ?></h5>
                         <p class="text-muted small mb-0" id="detail_voucher_no">#PV-00000</p>
                     </div>
                 </div>
@@ -364,35 +364,35 @@ $currency = get_setting('currency', 'TZS');
                 <div class="row g-4 mb-4">
                     <div class="col-md-7">
                         <div class="bg-light p-4 rounded-4 h-100">
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Status &amp; Method</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Status &amp; Method') ?></label>
                             <div class="d-flex gap-2 mb-3">
                                 <div id="detail_status_badge"></div>
                                 <div id="detail_method_badge"></div>
                             </div>
                             <div class="row">
                                 <div class="col-6">
-                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1">Voucher Date</label>
+                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Voucher Date') ?></label>
                                     <p class="fw-bold fs-6 mb-3" id="detail_date"></p>
                                 </div>
                                 <div class="col-6">
-                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1">Reference No.</label>
+                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Reference No.') ?></label>
                                     <p class="fw-bold mb-3" id="detail_reference"></p>
                                 </div>
                             </div>
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Payee (Pay To)</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Payee (Pay To)') ?></label>
                             <p class="fw-bold mb-3 fs-5 text-dark" id="detail_payee"></p>
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Expense Category</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Expense Category') ?></label>
                             <p class="fw-bold mb-0" id="detail_category"></p>
                         </div>
                     </div>
                     <div class="col-md-5">
                         <div class="p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center" style="background:#e7f0ff;border:1px solid #b6ccfe;">
-                            <label class="small text-primary text-uppercase fw-bold d-block mb-2">Total Amount</label>
+                            <label class="small text-primary text-uppercase fw-bold d-block mb-2"><?= t('Total Amount') ?></label>
                             <h2 class="fw-bold text-primary mb-2" id="detail_amount" style="white-space:nowrap;line-height:1.2;">...</h2>
                             <p id="detail_words" class="text-muted small mb-0 border-top pt-2 mt-2" style="word-break:break-word;"></p>
                             <?php if ($enable_projects): ?>
                             <div class="mt-3 text-start">
-                                <label class="small text-muted text-uppercase fw-bold d-block mb-1">Project</label>
+                                <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Project') ?></label>
                                 <p class="badge bg-white text-dark border w-100 py-2 mb-0" id="detail_project"></p>
                             </div>
                             <?php endif; ?>
@@ -401,7 +401,7 @@ $currency = get_setting('currency', 'TZS');
                 </div>
 
                 <div class="p-4 bg-light rounded-4">
-                    <label class="small text-muted text-uppercase fw-bold d-block mb-2">Description / Narration</label>
+                    <label class="small text-muted text-uppercase fw-bold d-block mb-2"><?= t('Description / Narration') ?></label>
                     <p class="mb-0 fs-6 text-dark lh-base" id="detail_description" style="white-space:pre-wrap;font-style:italic;"></p>
                 </div>
 

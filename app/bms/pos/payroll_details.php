@@ -252,7 +252,7 @@ $page_title = 'Payroll Details';
             <!-- Meta Info -->
             <div class="col-lg-4">
                 <div class="details-card p-4 h-100">
-                    <h5 class="fw-bold mb-4">Industrial Audit</h5>
+                    <h5 class="fw-bold mb-4"><?= t('Industrial Audit') ?></h5>
                     
                     <div class="mb-4">
                         <p class="info-label mb-1">Created By</p>
@@ -446,9 +446,9 @@ function bulkAction(status, ids, netSalary, amountPaid) {
                         <option value="">— choose account —</option>
                         ${acctOpts}
                     </select>
-                    <label class="form-label fw-semibold">Amount to Pay</label>
+                    <label class="form-label fw-semibold"><?= t('Amount to Pay') ?></label>
                     <input id="pd-swal-amount" type="number" class="form-control"
-                           placeholder="Leave blank = full remaining balance" min="1" step="0.01"${remaining > 0 ? ` max="${remaining}"` : ''}>
+                           placeholder="<?= t('Leave blank = full remaining balance') ?>" min="1" step="0.01"${remaining > 0 ? ` max="${remaining}"` : ''}>
                     <small class="text-muted">Leave blank to pay the full remaining balance.</small>
                 </div>`,
             showCancelButton: true,

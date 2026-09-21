@@ -74,11 +74,11 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
             <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
                 <div class="row g-2 align-items-end">
                     <div class="col-6 col-md-3">
-                        <label class="form-label small mb-1">Cycle</label>
+                        <label class="form-label small mb-1"><?= t('Cycle') ?></label>
                         <select class="form-select form-select-sm" id="af_cycle"><option value="">All cycles</option></select>
                     </div>
                     <div class="col-6 col-md-3">
-                        <label class="form-label small mb-1">Status</label>
+                        <label class="form-label small mb-1"><?= t('Status') ?></label>
                         <select class="form-select form-select-sm" id="af_status">
                             <option value="">All statuses</option>
                             <option value="draft">Draft</option><option value="submitted">Submitted</option>
@@ -86,7 +86,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                         </select>
                     </div>
                     <div class="col-12 col-md-4">
-                        <label class="form-label small mb-1">Employee</label>
+                        <label class="form-label small mb-1"><?= t('Employee') ?></label>
                         <select class="form-select form-select-sm" id="af_employee"><option value="">All employees</option></select>
                     </div>
                     <div class="col-12 col-md-2">
@@ -98,7 +98,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
             <div id="apTableView" class="card border-0 shadow-sm"><div class="card-body">
                 <table id="appraisalsTable" class="table table-hover align-middle w-100">
                     <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr>
-                        <th class="text-center">S/NO</th><th>Date</th><th>Employee</th><th>Cycle</th><th>Designation</th><th>Overall</th><th>Status</th><th class="text-end">Actions</th>
+                        <th class="text-center"><?= t('S/NO') ?></th><th><?= t('Date') ?></th><th><?= t('Employee') ?></th><th><?= t('Cycle') ?></th><th><?= t('Designation') ?></th><th><?= t('Overall') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th>
                     </tr></thead>
                     <tbody></tbody>
                 </table>
@@ -122,20 +122,20 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
             <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
                 <div class="row g-2 align-items-end">
                     <div class="col-6 col-md-3">
-                        <label class="form-label small mb-1">Type</label>
+                        <label class="form-label small mb-1"><?= t('Type') ?></label>
                         <select class="form-select form-select-sm" id="gf_type"><option value="">All types</option>
                             <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= caseFormat($gt['type_name']) ?></option><?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-6 col-md-3">
-                        <label class="form-label small mb-1">Status</label>
+                        <label class="form-label small mb-1"><?= t('Status') ?></label>
                         <select class="form-select form-select-sm" id="gf_status"><option value="">All statuses</option>
                             <option value="not_started">Not started</option><option value="in_progress">In progress</option>
                             <option value="completed">Completed</option><option value="cancelled">Cancelled</option>
                         </select>
                     </div>
                     <div class="col-12 col-md-4">
-                        <label class="form-label small mb-1">Employee</label>
+                        <label class="form-label small mb-1"><?= t('Employee') ?></label>
                         <select class="form-select form-select-sm" id="gf_employee"><option value="">All employees</option></select>
                     </div>
                     <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-secondary w-100" id="gf_reset"><i class="bi bi-arrow-clockwise"></i></button></div>
@@ -143,7 +143,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
             </div></div>
             <div id="gTableView" class="card border-0 shadow-sm"><div class="card-body">
                 <table id="goalsTable" class="table table-hover align-middle w-100">
-                    <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Employee</th><th>Goal</th><th>Type</th><th>Due</th><th style="min-width:140px">Progress</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+                    <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center"><?= t('S/NO') ?></th><th><?= t('Employee') ?></th><th><?= t('Goal') ?></th><th><?= t('Type') ?></th><th><?= t('Due') ?></th><th style="min-width:140px"><?= t('Progress') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div></div>
@@ -178,7 +178,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                         </div>
                         <div class="card-body">
                             <div class="mb-3" style="max-width:360px">
-                                <label class="form-label small mb-1">Designation</label>
+                                <label class="form-label small mb-1"><?= t('Designation') ?></label>
                                 <select id="matrix_designation" class="form-select">
                                     <option value="">Select a designation…</option>
                                     <?php foreach ($designations as $d): ?>
@@ -222,7 +222,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <input type="text" class="form-control" name="category_name" id="cat_name" required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Sort Order</label>
+                    <label class="form-label"><?= t('Sort Order') ?></label>
                     <input type="number" class="form-control" name="sort_order" id="cat_sort" value="0">
                 </div>
             </div>
@@ -254,7 +254,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <input type="text" class="form-control" name="indicator_name" id="ind_name" required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Description</label>
+                    <label class="form-label"><?= t('Description') ?></label>
                     <textarea class="form-control" name="description" id="ind_desc" rows="2"></textarea>
                 </div>
             </div>
@@ -311,8 +311,8 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <p class="text-muted">Pick an employee to load the competency indicators.</p>
                 </div>
                 <div class="mt-3">
-                    <label class="form-label">Summary Remarks</label>
-                    <textarea class="form-control" name="remarks" rows="2" placeholder="Overall appraiser summary"></textarea>
+                    <label class="form-label"><?= t('Summary Remarks') ?></label>
+                    <textarea class="form-control" name="remarks" rows="2" placeholder="<?= t('Overall appraiser summary') ?>"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -339,9 +339,9 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
             <form id="cycleForm" class="row g-2 align-items-end mb-3">
                 <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                 <input type="hidden" name="cycle_id" id="cy_id">
-                <div class="col-md-4"><label class="form-label small mb-1">Name</label><input class="form-control form-control-sm" name="cycle_name" id="cy_name" required></div>
-                <div class="col-md-3"><label class="form-label small mb-1">From</label><input type="date" class="form-control form-control-sm" name="period_from" id="cy_from" required></div>
-                <div class="col-md-3"><label class="form-label small mb-1">To</label><input type="date" class="form-control form-control-sm" name="period_to" id="cy_to" required></div>
+                <div class="col-md-4"><label class="form-label small mb-1"><?= t('Name') ?></label><input class="form-control form-control-sm" name="cycle_name" id="cy_name" required></div>
+                <div class="col-md-3"><label class="form-label small mb-1"><?= t('From') ?></label><input type="date" class="form-control form-control-sm" name="period_from" id="cy_from" required></div>
+                <div class="col-md-3"><label class="form-label small mb-1"><?= t('To') ?></label><input type="date" class="form-control form-control-sm" name="period_to" id="cy_to" required></div>
                 <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-check-circle"></i> Save</button></div>
             </form>
             <div id="cyclesList"><div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm"></span></div></div>
@@ -381,7 +381,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <div class="col-md-6 mb-3"><label class="form-label">Start <span class="text-danger">*</span></label><input type="date" class="form-control" name="start_date" value="<?= date('Y-m-d') ?>" required></div>
                     <div class="col-md-6 mb-3"><label class="form-label">End <span class="text-danger">*</span></label><input type="date" class="form-control" name="end_date" required></div>
                 </div>
-                <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+                <div class="mb-3"><label class="form-label"><?= t('Description') ?></label><textarea class="form-control" name="description" rows="2"></textarea></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -410,7 +410,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                     <input type="range" class="form-range" min="0" max="100" step="5" name="progress" id="gp_progress" oninput="document.getElementById('gp_val').textContent=this.value">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label"><?= t('Status') ?></label>
                     <select class="form-select" name="status" id="gp_status">
                         <option value="">Keep / auto</option>
                         <option value="in_progress">In progress</option>
@@ -420,7 +420,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Progress Note <span class="text-danger">*</span></label>
-                    <textarea class="form-control" name="note" rows="2" required placeholder="What changed? (recorded in the audit trail)"></textarea>
+                    <textarea class="form-control" name="note" rows="2" required placeholder="<?= t('What changed? (recorded in the audit trail)') ?>"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -668,7 +668,7 @@ function viewAppraisal(id) {
                 <div class="text-end">${apStatusBadge(a.status)}<div class="small text-muted mt-1">${safeOutput(a.appraisal_date)}</div>
                     ${a.overall_rating !== null ? `<div class="mt-1">Overall: ${starsInline(Math.round(a.overall_rating))} <strong>${Number(a.overall_rating).toFixed(2)}/5</strong></div>` : ''}</div>
             </div>
-            <table class="table table-sm align-middle"><thead><tr><th>Indicator</th><th>Expected</th><th>Actual</th></tr></thead><tbody>${rows}</tbody></table>
+            <table class="table table-sm align-middle"><thead><tr><th><?= t('Indicator') ?></th><th><?= t('Expected') ?></th><th><?= t('Actual') ?></th></tr></thead><tbody>${rows}</tbody></table>
             ${a.remarks ? `<div><strong>Remarks:</strong> ${safeOutput(a.remarks)}</div>` : ''}
             ${a.reject_reason ? `<div class="text-danger"><strong>Reject reason:</strong> ${safeOutput(a.reject_reason)}</div>` : ''}
             ${a.approved_by_name ? `<div class="small text-muted mt-1">${a.status==='rejected'?'Rejected':'Approved'} by ${safeOutput(a.approved_by_name)}</div>` : ''}
@@ -777,7 +777,7 @@ $('#ap_employee').on('change', function () {
                     const exp = res.targets[i.indicator_id] || 0;
                     html += `<div class="py-1 border-bottom"><div class="d-flex justify-content-between align-items-center">
                         <span>${safeOutput(i.indicator_name)}</span>${apStarInput('rating['+i.indicator_id+']', exp)}</div>
-                        <input class="form-control form-control-sm mt-1" name="comment[${i.indicator_id}]" placeholder="Comment (optional)"></div>`;
+                        <input class="form-control form-control-sm mt-1" name="comment[${i.indicator_id}]" placeholder="<?= t('Comment (optional)') ?>"></div>`;
                 });
                 html += '</div>';
             });
@@ -810,7 +810,7 @@ function loadCyclesList() {
     $.getJSON('<?= buildUrl('api/manage_appraisal_cycles.php') ?>', { action:'list' }, function (res) {
         if (!res.success) return;
         if (!res.data.length) { $('#cyclesList').html('<p class="text-muted mb-0">No cycles yet.</p>'); return; }
-        let html = '<table class="table table-sm align-middle"><thead><tr><th>Name</th><th>Period</th><th>Appraisals</th><th>Status</th><th></th></tr></thead><tbody>';
+        let html = '<table class="table table-sm align-middle"><thead><tr><th><?= t('Name') ?></th><th><?= t('Period') ?></th><th><?= t('Appraisals') ?></th><th><?= t('Status') ?></th><th></th></tr></thead><tbody>';
         res.data.forEach(c => {
             html += `<tr><td>${safeOutput(c.cycle_name)}</td><td class="small">${safeOutput(c.period_from)} → ${safeOutput(c.period_to)}</td>
                 <td>${c.appraisal_count}</td><td>${c.status==='open'?'<span class="badge bg-success">Open</span>':'<span class="badge bg-secondary">Closed</span>'}</td>
