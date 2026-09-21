@@ -125,9 +125,9 @@ $baseDom = tenantBaseDomain();
         </div>
 
         <div class="mb-3">
-            <label for="owner_email" class="form-label">Your email</label>
-            <input type="email" class="form-control" id="owner_email" name="owner_email" maxlength="191" required>
-            <div class="form-text">You will sign in with this address.</div>
+            <label for="owner_phone" class="form-label">Phone number</label>
+            <input type="tel" class="form-control" id="owner_phone" name="owner_phone" maxlength="20" placeholder="e.g. 0712345678" required>
+            <div class="form-text">You will sign in with this number.</div>
         </div>
 
         <div class="row g-2 mb-3">
