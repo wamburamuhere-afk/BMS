@@ -188,12 +188,12 @@ if (!function_exists('registerTenant')) {
 
         $company = trim((string)($in['company_name'] ?? ''));
         $sub     = strtolower(trim((string)($in['subdomain'] ?? '')));
-        $email   = strtolower(trim((string)($in['owner_email'] ?? '')));
+        $phone   = preg_replace('/\s+/', '', (string)($in['owner_phone'] ?? ''));
         $pw      = (string)($in['owner_password'] ?? '');
 
         // ── Is signup open at all? ───────────────────────────────────────────
         if ($closed = selfRegistrationClosedReason()) {
-            return $fail($closed, 'rejected', $email ?: null, $sub ?: null);
+            return $fail($closed, 'rejected', $phone ?: null, $sub ?: null);
         }
 
         // ── Honeypot ─────────────────────────────────────────────────────────
@@ -201,41 +201,41 @@ if (!function_exists('registerTenant')) {
         // it is refused with the same wording a person would see — never a hint
         // that the trap exists.
         if (trim((string)($in['website'] ?? '')) !== '') {
-            return $fail('Registration could not be completed.', 'rejected', $email ?: null, $sub ?: null);
+            return $fail('Registration could not be completed.', 'rejected', $phone ?: null, $sub ?: null);
         }
 
         // ── Throttle ─────────────────────────────────────────────────────────
         if ($msg = registrationThrottleCheck($ip)) {
-            logRegistrationAttempt($ip, $email ?: null, $sub ?: null, 'throttled', $msg);
+            logRegistrationAttempt($ip, $phone ?: null, $sub ?: null, 'throttled', $msg);
             return ['ok' => false, 'error' => $msg, 'tenant_id' => null, 'subdomain' => null, 'login_url' => null];
         }
 
         // ── Validate before doing any work ───────────────────────────────────
         if ($company === '' || mb_strlen($company) < 2) {
-            return $fail('Please enter your company name.', 'rejected', $email ?: null, $sub ?: null);
+            return $fail('Please enter your company name.', 'rejected', $phone ?: null, $sub ?: null);
         }
         if ($err = tenantSubdomainError($sub)) {
-            return $fail($err, 'rejected', $email ?: null, $sub ?: null);
+            return $fail($err, 'rejected', $phone ?: null, $sub ?: null);
         }
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return $fail('Please enter a valid email address.', 'rejected', $email ?: null, $sub);
+        if (!preg_match('/^\+?[0-9]{7,15}$/', $phone)) {
+            return $fail('Please enter a valid phone number (digits only, 7–15 characters).', 'rejected', $phone ?: null, $sub);
         }
         // .claude/security.md §20 — 8+ chars, at least one letter and one digit.
         if (strlen($pw) < 8 || !preg_match('/[A-Za-z]/', $pw) || !preg_match('/\d/', $pw)) {
             return $fail('Password must be at least 8 characters and include a letter and a number.',
-                'rejected', $email, $sub);
+                'rejected', $phone, $sub);
         }
         if (($in['owner_password_confirm'] ?? $pw) !== $pw) {
-            return $fail('The two passwords do not match.', 'rejected', $email, $sub);
+            return $fail('The two passwords do not match.', 'rejected', $phone, $sub);
         }
         if (!tenantSubdomainAvailable($sub)) {
-            return $fail('That subdomain is already taken. Please choose another.', 'rejected', $email, $sub);
+            return $fail('That subdomain is already taken. Please choose another.', 'rejected', $phone, $sub);
         }
 
         // ── Provision ────────────────────────────────────────────────────────
         // provisionTenant() guarantees all-or-nothing: on failure there is no
         // orphaned database, MySQL user or registry row to clean up here.
-        $r = provisionTenant($company, $sub, $email, $pw, [
+        $r = provisionTenant($company, $sub, $phone, $pw, [
             'status'            => 'active',      // so the owner can sign in immediately
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
@@ -249,7 +249,7 @@ if (!function_exists('registerTenant')) {
             // The provisioner's message can name internal objects; log the detail
             // and show the visitor something plain.
             error_log('Self-registration failed for ' . $sub . ': ' . $r['error']);
-            logRegistrationAttempt($ip, $email, $sub, 'failed', $r['error']);
+            logRegistrationAttempt($ip, $phone, $sub, 'failed', $r['error']);
             $public = (stripos((string)$r['error'], 'already taken') !== false
                     || stripos((string)$r['error'], 'just taken') !== false)
                 ? 'That subdomain is already taken. Please choose another.'
@@ -284,11 +284,11 @@ if (!function_exists('registerTenant')) {
             error_log('applySelfRegistrationDefaults threw: ' . $_defaultsE->getMessage());
         }
 
-        logRegistrationAttempt($ip, $email, $sub, 'success', null, $r['tenant_id']);
+        logRegistrationAttempt($ip, $phone, $sub, 'success', null, $r['tenant_id']);
 
         // Notify all superadmins by email — best-effort, never fatal.
         try {
-            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $email, $company);
+            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $phone, $company);
         } catch (Throwable $_notifyE) {
             error_log('notifySuperadminsOfNewRegistration threw: ' . $_notifyE->getMessage());
         }

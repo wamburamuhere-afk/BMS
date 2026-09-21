@@ -347,8 +347,8 @@ if (!function_exists('provisionTenant')) {
         if ($err = tenantSubdomainError($subdomain)) {
             return $fail($err);
         }
-        if (!filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
-            return $fail('Please enter a valid email address.');
+        if ($ownerEmail === '') {
+            return $fail('Please enter a phone number or email.');
         }
         if (strlen($ownerPassword) < 8) {
             return $fail('Password must be at least 8 characters.');
@@ -495,7 +495,7 @@ if (!function_exists('provisionTenant')) {
             ")->execute([
                 $ownerEmail,
                 password_hash($ownerPassword, PASSWORD_DEFAULT),
-                $ownerEmail,
+                '',
                 'Admin', 'Admin',
                 (int)$roleId,
                 trim((string)($opts['owner_first_name'] ?? '')) ?: $companyName,
