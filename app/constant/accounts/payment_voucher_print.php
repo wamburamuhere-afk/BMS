@@ -347,7 +347,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
         <h3>Payment / Bank Details</h3>
         <?php if ($hasBankTransfer): ?>
         <div class="bank-section">
-            <h4>Bank Transfer</h4>
+            <h4><?= t('Bank Transfer') ?></h4>
             <?php if (!empty($pay['bank_name'])): ?><p><strong>Bank:</strong> <?= htmlspecialchars($pay['bank_name']) ?></p><?php endif; ?>
             <?php if (!empty($pay['account_name'])): ?><p><strong>Account Name:</strong> <?= htmlspecialchars($pay['account_name']) ?></p><?php endif; ?>
             <?php if (!empty($pay['account_number'])): ?><p><strong>Account No:</strong> <?= htmlspecialchars($pay['account_number']) ?></p><?php endif; ?>
@@ -356,14 +356,14 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
         <?php endif; ?>
         <?php if ($hasMobile): ?>
         <div class="bank-section">
-            <h4>Mobile Money</h4>
+            <h4><?= t('Mobile Money') ?></h4>
             <?php if (!empty($pay['mpesa_paybill'])): ?><p><strong>Paybill / Till:</strong> <?= htmlspecialchars($pay['mpesa_paybill']) ?></p><?php endif; ?>
             <?php if (!empty($pay['mpesa_account_no'])): ?><p><strong>Account No:</strong> <?= htmlspecialchars($pay['mpesa_account_no']) ?></p><?php endif; ?>
         </div>
         <?php endif; ?>
         <?php if ($hasCheque): ?>
         <div class="bank-section">
-            <h4>Cheque</h4>
+            <h4><?= t('Cheque') ?></h4>
             <p><strong>Payable To:</strong> <?= htmlspecialchars($pay['check_payable_to']) ?></p>
         </div>
         <?php endif; ?>

@@ -122,7 +122,7 @@ try {
             <!-- Categories Panel -->
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Account Categories</h5>
+                    <h5 class="mb-0"><?= t('Account Categories') ?></h5>
                     <?php if (canCreate('chart_of_accounts')): ?>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal" onclick="resetCategoryForm()">
                         <i class="bi bi-folder-plus"></i> Add Category
@@ -131,7 +131,7 @@ try {
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <input type="text" id="categorySearch" class="form-control" placeholder="Search categories..." onkeyup="filterCategories()">
+                        <input type="text" id="categorySearch" class="form-control" placeholder="<?= t('Search categories...') ?>" onkeyup="filterCategories()">
                     </div>
                     <div id="categoriesTree" class="categories-tree">
                         <?php if (count($categories) > 0): ?>
@@ -182,7 +182,7 @@ try {
             <!-- Quick Stats -->
             <div class="card mt-3">
                 <div class="card-header">
-                    <h6 class="mb-0">Quick Stats</h6>
+                    <h6 class="mb-0"><?= t('Quick Stats') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
@@ -219,7 +219,7 @@ try {
             <!-- Accounts Panel -->
             <div class="card print-flow-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Accounts</h5>
+                    <h5 class="mb-0"><?= t('Accounts') ?></h5>
                     <div>
                         <?php if (canCreate('chart_of_accounts')): ?>
                         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#accountModal" onclick="resetAccountForm()">
@@ -270,7 +270,7 @@ try {
                         </div>
                         <div class="col-md-6">
                             <div class="input-group input-group-sm">
-                                <input type="text" id="customSearch" class="form-control" placeholder="Search accounts...">
+                                <input type="text" id="customSearch" class="form-control" placeholder="<?= t('Search accounts...') ?>">
                             </div>
                         </div>
                     </div>
@@ -281,13 +281,13 @@ try {
                             <thead>
                                 <tr>
                                     <th style="width:20px;"></th> <!-- Control Column -->
-                                    <th style="width:50px;">S/NO</th>
-                                    <th>Code</th>
-                                    <th>Account Name</th>
-                                    <th>Type</th>
-                                    <th>Balance</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th style="width:50px;"><?= t('S/NO') ?></th>
+                                    <th><?= t('Code') ?></th>
+                                    <th><?= t('Account Name') ?></th>
+                                    <th><?= t('Type') ?></th>
+                                    <th><?= t('Balance') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="text-end"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -329,7 +329,7 @@ try {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="accountModalTitle">Add New Account</h5>
+                <h5 class="modal-title" id="accountModalTitle"><?= t('Add New Account') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="accountForm" action="/api/account/save_account.php" method="POST">
@@ -346,9 +346,9 @@ try {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="account_code" class="form-label">Account Code *</label>
+                                <label for="account_code" class="form-label"><?= t('Account Code *') ?></label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control bg-light" id="account_code" name="account_code" placeholder="Auto-generating…" readonly required>
+                                    <input type="text" class="form-control bg-light" id="account_code" name="account_code" placeholder="<?= t('Auto-generating…') ?>" readonly required>
                                     <button type="button" class="btn btn-outline-secondary" id="btnGenCode" onclick="generateAccountCode()" title="Regenerate code"><i class="bi bi-arrow-clockwise"></i></button>
                                 </div>
                                 <div class="form-text"><i class="bi bi-lock-fill"></i> Auto-generated from the class &amp; parent — not editable, to keep the numbering consistent.</div>
@@ -356,7 +356,7 @@ try {
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="account_type" class="form-label">Account Type *</label>
+                                <label for="account_type" class="form-label"><?= t('Account Type *') ?></label>
                                 <select class="form-select select2-static" id="account_type" name="account_type" required>
                                     <option value="">Select Type</option>
                                     <?php foreach ($accountTypes as $type): ?>
@@ -382,19 +382,19 @@ try {
                     <?php endif; ?>
 
                     <div class="mb-3">
-                        <label for="account_name" class="form-label">Account Name *</label>
+                        <label for="account_name" class="form-label"><?= t('Account Name *') ?></label>
                         <input type="text" class="form-control" id="account_name" name="account_name" required>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
+                        <label for="description" class="form-label"><?= t('Description') ?></label>
                         <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="opening_balance" class="form-label">Opening Balance</label>
+                                <label for="opening_balance" class="form-label"><?= t('Opening Balance') ?></label>
                                 <div class="input-group">
                                     <!-- removed TSh prefix -->
                                     <input type="number" step="0.01" class="form-control" id="opening_balance" name="opening_balance" value="0.00">
@@ -403,7 +403,7 @@ try {
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="status" class="form-label">Status</label>
+                                <label for="status" class="form-label"><?= t('Status') ?></label>
                                 <select class="form-select select2-static" id="status" name="status">
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
@@ -415,7 +415,7 @@ try {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Parent Account</label>
+                                <label class="form-label"><?= t('Parent Account') ?></label>
                                 <!-- Cascading selector: pick a top-level group, then drill into
                                      sub-accounts (▸), then sub-of-sub. The deepest choice is the
                                      parent; the chosen id is mirrored into the hidden field below. -->
@@ -426,12 +426,12 @@ try {
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label d-block">Normal Balance *</label>
+                                <label class="form-label d-block"><?= t('Normal Balance *') ?></label>
                                 <div class="btn-group" role="group" aria-label="Normal balance">
                                     <input type="radio" class="btn-check" name="normal_balance" id="nb_debit" value="debit" autocomplete="off">
-                                    <label class="btn btn-outline-primary btn-sm" for="nb_debit">Debit</label>
+                                    <label class="btn btn-outline-primary btn-sm" for="nb_debit"><?= t('Debit') ?></label>
                                     <input type="radio" class="btn-check" name="normal_balance" id="nb_credit" value="credit" autocomplete="off">
-                                    <label class="btn btn-outline-success btn-sm" for="nb_credit">Credit</label>
+                                    <label class="btn btn-outline-success btn-sm" for="nb_credit"><?= t('Credit') ?></label>
                                 </div>
                                 <div class="form-text">Auto-set from the account type; override if needed.</div>
                             </div>
@@ -455,7 +455,7 @@ try {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="categoryModalTitle">Add New Category</h5>
+                <h5 class="modal-title" id="categoryModalTitle"><?= t('Add New Category') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="categoryForm" action="/api/account/save_category.php" method="POST">
@@ -463,12 +463,12 @@ try {
                     <input type="hidden" id="category_id" name="category_id">
                     
                     <div class="mb-3">
-                        <label for="category_name" class="form-label">Category Name *</label>
+                        <label for="category_name" class="form-label"><?= t('Category Name *') ?></label>
                         <input type="text" class="form-control" id="category_name" name="category_name" required>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="category_type" class="form-label">Category Type *</label>
+                        <label for="category_type" class="form-label"><?= t('Category Type *') ?></label>
                         <select class="form-control" id="category_type" name="category_type" required>
                             <option value="">Select Type</option>
                             <?php foreach ($accountTypes as $type): ?>
@@ -478,12 +478,12 @@ try {
                     </div>
                     
                     <div class="mb-3">
-                        <label for="category_description" class="form-label">Description</label>
+                        <label for="category_description" class="form-label"><?= t('Description') ?></label>
                         <textarea class="form-control" id="category_description" name="category_description" rows="3"></textarea>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="parent_category_id" class="form-label">Parent Category</label>
+                        <label for="parent_category_id" class="form-label"><?= t('Parent Category') ?></label>
                         <select class="form-control" id="parent_category_id" name="parent_category_id">
                             <option value="">No Parent (Top Level)</option>
                             <?php foreach ($categories as $cat): ?>
@@ -509,7 +509,7 @@ try {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalTitle">Confirm Delete</h5>
+                <h5 class="modal-title" id="deleteModalTitle"><?= t('Confirm Delete') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -534,7 +534,7 @@ try {
 <div class="offcanvas offcanvas-end" tabindex="-1" id="accountViewOffcanvas" aria-labelledby="avTitle" style="width: 480px; max-width: 92vw;">
     <div class="offcanvas-header bg-light border-bottom">
         <div class="text-truncate">
-            <h5 class="offcanvas-title mb-0 text-truncate" id="avTitle">Account</h5>
+            <h5 class="offcanvas-title mb-0 text-truncate" id="avTitle"><?= t('Account') ?></h5>
             <small class="text-muted" id="avSubtitle"></small>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -1169,15 +1169,15 @@ function renderAccountView(data) {
         : '<span class="text-muted">None (top-level)</span>';
     document.getElementById('avDetails').innerHTML = `
         <table class="table table-sm mb-0">
-            <tr><th class="text-muted" style="width:42%">Code</th><td>${escapeHtml(a.account_code)}</td></tr>
-            <tr><th class="text-muted">Name</th><td>${escapeHtml(a.account_name)}${sysPill}</td></tr>
-            <tr><th class="text-muted">Type</th><td>${escapeHtml(a.type_display || a.account_type || '—')}</td></tr>
-            <tr><th class="text-muted">Category</th><td>${escapeHtml(a.category || '—')}</td></tr>
-            <tr><th class="text-muted">Level</th><td>${parseInt(a.level || 1, 10)}</td></tr>
-            <tr><th class="text-muted">Parent</th><td>${parent}</td></tr>
-            <tr><th class="text-muted">Normal balance</th><td>${sidePill}</td></tr>
-            <tr><th class="text-muted">Status</th><td>${escapeHtml(a.status)}</td></tr>
-            <tr><th class="text-muted">Description</th><td>${a.description ? escapeHtml(a.description) : '<span class="text-muted">—</span>'}</td></tr>
+            <tr><th class="text-muted" style="width:42%"><?= t('Code') ?></th><td>${escapeHtml(a.account_code)}</td></tr>
+            <tr><th class="text-muted"><?= t('Name') ?></th><td>${escapeHtml(a.account_name)}${sysPill}</td></tr>
+            <tr><th class="text-muted"><?= t('Type') ?></th><td>${escapeHtml(a.type_display || a.account_type || '—')}</td></tr>
+            <tr><th class="text-muted"><?= t('Category') ?></th><td>${escapeHtml(a.category || '—')}</td></tr>
+            <tr><th class="text-muted"><?= t('Level') ?></th><td>${parseInt(a.level || 1, 10)}</td></tr>
+            <tr><th class="text-muted"><?= t('Parent') ?></th><td>${parent}</td></tr>
+            <tr><th class="text-muted"><?= t('Normal balance') ?></th><td>${sidePill}</td></tr>
+            <tr><th class="text-muted"><?= t('Status') ?></th><td>${escapeHtml(a.status)}</td></tr>
+            <tr><th class="text-muted"><?= t('Description') ?></th><td>${a.description ? escapeHtml(a.description) : '<span class="text-muted">—</span>'}</td></tr>
         </table>`;
 
     // Sub-accounts
@@ -1199,7 +1199,7 @@ function renderAccountView(data) {
     // Transactions
     let txHtml;
     if (data.transactions && data.transactions.length) {
-        txHtml = '<div class="table-responsive"><table class="table table-sm table-striped mb-0"><thead><tr><th>Date</th><th>Ref / Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th></tr></thead><tbody>' +
+        txHtml = '<div class="table-responsive"><table class="table table-sm table-striped mb-0"><thead><tr><th><?= t('Date') ?></th><th><?= t('Ref / Description') ?></th><th class="text-end"><?= t('Debit') ?></th><th class="text-end"><?= t('Credit') ?></th></tr></thead><tbody>' +
             data.transactions.map(t => `<tr>
                 <td class="text-nowrap">${escapeHtml(t.entry_date || '')}</td>
                 <td>${escapeHtml(t.reference_number || '')}<br><small class="text-muted">${escapeHtml(t.item_desc || t.entry_desc || '')}</small></td>
@@ -1216,11 +1216,11 @@ function renderAccountView(data) {
     document.getElementById('avBalance').innerHTML = `
         ${warn}
         <table class="table table-sm mb-0">
-            <tr><th class="text-muted">Opening balance</th><td class="text-end">${formatCurrency(b.opening_balance || 0)}</td></tr>
-            <tr><th class="text-muted">Total debits (posted)</th><td class="text-end">${formatCurrency(b.total_debit || 0)}</td></tr>
-            <tr><th class="text-muted">Total credits (posted)</th><td class="text-end">${formatCurrency(b.total_credit || 0)}</td></tr>
-            <tr class="table-light"><th>Calculated balance</th><td class="text-end fw-bold">${formatCurrency(b.calculated_balance || 0)}</td></tr>
-            <tr><th class="text-muted">Stored balance</th><td class="text-end">${formatCurrency(b.current_balance || 0)}</td></tr>
+            <tr><th class="text-muted"><?= t('Opening balance') ?></th><td class="text-end">${formatCurrency(b.opening_balance || 0)}</td></tr>
+            <tr><th class="text-muted"><?= t('Total debits (posted)') ?></th><td class="text-end">${formatCurrency(b.total_debit || 0)}</td></tr>
+            <tr><th class="text-muted"><?= t('Total credits (posted)') ?></th><td class="text-end">${formatCurrency(b.total_credit || 0)}</td></tr>
+            <tr class="table-light"><th><?= t('Calculated balance') ?></th><td class="text-end fw-bold">${formatCurrency(b.calculated_balance || 0)}</td></tr>
+            <tr><th class="text-muted"><?= t('Stored balance') ?></th><td class="text-end">${formatCurrency(b.current_balance || 0)}</td></tr>
         </table>
         <small class="text-muted">Natural side: ${escapeHtml(b.normal_side || '—')}.</small>`;
 }

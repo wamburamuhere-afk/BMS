@@ -37,23 +37,23 @@ $users = $pdo->query("SELECT user_id, username FROM users ORDER BY username ASC"
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('From') ?></label>
                     <input type="date" name="start_date" id="f-from" class="form-control" value="<?= htmlspecialchars($start_date) ?>"></div>
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('To') ?></label>
                     <input type="date" name="end_date" id="f-to" class="form-control" value="<?= htmlspecialchars($end_date) ?>"></div>
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">User</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('User') ?></label>
                     <select name="user_id" id="f-user" class="form-select" style="width:100%">
                         <option value="">All Staff</option>
                         <?php foreach ($users as $u): ?><option value="<?= (int)$u['user_id'] ?>"><?= safe_output($u['username']) ?></option><?php endforeach; ?>
                     </select></div>
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Log Type</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Log Type') ?></label>
                     <select name="log_type" id="f-type" class="form-select" style="width:100%">
                         <option value="">Both Types</option>
                         <option value="activity">Activity</option>
                         <option value="audit">Audit (Data Changes)</option>
                     </select></div>
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Action</label>
-                    <input type="text" name="action" id="f-action" class="form-control" placeholder="Login, Delete…"></div>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Action') ?></label>
+                    <input type="text" name="action" id="f-action" class="form-control" placeholder="<?= t('Login, Delete…') ?>"></div>
                 <div class="col-md-1"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter"></i></button></div>
             </form>
         </div>
@@ -76,8 +76,8 @@ $users = $pdo->query("SELECT user_id, username FROM users ORDER BY username ASC"
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="auditTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Date &amp; Time</th><th>User</th>
-                    <th class="text-center">Type</th><th>Action</th><th>Details</th><th class="pe-3">IP Address</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Date &amp; Time') ?></th><th><?= t('User') ?></th>
+                    <th class="text-center"><?= t('Type') ?></th><th><?= t('Action') ?></th><th><?= t('Details') ?></th><th class="pe-3"><?= t('IP Address') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>

@@ -102,15 +102,15 @@ if (function_exists('logActivity')) {
         <div class="card-body">
             <form class="row g-2 align-items-end" method="get" action="<?= getUrl('reports/consolidated_expenses') ?>">
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted mb-1">From</label>
+                    <label class="form-label small fw-bold text-muted mb-1"><?= t('From') ?></label>
                     <input type="date" name="from" class="form-control form-control-sm" value="<?= safe_output($from) ?>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted mb-1">To</label>
+                    <label class="form-label small fw-bold text-muted mb-1"><?= t('To') ?></label>
                     <input type="date" name="to" class="form-control form-control-sm" value="<?= safe_output($to) ?>">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted mb-1">Type</label>
+                    <label class="form-label small fw-bold text-muted mb-1"><?= t('Type') ?></label>
                     <select name="type" class="form-select form-select-sm">
                         <option value="">All types</option>
                         <?php foreach ($OUTFLOW_TYPES as $k => $label): ?>
@@ -119,7 +119,7 @@ if (function_exists('logActivity')) {
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted mb-1">Source Account</label>
+                    <label class="form-label small fw-bold text-muted mb-1"><?= t('Source Account') ?></label>
                     <select name="source" class="form-select form-select-sm">
                         <option value="">All sources</option>
                         <?php foreach ($cash_accounts as $acc): ?>
@@ -175,12 +175,12 @@ if (function_exists('logActivity')) {
                         <table id="ceTable" class="table table-hover align-middle mb-0 w-100">
                             <thead class="bg-light text-uppercase small fw-bold text-muted">
                                 <tr>
-                                    <th class="ps-3">Date</th>
-                                    <th>Type</th>
-                                    <th>Description</th>
-                                    <th>Reference</th>
-                                    <th>Paid From</th>
-                                    <th class="text-end pe-3">Amount</th>
+                                    <th class="ps-3"><?= t('Date') ?></th>
+                                    <th><?= t('Type') ?></th>
+                                    <th><?= t('Description') ?></th>
+                                    <th><?= t('Reference') ?></th>
+                                    <th><?= t('Paid From') ?></th>
+                                    <th class="text-end pe-3"><?= t('Amount') ?></th>
                                 </tr>
                             </thead>
                             <tbody>

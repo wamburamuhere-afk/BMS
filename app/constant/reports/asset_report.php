@@ -36,12 +36,12 @@ $currency = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Category</label>
+                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Category') ?></label>
                     <select name="category" id="f-category" class="form-select" style="width:100%">
                         <option value="">All Categories</option>
                         <?php foreach ($categories as $cat): ?><option value="<?= safe_output($cat) ?>"><?= safe_output($cat) ?></option><?php endforeach; ?>
                     </select></div>
-                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Status</label>
+                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Status') ?></label>
                     <select name="status" id="f-status" class="form-select" style="width:100%">
                         <option value="">All Statuses</option>
                         <option value="active">Active</option>
@@ -79,8 +79,8 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="assetTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Code</th><th>Asset</th><th>Category</th><th>Purchased</th>
-                    <th class="text-end">Cost</th><th class="text-end">Accum. Dep.</th><th class="text-end">NBV</th><th class="pe-3 text-center">Status</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Code') ?></th><th><?= t('Asset') ?></th><th><?= t('Category') ?></th><th><?= t('Purchased') ?></th>
+                    <th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Accum. Dep.') ?></th><th class="text-end"><?= t('NBV') ?></th><th class="pe-3 text-center"><?= t('Status') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>

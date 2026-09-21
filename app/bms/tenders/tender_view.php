@@ -105,23 +105,23 @@ $company_logo = getSetting('company_logo', '');
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <tr>
-                                <th class="bg-light ps-3 text-nowrap" width="35%">Procuring Entity</th>
+                                <th class="bg-light ps-3 text-nowrap" width="35%"><?= t('Procuring Entity') ?></th>
                             <td class="fw-bold"><?= caseFormat($tender['entity_name'] ?: $tender['procuring_entity_name']) ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Acronym</th>
+                            <th class="bg-light ps-3"><?= t('Acronym') ?></th>
                             <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2"><?= caseFormat($tender['acronym']) ?></span></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Location</th>
+                            <th class="bg-light ps-3"><?= t('Location') ?></th>
                             <td><?= caseFormat($display_ward) ?>, <?= caseFormat($display_council) ?>, <?= caseFormat($display_district) ?>, <?= caseFormat($display_region) ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Contacts</th>
+                            <th class="bg-light ps-3"><?= t('Contacts') ?></th>
                             <td><?= caseFormat($tender['contact_number']) ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Physical Address</th>
+                            <th class="bg-light ps-3"><?= t('Physical Address') ?></th>
                             <td><?= caseFormat($tender['physical_address']) ?></td>
                         </tr>
                     </table>
@@ -139,27 +139,27 @@ $company_logo = getSetting('company_logo', '');
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <tr>
-                                <th class="bg-light ps-3 text-nowrap" width="35%">Description</th>
+                                <th class="bg-light ps-3 text-nowrap" width="35%"><?= t('Description') ?></th>
                             <td><?= nl2br(caseFormat($tender['tender_description'])) ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Category</th>
+                            <th class="bg-light ps-3"><?= t('Category') ?></th>
                             <td><?= caseFormat($tender['tender_category']) ?> <?= $tender['tender_category_specify'] ? "({$tender['tender_category_specify']})" : '' ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">NeST Reference</th>
+                            <th class="bg-light ps-3"><?= t('NeST Reference') ?></th>
                             <td><?= caseFormat($tender['nest_reference'] ?? null, '—') ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Deadline</th>
+                            <th class="bg-light ps-3"><?= t('Deadline') ?></th>
                             <td class="text-danger fw-bold"><i class="bi bi-calendar-event me-1"></i><?= format_date($tender['submission_deadline'], 'd M Y, H:i') ?></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Current Status</th>
+                            <th class="bg-light ps-3"><?= t('Current Status') ?></th>
                             <td><span class="badge bg-primary px-3"><?= strtoupper($tender['status']) ?></span></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Entrance Fee</th>
+                            <th class="bg-light ps-3"><?= t('Entrance Fee') ?></th>
                             <td>
                                 <?php
                                 $ef_tzs = $tender['entrance_fee_tzs'] ?? null;
@@ -206,11 +206,11 @@ $company_logo = getSetting('company_logo', '');
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr class="small text-uppercase">
-                            <th class="ps-3" width="60">S/NO</th>
-                            <th>Full Name</th>
-                            <th>Employee No</th>
-                            <th>Designation</th>
-                            <th>Role in Tender</th>
+                            <th class="ps-3" width="60"><?= t('S/NO') ?></th>
+                            <th><?= t('Full Name') ?></th>
+                            <th><?= t('Employee No') ?></th>
+                            <th><?= t('Designation') ?></th>
+                            <th><?= t('Role in Tender') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -327,10 +327,10 @@ $company_logo = getSetting('company_logo', '');
                 <table class="table table-sm table-hover mb-0">
                     <thead class="bg-light">
                         <tr class="small text-uppercase">
-                            <th class="ps-3" width="180">Date & Time</th>
-                            <th width="150">User</th>
-                            <th width="100">Action</th>
-                            <th>Description</th>
+                            <th class="ps-3" width="180"><?= t('Date & Time') ?></th>
+                            <th width="150"><?= t('User') ?></th>
+                            <th width="100"><?= t('Action') ?></th>
+                            <th><?= t('Description') ?></th>
                         </tr>
                     </thead>
                     <tbody>

@@ -43,7 +43,7 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-5">
-                    <label class="form-label small fw-bold text-muted">Bank / Cash Account</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('Bank / Cash Account') ?></label>
                     <!-- §UI-3: DB-backed select must use Select2 -->
                     <select id="acct" class="form-select select2-static">
                         <option value="">— Select account —</option>
@@ -55,11 +55,11 @@ $currency = get_setting('currency', 'TZS');
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">From</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('From') ?></label>
                     <input type="date" id="from" class="form-control">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">To</label>
+                    <label class="form-label small fw-bold text-muted"><?= t('To') ?></label>
                     <input type="date" id="to" class="form-control">
                 </div>
                 <div class="col-md-1">
@@ -106,14 +106,14 @@ $currency = get_setting('currency', 'TZS');
                 <table id="stmtTable" class="table table-hover align-middle mb-0 w-100">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3" style="width:50px;">S/No</th>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Reference</th>
-                            <th class="text-end">Money In</th>
-                            <th class="text-end">Money Out</th>
-                            <th class="text-end">Balance</th>
-                            <th class="text-center">Status</th>
+                            <th class="ps-3" style="width:50px;"><?= t('S/No') ?></th>
+                            <th><?= t('Date') ?></th>
+                            <th><?= t('Description') ?></th>
+                            <th><?= t('Reference') ?></th>
+                            <th class="text-end"><?= t('Money In') ?></th>
+                            <th class="text-end"><?= t('Money Out') ?></th>
+                            <th class="text-end"><?= t('Balance') ?></th>
+                            <th class="text-center"><?= t('Status') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>

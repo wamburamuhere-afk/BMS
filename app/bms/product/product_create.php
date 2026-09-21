@@ -314,7 +314,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
                                     
                                     <div class="col-md-6 mt-4">
-                                        <label for="sku" class="form-label fw-bold text-muted small uppercase">SKU (Internal Code)</label>
+                                        <label for="sku" class="form-label fw-bold text-muted small uppercase"><?= t('SKU (Internal Code)') ?></label>
                                         <div class="input-group">
                                             <input type="text" class="form-control bg-light border-0" id="sku" name="sku" 
                                                    value="<?= generate_sku() ?>">
@@ -325,7 +325,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
                                     
                                     <div class="col-md-6 mt-4">
-                                        <label for="barcode" class="form-label fw-bold text-muted small">Barcode (Universal Code)</label>
+                                        <label for="barcode" class="form-label fw-bold text-muted small"><?= t('Barcode (Universal Code)') ?></label>
                                         <div class="input-group">
                                             <input type="text" class="form-control bg-light border-0" id="barcode" name="barcode" 
                                                    value="<?= generate_barcode() ?>">
@@ -336,7 +336,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
 
                                     <div class="col-md-12 mt-4">
-                                        <label for="category_id" class="form-label fw-bold">Category</label>
+                                        <label for="category_id" class="form-label fw-bold"><?= t('Category') ?></label>
                                         <div class="input-group">
                                             <select class="form-select bg-light border-0 py-2" id="category_id" name="category_id">
                                                 <option value="">Select Category</option>
@@ -349,16 +349,16 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
 
                                     <div class="col-md-12 mt-4">
-                                        <label for="description" class="form-label fw-bold">Detailed Description</label>
+                                        <label for="description" class="form-label fw-bold"><?= t('Detailed Description') ?></label>
                                         <textarea class="form-control bg-light border-0" id="description" name="description" 
-                                                  rows="4" placeholder="Mention key features, specifications or other details..."></textarea>
+                                                  rows="4" placeholder="<?= t('Mention key features, specifications or other details...') ?>"></textarea>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="col-md-4 border-start ps-xxl-5">
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">Product Image</label>
+                                    <label class="form-label fw-bold"><?= t('Product Image') ?></label>
                                     <div id="imagePreview" class="border rounded-4 p-3 mb-3 d-flex align-items-center justify-content-center bg-light shadow-inner" style="height: 250px;">
                                         <div class="text-center opacity-50">
                                             <i class="bi bi-image-fill display-3"></i>
@@ -373,7 +373,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                 </div>
                                 
                                 <div class="mb-3 p-3 bg-light rounded-4">
-                                    <label class="form-label fw-bold">Status</label>
+                                    <label class="form-label fw-bold"><?= t('Status') ?></label>
                                     <div class="d-flex flex-column gap-2">
                                         <div class="form-check custom-radio">
                                             <input class="form-check-input" type="radio" name="status" id="status_active" value="active" checked>
@@ -423,12 +423,12 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
 
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="wholesale_price" class="form-label fw-bold small text-muted">Wholesale Price</label>
+                                            <label for="wholesale_price" class="form-label fw-bold small text-muted"><?= t('Wholesale Price') ?></label>
                                             <input type="number" class="form-control bg-white border-0" id="wholesale_price" name="wholesale_price" 
                                                    min="0" step="0.01" value="0.00">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="discount_rate" class="form-label fw-bold small text-muted">Max Discount %</label>
+                                            <label for="discount_rate" class="form-label fw-bold small text-muted"><?= t('Max Discount %') ?></label>
                                             <div class="input-group">
                                                 <input type="number" class="form-control bg-white border-0" id="discount_rate" name="discount_rate" 
                                                        min="0" max="100" step="0.01" value="0.00" onkeyup="calculateMinSellingPrice()">
@@ -446,7 +446,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     <div class="row">
                                         <div class="col-md-6 mb-4">
                                             <div class="card border-0 shadow-sm rounded-4 text-center p-3">
-                                                <label class="form-label text-muted small fw-bold mb-1 uppercase">Markup Percentage</label>
+                                                <label class="form-label text-muted small fw-bold mb-1 uppercase"><?= t('Markup Percentage') ?></label>
                                                 <div class="d-flex align-items-center justify-content-center">
                                                     <input type="text" class="form-control-plaintext text-center fw-bold fs-3 border-0" id="markup_percentage" value="0.00" readonly style="width: 100px;">
                                                     <span class="fw-bold fs-3">%</span>
@@ -455,7 +455,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                         </div>
                                         <div class="col-md-6 mb-4">
                                             <div class="card border-0 shadow-sm rounded-4 text-center p-3">
-                                                <label class="form-label text-muted small fw-bold mb-1 uppercase">Estimated Profit</label>
+                                                <label class="form-label text-muted small fw-bold mb-1 uppercase"><?= t('Estimated Profit') ?></label>
                                                 <div class="d-flex align-items-center justify-content-center">
                                                     <span class="fw-bold fs-5 me-1">TZS</span>
                                                     <input type="text" class="form-control-plaintext text-center fw-bold fs-3 border-0" id="profit_margin" value="0.00" readonly style="width: 130px;">
@@ -465,7 +465,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label fw-bold small text-muted">Tax Configuration</label>
+                                        <label class="form-label fw-bold small text-muted"><?= t('Tax Configuration') ?></label>
                                         <select class="form-select border-0 bg-white py-2 shadow-sm" id="tax_id" name="tax_id">
                                             <option value="">No Tax (Default)</option>
                                             <?php foreach ($tax_rates as $tax): ?>
@@ -529,7 +529,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                             </div>
                                             
                                             <div class="col-md-6">
-                                                <label class="form-label fw-bold">Tracking</label>
+                                                <label class="form-label fw-bold"><?= t('Tracking') ?></label>
                                                 <div class="form-check form-switch p-3 bg-light rounded-3">
                                                     <input class="form-check-input" type="checkbox" id="track_inventory" name="track_inventory" checked>
                                                     <label class="form-check-label fw-bold ms-2" for="track_inventory"><?= t('Track Stock Levels') ?></label>
@@ -583,7 +583,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     <h6 class="fw-bold mb-4"><i class="bi bi-rulers me-2 text-secondary"></i> Physical Specifications</h6>
                                     
                                     <div class="mb-4">
-                                        <label for="weight" class="form-label fw-bold small">Weight (Gross)</label>
+                                        <label for="weight" class="form-label fw-bold small"><?= t('Weight (Gross)') ?></label>
                                         <div class="input-group py-1">
                                             <input type="number" class="form-control bg-white border-0 py-2 px-3" id="weight" name="weight" 
                                                    min="0" step="0.001" value="0.000">
@@ -592,7 +592,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label fw-bold small">Dimensions (Length × Width × Height)</label>
+                                        <label class="form-label fw-bold small"><?= t('Dimensions (Length × Width × Height)') ?></label>
                                         <div class="row g-2">
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
@@ -641,7 +641,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     <h6 class="fw-bold mb-4 border-bottom pb-2 text-dark"><i class="bi bi-truck me-2 text-info"></i> Supply Chain</h6>
                                     
                                     <div class="mb-4">
-                                        <label for="brand_id" class="form-label fw-bold small">Brand</label>
+                                        <label for="brand_id" class="form-label fw-bold small"><?= t('Brand') ?></label>
                                         <div class="input-group">
                                             <select class="form-select border-0 py-2 shadow-sm" id="brand_id" name="brand_id">
                                                 <option value="">Select Brand</option>
@@ -658,9 +658,9 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     </div>
 
                                     <div class="mb-3">
-                                        <label for="manufacturer" class="form-label fw-bold small">Manufacturer (Optional)</label>
+                                        <label for="manufacturer" class="form-label fw-bold small"><?= t('Manufacturer (Optional)') ?></label>
                                         <input type="text" class="form-control border-0 py-2 shadow-sm" id="manufacturer" name="manufacturer" 
-                                               placeholder="Manufacturer name">
+                                               placeholder="<?= t('Manufacturer name') ?>">
                                     </div>
                                 </div>
                             </div>
@@ -671,19 +671,19 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     
                                     <div class="row g-3">
                                         <div class="col-md-6">
-                                            <label for="model" class="form-label fw-bold small">Model / Series</label>
+                                            <label for="model" class="form-label fw-bold small"><?= t('Model / Series') ?></label>
                                             <input type="text" class="form-control border-0 shadow-sm" id="model" name="model">
                                         </div>
                                         <div class="col-md-6">
-                                            <label for="serial_number" class="form-label fw-bold small">Serial Number</label>
+                                            <label for="serial_number" class="form-label fw-bold small"><?= t('Serial Number') ?></label>
                                             <input type="text" class="form-control border-0 shadow-sm" id="serial_number" name="serial_number">
                                         </div>
                                         <div class="col-md-6 mt-4">
-                                            <label for="warranty_period" class="form-label fw-bold small">Warranty (Months)</label>
+                                            <label for="warranty_period" class="form-label fw-bold small"><?= t('Warranty (Months)') ?></label>
                                             <input type="number" class="form-control border-0 shadow-sm" id="warranty_period" name="warranty_period" min="0" value="0">
                                         </div>
                                         <div class="col-md-6 mt-4">
-                                            <label for="expiry_days" class="form-label fw-bold small text-muted">Shelf Life (Days)</label>
+                                            <label for="expiry_days" class="form-label fw-bold small text-muted"><?= t('Shelf Life (Days)') ?></label>
                                             <input type="number" class="form-control border-0 shadow-sm" id="expiry_days" name="expiry_days" min="0" value="0">
                                         </div>
                                     </div>
@@ -696,7 +696,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                             </div>
                                             <div class="form-check custom-radio">
                                                 <input class="form-check-input" type="checkbox" id="is_taxable" name="is_taxable" checked>
-                                                <label class="form-check-label fw-bold" for="is_taxable">Enable Tax calculation for this item</label>
+                                                <label class="form-check-label fw-bold" for="is_taxable"><?= t('Enable Tax calculation for this item') ?></label>
                                             </div>
                                         </div>
                                     </div>
@@ -754,7 +754,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                     </div>
                 </div>
                 <div class="input-group">
-                    <input type="text" class="form-control" id="manualBarcodeInput" placeholder="Or enter barcode manually">
+                    <input type="text" class="form-control" id="manualBarcodeInput" placeholder="<?= t('Or enter barcode manually') ?>">
                     <button class="btn btn-outline-secondary" type="button" onclick="useManualBarcode()">
                         <i class="bi bi-check"></i> Use
                     </button>
@@ -776,11 +776,11 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">Category Name</label>
-                    <input type="text" class="form-control" id="quickCategoryName" placeholder="Enter category name">
+                    <label class="form-label"><?= t('Category Name') ?></label>
+                    <input type="text" class="form-control" id="quickCategoryName" placeholder="<?= t('Enter category name') ?>">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Parent Category</label>
+                    <label class="form-label"><?= t('Parent Category') ?></label>
                     <select class="form-select" id="quickCategoryParent">
                         <option value="0">None (Top Level)</option>
                         <?= build_category_tree($categories) ?>
@@ -808,11 +808,11 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">Brand Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="quickBrandName" placeholder="Enter brand name">
+                    <input type="text" class="form-control" id="quickBrandName" placeholder="<?= t('Enter brand name') ?>">
                 </div>
                 <!-- Website is optional now, and we can skip it for 'Quick' add to keep it simple, or add it. Let's keep it simple or user might ask where it is. I'll add it to be safe since they just asked about it. -->
                 <div class="mb-3">
-                    <label class="form-label">Website (Optional)</label>
+                    <label class="form-label"><?= t('Website (Optional)') ?></label>
                     <input type="url" class="form-control" id="quickBrandWebsite" placeholder="https://example.com">
                 </div>
             </div>

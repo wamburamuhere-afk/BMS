@@ -229,7 +229,7 @@ global $company_name, $company_logo;
     <!-- Print-only Header -->
     <div class="d-none d-print-block text-center mb-4">
        
-        <h4 class="fw-bold text-dark text-uppercase">SUPPLIER INFORMATION REPORT</h4>
+        <h4 class="fw-bold text-dark text-uppercase"><?= t('SUPPLIER INFORMATION REPORT') ?></h4>
         <h5 class="text-muted"><?= caseFormat($supplier['supplier_name']) ?> (<?= htmlspecialchars($supplier['supplier_code']) ?>)</h5>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 150px; margin: 0 auto;"></div>
     </div>
@@ -1076,13 +1076,13 @@ global $company_name, $company_logo;
                                 <table class="table table-hover table-bordered mb-0" id="supplierProjectsTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width:50px">S/No</th>
-                                            <th>Project Name</th>
-                                            <th>Contract Value</th>
-                                            <th>Assigned On</th>
-                                            <th>Assigned By</th>
-                                            <th>Status</th>
-                                            <th class="text-end">Action</th>
+                                            <th style="width:50px"><?= t('S/No') ?></th>
+                                            <th><?= t('Project Name') ?></th>
+                                            <th><?= t('Contract Value') ?></th>
+                                            <th><?= t('Assigned On') ?></th>
+                                            <th><?= t('Assigned By') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Action') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1163,14 +1163,14 @@ global $company_name, $company_logo;
                                 <table class="table table-sm table-hover mb-0 w-100" id="riTable" style="width:100%">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th width="45">S/NO</th>
-                                            <th>Invoice Ref</th>
-                                            <th>Date Raised</th>
-                                            <th>Date Recorded</th>
-                                            <th>PO Reference</th>
-                                            <th class="text-end">Amount (TZS)</th>
-                                            <th>Status</th>
-                                            <th class="text-end">Actions</th>
+                                            <th width="45"><?= t('S/NO') ?></th>
+                                            <th><?= t('Invoice Ref') ?></th>
+                                            <th><?= t('Date Raised') ?></th>
+                                            <th><?= t('Date Recorded') ?></th>
+                                            <th><?= t('PO Reference') ?></th>
+                                            <th class="text-end"><?= t('Amount (TZS)') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -1217,12 +1217,12 @@ global $company_name, $company_logo;
                                 <table class="table table-sm table-hover mb-0" id="supplierPOTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th width="50">S/NO</th>
-                                            <th>Order #</th>
-                                            <th>Date</th>
-                                            <th>Amount</th>
-                                            <th>Status</th>
-                                            <th class="text-end">Actions</th>
+                                            <th width="50"><?= t('S/NO') ?></th>
+                                            <th><?= t('Order #') ?></th>
+                                            <th><?= t('Date') ?></th>
+                                            <th><?= t('Amount') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1305,13 +1305,13 @@ global $company_name, $company_logo;
                                 <table class="table table-sm table-hover mb-0" id="supplierPaymentsTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th width="50">S/NO</th>
-                                            <th>Date</th>
-                                            <th>Reference</th>
-                                            <th>Amount</th>
-                                            <th>Currency</th>
-                                            <th>Method</th>
-                                            <th class="text-end">Actions</th>
+                                            <th width="50"><?= t('S/NO') ?></th>
+                                            <th><?= t('Date') ?></th>
+                                            <th><?= t('Reference') ?></th>
+                                            <th><?= t('Amount') ?></th>
+                                            <th><?= t('Currency') ?></th>
+                                            <th><?= t('Method') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1369,35 +1369,35 @@ global $company_name, $company_logo;
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Supplier Code</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Supplier Code') ?></label>
                                     <p class="mb-0 fw-semibold"><code><?= caseFormat($supplier['supplier_code']) ?></code></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Status</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
                                     <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= ucfirst($supplier['status']) ?></span></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Created By</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Created By') ?></label>
                                     <p class="mb-0 fw-semibold"><?= caseFormat($supplier['created_by_name'], '—') ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Date Created</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Date Created') ?></label>
                                     <p class="mb-0 fw-semibold"><?= !empty($supplier['created_at']) ? format_date($supplier['created_at']) : '—' ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Last Updated By</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Last Updated By') ?></label>
                                     <p class="mb-0 fw-semibold"><?= caseFormat($supplier['updated_by_name'], '—') ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Last Updated</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Last Updated') ?></label>
                                     <p class="mb-0 fw-semibold"><?= !empty($supplier['updated_at']) ? format_date($supplier['updated_at']) : '—' ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Category</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Category') ?></label>
                                     <p class="mb-0 fw-semibold"><?= caseFormat($supplier['category_name'], '—') ?></p>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted small mb-1">Projects Linked</label>
+                                    <label class="form-label text-muted small mb-1"><?= t('Projects Linked') ?></label>
                                     <p class="mb-0 fw-semibold"><?= (int) $total_supplier_projects ?></p>
                                 </div>
                             </div>
@@ -1416,11 +1416,11 @@ global $company_name, $company_logo;
                                 <table class="table table-sm table-hover mb-0" id="supplierAuditTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width:50px;">S/NO</th>
-                                            <th>When</th>
-                                            <th>Action</th>
-                                            <th>By</th>
-                                            <th>Description</th>
+                                            <th style="width:50px;"><?= t('S/NO') ?></th>
+                                            <th><?= t('When') ?></th>
+                                            <th><?= t('Action') ?></th>
+                                            <th><?= t('By') ?></th>
+                                            <th><?= t('Description') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1933,7 +1933,7 @@ window.addEventListener('resize', resizeTextToFit);
             </div>
             <form id="supplierAssignProjectForm">
                 <div class="modal-body p-4">
-                    <label class="form-label fw-bold">Select Project</label>
+                    <label class="form-label fw-bold"><?= t('Select Project') ?></label>
                     <select class="form-select select2-static" id="supplierAssignProjectSelect" required>
                         <option value="">-- Choose a project --</option>
                         <?php foreach ($all_projects as $proj): ?>
@@ -1971,12 +1971,12 @@ window.addEventListener('resize', resizeTextToFit);
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Invoice Reference No. <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="text" class="form-control" name="invoice_ref" id="ri-ref" placeholder="Auto-generating..." required>
+                                <input type="text" class="form-control" name="invoice_ref" id="ri-ref" placeholder="<?= t('Auto-generating...') ?>" required>
                                 <button type="button" class="btn btn-outline-secondary" id="ri-btn-refresh" onclick="generateRiRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">PO Reference</label>
+                            <label class="form-label fw-bold"><?= t('PO Reference') ?></label>
                             <select name="po_id" id="ri-po" class="form-select select2-static">
                                 <option value="">— Select PO (optional) —</option>
                             </select>
@@ -2036,8 +2036,8 @@ window.addEventListener('resize', resizeTextToFit);
                             <small id="ri-current-file" class="text-muted d-none"></small>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Notes</label>
-                            <textarea class="form-control" name="notes" id="ri-notes" rows="2" placeholder="Optional..."></textarea>
+                            <label class="form-label fw-bold"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" id="ri-notes" rows="2" placeholder="<?= t('Optional...') ?>"></textarea>
                         </div>
                     </div>
                 </div>

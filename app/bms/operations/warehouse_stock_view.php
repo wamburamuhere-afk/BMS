@@ -340,13 +340,13 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                             <thead class="table-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3" style="width:50px;">#</th>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>Category</th>
-                                    <th class="text-center">Stock Qty</th>
-                                    <th class="text-center">Reserved</th>
-                                    <th class="text-center">Available</th>
-                                    <th>Unit</th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= t('SKU') ?></th>
+                                    <th><?= t('Category') ?></th>
+                                    <th class="text-center"><?= t('Stock Qty') ?></th>
+                                    <th class="text-center"><?= t('Reserved') ?></th>
+                                    <th class="text-center"><?= t('Available') ?></th>
+                                    <th><?= t('Unit') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -393,14 +393,14 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                             <thead class="table-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3" style="width:50px;">#</th>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>GRN #</th>
-                                    <th>Date</th>
-                                    <th class="text-center">Qty Received</th>
-                                    <th>Unit</th>
-                                    <th>Supplier</th>
-                                    <th>Status</th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= t('SKU') ?></th>
+                                    <th><?= t('GRN #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th class="text-center"><?= t('Qty Received') ?></th>
+                                    <th><?= t('Unit') ?></th>
+                                    <th><?= t('Supplier') ?></th>
+                                    <th><?= t('Status') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -451,14 +451,14 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                             <thead class="table-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3" style="width:50px;">#</th>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>DN #</th>
-                                    <th>Date</th>
-                                    <th class="text-center">Qty Issued</th>
-                                    <th>Unit</th>
-                                    <th>Supplier</th>
-                                    <th>Status</th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= t('SKU') ?></th>
+                                    <th><?= t('DN #') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th class="text-center"><?= t('Qty Issued') ?></th>
+                                    <th><?= t('Unit') ?></th>
+                                    <th><?= t('Supplier') ?></th>
+                                    <th><?= t('Status') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -509,14 +509,14 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                             <thead class="table-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3" style="width:50px;">#</th>
-                                    <th>Date</th>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>Type</th>
-                                    <th class="text-center">Quantity</th>
-                                    <th>Unit</th>
-                                    <th>Adjusted By</th>
-                                    <th>Notes</th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= t('SKU') ?></th>
+                                    <th><?= t('Type') ?></th>
+                                    <th class="text-center"><?= t('Quantity') ?></th>
+                                    <th><?= t('Unit') ?></th>
+                                    <th><?= t('Adjusted By') ?></th>
+                                    <th><?= t('Notes') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -569,13 +569,13 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
                             <thead class="table-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3" style="width:50px;">#</th>
-                                    <th>Date / Time</th>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>Type</th>
-                                    <th class="text-center">Quantity</th>
-                                    <th>Unit</th>
-                                    <th>Ref #</th>
+                                    <th><?= t('Date / Time') ?></th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= t('SKU') ?></th>
+                                    <th><?= t('Type') ?></th>
+                                    <th class="text-center"><?= t('Quantity') ?></th>
+                                    <th><?= t('Unit') ?></th>
+                                    <th><?= t('Ref #') ?></th>
                                 </tr>
                             </thead>
                             <tbody>

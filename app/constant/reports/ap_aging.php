@@ -43,12 +43,12 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">As of date</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('As of date') ?></label>
                     <input type="date" name="as_of_date" id="f-asof" class="form-control" value="<?= htmlspecialchars($as_of) ?>">
                 </div>
                 <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Project') ?></label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?>
@@ -58,7 +58,7 @@ $currency = get_setting('currency', 'TZS');
                 </div>
                 <?php endif; ?>
                 <div class="col-md-<?= projectsModuleActive() ? 4 : 5 ?>">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier / Sub-contractor</label>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Supplier / Sub-contractor') ?></label>
                     <select name="vendor_id" id="f-vendor" class="form-select" style="width:100%"></select>
                 </div>
                 <div class="col-md-1">
@@ -118,15 +118,15 @@ $currency = get_setting('currency', 'TZS');
                 <table class="table table-hover align-middle mb-0 w-100" id="vendTable">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">S/No</th>
-                            <th>Vendor</th>
-                            <th class="text-end">Current</th>
+                            <th class="ps-3"><?= t('S/No') ?></th>
+                            <th><?= t('Vendor') ?></th>
+                            <th class="text-end"><?= t('Current') ?></th>
                             <th class="text-end">1–30</th>
                             <th class="text-end">31–60</th>
                             <th class="text-end">61–90</th>
                             <th class="text-end">90+</th>
-                            <th class="text-end">Total</th>
-                            <th class="text-center pe-3 d-print-none">Statement</th>
+                            <th class="text-end"><?= t('Total') ?></th>
+                            <th class="text-center pe-3 d-print-none"><?= t('Statement') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -145,17 +145,17 @@ $currency = get_setting('currency', 'TZS');
                 <table class="table table-hover align-middle mb-0 w-100" id="billTable">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">S/No</th>
-                            <th>Bill Ref</th>
-                            <th>Vendor</th>
-                            <th>Type</th>
-                            <th>Invoice Date</th>
-                            <th>Due Date</th>
-                            <th class="text-center">Days Overdue</th>
-                            <th class="text-end">Amount</th>
-                            <th class="text-end">WHT</th>
-                            <th class="text-end">Payable</th>
-                            <th class="text-center pe-3">Bucket</th>
+                            <th class="ps-3"><?= t('S/No') ?></th>
+                            <th><?= t('Bill Ref') ?></th>
+                            <th><?= t('Vendor') ?></th>
+                            <th><?= t('Type') ?></th>
+                            <th><?= t('Invoice Date') ?></th>
+                            <th><?= t('Due Date') ?></th>
+                            <th class="text-center"><?= t('Days Overdue') ?></th>
+                            <th class="text-end"><?= t('Amount') ?></th>
+                            <th class="text-end"><?= t('WHT') ?></th>
+                            <th class="text-end"><?= t('Payable') ?></th>
+                            <th class="text-center pe-3"><?= t('Bucket') ?></th>
                         </tr>
                     </thead>
                     <tbody></tbody>

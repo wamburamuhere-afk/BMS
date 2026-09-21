@@ -44,7 +44,7 @@ $current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($curr
 
     <div id="mtTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="meetingsTable" class="table table-hover align-middle w-100">
-            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Title</th><th>Date</th><th>Time</th><th>Location</th><th>Attendees</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center"><?= t('S/NO') ?></th><th><?= t('Title') ?></th><th><?= t('Date') ?></th><th><?= t('Time') ?></th><th><?= t('Location') ?></th><th><?= t('Attendees') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -64,9 +64,9 @@ $current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($curr
             <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
             <input type="hidden" name="meeting_id" id="mt_id">
             <div class="mb-3"><label class="form-label">Title <span class="text-danger">*</span></label><input class="form-control" name="title" id="mt_title" required maxlength="255"></div>
-            <div class="mb-3"><label class="form-label">Agenda</label><textarea class="form-control" name="agenda" id="mt_agenda" rows="2"></textarea></div>
+            <div class="mb-3"><label class="form-label"><?= t('Agenda') ?></label><textarea class="form-control" name="agenda" id="mt_agenda" rows="2"></textarea></div>
             <div class="mb-3">
-                <label class="form-label d-block">Meeting Type</label>
+                <label class="form-label d-block"><?= t('Meeting Type') ?></label>
                 <div class="btn-group" role="group">
                     <input type="radio" class="btn-check" name="meeting_type" id="mt_type_person" value="in_person" checked>
                     <label class="btn btn-outline-primary btn-sm" for="mt_type_person"><i class="bi bi-geo-alt me-1"></i>In-Person</label>
@@ -77,42 +77,42 @@ $current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($curr
             </div>
             <div class="row">
                 <div class="col-md-4 mb-3"><label class="form-label">Date <span class="text-danger">*</span></label><input type="date" class="form-control" name="meeting_date" id="mt_date" value="<?= date('Y-m-d') ?>" required></div>
-                <div class="col-md-3 mb-3"><label class="form-label">Start</label><input type="time" class="form-control" name="start_time" id="mt_start"></div>
-                <div class="col-md-3 mb-3"><label class="form-label">End</label><input type="time" class="form-control" name="end_time" id="mt_end"></div>
-                <div class="col-md-2 mb-3" id="mt_venue_wrap"><label class="form-label">Venue</label><input class="form-control" name="venue" id="mt_venue"></div>
+                <div class="col-md-3 mb-3"><label class="form-label"><?= t('Start') ?></label><input type="time" class="form-control" name="start_time" id="mt_start"></div>
+                <div class="col-md-3 mb-3"><label class="form-label"><?= t('End') ?></label><input type="time" class="form-control" name="end_time" id="mt_end"></div>
+                <div class="col-md-2 mb-3" id="mt_venue_wrap"><label class="form-label"><?= t('Venue') ?></label><input class="form-control" name="venue" id="mt_venue"></div>
             </div>
             <div class="d-none" id="mt_zoom_wrap">
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Organizer</label>
+                        <label class="form-label"><?= t('Organizer') ?></label>
                         <div class="form-control-plaintext fw-bold py-1" id="mt_host_display"><i class="bi bi-person-check text-primary me-1"></i><?= caseFormat($current_user_name) ?> (you)</div>
                         <input type="hidden" id="mt_host" value="<?= (int)($_SESSION['user_id'] ?? 0) ?>">
                         <div class="form-text">The BMS record shows whoever creates it as organizer. On Zoom, every meeting is hosted under the one shared company Zoom account (Settings -> Zoom Integration) — no personal Zoom login needed.</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Password <span class="text-muted small">(optional)</span></label>
-                        <input class="form-control" name="zoom_password" id="mt_zoom_password" maxlength="10" placeholder="Leave blank to auto-generate">
+                        <input class="form-control" name="zoom_password" id="mt_zoom_password" maxlength="10" placeholder="<?= t('Leave blank to auto-generate') ?>">
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_host_video" id="mt_zoom_host_video" value="1" checked><label class="form-check-label" for="mt_zoom_host_video">Host video on</label></div></div>
-                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_participant_video" id="mt_zoom_participant_video" value="1"><label class="form-check-label" for="mt_zoom_participant_video">Participant video on</label></div></div>
-                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_waiting_room" id="mt_zoom_waiting_room" value="1" checked><label class="form-check-label" for="mt_zoom_waiting_room">Waiting room</label></div></div>
-                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_auto_recording" id="mt_zoom_auto_recording" value="1"><label class="form-check-label" for="mt_zoom_auto_recording">Auto-record (cloud)</label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_host_video" id="mt_zoom_host_video" value="1" checked><label class="form-check-label" for="mt_zoom_host_video"><?= t('Host video on') ?></label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_participant_video" id="mt_zoom_participant_video" value="1"><label class="form-check-label" for="mt_zoom_participant_video"><?= t('Participant video on') ?></label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_waiting_room" id="mt_zoom_waiting_room" value="1" checked><label class="form-check-label" for="mt_zoom_waiting_room"><?= t('Waiting room') ?></label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_auto_recording" id="mt_zoom_auto_recording" value="1"><label class="form-check-label" for="mt_zoom_auto_recording"><?= t('Auto-record (cloud)') ?></label></div></div>
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label">Attendees</label>
+                <label class="form-label"><?= t('Attendees') ?></label>
                 <select class="form-select" name="attendees[]" id="mt_attendees" multiple style="width:100%"></select>
                 <div class="d-none border rounded p-2 mt-2 bg-light" id="mt_role_picker_wrap">
-                    <label class="form-label small fw-bold mb-1">Add attendees by role</label>
+                    <label class="form-label small fw-bold mb-1"><?= t('Add attendees by role') ?></label>
                     <select class="form-select form-select-sm" id="mt_role_select" style="max-width:280px">
                         <option value="">Choose a role…</option>
                     </select>
                     <div class="d-none mt-2" id="mt_role_users_wrap">
                         <div class="form-check mb-1">
                             <input class="form-check-input" type="checkbox" id="mt_role_select_all">
-                            <label class="form-check-label small fw-bold" for="mt_role_select_all">Select all in this role</label>
+                            <label class="form-check-label small fw-bold" for="mt_role_select_all"><?= t('Select all in this role') ?></label>
                         </div>
                         <div id="mt_role_users_list" class="mb-2" style="max-height:150px;overflow-y:auto;"></div>
                         <button type="button" class="btn btn-sm btn-primary" id="mt_role_add_btn"><i class="bi bi-plus-lg"></i> Add selected</button>
@@ -220,7 +220,7 @@ function viewMeeting(id){
             ${zoomBlock}
             ${m.agenda?`<div class="mb-2"><strong>Agenda:</strong> ${safeOutput(m.agenda)}</div>`:''}
             ${m.minutes?`<div class="mb-2"><strong>Minutes:</strong><div style="white-space:pre-wrap">${safeOutput(m.minutes)}</div></div>`:''}
-            <table class="table table-sm"><thead><tr><th>Attendee</th><th>Attended</th></tr></thead><tbody>${prows}</tbody></table>
+            <table class="table table-sm"><thead><tr><th><?= t('Attendee') ?></th><th><?= t('Attended') ?></th></tr></thead><tbody>${prows}</tbody></table>
             ${editable && res.attendees.some(a=>a.employee_id) ? `<button class="btn btn-sm btn-primary" onclick="saveAttendance(${m.meeting_id})"><i class="bi bi-save me-1"></i>Save Attendance</button>` : ''}`);
         new bootstrap.Modal(document.getElementById('meetingViewModal')).show();
     });

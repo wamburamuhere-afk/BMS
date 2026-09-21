@@ -305,7 +305,7 @@ try {
                         <div class="icon-circle bg-primary-subtle text-primary">
                             <i class="bi bi-calendar-event"></i>
                         </div>
-                        <h6 class="mb-0 fw-bold text-dark d-none d-lg-block">Report Period</h6>
+                        <h6 class="mb-0 fw-bold text-dark d-none d-lg-block"><?= t('Report Period') ?></h6>
                     </div>
                     <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
                         <input type="hidden" name="format" value="<?= $format ?>">
@@ -417,9 +417,9 @@ try {
         <div class="row px-4">
             <!-- ASSETS -->
             <div class="col-md-6 border-end">
-                <h4 class="section-title">ASSETS</h4>
+                <h4 class="section-title"><?= t('ASSETS') ?></h4>
                 <div class="subsection">
-                    <h5 class="subsection-header">Current Assets</h5>
+                    <h5 class="subsection-header"><?= t('Current Assets') ?></h5>
                     <table class="table table-borderless table-sm account-table">
                         <?php foreach ($sections['assets']['current'] as $acc): ?>
                         <tr>
@@ -428,13 +428,13 @@ try {
                         </tr>
                         <?php endforeach; ?>
                         <tr class="subtotal-row">
-                            <td>Total Current Assets</td>
+                            <td><?= t('Total Current Assets') ?></td>
                             <td class="text-end"><?= format_accounting($sections['assets']['total_current']) ?></td>
                         </tr>
                     </table>
                 </div>
                 <div class="subsection mt-4">
-                    <h5 class="subsection-header">Non-Current Assets</h5>
+                    <h5 class="subsection-header"><?= t('Non-Current Assets') ?></h5>
                     <table class="table table-borderless table-sm account-table">
                         <?php foreach ($sections['assets']['non_current'] as $acc): ?>
                         <tr>
@@ -458,9 +458,9 @@ try {
 
             <!-- LIABILITIES & EQUITY -->
             <div class="col-md-6">
-                <h4 class="section-title">LIABILITIES & EQUITY</h4>
+                <h4 class="section-title"><?= t('LIABILITIES & EQUITY') ?></h4>
                 <div class="subsection">
-                    <h5 class="subsection-header">Current Liabilities</h5>
+                    <h5 class="subsection-header"><?= t('Current Liabilities') ?></h5>
                     <table class="table table-borderless table-sm account-table">
                         <?php foreach ($sections['liabilities']['current'] as $acc): ?>
                         <tr>
@@ -469,14 +469,14 @@ try {
                         </tr>
                         <?php endforeach; ?>
                         <tr class="subtotal-row">
-                            <td>Total Current Liabilities</td>
+                            <td><?= t('Total Current Liabilities') ?></td>
                             <td class="text-end"><?= format_accounting($sections['liabilities']['total_current']) ?></td>
                         </tr>
                     </table>
                 </div>
                 <?php if (!empty($sections['liabilities']['non_current'])): ?>
                 <div class="subsection mt-4">
-                    <h5 class="subsection-header">Non-Current Liabilities</h5>
+                    <h5 class="subsection-header"><?= t('Non-Current Liabilities') ?></h5>
                     <table class="table table-borderless table-sm account-table">
                         <?php foreach ($sections['liabilities']['non_current'] as $acc): ?>
                         <tr>
@@ -492,7 +492,7 @@ try {
                 </div>
                 <?php endif; ?>
                 <div class="subsection mt-4">
-                    <h5 class="subsection-header">Equity</h5>
+                    <h5 class="subsection-header"><?= t('Equity') ?></h5>
                     <table class="table table-borderless table-sm account-table">
                         <?php foreach ($sections['equity']['accounts'] as $acc): ?>
                         <tr>
@@ -508,7 +508,7 @@ try {
                             <td class="text-end fw-bold"><?= format_accounting($net_income) ?></td>
                         </tr>
                         <tr class="subtotal-row">
-                            <td>Total Equity</td>
+                            <td><?= t('Total Equity') ?></td>
                             <td class="text-end"><?= format_accounting($sections['equity']['total']) ?></td>
                         </tr>
                     </table>

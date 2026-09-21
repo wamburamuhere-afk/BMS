@@ -203,7 +203,7 @@ logAudit($pdo, $_SESSION['user_id'], 'view_payslip', [
         
         <div style="border-top: 2px solid #0d6efd; width: 100px; margin: 15px auto;"></div>
         
-        <h4 class="fw-bold mb-0 text-dark" style="letter-spacing: 2px;">PAYSLIP</h4>
+        <h4 class="fw-bold mb-0 text-dark" style="letter-spacing: 2px;"><?= t('PAYSLIP') ?></h4>
         <p class="text-muted small">#<?= $p['payroll_number'] ?></p>
     </div>
 
@@ -253,23 +253,23 @@ logAudit($pdo, $_SESSION['user_id'], 'view_payslip', [
             <table class="table table-payslip">
                 <thead>
                     <tr>
-                        <th width="70%">Description</th>
-                        <th class="text-end">Amount</th>
+                        <th width="70%"><?= t('Description') ?></th>
+                        <th class="text-end"><?= t('Amount') ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Basic Salary</td>
+                        <td><?= t('Basic Salary') ?></td>
                         <td class="text-end"><?= number_format($p['basic_salary'], 2) ?></td>
                     </tr>
                     <tr>
-                        <td>Allowances</td>
+                        <td><?= t('Allowances') ?></td>
                         <td class="text-end"><?= number_format($p['allowances'], 2) ?></td>
                     </tr>
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td>Gross Earnings</td>
+                        <td><?= t('Gross Earnings') ?></td>
                         <td class="text-end"><?= number_format($p['gross_salary'], 2) ?></td>
                     </tr>
                 </tfoot>
@@ -280,8 +280,8 @@ logAudit($pdo, $_SESSION['user_id'], 'view_payslip', [
             <table class="table table-payslip">
                 <thead>
                     <tr>
-                        <th width="70%">Description</th>
-                        <th class="text-end">Amount</th>
+                        <th width="70%"><?= t('Description') ?></th>
+                        <th class="text-end"><?= t('Amount') ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -290,13 +290,13 @@ logAudit($pdo, $_SESSION['user_id'], 'view_payslip', [
                         <td class="text-end"><?= number_format($p['tax_amount'], 2) ?></td>
                     </tr>
                     <tr>
-                        <td>General Deductions</td>
+                        <td><?= t('General Deductions') ?></td>
                         <td class="text-end"><?= number_format($p['deductions'], 2) ?></td>
                     </tr>
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td>Total Deductions</td>
+                        <td><?= t('Total Deductions') ?></td>
                         <td class="text-end text-danger"><?= number_format($p['tax_amount'] + $p['deductions'], 2) ?></td>
                     </tr>
                 </tfoot>
@@ -306,7 +306,7 @@ logAudit($pdo, $_SESSION['user_id'], 'view_payslip', [
 
     <div class="net-salary-box d-flex justify-content-between align-items-center">
         <div>
-            <h5 class="fw-bold mb-1 text-primary">Net Salary Distributed</h5>
+            <h5 class="fw-bold mb-1 text-primary"><?= t('Net Salary Distributed') ?></h5>
             <p class="text-muted small mb-0">Paid via <?= $p['payment_method'] ?: 'Standard Transfer' ?></p>
         </div>
         <div class="text-end">

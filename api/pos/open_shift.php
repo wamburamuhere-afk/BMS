@@ -102,27 +102,6 @@ try {
         exit();
     }
 
-    // A register can only be staffed by one active shift at a time.
-    $regBusy = $pdo->prepare("
-        SELECT TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS full_name,
-               u.username,
-               DATE_FORMAT(sh.start_time, '%d %b, %H:%i') AS started_label
-        FROM cash_register_shifts sh
-        JOIN users u ON u.user_id = sh.user_id
-        WHERE sh.register_id = ? AND sh.status = 'active'
-        LIMIT 1
-    ");
-    $regBusy->execute([$register_id]);
-    $busyShift = $regBusy->fetch(PDO::FETCH_ASSOC);
-    if ($busyShift) {
-        $busyCashier = trim($busyShift['full_name']) ?: $busyShift['username'];
-        echo json_encode(['success' => false, 'message' => sprintf(
-            t('%s has an active shift since %s. They must close it before you can start.'),
-            $busyCashier, $busyShift['started_label']
-        )]);
-        exit();
-    }
-
     // Generate shift code
     $shift_code = 'SHIFT-' . date('Ymd-His') . '-' . $user_id;
 

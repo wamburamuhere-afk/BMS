@@ -252,7 +252,7 @@ try {
         <div class="card-body py-3">
             <form method="GET" class="row g-3 align-items-center">
                 <div class="col-md-4">
-                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">As Of Date</label>
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1"><?= t('As Of Date') ?></label>
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
                         <input type="date" name="as_of_date" class="form-control" value="<?= $as_of_date ?>">
@@ -341,7 +341,7 @@ try {
     <!-- Report Table — sectioned by accounting category -->
     <div class="card border-0 shadow-lg" id="report-content">
         <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-uppercase ls-1">Account Balances by Category</h5>
+            <h5 class="mb-0 fw-bold text-uppercase ls-1"><?= t('Account Balances by Category') ?></h5>
             <small class="text-muted">As of <?= htmlspecialchars(date('d M Y', strtotime($as_of_date))) ?></small>
         </div>
         <div class="card-body p-0">
@@ -349,10 +349,10 @@ try {
                 <table class="table table-sm tb-table mb-0 align-middle">
                     <thead class="bg-dark text-white">
                         <tr>
-                            <th class="ps-4 py-2" style="width:12%; font-size: 0.85rem;">Code</th>
-                            <th class="py-2" style="width:48%; font-size: 0.85rem;">Account Name</th>
-                            <th class="text-end py-2" style="width:20%; font-size: 0.85rem;">Debit</th>
-                            <th class="text-end pe-4 py-2" style="width:20%; font-size: 0.85rem;">Credit</th>
+                            <th class="ps-4 py-2" style="width:12%; font-size: 0.85rem;"><?= t('Code') ?></th>
+                            <th class="py-2" style="width:48%; font-size: 0.85rem;"><?= t('Account Name') ?></th>
+                            <th class="text-end py-2" style="width:20%; font-size: 0.85rem;"><?= t('Debit') ?></th>
+                            <th class="text-end pe-4 py-2" style="width:20%; font-size: 0.85rem;"><?= t('Credit') ?></th>
                         </tr>
                     </thead>
                     <tbody>

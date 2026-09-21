@@ -51,7 +51,7 @@ autoEnforcePermission('admin'); // compliance oversight is admin-only
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="compTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Category</th><th>Reference</th><th>Detail</th><th>Value</th><th class="pe-3 text-center">Severity</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Category') ?></th><th><?= t('Reference') ?></th><th><?= t('Detail') ?></th><th><?= t('Value') ?></th><th class="pe-3 text-center"><?= t('Severity') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>

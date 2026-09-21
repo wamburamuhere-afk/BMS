@@ -137,11 +137,11 @@ try {
         <form method="GET" action="<?= getUrl('reports') ?>" class="row g-3 align-items-end">
             <input type="hidden" name="report" value="sales_customer">
             <div class="col-md-4">
-                <label class="form-label small fw-bold">From Date</label>
+                <label class="form-label small fw-bold"><?= t('From Date') ?></label>
                 <input type="date" class="form-control form-control-sm" name="start_date" value="<?= $start_date ?>">
             </div>
             <div class="col-md-4">
-                <label class="form-label small fw-bold">To Date</label>
+                <label class="form-label small fw-bold"><?= t('To Date') ?></label>
                 <input type="date" class="form-control form-control-sm" name="end_date" value="<?= $end_date ?>">
             </div>
             <div class="col-md-4 d-grid">
@@ -168,11 +168,11 @@ try {
         <table class="table table-hover align-middle mb-0">
             <thead class="bg-light text-uppercase small fw-bold">
                 <tr>
-                    <th class="ps-4">Customer Name</th>
-                    <th>Phone</th>
-                    <th class="text-center">Total Orders</th>
-                    <th class="text-end">Avg. Value</th>
-                    <th class="text-end pe-4">Total Revenue</th>
+                    <th class="ps-4"><?= t('Customer Name') ?></th>
+                    <th><?= t('Phone') ?></th>
+                    <th class="text-center"><?= t('Total Orders') ?></th>
+                    <th class="text-end"><?= t('Avg. Value') ?></th>
+                    <th class="text-end pe-4"><?= t('Total Revenue') ?></th>
                 </tr>
             </thead>
             <tbody>

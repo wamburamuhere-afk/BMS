@@ -215,7 +215,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             <?php endif; ?>
             <h1 class="fw-bold text-primary mb-1" style="text-transform: uppercase; font-size: 1.5rem;"><?= htmlspecialchars($company_name) ?></h1>
-            <h4 class="fw-bold mb-2 text-dark" style="text-transform: uppercase; font-size: 1.1rem;">PROJECT DETAILS REPORT</h4>
+            <h4 class="fw-bold mb-2 text-dark" style="text-transform: uppercase; font-size: 1.1rem;"><?= t('PROJECT DETAILS REPORT') ?></h4>
             <div class="mx-auto bg-primary mb-2" style="width: 60px; height: 2px; border-radius: 2px;"></div>
             <h5 class="fw-bold mb-3" id="projectTitlePrint"></h5>
         </div>
@@ -1140,7 +1140,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="stats-icon bg-primary bg-opacity-10 text-primary mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
                                             <i class="bi bi-cart"></i>
                                         </div>
-                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Sales</h6>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;"><?= t('Sales') ?></h6>
                                         <h4 class="fw-bold mb-0 text-primary" id="countSalesOrders" style="font-size: 1.1rem;">0</h4>
                                         <button class="btn btn-sm btn-link text-primary mt-1 p-0 text-decoration-none small" onclick="$('#sales-tab').tab('show')">View</button>
                                     </div>
@@ -1152,7 +1152,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="stats-icon bg-success bg-opacity-10 text-success mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
                                             <i class="bi bi-receipt"></i>
                                         </div>
-                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Invoices</h6>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;"><?= t('Invoices') ?></h6>
                                         <h4 class="fw-bold mb-0 text-success" id="countInvoices" style="font-size: 1.1rem;">0</h4>
                                         <button class="btn btn-sm btn-link text-success mt-1 p-0 text-decoration-none small" onclick="$('#invoices-tab').tab('show')">View</button>
                                     </div>
@@ -1164,7 +1164,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="stats-icon bg-warning bg-opacity-10 text-warning mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
                                             <i class="bi bi-bag"></i>
                                         </div>
-                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Purchases</h6>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;"><?= t('Purchases') ?></h6>
                                         <h4 class="fw-bold mb-0 text-warning" id="countPurchases" style="font-size: 1.1rem;">0</h4>
                                         <button class="btn btn-sm btn-link text-warning mt-1 p-0 text-decoration-none small" onclick="$('#purchases-tab').tab('show')">View</button>
                                     </div>
@@ -1176,7 +1176,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="stats-icon bg-danger bg-opacity-10 text-danger mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
                                             <i class="bi bi-wallet"></i>
                                         </div>
-                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Vouchers</h6>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;"><?= t('Vouchers') ?></h6>
                                         <h4 class="fw-bold mb-0 text-danger" id="countVouchers" style="font-size: 1.1rem;">0</h4>
                                         <button class="btn btn-sm btn-link text-danger mt-1 p-0 text-decoration-none small" onclick="$('#vouchers-tab').tab('show')">View</button>
                                     </div>
@@ -1188,7 +1188,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="stats-icon bg-info bg-opacity-10 text-info mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
                                             <i class="bi bi-files"></i>
                                         </div>
-                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Docs</h6>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;"><?= t('Docs') ?></h6>
                                         <h4 class="fw-bold mb-0 text-info" id="countDocuments" style="font-size: 1.1rem;">0</h4>
                                         <button class="btn btn-sm btn-link text-info mt-1 p-0 text-decoration-none small" onclick="$('#docs-view-tab').tab('show')">Files</button>
                                     </div>
@@ -1251,20 +1251,20 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
 
                                 <div class="mb-4">
-                                    <label for="plan_title" class="form-label fw-bold text-muted small text-uppercase">Project Plan Title</label>
-                                    <input type="text" class="form-control form-control-lg border-2" id="plan_title" placeholder="Enter Plan Title (e.g., Construction Phase 1)" style="border-radius: 8px;">
+                                    <label for="plan_title" class="form-label fw-bold text-muted small text-uppercase"><?= t('Project Plan Title') ?></label>
+                                    <input type="text" class="form-control form-control-lg border-2" id="plan_title" placeholder="<?= t('Enter Plan Title (e.g., Construction Phase 1)') ?>" style="border-radius: 8px;">
                                 </div>
 
                                 <div class="table-responsive">
                                     <table class="table table-hover align-middle border" id="planningTable" style="border-radius: 8px; overflow: hidden;">
                                         <thead class="bg-light">
                                             <tr>
-                                                <th class="text-center" style="width: 60px;">S/NO</th>
-                                                <th class="text-center">Task Description / Phase</th>
-                                                <th class="text-center" style="width: 120px;">Duration</th>
-                                                <th class="text-center" style="width: 170px;">Start Date</th>
-                                                <th class="text-center" style="width: 170px;">Finish Date</th>
-                                                <th class="text-center" style="width: 100px;">Actions</th>
+                                                <th class="text-center" style="width: 60px;"><?= t('S/NO') ?></th>
+                                                <th class="text-center"><?= t('Task Description / Phase') ?></th>
+                                                <th class="text-center" style="width: 120px;"><?= t('Duration') ?></th>
+                                                <th class="text-center" style="width: 170px;"><?= t('Start Date') ?></th>
+                                                <th class="text-center" style="width: 170px;"><?= t('Finish Date') ?></th>
+                                                <th class="text-center" style="width: 100px;"><?= t('Actions') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1888,11 +1888,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0 w-100" id="procMatTable">
                                     <thead>
                                         <tr>
-                                            <th class="text-center" style="width:5%">S/NO</th>
-                                            <th style="width:35%">Materials List Name</th>
-                                            <th class="text-center" style="width:20%">Materials List No</th>
-                                            <th class="text-center" style="width:20%">Warehouse</th>
-                                            <th class="text-center pe-3 d-print-none" style="width:20%">Actions</th>
+                                            <th class="text-center" style="width:5%"><?= t('S/NO') ?></th>
+                                            <th style="width:35%"><?= t('Materials List Name') ?></th>
+                                            <th class="text-center" style="width:20%"><?= t('Materials List No') ?></th>
+                                            <th class="text-center" style="width:20%"><?= t('Warehouse') ?></th>
+                                            <th class="text-center pe-3 d-print-none" style="width:20%"><?= t('Actions') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody id="procMatTableBody"></tbody>
@@ -1946,7 +1946,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <div class="col-md-5">
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                                            <input type="text" class="form-control border-0 bg-white" id="projNipSearch" placeholder="Search products..." oninput="projNipFilter()">
+                                            <input type="text" class="form-control border-0 bg-white" id="projNipSearch" placeholder="<?= t('Search products...') ?>" oninput="projNipFilter()">
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -2134,7 +2134,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-6 col-md-3">
-                                        <label class="form-label small fw-bold">Status</label>
+                                        <label class="form-label small fw-bold"><?= t('Status') ?></label>
                                         <select class="form-select" id="projScStatusFilter">
                                             <option value="">All Status</option>
                                             <option value="active">Active</option>
@@ -2144,7 +2144,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </select>
                                     </div>
                                     <div class="col-6 col-md-3">
-                                        <label class="form-label small fw-bold">Category</label>
+                                        <label class="form-label small fw-bold"><?= t('Category') ?></label>
                                         <select class="form-select" id="projScCategoryFilter">
                                             <option value="">All Categories</option>
                                             <?php foreach ($supplier_categories as $cat): ?>
@@ -2153,12 +2153,12 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </select>
                                     </div>
                                     <div class="col-6 col-md-3">
-                                        <label class="form-label small fw-bold">Country</label>
-                                        <input type="text" class="form-control" id="projScCountryFilter" placeholder="Filter by country">
+                                        <label class="form-label small fw-bold"><?= t('Country') ?></label>
+                                        <input type="text" class="form-control" id="projScCountryFilter" placeholder="<?= t('Filter by country') ?>">
                                     </div>
                                     <div class="col-6 col-md-3">
-                                        <label class="form-label small fw-bold">District / City</label>
-                                        <input type="text" class="form-control" id="projScCityFilter" placeholder="Filter by city">
+                                        <label class="form-label small fw-bold"><?= t('District / City') ?></label>
+                                        <input type="text" class="form-control" id="projScCityFilter" placeholder="<?= t('Filter by city') ?>">
                                     </div>
                                     <div class="col-12 d-flex justify-content-end gap-2">
                                         <button class="btn btn-outline-secondary btn-sm" onclick="projScClearFilters()">Clear</button>
@@ -2175,15 +2175,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <table id="proj-sc-table" class="table table-striped table-hover mb-0">
                                         <thead>
                                             <tr>
-                                                <th class="text-center">S/NO</th>
-                                                <th>Code</th>
-                                                <th>Name</th>
-                                                <th>Contact Info</th>
-                                                <th>Address</th>
-                                                <th>Category</th>
-                                                <th>Status</th>
-                                                <th class="d-none">Location</th>
-                                                <th class="d-print-none text-center">Actions</th>
+                                                <th class="text-center"><?= t('S/NO') ?></th>
+                                                <th><?= t('Code') ?></th>
+                                                <th><?= t('Name') ?></th>
+                                                <th><?= t('Contact Info') ?></th>
+                                                <th><?= t('Address') ?></th>
+                                                <th><?= t('Category') ?></th>
+                                                <th><?= t('Status') ?></th>
+                                                <th class="d-none"><?= t('Location') ?></th>
+                                                <th class="d-print-none text-center"><?= t('Actions') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
@@ -2271,7 +2271,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-6 col-md-3">
-                                        <label class="form-label small fw-bold">Result</label>
+                                        <label class="form-label small fw-bold"><?= t('Result') ?></label>
                                         <select class="form-select form-select-sm" id="inspResultFilter">
                                             <option value="">All Results</option>
                                             <option value="Pass">Pass</option>
@@ -2280,7 +2280,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </select>
                                     </div>
                                     <div class="col-6 col-md-3">
-                                        <label class="form-label small fw-bold">Status</label>
+                                        <label class="form-label small fw-bold"><?= t('Status') ?></label>
                                         <select class="form-select form-select-sm" id="inspStatusFilter">
                                             <option value="">All Status</option>
                                             <option value="Pending">Pending</option>
@@ -2303,16 +2303,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <table class="table table-hover align-middle mb-0" id="proj-insp-table">
                                         <thead class="table-light border-bottom border-2">
                                             <tr>
-                                                <th>S/NO</th>
-                                                <th>Insp. No</th>
-                                                <th>Date</th>
-                                                <th>Type</th>
-                                                <th>Milestone</th>
-                                                <th>Inspector</th>
-                                                <th>Location</th>
-                                                <th>Result</th>
-                                                <th>Status</th>
-                                                <th class="d-print-none">Actions</th>
+                                                <th><?= t('S/NO') ?></th>
+                                                <th><?= t('Insp. No') ?></th>
+                                                <th><?= t('Date') ?></th>
+                                                <th><?= t('Type') ?></th>
+                                                <th><?= t('Milestone') ?></th>
+                                                <th><?= t('Inspector') ?></th>
+                                                <th><?= t('Location') ?></th>
+                                                <th><?= t('Result') ?></th>
+                                                <th><?= t('Status') ?></th>
+                                                <th class="d-print-none"><?= t('Actions') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody><tr><td colspan="10" class="text-center text-muted py-4">Loading...</td></tr></tbody>
@@ -2394,15 +2394,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <table class="table table-hover align-middle mb-0 w-100" id="proj-ipc-table">
                                         <thead class="table-light border-bottom border-2">
                                             <tr>
-                                                <th>S/NO</th>
-                                                <th>IPC No</th>
-                                                <th>IPC Date</th>
-                                                <th>Period</th>
-                                                <th>Customer</th>
-                                                <th>Sales Order</th>
-                                                <th class="text-end">Net Payable (TZS)</th>
-                                                <th>Status</th>
-                                                <th class="d-print-none">Actions</th>
+                                                <th><?= t('S/NO') ?></th>
+                                                <th><?= t('IPC No') ?></th>
+                                                <th><?= t('IPC Date') ?></th>
+                                                <th><?= t('Period') ?></th>
+                                                <th><?= t('Customer') ?></th>
+                                                <th><?= t('Sales Order') ?></th>
+                                                <th class="text-end"><?= t('Net Payable (TZS)') ?></th>
+                                                <th><?= t('Status') ?></th>
+                                                <th class="d-print-none"><?= t('Actions') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody><tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr></tbody>
@@ -2514,15 +2514,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Filters -->
                         <div class="row g-2 mb-3 d-print-none">
                             <div class="col-6 col-md-3">
-                                <label class="form-label small fw-bold mb-1">Date From</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Date From') ?></label>
                                 <input type="date" id="attDateFrom" class="form-control form-control-sm">
                             </div>
                             <div class="col-6 col-md-3">
-                                <label class="form-label small fw-bold mb-1">Date To</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Date To') ?></label>
                                 <input type="date" id="attDateTo" class="form-control form-control-sm">
                             </div>
                             <div class="col-6 col-md-3">
-                                <label class="form-label small fw-bold mb-1">Status</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Status') ?></label>
                                 <select id="attStatusFilter" class="form-select form-select-sm">
                                     <option value="">All Status</option>
                                     <option value="present">Present</option>
@@ -2615,15 +2615,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Filters -->
                         <div class="row g-2 mb-3 d-print-none">
                             <div class="col-6 col-md-2">
-                                <label class="form-label small fw-bold mb-1">Date From</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Date From') ?></label>
                                 <input type="date" id="lvDateFrom" class="form-control form-control-sm">
                             </div>
                             <div class="col-6 col-md-2">
-                                <label class="form-label small fw-bold mb-1">Date To</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Date To') ?></label>
                                 <input type="date" id="lvDateTo" class="form-control form-control-sm">
                             </div>
                             <div class="col-6 col-md-2">
-                                <label class="form-label small fw-bold mb-1">Status</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Status') ?></label>
                                 <select id="lvStatusFilter" class="form-select form-select-sm">
                                     <option value="">All Status</option>
                                     <option value="pending">Pending</option>
@@ -2634,7 +2634,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </select>
                             </div>
                             <div class="col-6 col-md-3">
-                                <label class="form-label small fw-bold mb-1">Leave Type</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Leave Type') ?></label>
                                 <select id="lvTypeFilter" class="form-select form-select-sm">
                                     <option value="">All Types</option>
                                     <option value="annual">Annual Leave</option>
@@ -2715,11 +2715,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Filters -->
                         <div class="row g-2 mb-3 d-print-none">
                             <div class="col-6 col-md-3">
-                                <label class="form-label small fw-bold mb-1">Payroll Period</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Payroll Period') ?></label>
                                 <input type="month" id="prPeriodFilter" class="form-control form-control-sm">
                             </div>
                             <div class="col-6 col-md-3">
-                                <label class="form-label small fw-bold mb-1">Status</label>
+                                <label class="form-label small fw-bold mb-1"><?= t('Status') ?></label>
                                 <select id="prStatusFilter" class="form-select form-select-sm">
                                     <option value="">All Status</option>
                                     <option value="pending">Pending</option>
@@ -2806,12 +2806,12 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <input type="hidden" name="project_id" value="<?= $project_id ?>">
                                     <div class="row g-3">
                                         <div class="col-md-6">
-                                            <label for="doc_upload_name" class="form-label fw-bold small">Document Title</label>
+                                            <label for="doc_upload_name" class="form-label fw-bold small"><?= t('Document Title') ?></label>
                                             <input type="text" class="form-control" name="document_name" id="doc_upload_name" required placeholder="e.g. Project Scope Document">
                                             <div class="form-text small text-muted">Title will auto-fill from filename if left blank.</div>
                                         </div>
                                         <div class="col-md-6">
-                                            <label for="source_select" class="form-label fw-bold small">Source / Category</label>
+                                            <label for="source_select" class="form-label fw-bold small"><?= t('Source / Category') ?></label>
                                             <select class="form-select" name="source_select" id="source_select" required>
                                                 <option value="" selected disabled>Select Source/Category</option>
                                                 <option value="Project Asset">Project Asset</option>
@@ -2821,11 +2821,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <option value="Purchase Order">Purchase Order</option>
                                                 <option value="Other">Other (Write Manually)</option>
                                             </select>
-                                            <input type="text" class="form-control mt-2" name="source_manual" id="source_manual" style="display: none;" placeholder="Enter custom source...">
+                                            <input type="text" class="form-control mt-2" name="source_manual" id="source_manual" style="display: none;" placeholder="<?= t('Enter custom source...') ?>">
                                             <input type="hidden" name="source" id="final_source">
                                         </div>
                                         <div class="col-12">
-                                            <label for="doc_upload_file" class="form-label fw-bold small">File Selection</label>
+                                            <label for="doc_upload_file" class="form-label fw-bold small"><?= t('File Selection') ?></label>
                                             <div class="input-group">
                                                 <input type="file" class="form-control" name="document_file" id="doc_upload_file" required>
                                                 <label class="input-group-text bg-white"><i class="bi bi-file-earmark-arrow-up"></i></label>
@@ -2894,12 +2894,12 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0" id="milestonesTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4 text-center" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">Description</th>
-                                            <th class="text-center" style="width: 120px;">Unit</th>
-                                            <th class="text-center" style="width: 150px;">Scope (Qty)</th>
-                                            <th class="text-center" style="width: 150px;">Weight (%)</th>
-                                            <th class="text-end pe-4 d-print-none" style="width: 100px;">Action</th>
+                                            <th class="ps-4 text-center" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('Description') ?></th>
+                                            <th class="text-center" style="width: 120px;"><?= t('Unit') ?></th>
+                                            <th class="text-center" style="width: 150px;"><?= t('Scope (Qty)') ?></th>
+                                            <th class="text-center" style="width: 150px;"><?= t('Weight (%)') ?></th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 100px;"><?= t('Action') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2961,15 +2961,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0 scope-table" id="originalScopeTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">DESCRIPTION</th>
-                                            <th style="width: 100px;">UNIT</th>
-                                            <th style="width: 120px;">QUANTITY</th>
-                                            <th style="width: 130px;">PRICE</th>
-                                            <th style="width: 100px;">TAX (%)</th>
+                                            <th class="ps-4" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('DESCRIPTION') ?></th>
+                                            <th style="width: 100px;"><?= t('UNIT') ?></th>
+                                            <th style="width: 120px;"><?= t('QUANTITY') ?></th>
+                                            <th style="width: 130px;"><?= t('PRICE') ?></th>
+                                            <th style="width: 100px;"><?= t('TAX (%)') ?></th>
 
-                                            <th style="width: 160px;">TOTAL AMOUNT</th>
-                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                            <th style="width: 160px;"><?= t('TOTAL AMOUNT') ?></th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;"><?= t('ACTION') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3034,15 +3034,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0 scope-table" id="revisedScopeTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">DESCRIPTION</th>
-                                            <th style="width: 100px;">UNIT</th>
-                                            <th style="width: 120px;">QUANTITY</th>
-                                            <th style="width: 130px;">PRICE</th>
-                                            <th style="width: 100px;">TAX (%)</th>
+                                            <th class="ps-4" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('DESCRIPTION') ?></th>
+                                            <th style="width: 100px;"><?= t('UNIT') ?></th>
+                                            <th style="width: 120px;"><?= t('QUANTITY') ?></th>
+                                            <th style="width: 130px;"><?= t('PRICE') ?></th>
+                                            <th style="width: 100px;"><?= t('TAX (%)') ?></th>
 
-                                            <th style="width: 160px;">TOTAL AMOUNT</th>
-                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                            <th style="width: 160px;"><?= t('TOTAL AMOUNT') ?></th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;"><?= t('ACTION') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -3104,15 +3104,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0 scope-table" id="variationScopeTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">DESCRIPTION</th>
-                                            <th style="width: 100px;">UNIT</th>
-                                            <th style="width: 120px;">QUANTITY</th>
-                                            <th style="width: 130px;">PRICE</th>
-                                            <th style="width: 100px;">TAX (%)</th>
+                                            <th class="ps-4" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('DESCRIPTION') ?></th>
+                                            <th style="width: 100px;"><?= t('UNIT') ?></th>
+                                            <th style="width: 120px;"><?= t('QUANTITY') ?></th>
+                                            <th style="width: 130px;"><?= t('PRICE') ?></th>
+                                            <th style="width: 100px;"><?= t('TAX (%)') ?></th>
 
-                                            <th style="width: 160px;">TOTAL AMOUNT</th>
-                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                            <th style="width: 160px;"><?= t('TOTAL AMOUNT') ?></th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;"><?= t('ACTION') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -3178,15 +3178,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0 scope-table" id="variationHistoryTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">DESCRIPTION</th>
-                                            <th style="width: 100px;">UNIT</th>
-                                            <th style="width: 120px;">QUANTITY</th>
-                                            <th style="width: 130px;">PRICE</th>
-                                            <th style="width: 100px;">TAX (%)</th>
+                                            <th class="ps-4" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('DESCRIPTION') ?></th>
+                                            <th style="width: 100px;"><?= t('UNIT') ?></th>
+                                            <th style="width: 120px;"><?= t('QUANTITY') ?></th>
+                                            <th style="width: 130px;"><?= t('PRICE') ?></th>
+                                            <th style="width: 100px;"><?= t('TAX (%)') ?></th>
 
-                                            <th style="width: 160px;">TOTAL AMOUNT</th>
-                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                            <th style="width: 160px;"><?= t('TOTAL AMOUNT') ?></th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;"><?= t('ACTION') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -3261,15 +3261,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle mb-0 scope-table" id="additionalScopeTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">DESCRIPTION</th>
-                                            <th style="width: 100px;">UNIT</th>
-                                            <th style="width: 120px;">QUANTITY</th>
-                                            <th style="width: 130px;">PRICE</th>
-                                            <th style="width: 100px;">TAX (%)</th>
+                                            <th class="ps-4" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('DESCRIPTION') ?></th>
+                                            <th style="width: 100px;"><?= t('UNIT') ?></th>
+                                            <th style="width: 120px;"><?= t('QUANTITY') ?></th>
+                                            <th style="width: 130px;"><?= t('PRICE') ?></th>
+                                            <th style="width: 100px;"><?= t('TAX (%)') ?></th>
 
-                                            <th style="width: 160px;">TOTAL AMOUNT</th>
-                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                            <th style="width: 160px;"><?= t('TOTAL AMOUNT') ?></th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;"><?= t('ACTION') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -3307,7 +3307,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h5 class="fw-bold mb-0"><i class="bi bi-pencil-square me-2 text-primary"></i>Project Reporting & Updates</h5>
                             <div class="d-flex align-items-center">
-                                <label for="reportingReportDate" class="me-2 text-muted small fw-bold">Report Date:</label>
+                                <label for="reportingReportDate" class="me-2 text-muted small fw-bold"><?= t('Report Date:') ?></label>
                                 <input type="date" id="reportingReportDate" class="form-control form-control-sm border-primary shadow-sm" value="<?= date('Y-m-d') ?>" onchange="loadReportingData()" style="width: 160px;">
                             </div>
                         </div>
@@ -3316,13 +3316,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-hover align-middle border mb-0" id="reportingTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th class="ps-4 text-center" style="width: 80px;">S/NO</th>
-                                            <th class="text-center">Description</th>
-                                            <th class="text-center" style="width: 120px;">Unit</th>
-                                            <th class="text-center" style="width: 150px;">Total Scope</th>
-                                            <th class="text-center" style="width: 180px;">Actual (Qty)</th>
-                                            <th class="text-center" style="width: 120px;">Weight (%)</th>
-                                            <th class="text-center" style="width: 120px;">Progress (%)</th>
+                                            <th class="ps-4 text-center" style="width: 80px;"><?= t('S/NO') ?></th>
+                                            <th class="text-center"><?= t('Description') ?></th>
+                                            <th class="text-center" style="width: 120px;"><?= t('Unit') ?></th>
+                                            <th class="text-center" style="width: 150px;"><?= t('Total Scope') ?></th>
+                                            <th class="text-center" style="width: 180px;"><?= t('Actual (Qty)') ?></th>
+                                            <th class="text-center" style="width: 120px;"><?= t('Weight (%)') ?></th>
+                                            <th class="text-center" style="width: 120px;"><?= t('Progress (%)') ?></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3332,7 +3332,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                             <div id="reportingComments" class="mt-4">
                                 <label for="reportingComment" class="form-label fw-bold text-muted small"><i class="bi bi-chat-left-text me-1"></i> Reporting Comments / Observations:</label>
-                                <textarea id="reportingComment" class="form-control border-info-subtle shadow-sm" rows="3" placeholder="Enter any site observations or comments for today's report..."></textarea>
+                                <textarea id="reportingComment" class="form-control border-info-subtle shadow-sm" rows="3" placeholder="<?= t('Enter any site observations or comments for today\'s report...') ?>"></textarea>
                             </div>
                             <div class="mt-3">
                                 <label class="form-label fw-bold text-muted small mb-2"><i class="bi bi-paperclip me-1"></i> Attachments (PDF / Image):</label>
@@ -3368,19 +3368,19 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <!-- Period filter buttons — scrollable on narrow screens -->
                             <div class="btn-group shadow-sm flex-nowrap" role="group">
                                 <input type="radio" class="btn-check" name="report_filter" id="filter_daily" value="daily" checked onclick="setPerformanceFilter('daily')">
-                                <label class="btn btn-outline-success px-3" for="filter_daily">Daily</label>
+                                <label class="btn btn-outline-success px-3" for="filter_daily"><?= t('Daily') ?></label>
 
                                 <input type="radio" class="btn-check" name="report_filter" id="filter_weekly" value="weekly" onclick="setPerformanceFilter('weekly')">
-                                <label class="btn btn-outline-success px-3" for="filter_weekly">Weekly</label>
+                                <label class="btn btn-outline-success px-3" for="filter_weekly"><?= t('Weekly') ?></label>
 
                                 <input type="radio" class="btn-check" name="report_filter" id="filter_monthly" value="monthly" onclick="setPerformanceFilter('monthly')">
-                                <label class="btn btn-outline-success px-3" for="filter_monthly">Monthly</label>
+                                <label class="btn btn-outline-success px-3" for="filter_monthly"><?= t('Monthly') ?></label>
 
                                 <input type="radio" class="btn-check" name="report_filter" id="filter_quarterly" value="quarterly" onclick="setPerformanceFilter('quarterly')">
-                                <label class="btn btn-outline-success px-3" for="filter_quarterly">Quarterly</label>
+                                <label class="btn btn-outline-success px-3" for="filter_quarterly"><?= t('Quarterly') ?></label>
 
                                 <input type="radio" class="btn-check" name="report_filter" id="filter_annual" value="annual" onclick="setPerformanceFilter('annual')">
-                                <label class="btn btn-outline-success px-3" for="filter_annual">Yearly</label>
+                                <label class="btn btn-outline-success px-3" for="filter_annual"><?= t('Yearly') ?></label>
                             </div>
                         </div>
 
@@ -3438,13 +3438,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <table class="table table-bordered align-middle mb-0" id="performanceTable" style="min-width: 560px;">
                                         <thead class="bg-light" id="performanceTableHead">
                                             <tr>
-                                                <th class="ps-4 text-center" style="width: 60px;">S/NO</th>
-                                                <th class="text-center">Milestone Description / Phase</th>
-                                                <th class="text-center" style="width: 100px;">Unit</th>
-                                                <th class="text-center" style="width: 120px;">Scope</th>
-                                                <th class="text-center" style="width: 120px;">Actual</th>
-                                                <th class="text-center" style="width: 120px;">Weight (%)</th>
-                                                <th class="text-center" style="width: 120px;">Progress (%)</th>
+                                                <th class="ps-4 text-center" style="width: 60px;"><?= t('S/NO') ?></th>
+                                                <th class="text-center"><?= t('Milestone Description / Phase') ?></th>
+                                                <th class="text-center" style="width: 100px;"><?= t('Unit') ?></th>
+                                                <th class="text-center" style="width: 120px;"><?= t('Scope') ?></th>
+                                                <th class="text-center" style="width: 120px;"><?= t('Actual') ?></th>
+                                                <th class="text-center" style="width: 120px;"><?= t('Weight (%)') ?></th>
+                                                <th class="text-center" style="width: 120px;"><?= t('Progress (%)') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -3545,15 +3545,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <table class="table table-hover align-middle border mb-0" id="scPaymentsTable">
                                 <thead class="table-light small fw-bold text-muted">
                                     <tr>
-                                        <th width="50" class="text-center">S/No</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Currency</th>
-                                        <th>Method</th>
-                                        <th>Reference No</th>
-                                        <th>Receipt No</th>
-                                        <th>Status</th>
-                                        <th width="80" class="text-center d-print-none">Actions</th>
+                                        <th width="50" class="text-center"><?= t('S/No') ?></th>
+                                        <th><?= t('Date') ?></th>
+                                        <th><?= t('Amount') ?></th>
+                                        <th><?= t('Currency') ?></th>
+                                        <th><?= t('Method') ?></th>
+                                        <th><?= t('Reference No') ?></th>
+                                        <th><?= t('Receipt No') ?></th>
+                                        <th><?= t('Status') ?></th>
+                                        <th width="80" class="text-center d-print-none"><?= t('Actions') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody id="scPaymentsBody">
@@ -3724,7 +3724,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="row g-0">
                             <!-- Progress Info -->
                             <div class="col-md-5 bg-light p-4 text-center border-end">
-                                <h6 class="text-muted text-uppercase small fw-bold mb-3">Overall Progress</h6>
+                                <h6 class="text-muted text-uppercase small fw-bold mb-3"><?= t('Overall Progress') ?></h6>
                                 <div class="position-relative d-inline-block mb-3">
                                     <h1 class="fw-bold text-primary mb-0" id="progressTextDisplay" style="font-size: clamp(1.8rem, 6vw, 3.5rem); word-break: break-word; overflow-wrap: break-word; max-width: 100%;">0%</h1>
                                 </div>
@@ -3746,7 +3746,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     No description provided.
                                 </div>
 
-                                <h6 class="text-muted text-uppercase small fw-bold mb-3 border-top pt-3">Metrics Breakdown</h6>
+                                <h6 class="text-muted text-uppercase small fw-bold mb-3 border-top pt-3"><?= t('Metrics Breakdown') ?></h6>
                                 <div id="progressBreakdown"></div>
                             </div>
                         </div>
@@ -3826,7 +3826,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="d-flex justify-content-between align-items-start mb-3 position-relative">
                                 <div>
                                     <small class="text-uppercase fw-bold" style="font-size: 0.6rem; letter-spacing: 1.5px; opacity: 0.9;">Time status</small>
-                                    <h4 class="fw-bold mb-0 mt-1" id="daysRemainingFocus">Calculating...</h4>
+                                    <h4 class="fw-bold mb-0 mt-1" id="daysRemainingFocus"><?= t('Calculating...') ?></h4>
                                 </div>
                                 <div class="badge bg-white text-primary rounded-pill px-3 py-2 fw-bold shadow-sm ms-auto" style="font-size: 0.75rem;" id="totalDurationBadge">
                                     -- Days Total
@@ -3857,7 +3857,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div>
                             <small class="text-muted d-block mb-2">Current Status</small>
-                            <h5 class="fw-bold mb-0 text-capitalize" id="statusTextDisplay">Planning</h5>
+                            <h5 class="fw-bold mb-0 text-capitalize" id="statusTextDisplay"><?= t('Planning') ?></h5>
                         </div>
                     </div>
                 </div>
@@ -3890,18 +3890,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <input type="hidden" id="msEditRowId">
                 <div class="mb-3">
                     <label class="form-label fw-bold small">Description <span class="text-danger">*</span></label>
-                    <textarea class="form-control" id="msEditDesc" rows="3" placeholder="Milestone description..."></textarea>
+                    <textarea class="form-control" id="msEditDesc" rows="3" placeholder="<?= t('Milestone description...') ?>"></textarea>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">Unit</label>
+                    <label class="form-label fw-bold small"><?= t('Unit') ?></label>
                     <input type="text" class="form-control" id="msEditUnit" placeholder="e.g. days, pcs, %">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold small">Scope (%)</label>
+                    <label class="form-label fw-bold small"><?= t('Scope (%)') ?></label>
                     <input type="number" class="form-control" id="msEditScope" min="0" max="100" step="0.01" placeholder="0.00">
                 </div>
                 <div class="mb-3" id="msEditWeightGroup">
-                    <label class="form-label fw-bold small">Weight (%)</label>
+                    <label class="form-label fw-bold small"><?= t('Weight (%)') ?></label>
                     <input type="number" class="form-control" id="msEditWeight" min="0" max="100" step="0.01" placeholder="0.00">
                 </div>
             </div>
@@ -3927,11 +3927,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <input type="hidden" name="document_id" id="edit_doc_id">
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold small">Document Title</label>
+                        <label class="form-label fw-bold small"><?= t('Document Title') ?></label>
                         <input type="text" class="form-control" name="document_name" id="edit_doc_name" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold small">Source / Category</label>
+                        <label class="form-label fw-bold small"><?= t('Source / Category') ?></label>
                         <select class="form-select" name="source_select" id="edit_source_select" required>
                             <option value="Project Asset">Project Asset</option>
                             <option value="Payment Voucher">Payment Voucher</option>
@@ -3940,7 +3940,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <option value="Purchase Order">Purchase Order</option>
                             <option value="Other">Other (Write Manually)</option>
                         </select>
-                        <input type="text" class="form-control mt-2" name="source_manual" id="edit_source_manual" style="display: none;" placeholder="Enter custom source...">
+                        <input type="text" class="form-control mt-2" name="source_manual" id="edit_source_manual" style="display: none;" placeholder="<?= t('Enter custom source...') ?>">
                     </div>
                 </div>
                 <div class="modal-footer bg-light p-4">
@@ -3995,7 +3995,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </select>
                                 <div class="modern-input-wrapper mt-2" style="display:none;">
                                     <div class="input-group">
-                                        <input type="text" class="form-control" name="discipline_other" id="edit_discipline_other" placeholder="Type discipline and press Enter">
+                                        <input type="text" class="form-control" name="discipline_other" id="edit_discipline_other" placeholder="<?= t('Type discipline and press Enter') ?>">
                                         <button class="btn btn-outline-secondary" type="button" onclick="cancelModernOther(this)"><i class="bi bi-x"></i></button>
                                     </div>
                                 </div>
@@ -4013,19 +4013,19 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </select>
                                 <div class="modern-input-wrapper mt-2" style="display:none;">
                                     <div class="input-group">
-                                        <input type="text" class="form-control" name="role_position_other" id="edit_role_position_other" placeholder="Type position and press Enter">
+                                        <input type="text" class="form-control" name="role_position_other" id="edit_role_position_other" placeholder="<?= t('Type position and press Enter') ?>">
                                         <button class="btn btn-outline-secondary" type="button" onclick="cancelModernOther(this)"><i class="bi bi-x"></i></button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Contract Attachment</label>
+                            <label class="form-label fw-bold"><?= t('Contract Attachment') ?></label>
                             <input type="file" class="form-control" name="contract_file">
                             <div id="edit_current_attachment" class="small mt-1"></div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Project Manager</label>
+                            <label class="form-label fw-bold"><?= t('Project Manager') ?></label>
                             <input type="text" class="form-control" name="project_manager" id="edit_project_manager">
                         </div>
                         <div class="col-md-4">
@@ -4033,11 +4033,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="start_date" id="edit_start_date" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">END DATE</label>
+                            <label class="form-label fw-bold"><?= t('END DATE') ?></label>
                             <input type="date" class="form-control" name="deadline" id="edit_deadline">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">Priority</label>
+                            <label class="form-label fw-bold"><?= t('Priority') ?></label>
                             <select class="form-select" name="priority" id="edit_priority">
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
@@ -4046,7 +4046,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-12">
-                            <label class="form-label fw-bold">Status</label>
+                            <label class="form-label fw-bold"><?= t('Status') ?></label>
                             <select class="form-select" name="status" id="edit_status">
                                 <option value="planning">Planning</option>
                                 <option value="active">Active</option>
@@ -4056,7 +4056,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Description</label>
+                            <label class="form-label fw-bold"><?= t('Description') ?></label>
                             <textarea class="form-control" name="description" id="edit_description" rows="3"></textarea>
                         </div>
                     </div>
@@ -4130,7 +4130,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Paid To Type</label>
+                            <label class="form-label fw-bold"><?= t('Paid To Type') ?></label>
                             <select class="form-select" name="paid_to_type" id="edit_ex_paid_to_type">
                                 <option value="">General / Other</option>
                                 <option value="supplier">Supplier</option>
@@ -4140,7 +4140,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6 d-none" id="edit_paid_to_id_block">
-                            <label class="form-label fw-bold" id="edit_paid_to_id_label">Payee</label>
+                            <label class="form-label fw-bold" id="edit_paid_to_id_label"><?= t('Payee') ?></label>
                             <select class="form-select" name="paid_to_id" id="edit_paid_to_id_select">
                                 <option value="">Select...</option>
                             </select>
@@ -4148,11 +4148,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <div class="col-12">
                             <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" rows="3" required placeholder="Explain why this expense happened..."></textarea>
+                            <textarea class="form-control" name="description" rows="3" required placeholder="<?= t('Explain why this expense happened...') ?>"></textarea>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Notes</label>
-                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional details..."></textarea>
+                            <label class="form-label fw-bold"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Additional details...') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -4223,7 +4223,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label for="ex_paid_to_type" class="form-label fw-bold">Paid To Type</label>
+                            <label for="ex_paid_to_type" class="form-label fw-bold"><?= t('Paid To Type') ?></label>
                             <select class="form-select" name="paid_to_type" id="ex_paid_to_type">
                                 <option value="">General / Other</option>
                                 <option value="supplier">Supplier</option>
@@ -4233,7 +4233,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6 d-none" id="proj_paid_to_id_block">
-                            <label class="form-label fw-bold" id="proj_paid_to_id_label">Payee</label>
+                            <label class="form-label fw-bold" id="proj_paid_to_id_label"><?= t('Payee') ?></label>
                             <select class="form-select" name="paid_to_id" id="proj_paid_to_id_select">
                                 <option value="">Select...</option>
                             </select>
@@ -4241,11 +4241,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <div class="col-12">
                             <label for="ex_description" class="form-label fw-bold">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" id="ex_description" rows="3" required placeholder="Explain why this expense happened "></textarea>
+                            <textarea class="form-control" name="description" id="ex_description" rows="3" required placeholder="<?= t('Explain why this expense happened') ?>"></textarea>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Notes</label>
-                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional details..."></textarea>
+                            <label class="form-label fw-bold"><?= t('Notes') ?></label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Additional details...') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -4305,7 +4305,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <label class="form-label fw-bold">Payee Name <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                <input type="text" class="form-control" name="payee_name" id="vc_payee_name" placeholder="Who are we paying?" required>
+                                <input type="text" class="form-control" name="payee_name" id="vc_payee_name" placeholder="<?= t('Who are we paying?') ?>" required>
                             </div>
                         </div>
 
@@ -4327,7 +4327,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <!-- Payment Method -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Payment Method</label>
+                            <label class="form-label fw-bold"><?= t('Payment Method') ?></label>
                             <select class="form-select" name="payment_method" id="vc_payment_method">
                                 <option value="cash">Cash</option>
                                 <option value="bank_transfer">Bank Transfer</option>
@@ -4338,17 +4338,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <!-- Amount in Words -->
                         <div class="col-12">
-                            <label class="form-label fw-bold">Amount in Words</label>
+                            <label class="form-label fw-bold"><?= t('Amount in Words') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text small fw-bold text-muted">WORDS</span>
-                                <input type="text" class="form-control bg-light opacity-75" name="amount_in_words" id="vc_amount_words" placeholder="Auto-calculated..." readonly>
+                                <input type="text" class="form-control bg-light opacity-75" name="amount_in_words" id="vc_amount_words" placeholder="<?= t('Auto-calculated...') ?>" readonly>
                             </div>
                         </div>
 
                         <!-- Description -->
                         <div class="col-12">
                             <label class="form-label fw-bold">Description / Purpose <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" id="vc_description" rows="2" placeholder="Reference invoice, receipt, or reason for payment..." required></textarea>
+                            <textarea class="form-control" name="description" id="vc_description" rows="2" placeholder="<?= t('Reference invoice, receipt, or reason for payment...') ?>" required></textarea>
                         </div>
 
                         <!-- Upload Proof -->
@@ -4360,8 +4360,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <!-- Reference Number -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Reference #</label>
-                            <input type="text" class="form-control" name="reference" id="vc_reference" placeholder="Check/Trans ID/Receipt #">
+                            <label class="form-label fw-bold"><?= t('Reference #') ?></label>
+                            <input type="text" class="form-control" name="reference" id="vc_reference" placeholder="<?= t('Check/Trans ID/Receipt #') ?>">
                         </div>
 
                         <!-- Expense Account — same field as the external Payment Vouchers form.
@@ -4369,7 +4369,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                              pre-filled from the linked expense's own account when one is picked,
                              but freely editable, matching the external form's behaviour. -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Account</label>
+                            <label class="form-label fw-bold"><?= t('Expense Account') ?></label>
                             <select class="form-select select2" name="expense_account_id" id="vc_expense_account_id">
                                 <option value="">Select expense account</option>
                                 <?php foreach ($expense_accounts as $ea): ?>
@@ -4402,7 +4402,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <i class="bi bi-file-earmark-text text-primary fs-4"></i>
                     </div>
                     <div>
-                        <h5 class="modal-title fw-bold mb-0">Payment Voucher Details</h5>
+                        <h5 class="modal-title fw-bold mb-0"><?= t('Payment Voucher Details') ?></h5>
                         <p class="text-muted small mb-0" id="pv_detail_voucher_no">#PV-00000</p>
                     </div>
                 </div>
@@ -4412,34 +4412,34 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="row g-4 mb-4">
                     <div class="col-md-7">
                         <div class="bg-light p-4 rounded-4 h-100">
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Status &amp; Method</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Status &amp; Method') ?></label>
                             <div class="d-flex gap-2 mb-3">
                                 <div id="pv_detail_status_badge"></div>
                                 <div id="pv_detail_method_badge"></div>
                             </div>
                             <div class="row">
                                 <div class="col-6">
-                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1">Voucher Date</label>
+                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Voucher Date') ?></label>
                                     <p class="fw-bold fs-6 mb-3" id="pv_detail_date"></p>
                                 </div>
                                 <div class="col-6">
-                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1">Reference No.</label>
+                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Reference No.') ?></label>
                                     <p class="fw-bold mb-3" id="pv_detail_reference"></p>
                                 </div>
                             </div>
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Payee (Pay To)</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Payee (Pay To)') ?></label>
                             <p class="fw-bold mb-3 fs-5 text-dark" id="pv_detail_payee"></p>
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Expense Category</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Expense Category') ?></label>
                             <p class="fw-bold mb-0" id="pv_detail_category"></p>
                         </div>
                     </div>
                     <div class="col-md-5">
                         <div class="p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center" style="background:#e7f0ff;border:1px solid #b6ccfe;">
-                            <label class="small text-primary text-uppercase fw-bold d-block mb-2">Total Amount</label>
+                            <label class="small text-primary text-uppercase fw-bold d-block mb-2"><?= t('Total Amount') ?></label>
                             <h2 class="fw-bold text-primary mb-2" id="pv_detail_amount" style="white-space:nowrap;line-height:1.2;">...</h2>
                             <p id="pv_detail_words" class="text-muted small mb-0 border-top pt-2 mt-2" style="word-break:break-word;"></p>
                             <div class="mt-3 text-start">
-                                <label class="small text-muted text-uppercase fw-bold d-block mb-1">Project</label>
+                                <label class="small text-muted text-uppercase fw-bold d-block mb-1"><?= t('Project') ?></label>
                                 <p class="badge bg-white text-dark border w-100 py-2 mb-0" id="pv_detail_project"></p>
                             </div>
                         </div>
@@ -4447,7 +4447,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
 
                 <div class="p-4 bg-light rounded-4">
-                    <label class="small text-muted text-uppercase fw-bold d-block mb-2">Description / Narration</label>
+                    <label class="small text-muted text-uppercase fw-bold d-block mb-2"><?= t('Description / Narration') ?></label>
                     <p class="mb-0 fs-6 text-dark lh-base" id="pv_detail_description" style="white-space:pre-wrap;font-style:italic;"></p>
                 </div>
 
@@ -4544,7 +4544,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="payment_date" id="pay_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold small text-muted">Method</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Method') ?></label>
                             <select class="form-select" name="payment_method" id="pay_method">
                                 <option value="cash">Cash</option>
                                 <option value="cheque">Cheque</option>
@@ -4553,11 +4553,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">Reference (Cheque/Txn No.)</label>
-                            <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="Optional">
+                            <label class="form-label fw-bold small text-muted"><?= t('Reference (Cheque/Txn No.)') ?></label>
+                            <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="<?= t('Optional') ?>">
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted">Payment Proof (optional)</label>
+                            <label class="form-label fw-bold small text-muted"><?= t('Payment Proof (optional)') ?></label>
                             <input type="file" class="form-control" name="attachment_file" accept=".pdf,.jpg,.jpeg,.png">
                         </div>
                     </div>
@@ -4596,13 +4596,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Project</label>
+                            <label class="form-label fw-bold small"><?= t('Project') ?></label>
                             <input type="text" class="form-control form-control-sm bg-light" readonly
                                 value="<?= htmlspecialchars($project_name ?? '') ?>">
                             <div class="form-text">Linked to this project automatically.</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Warehouse</label>
+                            <label class="form-label fw-bold small"><?= t('Warehouse') ?></label>
                             <select name="warehouse_id" id="procMlAddWarehouse" class="form-select form-select-sm" onchange="procMlAddWarehouseChanged()">
                                 <option value="">— Loading… —</option>
                             </select>
@@ -4613,9 +4613,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-hover align-middle mb-0" id="procMlAddTable">
                             <thead class="text-white text-center" style="background:#0d6efd;">
                                 <tr class="small">
-                                    <th style="width:55px;">S/NO</th>
-                                    <th class="text-start ps-3">Non-Inventory Product</th>
-                                    <th style="width:20%;">Quantity</th>
+                                    <th style="width:55px;"><?= t('S/NO') ?></th>
+                                    <th class="text-start ps-3"><?= t('Non-Inventory Product') ?></th>
+                                    <th style="width:20%;"><?= t('Quantity') ?></th>
                                     <th style="width:55px;"></th>
                                 </tr>
                             </thead>
@@ -4698,15 +4698,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="row g-2">
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">SKU / Item Code</label>
+                                <label class="form-label fw-bold small"><?= t('SKU / Item Code') ?></label>
                                 <input type="text" class="form-control form-control-sm bg-light" id="editProcNipSku" readonly>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Contract Item No</label>
+                                <label class="form-label fw-bold small"><?= t('Contract Item No') ?></label>
                                 <input type="text" class="form-control form-control-sm" name="contract_item_no" id="editProcNipContractNo">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Status</label>
+                                <label class="form-label fw-bold small"><?= t('Status') ?></label>
                                 <select class="form-select form-select-sm" name="status" id="editProcNipStatus">
                                     <option value="active">Active</option>
                                     <option value="approved">Approved</option>
@@ -4728,14 +4728,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Cost Price (Auto-Sum)</label>
+                            <label class="form-label fw-bold small"><?= t('Cost Price (Auto-Sum)') ?></label>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text">TZS</span>
                                 <input type="number" class="form-control bg-light" name="cost_price" id="editProcNipCost" step="0.01" readonly>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Project</label>
+                            <label class="form-label fw-bold small"><?= t('Project') ?></label>
                             <input type="text" class="form-control form-control-sm bg-light" id="editProcNipProjectDisplay" readonly>
                             <input type="hidden" name="project_id" id="editProcNipProjectId">
                         </div>
@@ -4744,13 +4744,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Row 2: Tax Rate | Warehouse (same row) -->
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Tax Rate</label>
+                            <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                             <select class="form-select form-select-sm" name="tax_id" id="editProcNipTax" onchange="editProcNipRecalcCost()">
                                 <option value="" data-rate="0">No Tax</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Warehouse</label>
+                            <label class="form-label fw-bold small"><?= t('Warehouse') ?></label>
                             <select class="form-select form-select-sm" name="warehouse_id" id="editProcNipWarehouse">
                                 <option value="">— Select Warehouse —</option>
                             </select>
@@ -4758,15 +4758,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <!-- Components -->
-                    <h6 class="fw-bold border-bottom pb-2 mb-3">Material Components</h6>
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><?= t('Material Components') ?></h6>
                     <div class="table-responsive mb-2">
                         <table class="table table-bordered table-sm align-middle" id="editProcNipCompTable">
                             <thead class="bg-white small">
                                 <tr>
-                                    <th style="width:5%">S/No</th>
-                                    <th style="width:55%">Materials Description</th>
-                                    <th style="width:14%">Unit</th>
-                                    <th style="width:16%">Qty / Unit</th>
+                                    <th style="width:5%"><?= t('S/No') ?></th>
+                                    <th style="width:55%"><?= t('Materials Description') ?></th>
+                                    <th style="width:14%"><?= t('Unit') ?></th>
+                                    <th style="width:16%"><?= t('Qty / Unit') ?></th>
                                     <th style="width:10%"></th>
                                 </tr>
                             </thead>
@@ -4854,15 +4854,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <textarea class="form-control form-control-lg bg-light border-0 shadow-sm" name="product_name" required rows="2" placeholder="e.g. Consulting, Delivery Charge"></textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label fw-bold small">Description</label>
-                                        <textarea class="form-control bg-light border-0" name="description" rows="2" placeholder="Describe this product..."></textarea>
+                                        <label class="form-label fw-bold small"><?= t('Description') ?></label>
+                                        <textarea class="form-control bg-light border-0" name="description" rows="2" placeholder="<?= t('Describe this product...') ?>"></textarea>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Item Code</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                         <input type="text" class="form-control form-control-sm border-0 bg-light fw-bold" name="contract_item_no" placeholder="e.g. ITEM-001">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Unit</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Unit') ?></label>
                                         <div id="projNipAddUnitContainer">
                                             <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="projNipAddUnitSelect" onchange="projNipCheckOtherUnit(this,'projNipAddUnitContainer')">
                                                 <option value="job">Job</option>
@@ -4876,7 +4876,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Qty</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Qty') ?></label>
                                         <input type="number" class="form-control form-control-sm bg-secondary bg-opacity-10 fw-bold" name="assembly_quantity" id="projNipAddAsmQty" value="1" readonly>
                                     </div>
                                 </div>
@@ -4908,14 +4908,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small text-muted">Cost Price (Auto-Sum)</label>
+                                <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-light">TZS</span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="projNipAddCostSum" value="0" step="0.01" readonly>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Tax Rate</label>
+                                <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                                 <select class="form-select form-select-sm border-0 bg-light" name="tax_id">
                                     <option value="">No Tax</option>
                                     <?php foreach ($tax_rates as $tx): ?>
@@ -4938,10 +4938,10 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="bg-dark text-white text-center">
                                     <tr class="small">
-                                        <th style="width:50px;">S/NO</th>
-                                        <th class="text-start ps-3">Materials Description</th>
-                                        <th style="width:12%;">Unit</th>
-                                        <th style="width:14%;">Qty / Unit</th>
+                                        <th style="width:50px;"><?= t('S/NO') ?></th>
+                                        <th class="text-start ps-3"><?= t('Materials Description') ?></th>
+                                        <th style="width:12%;"><?= t('Unit') ?></th>
+                                        <th style="width:14%;"><?= t('Qty / Unit') ?></th>
                                         <th style="width:7%;"></th>
                                     </tr>
                                 </thead>
@@ -5007,15 +5007,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <textarea class="form-control form-control-lg bg-light border-0 shadow-sm" name="product_name" id="projNipEditName" required rows="2"></textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label fw-bold small">Description</label>
+                                        <label class="form-label fw-bold small"><?= t('Description') ?></label>
                                         <textarea class="form-control bg-light border-0" name="description" id="projNipEditDesc" rows="2"></textarea>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Item Code</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                         <input type="text" class="form-control form-control-sm border-0 bg-light fw-bold" name="contract_item_no" id="projNipEditContractNo">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Unit</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Unit') ?></label>
                                         <div id="projNipEditUnitContainer">
                                             <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="projNipEditUnitSelect" onchange="projNipCheckOtherUnit(this,'projNipEditUnitContainer')">
                                                 <option value="job">Job</option>
@@ -5029,7 +5029,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Status</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Status') ?></label>
                                         <select class="form-select form-select-sm" name="status" id="projNipEditStatus">
                                             <option value="active">Active</option>
                                             <option value="inactive">Inactive</option>
@@ -5038,7 +5038,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </select>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Qty</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Qty') ?></label>
                                         <input type="number" class="form-control form-control-sm bg-secondary bg-opacity-10 fw-bold" name="assembly_quantity" id="projNipEditAsmQty" value="1" readonly>
                                     </div>
                                 </div>
@@ -5068,14 +5068,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small text-muted">Cost Price (Auto-Sum)</label>
+                                <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-light">TZS</span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="projNipEditCost" step="0.01" readonly>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Tax Rate</label>
+                                <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                                 <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="projNipEditTax">
                                     <option value="">No Tax</option>
                                     <?php foreach ($tax_rates as $tx): ?>
@@ -5098,10 +5098,10 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="bg-dark text-white text-center">
                                     <tr class="small">
-                                        <th style="width:50px;">S/NO</th>
-                                        <th class="text-start ps-3">Materials Description</th>
-                                        <th style="width:12%;">Unit</th>
-                                        <th style="width:14%;">Qty / Unit</th>
+                                        <th style="width:50px;"><?= t('S/NO') ?></th>
+                                        <th class="text-start ps-3"><?= t('Materials Description') ?></th>
+                                        <th style="width:12%;"><?= t('Unit') ?></th>
+                                        <th style="width:14%;"><?= t('Qty / Unit') ?></th>
                                         <th style="width:7%;"></th>
                                     </tr>
                                 </thead>
@@ -5183,22 +5183,22 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <option value="other">Other</option>
                             </select>
                             <div id="other_return_reason_div" class="mt-2" style="display: none;">
-                                <input type="text" class="form-control" id="other_return_reason" placeholder="Specify other reason...">
+                                <input type="text" class="form-control" id="other_return_reason" placeholder="<?= t('Specify other reason...') ?>">
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Items Being Returned</label>
+                            <label class="form-label fw-bold small"><?= t('Items Being Returned') ?></label>
                             <div class="table-responsive">
                                 <table class="table table-bordered table-sm" id="returnItemsTable">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width: 50px;">S/NO</th>
+                                            <th style="width: 50px;"><?= t('S/NO') ?></th>
                                             <th>Product/Item <span class="text-danger">*</span></th>
-                                            <th style="width:120px;">SKU/Barcode</th>
+                                            <th style="width:120px;"><?= t('SKU/Barcode') ?></th>
                                             <th style="width:100px;">Quantity <span class="text-danger">*</span></th>
-                                            <th style="width:80px;">Unit</th>
-                                            <th style="width:120px;">Unit Price</th>
-                                            <th style="width:120px;">Total</th>
+                                            <th style="width:80px;"><?= t('Unit') ?></th>
+                                            <th style="width:120px;"><?= t('Unit Price') ?></th>
+                                            <th style="width:120px;"><?= t('Total') ?></th>
                                             <th style="width:40px;"></th>
                                         </tr>
                                     </thead>
@@ -5214,8 +5214,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </button>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Notes / Remarks</label>
-                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional notes about this return..."></textarea>
+                            <label class="form-label fw-bold small"><?= t('Notes / Remarks') ?></label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Additional notes about this return...') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -5242,7 +5242,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-body p-4">
                     <p class="text-muted small">Select an available employee to assign to this project team.</p>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Select Employee</label>
+                        <label class="form-label fw-bold"><?= t('Select Employee') ?></label>
                         <select class="form-select select2" id="assign_employee_id" required>
                             <!-- Populated dynamically -->
                         </select>
@@ -5304,11 +5304,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" id="lv_end_date" name="end_date" required onchange="lvCalculateDays()">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">Total Days</label>
+                            <label class="form-label fw-bold"><?= t('Total Days') ?></label>
                             <input type="number" class="form-control" id="lv_total_days" name="total_days" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Half Day</label>
+                            <label class="form-label fw-bold"><?= t('Half Day') ?></label>
                             <select class="form-select" id="lv_half_day" name="half_day" onchange="lvCalculateDays()">
                                 <option value="">No</option>
                                 <option value="first_half">First Half</option>
@@ -5316,7 +5316,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Leave Pay</label>
+                            <label class="form-label fw-bold"><?= t('Leave Pay') ?></label>
                             <select class="form-select" id="lv_is_paid" name="is_paid">
                                 <option value="1">Paid Leave</option>
                                 <option value="0">Unpaid Leave</option>
@@ -5324,29 +5324,29 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">Reason for Leave <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="lv_reason" name="reason" rows="3" required placeholder="Please provide a reason for your leave"></textarea>
+                            <textarea class="form-control" id="lv_reason" name="reason" rows="3" required placeholder="<?= t('Please provide a reason for your leave') ?>"></textarea>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Additional Notes</label>
-                            <textarea class="form-control" id="lv_notes" name="notes" rows="2" placeholder="Any additional information or notes"></textarea>
+                            <label class="form-label fw-bold"><?= t('Additional Notes') ?></label>
+                            <textarea class="form-control" id="lv_notes" name="notes" rows="2" placeholder="<?= t('Any additional information or notes') ?>"></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Contact During Leave</label>
-                            <input type="text" class="form-control" id="lv_contact" name="contact_during_leave" placeholder="Phone number or email">
+                            <label class="form-label fw-bold"><?= t('Contact During Leave') ?></label>
+                            <input type="text" class="form-control" id="lv_contact" name="contact_during_leave" placeholder="<?= t('Phone number or email') ?>">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Handover To</label>
+                            <label class="form-label fw-bold"><?= t('Handover To') ?></label>
                             <select class="form-select" id="lv_handover_to" name="handover_to">
                                 <option value="">Select Colleague</option>
                             </select>
                         </div>
                         <div class="col-12" id="lv_documentSection" style="display:none;">
-                            <label class="form-label fw-bold">Supporting Document</label>
+                            <label class="form-label fw-bold"><?= t('Supporting Document') ?></label>
                             <input type="file" class="form-control" id="lv_document" name="document" accept=".pdf,.jpg,.jpeg,.png">
                             <small class="text-muted">Upload supporting document (e.g., medical certificate)</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Status</label>
+                            <label class="form-label fw-bold"><?= t('Status') ?></label>
                             <select class="form-select" id="lv_status" name="status">
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
@@ -5413,11 +5413,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="month" class="form-control form-control-lg rounded-3 border-0 shadow-sm" id="pr_period" name="payroll_period" required onchange="prPreviewPayroll()">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Reference Date</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Reference Date') ?></label>
                             <input type="date" class="form-control form-control-lg rounded-3 border-0 shadow-sm" id="pr_ref_date" name="payroll_date">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Filter Department</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Filter Department') ?></label>
                             <select class="form-select form-control-lg rounded-3 border-0 shadow-sm" id="pr_department" name="department_id" onchange="prPreviewPayroll()">
                                 <option value="">All Departments</option>
                                 <?php foreach ($hr_departments as $d): ?>
@@ -5426,7 +5426,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Employment Status</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Employment Status') ?></label>
                             <select class="form-select form-control-lg rounded-3 border-0 shadow-sm" id="pr_emp_status" name="employment_status" onchange="prPreviewPayroll()">
                                 <option value="">All Active</option>
                                 <option value="active">Active</option>
@@ -5439,25 +5439,25 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-md-6">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="pr_allowances" name="include_allowances" checked onchange="prPreviewPayroll()">
-                                <label class="form-check-label fw-bold text-muted small" for="pr_allowances">INCLUDE ALLOWANCES</label>
+                                <label class="form-check-label fw-bold text-muted small" for="pr_allowances"><?= t('INCLUDE ALLOWANCES') ?></label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="pr_deductions" name="include_deductions" checked onchange="prPreviewPayroll()">
-                                <label class="form-check-label fw-bold text-muted small" for="pr_deductions">INCLUDE DEDUCTIONS & TAX</label>
+                                <label class="form-check-label fw-bold text-muted small" for="pr_deductions"><?= t('INCLUDE DEDUCTIONS & TAX') ?></label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="pr_attendance" name="consider_attendance" onchange="prPreviewPayroll()">
-                                <label class="form-check-label fw-bold text-muted small" for="pr_attendance">CONSIDER ATTENDANCE</label>
+                                <label class="form-check-label fw-bold text-muted small" for="pr_attendance"><?= t('CONSIDER ATTENDANCE') ?></label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="pr_auto_approve" name="auto_approve">
-                                <label class="form-check-label fw-bold text-muted small" for="pr_auto_approve">AUTO-APPROVE RESULTS</label>
+                                <label class="form-check-label fw-bold text-muted small" for="pr_auto_approve"><?= t('AUTO-APPROVE RESULTS') ?></label>
                             </div>
                         </div>
                     </div>
@@ -5470,11 +5470,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <table class="table table-sm align-middle">
                                 <thead class="table-light">
                                     <tr class="small text-muted text-uppercase">
-                                        <th>Employee</th>
-                                        <th class="text-end">Basic</th>
-                                        <th class="text-end">Allowances</th>
-                                        <th class="text-end">Deductions</th>
-                                        <th class="text-end">Net</th>
+                                        <th><?= t('Employee') ?></th>
+                                        <th class="text-end"><?= t('Basic') ?></th>
+                                        <th class="text-end"><?= t('Allowances') ?></th>
+                                        <th class="text-end"><?= t('Deductions') ?></th>
+                                        <th class="text-end"><?= t('Net') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody id="prPreviewBody"></tbody>
@@ -5511,33 +5511,33 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Staff / Period info -->
                     <div class="row g-3 mb-2">
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Staff Member</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Staff Member') ?></label>
                             <input type="text" class="form-control rounded-3 border-0 shadow-sm" id="ep_staff_name" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Period</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Period') ?></label>
                             <input type="text" class="form-control rounded-3 border-0 shadow-sm" id="ep_period_display" readonly>
                         </div>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Basic Salary</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Basic Salary') ?></label>
                             <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_basic_salary" name="basic_salary" min="0" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Allowances</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Allowances') ?></label>
                             <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_allowances" name="allowances" min="0">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Deductions</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Deductions') ?></label>
                             <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_deductions" name="deductions" min="0">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Tax Amount</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Tax Amount') ?></label>
                             <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_tax_amount" name="tax_amount" min="0">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Payment Method</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Payment Method') ?></label>
                             <select class="form-select rounded-3 border-0 shadow-sm" id="ep_payment_method" name="payment_method">
                                 <option value="bank">Bank Transfer</option>
                                 <option value="cash">Cash</option>
@@ -5546,7 +5546,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Payment Status</label>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Payment Status') ?></label>
                             <select class="form-select rounded-3 border-0 shadow-sm" id="ep_status" name="payment_status">
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
@@ -5555,8 +5555,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-bold text-uppercase text-muted">Notes</label>
-                            <textarea class="form-control rounded-3 border-0 shadow-sm" id="ep_notes" name="notes" rows="2" placeholder="Optional notes..."></textarea>
+                            <label class="form-label small fw-bold text-uppercase text-muted"><?= t('Notes') ?></label>
+                            <textarea class="form-control rounded-3 border-0 shadow-sm" id="ep_notes" name="notes" rows="2" placeholder="<?= t('Optional notes...') ?>"></textarea>
                         </div>
                         <!-- Live Net Preview -->
                         <div class="col-12">
@@ -5633,13 +5633,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">Budget Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="category_other" id="budget_category_name" placeholder="Enter budget name" required>
+                            <input type="text" class="form-control" name="category_other" id="budget_category_name" placeholder="<?= t('Enter budget name') ?>" required>
                         </div>
 
                         <!-- Budget Items Breakdown -->
                         <div class="col-12 mt-4">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-bold mb-0">Budget Breakdown (Items)</label>
+                                <label class="form-label fw-bold mb-0"><?= t('Budget Breakdown (Items)') ?></label>
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBudgetLineItem()">
                                     <i class="bi bi-plus"></i> Add Item
                                 </button>
@@ -5648,13 +5648,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <table class="table table-sm table-borderless align-middle mb-0" id="budgetBreakdownTable">
                                     <thead class="bg-light small">
                                         <tr>
-                                            <th style="width: 5%;" class="text-center">S/No</th>
-                                            <th style="width: 32%;">Description</th>
-                                            <th style="width: 12%;">Units</th>
-                                            <th style="width: 10%;">Qty</th>
-                                            <th style="width: 16%;">Price/Each</th>
-                                            <th style="width: 10%;">Tax %</th>
-                                            <th style="width: 12%;">Total</th>
+                                            <th style="width: 5%;" class="text-center"><?= t('S/No') ?></th>
+                                            <th style="width: 32%;"><?= t('Description') ?></th>
+                                            <th style="width: 12%;"><?= t('Units') ?></th>
+                                            <th style="width: 10%;"><?= t('Qty') ?></th>
+                                            <th style="width: 16%;"><?= t('Price/Each') ?></th>
+                                            <th style="width: 10%;"><?= t('Tax %') ?></th>
+                                            <th style="width: 12%;"><?= t('Total') ?></th>
                                             <th style="width: 3%;"></th>
                                         </tr>
                                     </thead>
@@ -5666,7 +5666,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-bold">Grand Total Allocated (TZS)</label>
+                            <label class="form-label fw-bold"><?= t('Grand Total Allocated (TZS)') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light fw-bold text-success">TZS</span>
                                 <input type="number" class="form-control fw-bold fs-5 text-success" name="allocated_amount" id="budget_allocated_amount" readonly value="0.00">
@@ -5675,7 +5675,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6" id="budget_status_container">
-                            <label class="form-label fw-bold">Status</label>
+                            <label class="form-label fw-bold"><?= t('Status') ?></label>
                             <select class="form-select" name="status" id="budget_status_field">
                                 <option value="draft" selected>Draft</option>
                                 <option value="pending">Pending</option>
@@ -5686,18 +5686,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6 payment-info-fields" style="display: none;">
-                             <label class="form-label fw-bold">Payment Reference No</label>
-                             <input type="text" class="form-control" name="payment_reference" placeholder="Ref No (e.g. Receipt #)">
+                             <label class="form-label fw-bold"><?= t('Payment Reference No') ?></label>
+                             <input type="text" class="form-control" name="payment_reference" placeholder="<?= t('Ref No (e.g. Receipt #)') ?>">
                         </div>
 
                         <div class="col-12 payment-info-fields" style="display: none;">
-                             <label class="form-label fw-bold">Upload Proof (Voucher/Receipt)</label>
+                             <label class="form-label fw-bold"><?= t('Upload Proof (Voucher/Receipt)') ?></label>
                              <input type="file" class="form-control" name="attachment_file">
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-bold">General Notes (Optional)</label>
-                            <textarea class="form-control" name="notes" rows="2" placeholder="Overall notes for this budget..."></textarea>
+                            <label class="form-label fw-bold"><?= t('General Notes (Optional)') ?></label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Overall notes for this budget...') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -5726,7 +5726,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Search Sub-Contractor</label>
+                    <label class="form-label fw-bold"><?= t('Search Sub-Contractor') ?></label>
                     <select id="assignScSelect2" style="width:100%"></select>
                     <div class="form-text text-muted mt-1">Type to search by name or code. Already assigned sub-contractors are excluded.</div>
                 </div>
@@ -5762,11 +5762,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade show active" id="pasc-basic">
                             <div class="row">
                                 <div class="col-6 mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="supplier_name" required></div>
-                                <div class="col-6 mb-3"><label class="form-label">Company Name</label><input type="text" class="form-control" name="company_name"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Acronym</label><input type="text" class="form-control" name="acronym"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Logo</label><input type="file" class="form-control" name="logo" accept="image/*"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Company Name') ?></label><input type="text" class="form-control" name="company_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Acronym') ?></label><input type="text" class="form-control" name="acronym"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Logo') ?></label><input type="file" class="form-control" name="logo" accept="image/*"></div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Type</label>
+                                    <label class="form-label"><?= t('Type') ?></label>
                                     <select class="form-select" name="supplier_type">
                                         <option value="">Select Type</option>
                                         <option value="Manufacturer">Manufacturer</option>
@@ -5787,49 +5787,49 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Category</label>
+                                    <label class="form-label"><?= t('Category') ?></label>
                                     <select class="form-select" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option><?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" name="credit_limit" step="0.01" value="0"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Credit Limit') ?></label><input type="number" class="form-control" name="credit_limit" step="0.01" value="0"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Description') ?></label><textarea class="form-control" name="description" rows="2"></textarea></div>
                             </div>
                         </div>
                         <!-- Contact -->
                         <div class="tab-pane fade" id="pasc-contact">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Contact Person</label><input type="text" class="form-control" name="contact_person"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Title</label><input type="text" class="form-control" name="contact_title"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Company Email</label><input type="email" class="form-control" name="company_email"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" name="phone"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Mobile</label><input type="text" class="form-control" name="mobile"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Fax</label><input type="text" class="form-control" name="fax"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Website</label><input type="url" class="form-control" name="website"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Contact Person') ?></label><input type="text" class="form-control" name="contact_person"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Title') ?></label><input type="text" class="form-control" name="contact_title"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Email') ?></label><input type="email" class="form-control" name="email"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Company Email') ?></label><input type="email" class="form-control" name="company_email"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Phone') ?></label><input type="text" class="form-control" name="phone"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Mobile') ?></label><input type="text" class="form-control" name="mobile"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Fax') ?></label><input type="text" class="form-control" name="fax"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Website') ?></label><input type="url" class="form-control" name="website"></div>
                             </div>
                         </div>
                         <!-- Address -->
                         <div class="tab-pane fade" id="pasc-address">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Country</label><input type="text" class="form-control" name="country" value="Tanzania"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Region</label><input type="text" class="form-control" name="state"></div>
-                                <div class="col-6 mb-3"><label class="form-label">District</label><input type="text" class="form-control" name="city"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Council</label><input type="text" class="form-control" name="council"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Ward</label><input type="text" class="form-control" name="ward"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" name="postal_code"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Physical Address</label><textarea class="form-control" name="address" rows="2"></textarea></div>
-                                <div class="col-12 mb-3"><label class="form-label">Postal Address</label><input type="text" class="form-control" name="postal_address"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Country') ?></label><input type="text" class="form-control" name="country" value="Tanzania"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Region') ?></label><input type="text" class="form-control" name="state"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('District') ?></label><input type="text" class="form-control" name="city"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Council') ?></label><input type="text" class="form-control" name="council"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Ward') ?></label><input type="text" class="form-control" name="ward"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Zip Code') ?></label><input type="text" class="form-control" name="postal_code"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Physical Address') ?></label><textarea class="form-control" name="address" rows="2"></textarea></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Postal Address') ?></label><input type="text" class="form-control" name="postal_address"></div>
                             </div>
                         </div>
                         <!-- Financial -->
                         <div class="tab-pane fade" id="pasc-financial">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">TIN</label><input type="text" class="form-control" name="tax_id"></div>
-                                <div class="col-6 mb-3"><label class="form-label">VAT Number</label><input type="text" class="form-control" name="vat_number"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('TIN') ?></label><input type="text" class="form-control" name="tax_id"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('VAT Number') ?></label><input type="text" class="form-control" name="vat_number"></div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Payment Terms</label>
+                                    <label class="form-label"><?= t('Payment Terms') ?></label>
                                     <select class="form-select" name="payment_terms">
                                         <option value="">Select...</option>
                                         <option value="Cash">Cash</option>
@@ -5840,7 +5840,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Currency</label>
+                                    <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" name="currency">
                                         <option value="TZS" selected>TZS</option>
                                         <option value="USD">USD</option>
@@ -5849,9 +5849,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <option value="GBP">GBP</option>
                                     </select>
                                 </div>
-                                <div class="col-6 mb-3"><label class="form-label">Bank Name</label><input type="text" class="form-control" name="bank_name"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Bank Account</label><input type="text" class="form-control" name="bank_account"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Bank Address</label><textarea class="form-control" name="bank_address" rows="2"></textarea></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Name') ?></label><input type="text" class="form-control" name="bank_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Account') ?></label><input type="text" class="form-control" name="bank_account"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Bank Address') ?></label><textarea class="form-control" name="bank_address" rows="2"></textarea></div>
                             </div>
                         </div>
                     </div>
@@ -5888,15 +5888,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade show active" id="pesc-basic">
                             <div class="row">
                                 <div class="col-6 mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" id="pesc_name" name="supplier_name" required></div>
-                                <div class="col-6 mb-3"><label class="form-label">Company Name</label><input type="text" class="form-control" id="pesc_company_name" name="company_name"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Acronym</label><input type="text" class="form-control" id="pesc_acronym" name="acronym"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Company Name') ?></label><input type="text" class="form-control" id="pesc_company_name" name="company_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Acronym') ?></label><input type="text" class="form-control" id="pesc_acronym" name="acronym"></div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Logo</label>
+                                    <label class="form-label"><?= t('Logo') ?></label>
                                     <input type="file" class="form-control" name="logo" accept="image/*">
                                     <div id="pesc_logo_display" class="mt-1"></div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Type</label>
+                                    <label class="form-label"><?= t('Type') ?></label>
                                     <select class="form-select" id="pesc_type" name="supplier_type">
                                         <option value="">Select Type</option>
                                         <option value="Manufacturer">Manufacturer</option>
@@ -5917,14 +5917,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Category</label>
+                                    <label class="form-label"><?= t('Category') ?></label>
                                     <select class="form-select" id="pesc_category" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= caseFormat($cat['category_name']) ?></option><?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Status</label>
+                                    <label class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="pesc_status" name="status">
                                         <option value="active">Active</option>
                                         <option value="inactive">Inactive</option>
@@ -5932,43 +5932,43 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <option value="blacklisted">Blacklisted</option>
                                     </select>
                                 </div>
-                                <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" id="pesc_credit_limit" name="credit_limit" step="0.01"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Description</label><textarea class="form-control" id="pesc_description" name="description" rows="2"></textarea></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Credit Limit') ?></label><input type="number" class="form-control" id="pesc_credit_limit" name="credit_limit" step="0.01"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Description') ?></label><textarea class="form-control" id="pesc_description" name="description" rows="2"></textarea></div>
                             </div>
                         </div>
                         <!-- Contact -->
                         <div class="tab-pane fade" id="pesc-contact">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Contact Person</label><input type="text" class="form-control" id="pesc_contact_person" name="contact_person"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Title</label><input type="text" class="form-control" id="pesc_contact_title" name="contact_title"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="pesc_email" name="email"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Company Email</label><input type="email" class="form-control" id="pesc_company_email" name="company_email"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" id="pesc_phone" name="phone"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Mobile</label><input type="text" class="form-control" id="pesc_mobile" name="mobile"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Fax</label><input type="text" class="form-control" id="pesc_fax" name="fax"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Website</label><input type="url" class="form-control" id="pesc_website" name="website"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Contact Person') ?></label><input type="text" class="form-control" id="pesc_contact_person" name="contact_person"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Title') ?></label><input type="text" class="form-control" id="pesc_contact_title" name="contact_title"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Email') ?></label><input type="email" class="form-control" id="pesc_email" name="email"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Company Email') ?></label><input type="email" class="form-control" id="pesc_company_email" name="company_email"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Phone') ?></label><input type="text" class="form-control" id="pesc_phone" name="phone"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Mobile') ?></label><input type="text" class="form-control" id="pesc_mobile" name="mobile"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Fax') ?></label><input type="text" class="form-control" id="pesc_fax" name="fax"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Website') ?></label><input type="url" class="form-control" id="pesc_website" name="website"></div>
                             </div>
                         </div>
                         <!-- Address -->
                         <div class="tab-pane fade" id="pesc-address">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">Country</label><input type="text" class="form-control" id="pesc_country" name="country"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Region</label><input type="text" class="form-control" id="pesc_state" name="state"></div>
-                                <div class="col-6 mb-3"><label class="form-label">District</label><input type="text" class="form-control" id="pesc_city" name="city"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Council</label><input type="text" class="form-control" id="pesc_council" name="council"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Ward</label><input type="text" class="form-control" id="pesc_ward" name="ward"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" id="pesc_postal_code" name="postal_code"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Physical Address</label><textarea class="form-control" id="pesc_address" name="address" rows="2"></textarea></div>
-                                <div class="col-12 mb-3"><label class="form-label">Postal Address</label><input type="text" class="form-control" id="pesc_postal_address" name="postal_address"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Country') ?></label><input type="text" class="form-control" id="pesc_country" name="country"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Region') ?></label><input type="text" class="form-control" id="pesc_state" name="state"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('District') ?></label><input type="text" class="form-control" id="pesc_city" name="city"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Council') ?></label><input type="text" class="form-control" id="pesc_council" name="council"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Ward') ?></label><input type="text" class="form-control" id="pesc_ward" name="ward"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Zip Code') ?></label><input type="text" class="form-control" id="pesc_postal_code" name="postal_code"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Physical Address') ?></label><textarea class="form-control" id="pesc_address" name="address" rows="2"></textarea></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Postal Address') ?></label><input type="text" class="form-control" id="pesc_postal_address" name="postal_address"></div>
                             </div>
                         </div>
                         <!-- Financial -->
                         <div class="tab-pane fade" id="pesc-financial">
                             <div class="row">
-                                <div class="col-6 mb-3"><label class="form-label">TIN</label><input type="text" class="form-control" id="pesc_tax_id" name="tax_id"></div>
-                                <div class="col-6 mb-3"><label class="form-label">VAT Number</label><input type="text" class="form-control" id="pesc_vat_number" name="vat_number"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('TIN') ?></label><input type="text" class="form-control" id="pesc_tax_id" name="tax_id"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('VAT Number') ?></label><input type="text" class="form-control" id="pesc_vat_number" name="vat_number"></div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Payment Terms</label>
+                                    <label class="form-label"><?= t('Payment Terms') ?></label>
                                     <select class="form-select" id="pesc_payment_terms" name="payment_terms">
                                         <option value="">Select...</option>
                                         <option value="Cash">Cash</option>
@@ -5979,7 +5979,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Currency</label>
+                                    <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="pesc_currency" name="currency">
                                         <option value="TZS">TZS</option>
                                         <option value="USD">USD</option>
@@ -5988,9 +5988,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <option value="GBP">GBP</option>
                                     </select>
                                 </div>
-                                <div class="col-6 mb-3"><label class="form-label">Bank Name</label><input type="text" class="form-control" id="pesc_bank_name" name="bank_name"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Bank Account</label><input type="text" class="form-control" id="pesc_bank_account" name="bank_account"></div>
-                                <div class="col-12 mb-3"><label class="form-label">Bank Address</label><textarea class="form-control" id="pesc_bank_address" name="bank_address" rows="2"></textarea></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Name') ?></label><input type="text" class="form-control" id="pesc_bank_name" name="bank_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Account') ?></label><input type="text" class="form-control" id="pesc_bank_account" name="bank_account"></div>
+                                <div class="col-12 mb-3"><label class="form-label"><?= t('Bank Address') ?></label><textarea class="form-control" id="pesc_bank_address" name="bank_address" rows="2"></textarea></div>
                             </div>
                         </div>
                     </div>
@@ -6142,7 +6142,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="p-3 bg-light rounded border">
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold small mb-1">Milestone Scope</label>
+                                        <label class="form-label fw-bold small mb-1"><?= t('Milestone Scope') ?></label>
                                         <input type="text" class="form-control form-control-sm bg-white" id="inspScopeDisplay" readonly placeholder="0.00">
                                     </div>
                                     <div class="col-md-6">
@@ -6155,7 +6155,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <!-- Inspection Type & Date/Time -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Inspection Type</label>
+                            <label class="form-label fw-bold small"><?= t('Inspection Type') ?></label>
                             <select class="form-select form-select-sm" name="inspection_type">
                                 <option value="Site">Site</option>
                                 <option value="Quality">Quality</option>
@@ -6170,11 +6170,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control form-control-sm" name="inspection_date" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Inspection Time</label>
+                            <label class="form-label fw-bold small"><?= t('Inspection Time') ?></label>
                             <input type="time" class="form-control form-control-sm" name="inspection_time">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Location / Area</label>
+                            <label class="form-label fw-bold small"><?= t('Location / Area') ?></label>
                             <input type="text" class="form-control form-control-sm" name="location_area">
                         </div>
 
@@ -6184,10 +6184,10 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div id="inspectorsList">
                                 <div class="inspector-row row g-2 mb-2" data-idx="0">
                                     <div class="col-md-5">
-                                        <input type="text" class="form-control form-control-sm" name="insp_name[]" placeholder="Inspector Name *" required>
+                                        <input type="text" class="form-control form-control-sm" name="insp_name[]" placeholder="<?= t('Inspector Name *') ?>" required>
                                     </div>
                                     <div class="col-md-6">
-                                        <input type="text" class="form-control form-control-sm" name="insp_org[]" placeholder="Organisation">
+                                        <input type="text" class="form-control form-control-sm" name="insp_org[]" placeholder="<?= t('Organisation') ?>">
                                     </div>
                                     <div class="col-md-1 d-flex align-items-center justify-content-center"></div>
                                 </div>
@@ -6199,7 +6199,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <!-- Result & Re-inspection -->
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Result</label>
+                            <label class="form-label fw-bold small"><?= t('Result') ?></label>
                             <select class="form-select form-select-sm" name="result">
                                 <option value="">-- Pending --</option>
                                 <option value="Pass">Pass</option>
@@ -6208,20 +6208,20 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Re-inspection Required</label>
+                            <label class="form-label fw-bold small"><?= t('Re-inspection Required') ?></label>
                             <select class="form-select form-select-sm" name="reinspection_required">
                                 <option value="0">No</option>
                                 <option value="1">Yes</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Re-inspection Date</label>
+                            <label class="form-label fw-bold small"><?= t('Re-inspection Date') ?></label>
                             <input type="date" class="form-control form-control-sm" name="reinspection_date">
                         </div>
 
                         <!-- Status & Signed Off -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Status</label>
+                            <label class="form-label fw-bold small"><?= t('Status') ?></label>
                             <select class="form-select form-select-sm" name="status">
                                 <option value="Pending">Pending</option>
                                 <option value="Completed">Completed</option>
@@ -6229,21 +6229,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Signed Off By</label>
+                            <label class="form-label fw-bold small"><?= t('Signed Off By') ?></label>
                             <input type="text" class="form-control form-control-sm" name="signed_off_by">
                         </div>
 
                         <!-- Defects & Corrective Action -->
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Defects Found</label>
+                            <label class="form-label fw-bold small"><?= t('Defects Found') ?></label>
                             <textarea class="form-control form-control-sm" name="defects_found" rows="2"></textarea>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Corrective Action</label>
+                            <label class="form-label fw-bold small"><?= t('Corrective Action') ?></label>
                             <textarea class="form-control form-control-sm" name="corrective_action" rows="2"></textarea>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Notes</label>
+                            <label class="form-label fw-bold small"><?= t('Notes') ?></label>
                             <textarea class="form-control form-control-sm" name="notes" rows="2"></textarea>
                         </div>
 
@@ -6253,7 +6253,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div id="inspAttachList">
                                 <div class="attach-row row g-2 mb-2">
                                     <div class="col-md-5">
-                                        <input type="text" class="form-control form-control-sm" name="attach_name[]" placeholder="Attachment name / description">
+                                        <input type="text" class="form-control form-control-sm" name="attach_name[]" placeholder="<?= t('Attachment name / description') ?>">
                                     </div>
                                     <div class="col-md-6">
                                         <input type="file" class="form-control form-control-sm" name="attachments[]" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif">
@@ -6292,7 +6292,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" name="project_id" value="<?= $project_id ?>">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Milestone</label>
+                            <label class="form-label fw-bold small"><?= t('Milestone') ?></label>
                             <select class="form-select form-select-sm" name="milestone_id" id="edit_insp_milestone">
                                 <option value="">-- No Milestone --</option>
                                 <?php foreach($proj_milestones as $ms): ?>
@@ -6301,7 +6301,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Inspection Type</label>
+                            <label class="form-label fw-bold small"><?= t('Inspection Type') ?></label>
                             <select class="form-select form-select-sm" name="inspection_type" id="edit_insp_type">
                                 <option value="Site">Site</option>
                                 <option value="Quality">Quality</option>
@@ -6316,15 +6316,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control form-control-sm" name="inspection_date" id="edit_insp_date" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Inspection Time</label>
+                            <label class="form-label fw-bold small"><?= t('Inspection Time') ?></label>
                             <input type="time" class="form-control form-control-sm" name="inspection_time" id="edit_insp_time">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Location / Area</label>
+                            <label class="form-label fw-bold small"><?= t('Location / Area') ?></label>
                             <input type="text" class="form-control form-control-sm" name="location_area" id="edit_insp_location">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Result</label>
+                            <label class="form-label fw-bold small"><?= t('Result') ?></label>
                             <select class="form-select form-select-sm" name="result" id="edit_insp_result">
                                 <option value="">-- Pending --</option>
                                 <option value="Pass">Pass</option>
@@ -6343,26 +6343,26 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Defects Found</label>
+                            <label class="form-label fw-bold small"><?= t('Defects Found') ?></label>
                             <textarea class="form-control form-control-sm" name="defects_found" id="edit_insp_defects" rows="2"></textarea>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Corrective Action</label>
+                            <label class="form-label fw-bold small"><?= t('Corrective Action') ?></label>
                             <textarea class="form-control form-control-sm" name="corrective_action" id="edit_insp_corrective" rows="2"></textarea>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Re-inspection Required</label>
+                            <label class="form-label fw-bold small"><?= t('Re-inspection Required') ?></label>
                             <select class="form-select form-select-sm" name="reinspection_required" id="edit_insp_reinsp_req">
                                 <option value="0">No</option>
                                 <option value="1">Yes</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Re-inspection Date</label>
+                            <label class="form-label fw-bold small"><?= t('Re-inspection Date') ?></label>
                             <input type="date" class="form-control form-control-sm" name="reinspection_date" id="edit_insp_reinsp_date">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Status</label>
+                            <label class="form-label fw-bold small"><?= t('Status') ?></label>
                             <select class="form-select form-select-sm" name="status" id="edit_insp_status">
                                 <option value="Pending">Pending</option>
                                 <option value="Completed">Completed</option>
@@ -6370,11 +6370,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small">Signed Off By</label>
+                            <label class="form-label fw-bold small"><?= t('Signed Off By') ?></label>
                             <input type="text" class="form-control form-control-sm" name="signed_off_by" id="edit_insp_signedby">
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small">Notes</label>
+                            <label class="form-label fw-bold small"><?= t('Notes') ?></label>
                             <textarea class="form-control form-control-sm" name="notes" id="edit_insp_notes" rows="2"></textarea>
                         </div>
 
@@ -6384,7 +6384,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div id="editInspAttachList">
                                 <div class="attach-row row g-2 mb-2">
                                     <div class="col-md-5">
-                                        <input type="text" class="form-control form-control-sm" name="attach_name[]" placeholder="Attachment name / description">
+                                        <input type="text" class="form-control form-control-sm" name="attach_name[]" placeholder="<?= t('Attachment name / description') ?>">
                                     </div>
                                     <div class="col-md-6">
                                         <input type="file" class="form-control form-control-sm" name="attachments[]" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif">
@@ -6427,26 +6427,26 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Row 1: IPC No, Date, Periods -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small">IPC No</label>
-                            <input type="text" class="form-control form-control-sm bg-light" id="ipc_add_no" readonly placeholder="Auto-generated">
+                            <label class="form-label fw-bold small"><?= t('IPC No') ?></label>
+                            <input type="text" class="form-control form-control-sm bg-light" id="ipc_add_no" readonly placeholder="<?= t('Auto-generated') ?>">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small">IPC Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control form-control-sm" name="ipc_date" value="<?= date('Y-m-d') ?>">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small">Period From</label>
+                            <label class="form-label fw-bold small"><?= t('Period From') ?></label>
                             <input type="date" class="form-control form-control-sm" name="period_from">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small">Period To</label>
+                            <label class="form-label fw-bold small"><?= t('Period To') ?></label>
                             <input type="date" class="form-control form-control-sm" name="period_to">
                         </div>
                     </div>
                     <!-- Row 2: Customer, Sales Order, Project -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Customer</label>
+                            <label class="form-label fw-bold small"><?= t('Customer') ?></label>
                             <select class="form-select form-select-sm" id="ipc_add_customer" onchange="ipcFilterSO(this.value,'add')">
                                 <option value="">-- Select Customer --</option>
                                 <?php foreach($ipc_customers as $c): ?>
@@ -6464,14 +6464,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Project</label>
+                            <label class="form-label fw-bold small"><?= t('Project') ?></label>
                             <input type="text" class="form-control form-control-sm bg-light" value="<?= caseFormat($project_name) ?>" readonly>
                         </div>
                     </div>
                     <!-- IPC Items Table -->
                     <div class="card border-0 shadow-sm mb-3">
                         <div class="card-header bg-light py-2">
-                            <h6 class="mb-0 fw-bold small">IPC Items</h6>
+                            <h6 class="mb-0 fw-bold small"><?= t('IPC Items') ?></h6>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -6479,19 +6479,19 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <thead class="table-light small fw-bold text-muted">
                                         <tr>
                                             <th width="35" class="text-center">#</th>
-                                            <th>Product / Item</th>
-                                            <th width="80" class="text-center">Quantity</th>
-                                            <th width="70" class="text-center">Unit</th>
-                                            <th width="130" class="text-end">Unit Price</th>
-                                            <th width="65" class="text-center">Tax %</th>
-                                            <th width="130" class="text-end">Total</th>
+                                            <th><?= t('Product / Item') ?></th>
+                                            <th width="80" class="text-center"><?= t('Quantity') ?></th>
+                                            <th width="70" class="text-center"><?= t('Unit') ?></th>
+                                            <th width="130" class="text-end"><?= t('Unit Price') ?></th>
+                                            <th width="65" class="text-center"><?= t('Tax %') ?></th>
+                                            <th width="130" class="text-end"><?= t('Total') ?></th>
                                             <th width="40" class="d-print-none"></th>
                                         </tr>
                                     </thead>
                                     <tbody id="ipcAddItemsBody">
                                         <tr>
                                             <td class="ipc-row-no text-center">1</td>
-                                            <td><input type="text" class="form-control form-control-sm border-0" data-field="product_name" placeholder="Product or description"></td>
+                                            <td><input type="text" class="form-control form-control-sm border-0" data-field="product_name" placeholder="<?= t('Product or description') ?>"></td>
                                             <td><input type="number" step="0.01" min="0" class="form-control form-control-sm border-0 text-center" data-field="quantity" value="1" oninput="ipcCalc('add')"></td>
                                             <td><input type="text" class="form-control form-control-sm border-0 text-center" data-field="unit" placeholder="pcs"></td>
                                             <td><input type="number" step="0.01" min="0" class="form-control form-control-sm border-0 text-end" data-field="unit_price" placeholder="0.00" oninput="ipcCalc('add')"></td>
@@ -6511,7 +6511,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" name="previous_payments" value="0">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label fw-bold small">Notes</label>
+                            <label class="form-label fw-bold small"><?= t('Notes') ?></label>
                             <textarea class="form-control form-control-sm" name="notes" rows="3"></textarea>
                         </div>
                         <div class="col-md-4">
@@ -6557,7 +6557,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Row 1: IPC No, Date, Periods -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small">IPC No</label>
+                            <label class="form-label fw-bold small"><?= t('IPC No') ?></label>
                             <input type="text" class="form-control form-control-sm bg-light" id="ipc_edit_no" readonly>
                         </div>
                         <div class="col-md-3">
@@ -6565,18 +6565,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control form-control-sm" name="ipc_date" id="edit_ipc_date">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small">Period From</label>
+                            <label class="form-label fw-bold small"><?= t('Period From') ?></label>
                             <input type="date" class="form-control form-control-sm" name="period_from" id="edit_ipc_period_from">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small">Period To</label>
+                            <label class="form-label fw-bold small"><?= t('Period To') ?></label>
                             <input type="date" class="form-control form-control-sm" name="period_to" id="edit_ipc_period_to">
                         </div>
                     </div>
                     <!-- Row 2: Customer, Sales Order, Project -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Customer</label>
+                            <label class="form-label fw-bold small"><?= t('Customer') ?></label>
                             <select class="form-select form-select-sm" id="ipc_edit_customer" onchange="ipcFilterSO(this.value,'edit')">
                                 <option value="">-- Select Customer --</option>
                                 <?php foreach($ipc_customers as $c): ?>
@@ -6594,14 +6594,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Project</label>
+                            <label class="form-label fw-bold small"><?= t('Project') ?></label>
                             <input type="text" class="form-control form-control-sm bg-light" value="<?= caseFormat($project_name) ?>" readonly>
                         </div>
                     </div>
                     <!-- IPC Items Table -->
                     <div class="card border-0 shadow-sm mb-3">
                         <div class="card-header bg-light py-2">
-                            <h6 class="mb-0 fw-bold small">IPC Items</h6>
+                            <h6 class="mb-0 fw-bold small"><?= t('IPC Items') ?></h6>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -6609,12 +6609,12 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <thead class="table-light small fw-bold text-muted">
                                         <tr>
                                             <th width="35" class="text-center">#</th>
-                                            <th>Product / Item</th>
-                                            <th width="80" class="text-center">Quantity</th>
-                                            <th width="70" class="text-center">Unit</th>
-                                            <th width="130" class="text-end">Unit Price</th>
-                                            <th width="65" class="text-center">Tax %</th>
-                                            <th width="130" class="text-end">Total</th>
+                                            <th><?= t('Product / Item') ?></th>
+                                            <th width="80" class="text-center"><?= t('Quantity') ?></th>
+                                            <th width="70" class="text-center"><?= t('Unit') ?></th>
+                                            <th width="130" class="text-end"><?= t('Unit Price') ?></th>
+                                            <th width="65" class="text-center"><?= t('Tax %') ?></th>
+                                            <th width="130" class="text-end"><?= t('Total') ?></th>
                                             <th width="40" class="d-print-none"></th>
                                         </tr>
                                     </thead>
@@ -6630,7 +6630,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" name="previous_payments" id="ipc_edit_previous" value="0">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label fw-bold small">Notes</label>
+                            <label class="form-label fw-bold small"><?= t('Notes') ?></label>
                             <textarea class="form-control form-control-sm" name="notes" id="edit_ipc_notes" rows="3"></textarea>
                         </div>
                         <div class="col-md-4">
@@ -6727,22 +6727,22 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" name="supplier_name" required placeholder="Enter supplier name">
+                                    <input type="text" class="form-control" name="supplier_name" required placeholder="<?= t('Enter supplier name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" name="company_name" placeholder="Company name (if different)">
+                                    <label class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" name="company_name" placeholder="<?= t('Company name (if different)') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Acronym</label>
+                                    <label class="form-label"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" name="acronym" placeholder="e.g. TANESCO, TRA">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Company Logo</label>
+                                    <label class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" name="logo" accept="image/*">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Supplier Type</label>
+                                    <label class="form-label"><?= t('Supplier Type') ?></label>
                                     <select class="form-select" name="supplier_type">
                                         <option value="">Select Type</option>
                                         <option value="Manufacturer">Manufacturer</option>
@@ -6768,7 +6768,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Category</label>
+                                    <label class="form-label"><?= t('Category') ?></label>
                                     <select class="form-select" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($supplier_categories as $cat): ?>
@@ -6777,7 +6777,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Status</label>
+                                    <label class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" name="status">
                                         <option value="active" selected>Active</option>
                                         <option value="inactive">Inactive</option>
@@ -6786,12 +6786,12 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Credit Limit</label>
+                                    <label class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" name="credit_limit" placeholder="0.00" step="0.01">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Description</label>
-                                    <textarea class="form-control" name="description" rows="2" placeholder="Supplier description or notes"></textarea>
+                                    <label class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" name="description" rows="2" placeholder="<?= t('Supplier description or notes') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -6800,35 +6800,35 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade" id="aps-contact" role="tabpanel" aria-labelledby="aps-contact-tab">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" name="contact_person" placeholder="Primary contact person">
+                                    <label class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" name="contact_person" placeholder="<?= t('Primary contact person') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Contact Title</label>
+                                    <label class="form-label"><?= t('Contact Title') ?></label>
                                     <input type="text" class="form-control" name="contact_title" placeholder="e.g., Manager, Director">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Contact Email</label>
+                                    <label class="form-label"><?= t('Contact Email') ?></label>
                                     <input type="email" class="form-control" name="email" placeholder="contact@example.com">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Company Email</label>
+                                    <label class="form-label"><?= t('Company Email') ?></label>
                                     <input type="email" class="form-control" name="company_email" placeholder="company@example.com">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Phone Number</label>
+                                    <label class="form-label"><?= t('Phone Number') ?></label>
                                     <input type="text" class="form-control" name="phone" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Mobile Number</label>
+                                    <label class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" name="mobile" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" name="fax" placeholder="Fax number">
+                                    <label class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label class="form-label">Website</label>
+                                    <label class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" name="website" placeholder="https://www.example.com">
                                 </div>
                             </div>
@@ -6839,39 +6839,39 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="row">
                                 <!-- Location cascade: Country → Region → District → Ward → Street/Village -->
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Country</label>
+                                    <label class="form-label"><?= t('Country') ?></label>
                                     <input type="text" class="form-control" id="aps_country" name="country" placeholder="e.g. Tanzania">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Region</label>
+                                    <label class="form-label"><?= t('Region') ?></label>
                                     <input type="text" class="form-control" id="aps_state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">District (City)</label>
+                                    <label class="form-label"><?= t('District (City)') ?></label>
                                     <input type="text" class="form-control" id="aps_city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Ward</label>
+                                    <label class="form-label"><?= t('Ward') ?></label>
                                     <input type="text" class="form-control" id="aps_ward" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Street/Village</label>
+                                    <label class="form-label"><?= t('Street/Village') ?></label>
                                     <input type="text" class="form-control" id="aps_village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Council</label>
+                                    <label class="form-label"><?= t('Council') ?></label>
                                     <input type="text" class="form-control" name="council" placeholder="e.g. Ilala Municipal">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Postal Code (Zip)</label>
-                                    <input type="text" class="form-control" name="postal_code" placeholder="Zip code">
+                                    <label class="form-label"><?= t('Postal Code (Zip)') ?></label>
+                                    <input type="text" class="form-control" name="postal_code" placeholder="<?= t('Zip code') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Physical Address</label>
+                                    <label class="form-label"><?= t('Physical Address') ?></label>
                                     <textarea class="form-control" name="address" rows="2" placeholder="e.g. Ilala - Dar-es-salaam"></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Postal Address</label>
+                                    <label class="form-label"><?= t('Postal Address') ?></label>
                                     <input type="text" class="form-control" name="postal_address" placeholder="e.g. p.o. box 120, mbezi">
                                 </div>
                             </div>
@@ -6881,15 +6881,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade" id="aps-financial" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" name="tax_id" placeholder="TIN">
+                                    <label class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" name="tax_id" placeholder="<?= t('TIN') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" name="vat_number" placeholder="VAT registration number">
+                                    <label class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Payment Terms</label>
+                                    <label class="form-label"><?= t('Payment Terms') ?></label>
                                     <select class="form-select" name="payment_terms">
                                         <option value="">Select Terms</option>
                                         <option value="cod">Cash on Delivery</option>
@@ -6902,7 +6902,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Currency</label>
+                                    <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" name="currency">
                                         <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
@@ -6913,16 +6913,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" name="bank_name" placeholder="Bank name">
+                                    <label class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" name="bank_account" placeholder="Bank account number">
+                                    <label class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label class="form-label">Bank Address</label>
-                                    <textarea class="form-control" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -6973,14 +6973,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="eps_supplier_name" name="supplier_name" required placeholder="Enter supplier name">
+                                    <input type="text" class="form-control" id="eps_supplier_name" name="supplier_name" required placeholder="<?= t('Enter supplier name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="eps_company_name" name="company_name" placeholder="Legal company name">
+                                    <label class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" id="eps_company_name" name="company_name" placeholder="<?= t('Legal company name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Category</label>
+                                    <label class="form-label"><?= t('Category') ?></label>
                                     <select class="form-select" id="eps_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($supplier_categories as $cat): ?>
@@ -6989,7 +6989,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Status</label>
+                                    <label class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="eps_status" name="status">
                                         <option value="active">Active</option>
                                         <option value="inactive">Inactive</option>
@@ -6998,7 +6998,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label class="form-label">Linked Project</label>
+                                    <label class="form-label"><?= t('Linked Project') ?></label>
                                     <select class="form-select" id="eps_project_id" name="project_id">
                                         <option value="">-- General Supplier (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
@@ -7007,8 +7007,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Description</label>
-                                    <textarea class="form-control" id="eps_description" name="description" rows="2" placeholder="Additional details..."></textarea>
+                                    <label class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" id="eps_description" name="description" rows="2" placeholder="<?= t('Additional details...') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -7017,31 +7017,31 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade" id="eps-contact" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" id="eps_contact_person" name="contact_person" placeholder="Full name">
+                                    <label class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" id="eps_contact_person" name="contact_person" placeholder="<?= t('Full name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Contact Title</label>
+                                    <label class="form-label"><?= t('Contact Title') ?></label>
                                     <input type="text" class="form-control" id="eps_contact_title" name="contact_title" placeholder="e.g. Sales Manager">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Email Address</label>
+                                    <label class="form-label"><?= t('Email Address') ?></label>
                                     <input type="email" class="form-control" id="eps_email" name="email" placeholder="example@supplier.com">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Phone Number</label>
-                                    <input type="text" class="form-control" id="eps_phone" name="phone" placeholder="Landline">
+                                    <label class="form-label"><?= t('Phone Number') ?></label>
+                                    <input type="text" class="form-control" id="eps_phone" name="phone" placeholder="<?= t('Landline') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Mobile Number</label>
+                                    <label class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" id="eps_mobile" name="mobile" placeholder="e.g. 07XXXXXXXX">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" id="eps_fax" name="fax" placeholder="Fax number">
+                                    <label class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" id="eps_fax" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label class="form-label">Website</label>
+                                    <label class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" id="eps_website" name="website" placeholder="https://">
                                 </div>
                             </div>
@@ -7051,33 +7051,33 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade" id="eps-address" role="tabpanel">
                             <div class="row">
                                 <div class="col-12 mb-3">
-                                    <label class="form-label">Physical Address</label>
-                                    <textarea class="form-control" id="eps_address" name="address" rows="2" placeholder="Street, Building, etc."></textarea>
+                                    <label class="form-label"><?= t('Physical Address') ?></label>
+                                    <textarea class="form-control" id="eps_address" name="address" rows="2" placeholder="<?= t('Street, Building, etc.') ?>"></textarea>
                                 </div>
                                 <!-- Location cascade: Country → Region → District → Ward → Street/Village -->
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Country</label>
-                                    <input type="text" class="form-control" id="eps_country" name="country" placeholder="Country">
+                                    <label class="form-label"><?= t('Country') ?></label>
+                                    <input type="text" class="form-control" id="eps_country" name="country" placeholder="<?= t('Country') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Region</label>
-                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="Region">
+                                    <label class="form-label"><?= t('Region') ?></label>
+                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="<?= t('Region') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">District (City)</label>
-                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="District">
+                                    <label class="form-label"><?= t('District (City)') ?></label>
+                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="<?= t('District') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Ward</label>
-                                    <input type="text" class="form-control" id="eps_ward" name="ward" placeholder="Ward">
+                                    <label class="form-label"><?= t('Ward') ?></label>
+                                    <input type="text" class="form-control" id="eps_ward" name="ward" placeholder="<?= t('Ward') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Street/Village</label>
-                                    <input type="text" class="form-control" id="eps_village" name="village" placeholder="Street/Village">
+                                    <label class="form-label"><?= t('Street/Village') ?></label>
+                                    <input type="text" class="form-control" id="eps_village" name="village" placeholder="<?= t('Street/Village') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Postal Code</label>
-                                    <input type="text" class="form-control" id="eps_postal_code" name="postal_code" placeholder="Postal Code">
+                                    <label class="form-label"><?= t('Postal Code') ?></label>
+                                    <input type="text" class="form-control" id="eps_postal_code" name="postal_code" placeholder="<?= t('Postal Code') ?>">
                                 </div>
                             </div>
                         </div>
@@ -7086,15 +7086,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="tab-pane fade" id="eps-financial" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="eps_tax_id" name="tax_id" placeholder="TIN">
+                                    <label class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="eps_tax_id" name="tax_id" placeholder="<?= t('TIN') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" id="eps_vat_number" name="vat_number" placeholder="VAT registration number">
+                                    <label class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" id="eps_vat_number" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Payment Terms</label>
+                                    <label class="form-label"><?= t('Payment Terms') ?></label>
                                     <select class="form-select" id="eps_payment_terms" name="payment_terms">
                                         <option value="">Select Terms</option>
                                         <option value="cod">Cash on Delivery</option>
@@ -7106,7 +7106,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Currency</label>
+                                    <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="eps_currency" name="currency">
                                         <option value="TZS">Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
@@ -7114,16 +7114,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="eps_bank_name" name="bank_name" placeholder="Bank name">
+                                    <label class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="eps_bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" id="eps_bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" id="eps_bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label class="form-label">Bank Address</label>
-                                    <textarea class="form-control" id="eps_bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" id="eps_bank_address" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -7160,7 +7160,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div id="new_type_input_cont" class="mt-2" style="display: none;">
                         <div class="input-group">
-                            <input type="text" class="form-control border-success" id="cfg_new_type_name" placeholder="Enter New Type Name...">
+                            <input type="text" class="form-control border-success" id="cfg_new_type_name" placeholder="<?= t('Enter New Type Name...') ?>">
                             <button class="btn btn-success" type="button" onclick="saveNewExpenseType()">Save</button>
                         </div>
                     </div>
@@ -7174,7 +7174,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     
                     <!-- Add Category Form -->
                     <div class="input-group mb-3">
-                        <input type="text" class="form-control" id="cfg_new_cat_name" placeholder="Type new category name...">
+                        <input type="text" class="form-control" id="cfg_new_cat_name" placeholder="<?= t('Type new category name...') ?>">
                         <button class="btn btn-outline-primary fw-bold" type="button" onclick="saveNewCategory()">Add</button>
                     </div>
 
@@ -7216,7 +7216,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="number" class="form-control" id="scPayAmount" step="0.01" min="0.01" placeholder="0.00">
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-bold small">Currency</label>
+                        <label class="form-label fw-bold small"><?= t('Currency') ?></label>
                         <select class="form-select" id="scPayCurrency">
                             <option value="TZS">TZS</option>
                             <option value="USD">USD</option>
@@ -7246,16 +7246,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <small class="text-muted">Cash/bank account the money is paid from.</small>
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Reference Number</label>
+                        <label class="form-label fw-bold small"><?= t('Reference Number') ?></label>
                         <input type="text" class="form-control" id="scPayRef" placeholder="e.g. bank ref, cheque no...">
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-bold small">Receipt Number <span class="text-muted small fw-normal">(from sub-contractor)</span></label>
-                        <input type="text" class="form-control" id="scPayReceipt" placeholder="Receipt no. provided by SC after payment">
+                        <input type="text" class="form-control" id="scPayReceipt" placeholder="<?= t('Receipt no. provided by SC after payment') ?>">
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Notes</label>
-                        <textarea class="form-control" id="scPayNotes" rows="2" placeholder="Optional notes..."></textarea>
+                        <label class="form-label fw-bold small"><?= t('Notes') ?></label>
+                        <textarea class="form-control" id="scPayNotes" rows="2" placeholder="<?= t('Optional notes...') ?>"></textarea>
                     </div>
                 </div>
             </div>
@@ -7298,7 +7298,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="number" class="form-control" id="suppPayAmount" step="0.01" min="0.01" placeholder="0.00">
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-bold small">Currency</label>
+                        <label class="form-label fw-bold small"><?= t('Currency') ?></label>
                         <select class="form-select" id="suppPayCurrency">
                             <option value="TZS">TZS</option>
                             <option value="USD">USD</option>
@@ -7318,12 +7318,12 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Reference Number</label>
+                        <label class="form-label fw-bold small"><?= t('Reference Number') ?></label>
                         <input type="text" class="form-control" id="suppPayRef" placeholder="e.g. bank ref, cheque no...">
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Notes</label>
-                        <textarea class="form-control" id="suppPayNotes" rows="2" placeholder="Optional notes..."></textarea>
+                        <label class="form-label fw-bold small"><?= t('Notes') ?></label>
+                        <textarea class="form-control" id="suppPayNotes" rows="2" placeholder="<?= t('Optional notes...') ?>"></textarea>
                     </div>
                 </div>
             </div>
@@ -7363,7 +7363,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="number" class="form-control" id="editSuppPayAmount" step="0.01" min="0.01">
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-bold small">Currency</label>
+                        <label class="form-label fw-bold small"><?= t('Currency') ?></label>
                         <select class="form-select" id="editSuppPayCurrency">
                             <option value="TZS">TZS</option>
                             <option value="USD">USD</option>
@@ -7383,11 +7383,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Reference Number</label>
+                        <label class="form-label fw-bold small"><?= t('Reference Number') ?></label>
                         <input type="text" class="form-control" id="editSuppPayRef">
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-bold small">Notes</label>
+                        <label class="form-label fw-bold small"><?= t('Notes') ?></label>
                         <textarea class="form-control" id="editSuppPayNotes" rows="2"></textarea>
                     </div>
                 </div>
@@ -7847,7 +7847,7 @@ function smartPrint() {
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Project</label>
+                                <label class="form-label fw-bold small"><?= t('Project') ?></label>
                                 <input type="text" class="form-control bg-light" id="cdo_project_display" readonly>
                             </div>
                             <div class="col-md-4">
@@ -7861,15 +7861,15 @@ function smartPrint() {
                                 <input type="date" class="form-control" id="cdo_do_date" value="<?= date('Y-m-d') ?>" required>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Expected Delivery Date</label>
+                                <label class="form-label fw-bold small"><?= t('Expected Delivery Date') ?></label>
                                 <input type="date" class="form-control" id="cdo_expected_date">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Contact Person</label>
-                                <input type="text" class="form-control" id="cdo_contact_person" placeholder="Person at delivery site">
+                                <label class="form-label fw-bold small"><?= t('Contact Person') ?></label>
+                                <input type="text" class="form-control" id="cdo_contact_person" placeholder="<?= t('Person at delivery site') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Contact Phone</label>
+                                <label class="form-label fw-bold small"><?= t('Contact Phone') ?></label>
                                 <input type="text" class="form-control" id="cdo_contact_phone" placeholder="+255...">
                             </div>
                         </div>
@@ -7882,10 +7882,10 @@ function smartPrint() {
                             <table class="table table-sm table-bordered align-middle mb-0" id="cdoItemsTable">
                                 <thead class="table-light text-uppercase small fw-bold">
                                     <tr>
-                                        <th style="width:45px;" class="text-center">S/NO</th>
-                                        <th>Product</th>
-                                        <th style="width:130px;" class="text-center">Qty to Issue</th>
-                                        <th style="width:80px;" class="text-center">Unit</th>
+                                        <th style="width:45px;" class="text-center"><?= t('S/NO') ?></th>
+                                        <th><?= t('Product') ?></th>
+                                        <th style="width:130px;" class="text-center"><?= t('Qty to Issue') ?></th>
+                                        <th style="width:80px;" class="text-center"><?= t('Unit') ?></th>
                                         <th style="width:48px;" class="text-center"></th>
                                     </tr>
                                 </thead>
@@ -7902,7 +7902,7 @@ function smartPrint() {
                     <!-- Notes -->
                     <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
                         <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-chat-text me-1"></i> Notes / Instructions</h6>
-                        <textarea class="form-control" id="cdo_notes" rows="2" placeholder="Delivery instructions or special notes..."></textarea>
+                        <textarea class="form-control" id="cdo_notes" rows="2" placeholder="<?= t('Delivery instructions or special notes...') ?>"></textarea>
                     </div>
 
                     <!-- Section 2: Attachments -->
@@ -7949,7 +7949,7 @@ function smartPrint() {
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Project</label>
+                                <label class="form-label fw-bold small"><?= t('Project') ?></label>
                                 <input type="text" class="form-control bg-light" id="edit_project_display" readonly>
                             </div>
                             <div class="col-md-4">
@@ -7963,15 +7963,15 @@ function smartPrint() {
                                 <input type="date" class="form-control" id="edit_do_date" required>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Expected Delivery Date</label>
+                                <label class="form-label fw-bold small"><?= t('Expected Delivery Date') ?></label>
                                 <input type="date" class="form-control" id="edit_expected_date">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Contact Person</label>
-                                <input type="text" class="form-control" id="edit_contact_person" placeholder="Person at delivery site">
+                                <label class="form-label fw-bold small"><?= t('Contact Person') ?></label>
+                                <input type="text" class="form-control" id="edit_contact_person" placeholder="<?= t('Person at delivery site') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Contact Phone</label>
+                                <label class="form-label fw-bold small"><?= t('Contact Phone') ?></label>
                                 <input type="text" class="form-control" id="edit_contact_phone" placeholder="+255...">
                             </div>
                         </div>
@@ -7984,10 +7984,10 @@ function smartPrint() {
                             <table class="table table-sm table-bordered align-middle mb-0" id="editDOItemsTable">
                                 <thead class="table-light text-uppercase small fw-bold">
                                     <tr>
-                                        <th style="width:45px;" class="text-center">S/NO</th>
-                                        <th>Product</th>
-                                        <th style="width:130px;" class="text-center">Qty to Issue</th>
-                                        <th style="width:80px;" class="text-center">Unit</th>
+                                        <th style="width:45px;" class="text-center"><?= t('S/NO') ?></th>
+                                        <th><?= t('Product') ?></th>
+                                        <th style="width:130px;" class="text-center"><?= t('Qty to Issue') ?></th>
+                                        <th style="width:80px;" class="text-center"><?= t('Unit') ?></th>
                                         <th style="width:48px;" class="text-center"></th>
                                     </tr>
                                 </thead>
@@ -8004,7 +8004,7 @@ function smartPrint() {
                     <!-- Notes -->
                     <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
                         <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-chat-text me-1"></i> Notes / Instructions</h6>
-                        <textarea class="form-control" id="edit_do_notes" rows="2" placeholder="Delivery instructions or special notes..."></textarea>
+                        <textarea class="form-control" id="edit_do_notes" rows="2" placeholder="<?= t('Delivery instructions or special notes...') ?>"></textarea>
                     </div>
 
                     <!-- Section 2: Current Attachments (editable) -->

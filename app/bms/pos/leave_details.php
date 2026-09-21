@@ -496,7 +496,7 @@ require_once 'header.php';
 
                 <!-- Reason Section -->
                 <div class="mb-5">
-                    <h5 class="section-title">Reason &amp; Justification</h5>
+                    <h5 class="section-title"><?= t('Reason &amp; Justification') ?></h5>
                     <div class="reason-box">
                         <?= nl2br(htmlspecialchars($leave['reason'])) ?>
                     </div>
@@ -506,7 +506,7 @@ require_once 'header.php';
                 <div class="row g-4 mb-5">
                     <?php if($leave['approved_by']): ?>
                     <div class="col-md-6">
-                        <h5 class="section-title">Approval Details</h5>
+                        <h5 class="section-title"><?= t('Approval Details') ?></h5>
                         <div class="audit-trail">
                             <div class="d-flex align-items-center mb-2">
                                 <i class="bi bi-shield-check text-primary fs-4 me-3"></i>
@@ -521,7 +521,7 @@ require_once 'header.php';
 
                     <?php if(!empty($leave['notes'])): ?>
                     <div class="col-md-6">
-                        <h5 class="section-title">Approval/Rejection Notes</h5>
+                        <h5 class="section-title"><?= t('Approval/Rejection Notes') ?></h5>
                         <div class="audit-trail">
                             <i class="bi bi-chat-left-dots text-muted me-2"></i>
                             <span class="text-muted small fst-italic"><?= htmlspecialchars($leave['notes']) ?></span>

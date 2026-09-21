@@ -46,14 +46,14 @@ $currency = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Horizon</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Horizon') ?></label>
                     <select name="horizon" id="f-horizon" class="form-select" style="width:100%">
                         <option value="3">Next 3 months</option>
                         <option value="6" selected>Next 6 months</option>
                         <option value="12">Next 12 months</option>
                     </select></div>
                 <?php if (projectsModuleActive()): ?>
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Project') ?></label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= caseFormat($p['project_name']) ?></option><?php endforeach; ?>
@@ -88,8 +88,8 @@ $currency = get_setting('currency', 'TZS');
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="fcTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Forecast Month</th>
-                    <th class="text-end">Conservative (-15%)</th><th class="text-end">Baseline</th><th class="pe-3 text-end">Optimistic (+15%)</th>
+                    <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Forecast Month') ?></th>
+                    <th class="text-end"><?= t('Conservative (-15%)') ?></th><th class="text-end"><?= t('Baseline') ?></th><th class="pe-3 text-end"><?= t('Optimistic (+15%)') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>
