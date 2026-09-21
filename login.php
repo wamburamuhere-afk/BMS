@@ -22,49 +22,85 @@ if (!empty($_GET['lang']) && in_array($_GET['lang'], ['en', 'sw'], true)) {
 }
 
 $tr = $pageLang === 'sw' ? [
-    'page_title'     => 'Ingia | Mfumo wa Usimamizi wa Biashara',
-    'sign_in_prompt' => 'Tafadhali ingia kuendelea',
-    'username'       => 'Jina la Mtumiaji',
-    'username_ph'    => 'Andika jina lako la mtumiaji',
-    'password'       => 'Nenosiri',
-    'password_ph'    => 'Andika nenosiri lako',
-    'remember_me'    => 'Nikumbuke',
-    'forgot_pw'      => 'Umesahau nenosiri?',
-    'login_btn'      => 'Ingia',
-    'logging_in'     => 'Ingia...',
-    'new_company'    => 'Kampuni mpya?',
-    'register_here'  => 'Jisajili hapa',
-    'privacy'        => 'Sera ya Faragha',
-    'terms'          => 'Masharti ya Huduma',
-    'help'           => 'Msaada',
-    'login_failed'   => 'Imeshindwa Kuingia',
-    'invalid_creds'  => 'Jina la mtumiaji au nenosiri si sahihi.',
-    'server_error'   => 'Hitilafu ya seva. Tafadhali jaribu tena.',
-    'modal_back'     => 'Rudi Nyuma',
-    'modal_continue' => 'Endelea Kujisajili',
-    'lang_label'     => 'Lugha',
+    'page_title'        => 'Ingia | Mfumo wa Usimamizi wa Biashara',
+    'sign_in_prompt'    => 'Tafadhali ingia kuendelea',
+    'username'          => 'Jina la Mtumiaji',
+    'username_ph'       => 'Andika jina lako la mtumiaji',
+    'password'          => 'Nenosiri',
+    'password_ph'       => 'Andika nenosiri lako',
+    'remember_me'       => 'Nikumbuke',
+    'forgot_pw'         => 'Umesahau nenosiri?',
+    'login_btn'         => 'Ingia',
+    'logging_in'        => 'Ingia...',
+    'new_company'       => 'Kampuni mpya?',
+    'register_here'     => 'Jisajili hapa',
+    'privacy'           => 'Sera ya Faragha',
+    'terms'             => 'Masharti ya Huduma',
+    'help'              => 'Msaada',
+    'login_failed'      => 'Imeshindwa Kuingia',
+    'invalid_creds'     => 'Jina la mtumiaji au nenosiri si sahihi.',
+    'server_error'      => 'Hitilafu ya seva. Tafadhali jaribu tena.',
+    'modal_back'        => 'Rudi Nyuma',
+    'modal_continue'    => 'Endelea Kujisajili',
+    'lang_label'        => 'Lugha',
+    'modal_tagline'     => 'Simamia Duka Lako kwa Urahisi na Ufanisi',
+    'modal_desc'        => '<strong>Simple POS</strong> ni mfumo wetu wa kisasa wa kusimamia mauzo ya duka lako. Fuatilia bidhaa, mauzo, na hali ya duka lako lote mahali pamoja — haraka, rahisi, na salama. Jiunga leo na maelfu ya wafanyabiashara wanaotumia mfumo huu kukua kila siku!',
+    'modal_trial_title' => 'Siku 14 Bure — Bila Malipo!',
+    'modal_trial_body'  => 'Unapojisajili, utakuwa na siku <strong>14 za majaribio bure</strong>. Baada ya hapo, chagua mpango unaokufaa ili kuendelea kutumia mfumo.',
+    'modal_plans'       => 'MIPANGO YA BEI',
+    'plan_1m'           => 'Mwezi 1',
+    'plan_3m'           => 'Miezi 3',
+    'plan_6m'           => 'Miezi 6',
+    'plan_1y'           => 'Mwaka 1',
+    'per_month'         => '/mwezi',
+    'save_17'           => 'Akiba 17%',
+    'save_25'           => 'Akiba 25%',
+    'save_29'           => 'Akiba 29%',
+    'popular'           => 'MAARUFU',
+    'best'              => 'BORA ZAIDI',
+    'note_label'        => 'Kumbuka:',
+    'note_body'         => 'Mipango yote hapo juu ni kwa <strong>duka moja (1)</strong> na <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi, wasiliana nasi:',
+    'contact_us'        => 'wasiliana nasi',
 ] : [
-    'page_title'     => 'Login | Business Management System',
-    'sign_in_prompt' => 'Please sign in to continue',
-    'username'       => 'Username',
-    'username_ph'    => 'Enter your username',
-    'password'       => 'Password',
-    'password_ph'    => 'Enter your password',
-    'remember_me'    => 'Remember me',
-    'forgot_pw'      => 'Forgot password?',
-    'login_btn'      => 'Login',
-    'logging_in'     => 'Logging in...',
-    'new_company'    => 'New company?',
-    'register_here'  => 'Register here',
-    'privacy'        => 'Privacy Policy',
-    'terms'          => 'Terms of Service',
-    'help'           => 'Help Center',
-    'login_failed'   => 'Login Failed',
-    'invalid_creds'  => 'Invalid username or password.',
-    'server_error'   => 'Unable to connect to the server. Please try again.',
-    'modal_back'     => 'Go Back',
-    'modal_continue' => 'Continue to Register',
-    'lang_label'     => 'Language',
+    'page_title'        => 'Login | Business Management System',
+    'sign_in_prompt'    => 'Please sign in to continue',
+    'username'          => 'Username',
+    'username_ph'       => 'Enter your username',
+    'password'          => 'Password',
+    'password_ph'       => 'Enter your password',
+    'remember_me'       => 'Remember me',
+    'forgot_pw'         => 'Forgot password?',
+    'login_btn'         => 'Login',
+    'logging_in'        => 'Logging in...',
+    'new_company'       => 'New company?',
+    'register_here'     => 'Register here',
+    'privacy'           => 'Privacy Policy',
+    'terms'             => 'Terms of Service',
+    'help'              => 'Help Center',
+    'login_failed'      => 'Login Failed',
+    'invalid_creds'     => 'Invalid username or password.',
+    'server_error'      => 'Unable to connect to the server. Please try again.',
+    'modal_back'        => 'Go Back',
+    'modal_continue'    => 'Continue to Register',
+    'lang_label'        => 'Language',
+    'modal_tagline'     => 'Manage Your Shop with Ease and Efficiency',
+    'modal_desc'        => '<strong>Simple POS</strong> is our modern system for managing your shop\'s sales. Track products, sales, and your shop\'s status all in one place — fast, easy, and secure. Join thousands of business owners growing with this system every day!',
+    'modal_trial_title' => '14 Days Free — No Payment Required!',
+    'modal_trial_body'  => 'When you register, you get <strong>14 free trial days</strong>. After that, choose the plan that suits you to keep using the system.',
+    'modal_plans'       => 'PRICING PLANS',
+    'plan_1m'           => '1 Month',
+    'plan_3m'           => '3 Months',
+    'plan_6m'           => '6 Months',
+    'plan_1y'           => '1 Year',
+    'per_month'         => '/month',
+    'save_17'           => 'Save 17%',
+    'save_25'           => 'Save 25%',
+    'save_29'           => 'Save 29%',
+    'popular'           => 'POPULAR',
+    'best'              => 'BEST VALUE',
+    'note_label'        => 'Note:',
+    'note_body'         => 'All plans above are for <strong>one shop (1)</strong> and <strong>two users (2)</strong> only. For more shops or more users, contact us:',
+    'contact_us'        => 'contact us',
 ];
 
 // Get company branding and contact info from settings
@@ -288,78 +324,73 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         <!-- Welcome description -->
         <div class="text-center mb-4 px-2">
           <h6 class="fw-bold mb-2" style="color:#2c3e50;font-size:1rem;">
-            🛒 Simamia Duka Lako kwa Urahisi na Ufanisi
+            🛒 <?= htmlspecialchars($tr['modal_tagline']) ?>
           </h6>
           <p class="text-muted mb-0" style="font-size:.88rem;line-height:1.65;">
-            <strong>BMS Simple POS</strong> ni mfumo wetu wa kisasa wa kusimamia mauzo ya duka lako.
-            Fuatilia bidhaa, mauzo, na hali ya duka lako lote mahali pamoja — haraka, rahisi, na salama.
-            Jiunga leo na maelfu ya wafanyabiashara wanaotumia mfumo huu kukua kila siku!
+            <?= $tr['modal_desc'] ?>
           </p>
         </div>
 
         <!-- Free-trial banner -->
         <div class="text-center rounded-3 py-3 px-3 mb-4"
              style="background:linear-gradient(135deg,#1abc9c,#16a085);color:#fff;">
-          <div class="fw-bold fs-5 mb-1"><i class="fas fa-gift me-2"></i>Siku 14 Bure — Bila Malipo!</div>
-          <div style="font-size:.9rem;opacity:.92;">
-            Unapojisajili, utakuwa na siku <strong>14 za majaribio bure</strong>.
-            Baada ya hapo, chagua mpango unaokufaa ili kuendelea kutumia mfumo.
-          </div>
+          <div class="fw-bold fs-5 mb-1"><i class="fas fa-gift me-2"></i><?= htmlspecialchars($tr['modal_trial_title']) ?></div>
+          <div style="font-size:.9rem;opacity:.92;"><?= $tr['modal_trial_body'] ?></div>
         </div>
 
         <!-- Pricing cards -->
-        <h6 class="text-center fw-semibold mb-3" style="color:#555;letter-spacing:.3px;">MIPANGO YA BEI</h6>
+        <h6 class="text-center fw-semibold mb-3" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['modal_plans']) ?></h6>
         <div class="row g-3 mb-3">
 
           <div class="col-6 col-md-3">
             <div class="pricing-card text-center p-3 h-100 rounded-3 border" style="border-color:#dee2e6!important;">
               <div class="mb-2"><i class="fas fa-calendar-day" style="font-size:1.6rem;color:#3498db;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;">Mwezi 1</div>
+              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1m']) ?></div>
               <div class="my-2">
                 <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">10,000</span>
                 <span style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div style="font-size:.75rem;color:#888;">/mwezi</div>
+              <div style="font-size:.75rem;color:#888;"><?= htmlspecialchars($tr['per_month']) ?></div>
             </div>
           </div>
 
           <div class="col-6 col-md-3">
             <div class="pricing-card text-center p-3 h-100 rounded-3 border" style="border-color:#dee2e6!important;">
               <div class="mb-2"><i class="fas fa-calendar-week" style="font-size:1.6rem;color:#9b59b6;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;">Miezi 3</div>
+              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_3m']) ?></div>
               <div class="my-2">
                 <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">25,000</span>
                 <span style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div class="badge rounded-pill" style="background:#f0e6ff;color:#9b59b6;font-size:.7rem;">Akiba 17%</div>
+              <div class="badge rounded-pill" style="background:#f0e6ff;color:#9b59b6;font-size:.7rem;"><?= htmlspecialchars($tr['save_17']) ?></div>
             </div>
           </div>
 
           <div class="col-6 col-md-3">
             <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative" style="border-color:#1abc9c!important;">
               <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
-                    style="background:#1abc9c;font-size:.65rem;white-space:nowrap;">MAARUFU</span>
+                    style="background:#1abc9c;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['popular']) ?></span>
               <div class="mb-2 mt-1"><i class="fas fa-calendar-alt" style="font-size:1.6rem;color:#1abc9c;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;">Miezi 6</div>
+              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_6m']) ?></div>
               <div class="my-2">
                 <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">45,000</span>
                 <span style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div class="badge rounded-pill" style="background:#e6faf5;color:#1abc9c;font-size:.7rem;">Akiba 25%</div>
+              <div class="badge rounded-pill" style="background:#e6faf5;color:#1abc9c;font-size:.7rem;"><?= htmlspecialchars($tr['save_25']) ?></div>
             </div>
           </div>
 
           <div class="col-6 col-md-3">
             <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative" style="border-color:#f39c12!important;">
               <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
-                    style="background:#f39c12;font-size:.65rem;white-space:nowrap;">BORA ZAIDI</span>
+                    style="background:#f39c12;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['best']) ?></span>
               <div class="mb-2 mt-1"><i class="fas fa-crown" style="font-size:1.6rem;color:#f39c12;"></i></div>
-              <div class="fw-bold" style="color:#2c3e50;">Mwaka 1</div>
+              <div class="fw-bold" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1y']) ?></div>
               <div class="my-2">
                 <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">85,000</span>
                 <span style="font-size:.75rem;color:#888;"> TZS</span>
               </div>
-              <div class="badge rounded-pill" style="background:#fff8e6;color:#f39c12;font-size:.7rem;">Akiba 29%</div>
+              <div class="badge rounded-pill" style="background:#fff8e6;color:#f39c12;font-size:.7rem;"><?= htmlspecialchars($tr['save_29']) ?></div>
             </div>
           </div>
 
@@ -370,8 +401,7 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
              style="background:#fff8e6;border:1px solid #ffe5a0;">
           <i class="fas fa-info-circle mt-1" style="color:#f39c12;flex-shrink:0;"></i>
           <small style="color:#7a5c00;line-height:1.6;">
-            <strong>Kumbuka:</strong> Mipango yote hapo juu ni kwa <strong>duka moja (1)</strong> na
-            <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi, wasiliana nasi:
+            <strong><?= htmlspecialchars($tr['note_label']) ?></strong> <?= $tr['note_body'] ?>
             <?php if ($company_email || $company_phone): ?>
               <span class="d-block mt-1">
                 <?php if ($company_email): ?>
