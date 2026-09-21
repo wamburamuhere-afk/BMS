@@ -73,6 +73,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // slow as whichever of those was slowest. login.php's JS fires that
         // endpoint via sendBeacon right after this response, so the user never
         // waits on either.
+        // Transfer language preference from cookie to session so the chosen
+        // language on the login page carries through into the app.
+        if (!empty($_COOKIE['bms_lang']) && in_array($_COOKIE['bms_lang'], ['en', 'sw'], true)) {
+            $_SESSION['user_lang'] = $_COOKIE['bms_lang'];
+        }
+
         $response['success'] = true;
     } else {
         $response['message'] = 'Invalid username or password.';
