@@ -13,6 +13,8 @@ if (isset($_SESSION['user_lang'])) {
 
 require_once __DIR__ . '/../../core/pos_shift_reporting.php';
 require_once __DIR__ . '/../../core/pos_denominations.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -24,8 +26,6 @@ if (!canEdit('pos')) {
     echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to close POS shifts')]);
     exit();
 }
-csrf_check();
-
 try {
     global $pdo;
 
@@ -64,20 +64,27 @@ try {
         $shift_id = $requested_shift_id;
         $is_force_close = $shift && (int)$shift['user_id'] !== (int)$user_id;
     } else {
-        // Get active shift
+        // Get active shift — prefer session (web), fall back to DB lookup (mobile Bearer)
         $shift_id = isset($_SESSION['shift_id']) ? $_SESSION['shift_id'] : null;
 
         if (!$shift_id) {
-            echo json_encode([
-                'success' => false,
-                'message' => t('No active shift found')
-            ]);
-            exit();
+            // Mobile Bearer auth: session has no shift_id, look up by user_id
+            $stmt = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE user_id = ? AND status = 'active' ORDER BY shift_id DESC LIMIT 1");
+            $stmt->execute([$user_id]);
+            $shift = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$shift) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => t('No active shift found')
+                ]);
+                exit();
+            }
+            $shift_id = $shift['shift_id'];
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE shift_id = ? AND user_id = ? AND status = 'active'");
+            $stmt->execute([$shift_id, $user_id]);
+            $shift = $stmt->fetch(PDO::FETCH_ASSOC);
         }
-
-        $stmt = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE shift_id = ? AND user_id = ? AND status = 'active'");
-        $stmt->execute([$shift_id, $user_id]);
-        $shift = $stmt->fetch(PDO::FETCH_ASSOC);
         $is_force_close = false;
     }
 
