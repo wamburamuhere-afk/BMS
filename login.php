@@ -67,18 +67,22 @@ $tr = $pageLang === 'sw' ? [
     'lang_label'     => 'Language',
 ];
 
-// Get company branding from settings
-$company_logo = get_setting('company_logo', '');
-$company_name = get_setting('company_name', 'Business Management System');
+// Get company branding and contact info from settings
+$company_logo  = get_setting('company_logo', '');
+$company_name  = get_setting('company_name', 'Business Management System');
+$company_email = get_setting('company_email', '');
+$company_phone = get_setting('company_phone', '');
 
-// ── Multi-tenancy: register URL ───────────────────────────────────────────────
-$registerUrl = 'register.php';
+// ── Multi-tenancy: register URL + subdomain detection ────────────────────────
+$registerUrl  = 'register.php';
+$isSubdomain  = false;
 $tenantResolverFile = __DIR__ . '/core/tenant_resolver.php';
 if (is_file($tenantResolverFile)) {
     require_once $tenantResolverFile;
     if (function_exists('resolveTenantFromRequest')) {
         $__r = resolveTenantFromRequest();
         if (($__r['status'] ?? '') === 'found') {
+            $isSubdomain = true;
             $base = function_exists('tenantBaseDomain') ? tenantBaseDomain() : null;
             if ($base) {
                 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
@@ -237,12 +241,14 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
 
             <button type="submit" class="btn btn-primary w-100 btn-login"><?= htmlspecialchars($tr['login_btn']) ?></button>
 
+            <?php if (!$isSubdomain): ?>
             <div class="divider"><span class="divider-text">OR</span></div>
 
             <p class="text-center mb-0"><?= htmlspecialchars($tr['new_company']) ?>
                 <a href="#" data-bs-toggle="modal" data-bs-target="#pricingModal"
                    style="color:var(--primary-color);"><?= htmlspecialchars($tr['register_here']) ?></a>
             </p>
+            <?php endif; ?>
         </form>
 
         <div class="footer-links">
@@ -253,6 +259,7 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
     </div>
 </div>
 
+<?php if (!$isSubdomain): ?>
 <!-- Pricing / Offer Modal -->
 <div class="modal fade" id="pricingModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -362,9 +369,24 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         <div class="rounded-3 px-3 py-2 mb-1 d-flex align-items-start gap-2"
              style="background:#fff8e6;border:1px solid #ffe5a0;">
           <i class="fas fa-info-circle mt-1" style="color:#f39c12;flex-shrink:0;"></i>
-          <small style="color:#7a5c00;line-height:1.5;">
+          <small style="color:#7a5c00;line-height:1.6;">
             <strong>Kumbuka:</strong> Mipango yote hapo juu ni kwa <strong>duka moja (1)</strong> na
-            <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi, wasiliana nasi.
+            <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi, wasiliana nasi:
+            <?php if ($company_email || $company_phone): ?>
+              <span class="d-block mt-1">
+                <?php if ($company_email): ?>
+                  <i class="fas fa-envelope me-1"></i>
+                  <a href="mailto:<?= htmlspecialchars($company_email) ?>"
+                     style="color:#7a5c00;font-weight:600;"><?= htmlspecialchars($company_email) ?></a>
+                  <?php if ($company_phone): ?>&nbsp;&nbsp;<?php endif; ?>
+                <?php endif; ?>
+                <?php if ($company_phone): ?>
+                  <i class="fas fa-phone me-1"></i>
+                  <a href="tel:<?= htmlspecialchars($company_phone) ?>"
+                     style="color:#7a5c00;font-weight:600;"><?= htmlspecialchars($company_phone) ?></a>
+                <?php endif; ?>
+              </span>
+            <?php endif; ?>
           </small>
         </div>
 
@@ -384,6 +406,7 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
     </div>
   </div>
 </div>
+<?php endif; // !$isSubdomain — modal ?>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
