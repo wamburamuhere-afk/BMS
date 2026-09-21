@@ -11,7 +11,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 
 if (!isAuthenticated())        { http_response_code(401); echo json_encode(['results' => []]); exit; }
-if (!hasPermission('adjust_stock') && !isAdmin()) { http_response_code(403); echo json_encode(['results' => []]); exit; }
+if (!hasPermission('adjust_stock') && !hasPermission('pos_restock') && !isAdmin()) { http_response_code(403); echo json_encode(['results' => []]); exit; }
 
 global $pdo;
 
