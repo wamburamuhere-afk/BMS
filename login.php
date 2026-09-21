@@ -252,7 +252,7 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                   tenant's own subdomain (register.php 404s there by design).
                 -->
                 <p class="text-center mb-0">New company?
-                    <a href="<?= safe_output($registerUrl, 'register.php') ?>" style="color: var(--primary-color);">Register here</a>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#pricingModal" style="color: var(--primary-color);">Register here</a>
                 </p>
             </form>
             
@@ -263,6 +263,148 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
             </div>
         </div>
     </div>
+
+<!-- Pricing / Offer Modal -->
+<div class="modal fade" id="pricingModal" tabindex="-1" aria-labelledby="pricingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+
+      <!-- Header with brand -->
+      <div class="modal-header border-0 pb-0 pt-4 px-4">
+        <div class="d-flex flex-column align-items-center w-100 text-center">
+          <?php if ($company_logo): ?>
+            <img src="<?= htmlspecialchars($company_logo) ?>" alt="<?= htmlspecialchars($company_name) ?>"
+                 style="width:64px;height:64px;object-fit:contain;border-radius:10px;margin-bottom:.75rem;">
+          <?php else: ?>
+            <div style="width:64px;height:64px;background:linear-gradient(135deg,#3498db,#2980b9);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:.75rem;box-shadow:0 4px 14px rgba(52,152,219,.35);">
+              <i class="fas fa-building text-white fs-3"></i>
+            </div>
+          <?php endif; ?>
+          <h5 class="fw-bold mb-0" style="color:#2c3e50;"><?= htmlspecialchars($company_name) ?></h5>
+          <small class="text-muted">bms.bjptechnologies.co.tz</small>
+        </div>
+        <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body px-4 pt-3 pb-2">
+
+        <!-- Free-trial banner -->
+        <div class="text-center rounded-3 py-3 px-3 mb-4"
+             style="background:linear-gradient(135deg,#1abc9c,#16a085);color:#fff;">
+          <div class="fw-bold fs-5 mb-1"><i class="fas fa-gift me-2"></i>Siku 14 Bure — Bila Malipo!</div>
+          <div style="font-size:.9rem;opacity:.92;">
+            Unapojisajili kwenye mfumo wetu, utakuwa na siku <strong>14 za majaribio bure</strong>.<br>
+            Baada ya hapo, chagua mpango unaokufaa ili kuendelea kutumia mfumo.
+          </div>
+        </div>
+
+        <!-- Pricing cards -->
+        <h6 class="text-center fw-semibold mb-3" style="color:#555;letter-spacing:.3px;">MIPANGO YA BEI</h6>
+        <div class="row g-3 mb-3">
+
+          <!-- 1 month -->
+          <div class="col-6 col-md-3">
+            <div class="pricing-card text-center p-3 h-100 rounded-3 border"
+                 style="border-color:#dee2e6!important;transition:all .2s;">
+              <div class="pricing-icon mb-2">
+                <i class="fas fa-calendar-day" style="font-size:1.6rem;color:#3498db;"></i>
+              </div>
+              <div class="fw-bold" style="color:#2c3e50;">Mwezi 1</div>
+              <div class="my-2">
+                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">10,000</span>
+                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              </div>
+              <div style="font-size:.75rem;color:#888;">/mwezi</div>
+            </div>
+          </div>
+
+          <!-- 3 months -->
+          <div class="col-6 col-md-3">
+            <div class="pricing-card text-center p-3 h-100 rounded-3 border"
+                 style="border-color:#dee2e6!important;transition:all .2s;">
+              <div class="pricing-icon mb-2">
+                <i class="fas fa-calendar-week" style="font-size:1.6rem;color:#9b59b6;"></i>
+              </div>
+              <div class="fw-bold" style="color:#2c3e50;">Miezi 3</div>
+              <div class="my-2">
+                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">25,000</span>
+                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              </div>
+              <div class="badge rounded-pill" style="background:#f0e6ff;color:#9b59b6;font-size:.7rem;">Akiba 17%</div>
+            </div>
+          </div>
+
+          <!-- 6 months -->
+          <div class="col-6 col-md-3">
+            <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative"
+                 style="border-color:#1abc9c!important;transition:all .2s;">
+              <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
+                    style="background:#1abc9c;font-size:.65rem;white-space:nowrap;">MAARUFU</span>
+              <div class="pricing-icon mb-2 mt-1">
+                <i class="fas fa-calendar-alt" style="font-size:1.6rem;color:#1abc9c;"></i>
+              </div>
+              <div class="fw-bold" style="color:#2c3e50;">Miezi 6</div>
+              <div class="my-2">
+                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">45,000</span>
+                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              </div>
+              <div class="badge rounded-pill" style="background:#e6faf5;color:#1abc9c;font-size:.7rem;">Akiba 25%</div>
+            </div>
+          </div>
+
+          <!-- 1 year -->
+          <div class="col-6 col-md-3">
+            <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative"
+                 style="border-color:#f39c12!important;transition:all .2s;">
+              <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
+                    style="background:#f39c12;font-size:.65rem;white-space:nowrap;">BORA ZAIDI</span>
+              <div class="pricing-icon mb-2 mt-1">
+                <i class="fas fa-crown" style="font-size:1.6rem;color:#f39c12;"></i>
+              </div>
+              <div class="fw-bold" style="color:#2c3e50;">Mwaka 1</div>
+              <div class="my-2">
+                <span style="font-size:1.4rem;font-weight:800;color:#2c3e50;">85,000</span>
+                <span style="font-size:.75rem;color:#888;"> TZS</span>
+              </div>
+              <div class="badge rounded-pill" style="background:#fff8e6;color:#f39c12;font-size:.7rem;">Akiba 29%</div>
+            </div>
+          </div>
+
+        </div><!-- /row -->
+
+        <!-- Limitation note -->
+        <div class="rounded-3 px-3 py-2 mb-1 d-flex align-items-start gap-2"
+             style="background:#fff8e6;border:1px solid #ffe5a0;">
+          <i class="fas fa-info-circle mt-1" style="color:#f39c12;flex-shrink:0;"></i>
+          <small style="color:#7a5c00;line-height:1.5;">
+            <strong>Kumbuka:</strong> Mipango yote hapo juu ni kwa <strong>duka moja (1)</strong> na
+            <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi,
+            wasiliana nasi kupitia <strong>bms.bjptechnologies.co.tz</strong>.
+          </small>
+        </div>
+
+      </div><!-- /modal-body -->
+
+      <div class="modal-footer border-0 px-4 pb-4 pt-2 d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">
+          Rudi Nyuma
+        </button>
+        <a href="<?= safe_output($registerUrl, 'register.php') ?>"
+           class="btn flex-fill fw-semibold text-white"
+           style="background:linear-gradient(135deg,#3498db,#2980b9);">
+          <i class="fas fa-arrow-right me-1"></i> Endelea Kujisajili
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+<style>
+.pricing-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.10);
+}
+</style>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
