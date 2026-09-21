@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/mobile_auth.php'; mobileBearerAuth();
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/permissions.php';
