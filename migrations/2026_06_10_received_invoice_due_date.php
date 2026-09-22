@@ -5,6 +5,12 @@
  */
 require_once __DIR__ . '/../roots.php';
 
+if (!$pdo->query("SHOW TABLES LIKE 'supplier_invoices'")->fetchColumn()) {
+    echo "  · supplier_invoices table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 $cols = $pdo->query("SHOW COLUMNS FROM supplier_invoices LIKE 'payment_terms'")->fetchColumn();
 if (!$cols) {
     $pdo->exec("ALTER TABLE supplier_invoices

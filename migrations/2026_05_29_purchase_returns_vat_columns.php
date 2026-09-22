@@ -17,6 +17,12 @@ global $pdo;
 
 echo "Starting migration: purchase_returns VAT columns...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'purchase_returns'")->fetchColumn()) {
+    echo "  · purchase_returns table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     if (!$pdo->query("SHOW COLUMNS FROM `purchase_returns` LIKE 'total_tax'")->fetch()) {
         $pdo->exec("ALTER TABLE `purchase_returns` ADD COLUMN `total_tax` DECIMAL(10,2) NOT NULL DEFAULT '0.00' AFTER `total_amount`");

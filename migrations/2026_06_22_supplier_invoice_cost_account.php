@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: add cost_account_id to supplier_invoices...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'supplier_invoices'")->fetchColumn()) {
+    echo "  · supplier_invoices table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // Idempotent: only add the column if it isn't already there.
     $col = $pdo->query("SHOW COLUMNS FROM supplier_invoices LIKE 'cost_account_id'")->fetchColumn();

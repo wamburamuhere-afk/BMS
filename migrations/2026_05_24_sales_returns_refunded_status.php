@@ -30,6 +30,12 @@ global $pdo;
 
 echo "Starting migration: add 'refunded' to sales_returns.status ENUM...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'sales_returns'")->fetchColumn()) {
+    echo "  · sales_returns table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1. Extend the enum ──────────────────────────────────────────────
     $col = $pdo->query("SHOW COLUMNS FROM sales_returns LIKE 'status'")->fetch(PDO::FETCH_ASSOC);

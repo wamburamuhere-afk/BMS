@@ -26,6 +26,12 @@ global $pdo;
 
 echo "Starting migration: GRN three-approval workflow normalization...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'purchase_receipts'")->fetchColumn()) {
+    echo "  · purchase_receipts table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1. Add audit columns if missing ──────────────────────────────────
     $cols = [

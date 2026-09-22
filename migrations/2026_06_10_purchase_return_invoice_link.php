@@ -7,6 +7,12 @@
  */
 require_once __DIR__ . '/../roots.php';
 
+if (!$pdo->query("SHOW TABLES LIKE 'purchase_returns'")->fetchColumn()) {
+    echo "  · purchase_returns table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // purchase_returns.supplier_invoice_id
     $col = $pdo->query("SHOW COLUMNS FROM purchase_returns LIKE 'supplier_invoice_id'")->fetch();

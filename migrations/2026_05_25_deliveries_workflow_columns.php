@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: deliveries workflow snapshot columns...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+    echo "  · deliveries table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $columns = [
         'prepared_by_name' => "VARCHAR(150) NULL",

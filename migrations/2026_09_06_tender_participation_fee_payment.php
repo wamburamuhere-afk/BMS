@@ -6,6 +6,12 @@ global $pdo;
 
 echo "Starting migration: tender participation fee -> real GL payment...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'tenders'")->fetchColumn()) {
+    echo "  · tenders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // Turns the participation fee from a memo field into an actual tracked
     // payment: who it was paid from, when, which expense account it hit, and

@@ -32,6 +32,12 @@ global $pdo;
 
 echo "Starting migration: LPO standalone foundation...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'customer_lpos'")->fetchColumn()) {
+    echo "  · customer_lpos table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1+2. customer_lpos — workflow snapshot + project_id ─────────────────
     $lpoCols = [
@@ -74,13 +80,17 @@ try {
     }
 
     // ── 4. deliveries — customer_lpo_id (LPO -> DN(outbound) link) ──────────
-    $hasDelLpo = (bool)$pdo->query("SHOW COLUMNS FROM deliveries LIKE 'customer_lpo_id'")->fetch();
-    if ($hasDelLpo) {
-        echo "  · deliveries.customer_lpo_id already exists — skipping.\n";
+    if ($pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+        $hasDelLpo = (bool)$pdo->query("SHOW COLUMNS FROM deliveries LIKE 'customer_lpo_id'")->fetch();
+        if ($hasDelLpo) {
+            echo "  · deliveries.customer_lpo_id already exists — skipping.\n";
+        } else {
+            $pdo->exec("ALTER TABLE deliveries ADD COLUMN customer_lpo_id INT NULL AFTER purchase_order_id");
+            $pdo->exec("ALTER TABLE deliveries ADD INDEX idx_del_customer_lpo_id (customer_lpo_id)");
+            echo "  + deliveries.customer_lpo_id added.\n";
+        }
     } else {
-        $pdo->exec("ALTER TABLE deliveries ADD COLUMN customer_lpo_id INT NULL AFTER purchase_order_id");
-        $pdo->exec("ALTER TABLE deliveries ADD INDEX idx_del_customer_lpo_id (customer_lpo_id)");
-        echo "  + deliveries.customer_lpo_id added.\n";
+        echo "  · deliveries table absent — skipping customer_lpo_id link.\n";
     }
 
     // ── 5. invoices — delivery_id + customer_lpo_id (optional refs) ─────────

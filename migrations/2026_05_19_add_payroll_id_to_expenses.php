@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: add payroll_id to expenses...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'expenses'")->fetchColumn()) {
+    echo "  · expenses table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'payroll_id'")->fetch();
     if (!$col) {

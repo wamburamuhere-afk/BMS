@@ -6,6 +6,12 @@ global $pdo;
 
 echo "Starting migration: tender Bills of Quantities (BOQ) engine...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'tenders'")->fetchColumn()) {
+    echo "  · tenders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS tender_boq_bills (

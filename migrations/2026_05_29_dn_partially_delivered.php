@@ -11,6 +11,12 @@ global $pdo;
 
 echo "Starting migration: deliveries.status — add partially_delivered...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+    echo "  · deliveries table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $row = $pdo->query("SHOW COLUMNS FROM `deliveries` LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
     if (!$row) {

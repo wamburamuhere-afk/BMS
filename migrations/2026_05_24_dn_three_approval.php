@@ -22,6 +22,12 @@ global $pdo;
 
 echo "Starting migration: DN three-approval workflow normalization...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+    echo "  · deliveries table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1. Add reviewed_by INT if missing ────────────────────────────────
     $col = $pdo->query("SHOW COLUMNS FROM deliveries LIKE 'reviewed_by'")->fetch(PDO::FETCH_ASSOC);
