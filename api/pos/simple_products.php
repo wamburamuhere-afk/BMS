@@ -17,6 +17,8 @@ if (isset($_SESSION['user_lang'])) {
 }
 
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 
 // Security: Check if user is authenticated
 if (!isAuthenticated()) {

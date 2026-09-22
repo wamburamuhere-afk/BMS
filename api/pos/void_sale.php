@@ -15,6 +15,7 @@
  * Permission: canDelete('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth();
 // Respect the caller's saved language preference (set by header.php on their
 // last page load) so t()-wrapped messages below come back in the right
 // language, not always English.
@@ -34,7 +35,7 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canDelete('pos'))  { http_response_code(403); echo json_encode(['success' => false, 'message' => t('You do not have permission to void POS sales')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
-csrf_check();
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 
 $sale_id = (int)($_POST['sale_id'] ?? 0);
 $reason  = trim($_POST['reason'] ?? '');

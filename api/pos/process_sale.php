@@ -24,6 +24,8 @@ require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 require_once __DIR__ . '/../../core/pos_credit_limit.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
