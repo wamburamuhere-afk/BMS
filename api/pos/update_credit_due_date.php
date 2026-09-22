@@ -14,6 +14,8 @@
  * Permission: canEdit('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
@@ -28,7 +30,7 @@ if (!isAuthenticated())      { http_response_code(401); echo json_encode(['succe
 if (!canEdit('pos'))         { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if (!posSimpleModeEnabled()) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('This action is only available in Simple POS mode.')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
-csrf_check();
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 
 $sale_id  = (int)($_POST['sale_id'] ?? 0);
 $due_date = trim($_POST['due_date'] ?? '');
