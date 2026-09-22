@@ -23,6 +23,12 @@ global $pdo;
 
 echo "Starting migration: HIGH#2 legacy Bill/ledger cleanup...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'supplier_invoices'")->fetchColumn()) {
+    echo "  · supplier_invoices table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // Precondition guard (order-independent): Part B calls postGoodsInvoiceAccrual(),
     // which SELECTs supplier_invoices.cost_account_id. The runner sorts migrations by

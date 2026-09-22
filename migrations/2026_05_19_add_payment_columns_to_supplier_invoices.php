@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: add payment columns to supplier_invoices...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'supplier_invoices'")->fetchColumn()) {
+    echo "  · supplier_invoices table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $cols = [
         'payment_date'        => 'DATE NULL',

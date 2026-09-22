@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: payment_vouchers status workflow (pending→reviewed→approved→paid)...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'payment_vouchers'")->fetchColumn()) {
+    echo "  · payment_vouchers table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM payment_vouchers LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
     if (!$col) {

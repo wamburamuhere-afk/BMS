@@ -11,6 +11,12 @@ global $pdo;
 
 echo "Starting migration: purchase_receipts.delivery_id...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'purchase_receipts'")->fetchColumn()) {
+    echo "  · purchase_receipts table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     if (!$pdo->query("SHOW COLUMNS FROM `purchase_receipts` LIKE 'delivery_id'")->fetch()) {
         $pdo->exec("ALTER TABLE `purchase_receipts` ADD COLUMN `delivery_id` INT NULL DEFAULT NULL AFTER `delivery_note`");

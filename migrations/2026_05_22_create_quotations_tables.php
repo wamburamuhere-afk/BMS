@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: create dedicated quotations + quotation_items tables...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'sales_orders'")->fetchColumn()) {
+    echo "  · sales_orders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // 1. Create the quotations table mirroring sales_orders exactly.
     //    CREATE TABLE ... LIKE guarantees an identical structure.
