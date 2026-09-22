@@ -12,6 +12,8 @@ if (isset($_SESSION['user_lang'])) {
 }
 
 require_once __DIR__ . '/../../core/pos_denominations.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -23,8 +25,6 @@ if (!canCreate('pos')) {
     echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to open POS shifts')]);
     exit();
 }
-
-csrf_check();
 
 try {
     global $pdo;

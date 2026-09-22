@@ -24,6 +24,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth();
 require_once __DIR__ . '/../../core/stock_intake.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/payment_source.php';
@@ -42,7 +43,7 @@ if (!hasPermission('adjust_stock') && !hasPermission('pos_restock') && !isAdmin(
     exit;
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
-csrf_check();
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 
 global $pdo;
 
