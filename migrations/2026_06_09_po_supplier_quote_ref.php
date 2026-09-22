@@ -11,6 +11,12 @@ global $pdo;
 
 echo "Starting migration: purchase_orders.supplier_quote_ref...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'purchase_orders'")->fetchColumn()) {
+    echo "  · purchase_orders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $exists = $pdo->query("SHOW COLUMNS FROM purchase_orders LIKE 'supplier_quote_ref'")->fetch();
     if ($exists) {

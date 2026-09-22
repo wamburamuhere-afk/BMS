@@ -20,6 +20,12 @@ global $pdo;
 
 echo "Starting migration: retry journal_entries.warehouse_id backfill on the legacy database...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetchColumn()) {
+    echo "  · pos_sales table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $hasCol = $pdo->query("SHOW COLUMNS FROM journal_entries LIKE 'warehouse_id'")->fetch();
     if (!$hasCol) {

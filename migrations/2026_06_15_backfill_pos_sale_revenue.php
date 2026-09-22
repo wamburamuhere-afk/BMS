@@ -51,6 +51,12 @@ global $pdo;
 
 echo "Starting migration: backfill POS sale revenue + COGS (IN-5)...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetchColumn()) {
+    echo "  · pos_sales table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── Resolve posting user (lowest user_id — migration context, not a real user) ──
     $uid = (int)($pdo->query("SELECT user_id FROM users ORDER BY user_id LIMIT 1")->fetchColumn() ?: 0);

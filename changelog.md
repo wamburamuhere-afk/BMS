@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-22 — Hotfix: guard rfq migrations against databases without rfq table
+
+**Branch:** `hotfix/rfq-migration-guards` → PR #2126 → `main`
+
+Three `migrations/` files tried to reference the `rfq` table on every host. `bejundas_bms_bjp` predates RFQ functionality and has no such table, causing `php migrations/runner.php` to exit 1 and halt the deploy (PR #2125 / CI run #1029).
+
+Added `SHOW TABLES LIKE 'rfq'` guard at the top of each migration — skips cleanly with exit 0 if absent.
+
+- `migrations/2026_05_08_rfq_three_stage_workflow.php` — added rfq table guard
+- `migrations/2026_05_20_add_rfq_attachment.php` — added rfq table guard
+- `migrations/2026_05_20_rfq_multi_attachments.php` — added rfq table guard
+
 ## 2026-09-19 — Text display case Phases 7–13: `safe_output` → `caseFormat` sweep
 
 **Branch:** `feat/text-display-case-phase2`

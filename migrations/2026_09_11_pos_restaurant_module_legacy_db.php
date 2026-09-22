@@ -16,6 +16,12 @@ global $pdo;
 
 echo "Starting migration: POS restaurant module on the legacy database (Phase 30 backend)...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetchColumn()) {
+    echo "  · pos_sales table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM warehouses LIKE 'pos_mode'")->fetch();
     if (!$col) {
