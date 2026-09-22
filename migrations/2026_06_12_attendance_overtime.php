@@ -19,6 +19,12 @@ global $pdo;
 
 echo "Starting migration: attendance overtime columns + payroll settings...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'attendance'")->fetchColumn()) {
+    echo "  · attendance table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     foreach (['overtime_hours', 'overtime_amount'] as $col) {
         if (!$pdo->query("SHOW COLUMNS FROM attendance LIKE '$col'")->fetch()) {

@@ -6,6 +6,12 @@ global $pdo;
 
 echo "Starting migration: sub_contractors.village...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'sub_contractors'")->fetchColumn()) {
+    echo "  · sub_contractors table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $exists = $pdo->query("SHOW COLUMNS FROM sub_contractors LIKE 'village'")->fetch();
     if ($exists) {
