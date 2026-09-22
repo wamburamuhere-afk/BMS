@@ -18,6 +18,12 @@ global $pdo;
 
 echo "Starting migration: PO three-approval workflow normalization...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'purchase_orders'")->fetchColumn()) {
+    echo "  · purchase_orders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1. Add reviewed_by INT column if missing ─────────────────────────
     $col = $pdo->query("SHOW COLUMNS FROM purchase_orders LIKE 'reviewed_by'")->fetch(PDO::FETCH_ASSOC);

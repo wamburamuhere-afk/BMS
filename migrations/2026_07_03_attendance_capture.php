@@ -25,6 +25,12 @@ global $pdo;
 
 echo "Starting migration: smart attendance capture (GPS+Selfie, QR)...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'attendance'")->fetchColumn()) {
+    echo "  · attendance table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     /* 1. Feature flags + geofence defaults ------------------------------------ */
     $settings = [

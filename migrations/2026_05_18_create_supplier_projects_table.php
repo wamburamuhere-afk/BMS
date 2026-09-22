@@ -19,14 +19,18 @@ try {
         ");
         echo "Table supplier_projects created.\n";
 
-        // Seed existing project associations derived from purchase orders
-        $pdo->exec("
-            INSERT IGNORE INTO supplier_projects (supplier_id, project_id, assigned_by, assigned_at)
-            SELECT DISTINCT po.supplier_id, po.project_id, po.created_by, po.created_at
-            FROM purchase_orders po
-            WHERE po.project_id IS NOT NULL AND po.supplier_id IS NOT NULL
-        ");
-        echo "Existing PO-based project associations seeded.\n";
+        // Seed existing project associations derived from purchase orders (only if table exists)
+        if ($pdo->query("SHOW TABLES LIKE 'purchase_orders'")->fetchColumn()) {
+            $pdo->exec("
+                INSERT IGNORE INTO supplier_projects (supplier_id, project_id, assigned_by, assigned_at)
+                SELECT DISTINCT po.supplier_id, po.project_id, po.created_by, po.created_at
+                FROM purchase_orders po
+                WHERE po.project_id IS NOT NULL AND po.supplier_id IS NOT NULL
+            ");
+            echo "Existing PO-based project associations seeded.\n";
+        } else {
+            echo "purchase_orders table not present — skipping historical seed.\n";
+        }
     } else {
         echo "Table supplier_projects already exists, skipping.\n";
     }
