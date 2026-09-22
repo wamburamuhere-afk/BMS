@@ -4,6 +4,13 @@ global $pdo;
 
 echo "Starting migration: rfq_attachments table + drop single attachment column...\n";
 
+$rfqExists = (bool)$pdo->query("SHOW TABLES LIKE 'rfq'")->fetchColumn();
+if (!$rfqExists) {
+    echo "  · rfq table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // Create rfq_attachments table
     $exists = $pdo->query("SHOW TABLES LIKE 'rfq_attachments'")->fetchColumn();

@@ -4,6 +4,13 @@ global $pdo;
 
 echo "Starting migration: Add attachment column to rfq table...\n";
 
+$rfqExists = (bool)$pdo->query("SHOW TABLES LIKE 'rfq'")->fetchColumn();
+if (!$rfqExists) {
+    echo "  · rfq table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM rfq LIKE 'attachment'")->fetchColumn();
     if ($col) {
