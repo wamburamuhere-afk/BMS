@@ -25,6 +25,13 @@ global $pdo;
 
 echo "Starting migration: RFQ three-stage workflow normalization...\n";
 
+$rfqExists = (bool)$pdo->query("SHOW TABLES LIKE 'rfq'")->fetchColumn();
+if (!$rfqExists) {
+    echo "  · rfq table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1. Add audit columns to rfq if missing ───────────────────────────
     $cols = [
