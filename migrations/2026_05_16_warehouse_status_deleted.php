@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: Add 'deleted' to warehouses.status enum...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'warehouses'")->fetchColumn()) {
+    echo "  · warehouses table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM warehouses LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
     if ($col && strpos($col['Type'], 'deleted') !== false) {
