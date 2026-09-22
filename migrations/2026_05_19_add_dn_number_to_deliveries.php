@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: add dn_number to deliveries...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+    echo "  · deliveries table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM deliveries LIKE 'dn_number'")->fetch();
     if (!$col) {

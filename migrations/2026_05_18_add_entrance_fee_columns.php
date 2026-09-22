@@ -4,6 +4,12 @@ global $pdo;
 
 echo "Starting migration: add entrance_fee_tzs and entrance_fee_usd to tenders...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'tenders'")->fetchColumn()) {
+    echo "  · tenders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM tenders LIKE 'entrance_fee_tzs'")->fetch();
     if (!$col) {

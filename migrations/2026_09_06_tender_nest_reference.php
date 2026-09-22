@@ -6,6 +6,12 @@ global $pdo;
 
 echo "Starting migration: tenders.nest_reference...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'tenders'")->fetchColumn()) {
+    echo "  · tenders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // The reference NeST (Tanzania's National e-Procurement System, nest.go.tz)
     // itself assigns once a tender is listed there — distinct from tender_no

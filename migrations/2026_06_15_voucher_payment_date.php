@@ -18,6 +18,12 @@ global $pdo;
 
 echo "Starting migration: payment_vouchers.payment_date...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'payment_vouchers'")->fetchColumn()) {
+    echo "  · payment_vouchers table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $exists = $pdo->query("SHOW COLUMNS FROM payment_vouchers LIKE 'payment_date'")->fetch();
     if ($exists) {

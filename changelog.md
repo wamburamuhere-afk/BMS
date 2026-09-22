@@ -1,16 +1,52 @@
 # BMS Changelog
 
-## 2026-09-22 — Hotfix: guard rfq migrations against databases without rfq table
+## 2026-09-22 — Hotfix: mass-guard 33 migrations against legacy database missing feature tables
 
 **Branch:** `hotfix/rfq-migration-guards` → PR #2126 → `main`
 
-Three `migrations/` files tried to reference the `rfq` table on every host. `bejundas_bms_bjp` predates RFQ functionality and has no such table, causing `php migrations/runner.php` to exit 1 and halt the deploy (PR #2125 / CI run #1029).
+`bejundas_bms_bjp` is a legacy production host predating many BMS features. It has 334 pending migrations but is missing most "feature tables" (rfq, deliveries, purchase_receipts, supplier_invoices, tenders, sub_contractors, purchase_orders, sales_orders, sales_returns, purchase_returns, payment_vouchers, customer_lpos, pos_sales, stock_movements, expenses, attendance). Each migration that blindly ran `SHOW COLUMNS FROM <missing_table>` caused `php migrations/runner.php` to exit 1, halting the deploy.
 
-Added `SHOW TABLES LIKE 'rfq'` guard at the top of each migration — skips cleanly with exit 0 if absent.
+Added `SHOW TABLES LIKE '<table>'` guard at the top of each migration (or inline for multi-table migrations). A missing table causes the migration to print a skip notice and exit 0, letting the runner record it as done and continue.
 
-- `migrations/2026_05_08_rfq_three_stage_workflow.php` — added rfq table guard
-- `migrations/2026_05_20_add_rfq_attachment.php` — added rfq table guard
-- `migrations/2026_05_20_rfq_multi_attachments.php` — added rfq table guard
+- `migrations/2026_05_08_rfq_three_stage_workflow.php` — rfq guard
+- `migrations/2026_05_14_sub_contractor_projects.php` — sub_contractors guard
+- `migrations/2026_05_16_deliveries_purchase_order_id.php` — deliveries guard
+- `migrations/2026_05_18_add_entrance_fee_columns.php` — tenders guard
+- `migrations/2026_05_19_add_dn_number_to_deliveries.php` — deliveries guard
+- `migrations/2026_05_19_add_invoice_id_to_expenses.php` — expenses guard
+- `migrations/2026_05_19_add_payment_columns_to_supplier_invoices.php` — supplier_invoices guard
+- `migrations/2026_05_19_add_payroll_id_to_expenses.php` — expenses guard
+- `migrations/2026_05_20_add_rfq_attachment.php` — rfq guard
+- `migrations/2026_05_20_rfq_multi_attachments.php` — rfq guard
+- `migrations/2026_05_21_dn_record_vs_create.php` — deliveries guard
+- `migrations/2026_05_22_create_quotations_tables.php` — sales_orders guard
+- `migrations/2026_05_24_dn_three_approval.php` — deliveries guard
+- `migrations/2026_05_24_grn_three_approval.php` — purchase_receipts guard
+- `migrations/2026_05_24_sales_returns_refunded_status.php` — sales_returns guard
+- `migrations/2026_05_24_so_remove_draft.php` — sales_orders guard
+- `migrations/2026_05_24_so_three_approval.php` — sales_orders guard
+- `migrations/2026_05_25_deliveries_workflow_columns.php` — deliveries guard
+- `migrations/2026_05_29_dn_partially_delivered.php` — deliveries guard
+- `migrations/2026_05_29_grn_delivery_id.php` — purchase_receipts guard
+- `migrations/2026_05_29_purchase_returns_vat_columns.php` — purchase_returns guard
+- `migrations/2026_05_29_sales_returns_vat_columns.php` — sales_returns guard
+- `migrations/2026_05_31_backfill_stock_movement_metadata.php` — stock_movements guard
+- `migrations/2026_06_02_received_invoice_three_stage.php` — supplier_invoices guard
+- `migrations/2026_06_09_po_supplier_quote_ref.php` — purchase_orders guard
+- `migrations/2026_06_10_purchase_return_invoice_link.php` — purchase_returns guard
+- `migrations/2026_06_10_received_invoice_due_date.php` — supplier_invoices guard
+- `migrations/2026_06_15_voucher_payment_date.php` — payment_vouchers guard
+- `migrations/2026_06_17_payment_voucher_status_workflow.php` — payment_vouchers guard
+- `migrations/2026_06_22_bill_ledger_legacy_cleanup.php` — supplier_invoices guard
+- `migrations/2026_06_22_supplier_invoice_cost_account.php` — supplier_invoices guard
+- `migrations/2026_07_01_dn_customer_party_type.php` — deliveries guard
+- `migrations/2026_07_01_lpo_standalone_foundation.php` — customer_lpos top-level guard + inline deliveries guard on step 4
+- `migrations/2026_07_03_add_village_to_sub_contractors.php` — sub_contractors guard
+- `migrations/2026_07_14_payment_vouchers_reviewed_by.php` — payment_vouchers guard
+- `migrations/2026_09_05_tender_boq.php` — tenders guard
+- `migrations/2026_09_05_tender_form_of_tender.php` — tenders guard
+- `migrations/2026_09_06_tender_nest_reference.php` — tenders guard
+- `migrations/2026_09_06_tender_participation_fee_payment.php` — tenders guard
 
 ## 2026-09-19 — Text display case Phases 7–13: `safe_output` → `caseFormat` sweep
 

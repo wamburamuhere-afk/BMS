@@ -23,6 +23,12 @@ global $pdo;
 
 echo "Starting migration: backfill stock_movements metadata...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'stock_movements'")->fetchColumn()) {
+    echo "  · stock_movements table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 $IN_TYPES = ['purchase_in','adjustment_in','transfer_in','return_in','production_in','found','correction'];
 
 /** Pull a GRN-/DN-style reference code out of a free-text notes string. */

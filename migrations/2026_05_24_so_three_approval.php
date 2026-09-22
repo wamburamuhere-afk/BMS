@@ -19,6 +19,12 @@ global $pdo;
 
 echo "Starting migration: SO three-approval workflow normalization...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'sales_orders'")->fetchColumn()) {
+    echo "  · sales_orders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // ── 1. Add audit columns if missing ──────────────────────────────────
     $cols = [

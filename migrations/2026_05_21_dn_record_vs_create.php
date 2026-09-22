@@ -5,6 +5,12 @@ global $pdo;
 
 echo "Starting migration: DN record vs create (inbound/outbound)...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+    echo "  · deliveries table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     // 1. dn_type — inbound = Record DN (from supplier/sub-contractor),
     //              outbound = Create DN (to supplier/sub-contractor)

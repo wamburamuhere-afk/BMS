@@ -17,6 +17,12 @@ global $pdo;
 
 echo "Starting migration: DN customer party_type...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'deliveries'")->fetchColumn()) {
+    echo "  · deliveries table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM deliveries LIKE 'party_type'")->fetch(PDO::FETCH_ASSOC);
     if (!$col) {

@@ -6,6 +6,12 @@ global $pdo;
 
 echo "Starting migration: tender Form of Tender auto-draft...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'tenders'")->fetchColumn()) {
+    echo "  · tenders table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $cols = [
         // NULL until first drafted/saved — distinguishes "never opened this

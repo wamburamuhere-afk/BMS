@@ -18,6 +18,12 @@ global $pdo;
 
 echo "Starting migration: received invoice three-stage workflow...\n";
 
+if (!$pdo->query("SHOW TABLES LIKE 'supplier_invoices'")->fetchColumn()) {
+    echo "  · supplier_invoices table does not exist on this database — skipped.\n";
+    echo "Migration complete.\n";
+    exit(0);
+}
+
 try {
     $col = $pdo->query("SHOW COLUMNS FROM supplier_invoices LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
     if (!$col) { echo "  ! status column missing — skipping.\n"; exit(0); }
