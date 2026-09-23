@@ -670,11 +670,15 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 const grid = $('#productGrid');
                 grid.empty();
 
-                // Default render cap: show only the first 20 products when
-                // no search term and no specific category is active (both
-                // mobile and desktop). Typing a search or tapping a category
-                // reveals the full matching set immediately.
-                const DEFAULT_DISPLAY_LIMIT = <?= (int)get_setting('pos_products_display_limit', '20') ?>;
+                // Default render cap: show only the first N products when
+                // no search term and no specific category is active. Mobile
+                // uses a smaller default (10) so the grid loads fast and fits
+                // the screen; desktop keeps the larger default (20). Both are
+                // configurable in POS Settings. Typing a search or tapping a
+                // category reveals the full matching set immediately.
+                const DEFAULT_DISPLAY_LIMIT = window.innerWidth < 768
+                    ? <?= (int)get_setting('pos_products_display_limit_mobile', '10') ?>
+                    : <?= (int)get_setting('pos_products_display_limit', '20') ?>;
                 const isDefaultView = !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined);
                 const capped = isDefaultView && response.data.length > DEFAULT_DISPLAY_LIMIT;
                 const renderList = capped ? response.data.slice(0, DEFAULT_DISPLAY_LIMIT) : response.data;
