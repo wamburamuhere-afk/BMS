@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-09-23 — fix(mobile-auth): remove hard 30-day token expiry — tokens now non-expiring
+
+**Files:** `api/mobile/login.php`, `core/mobile_auth.php`
+
+Mobile Bearer tokens now have `expires_at = NULL` (no expiry). Active users are never forced to re-login; sessions end only on explicit logout, admin account deactivation, or manual token revocation. The expiry check in `mobileBearerAuth()` is skipped when `expires_at IS NULL` so existing tokens with a date still expire normally. Web sessions are unchanged.
+
 ## 2026-09-23 — feat(mobile-api): master data CRUD APIs — Customers, Suppliers, Products/Services, Expenses, Warehouses
 
 **Branch:** `feat/mobile-api-master-data-crud`

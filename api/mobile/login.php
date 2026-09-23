@@ -48,9 +48,9 @@ try {
         exit;
     }
 
-    // Generate a 64-hex-char opaque token valid for 30 days
+    // Generate a 64-hex-char opaque token — no expiry; revoked on logout or account deactivation
     $token      = bin2hex(random_bytes(32));
-    $expires_at = date('Y-m-d H:i:s', strtotime('+30 days'));
+    $expires_at = null;
 
     $pdo->prepare("
         INSERT INTO mobile_tokens (token, user_id, device_name, expires_at)
@@ -70,7 +70,7 @@ try {
     echo json_encode([
         'success'    => true,
         'token'      => $token,
-        'expires_at' => $expires_at,
+        'expires_at' => null,
         'user'       => [
             'id'           => (int)$user['user_id'],
             'name'         => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
