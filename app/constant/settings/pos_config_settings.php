@@ -21,6 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     try {
         save_setting('pos_discount_type', $_POST['pos_discount_type'] ?? 'percentage');
+        $allowed_display_limits = [10, 20, 30, 50, 100];
+        $display_limit = (int)($_POST['pos_products_display_limit'] ?? 20);
+        save_setting('pos_products_display_limit', in_array($display_limit, $allowed_display_limits, true) ? $display_limit : 20);
         // Phase 10 (pos_upgrade_plan.md §7) — receipt printing preferences.
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
@@ -38,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$pos_products_display_limit = (int)get_setting('pos_products_display_limit', '20');
 $pos_discount_type      = get_setting('pos_discount_type', 'percentage');
 $pos_receipt_width      = get_setting('pos_receipt_width', '80');
 $pos_auto_print_receipt = get_setting('pos_auto_print_receipt', '0');
@@ -79,9 +83,20 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-body p-4">
-                    <h6 class="fw-bold mb-4 text-dark text-uppercase small"><?= t('Discount Configuration') ?></h6>
+                    <h6 class="fw-bold mb-4 text-dark text-uppercase small"><?= t('Display') ?></h6>
                     <form method="POST">
                         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <div class="mb-3">
+                            <label for="pos_products_display_limit" class="form-label"><?= t('Products shown on open') ?></label>
+                            <select class="form-select" id="pos_products_display_limit" name="pos_products_display_limit">
+                                <?php foreach ([10, 20, 30, 50, 100] as $n): ?>
+                                <option value="<?= $n ?>" <?= $pos_products_display_limit == $n ? 'selected' : '' ?>><?= $n ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text"><?= t('How many products to show in the product grid when no search or category filter is active. Searching or tapping a category always shows all matching results.') ?></div>
+                        </div>
+
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Discount Configuration') ?></h6>
                         <div class="mb-3">
                             <label for="pos_discount_type" class="form-label"><?= t('Discount Type Preference') ?></label>
                             <select class="form-select" id="pos_discount_type" name="pos_discount_type">

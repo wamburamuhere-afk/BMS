@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-23 — fix(pos): hide VAT row in Simple POS mode; configurable products-per-page
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/constant/settings/pos_config_settings.php`
+
+- `pos.php`: wrapped VAT select + Total Tax row in `if (!posSimpleModeEnabled())` — both rows hidden when Simple POS is on
+- `pos_config_settings.php`: added "Products shown on open" select (10 / 20 / 30 / 50 / 100) saved to `pos_products_display_limit` setting
+- `pos_scripts_new.php`: replaced hardcoded `DEFAULT_DISPLAY_LIMIT = 20` with `get_setting('pos_products_display_limit', '20')` from PHP
+
 ## 2026-09-23 — feat(mobile-api): add Simple POS mode flags to /me response
 
 **File:** `api/mobile/me.php`
