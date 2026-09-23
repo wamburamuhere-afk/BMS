@@ -4,9 +4,9 @@
  * Indirect Method - Premium UI Design
  */
 ob_start();
-require_once __DIR__ . '/../../../roots.php';
-require_once __DIR__ . '/../../../helpers.php';
-require_once __DIR__ . '/../../../core/project_scope.php';
+require_once __DIR__ . '/../../../../roots.php';
+require_once __DIR__ . '/../../../../helpers.php';
+require_once __DIR__ . '/../../../../core/project_scope.php';
 
 includeHeader();
 
@@ -49,7 +49,7 @@ $cf_warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
 )->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // Load canonical classification helper (Phase 1).
-require_once __DIR__ . '/../../../core/financial_classification.php';
+require_once __DIR__ . '/../../../../core/financial_classification.php';
 
 // Defensive defaults — if anything in the try block throws (e.g. the
 // account_types classification migration hasn't run on this server),

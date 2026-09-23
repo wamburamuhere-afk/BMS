@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-23 — fix(reports): correct require_once path depth in trial_balance and cash_flow
+
+**Files:** `app/bms/invoice/reps/trial_balance.php`, `app/bms/invoice/reps/cash_flow.php`
+
+- Both files used `'/../../../roots.php'` (3 levels) but `reps/` is 4 levels below the project root — fatal `Failed opening required` on every visit (Sentry ID: dada884e)
+- Fixed all `require_once` paths in both files from `../../../` to `../../../../`
+- PR: #2158
+
 ## 2026-09-23 — feat(superadmin): show tenant company profile in Overview tab
 
 **Files:** `app/superadmin/tenant_view.php`, `actions/superadmin_tenant_profile.php` (new)
