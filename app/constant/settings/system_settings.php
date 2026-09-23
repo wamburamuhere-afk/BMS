@@ -103,15 +103,17 @@ if ($_POST) {
     // Email Settings
     if (isset($_POST['save_email'])) {
         try {
+            $usePlatform = isset($_POST['use_platform_email']) ? '1' : '0';
             $settings = [
-                'smtp_host' => $_POST['smtp_host'],
-                'smtp_port' => $_POST['smtp_port'],
-                'smtp_username' => $_POST['smtp_username'],
-                'smtp_password' => $_POST['smtp_password'],
-                'smtp_encryption' => $_POST['smtp_encryption'],
-                'from_email' => $_POST['from_email'],
-                'from_name' => $_POST['from_name'],
-                'enable_email_notifications' => $_POST['enable_email_notifications'] ?? 0
+                'use_platform_email'          => $usePlatform,
+                'smtp_host'                   => $_POST['smtp_host'] ?? '',
+                'smtp_port'                   => $_POST['smtp_port'] ?? 587,
+                'smtp_username'               => $_POST['smtp_username'] ?? '',
+                'smtp_password'               => $_POST['smtp_password'] ?? '',
+                'smtp_encryption'             => $_POST['smtp_encryption'] ?? 'tls',
+                'from_email'                  => $_POST['from_email'] ?? '',
+                'from_name'                   => $_POST['from_name'] ?? '',
+                'enable_email_notifications'  => $_POST['enable_email_notifications'] ?? 0,
             ];
             
             foreach ($settings as $key => $value) {
@@ -588,12 +590,31 @@ if ($_POST) {
 
                 <!-- Email Settings Tab -->
                 <div class="tab-pane fade" id="email" role="tabpanel">
+                    <?php $usePlatformEmail = get_setting('use_platform_email', '1') === '1'; ?>
                     <form method="POST">
                         <div class="d-flex align-items-center mb-4">
                             <h4 class="section-title mb-0"><?= t('Email Configuration') ?></h4>
                             <span class="badge bg-info-soft text-info ms-3"><?= t('Communication') ?></span>
                         </div>
 
+                        <!-- Platform Email Toggle -->
+                        <div class="card info-card mb-4 border-<?= $usePlatformEmail ? 'success' : 'secondary' ?>">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                    <div>
+                                        <h6 class="fw-bold mb-1"><?= t('Use Platform Email Relay') ?> <span class="badge bg-success-soft text-success ms-1"><?= t('Recommended') ?></span></h6>
+                                        <p class="small text-muted mb-0"><?= t('When ON, all emails are sent through the platform relay automatically — no SMTP setup required. Turn OFF only if you want to send from your own email server.') ?></p>
+                                    </div>
+                                    <div class="form-check form-switch flex-shrink-0 mt-1">
+                                        <input class="form-check-input" type="checkbox" id="use_platform_email" name="use_platform_email"
+                                               value="1" style="width:3.5rem;height:1.75rem;" <?= $usePlatformEmail ? 'checked' : '' ?>
+                                               onchange="toggleSmtpFields()">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="smtp_fields_wrapper" <?= $usePlatformEmail ? 'style="display:none"' : '' ?>>
                         <div class="row g-4">
                             <div class="col-md-7">
                                 <div class="card info-card h-100">
@@ -601,24 +622,24 @@ if ($_POST) {
                                         <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('SMTP Server Details') ?></h6>
                                         <div class="row g-3">
                                             <div class="col-md-8">
-                                                <label for="smtp_host" class="form-label"><?= t('SMTP Host') ?> *</label>
-                                                <input type="text" class="form-control" id="smtp_host" name="smtp_host" value="<?= get_setting('smtp_host', 'smtp.gmail.com') ?>" required>
+                                                <label for="smtp_host" class="form-label"><?= t('SMTP Host') ?></label>
+                                                <input type="text" class="form-control" id="smtp_host" name="smtp_host" value="<?= get_setting('smtp_host') ?>">
                                             </div>
                                             <div class="col-md-4">
-                                                <label for="smtp_port" class="form-label"><?= t('Port') ?> *</label>
-                                                <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="<?= get_setting('smtp_port', '587') ?>" required>
+                                                <label for="smtp_port" class="form-label"><?= t('Port') ?></label>
+                                                <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="<?= get_setting('smtp_port', '587') ?>">
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="smtp_username" class="form-label"><?= t('Username') ?> *</label>
-                                                <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="<?= get_setting('smtp_username') ?>" required>
+                                                <label for="smtp_username" class="form-label"><?= t('Username') ?></label>
+                                                <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="<?= get_setting('smtp_username') ?>">
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="smtp_password" class="form-label"><?= t('Password') ?> *</label>
-                                                <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="<?= get_setting('smtp_password') ?>" required>
+                                                <label for="smtp_password" class="form-label"><?= t('Password') ?></label>
+                                                <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="<?= get_setting('smtp_password') ?>">
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="smtp_encryption" class="form-label"><?= t('Encryption') ?> *</label>
-                                                <select class="form-select" id="smtp_encryption" name="smtp_encryption" required>
+                                                <label for="smtp_encryption" class="form-label"><?= t('Encryption') ?></label>
+                                                <select class="form-select" id="smtp_encryption" name="smtp_encryption">
                                                     <option value="tls" <?= get_setting('smtp_encryption') == 'tls' ? 'selected' : '' ?>>TLS</option>
                                                     <option value="ssl" <?= get_setting('smtp_encryption') == 'ssl' ? 'selected' : '' ?>>SSL</option>
                                                     <option value="" <?= get_setting('smtp_encryption') == '' ? 'selected' : '' ?>><?= t('None') ?></option>
@@ -634,12 +655,12 @@ if ($_POST) {
                                     <div class="card-body p-4">
                                         <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Sender Identification') ?></h6>
                                         <div class="mb-3">
-                                            <label for="from_email" class="form-label"><?= t('From Email Address') ?> *</label>
-                                            <input type="email" class="form-control" id="from_email" name="from_email" value="<?= get_setting('from_email', get_setting('company_email')) ?>" required>
+                                            <label for="from_email" class="form-label"><?= t('From Email Address') ?></label>
+                                            <input type="email" class="form-control" id="from_email" name="from_email" value="<?= get_setting('from_email', get_setting('company_email')) ?>">
                                         </div>
                                         <div class="mb-3">
-                                            <label for="from_name" class="form-label"><?= t('From Name') ?> *</label>
-                                            <input type="text" class="form-control" id="from_name" name="from_name" value="<?= get_setting('from_name', get_setting('company_name')) ?>" required>
+                                            <label for="from_name" class="form-label"><?= t('From Name') ?></label>
+                                            <input type="text" class="form-control" id="from_name" name="from_name" value="<?= get_setting('from_name', get_setting('company_name')) ?>">
                                         </div>
                                         <div class="mb-0">
                                             <div class="form-check form-switch p-0 ms-0">
@@ -668,6 +689,7 @@ if ($_POST) {
                                 </div>
                             </div>
                         </div>
+                        </div><!-- /smtp_fields_wrapper -->
 
                         <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_email" class="btn btn-primary px-5">
@@ -1035,6 +1057,12 @@ $(document).ready(function() {
 
     // Text Display Case — reflect the saved setting in the preview box on load.
     updateTextCasePreview();
+
+    // Platform Email toggle — show/hide SMTP fields
+    window.toggleSmtpFields = function () {
+        var on = document.getElementById('use_platform_email').checked;
+        document.getElementById('smtp_fields_wrapper').style.display = on ? 'none' : '';
+    };
 
     // Test Email Configuration
     $('#testEmailConfig').click(function() {

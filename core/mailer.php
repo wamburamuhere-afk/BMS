@@ -98,41 +98,53 @@ if (!function_exists('sendEmail')) {
             return function_exists('get_setting') ? get_setting($key, $default) : $default;
         };
 
-        // Resolve SMTP config: per-call override wins, else saved settings.
-        $smtp = $opts['smtp'] ?? [];
-        $host = trim((string)($smtp['host']        ?? $get('smtp_host')));
-        $port = (int)            ($smtp['port']        ?? $get('smtp_port', 587));
-        $user = trim((string)($smtp['username']    ?? $get('smtp_username')));
-        $pass =        (string)($smtp['password']    ?? $get('smtp_password'));
-        $enc  = strtolower(trim((string)($smtp['encryption'] ?? $get('smtp_encryption', 'tls'))));
+        // from_email / from_name are always tenant-specific regardless of which relay is used.
+        $smtp      = $opts['smtp'] ?? [];
         $fromEmail = trim((string)($opts['from_email'] ?? $smtp['from_email'] ?? $get('from_email', $get('company_email'))));
         $fromName  = trim((string)($opts['from_name']  ?? $smtp['from_name']  ?? $get('from_name',  $get('company_name', 'BMS'))));
 
-        if ($host === '' || $user === '') {
-            // Tenant has no SMTP configured — fall back to the platform relay
-            // so all tenant emails work out of the box without any per-tenant
-            // setup. from_email / from_name are kept as the tenant's own values
-            // (resolved above: company_email / company_name) so the recipient
-            // still sees the sending company's identity.
+        // Relay precedence:
+        //   1. Per-call smtp override (Test Connection button) — always honoured.
+        //   2. use_platform_email = 1 (default for all tenants) — platform relay, no per-tenant config needed.
+        //   3. use_platform_email = 0 — tenant's own SMTP; platform relay as last-resort fallback if blank.
+        $hasCallSmtp = !empty($smtp['host']);
+
+        $platformRelayLoader = function () use (&$host, &$port, &$user, &$pass, &$enc, &$fromEmail): bool {
             if (!function_exists('platformMailerOpts')) {
                 @require_once __DIR__ . '/platform_settings.php';
             }
-            if (function_exists('platformMailerOpts')) {
-                $pf = platformMailerOpts();
-                if ($pf['configured']) {
-                    $pSmtp = $pf['opts']['smtp'];
-                    $host  = $pSmtp['host'];
-                    $port  = (int)$pSmtp['port'];
-                    $user  = $pSmtp['username'];
-                    $pass  = (string)$pSmtp['password'];
-                    $enc   = strtolower((string)$pSmtp['encryption']);
-                    // If the tenant has no from_email either, use the platform's.
-                    if ($fromEmail === '') {
-                        $fromEmail = trim((string)$pSmtp['from_email']);
-                    }
-                }
-            }
+            if (!function_exists('platformMailerOpts')) { return false; }
+            $pf = platformMailerOpts();
+            if (!$pf['configured']) { return false; }
+            $pSmtp = $pf['opts']['smtp'];
+            $host  = $pSmtp['host'];
+            $port  = (int)$pSmtp['port'];
+            $user  = $pSmtp['username'];
+            $pass  = (string)$pSmtp['password'];
+            $enc   = strtolower((string)$pSmtp['encryption']);
+            if ($fromEmail === '') { $fromEmail = trim((string)$pSmtp['from_email']); }
+            return true;
+        };
+
+        $host = $user = $pass = $enc = ''; $port = 587;
+
+        if ($hasCallSmtp) {
+            $host = trim((string)$smtp['host']);
+            $port = (int)($smtp['port'] ?? 587);
+            $user = trim((string)($smtp['username'] ?? ''));
+            $pass = (string)($smtp['password'] ?? '');
+            $enc  = strtolower(trim((string)($smtp['encryption'] ?? 'tls')));
+        } elseif ((string)$get('use_platform_email', '1') === '1') {
+            $platformRelayLoader();
+        } else {
+            $host = trim((string)$get('smtp_host'));
+            $port = (int)$get('smtp_port', 587);
+            $user = trim((string)$get('smtp_username'));
+            $pass = (string)$get('smtp_password');
+            $enc  = strtolower(trim((string)$get('smtp_encryption', 'tls')));
+            if ($host === '' || $user === '') { $platformRelayLoader(); }
         }
+
         if ($host === '' || $user === '') {
             $GLOBALS['__bms_mailer_last_error'] = 'SMTP is not configured (set Host & Username in Settings > Email).';
             error_log('sendEmail: ' . $GLOBALS['__bms_mailer_last_error']);

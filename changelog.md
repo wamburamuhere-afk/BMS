@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(email): use_platform_email toggle — per-tenant on/off switch for platform relay
+
+**Files:** `core/mailer.php`, `core/tenant_provisioner.php`, `app/constant/settings/system_settings.php`, `app/superadmin/tenant_view.php`, `actions/superadmin_tenant_email_relay.php`
+
+- New `use_platform_email` setting (default `1`). When ON: platform relay is used directly, no SMTP setup needed per tenant. When OFF: tenant's own SMTP is used, with platform relay as last-resort fallback.
+- `seedTenantCompanyProfile()` seeds `use_platform_email = 1` for every new tenant.
+- `sendEmail()` in `core/mailer.php` checks the flag first: per-call override → platform relay (if flag=1) → tenant SMTP + relay fallback (if flag=0).
+- Email Configuration page (Settings): "Use Platform Email Relay" toggle at top; SMTP fields hidden when ON, shown when OFF; `required` removed from SMTP inputs.
+- Superadmin `tenant_view.php`: Platform Email Relay ON/OFF toggle in Company Profile card header; reads/writes via new `actions/superadmin_tenant_email_relay.php`.
+
 ## 2026-09-23 — docs(app): add version tag V2 to Flutter app plan document
 
 **Files:** `app.md`
