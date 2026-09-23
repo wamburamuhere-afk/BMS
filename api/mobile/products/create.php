@@ -13,6 +13,33 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 $body = $_POST;
 if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body = json_decode($raw, true) ?: []; } }
 
+// Self-heal DDL (outside any transaction — MySQL DDL causes implicit commit).
+try {
+    if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'client_uuid'")->fetch()) {
+        $pdo->exec("ALTER TABLE products ADD COLUMN client_uuid VARCHAR(36) NULL");
+        try { $pdo->exec("ALTER TABLE products ADD UNIQUE KEY ux_products_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
+    }
+} catch (PDOException $_ddlE) {}
+
+// Parse idempotency key.
+$client_uuid = '';
+$rawUuid = trim($body['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
+    $client_uuid = $rawUuid;
+}
+
+// Idempotency pre-check.
+if ($client_uuid !== '') {
+    try {
+        $dupChk = $pdo->prepare("SELECT product_id, product_name, sku, is_service FROM products WHERE client_uuid = ? LIMIT 1");
+        $dupChk->execute([$client_uuid]);
+        if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode(['success' => true, 'idempotent' => true, 'product_id' => (int)$dup['product_id'], 'product_name' => $dup['product_name'], 'sku' => $dup['sku'], 'is_service' => (bool)$dup['is_service'], 'message' => ($dup['is_service'] ? 'Service' : 'Product') . ' already exists.']);
+            exit;
+        }
+    } catch (PDOException $_idemp) { $client_uuid = ''; }
+}
+
 $product_name  = trim($body['product_name']  ?? '');
 if ($product_name === '') { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Product name is required']); exit; }
 if (mb_strlen($product_name) > 191) { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Product name too long (max 191 characters)']); exit; }
@@ -50,12 +77,13 @@ try {
 
     $stmt = $pdo->prepare("
         INSERT INTO products
-            (product_name, sku, barcode, unit, selling_price, cost_price, purchase_price,
+            (client_uuid, product_name, sku, barcode, unit, selling_price, cost_price, purchase_price,
              current_stock, reorder_level, is_service, category_id,
              description, status, created_at, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
     ");
     $stmt->execute([
+        $client_uuid ?: null,
         $product_name,
         $sku      !== '' ? $sku      : null,
         $barcode  !== '' ? $barcode  : null,
