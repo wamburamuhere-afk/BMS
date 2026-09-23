@@ -235,12 +235,19 @@ if (!function_exists('registerTenant')) {
         // ── Provision ────────────────────────────────────────────────────────
         // provisionTenant() guarantees all-or-nothing: on failure there is no
         // orphaned database, MySQL user or registry row to clean up here.
+        $ownerEmail = trim((string)($in['owner_email'] ?? ''));
+        if ($ownerEmail !== '' && !filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+            return $fail('Please enter a valid email address.', 'rejected', $phone, $sub);
+        }
+
         $r = provisionTenant($company, $sub, $phone, $pw, [
             'status'            => 'active',      // so the owner can sign in immediately
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
             'physical_address'  => trim((string)($in['company_physical_address'] ?? '')),
             'postal_address'    => trim((string)($in['company_postal_address'] ?? '')),
+            'phone'             => $phone,
+            'email'             => $ownerEmail,
             'logo_tmp_path'     => $in['logo_tmp_path'] ?? null,
             'logo_extension'    => $in['logo_extension'] ?? null,
         ]);

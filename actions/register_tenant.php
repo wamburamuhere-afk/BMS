@@ -74,6 +74,7 @@ $result = registerTenant([
     'company_name'             => $_POST['company_name'] ?? '',
     'subdomain'                => $_POST['subdomain'] ?? '',
     'owner_phone'              => $_POST['owner_phone'] ?? '',
+    'owner_email'              => $_POST['owner_email'] ?? '',
     'owner_password'           => $_POST['owner_password'] ?? '',
     'owner_password_confirm'   => $_POST['owner_password_confirm'] ?? '',
     'owner_first_name'         => $_POST['owner_first_name'] ?? '',
