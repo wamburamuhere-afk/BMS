@@ -46,7 +46,8 @@ if (!function_exists('mobileBearerAuth')) {
         if ((int)($row['is_active'] ?? 1) !== 1) {
             return false;
         }
-        if (new DateTime($row['expires_at']) < new DateTime()) {
+        // NULL expires_at = no expiry (personal device tokens); only check when set
+        if ($row['expires_at'] !== null && new DateTime($row['expires_at']) < new DateTime()) {
             return false;
         }
 
