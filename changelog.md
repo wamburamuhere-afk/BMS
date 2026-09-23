@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(registration): seed phone + optional email into company profile
+
+**Files:** `register.php`, `actions/register_tenant.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`
+
+- `register.php`: added optional Email Address field (after phone number; no `required`)
+- `actions/register_tenant.php`: forwards `owner_email` POST field to `registerTenant()`
+- `core/tenant_registration.php`: validates email format if provided (optional); passes `phone` and `email` into `provisionTenant()` opts so both seed `company_phone`/`company_email` in system_settings
+- `core/tenant_provisioner.php`: `seedTenantCompanyProfile()` call now includes `phone` and `email` from `$opts`
+
 ## 2026-09-23 — feat(mobile): offline-first sync Phase 2 — master data idempotency
 
 **Files:** `api/mobile/customers/create.php`, `api/mobile/suppliers/create.php`, `api/mobile/products/create.php`, `api/mobile/expenses/create.php`, `api/mobile/warehouses/create.php`, `migrations/tenant/2026_09_23_master_data_offline_sync.php`, `migrations/2026_09_23_master_data_offline_sync_legacy_db.php`
