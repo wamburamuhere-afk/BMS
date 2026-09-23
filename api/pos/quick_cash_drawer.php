@@ -24,10 +24,25 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 global $pdo;
 
+// Self-heal: ensure cash_register_transactions.client_uuid exists (DDL outside any transaction).
+try {
+    if (!$pdo->query("SHOW COLUMNS FROM cash_register_transactions LIKE 'client_uuid'")->fetch()) {
+        $pdo->exec("ALTER TABLE cash_register_transactions ADD COLUMN client_uuid VARCHAR(36) NULL");
+        try { $pdo->exec("ALTER TABLE cash_register_transactions ADD UNIQUE KEY ux_crt_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
+    }
+} catch (PDOException $_ddlE) {}
+
 $type   = trim($_POST['type']   ?? '');
 $amount = (float)($_POST['amount'] ?? 0);
 $reason = trim($_POST['reason'] ?? '');
 $userId = (int)$_SESSION['user_id'];
+
+// Parse idempotency key.
+$crt_client_uuid = '';
+$rawCrtUuid = trim($_POST['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawCrtUuid)) {
+    $crt_client_uuid = $rawCrtUuid;
+}
 
 if (!in_array($type, ['cash_in', 'cash_out'], true)) {
     http_response_code(422);
@@ -38,6 +53,25 @@ if ($amount <= 0) {
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Amount must be greater than zero']);
     exit;
+}
+
+// Idempotency pre-check.
+if ($crt_client_uuid !== '') {
+    try {
+        $crtDupChk = $pdo->prepare("SELECT shift_id FROM cash_register_transactions WHERE client_uuid = ? LIMIT 1");
+        $crtDupChk->execute([$crt_client_uuid]);
+        if ($crtDup = $crtDupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode([
+                'success'   => true,
+                'idempotent'=> true,
+                'message'   => 'Transaction already recorded.',
+                'shift_id'  => (int)$crtDup['shift_id'],
+            ]);
+            exit;
+        }
+    } catch (PDOException $_crtIdemp) {
+        $crt_client_uuid = '';
+    }
 }
 
 try {
@@ -58,9 +92,9 @@ try {
 
     $pdo->prepare(
         "INSERT INTO cash_register_transactions
-           (shift_id, transaction_type, amount, payment_method, reason, created_by, created_at)
-         VALUES (?, ?, ?, 'cash', ?, ?, NOW())"
-    )->execute([$shiftId, $type, $amount, $reason ?: null, $userId]);
+           (client_uuid, shift_id, transaction_type, amount, payment_method, reason, created_by, created_at)
+         VALUES (?, ?, ?, ?, 'cash', ?, ?, NOW())"
+    )->execute([$crt_client_uuid ?: null, $shiftId, $type, $amount, $reason ?: null, $userId]);
 
     $label = $type === 'cash_in' ? 'Cash in' : 'Cash out';
     echo json_encode([
