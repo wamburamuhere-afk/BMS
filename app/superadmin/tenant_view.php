@@ -236,6 +236,37 @@ function svBadge(string $status): string
             </div>
         </div>
 
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-person-lines-fill text-primary me-1"></i> Company Profile</div>
+                <div class="card-body">
+                    <div id="profileLoading" class="text-muted small">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Loading&hellip;
+                    </div>
+                    <dl class="row mb-0 d-none" id="profileData">
+                        <div class="col-sm-6 col-md-4">
+                            <dt>Phone Number</dt>
+                            <dd id="pf-phone">—</dd>
+                            <dt>Email Address</dt>
+                            <dd id="pf-email">—</dd>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <dt>Address</dt>
+                            <dd id="pf-address" style="white-space:pre-line">—</dd>
+                            <dt>Website</dt>
+                            <dd id="pf-website">—</dd>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <dt>TIN</dt>
+                            <dd id="pf-tin">—</dd>
+                            <dt>VRN</dt>
+                            <dd id="pf-vrn">—</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
         <?php if ($tenant['status'] !== 'deleted' && $plansSetup): ?>
         <div class="col-12">
             <div class="card detail-card">
@@ -584,6 +615,43 @@ const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 const TENANT_DELETED = <?= json_encode(($tenant['status'] ?? '') === 'deleted') ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
+
+// Auto-load company profile — Overview is the default tab so we fetch it
+// on page load without waiting for an explicit click.
+(function loadTenantProfile() {
+    if (TENANT_DELETED) {
+        $('#profileLoading').text('This tenant has been deleted — no profile to read.');
+        return;
+    }
+    $.ajax({
+        url: '/actions/superadmin_tenant_profile.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }
+    }).done(function (res) {
+        if (res && res.success) {
+            function pfBlank(v) {
+                return (v && v.trim()) ? safeOutput(v.trim()) : '<span class="text-muted">—</span>';
+            }
+            $('#pf-phone').html(pfBlank(res.phone));
+            $('#pf-address').html(pfBlank(res.address));
+            $('#pf-tin').html(pfBlank(res.tin));
+            $('#pf-vrn').html(pfBlank(res.vrn));
+            $('#pf-email').html(res.email && res.email.trim()
+                ? '<a href="mailto:' + safeOutput(res.email.trim()) + '">' + safeOutput(res.email.trim()) + '</a>'
+                : '<span class="text-muted">—</span>');
+            $('#pf-website').html(res.website && res.website.trim()
+                ? '<a href="' + safeOutput(res.website.trim()) + '" target="_blank" rel="noopener noreferrer">' + safeOutput(res.website.trim()) + '</a>'
+                : '<span class="text-muted">—</span>');
+            $('#profileLoading').addClass('d-none');
+            $('#profileData').removeClass('d-none');
+        } else {
+            $('#profileLoading').html('<i class="bi bi-exclamation-triangle me-1"></i>'
+                + ((res && res.message) || 'Could not read company profile.'));
+        }
+    }).fail(function () {
+        $('#profileLoading').html('<i class="bi bi-exclamation-triangle me-1"></i>Could not read company profile.');
+    });
+})();
 
 // POS Advanced / Restaurant POS — pulled from the same $features the main
 // grid already renders from (control-DB only, always fresh on page load; no
