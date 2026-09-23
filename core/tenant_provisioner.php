@@ -275,6 +275,16 @@ if (!function_exists('seedTenantCompanyProfile')) {
             $values['company_postal_address'] = $extra['postal_address'];
         }
 
+        // Optional profile fields the operator (or the company itself) may
+        // supply at registration time — same keys company_profile.php reads.
+        foreach (['phone' => 'company_phone', 'email' => 'company_email',
+                  'address' => 'company_address', 'website' => 'company_website',
+                  'tin' => 'company_tin', 'vrn' => 'company_vrn'] as $optKey => $settingKey) {
+            if (($extra[$optKey] ?? '') !== '') {
+                $values[$settingKey] = $extra[$optKey];
+            }
+        }
+
         $tmpPath = $extra['logo_tmp_path'] ?? null;
         $ext     = $extra['logo_extension'] ?? null;
         if ($tmpPath && $ext && is_uploaded_file($tmpPath)) {
