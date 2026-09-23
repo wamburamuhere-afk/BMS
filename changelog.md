@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-22 — feat(mobile-api): add save_pos_setting and save_customer_quick APIs (Phase 14)
+
+**Branch:** `feat/mobile-api-bearer-patch-held-sales`
+
+**Files added:** `api/pos/save_pos_setting.php`, `api/pos/save_customer_quick.php`
+
+Two Phase-14 backend files from app.md plan now built:
+- `save_pos_setting.php`: accepts `POST {key, value}` with strict allow-list (pos_discount_type, pos_receipt_width, pos_auto_print_receipt). Requires `canEdit('pos_config_settings')`. Mirrors the three settings in the web POS Config page so the Flutter Settings screen stays in sync.
+- `save_customer_quick.php`: minimal customer create (name + phone) for the Flutter checkout screen's "+ New Customer" button. Uses `nextCode('CUST')` for the sequential customer code. Requires `canCreate('customers')`. Both files use `mobileBearerAuth()` + CSRF guard pattern.
+
+---
+
 ## 2026-09-22 — feat(mobile-api): patch 4 remaining POS endpoints with Bearer auth
 
 **Branch:** `feat/mobile-api-bearer-patch-held-sales` → PR #2137 → `develop`
