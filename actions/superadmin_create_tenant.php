@@ -50,6 +50,13 @@ $r = createTenantAsOperator([
     'owner_last_name'        => (string)($_POST['owner_last_name'] ?? ''),
     'status'                 => (string)($_POST['status'] ?? 'active'),
     'plan_id'                => (string)($_POST['plan_id'] ?? ''),
+    // Optional company profile fields
+    'phone'   => (string)($_POST['phone']   ?? ''),
+    'email'   => (string)($_POST['email']   ?? ''),
+    'address' => (string)($_POST['address'] ?? ''),
+    'website' => (string)($_POST['website'] ?? ''),
+    'tin'     => (string)($_POST['tin']     ?? ''),
+    'vrn'     => (string)($_POST['vrn']     ?? ''),
 ]);
 
 if (!$r['ok']) {
