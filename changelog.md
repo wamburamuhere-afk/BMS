@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(mobile-api): add Simple POS mode flags to /me response
+
+**File:** `api/mobile/me.php`
+
+Added `pos_nav.php` require and expanded `pos_settings` in the `/me` response with five Simple POS flags the Flutter app needs to render the correct form variant per entity:
+- `simple_mode` — main toggle; true = simplified forms + credit sales enabled
+- `advanced_product` — override: show full product form even in simple mode
+- `advanced_customer` — override: show full customer form even in simple mode
+- `advanced_supplier` — override: show full supplier form even in simple mode
+- `supplier_access` — whether supplier module is reachable in simple mode
+
 ## 2026-09-23 — fix(mobile-auth): remove hard 30-day token expiry — tokens now non-expiring
 
 **Files:** `api/mobile/login.php`, `core/mobile_auth.php`
