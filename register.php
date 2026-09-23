@@ -178,6 +178,11 @@ $baseDom = tenantBaseDomain();
             <div class="form-text">You will sign in with this number.</div>
         </div>
 
+        <div class="mb-3">
+            <label for="owner_email" class="form-label">Email address <span class="text-muted">(optional)</span></label>
+            <input type="email" class="form-control" id="owner_email" name="owner_email" maxlength="191" placeholder="e.g. info@yourcompany.com">
+        </div>
+
         <div class="row g-2 mb-3">
             <div class="col-md-6">
                 <label for="owner_password" class="form-label">Password</label>

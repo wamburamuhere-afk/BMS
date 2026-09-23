@@ -553,6 +553,8 @@ if (!function_exists('provisionTenant')) {
                 seedTenantCompanyProfile($tpdo, $tenantId, $companyName, [
                     'physical_address' => $opts['physical_address'] ?? '',
                     'postal_address'   => $opts['postal_address'] ?? '',
+                    'phone'            => $opts['phone'] ?? '',
+                    'email'            => $opts['email'] ?? '',
                     'logo_tmp_path'    => $opts['logo_tmp_path'] ?? null,
                     'logo_extension'   => $opts['logo_extension'] ?? null,
                 ]);
