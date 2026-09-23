@@ -97,6 +97,12 @@ try {
         // Whether the Suppliers module is reachable in Simple POS mode
         // (separate from advanced_supplier — this controls visibility, not form depth)
         'supplier_access'      => supplierAccessEnabled(),
+
+        // How many products to render in the grid on open (before any search/filter)
+        'products_display_limit' => (int)get_setting('pos_products_display_limit', '20'),
+
+        // VAT is hidden and always 0 when simple_mode=true
+        'vat_enabled'          => !$simpleMode,
     ];
 
     // ── Tax rates ─────────────────────────────────────────────────────────────
