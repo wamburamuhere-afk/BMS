@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-23 — fix(cash-flow): remove backdrop-filter; lazy-load html2pdf
+
+**File:** `app/bms/invoice/reps/cash_flow.php`
+
+- `backdrop-filter: blur(10px)` on `.glass-action-bar` created a Chromium compositor layer above the fixed nav header (z-index 1030), blocking nav clicks — removed; replaced with near-opaque white background
+- `html2pdf.js` moved from eager page-load to lazy: injected only on first "Save PDF" click
+- PR: #2161
+
 ## 2026-09-23 — fix(reports): correct require_once path depth in trial_balance and cash_flow
 
 **Files:** `app/bms/invoice/reps/trial_balance.php`, `app/bms/invoice/reps/cash_flow.php`

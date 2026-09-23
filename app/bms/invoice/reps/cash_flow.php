@@ -336,7 +336,7 @@ try {
                     <button class="btn btn-sm btn-light border text-dark fw-bold px-3 d-flex align-items-center gap-2" onclick="window.print()">
                         <i class="bi bi-printer fs-6 text-primary"></i> <span>Print</span>
                     </button>
-                    <button class="btn btn-sm btn-dark fw-bold px-3 d-flex align-items-center gap-2" onclick="exportToPDF()">
+                    <button class="btn btn-sm btn-dark fw-bold px-3 d-flex align-items-center gap-2" onclick="exportToPDF(this)">
                         <i class="bi bi-file-earmark-pdf fs-6 text-warning"></i> <span>Save PDF</span>
                     </button>
                 </div>
@@ -525,7 +525,7 @@ try {
 .ls-1 { letter-spacing: 1px; }
 .cf-table { width: 100%; border-collapse: separate; border-spacing: 0 2px; }
 .cf-table td { padding: 10px 8px; border-bottom: 1px solid #f8f9fa; }
-.glass-action-bar { background: rgba(255,255,255,0.9) !important; backdrop-filter: blur(10px); border-radius: 1.25rem !important; border: 1px solid rgba(0,0,0,0.05) !important; }
+.glass-action-bar { background: rgba(255,255,255,0.97) !important; border-radius: 1.25rem !important; border: 1px solid rgba(0,0,0,0.08) !important; }
 .icon-circle { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 1.2rem; }
 .text-warning-emphasis { color: #856404 !important; }
 @media print {
@@ -548,7 +548,6 @@ try {
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 // Narrows the Warehouse dropdown to the chosen project's own linked warehouses
 // + any warehouse not tied to a project — client-side only, mirrors
@@ -570,16 +569,30 @@ function cfFilterWarehouses() {
 }
 document.addEventListener('DOMContentLoaded', cfFilterWarehouses);
 
-function exportToPDF() {
-    const element = document.getElementById('reportContent');
-    const opt = {
-        margin: [0.5, 0.5],
-        filename: 'Cash_Flow_Statement_<?= date('Y-m-d') ?>.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(element).save();
+// html2pdf loaded only on first Save PDF click — keeps the library off the
+// initial page load (removes a ~1 MB synchronous script and any compositor
+// side-effects from having it present at render time).
+function exportToPDF(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+    function doExport() {
+        const element = document.getElementById('reportContent');
+        const opt = {
+            margin: [0.5, 0.5],
+            filename: 'Cash_Flow_Statement_<?= date('Y-m-d') ?>.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save().finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-pdf fs-6 text-warning"></i> <span>Save PDF</span>'; }
+        });
+    }
+    if (typeof html2pdf !== 'undefined') { doExport(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload = doExport;
+    s.onerror = function() { alert('Could not load PDF library. Please try again.'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-pdf fs-6 text-warning"></i> <span>Save PDF</span>'; } };
+    document.head.appendChild(s);
 }
 
 $(document).ready(function() {
