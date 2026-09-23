@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(mobile-api): master data CRUD APIs — Customers, Suppliers, Products/Services, Expenses, Warehouses
+
+**Branch:** `feat/mobile-api-master-data-crud`
+
+**Files added (25 new files):**
+- `api/mobile/customers/` — list, get, create, update, delete (5 files)
+- `api/mobile/suppliers/` — list, get, create, update, delete (5 files)
+- `api/mobile/products/` — list, get, create, update, delete (5 files; `is_service=1` filter supports Services)
+- `api/mobile/expenses/` — list, get, create, update, delete (5 files)
+- `api/mobile/warehouses/` — list, get, create, update, delete (5 files)
+
+Full CRUD for all master-data entities accessible from the mobile POS app. All endpoints use Bearer token auth + web-session CSRF compatibility. Key points:
+- Customer/Supplier: `nextCode($pdo, 'CUST'/'SUP')` for sequential codes; soft-delete with active-record guard
+- Products: Services share the products table (`is_service=1`); auto-generates SKU if not supplied; duplicate-SKU guard; delete blocked if has POS sale items
+- Expenses: Simple POS auto-resolves accounts via `miscExpenseAccountId()`/`defaultCashAccountId()`; full GL posting chain (`postExpenseAccrual → postOutflow → recordBankTransaction`); only `pending` expenses editable/deletable via mobile
+- Warehouses: auto-generates warehouse_code; creates default Main Storage Area location in same transaction; grants creator scope via `user_scope_overrides`; delete blocked if has sales or is the only active shop
+- Scope enforcement: project + warehouse scopes applied via `scopeFilterSqlNullable()` throughout (confirmed valid for 'warehouse' type via `_scope_list_key` + `_scope_column` mapping)
+- Bug fix in `expenses/list.php`: removed incorrect `ltrim($scope, ' AND ')` pattern (strips individual chars, not substring); scope strings now appended directly
+
 ## 2026-09-22 — feat(mobile-api): add save_pos_setting and save_customer_quick APIs (Phase 14)
 
 **Branch:** `feat/mobile-api-bearer-patch-held-sales`
