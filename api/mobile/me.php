@@ -9,6 +9,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
+require_once __DIR__ . '/../../core/pos_nav.php';
 
 if (!mobileBearerAuth()) {
     http_response_code(401);
@@ -75,10 +76,27 @@ try {
     } catch (Exception $e) { /* non-fatal */ }
 
     // ── POS settings ──────────────────────────────────────────────────────────
+    $simpleMode = posSimpleModeEnabled();
     $pos_settings = [
-        'discount_type'      => get_setting('pos_discount_type',       'percentage'),
-        'receipt_width'      => (int)get_setting('pos_receipt_width',   '80'),
-        'auto_print_receipt' => get_setting('pos_auto_print_receipt',  '0') === '1',
+        // Display preferences
+        'discount_type'      => get_setting('pos_discount_type',      'percentage'),
+        'receipt_width'      => (int)get_setting('pos_receipt_width',  '80'),
+        'auto_print_receipt' => get_setting('pos_auto_print_receipt', '0') === '1',
+
+        // Simple POS mode flags — Flutter uses these to decide which form variant to render
+        // simple_mode=true  → simplified forms (see below), credit sales enabled, simple dashboard
+        // simple_mode=false → full ERP forms with all fields
+        'simple_mode'          => $simpleMode,
+
+        // Per-entity form overrides (only relevant when simple_mode=true):
+        // true = show full form for that entity even while simple_mode is on
+        'advanced_product'     => advancedProductEnabled(),
+        'advanced_customer'    => advancedCustomerEnabled(),
+        'advanced_supplier'    => advancedSupplierEnabled(),
+
+        // Whether the Suppliers module is reachable in Simple POS mode
+        // (separate from advanced_supplier — this controls visibility, not form depth)
+        'supplier_access'      => supplierAccessEnabled(),
     ];
 
     // ── Tax rates ─────────────────────────────────────────────────────────────
