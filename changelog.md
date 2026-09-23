@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(superadmin): show tenant company profile in Overview tab
+
+**Files:** `app/superadmin/tenant_view.php`, `actions/superadmin_tenant_profile.php` (new)
+
+- `superadmin_tenant_profile.php`: new on-demand action endpoint that connects to the tenant's own DB and reads `company_phone`, `company_email`, `company_address`, `company_website`, `company_tin`, `company_vrn` from `system_settings`
+- `tenant_view.php`: added "Company Profile" card to the Overview tab; auto-loads via AJAX on page open (Overview is the default tab); email and website rendered as clickable links; address preserves line breaks; graceful "—" for unset fields
+
 ## 2026-09-23 — feat(mobile-api): expose products_display_limit and vat_enabled in /me
 
 **File:** `api/mobile/me.php`
