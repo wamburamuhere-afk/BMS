@@ -1,5 +1,7 @@
 # BMS Simple POS — Flutter Native App Plan
 
+**Version: V2** · Last updated: 2026-09-23
+
 > Implementation reference. Every section here is derived from reading the actual
 > BMS source. Follow this document top-to-bottom when building. Do not skip steps.
 

@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-23 — docs(app): add version tag V2 to Flutter app plan document
+
+**Files:** `app.md`
+
+- Added `**Version: V2**` header with date to track document revisions; going forward the version increments on every change.
+- Subdomain format in all examples already correctly uses `.bms.bjptechnologies.co.tz` (confirmed: no `{subdomain}.bjptechnologies.co.tz` patterns remain).
+
 ## 2026-09-23 — feat(mailer): fall back to platform SMTP when tenant has none configured
 
 **Files:** `core/mailer.php`
