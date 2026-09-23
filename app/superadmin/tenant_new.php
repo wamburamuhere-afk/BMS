@@ -155,6 +155,38 @@ $startingPlans = planTablesReady()
                         </div>
 
                         <hr class="my-3">
+                        <h6 class="mb-1">Company profile <span class="text-muted fw-normal" style="font-size:.85rem">(optional)</span></h6>
+                        <p class="text-muted small mb-3">Pre-fills the company's profile. Every field can be left blank and filled in by the company later.</p>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Phone Number</label>
+                                <input type="text" class="form-control" name="phone" maxlength="50">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Company Email</label>
+                                <input type="email" class="form-control" name="email" maxlength="191">
+                                <div class="form-text">The company's contact email, not necessarily the owner's sign-in address.</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Address</label>
+                                <textarea class="form-control" name="address" rows="2" maxlength="500"></textarea>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Website</label>
+                                <input type="url" class="form-control" name="website" maxlength="255" placeholder="https://">
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label">TIN</label>
+                                <input type="text" class="form-control" name="tin" maxlength="50">
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label">VRN</label>
+                                <input type="text" class="form-control" name="vrn" maxlength="50">
+                            </div>
+                        </div>
+
+                        <hr class="my-3">
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-check-circle me-1"></i> Create company

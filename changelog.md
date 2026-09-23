@@ -15,6 +15,15 @@
 - `superadmin_tenant_profile.php`: new on-demand action endpoint that connects to the tenant's own DB and reads `company_phone`, `company_email`, `company_address`, `company_website`, `company_tin`, `company_vrn` from `system_settings`
 - `tenant_view.php`: added "Company Profile" card to the Overview tab; auto-loads via AJAX on page open (Overview is the default tab); email and website rendered as clickable links; address preserves line breaks; graceful "—" for unset fields
 
+## 2026-09-23 — feat(superadmin): optional company profile fields on tenant registration form
+
+**Files:** `app/superadmin/tenant_new.php`, `actions/superadmin_create_tenant.php`, `core/tenant_admin.php`, `core/tenant_provisioner.php`
+
+- `tenant_new.php`: added optional "Company profile" section at the bottom of the New Company form with Phone, Email, Address, Website, TIN, VRN fields — all optional, clearly labelled
+- `superadmin_create_tenant.php`: reads and forwards the 6 new POST fields to `createTenantAsOperator()`
+- `tenant_admin.php` (`createTenantAsOperator`): passes the 6 fields through to `provisionTenant()` via `$opts`
+- `tenant_provisioner.php` (`seedTenantCompanyProfile`): writes any non-blank value for `company_phone`, `company_email`, `company_address`, `company_website`, `company_tin`, `company_vrn` into the new tenant's `system_settings` using the same upsert pattern already in place; blank fields are silently skipped
+
 ## 2026-09-23 — feat(mobile-api): expose products_display_limit and vat_enabled in /me
 
 **File:** `api/mobile/me.php`
