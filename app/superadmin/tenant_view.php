@@ -238,7 +238,18 @@ function svBadge(string $status): string
 
         <div class="col-12">
             <div class="card detail-card">
-                <div class="card-header"><i class="bi bi-person-lines-fill text-primary me-1"></i> Company Profile</div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-person-lines-fill text-primary me-1"></i> Company Profile</span>
+                    <div class="d-flex align-items-center gap-2" id="pf-relay-wrapper" style="display:none!important">
+                        <small class="text-muted">Platform Email Relay</small>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="pf-relay-toggle"
+                                   style="width:2.5rem;height:1.4rem;cursor:pointer"
+                                   title="When ON, this tenant's emails go through the platform relay (no SMTP setup needed). Turn OFF to let them configure their own SMTP.">
+                        </div>
+                        <span id="pf-relay-badge" class="badge bg-secondary" style="font-size:.75rem">—</span>
+                    </div>
+                </div>
                 <div class="card-body">
                     <div id="profileLoading" class="text-muted small">
                         <span class="spinner-border spinner-border-sm me-1"></span> Loading&hellip;
@@ -644,6 +655,22 @@ $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
                 : '<span class="text-muted">—</span>');
             $('#profileLoading').addClass('d-none');
             $('#profileData').removeClass('d-none');
+
+            // Also load the platform-email-relay toggle
+            $.ajax({
+                url: '/actions/superadmin_tenant_email_relay.php',
+                method: 'POST', dataType: 'json',
+                data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'get' }
+            }).done(function (r) {
+                if (!r.success) return;
+                var isOn = r.value === '1';
+                $('#pf-relay-toggle').prop('checked', isOn);
+                $('#pf-relay-badge')
+                    .text(isOn ? 'ON' : 'OFF')
+                    .removeClass('bg-secondary bg-success bg-warning')
+                    .addClass(isOn ? 'bg-success' : 'bg-warning');
+                $('#pf-relay-wrapper').css('display', '');
+            });
         } else {
             $('#profileLoading').html('<i class="bi bi-exclamation-triangle me-1"></i>'
                 + ((res && res.message) || 'Could not read company profile.'));
@@ -652,6 +679,30 @@ $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
         $('#profileLoading').html('<i class="bi bi-exclamation-triangle me-1"></i>Could not read company profile.');
     });
 })();
+
+// Platform email relay toggle — superadmin can flip on/off for any tenant
+$('#pf-relay-toggle').on('change', function () {
+    var newVal = $(this).prop('checked') ? '1' : '0';
+    var badge  = $('#pf-relay-badge');
+    badge.text('…').removeClass('bg-success bg-warning').addClass('bg-secondary');
+    $.ajax({
+        url: '/actions/superadmin_tenant_email_relay.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set', value: newVal }
+    }).done(function (r) {
+        var on = r.success ? (r.value === '1') : $('#pf-relay-toggle').prop('checked');
+        badge.text(on ? 'ON' : 'OFF')
+             .removeClass('bg-secondary bg-success bg-warning')
+             .addClass(on ? 'bg-success' : 'bg-warning');
+        if (!r.success) {
+            $('#pf-relay-toggle').prop('checked', !on); // revert
+            alert(r.message || 'Could not update setting.');
+        }
+    }).fail(function () {
+        badge.text('ERR').removeClass('bg-secondary bg-success bg-warning').addClass('bg-danger');
+        $('#pf-relay-toggle').prop('checked', !$('#pf-relay-toggle').prop('checked'));
+    });
+});
 
 // POS Advanced / Restaurant POS — pulled from the same $features the main
 // grid already renders from (control-DB only, always fresh on page load; no
