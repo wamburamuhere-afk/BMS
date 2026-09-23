@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(mailer): fall back to platform SMTP when tenant has none configured
+
+**Files:** `core/mailer.php`
+
+- When a tenant's own SMTP settings are blank, `sendEmail()` now silently falls back to the platform relay (`platformMailerOpts()`). `from_name` and `from_email` keep their tenant-resolved values (company_name / company_email) so the recipient sees the sending company's identity. If the tenant has no from_email either, the platform's is used.
+- Zero config needed per tenant; existing unconfigured tenants benefit immediately on deploy.
+- Tenants can override by setting their own SMTP in Settings > Email at any time.
+
 ## 2026-09-23 — feat(pos): mobile default product display limit = 10
 
 **Files:** `app/bms/pos/pos_scripts_new.php`, `app/constant/settings/pos_config_settings.php`
