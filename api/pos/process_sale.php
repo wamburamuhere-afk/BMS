@@ -43,21 +43,65 @@ try {
 
     // Ensure pos_sales.due_date exists before opening the transaction — MySQL
     // DDL triggers an implicit commit, so this must stay outside beginTransaction().
-    // Self-heals tenants that haven't run the 2026_09_16_pos_sales_due_date
-    // migration without needing a CLI step.
+    // Self-heals tenants that haven't run the 2026_09_16_pos_sales_due_date migration.
     try {
         if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'due_date'")->fetch()) {
             $pdo->exec("ALTER TABLE pos_sales ADD COLUMN due_date DATE NULL AFTER payment_date");
             try { $pdo->exec("ALTER TABLE pos_sales ADD INDEX idx_pos_sales_due_date (due_date)"); } catch (PDOException $_ddlE) {}
         }
     } catch (PDOException $_ddlE) {}
+    // Self-heal offline-sync columns — DDL must stay outside the transaction.
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'client_uuid'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN client_uuid VARCHAR(36) NULL AFTER shift_id");
+            try { $pdo->exec("ALTER TABLE pos_sales ADD UNIQUE KEY ux_pos_sales_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
+        }
+    } catch (PDOException $_ddlE) {}
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'sold_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN sold_at DATETIME NULL AFTER client_uuid");
+        }
+    } catch (PDOException $_ddlE) {}
+
+    // Read body once here — php://input is a one-shot stream.
+    $_posRawBody    = file_get_contents('php://input');
+    $_posEarlyInput = json_decode($_posRawBody, true) ?: [];
+
+    // Idempotency pre-check (read-only, outside the transaction).
+    // If this client_uuid is already committed, return the original result immediately
+    // so the Flutter app can safely retry over flaky connections without creating duplicates.
+    $_preClientUuid = '';
+    if (!empty($_posEarlyInput['client_uuid'])) {
+        $uuid = trim((string)$_posEarlyInput['client_uuid']);
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid)) {
+            $_preClientUuid = $uuid;
+            try {
+                $dupChk = $pdo->prepare("SELECT sale_id, receipt_number, payment_status FROM pos_sales WHERE client_uuid = ? LIMIT 1");
+                $dupChk->execute([$_preClientUuid]);
+                if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+                    echo json_encode([
+                        'success'        => true,
+                        'idempotent'     => true,
+                        'message'        => t('Sale already recorded.'),
+                        'sale_id'        => (int)$dup['sale_id'],
+                        'receipt_number' => $dup['receipt_number'],
+                        'payment_status' => $dup['payment_status'],
+                    ]);
+                    exit;
+                }
+            } catch (PDOException $_idemp) {
+                // Column not yet on this tenant (self-heal may have failed) — proceed normally.
+                $_preClientUuid = '';
+            }
+        }
+    }
 
     $pdo->beginTransaction();
 
-    // Read JSON input
-    $input = json_decode(file_get_contents('php://input'), true);
-    if (!$input) {
-        throw new Exception("Invalid input data");
+    // Re-use the body already read above.
+    $input = $_posEarlyInput;
+    if (empty($input)) {
+        throw new Exception("Invalid input data", 422);
     }
 
     $user_id = $_SESSION['user_id'];
@@ -97,6 +141,19 @@ try {
     if (!empty($input['due_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$input['due_date'])) {
         $due_date = $input['due_date'];
     }
+    // Offline-sync: idempotency key (validated above) + client-supplied sale timestamp.
+    $client_uuid     = $_preClientUuid; // '' when not provided or format invalid
+    $sold_at         = null;
+    $sale_date_value = date('Y-m-d');
+    if (!empty($input['sold_at'])) {
+        $ts = strtotime((string)$input['sold_at']);
+        // Accept timestamps up to 30 days in the past and 5 minutes in the future
+        // (tolerance for clock drift). Falls back to server time silently.
+        if ($ts && $ts >= time() - 2592000 && $ts <= time() + 300) {
+            $sold_at         = date('Y-m-d H:i:s', $ts);
+            $sale_date_value = date('Y-m-d', $ts);
+        }
+    }
 
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module. All three fields
     // are optional and additive: a plain retail sale that never sends them
@@ -128,19 +185,19 @@ try {
     $amount_paid_now = isset($input['amount_paid']) ? floatval($input['amount_paid']) : ($is_credit ? 0.0 : $total);
     if ($amount_paid_now < 0) $amount_paid_now = 0.0;
     if ($is_credit && empty($customer_id)) {
-        throw new Exception('Credit sales require a customer — you cannot sell on credit to a walk-in.');
+        throw new Exception('Credit sales require a customer — you cannot sell on credit to a walk-in.', 422);
     }
 
     if (empty($items)) {
-        throw new Exception("No items in cart");
+        throw new Exception("No items in cart", 422);
     }
 
     // Warehouse is compulsory — a sale must be drawn from a specific warehouse.
     if (empty($warehouse_id)) {
-        throw new Exception("A warehouse must be selected for the sale.");
+        throw new Exception("A warehouse must be selected for the sale.", 422);
     }
     if (!userCan('warehouse', $warehouse_id)) {
-        throw new Exception(isShopLabel(true) ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.");
+        throw new Exception(isShopLabel(true) ? "Access denied: this shop is not in your assigned scope." : "Access denied: this warehouse is not in your assigned scope.", 403);
     }
 
     // Phase 30 — a table_id must genuinely belong to the sale's own
@@ -161,7 +218,7 @@ try {
     $shift = $stmt->fetch(PDO::FETCH_ASSOC);
     $shift_id = $shift['shift_id'] ?? null;
     if (!$shift_id) {
-        throw new Exception("Please start a cash register shift before completing a sale.");
+        throw new Exception("Please start a cash register shift before completing a sale.", 409);
     }
 
     // Shop scope (2026-09-16): a shift opened on a shop-assigned register is
@@ -209,19 +266,42 @@ try {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO pos_sales (
+                client_uuid, sold_at,
                 receipt_number, shift_id, user_id, assigned_to, customer_id, warehouse_id, table_id, project_id,
                 subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
                 payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
                 sale_type, sale_status, payment_status, due_date, sale_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', ?, ?, NOW())
         ");
         $stmt->execute([
+            $client_uuid ?: null, $sold_at,
             $receipt_number, $shift_id, $user_id, $assigned_to, $customer_id, $warehouse_id, $table_id, $project_id,
             $subtotal, $discount_percentage, $discount_amount, $tax, $total,
             $db_payment_method, $amount_tendered, $change, $payment_details_json, $register_id, $register_name,
-            $sale_type_in, $due_date
+            $sale_type_in, $due_date, $sale_date_value
         ]);
     } catch (PDOException $e) {
+        // Concurrent duplicate on client_uuid: two retries hit the server simultaneously.
+        // The first committed; return its data as success (same as the pre-check path).
+        if ($client_uuid !== '' && str_contains($e->getMessage(), 'Duplicate') &&
+            (str_contains($e->getMessage(), 'client_uuid') || str_contains($e->getMessage(), 'ux_pos_sales_client_uuid'))) {
+            $pdo->rollBack();
+            $concDup = null;
+            try {
+                $cDupChk = $pdo->prepare("SELECT sale_id, receipt_number, payment_status FROM pos_sales WHERE client_uuid = ? LIMIT 1");
+                $cDupChk->execute([$client_uuid]);
+                $concDup = $cDupChk->fetch(PDO::FETCH_ASSOC);
+            } catch (PDOException $_e) {}
+            echo json_encode([
+                'success'        => true,
+                'idempotent'     => true,
+                'message'        => t('Sale already recorded.'),
+                'sale_id'        => $concDup ? (int)$concDup['sale_id'] : 0,
+                'receipt_number' => $concDup['receipt_number'] ?? '',
+                'payment_status' => $concDup['payment_status'] ?? '',
+            ]);
+            exit;
+        }
         $missingAssignedTable = stripos($e->getMessage(), 'assigned_to') !== false || stripos($e->getMessage(), "'table_id'") !== false;
         $missingDueDate = stripos($e->getMessage(), "'due_date'") !== false;
         if (!$missingAssignedTable && !$missingDueDate) {
@@ -235,17 +315,19 @@ try {
         }
         $stmt = $pdo->prepare("
             INSERT INTO pos_sales (
+                client_uuid, sold_at,
                 receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,
                 subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
                 payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
                 sale_type, sale_status, payment_status, due_date, sale_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', ?, ?, NOW())
         ");
         $stmt->execute([
+            $client_uuid ?: null, $sold_at,
             $receipt_number, $shift_id, $user_id, $customer_id, $warehouse_id, $project_id,
             $subtotal, $discount_percentage, $discount_amount, $tax, $total,
             $db_payment_method, $amount_tendered, $change, $payment_details_json, $register_id, $register_name,
-            $sale_type_in, $due_date
+            $sale_type_in, $due_date, $sale_date_value
         ]);
     }
 
@@ -817,6 +899,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     
 } catch (PosCreditLimitExceededException $e) {
     $pdo->rollBack();
+    http_response_code(409);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
@@ -828,6 +911,10 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     ]);
 } catch (Exception $e) {
     $pdo->rollBack();
+    // Use the exception code as HTTP status when it's a known business/validation code;
+    // fall back to 500 for unexpected errors.
+    $httpCode = in_array((int)$e->getCode(), [403, 409, 422]) ? (int)$e->getCode() : 500;
+    http_response_code($httpCode);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage()

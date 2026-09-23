@@ -37,9 +37,37 @@ $method  = $_POST['payment_method'] ?? 'cash';
 $reference = trim($_POST['reference'] ?? '');
 
 $allowed = ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'];
-if ($sale_id <= 0)                     { echo json_encode(['success' => false, 'message' => t('Invalid sale.')]); exit; }
-if ($amount <= 0)                      { echo json_encode(['success' => false, 'message' => t('Enter a payment amount greater than zero.')]); exit; }
-if (!in_array($method, $allowed, true)){ echo json_encode(['success' => false, 'message' => t('Invalid payment method.')]); exit; }
+if ($sale_id <= 0)                     { http_response_code(422); echo json_encode(['success' => false, 'message' => t('Invalid sale.')]); exit; }
+if ($amount <= 0)                      { http_response_code(422); echo json_encode(['success' => false, 'message' => t('Enter a payment amount greater than zero.')]); exit; }
+if (!in_array($method, $allowed, true)){ http_response_code(422); echo json_encode(['success' => false, 'message' => t('Invalid payment method.')]); exit; }
+
+// Idempotency: a client_uuid lets the Flutter app retry a credit-settlement safely.
+$pay_client_uuid = '';
+$rawPayUuid = trim($_POST['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawPayUuid)) {
+    $pay_client_uuid = $rawPayUuid;
+    try {
+        global $pdo;
+        $pDupChk = $pdo->prepare("SELECT psp.payment_id, ps.payment_status, ps.grand_total,
+                                          COALESCE(SUM(psp2.amount),0) AS total_paid
+                                     FROM pos_sale_payments psp
+                                     JOIN pos_sales ps ON ps.sale_id = psp.sale_id
+                                LEFT JOIN pos_sale_payments psp2 ON psp2.sale_id = psp.sale_id
+                                    WHERE psp.client_uuid = ? LIMIT 1");
+        $pDupChk->execute([$pay_client_uuid]);
+        if ($pDup = $pDupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode([
+                'success'        => true,
+                'idempotent'     => true,
+                'message'        => t('Payment already recorded.'),
+                'payment_status' => $pDup['payment_status'],
+            ]);
+            exit;
+        }
+    } catch (PDOException $_pIdemp) {
+        $pay_client_uuid = '';
+    }
+}
 
 try {
     global $pdo;
@@ -64,9 +92,9 @@ try {
     if ($amount > $balance + 0.01) { throw new Exception('Payment exceeds the balance due (' . number_format($balance, 2) . ').'); }
 
     // Record the payment.
-    $pdo->prepare("INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
-                   VALUES (?, ?, ?, ?, 'Payment received', ?, NOW())")
-        ->execute([$sale_id, $amount, $method, ($reference !== '' ? $reference : null), $_SESSION['user_id']]);
+    $pdo->prepare("INSERT INTO pos_sale_payments (client_uuid, sale_id, amount, payment_method, reference, notes, received_by, created_at)
+                   VALUES (?, ?, ?, ?, ?, 'Payment received', ?, NOW())")
+        ->execute([$pay_client_uuid ?: null, $sale_id, $amount, $method, ($reference !== '' ? $reference : null), $_SESSION['user_id']]);
 
     // Recompute status.
     $new_paid    = round($paid + $amount, 2);
@@ -106,5 +134,7 @@ try {
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('receive_payment: ' . $e->getMessage());
+    $httpCode = in_array((int)$e->getCode(), [403, 409, 422]) ? (int)$e->getCode() : 500;
+    http_response_code($httpCode);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
