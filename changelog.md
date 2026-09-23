@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(pos): mobile default product display limit = 10
+
+**Files:** `app/bms/pos/pos_scripts_new.php`, `app/constant/settings/pos_config_settings.php`
+
+- `pos_scripts_new.php`: `DEFAULT_DISPLAY_LIMIT` now uses `window.innerWidth < 768` to pick between `pos_products_display_limit_mobile` (default 10) on mobile and `pos_products_display_limit` (default 20) on desktop
+- `pos_config_settings.php`: added `pos_products_display_limit_mobile` setting (save + read + UI dropdown) in the Display section; renamed desktop label to "(desktop)" for clarity
+
 ## 2026-09-23 — feat(registration): seed phone + optional email into company profile
 
 **Files:** `register.php`, `actions/register_tenant.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`

@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $allowed_display_limits = [10, 20, 30, 50, 100];
         $display_limit = (int)($_POST['pos_products_display_limit'] ?? 20);
         save_setting('pos_products_display_limit', in_array($display_limit, $allowed_display_limits, true) ? $display_limit : 20);
+        $display_limit_mobile = (int)($_POST['pos_products_display_limit_mobile'] ?? 10);
+        save_setting('pos_products_display_limit_mobile', in_array($display_limit_mobile, $allowed_display_limits, true) ? $display_limit_mobile : 10);
         // Phase 10 (pos_upgrade_plan.md §7) — receipt printing preferences.
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
@@ -41,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pos_products_display_limit = (int)get_setting('pos_products_display_limit', '20');
+$pos_products_display_limit        = (int)get_setting('pos_products_display_limit', '20');
+$pos_products_display_limit_mobile = (int)get_setting('pos_products_display_limit_mobile', '10');
 $pos_discount_type      = get_setting('pos_discount_type', 'percentage');
 $pos_receipt_width      = get_setting('pos_receipt_width', '80');
 $pos_auto_print_receipt = get_setting('pos_auto_print_receipt', '0');
@@ -87,13 +90,23 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                     <form method="POST">
                         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                         <div class="mb-3">
-                            <label for="pos_products_display_limit" class="form-label"><?= t('Products shown on open') ?></label>
+                            <label for="pos_products_display_limit" class="form-label"><?= t('Products shown on open (desktop)') ?></label>
                             <select class="form-select" id="pos_products_display_limit" name="pos_products_display_limit">
                                 <?php foreach ([10, 20, 30, 50, 100] as $n): ?>
                                 <option value="<?= $n ?>" <?= $pos_products_display_limit == $n ? 'selected' : '' ?>><?= $n ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text"><?= t('How many products to show in the product grid when no search or category filter is active. Searching or tapping a category always shows all matching results.') ?></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="pos_products_display_limit_mobile" class="form-label"><?= t('Products shown on open (mobile)') ?></label>
+                            <select class="form-select" id="pos_products_display_limit_mobile" name="pos_products_display_limit_mobile">
+                                <?php foreach ([10, 20, 30, 50, 100] as $n): ?>
+                                <option value="<?= $n ?>" <?= $pos_products_display_limit_mobile == $n ? 'selected' : '' ?>><?= $n ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text"><?= t('Same as above but for phones and small tablets (screen width below 768 px). Default is 10 for faster loading on mobile.') ?></div>
                         </div>
 
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Discount Configuration') ?></h6>
