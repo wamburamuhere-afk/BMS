@@ -266,7 +266,9 @@ if (!function_exists('seedTenantCompanyProfile')) {
      */
     function seedTenantCompanyProfile(PDO $tpdo, int $tenantId, string $companyName, array $extra): void
     {
-        $values = ['company_name' => $companyName];
+        // use_platform_email = 1 by default: all new tenants route mail through
+        // the platform relay without any per-tenant SMTP setup required.
+        $values = ['company_name' => $companyName, 'use_platform_email' => '1'];
 
         if (($extra['physical_address'] ?? '') !== '') {
             $values['company_physical_address'] = $extra['physical_address'];
