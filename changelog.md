@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-22 — feat(mobile-api): patch 4 remaining POS endpoints with Bearer auth
+
+**Branch:** `feat/mobile-api-bearer-patch-held-sales` → PR #2137 → `develop`
+
+**Files changed:** `api/pos/hold_sale.php`, `api/pos/get_held_sales.php`, `api/pos/delete_held_sale.php`, `api/pos/update_credit_due_date.php`
+
+Added `mobileBearerAuth()` to 4 POS endpoints missed in the original mobile API work (Phases 1–14). Flutter app can now use Bearer token auth on hold/retrieve/delete cart and update-credit-due-date flows. For `update_credit_due_date.php` (which had `csrf_check()`), the guard `if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check()` preserves CSRF protection for web browser sessions while skipping it for mobile Bearer-token requests — same pattern as `void_sale.php`.
+
+**Known issue discovered:** `api/pos/get_products.php` contains `grn_create.php` HTML content instead of a JSON products API — pre-existing bug, separate fix needed.
+
+---
+
 ## 2026-09-22 — Hotfix: mass-guard 33 migrations against legacy database missing feature tables
 
 **Branch:** `hotfix/rfq-migration-guards` → PR #2126 → `main`
