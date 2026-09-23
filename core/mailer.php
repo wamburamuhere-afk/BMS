@@ -109,6 +109,31 @@ if (!function_exists('sendEmail')) {
         $fromName  = trim((string)($opts['from_name']  ?? $smtp['from_name']  ?? $get('from_name',  $get('company_name', 'BMS'))));
 
         if ($host === '' || $user === '') {
+            // Tenant has no SMTP configured — fall back to the platform relay
+            // so all tenant emails work out of the box without any per-tenant
+            // setup. from_email / from_name are kept as the tenant's own values
+            // (resolved above: company_email / company_name) so the recipient
+            // still sees the sending company's identity.
+            if (!function_exists('platformMailerOpts')) {
+                @require_once __DIR__ . '/platform_settings.php';
+            }
+            if (function_exists('platformMailerOpts')) {
+                $pf = platformMailerOpts();
+                if ($pf['configured']) {
+                    $pSmtp = $pf['opts']['smtp'];
+                    $host  = $pSmtp['host'];
+                    $port  = (int)$pSmtp['port'];
+                    $user  = $pSmtp['username'];
+                    $pass  = (string)$pSmtp['password'];
+                    $enc   = strtolower((string)$pSmtp['encryption']);
+                    // If the tenant has no from_email either, use the platform's.
+                    if ($fromEmail === '') {
+                        $fromEmail = trim((string)$pSmtp['from_email']);
+                    }
+                }
+            }
+        }
+        if ($host === '' || $user === '') {
             $GLOBALS['__bms_mailer_last_error'] = 'SMTP is not configured (set Host & Username in Settings > Email).';
             error_log('sendEmail: ' . $GLOBALS['__bms_mailer_last_error']);
             return false;
