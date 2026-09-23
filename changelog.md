@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(mobile): offline-first sync Phase 2 — master data idempotency
+
+**Files:** `api/mobile/customers/create.php`, `api/mobile/suppliers/create.php`, `api/mobile/products/create.php`, `api/mobile/expenses/create.php`, `api/mobile/warehouses/create.php`, `migrations/tenant/2026_09_23_master_data_offline_sync.php`, `migrations/2026_09_23_master_data_offline_sync_legacy_db.php`
+
+- Added `client_uuid` (UUID v4) idempotency key to all five master-data create endpoints — duplicate retries return `idempotent: true` with the original record, no duplicate customers/suppliers/products/expenses/warehouses created
+- Schema: `client_uuid VARCHAR(36) NULL` + UNIQUE key on `customers`, `suppliers`, `products`, `expenses`, `warehouses`; both tenant and legacy migrations + in-file self-heal DDL in each endpoint
+- Updated mobile API doc artifact (Version 5) — `client_uuid` field + idempotent response shape documented for all five create endpoints
+
+## 2026-09-23 — feat(pos): offline-first sync Phase 1 — idempotency + sold_at
+
+**Files:** `api/pos/process_sale.php`, `api/pos/create_return.php`, `api/pos/receive_payment.php`, `api/pos/quick_cash_drawer.php`, `migrations/tenant/2026_09_23_pos_offline_sync.php`, `migrations/2026_09_23_pos_offline_sync_legacy_db.php`
+
+- Added `client_uuid` (UUID v4) idempotency key to all four POS write endpoints — duplicate retries return `idempotent: true` with the original result, no duplicate records created
+- Added `sold_at` client-supplied timestamp to `process_sale.php` — offline sales show real sale time, not sync time; accepts ≤30 days past / ≤5 min future, falls back to server time silently
+- Proper HTTP status codes: 409 business conflicts (shift not open, credit limit), 422 validation errors, 403 scope violations
+- Schema: `client_uuid VARCHAR(36) NULL` + UNIQUE key on `pos_sales`, `pos_sale_payments`, `cash_register_transactions`; `sold_at DATETIME NULL` on `pos_sales`; both migrations + in-file self-heal
+- PR: #2163
+
 ## 2026-09-23 — fix(cash-flow): remove backdrop-filter; lazy-load html2pdf
 
 **File:** `app/bms/invoice/reps/cash_flow.php`

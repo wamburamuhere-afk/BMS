@@ -14,6 +14,33 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 $body = $_POST;
 if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body = json_decode($raw, true) ?: []; } }
 
+// Self-heal DDL (outside any transaction — MySQL DDL causes implicit commit).
+try {
+    if (!$pdo->query("SHOW COLUMNS FROM customers LIKE 'client_uuid'")->fetch()) {
+        $pdo->exec("ALTER TABLE customers ADD COLUMN client_uuid VARCHAR(36) NULL");
+        try { $pdo->exec("ALTER TABLE customers ADD UNIQUE KEY ux_customers_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
+    }
+} catch (PDOException $_ddlE) {}
+
+// Parse idempotency key.
+$client_uuid = '';
+$rawUuid = trim($body['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
+    $client_uuid = $rawUuid;
+}
+
+// Idempotency pre-check.
+if ($client_uuid !== '') {
+    try {
+        $dupChk = $pdo->prepare("SELECT customer_id, customer_code, customer_name FROM customers WHERE client_uuid = ? LIMIT 1");
+        $dupChk->execute([$client_uuid]);
+        if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode(['success' => true, 'idempotent' => true, 'customer_id' => (int)$dup['customer_id'], 'customer_code' => $dup['customer_code'], 'customer_name' => $dup['customer_name'], 'message' => 'Customer already exists.']);
+            exit;
+        }
+    } catch (PDOException $_idemp) { $client_uuid = ''; }
+}
+
 $customer_name = trim($body['customer_name'] ?? '');
 if ($customer_name === '') { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Customer name is required']); exit; }
 if (mb_strlen($customer_name) > 191) { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Customer name too long (max 191 characters)']); exit; }
@@ -32,11 +59,12 @@ try {
 
     $stmt = $pdo->prepare("
         INSERT INTO customers
-            (customer_code, customer_name, phone, email, address, city,
+            (client_uuid, customer_code, customer_name, phone, email, address, city,
              customer_type, credit_limit, notes, status, created_at, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
     ");
     $stmt->execute([
+        $client_uuid ?: null,
         $customer_code, $customer_name,
         $phone  !== '' ? $phone  : null,
         $email  !== '' ? $email  : null,
