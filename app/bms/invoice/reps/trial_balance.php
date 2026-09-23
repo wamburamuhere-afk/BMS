@@ -20,9 +20,9 @@
  *   - Filters journal_entries by status = 'posted' only.
  */
 ob_start();
-require_once __DIR__ . '/../../../roots.php';
-require_once __DIR__ . '/../../../helpers.php';
-require_once __DIR__ . '/../../../core/financial_classification.php';
+require_once __DIR__ . '/../../../../roots.php';
+require_once __DIR__ . '/../../../../helpers.php';
+require_once __DIR__ . '/../../../../core/financial_classification.php';
 
 includeHeader();
 
