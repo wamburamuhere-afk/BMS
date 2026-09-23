@@ -18,6 +18,33 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 $body = $_POST;
 if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body = json_decode($raw, true) ?: []; } }
 
+// Self-heal DDL (outside any transaction — MySQL DDL causes implicit commit).
+try {
+    if (!$pdo->query("SHOW COLUMNS FROM expenses LIKE 'client_uuid'")->fetch()) {
+        $pdo->exec("ALTER TABLE expenses ADD COLUMN client_uuid VARCHAR(36) NULL");
+        try { $pdo->exec("ALTER TABLE expenses ADD UNIQUE KEY ux_expenses_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
+    }
+} catch (PDOException $_ddlE) {}
+
+// Parse idempotency key.
+$client_uuid = '';
+$rawUuid = trim($body['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
+    $client_uuid = $rawUuid;
+}
+
+// Idempotency pre-check (before scope gates and GL posting).
+if ($client_uuid !== '') {
+    try {
+        $dupChk = $pdo->prepare("SELECT expense_id FROM expenses WHERE client_uuid = ? LIMIT 1");
+        $dupChk->execute([$client_uuid]);
+        if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode(['success' => true, 'idempotent' => true, 'expense_id' => (int)$dup['expense_id'], 'message' => 'Expense already recorded.']);
+            exit;
+        }
+    } catch (PDOException $_idemp) { $client_uuid = ''; }
+}
+
 $description  = trim($body['description']  ?? '');
 $amount_raw   = $body['amount']           ?? '';
 $expense_date = trim($body['expense_date'] ?? '');
@@ -62,12 +89,13 @@ try {
 
     $stmt = $pdo->prepare("
         INSERT INTO expenses
-            (expense_date, expense_account_id, amount, bank_account_id,
+            (client_uuid, expense_date, expense_account_id, amount, bank_account_id,
              project_id, warehouse_id, description, notes, status,
              created_by, paid_to_type, paid_to_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?)
     ");
     $stmt->execute([
+        $client_uuid ?: null,
         $expense_date, $expense_account_id, $amount, $bank_account_id,
         $project_id, $warehouse_id, $description,
         $notes !== '' ? $notes : null,

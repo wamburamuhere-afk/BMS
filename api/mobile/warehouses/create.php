@@ -13,6 +13,33 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 $body = $_POST;
 if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body = json_decode($raw, true) ?: []; } }
 
+// Self-heal DDL (outside any transaction — MySQL DDL causes implicit commit).
+try {
+    if (!$pdo->query("SHOW COLUMNS FROM warehouses LIKE 'client_uuid'")->fetch()) {
+        $pdo->exec("ALTER TABLE warehouses ADD COLUMN client_uuid VARCHAR(36) NULL");
+        try { $pdo->exec("ALTER TABLE warehouses ADD UNIQUE KEY ux_warehouses_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
+    }
+} catch (PDOException $_ddlE) {}
+
+// Parse idempotency key.
+$client_uuid = '';
+$rawUuid = trim($body['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
+    $client_uuid = $rawUuid;
+}
+
+// Idempotency pre-check.
+if ($client_uuid !== '') {
+    try {
+        $dupChk = $pdo->prepare("SELECT warehouse_id, warehouse_code, warehouse_name FROM warehouses WHERE client_uuid = ? LIMIT 1");
+        $dupChk->execute([$client_uuid]);
+        if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode(['success' => true, 'idempotent' => true, 'warehouse_id' => (int)$dup['warehouse_id'], 'warehouse_code' => $dup['warehouse_code'], 'warehouse_name' => $dup['warehouse_name'], 'message' => 'Shop already exists.']);
+            exit;
+        }
+    } catch (PDOException $_idemp) { $client_uuid = ''; }
+}
+
 $warehouse_name = trim($body['warehouse_name'] ?? '');
 if ($warehouse_name === '') { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Shop name is required']); exit; }
 
@@ -48,11 +75,12 @@ try {
 
     $stmt = $pdo->prepare("
         INSERT INTO warehouses
-            (warehouse_name, warehouse_code, address, city, phone, email,
+            (client_uuid, warehouse_name, warehouse_code, address, city, phone, email,
              contact_person, pos_mode, status, notes, capacity, is_primary, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NOW())
     ");
     $stmt->execute([
+        $client_uuid ?: null,
         $warehouse_name, $warehouse_code,
         $address        !== '' ? $address        : null,
         $city           !== '' ? $city           : null,
