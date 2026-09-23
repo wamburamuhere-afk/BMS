@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(mobile-api): expose products_display_limit and vat_enabled in /me
+
+**File:** `api/mobile/me.php`
+
+Added two fields to `pos_settings` in the `/me` response:
+- `products_display_limit` — reads `pos_products_display_limit` setting (default 20); Flutter app renders this many product cards on open
+- `vat_enabled` — `false` when `simple_mode` is on; Flutter hides VAT selector and submits sales with tax = 0
+
 ## 2026-09-23 — fix(pos): hide VAT row in Simple POS mode; configurable products-per-page
 
 **Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/constant/settings/pos_config_settings.php`
