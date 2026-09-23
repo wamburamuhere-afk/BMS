@@ -46,6 +46,33 @@ $reason           = trim($_POST['reason'] ?? '');
 $refund_method    = $_POST['refund_method'] ?? 'cash';
 $itemsRaw         = $_POST['items'] ?? '';
 
+// Idempotency: a client_uuid (valid UUID v4) lets the Flutter app retry safely.
+// If this UUID is already in pos_sales (is_return_sale=1), return the original
+// result immediately without touching any data.
+$return_client_uuid = '';
+$rawReturnUuid = trim($_POST['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawReturnUuid)) {
+    $return_client_uuid = $rawReturnUuid;
+    try {
+        global $pdo;
+        $rDupChk = $pdo->prepare("SELECT sale_id, receipt_number, payment_status FROM pos_sales WHERE client_uuid = ? AND is_return_sale = 1 LIMIT 1");
+        $rDupChk->execute([$return_client_uuid]);
+        if ($rDup = $rDupChk->fetch(PDO::FETCH_ASSOC)) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success'        => true,
+                'idempotent'     => true,
+                'message'        => t('Return already recorded.'),
+                'return_id'      => (int)$rDup['sale_id'],
+                'receipt_number' => $rDup['receipt_number'],
+            ]);
+            exit;
+        }
+    } catch (PDOException $_rIdemp) {
+        $return_client_uuid = ''; // column may not exist yet — proceed normally
+    }
+}
+
 $allowed_methods = ['cash', 'card', 'mobile_money', 'bank_transfer'];
 if (!in_array($refund_method, $allowed_methods, true)) { echo json_encode(['success' => false, 'message' => t('Invalid refund method.')]); exit; }
 if ($original_sale_id <= 0) { echo json_encode(['success' => false, 'message' => t('Invalid original sale.')]); exit; }
@@ -127,12 +154,13 @@ try {
 
     // Create the return header.
     $pdo->prepare("INSERT INTO pos_sales
-                      (receipt_number, shift_id, user_id, customer_id, customer_name, warehouse_id, project_id,
+                      (client_uuid, receipt_number, shift_id, user_id, customer_id, customer_name, warehouse_id, project_id,
                        subtotal, discount_amount, tax_amount, grand_total,
                        payment_method, payment_status, sale_status,
                        is_return_sale, original_sale_id, return_reason, sale_date, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'refunded', 1, ?, ?, NOW(), NOW())")
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'refunded', 1, ?, ?, NOW(), NOW())")
         ->execute([
+            $return_client_uuid ?: null,
             $return_receipt, $shift_id, $_SESSION['user_id'], $orig['customer_id'], $orig['customer_name'],
             $warehouse_id, $project_id, $r_subtotal, $r_discount, $r_tax, $r_grand,
             $refund_method, $original_sale_id, $reason,
