@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-23 — feat(api): mobile self-registration endpoint
+
+**Files:** `api/mobile/register.php`
+
+- New public POST endpoint: `api/mobile/register.php` — allows Flutter app users to create a new tenant account without going to the website.
+- Accepts: `company_name`, `owner_phone`, `owner_password`, `owner_password_confirm`, `owner_first_name`, `owner_last_name`, `owner_email`, `company_physical_address`, `company_postal_address`, `subdomain` (optional — auto-generated from company name if omitted), `device_name`.
+- Auto-generates subdomain from company name with collision-safe suffix (`acme-shop`, `acme-shop-2`, …).
+- Reuses `registerTenant()` — same throttle, honeypot-bypass for API, validation, provisioning, and superadmin notification as the web flow.
+- On success: connects to the provisioned tenant DB, issues a Bearer token, returns `token` + `user` + `company` in one response — no separate login step needed.
+- On token-issuance failure (rare): returns `token: null` + success so the user can still log in via `api/mobile/login.php`.
+- Both `application/json` and `application/x-www-form-urlencoded` POST bodies accepted.
+
 ## 2026-09-23 — fix(pos): show VAT in Simple POS; amount tendered auto-fills from total
 
 **Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`
