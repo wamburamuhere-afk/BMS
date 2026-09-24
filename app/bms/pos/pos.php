@@ -431,7 +431,6 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                         <span class="text-muted"><?= t('Discount') ?> (<span id="discountPercentageDisplay">0</span>%):</span>
                         <strong id="cartDiscount" class="text-danger">-<?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
-                    <?php if (!posSimpleModeEnabled()): ?>
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-muted"><?= t('VAT:') ?></span>
                         <select id="saleVatSelect" class="form-select form-select-sm" style="width:auto;min-width:140px;">
@@ -443,7 +442,6 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                         <span class="text-muted"><?= t('Total Tax:') ?></span>
                         <strong id="cartTax"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
-                    <?php endif; ?>
                     <div class="d-flex justify-content-between border-top pt-2">
                         <h6 class="mb-0"><?= t('TOTAL:') ?></h6>
                         <h5 class="mb-0 text-success" id="cartTotal"><?= htmlspecialchars($currency) ?> 0.00</h5>
