@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-23 — fix(pos): show VAT in Simple POS; amount tendered auto-fills from total
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`
+
+- Removed `posSimpleModeEnabled()` guard from VAT row — VAT selector (No Tax / VAT 18%) now visible in all POS modes including Simple POS.
+- Amount Tendered auto-fills with the cart TOTAL whenever Cash is selected as payment method, and updates live as items are added/removed.
+
 ## 2026-09-23 — feat(email): use_platform_email toggle — per-tenant on/off switch for platform relay
 
 **Files:** `core/mailer.php`, `core/tenant_provisioner.php`, `app/constant/settings/system_settings.php`, `app/superadmin/tenant_view.php`, `actions/superadmin_tenant_email_relay.php`

@@ -497,6 +497,8 @@ $(document).ready(function() {
         const method = $(this).val();
         $('#cashPaymentSection').toggle(method === 'cash');
         if (method === 'cash') {
+            const currentTotal = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
+            if (currentTotal > 0) $('#amountTendered').val(currentTotal.toFixed(2));
             calculateChange();
         } else if (method === 'credit') {
             // Clear any cash amount so credit sales are never recorded as cash receipts
@@ -1380,6 +1382,11 @@ function calculateCartTotal() {
     $('#cartSubtotal').text(POS_CURRENCY + ' ' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2}));
     $('#cartTax').text(POS_CURRENCY + ' ' + totalTax.toLocaleString('en-US', {minimumFractionDigits: 2}));
     $('#cartTotal').text(POS_CURRENCY + ' ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+
+    // Auto-fill amount tendered when cash is selected
+    if ($('input[name="paymentMethod"]:checked').val() === 'cash' && total > 0) {
+        $('#amountTendered').val(total.toFixed(2));
+    }
 
     // Hide discount row as we now handle per-item discount
     $('#discountRow').hide();
