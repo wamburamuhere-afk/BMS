@@ -81,12 +81,47 @@ try {
         }
     }
 
+    $trialSuspended = $suspended;
+
+    // Also suspend active tenants whose subscription has expired
+    $stmt2 = $ctrl->prepare(
+        "SELECT id, subdomain, owner_email, company_name, subscription_ends_at
+           FROM tenants
+          WHERE status = 'active'
+            AND subscription_ends_at IS NOT NULL
+            AND subscription_ends_at < CURDATE()"
+    );
+    $stmt2->execute();
+    $expiredSubs = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+    $subSuspended = 0;
+    foreach ($expiredSubs as $t) {
+        try {
+            $ctrl->prepare(
+                "UPDATE tenants SET status='suspended', suspended_at=NOW()
+                  WHERE id=? AND status='active'"
+            )->execute([$t['id']]);
+            logTenantAdminAction(
+                (int)$t['id'],
+                (string)$t['subdomain'],
+                'auto_suspend_subscription',
+                'Subscription expired ' . ($t['subscription_ends_at'] ?? '?') . ' — batch enforcement'
+            );
+            $subSuspended++;
+        } catch (Throwable $e) {
+            error_log('trial_enforcement (subscription): tenant ' . $t['id'] . ' error: ' . $e->getMessage());
+            $errors++;
+        }
+    }
+
     echo json_encode([
-        'ok'        => true,
-        'found'     => count($expired),
-        'suspended' => $suspended,
-        'errors'    => $errors,
-        'ran_at'    => date('c'),
+        'ok'                 => true,
+        'trials_found'       => count($expired),
+        'trials_suspended'   => $trialSuspended,
+        'subs_found'         => count($expiredSubs),
+        'subs_suspended'     => $subSuspended,
+        'errors'             => $errors,
+        'ran_at'             => date('c'),
     ]);
 
 } catch (Throwable $e) {

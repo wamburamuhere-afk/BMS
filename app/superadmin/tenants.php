@@ -34,20 +34,33 @@ foreach ($tenants as $t) {
 }
 ksort($allIndustries); ksort($allCountries); ksort($allSizes);
 
-/** Trial expiry badge — colour-coded by urgency. */
-function trialExpiryBadge(?string $trialEndsAt, string $status): string
+/**
+ * Unified "Expires" badge.
+ * - Trial tenants   → trial_ends_at
+ * - Active (paid)   → subscription_ends_at (if set)
+ * - Everything else → —
+ */
+function expiresBadge(?string $trialEndsAt, ?string $subscriptionEndsAt, string $status): string
 {
-    if ($status !== 'trial' || $trialEndsAt === null) return '<span class="text-muted">—</span>';
-    $daysLeft = (int)floor((strtotime($trialEndsAt) - time()) / 86400);
-    if ($daysLeft < 0) {
-        return '<span class="badge bg-danger">EXPIRED</span>';
-    } elseif ($daysLeft <= 3) {
-        return '<span class="badge bg-danger">' . $daysLeft . 'd left</span>';
-    } elseif ($daysLeft <= 7) {
-        return '<span class="badge bg-warning text-dark">' . $daysLeft . 'd left</span>';
-    } else {
-        return '<span class="badge bg-success">' . $daysLeft . 'd left</span>';
+    if ($status === 'trial') {
+        if ($trialEndsAt === null) return '<span class="text-muted">—</span>';
+        $daysLeft = (int)floor((strtotime($trialEndsAt) - time()) / 86400);
+        $label = 'Trial · ' . date('d M Y', strtotime($trialEndsAt));
+        if ($daysLeft < 0)  return '<span class="badge bg-danger">EXPIRED</span>';
+        if ($daysLeft <= 3) return '<span class="badge bg-danger">' . $label . '<br><small>' . $daysLeft . 'd left</small></span>';
+        if ($daysLeft <= 7) return '<span class="badge bg-warning text-dark">' . $label . '<br><small>' . $daysLeft . 'd left</small></span>';
+        return '<span class="badge bg-info text-dark">' . $label . '</span>';
     }
+    if ($status === 'active') {
+        if ($subscriptionEndsAt === null) return '<span class="text-muted small">Not set</span>';
+        $daysLeft = (int)floor((strtotime($subscriptionEndsAt) - time()) / 86400);
+        $label = date('d M Y', strtotime($subscriptionEndsAt));
+        if ($daysLeft < 0)   return '<span class="badge bg-danger">EXPIRED ' . $label . '</span>';
+        if ($daysLeft <= 7)  return '<span class="badge bg-warning text-dark">' . $label . ' (' . $daysLeft . 'd)</span>';
+        if ($daysLeft <= 30) return '<span class="badge bg-success">' . $label . ' (' . $daysLeft . 'd)</span>';
+        return '<span class="badge bg-success">' . $label . '</span>';
+    }
+    return '<span class="text-muted">—</span>';
 }
 
 /** Last-active badge — colour by dormancy. */
@@ -181,7 +194,7 @@ function saBadge(string $status): string
                 <tr>
                     <th style="width:2rem"><input type="checkbox" id="chkAll" class="form-check-input" title="Select all visible"></th>
                     <th>#</th><th>Company</th><th>Subdomain</th><th>Status</th>
-                    <th>Owner</th><th>Trial Ends</th><th>Last Active</th>
+                    <th>Owner</th><th>Expires</th><th>Last Active</th>
                     <th>Created</th><th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -210,8 +223,8 @@ function saBadge(string $status): string
                         <?= htmlspecialchars($ownerDisplay, ENT_QUOTES, 'UTF-8') ?>
                         <?php if (!empty($t['owner_phone'])): ?><br><small class="text-muted"><?= safe_output($t['owner_phone'], '') ?></small><?php endif; ?>
                     </td>
-                    <td data-order="<?= htmlspecialchars($t['trial_ends_at'] ?? '', ENT_QUOTES) ?>">
-                        <?= trialExpiryBadge($t['trial_ends_at'] ?? null, (string)$t['status']) ?>
+                    <td data-order="<?= htmlspecialchars($t['trial_ends_at'] ?? ($t['subscription_ends_at'] ?? ''), ENT_QUOTES) ?>">
+                        <?= expiresBadge($t['trial_ends_at'] ?? null, $t['subscription_ends_at'] ?? null, (string)$t['status']) ?>
                     </td>
                     <td data-order="<?= htmlspecialchars($t['last_active_at'] ?? '', ENT_QUOTES) ?>">
                         <?= lastActiveBadge($t['last_active_at'] ?? null) ?>
