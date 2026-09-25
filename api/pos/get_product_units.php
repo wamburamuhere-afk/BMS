@@ -9,6 +9,7 @@
  * GET: product_id
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth();
 header('Content-Type: application/json');
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
