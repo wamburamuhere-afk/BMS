@@ -47,27 +47,69 @@ if ($action === 'save_branding') {
 }
 
 if ($action === 'save_email') {
-    $host = trim((string)($_POST['smtp_host'] ?? ''));
-    $port = trim((string)($_POST['smtp_port'] ?? ''));
+    // ── Provider ─────────────────────────────────────────────────────────────
+    $provider = strtolower(trim((string)($_POST['email_provider'] ?? 'own')));
+    if (!in_array($provider, ['own', 'ses', 'mailgun', 'sendgrid'], true)) {
+        $provider = 'own';
+    }
+
+    // For managed providers, derive host/port/enc server-side — never trust POST
+    $sesRegion = 'us-east-1';
+    if ($provider === 'ses') {
+        $sesRegion = trim((string)($_POST['ses_region'] ?? 'us-east-1'));
+        if (!preg_match('/^[a-z][a-z0-9-]{2,29}$/', $sesRegion)) {
+            $sesRegion = 'us-east-1';
+        }
+    }
+
+    $providerPresets = [
+        'ses'      => ['host' => "email-smtp.{$sesRegion}.amazonaws.com", 'port' => '587', 'enc' => 'tls'],
+        'mailgun'  => ['host' => 'smtp.mailgun.org',                      'port' => '587', 'enc' => 'tls'],
+        'sendgrid' => ['host' => 'smtp.sendgrid.net',                     'port' => '587', 'enc' => 'tls'],
+    ];
+
+    if ($provider !== 'own') {
+        // Managed provider: host/port/enc are fixed
+        $preset = $providerPresets[$provider];
+        $host = $preset['host'];
+        $port = $preset['port'];
+        $enc  = $preset['enc'];
+    } else {
+        // Own server: read from POST and validate
+        $host = trim((string)($_POST['smtp_host'] ?? ''));
+        $port = trim((string)($_POST['smtp_port'] ?? ''));
+        $enc  = strtolower(trim((string)($_POST['smtp_encryption'] ?? 'tls')));
+
+        if ($host === '') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'SMTP Host is required for Own Server.']);
+            exit;
+        }
+        if ($port === '' || !ctype_digit($port) || (int)$port < 1 || (int)$port > 65535) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Enter a valid SMTP port (1-65535).']);
+            exit;
+        }
+        if (!in_array($enc, ['tls', 'ssl', ''], true)) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Encryption must be TLS, SSL, or None.']);
+            exit;
+        }
+    }
+
+    // ── Credentials (always from POST regardless of provider) ────────────────
     $user = trim((string)($_POST['smtp_username'] ?? ''));
-    $pass = (string)($_POST['smtp_password'] ?? '');            // blank = keep existing
-    $enc  = strtolower(trim((string)($_POST['smtp_encryption'] ?? 'tls')));
+    // SendGrid requires username = 'apikey' (enforced here too)
+    if ($provider === 'sendgrid') {
+        $user = 'apikey';
+    }
+    $pass      = (string)($_POST['smtp_password'] ?? '');   // blank = keep existing
     $fromEmail = trim((string)($_POST['from_email'] ?? ''));
     $fromName  = trim((string)($_POST['from_name'] ?? ''));
 
-    if ($host === '' || $user === '') {
+    if ($user === '') {
         http_response_code(422);
-        echo json_encode(['success' => false, 'message' => 'SMTP Host and Username are required.']);
-        exit;
-    }
-    if ($port === '' || !ctype_digit($port) || (int)$port < 1 || (int)$port > 65535) {
-        http_response_code(422);
-        echo json_encode(['success' => false, 'message' => 'Enter a valid SMTP port (1-65535).']);
-        exit;
-    }
-    if (!in_array($enc, ['tls', 'ssl', ''], true)) {
-        http_response_code(422);
-        echo json_encode(['success' => false, 'message' => 'Encryption must be TLS, SSL, or None.']);
+        echo json_encode(['success' => false, 'message' => 'Username / Access Key ID is required.']);
         exit;
     }
     if ($fromEmail !== '' && !filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
@@ -76,17 +118,23 @@ if ($action === 'save_email') {
         exit;
     }
 
-    setPlatformSetting('smtp_host', $host, (int)$me['id']);
-    setPlatformSetting('smtp_port', $port, (int)$me['id']);
-    setPlatformSetting('smtp_username', $user, (int)$me['id']);
-    setPlatformSetting('smtp_encryption', $enc, (int)$me['id']);
-    setPlatformSetting('from_email', $fromEmail, (int)$me['id']);
-    setPlatformSetting('from_name', $fromName, (int)$me['id']);
+    // ── Persist ───────────────────────────────────────────────────────────────
+    $uid = (int)$me['id'];
+    setPlatformSetting('email_provider', $provider,   $uid);
+    setPlatformSetting('smtp_host',       $host,       $uid);
+    setPlatformSetting('smtp_port',       $port,       $uid);
+    setPlatformSetting('smtp_username',   $user,       $uid);
+    setPlatformSetting('smtp_encryption', $enc,        $uid);
+    setPlatformSetting('from_email',      $fromEmail,  $uid);
+    setPlatformSetting('from_name',       $fromName,   $uid);
+    if ($provider === 'ses') {
+        setPlatformSetting('ses_region', $sesRegion, $uid);
+    }
     if ($pass !== '') {
-        setPlatformSetting('smtp_password_enc', encryptSecret($pass), (int)$me['id']);
+        setPlatformSetting('smtp_password_enc', encryptSecret($pass), $uid);
     }
 
-    logTenantAdminAction(null, null, 'platform_settings', 'Updated email/SMTP settings');
+    logTenantAdminAction(null, null, 'platform_settings', "Updated email/SMTP settings (provider: {$provider})");
     echo json_encode(['success' => true, 'message' => 'Email settings updated.']);
     exit;
 }
