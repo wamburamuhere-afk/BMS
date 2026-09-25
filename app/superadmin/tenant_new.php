@@ -100,10 +100,16 @@ $startingPlans = planTablesReady()
 
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Account status <span class="text-danger">*</span></label>
-                                <select class="form-select" name="status" required>
+                                <select class="form-select" name="status" required id="f-status" onchange="toggleTrialDate()">
                                     <option value="active" selected>Active — can sign in immediately</option>
                                     <option value="trial">Trial</option>
                                 </select>
+                            </div>
+
+                            <div class="col-12 col-md-6" id="trialDateRow" style="display:none">
+                                <label class="form-label">Trial ends <span class="text-muted fw-normal" style="font-size:.85rem">(default: +14 days)</span></label>
+                                <input type="date" class="form-control" name="trial_ends_at" id="f-trial-ends">
+                                <div class="form-text">Leave blank to use the default 14-day trial.</div>
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -160,7 +166,46 @@ $startingPlans = planTablesReady()
 
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
-                                <label class="form-label">Phone Number</label>
+                                <label class="form-label">Owner Phone</label>
+                                <input type="text" class="form-control" name="owner_phone" maxlength="20" placeholder="+255…">
+                                <div class="form-text">Stored in the platform registry for quick access.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Country</label>
+                                <select class="form-select" name="country">
+                                    <option value="">— Select —</option>
+                                    <option value="Tanzania">Tanzania</option>
+                                    <option value="Kenya">Kenya</option>
+                                    <option value="Uganda">Uganda</option>
+                                    <option value="Rwanda">Rwanda</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Industry</label>
+                                <select class="form-select" name="industry">
+                                    <option value="">— Select —</option>
+                                    <option value="retail">Retail / Shop</option>
+                                    <option value="restaurant">Restaurant / Café</option>
+                                    <option value="services">Services / Consulting</option>
+                                    <option value="manufacturing">Manufacturing</option>
+                                    <option value="healthcare">Healthcare</option>
+                                    <option value="transport">Transport / Logistics</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Company size</label>
+                                <select class="form-select" name="company_size">
+                                    <option value="">— Select —</option>
+                                    <option value="1-5">1–5 staff</option>
+                                    <option value="6-20">6–20 staff</option>
+                                    <option value="21-100">21–100 staff</option>
+                                    <option value="100+">100+ staff</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Company Phone</label>
                                 <input type="text" class="form-control" name="phone" maxlength="50">
                             </div>
                             <div class="col-12 col-md-6">
@@ -206,6 +251,11 @@ $startingPlans = planTablesReady()
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
+
+function toggleTrialDate() {
+    const status = document.getElementById('f-status').value;
+    document.getElementById('trialDateRow').style.display = status === 'trial' ? '' : 'none';
+}
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
 // Live availability check. Advisory only — the server re-checks on submit, so a

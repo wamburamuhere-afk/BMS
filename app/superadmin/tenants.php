@@ -25,6 +25,32 @@ try {
     $dbError = 'The tenant registry could not be read.';
 }
 
+/** Trial expiry badge — colour-coded by urgency. */
+function trialExpiryBadge(?string $trialEndsAt, string $status): string
+{
+    if ($status !== 'trial' || $trialEndsAt === null) return '<span class="text-muted">—</span>';
+    $daysLeft = (int)floor((strtotime($trialEndsAt) - time()) / 86400);
+    if ($daysLeft < 0) {
+        return '<span class="badge bg-danger">EXPIRED</span>';
+    } elseif ($daysLeft <= 3) {
+        return '<span class="badge bg-danger">' . $daysLeft . 'd left</span>';
+    } elseif ($daysLeft <= 7) {
+        return '<span class="badge bg-warning text-dark">' . $daysLeft . 'd left</span>';
+    } else {
+        return '<span class="badge bg-success">' . $daysLeft . 'd left</span>';
+    }
+}
+
+/** Last-active badge — colour by dormancy. */
+function lastActiveBadge(?string $lastActiveAt): string
+{
+    if ($lastActiveAt === null) return '<span class="text-muted small">Never</span>';
+    $days = (int)floor((time() - strtotime($lastActiveAt)) / 86400);
+    if ($days <= 7)  return '<span class="badge bg-success-subtle text-success">' . $days . 'd ago</span>';
+    if ($days <= 30) return '<span class="badge bg-warning-subtle text-warning">' . $days . 'd ago</span>';
+    return '<span class="badge bg-danger-subtle text-danger">Dormant ' . $days . 'd</span>';
+}
+
 /** Status badge — blue scale only, per .claude/ui-constants.md §UI-1. */
 function saBadge(string $status): string
 {
@@ -83,9 +109,16 @@ function saBadge(string $status): string
         <?php endforeach; ?>
     </div>
 
-    <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
         <h6 class="mb-0"><i class="bi bi-building text-primary me-1"></i> Tenants (<?= (int)($stats['total'] ?? 0) ?>)</h6>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
+            <select id="filterStatus" class="form-select form-select-sm w-auto">
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="trial">Trial</option>
+                <option value="suspended">Suspended</option>
+                <option value="deleted">Closed</option>
+            </select>
             <input type="search" id="tblSearch" class="form-control form-control-sm w-auto" placeholder="Search…">
             <a href="<?= saUrl('tenants/new') ?>" class="btn btn-sm btn-primary text-nowrap">
                 <i class="bi bi-plus-circle me-1"></i> New company
@@ -110,18 +143,37 @@ function saBadge(string $status): string
             <thead>
                 <tr>
                     <th>#</th><th>Company</th><th>Subdomain</th><th>Status</th>
-                    <th>Owner</th><th>Created</th><th class="text-end">Actions</th>
+                    <th>Owner</th><th>Trial Ends</th><th>Last Active</th>
+                    <th>Created</th><th class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($tenants as $t): ?>
-                <tr>
+                <?php
+                $ownerName = trim(($t['owner_first_name'] ?? '') . ' ' . ($t['owner_last_name'] ?? ''));
+                $ownerDisplay = $ownerName !== '' ? $ownerName : safe_output($t['owner_email'], '');
+                ?>
+                <tr data-status="<?= htmlspecialchars($t['status'], ENT_QUOTES) ?>">
                     <td><?= (int)$t['id'] ?></td>
-                    <td><?= safe_output($t['company_name'], '') ?></td>
+                    <td>
+                        <a href="<?= saUrl('tenants/view') ?>?id=<?= (int)$t['id'] ?>" class="fw-semibold text-decoration-none">
+                            <?= safe_output($t['company_name'], '') ?>
+                        </a>
+                        <?php if (!empty($t['industry'])): ?><br><small class="text-muted"><?= safe_output($t['industry'], '') ?></small><?php endif; ?>
+                    </td>
                     <td><code><?= safe_output($t['subdomain'], '') ?></code></td>
                     <td data-order="<?= safe_output($t['status'], '') ?>"><?= saBadge((string)$t['status']) ?></td>
-                    <td><?= safe_output($t['owner_email'], '') ?></td>
-                    <td><?= safe_output($t['created_at'], '') ?></td>
+                    <td>
+                        <?= htmlspecialchars($ownerDisplay, ENT_QUOTES, 'UTF-8') ?>
+                        <?php if (!empty($t['owner_phone'])): ?><br><small class="text-muted"><?= safe_output($t['owner_phone'], '') ?></small><?php endif; ?>
+                    </td>
+                    <td data-order="<?= htmlspecialchars($t['trial_ends_at'] ?? '', ENT_QUOTES) ?>">
+                        <?= trialExpiryBadge($t['trial_ends_at'] ?? null, (string)$t['status']) ?>
+                    </td>
+                    <td data-order="<?= htmlspecialchars($t['last_active_at'] ?? '', ENT_QUOTES) ?>">
+                        <?= lastActiveBadge($t['last_active_at'] ?? null) ?>
+                    </td>
+                    <td><?= date('d M Y', strtotime((string)$t['created_at'])) ?></td>
                     <td class="text-end"><?= tenantActionMenu($t) ?></td>
                 </tr>
             <?php endforeach; ?>
@@ -221,6 +273,19 @@ if (document.getElementById('tenantTable')) {
         language: { emptyTable: 'No records found.', zeroRecords: 'No matching records.' }
     });
     $('#tblSearch').on('keyup', function () { table.search(this.value).draw(); });
+
+    // Status filter — filter on data-status attribute of each row
+    $('#filterStatus').on('change', function () {
+        const val = this.value;
+        if (!val) {
+            table.rows().every(function () { $(this.node()).show(); });
+        } else {
+            table.rows().every(function () {
+                const status = $(this.node()).data('status');
+                $(this.node()).toggle(status === val);
+            });
+        }
+    });
 }
 
 function postAction(data, successTitle) {
