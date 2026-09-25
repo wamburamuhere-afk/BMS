@@ -30,14 +30,26 @@ $currentPlan  = null;     // the plan matching this tenant's tenants.plan key, i
 
 $migrationHealth = ['total' => 0, 'failed' => 0, 'last_failure' => null];
 
+$paymentHistory = [];
+
 try {
     $tenant = $id > 0 ? getTenant($id) : null;
     if ($tenant) {
         $log = tenantAdminLog($id, 50);
-        // Control-DB only (never opens the tenant's own database — see the
-        // function's own docblock), so safe to read on every normal page
-        // load, same as the log above.
         $migrationHealth = tenantMigrationHealth($id);
+        // Payment history — best-effort; table may not exist on older installs
+        try {
+            $phStmt = getControlPdo()->prepare("
+                SELECT tp.*, sa.email AS recorded_by_email
+                  FROM tenant_payments tp
+                  LEFT JOIN superadmins sa ON sa.id = tp.recorded_by
+                 WHERE tp.tenant_id = ?
+                 ORDER BY tp.recorded_at DESC
+                 LIMIT 20
+            ");
+            $phStmt->execute([$id]);
+            $paymentHistory = $phStmt->fetchAll();
+        } catch (Throwable $_e) { /* table not yet created — show empty */ }
     }
 } catch (Throwable $e) {
     error_log('superadmin tenant_view: ' . $e->getMessage());
@@ -708,59 +720,234 @@ function svBadge(string $status): string
     </div>
     </div>
 
-    <!-- P7 — Billing tab --------------------------------------------------- -->
+    <!-- Billing tab --------------------------------------------------------- -->
     <div class="tab-pane fade" id="tab-billing" role="tabpanel">
+    <?php
+    $subEndsAt     = $tenant['subscription_ends_at'] ?? null;
+    $subDaysLeft   = $subEndsAt ? (int)floor((strtotime($subEndsAt) - time()) / 86400) : null;
+    $payStatus     = $tenant['payment_status'] ?? 'none';
+    $billingCycleLabel = [
+        'monthly'  => 'Monthly',
+        'quarterly'=> '3 Months (Quarterly)',
+        'biannual' => '6 Months (Bi-annual)',
+        'annual'   => '12 Months (Annual)',
+    ];
+    $cycleLabel = $billingCycleLabel[$tenant['billing_cycle'] ?? ''] ?? '—';
+    ?>
     <div class="row g-3">
+
+        <!-- Subscription status card -->
         <div class="col-12">
-            <div class="card detail-card">
-                <div class="card-header"><i class="bi bi-receipt text-primary me-1"></i> Billing Details</div>
-                <div class="card-body">
-                    <form id="billingForm">
-                        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-                        <input type="hidden" name="tenant_id" value="<?= $id ?>">
-                        <div class="row g-3">
-                            <div class="col-sm-6 col-md-3">
-                                <label class="form-label fw-semibold">Billing Cycle</label>
-                                <select name="billing_cycle" class="form-select">
-                                    <option value="">— not set —</option>
-                                    <option value="monthly"  <?= ($tenant['billing_cycle'] ?? '') === 'monthly'  ? 'selected' : '' ?>>Monthly</option>
-                                    <option value="annual"   <?= ($tenant['billing_cycle'] ?? '') === 'annual'   ? 'selected' : '' ?>>Annual</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-6 col-md-3">
-                                <label class="form-label fw-semibold">Amount (TZS)</label>
-                                <input type="number" name="billing_amount_tzs" class="form-control"
-                                       min="0" step="1000"
-                                       value="<?= (int)($tenant['billing_amount_tzs'] ?? 0) ?: '' ?>">
-                                <div class="form-text">Monthly amount for monthly plans; full annual amount for annual plans.</div>
-                            </div>
-                            <div class="col-sm-6 col-md-3">
-                                <label class="form-label fw-semibold">Next Billing Date</label>
-                                <input type="date" name="next_billing_date" class="form-control"
-                                       value="<?= htmlspecialchars($tenant['next_billing_date'] ?? '', ENT_QUOTES) ?>">
-                            </div>
-                            <div class="col-sm-6 col-md-3">
-                                <label class="form-label fw-semibold">Payment Status</label>
-                                <select name="payment_status" class="form-select">
-                                    <option value="none"     <?= ($tenant['payment_status'] ?? 'none') === 'none'    ? 'selected' : '' ?>>Not set</option>
-                                    <option value="current"  <?= ($tenant['payment_status'] ?? '') === 'current'  ? 'selected' : '' ?>>Current</option>
-                                    <option value="pending"  <?= ($tenant['payment_status'] ?? '') === 'pending'  ? 'selected' : '' ?>>Pending</option>
-                                    <option value="overdue"  <?= ($tenant['payment_status'] ?? '') === 'overdue'  ? 'selected' : '' ?>>Overdue</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-3">
-                            <button type="submit" class="btn btn-primary" id="btnSaveBilling">
-                                <i class="bi bi-check2-circle me-1"></i> Save Billing
-                            </button>
-                        </div>
-                    </form>
+        <div class="card detail-card">
+            <div class="card-header"><i class="bi bi-shield-check text-primary me-1"></i> Subscription Status</div>
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-sm-4">
+                        <div class="small text-muted mb-1">Subscription Ends</div>
+                        <?php if ($subEndsAt === null): ?>
+                            <span class="badge bg-secondary">Not set</span>
+                        <?php elseif ($subDaysLeft < 0): ?>
+                            <span class="badge bg-danger">EXPIRED <?= date('d M Y', strtotime($subEndsAt)) ?></span>
+                        <?php elseif ($subDaysLeft <= 7): ?>
+                            <span class="badge bg-warning text-dark"><?= date('d M Y', strtotime($subEndsAt)) ?> (<?= $subDaysLeft ?>d left)</span>
+                        <?php else: ?>
+                            <span class="badge bg-success"><?= date('d M Y', strtotime($subEndsAt)) ?> (<?= $subDaysLeft ?>d left)</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="small text-muted mb-1">Payment Status</div>
+                        <?php
+                        $psMap = ['current' => 'bg-success', 'pending' => 'bg-warning text-dark', 'overdue' => 'bg-danger', 'none' => 'bg-secondary'];
+                        echo '<span class="badge ' . ($psMap[$payStatus] ?? 'bg-secondary') . '">' . ucfirst($payStatus) . '</span>';
+                        ?>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="small text-muted mb-1">Billing Cycle</div>
+                        <span class="fw-semibold"><?= htmlspecialchars($cycleLabel, ENT_QUOTES) ?></span>
+                        <?php if ($tenant['billing_amount_tzs'] ?? 0): ?>
+                        <br><small class="text-muted"><?= number_format((int)$tenant['billing_amount_tzs']) ?> TZS</small>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                        <i class="bi bi-plus-circle me-1"></i> Record Payment
+                    </button>
+                    <?php if (($payStatus === 'overdue' || $payStatus === 'pending') && $subEndsAt !== null): ?>
+                    <span class="ms-3 text-warning small"><i class="bi bi-exclamation-triangle me-1"></i>Subscription overdue or pending — record a payment to mark as current.</span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
+        </div>
+
+        <!-- Payment history card -->
+        <div class="col-12">
+        <div class="card detail-card">
+            <div class="card-header"><i class="bi bi-clock-history text-secondary me-1"></i> Payment History</div>
+            <?php if (empty($paymentHistory)): ?>
+            <div class="card-body text-muted small">No payments recorded yet.</div>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Recorded</th>
+                            <th>Amount</th>
+                            <th>Duration</th>
+                            <th>Starts</th>
+                            <th>Ends</th>
+                            <th>By</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($paymentHistory as $p): ?>
+                        <tr>
+                            <td class="small text-nowrap"><?= date('d M Y', strtotime((string)$p['recorded_at'])) ?></td>
+                            <td class="fw-semibold"><?= number_format((int)$p['amount_tzs']) ?> TZS</td>
+                            <td><?= (int)$p['duration_months'] ?> month<?= $p['duration_months'] != 1 ? 's' : '' ?></td>
+                            <td class="small"><?= date('d M Y', strtotime((string)$p['starts_at'])) ?></td>
+                            <td class="small"><?= date('d M Y', strtotime((string)$p['ends_at'])) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars($p['recorded_by_email'] ?? 'system', ENT_QUOTES) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars($p['notes'] ?? '', ENT_QUOTES) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+        </div>
+
+        <!-- Manual override (collapsed, secondary) -->
+        <div class="col-12">
+        <div class="card detail-card border-secondary-subtle">
+            <div class="card-header bg-light" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#billingOverride">
+                <i class="bi bi-sliders text-secondary me-1"></i>
+                <span class="text-secondary small">Manual Billing Override</span>
+                <i class="bi bi-chevron-down float-end text-secondary small mt-1"></i>
+            </div>
+            <div class="collapse" id="billingOverride">
+            <div class="card-body">
+                <p class="small text-muted">Use this only to manually adjust billing fields without recording a payment.</p>
+                <form id="billingForm">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="tenant_id" value="<?= $id ?>">
+                    <div class="row g-3">
+                        <div class="col-sm-6 col-md-3">
+                            <label class="form-label fw-semibold small">Billing Cycle</label>
+                            <select name="billing_cycle" class="form-select form-select-sm">
+                                <option value="">— not set —</option>
+                                <option value="monthly"   <?= ($tenant['billing_cycle'] ?? '') === 'monthly'   ? 'selected' : '' ?>>Monthly</option>
+                                <option value="quarterly" <?= ($tenant['billing_cycle'] ?? '') === 'quarterly' ? 'selected' : '' ?>>Quarterly (3m)</option>
+                                <option value="biannual"  <?= ($tenant['billing_cycle'] ?? '') === 'biannual'  ? 'selected' : '' ?>>Bi-annual (6m)</option>
+                                <option value="annual"    <?= ($tenant['billing_cycle'] ?? '') === 'annual'    ? 'selected' : '' ?>>Annual (12m)</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <label class="form-label fw-semibold small">Amount (TZS)</label>
+                            <input type="number" name="billing_amount_tzs" class="form-control form-control-sm"
+                                   min="0" step="1000"
+                                   value="<?= (int)($tenant['billing_amount_tzs'] ?? 0) ?: '' ?>">
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <label class="form-label fw-semibold small">Next Billing Date</label>
+                            <input type="date" name="next_billing_date" class="form-control form-control-sm"
+                                   value="<?= htmlspecialchars($tenant['next_billing_date'] ?? '', ENT_QUOTES) ?>">
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <label class="form-label fw-semibold small">Payment Status</label>
+                            <select name="payment_status" class="form-select form-select-sm">
+                                <option value="none"    <?= $payStatus === 'none'    ? 'selected' : '' ?>>Not set</option>
+                                <option value="current" <?= $payStatus === 'current' ? 'selected' : '' ?>>Current</option>
+                                <option value="pending" <?= $payStatus === 'pending' ? 'selected' : '' ?>>Pending</option>
+                                <option value="overdue" <?= $payStatus === 'overdue' ? 'selected' : '' ?>>Overdue</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" id="btnSaveBilling">
+                            <i class="bi bi-check2-circle me-1"></i> Save Override
+                        </button>
+                    </div>
+                </form>
+            </div>
+            </div>
+        </div>
+        </div>
+
     </div>
     </div>
-    <!-- /P7 -->
+    <!-- /Billing tab -->
+
+    <!-- Record Payment Modal ------------------------------------------------ -->
+    <div class="modal fade" id="paymentModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Record Payment</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="paymentForm" autocomplete="off">
+                    <div class="modal-body">
+                        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <input type="hidden" name="tenant_id" value="<?= $id ?>">
+                        <div id="paymentMsg" class="mb-2"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Amount Paid (TZS) <span class="text-danger">*</span></label>
+                            <input type="number" name="amount_tzs" class="form-control" min="1" step="1000" required
+                                   placeholder="e.g. 50000">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Subscription Duration <span class="text-danger">*</span></label>
+                            <div class="row g-2" id="durationBtns">
+                                <div class="col-6"><button type="button" class="btn btn-outline-secondary w-100 duration-btn" data-months="1">1 Month</button></div>
+                                <div class="col-6"><button type="button" class="btn btn-outline-secondary w-100 duration-btn" data-months="3">3 Months</button></div>
+                                <div class="col-6"><button type="button" class="btn btn-outline-secondary w-100 duration-btn" data-months="6">6 Months</button></div>
+                                <div class="col-6"><button type="button" class="btn btn-outline-success w-100 duration-btn" data-months="12">12 Months (Annual)</button></div>
+                            </div>
+                            <input type="hidden" name="duration_months" id="selectedDuration" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Starts From</label>
+                            <input type="date" name="starts_at" id="paymentStartsAt" class="form-control"
+                                   value="<?= date('Y-m-d') ?>">
+                        </div>
+
+                        <div class="alert alert-info py-2 small" id="subPreview" style="display:none">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Subscription will run until <strong id="previewEndsAt">—</strong>
+                        </div>
+
+                        <?php if (($tenant['status'] ?? '') === 'suspended'): ?>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="activate" value="1" id="chkActivate" checked>
+                            <label class="form-check-label" for="chkActivate">
+                                Also <strong>re-activate</strong> this tenant (currently suspended)
+                            </label>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="mb-1">
+                            <label class="form-label fw-semibold small">Notes (optional)</label>
+                            <input type="text" name="notes" class="form-control form-control-sm"
+                                   maxlength="500" placeholder="e.g. Cash payment received by Wambura">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="btnRecordPayment">
+                            <i class="bi bi-check2-circle me-1"></i> Record Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
 <?php endif; ?>
 </div>
@@ -901,7 +1088,7 @@ function postAction(data, title, redirect) {
     });
 }
 
-// P7 — Billing form
+// Billing — manual override form
 (function () {
     const form = document.getElementById('billingForm');
     if (!form) return;
@@ -923,6 +1110,94 @@ function postAction(data, title, redirect) {
             })
             .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }))
             .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+    });
+})();
+
+// Record Payment modal
+(function () {
+    let selectedMonths = 0;
+
+    // Duration button selection
+    document.querySelectorAll('.duration-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.duration-btn').forEach(function (b) {
+                b.classList.remove('btn-success', 'btn-primary', 'active');
+                b.classList.add('btn-outline-secondary');
+            });
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-success', 'active');
+            selectedMonths = parseInt(btn.dataset.months, 10);
+            document.getElementById('selectedDuration').value = selectedMonths;
+            updatePreview();
+        });
+    });
+
+    function updatePreview() {
+        const startsAtVal = document.getElementById('paymentStartsAt').value;
+        if (!selectedMonths || !startsAtVal) {
+            document.getElementById('subPreview').style.display = 'none';
+            return;
+        }
+        const starts = new Date(startsAtVal);
+        const ends = new Date(starts);
+        ends.setMonth(ends.getMonth() + selectedMonths);
+        const formatted = ends.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        document.getElementById('previewEndsAt').textContent = formatted;
+        document.getElementById('subPreview').style.display = '';
+    }
+
+    const startsInput = document.getElementById('paymentStartsAt');
+    if (startsInput) startsInput.addEventListener('change', updatePreview);
+
+    // Reset modal on open
+    const modal = document.getElementById('paymentModal');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function () {
+            document.getElementById('paymentForm').reset();
+            document.getElementById('paymentMsg').innerHTML = '';
+            document.getElementById('subPreview').style.display = 'none';
+            document.getElementById('selectedDuration').value = '';
+            selectedMonths = 0;
+            document.querySelectorAll('.duration-btn').forEach(function (b) {
+                b.classList.remove('btn-success', 'btn-primary', 'active');
+                b.classList.add('btn-outline-secondary');
+            });
+            if (startsInput) startsInput.value = new Date().toISOString().slice(0, 10);
+        });
+    }
+
+    // Submit
+    const form = document.getElementById('paymentForm');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!selectedMonths) {
+            document.getElementById('paymentMsg').innerHTML =
+                '<div class="alert alert-warning py-1 small">Please select a duration.</div>';
+            return;
+        }
+        const btn  = document.getElementById('btnRecordPayment');
+        const orig = btn.innerHTML;
+        btn.disabled  = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+        document.getElementById('paymentMsg').innerHTML = '';
+        fetch('/actions/superadmin_record_payment.php', { method: 'POST', body: new FormData(form) })
+            .then(r => r.json())
+            .then(r => {
+                if (r.success) {
+                    Swal.fire({ icon: 'success', title: 'Payment Recorded!', text: r.message,
+                        timer: 2500, showConfirmButton: false })
+                        .then(function () { window.location.reload(); });
+                } else {
+                    document.getElementById('paymentMsg').innerHTML =
+                        '<div class="alert alert-danger py-1 small">' + (r.message || 'Error saving payment.') + '</div>';
+                }
+            })
+            .catch(function () {
+                document.getElementById('paymentMsg').innerHTML =
+                    '<div class="alert alert-danger py-1 small">Server error. Please try again.</div>';
+            })
+            .finally(function () { btn.disabled = false; btn.innerHTML = orig; });
     });
 })();
 

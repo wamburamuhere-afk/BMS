@@ -229,6 +229,28 @@ if (!function_exists('bmsConnectPdo')) {
                 'Your free trial has ended. Please contact us to continue using ' . (string)($tenant['company_name'] ?? 'BMS') . '.');
         }
 
+        // Subscription expiry gate ─────────────────────────────────────────
+        // If a paid subscription has expired, auto-suspend and block access.
+        if ($status === 'active'
+            && !empty($tenant['subscription_ends_at'])
+            && strtotime((string)$tenant['subscription_ends_at']) < strtotime('today')
+        ) {
+            try {
+                require_once __DIR__ . '/control_db.php';
+                getControlPdo()->prepare(
+                    "UPDATE tenants SET status='suspended', suspended_at=NOW() WHERE id=? AND status='active'"
+                )->execute([(int)$tenant['id']]);
+                getControlPdo()->prepare("
+                    INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
+                    VALUES (?, ?, 'auto_suspend_subscription', 'Subscription expired — auto-suspended at access attempt', NOW())
+                ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? '')]);
+            } catch (Throwable $_e) {
+                error_log('subscription expiry auto-suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
+            }
+            bmsTenantHalt(402, 'Subscription ended',
+                'Your subscription has expired. Please contact us to renew and continue using ' . (string)($tenant['company_name'] ?? 'BMS') . '.');
+        }
+
         // ── Cross-tenant session guard ───────────────────────────────────────
         // A session cookie carrying another tenant's id must never be honoured
         // here. ternant.md put this in header.php; it lives here instead because

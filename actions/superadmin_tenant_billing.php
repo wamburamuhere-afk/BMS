@@ -35,7 +35,7 @@ if ($tenantId <= 0) {
     exit;
 }
 
-$billingCycle  = in_array($_POST['billing_cycle'] ?? '', ['monthly','annual'], true) ? $_POST['billing_cycle'] : null;
+$billingCycle  = in_array($_POST['billing_cycle'] ?? '', ['monthly','quarterly','biannual','annual'], true) ? $_POST['billing_cycle'] : null;
 $billingAmount = $_POST['billing_amount_tzs'] !== '' ? (int)($_POST['billing_amount_tzs'] ?? 0) : null;
 $nextBillingDate = trim((string)($_POST['next_billing_date'] ?? ''));
 if ($nextBillingDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $nextBillingDate)) {
