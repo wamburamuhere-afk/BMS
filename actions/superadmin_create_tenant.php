@@ -58,12 +58,15 @@ $r = createTenantAsOperator([
                                    ? date('Y-m-d 23:59:59', strtotime((string)$_POST['trial_ends_at']))
                                    : '',
     // Optional company profile fields
-    'phone'   => (string)($_POST['phone']   ?? ''),
-    'email'   => (string)($_POST['email']   ?? ''),
-    'address' => (string)($_POST['address'] ?? ''),
-    'website' => (string)($_POST['website'] ?? ''),
-    'tin'     => (string)($_POST['tin']     ?? ''),
-    'vrn'     => (string)($_POST['vrn']     ?? ''),
+    'phone'               => (string)($_POST['phone']               ?? ''),
+    'email'               => (string)($_POST['email']               ?? ''),
+    'address'             => (string)($_POST['address']             ?? ''),
+    'website'             => (string)($_POST['website']             ?? ''),
+    'tin'                 => (string)($_POST['tin']                 ?? ''),
+    'vrn'                 => (string)($_POST['vrn']                 ?? ''),
+    'billing_cycle'       => (string)($_POST['billing_cycle']       ?? ''),
+    'billing_amount_tzs'  => (string)($_POST['billing_amount_tzs']  ?? ''),
+    'payment_status'      => (string)($_POST['payment_status']      ?? ''),
 ]);
 
 if (!$r['ok']) {

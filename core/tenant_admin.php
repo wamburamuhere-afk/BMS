@@ -739,6 +739,22 @@ if (!function_exists('createTenantAsOperator')) {
             }
         }
 
+        // Optional billing data — update after provisioning (best-effort; non-fatal)
+        $billingCycle  = in_array($in['billing_cycle'] ?? '', ['monthly','annual'], true) ? $in['billing_cycle'] : null;
+        $billingAmount = isset($in['billing_amount_tzs']) && (string)$in['billing_amount_tzs'] !== ''
+                         ? (int)$in['billing_amount_tzs'] : null;
+        $paymentStatus = in_array($in['payment_status'] ?? '', ['none','current','pending','overdue'], true)
+                         ? $in['payment_status'] : null;
+        if ($billingCycle !== null || $billingAmount !== null || $paymentStatus !== null) {
+            try {
+                getControlPdo()->prepare(
+                    "UPDATE tenants SET billing_cycle=?, billing_amount_tzs=?, payment_status=? WHERE id=?"
+                )->execute([$billingCycle, $billingAmount, $paymentStatus ?? 'none', (int)$r['tenant_id']]);
+            } catch (Throwable $__be) {
+                error_log('createTenantAsOperator: billing update failed for tenant ' . $r['tenant_id'] . ': ' . $__be->getMessage());
+            }
+        }
+
         logTenantAdminAction((int)$r['tenant_id'], $sub, 'create',
             'Created from the superadmin panel for ' . $email . ' (status: ' . $status . ')'
             . ($planId !== null ? ' with starting plan #' . $planId : ''));

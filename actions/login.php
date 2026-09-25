@@ -54,6 +54,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $__tenantId = bmsCurrentTenantId();
             if ($__tenantId !== null) {
                 $_SESSION['tenant_id'] = $__tenantId;
+                // Update last_active_at in the control DB for the tenant dashboard
+                try {
+                    if (function_exists('getControlPdo')) {
+                        getControlPdo()->prepare(
+                            "UPDATE tenants SET last_active_at = NOW() WHERE id = ?"
+                        )->execute([$__tenantId]);
+                    }
+                } catch (Throwable $__e) {
+                    // Non-fatal: never block a login because of a control-DB hiccup
+                    error_log('last_active_at update failed for tenant ' . $__tenantId . ': ' . $__e->getMessage());
+                }
             }
         }
 

@@ -231,6 +231,33 @@ $startingPlans = planTablesReady()
                             </div>
                         </div>
 
+                        <!-- P7 — Billing (optional) -->
+                        <hr class="my-3">
+                        <h6 class="mb-1">Billing <span class="text-muted fw-normal" style="font-size:.85rem">(optional)</span></h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Billing Cycle</label>
+                                <select class="form-select" name="billing_cycle">
+                                    <option value="">— not set —</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Amount (TZS)</label>
+                                <input type="number" class="form-control" name="billing_amount_tzs" min="0" step="1000" placeholder="0">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Payment Status</label>
+                                <select class="form-select" name="payment_status">
+                                    <option value="none">Not set</option>
+                                    <option value="current">Current</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="overdue">Overdue</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <hr class="my-3">
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">

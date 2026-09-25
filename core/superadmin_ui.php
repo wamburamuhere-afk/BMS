@@ -94,6 +94,7 @@ if (!function_exists('renderSuperadminHeader')) {
                             $navItem('tenants',   saUrl('tenants'),   'bi-building',     'Tenants');
                             $navItem('features',  saUrl('features'), 'bi-grid',         'Modules');
                             $navItem('plans',     saUrl('plans'),    'bi-box-seam',     'Plans');
+                            $navItem('broadcast', saUrl('broadcast'), 'bi-megaphone',   'Broadcast');
 
                             $pendingRequests = 0;
                             if (moduleRequestsTableReady()) {

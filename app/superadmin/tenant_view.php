@@ -154,6 +154,11 @@ function svBadge(string $status): string
                 <i class="bi bi-clock-history me-1"></i> Activity Log
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-btn-billing" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button" role="tab">
+                <i class="bi bi-receipt me-1"></i> Billing
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content" id="tenantTabsContent">
@@ -368,6 +373,52 @@ function svBadge(string $status): string
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- P5 — Operator Notes ------------------------------------------------ -->
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-journal-text text-primary me-1"></i> Operator Notes</div>
+                <div class="card-body">
+                    <form id="notesForm">
+                        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <input type="hidden" name="tenant_id" value="<?= $id ?>">
+                        <div class="mb-2">
+                            <textarea class="form-control form-control-sm font-monospace"
+                                      name="notes" id="f-notes" rows="4" maxlength="1000"
+                                      placeholder="Internal notes visible to all operators…"><?= htmlspecialchars($tenant['notes'] ?? '', ENT_QUOTES) ?></textarea>
+                            <div class="form-text d-flex justify-content-between">
+                                <span>
+                                <?php if (!empty($tenant['notes_updated_at'])): ?>
+                                    Last updated
+                                    <?php
+                                    // Resolve updater email from the control DB (best-effort)
+                                    $notesUpdaterEmail = '';
+                                    if (!empty($tenant['notes_updated_by'])) {
+                                        try {
+                                            $ctrl = getControlPdo();
+                                            $ns = $ctrl->prepare("SELECT email FROM superadmins WHERE id = ? LIMIT 1");
+                                            $ns->execute([$tenant['notes_updated_by']]);
+                                            $notesUpdaterEmail = (string)($ns->fetchColumn() ?: '');
+                                        } catch (Throwable $__e) { /* non-fatal */ }
+                                    }
+                                    ?>
+                                    <?= htmlspecialchars($notesUpdaterEmail ? 'by ' . $notesUpdaterEmail . ' on ' : 'on ', ENT_QUOTES) ?>
+                                    <?= date('d M Y H:i', strtotime($tenant['notes_updated_at'])) ?>
+                                <?php else: ?>
+                                    No notes yet.
+                                <?php endif; ?>
+                                </span>
+                                <span id="notes-char-count" class="text-muted"></span>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary" id="btnSaveNotes">
+                            <i class="bi bi-check2-circle me-1"></i> Save Notes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- /P5 -->
     </div>
     </div>
 
@@ -657,6 +708,60 @@ function svBadge(string $status): string
     </div>
     </div>
 
+    <!-- P7 — Billing tab --------------------------------------------------- -->
+    <div class="tab-pane fade" id="tab-billing" role="tabpanel">
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-receipt text-primary me-1"></i> Billing Details</div>
+                <div class="card-body">
+                    <form id="billingForm">
+                        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <input type="hidden" name="tenant_id" value="<?= $id ?>">
+                        <div class="row g-3">
+                            <div class="col-sm-6 col-md-3">
+                                <label class="form-label fw-semibold">Billing Cycle</label>
+                                <select name="billing_cycle" class="form-select">
+                                    <option value="">— not set —</option>
+                                    <option value="monthly"  <?= ($tenant['billing_cycle'] ?? '') === 'monthly'  ? 'selected' : '' ?>>Monthly</option>
+                                    <option value="annual"   <?= ($tenant['billing_cycle'] ?? '') === 'annual'   ? 'selected' : '' ?>>Annual</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-6 col-md-3">
+                                <label class="form-label fw-semibold">Amount (TZS)</label>
+                                <input type="number" name="billing_amount_tzs" class="form-control"
+                                       min="0" step="1000"
+                                       value="<?= (int)($tenant['billing_amount_tzs'] ?? 0) ?: '' ?>">
+                                <div class="form-text">Monthly amount for monthly plans; full annual amount for annual plans.</div>
+                            </div>
+                            <div class="col-sm-6 col-md-3">
+                                <label class="form-label fw-semibold">Next Billing Date</label>
+                                <input type="date" name="next_billing_date" class="form-control"
+                                       value="<?= htmlspecialchars($tenant['next_billing_date'] ?? '', ENT_QUOTES) ?>">
+                            </div>
+                            <div class="col-sm-6 col-md-3">
+                                <label class="form-label fw-semibold">Payment Status</label>
+                                <select name="payment_status" class="form-select">
+                                    <option value="none"     <?= ($tenant['payment_status'] ?? 'none') === 'none'    ? 'selected' : '' ?>>Not set</option>
+                                    <option value="current"  <?= ($tenant['payment_status'] ?? '') === 'current'  ? 'selected' : '' ?>>Current</option>
+                                    <option value="pending"  <?= ($tenant['payment_status'] ?? '') === 'pending'  ? 'selected' : '' ?>>Pending</option>
+                                    <option value="overdue"  <?= ($tenant['payment_status'] ?? '') === 'overdue'  ? 'selected' : '' ?>>Overdue</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary" id="btnSaveBilling">
+                                <i class="bi bi-check2-circle me-1"></i> Save Billing
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <!-- /P7 -->
+
 <?php endif; ?>
 </div>
 
@@ -795,6 +900,69 @@ function postAction(data, title, redirect) {
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     });
 }
+
+// P7 — Billing form
+(function () {
+    const form = document.getElementById('billingForm');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const btn  = document.getElementById('btnSaveBilling');
+        const orig = btn.innerHTML;
+        btn.disabled  = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+        const fd = new FormData(form);
+        fetch('/actions/superadmin_tenant_billing.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(r => {
+                if (r.success) {
+                    Swal.fire({ icon: 'success', title: 'Saved', text: r.message, timer: 1800, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: r.message || 'Could not save billing.' });
+                }
+            })
+            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }))
+            .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+    });
+})();
+
+// P5 — Operator Notes
+(function () {
+    const ta     = document.getElementById('f-notes');
+    const cc     = document.getElementById('notes-char-count');
+    const max    = 1000;
+    function updateCount() {
+        if (ta && cc) {
+            const left = max - ta.value.length;
+            cc.textContent = left + ' chars left';
+            cc.className   = left < 100 ? 'text-warning' : 'text-muted';
+        }
+    }
+    if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
+
+    const form = document.getElementById('notesForm');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const btn  = document.getElementById('btnSaveNotes');
+            const orig = btn.innerHTML;
+            btn.disabled  = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+            const fd = new FormData(form);
+            fetch('/actions/superadmin_tenant_notes.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(r => {
+                    if (r.success) {
+                        Swal.fire({ icon: 'success', title: 'Saved', text: r.message, timer: 1800, showConfirmButton: false });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: r.message || 'Could not save notes.' });
+                    }
+                })
+                .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }))
+                .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+        });
+    }
+})();
 
 function doExtendTrial() {
     Swal.fire({
