@@ -16,6 +16,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth();
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 // Respect the caller's saved language preference (set by header.php on their
 // last page load) so t()-wrapped messages below come back in the right

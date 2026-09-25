@@ -11,6 +11,7 @@
  * GET: product_id, warehouse_id
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth();
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 header('Content-Type: application/json');
 if (isset($_SESSION['user_lang'])) {
