@@ -340,7 +340,70 @@ try {
     error_log('superadmin dashboard (signup abuse): ' . $e->getMessage());
 }
 
+// P7 — Overdue billing attention
+try {
+    $rows = getControlPdo()->query("
+        SELECT id AS tenant_id, subdomain, company_name, payment_status, next_billing_date
+          FROM tenants
+         WHERE status = 'active' AND payment_status = 'overdue'
+         ORDER BY next_billing_date ASC
+         LIMIT 50
+    ")->fetchAll();
+    if ($rows) {
+        $attention['billing_overdue'] = [
+            'title' => 'Tenants with overdue payment',
+            'icon'  => 'bi-exclamation-circle',
+            'color' => 'danger',
+            'items' => $rows,
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (billing overdue): ' . $e->getMessage());
+}
+
+// P7 — Due in ≤7 days attention
+try {
+    $rows = getControlPdo()->query("
+        SELECT id AS tenant_id, subdomain, company_name, payment_status, next_billing_date
+          FROM tenants
+         WHERE status = 'active'
+           AND payment_status IN ('pending','current')
+           AND next_billing_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+         ORDER BY next_billing_date ASC
+         LIMIT 50
+    ")->fetchAll();
+    if ($rows) {
+        $attention['billing_due_soon'] = [
+            'title' => 'Billing due in ≤7 days',
+            'icon'  => 'bi-calendar2-event',
+            'color' => 'warning',
+            'items' => $rows,
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (billing due soon): ' . $e->getMessage());
+}
+
 $attentionTotal = array_sum(array_map(fn($g) => count($g['items']), $attention));
+
+// ── MRR calculation (P7) ────────────────────────────────────────────────────
+$mrr = 0;
+try {
+    $r = getControlPdo()->query("
+        SELECT SUM(
+            CASE billing_cycle
+                WHEN 'monthly' THEN billing_amount_tzs
+                WHEN 'annual'  THEN billing_amount_tzs / 12
+                ELSE 0
+            END
+        ) AS mrr
+          FROM tenants
+         WHERE status = 'active' AND billing_amount_tzs > 0
+    ")->fetch();
+    $mrr = (int)round((float)($r['mrr'] ?? 0));
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (MRR): ' . $e->getMessage());
+}
 
 // ── Recent platform activity ────────────────────────────────────────────────
 $recentLog = [];
@@ -387,6 +450,11 @@ function saAttentionItemHtml(string $key, array $it): string
             $body = '<div class="fw-semibold small">IP ' . safe_output($it['ip_address'], '') . '</div>'
                   . '<div class="text-muted" style="font-size:.75rem;">' . (int)$it['attempts'] . ' blocked attempts · last ' . saTimeAgo((string)$it['last_attempt']) . '</div>';
             $tenantLink = null; // no single tenant to jump to
+            break;
+        case 'billing_overdue':
+        case 'billing_due_soon':
+            $body = '<div class="fw-semibold small">' . safe_output($it['company_name'] ?? $it['subdomain'], 'Unknown') . ' <span class="text-muted fw-normal">(' . safe_output($it['subdomain'], '') . ')</span></div>'
+                  . '<div class="text-muted" style="font-size:.75rem;">Next billing: ' . safe_output($it['next_billing_date'] ?? '—', '—') . ' · Status: ' . safe_output($it['payment_status'], 'unknown') . '</div>';
             break;
         default:
             $body = '<div class="small text-muted">' . safe_output(json_encode($it), '') . '</div>';
@@ -568,6 +636,14 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
             <div class="card bg-danger text-white border-0 shadow-sm p-3">
                 <div class="small opacity-75"><i class="bi bi-clock-history me-1"></i>Expiring ≤7d</div>
                 <div class="value"><?= (int)$stats['expiring_soon'] ?></div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php if ($mrr > 0): ?>
+        <div class="col-6 col-md-3">
+            <div class="card bg-success text-white border-0 shadow-sm p-3">
+                <div class="small opacity-75"><i class="bi bi-graph-up me-1"></i>MRR (TZS)</div>
+                <div class="value" style="font-size:1.3rem"><?= number_format($mrr) ?></div>
             </div>
         </div>
         <?php endif; ?>
