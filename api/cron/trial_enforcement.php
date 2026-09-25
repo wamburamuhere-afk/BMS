@@ -19,6 +19,8 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/control_db.php';
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/superadmin_notifications.php';
+require_once __DIR__ . '/../../core/mailer.php';
 
 header('Content-Type: application/json');
 
@@ -63,16 +65,19 @@ try {
     foreach ($expired as $t) {
         try {
             $ctrl->prepare(
-                "UPDATE tenants SET status='suspended', suspended_at=NOW()
+                "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='trial_expired'
                   WHERE id=? AND status='trial'"
             )->execute([$t['id']]);
-
-            // Audit log (actor = NULL = system)
             logTenantAdminAction(
                 (int)$t['id'],
                 (string)$t['subdomain'],
                 'auto_suspend_trial',
                 'Trial expired ' . ($t['trial_ends_at'] ?? '?') . ' — batch enforcement'
+            );
+            insertSaNotification(
+                (int)$t['id'], 'trial_expired',
+                (string)($t['company_name'] ?? $t['subdomain']),
+                (string)$t['subdomain']
             );
             $suspended++;
         } catch (Throwable $e) {
@@ -98,7 +103,7 @@ try {
     foreach ($expiredSubs as $t) {
         try {
             $ctrl->prepare(
-                "UPDATE tenants SET status='suspended', suspended_at=NOW()
+                "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='subscription_expired'
                   WHERE id=? AND status='active'"
             )->execute([$t['id']]);
             logTenantAdminAction(
@@ -107,10 +112,74 @@ try {
                 'auto_suspend_subscription',
                 'Subscription expired ' . ($t['subscription_ends_at'] ?? '?') . ' — batch enforcement'
             );
+            insertSaNotification(
+                (int)$t['id'], 'subscription_expired',
+                (string)($t['company_name'] ?? $t['subdomain']),
+                (string)$t['subdomain']
+            );
             $subSuspended++;
         } catch (Throwable $e) {
             error_log('trial_enforcement (subscription): tenant ' . $t['id'] . ' error: ' . $e->getMessage());
             $errors++;
+        }
+    }
+
+    // Email digest to all superadmins when anything expired today
+    $totalSuspended = $trialSuspended + $subSuspended;
+    if ($totalSuspended > 0) {
+        try {
+            $saEmails = $ctrl->query(
+                "SELECT name, email FROM superadmins WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+            )->fetchAll(\PDO::FETCH_ASSOC);
+
+            if ($saEmails) {
+                $todayLabel = date('d M Y');
+                $subject    = "BMS — {$totalSuspended} tenant" . ($totalSuspended > 1 ? 's' : '') . " expired today ({$todayLabel})";
+
+                $trialRows = '';
+                foreach ($expired as $t) {
+                    $trialRows .= '<tr><td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#dc3545">Trial expired ' . htmlspecialchars((string)$t['trial_ends_at'], ENT_QUOTES) . '</td></tr>';
+                }
+                $subRows = '';
+                foreach ($expiredSubs as $t) {
+                    $subRows .= '<tr><td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#fd7e14">Subscription expired ' . htmlspecialchars((string)$t['subscription_ends_at'], ENT_QUOTES) . '</td></tr>';
+                }
+
+                $tableStyle = 'width:100%;border-collapse:collapse;font-size:14px';
+                $thStyle    = 'padding:8px 10px;background:#f8f9fa;text-align:left;font-weight:600;border-bottom:2px solid #dee2e6';
+
+                $body = '
+                <p>This is your daily BMS enforcement summary for <strong>' . $todayLabel . '</strong>.</p>
+                <table style="' . $tableStyle . '">
+                    <thead><tr>
+                        <th style="' . $thStyle . '">Company</th>
+                        <th style="' . $thStyle . '">Subdomain</th>
+                        <th style="' . $thStyle . '">Reason</th>
+                    </tr></thead>
+                    <tbody>' . $trialRows . $subRows . '</tbody>
+                </table>
+                <p style="margin-top:16px">
+                    These tenants are now suspended. Log in to extend a trial, record a payment, or take action:<br>
+                    <a href="https://superadmin.bms.bjptechnologies.co.tz/tenants">
+                        superadmin.bms.bjptechnologies.co.tz/tenants
+                    </a>
+                </p>';
+
+                foreach ($saEmails as $sa) {
+                    sendEmail(
+                        $sa['email'],
+                        $subject,
+                        '<p>Hi ' . htmlspecialchars((string)$sa['name'], ENT_QUOTES) . ',</p>' . $body,
+                        ['wrap_brand' => 'BJP Technologies / BMS']
+                    );
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('trial_enforcement email digest: ' . $e->getMessage());
         }
     }
 
@@ -121,6 +190,7 @@ try {
         'subs_found'         => count($expiredSubs),
         'subs_suspended'     => $subSuspended,
         'errors'             => $errors,
+        'digest_sent'        => $totalSuspended > 0,
         'ran_at'             => date('c'),
     ]);
 

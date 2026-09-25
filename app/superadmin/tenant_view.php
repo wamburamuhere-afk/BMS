@@ -273,6 +273,30 @@ function svBadge(string $status): string
                 <?php else: ?>
                     <?php if ($tenant['status'] === 'suspended'): ?>
                         <p class="small text-muted">Suspended tenants are locked out of their system, but no data has been deleted.</p>
+                        <?php
+                        $suspReason = $tenant['suspension_reason'] ?? null;
+                        if ($suspReason === 'trial_expired') {
+                            $suspDate = !empty($tenant['trial_ends_at']) ? date('d M Y', strtotime($tenant['trial_ends_at'])) : null;
+                            echo '<div class="alert alert-danger py-2 mb-2 d-flex align-items-center gap-2">'
+                               . '<i class="bi bi-hourglass-split fs-5"></i>'
+                               . '<div><strong>Trial expired</strong>'
+                               . ($suspDate ? '<br><small class="text-muted">Ended ' . $suspDate . '</small>' : '')
+                               . '</div></div>';
+                        } elseif ($suspReason === 'subscription_expired') {
+                            $suspDate = !empty($tenant['subscription_ends_at']) ? date('d M Y', strtotime($tenant['subscription_ends_at'])) : null;
+                            echo '<div class="alert alert-danger py-2 mb-2 d-flex align-items-center gap-2">'
+                               . '<i class="bi bi-credit-card fs-5"></i>'
+                               . '<div><strong>Subscription expired</strong>'
+                               . ($suspDate ? '<br><small class="text-muted">Ended ' . $suspDate . '</small>' : '')
+                               . '</div></div>';
+                        } else {
+                            echo '<div class="alert alert-secondary py-2 mb-2 d-flex align-items-center gap-2">'
+                               . '<i class="bi bi-hand-index fs-5"></i>'
+                               . '<div><strong>Manually suspended</strong>'
+                               . (!empty($tenant['suspended_at']) ? '<br><small class="text-muted">On ' . date('d M Y', strtotime($tenant['suspended_at'])) . '</small>' : '')
+                               . '</div></div>';
+                        }
+                        ?>
                         <button class="btn btn-primary w-100 mb-2" onclick="doActivate()">
                             <i class="bi bi-play-circle me-1"></i> Reactivate
                         </button>

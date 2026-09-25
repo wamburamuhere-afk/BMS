@@ -214,14 +214,19 @@ if (!function_exists('bmsConnectPdo')) {
         ) {
             try {
                 require_once __DIR__ . '/control_db.php';
+                require_once __DIR__ . '/superadmin_notifications.php';
                 getControlPdo()->prepare(
-                    "UPDATE tenants SET status='suspended', suspended_at=NOW() WHERE id=? AND status='trial'"
+                    "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='trial_expired' WHERE id=? AND status='trial'"
                 )->execute([(int)$tenant['id']]);
-                // Log to tenant_admin_log so the operator can see the auto-suspension
                 getControlPdo()->prepare("
                     INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
                     VALUES (?, ?, 'auto_suspend_trial', 'Trial expired — auto-suspended at access attempt', NOW())
                 ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? '')]);
+                insertSaNotification(
+                    (int)$tenant['id'], 'trial_expired',
+                    (string)($tenant['company_name'] ?? $tenant['subdomain'] ?? ''),
+                    (string)($tenant['subdomain'] ?? '')
+                );
             } catch (Throwable $_e) {
                 error_log('trial expiry auto-suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
             }
@@ -237,13 +242,19 @@ if (!function_exists('bmsConnectPdo')) {
         ) {
             try {
                 require_once __DIR__ . '/control_db.php';
+                require_once __DIR__ . '/superadmin_notifications.php';
                 getControlPdo()->prepare(
-                    "UPDATE tenants SET status='suspended', suspended_at=NOW() WHERE id=? AND status='active'"
+                    "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='subscription_expired' WHERE id=? AND status='active'"
                 )->execute([(int)$tenant['id']]);
                 getControlPdo()->prepare("
                     INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
                     VALUES (?, ?, 'auto_suspend_subscription', 'Subscription expired — auto-suspended at access attempt', NOW())
                 ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? '')]);
+                insertSaNotification(
+                    (int)$tenant['id'], 'subscription_expired',
+                    (string)($tenant['company_name'] ?? $tenant['subdomain'] ?? ''),
+                    (string)($tenant['subdomain'] ?? '')
+                );
             } catch (Throwable $_e) {
                 error_log('subscription expiry auto-suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
             }
