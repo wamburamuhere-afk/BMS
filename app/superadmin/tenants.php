@@ -25,6 +25,15 @@ try {
     $dbError = 'The tenant registry could not be read.';
 }
 
+// Build distinct filter option lists from the loaded data
+$allIndustries = $allCountries = $allSizes = [];
+foreach ($tenants as $t) {
+    if (!empty($t['industry']))    $allIndustries[$t['industry']] = true;
+    if (!empty($t['country']))     $allCountries[$t['country']]   = true;
+    if (!empty($t['company_size'])) $allSizes[$t['company_size']] = true;
+}
+ksort($allIndustries); ksort($allCountries); ksort($allSizes);
+
 /** Trial expiry badge — colour-coded by urgency. */
 function trialExpiryBadge(?string $trialEndsAt, string $status): string
 {
@@ -110,8 +119,8 @@ function saBadge(string $status): string
     </div>
 
     <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-        <h6 class="mb-0"><i class="bi bi-building text-primary me-1"></i> Tenants (<?= (int)($stats['total'] ?? 0) ?>)</h6>
-        <div class="d-flex gap-2 flex-wrap">
+        <h6 class="mb-0"><i class="bi bi-building text-primary me-1"></i> Tenants (<span id="visibleCount"><?= count($tenants) ?></span>)</h6>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
             <select id="filterStatus" class="form-select form-select-sm w-auto">
                 <option value="">All statuses</option>
                 <option value="active">Active</option>
@@ -119,12 +128,40 @@ function saBadge(string $status): string
                 <option value="suspended">Suspended</option>
                 <option value="deleted">Closed</option>
             </select>
+            <?php if ($allIndustries): ?>
+            <select id="filterIndustry" class="form-select form-select-sm w-auto">
+                <option value="">All industries</option>
+                <?php foreach (array_keys($allIndustries) as $v): ?>
+                <option value="<?= htmlspecialchars($v, ENT_QUOTES) ?>"><?= htmlspecialchars(ucfirst($v), ENT_QUOTES) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <?php if ($allCountries): ?>
+            <select id="filterCountry" class="form-select form-select-sm w-auto">
+                <option value="">All countries</option>
+                <?php foreach (array_keys($allCountries) as $v): ?>
+                <option value="<?= htmlspecialchars($v, ENT_QUOTES) ?>"><?= htmlspecialchars($v, ENT_QUOTES) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <?php if ($allSizes): ?>
+            <select id="filterSize" class="form-select form-select-sm w-auto">
+                <option value="">All sizes</option>
+                <?php foreach (array_keys($allSizes) as $v): ?>
+                <option value="<?= htmlspecialchars($v, ENT_QUOTES) ?>"><?= htmlspecialchars($v, ENT_QUOTES) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
             <input type="search" id="tblSearch" class="form-control form-control-sm w-auto" placeholder="Search…">
+            <button class="btn btn-sm btn-outline-secondary" id="btnExportCsv" title="Export filtered view to CSV">
+                <i class="bi bi-download me-1"></i> CSV
+            </button>
             <a href="<?= saUrl('tenants/new') ?>" class="btn btn-sm btn-primary text-nowrap">
                 <i class="bi bi-plus-circle me-1"></i> New company
             </a>
         </div>
     </div>
+    <div id="filterChips" class="d-flex flex-wrap gap-1 mb-2" style="min-height:0"></div>
 
     <?php if (!$tenants && !$dbError): ?>
         <div class="text-center text-muted py-5">
@@ -153,7 +190,10 @@ function saBadge(string $status): string
                 $ownerName = trim(($t['owner_first_name'] ?? '') . ' ' . ($t['owner_last_name'] ?? ''));
                 $ownerDisplay = $ownerName !== '' ? $ownerName : safe_output($t['owner_email'], '');
                 ?>
-                <tr data-status="<?= htmlspecialchars($t['status'], ENT_QUOTES) ?>">
+                <tr data-status="<?= htmlspecialchars($t['status'], ENT_QUOTES) ?>"
+                    data-industry="<?= htmlspecialchars(strtolower($t['industry'] ?? ''), ENT_QUOTES) ?>"
+                    data-country="<?= htmlspecialchars($t['country'] ?? '', ENT_QUOTES) ?>"
+                    data-size="<?= htmlspecialchars($t['company_size'] ?? '', ENT_QUOTES) ?>">
                     <td><?= (int)$t['id'] ?></td>
                     <td>
                         <a href="<?= saUrl('tenants/view') ?>?id=<?= (int)$t['id'] ?>" class="fw-semibold text-decoration-none">
@@ -274,17 +314,76 @@ if (document.getElementById('tenantTable')) {
     });
     $('#tblSearch').on('keyup', function () { table.search(this.value).draw(); });
 
-    // Status filter — filter on data-status attribute of each row
-    $('#filterStatus').on('change', function () {
-        const val = this.value;
-        if (!val) {
-            table.rows().every(function () { $(this.node()).show(); });
-        } else {
-            table.rows().every(function () {
-                const status = $(this.node()).data('status');
-                $(this.node()).toggle(status === val);
+    // Multi-filter: status, industry, country, size
+    function applyFilters() {
+        const fStatus   = $('#filterStatus').val()   || '';
+        const fIndustry = ($('#filterIndustry').val() || '').toLowerCase();
+        const fCountry  = $('#filterCountry').val()  || '';
+        const fSize     = $('#filterSize').val()     || '';
+        let visible = 0;
+        table.rows().every(function () {
+            const node    = $(this.node());
+            const status  = node.data('status')   || '';
+            const industry= (node.data('industry') || '').toLowerCase();
+            const country = node.data('country')  || '';
+            const size    = node.data('size')      || '';
+            const show = (!fStatus   || status   === fStatus)
+                      && (!fIndustry || industry === fIndustry)
+                      && (!fCountry  || country  === fCountry)
+                      && (!fSize     || size      === fSize);
+            node.toggle(show);
+            if (show) visible++;
+        });
+        $('#visibleCount').text(visible);
+        renderChips(fStatus, fIndustry, fCountry, fSize);
+    }
+
+    function renderChips(fStatus, fIndustry, fCountry, fSize) {
+        const chips = [];
+        if (fStatus)   chips.push({ label: 'Status: ' + fStatus,   clear: function () { $('#filterStatus').val('').trigger('change'); } });
+        if (fIndustry) chips.push({ label: 'Industry: ' + fIndustry, clear: function () { $('#filterIndustry').val('').trigger('change'); } });
+        if (fCountry)  chips.push({ label: 'Country: ' + fCountry,  clear: function () { $('#filterCountry').val('').trigger('change'); } });
+        if (fSize)     chips.push({ label: 'Size: ' + fSize,        clear: function () { $('#filterSize').val('').trigger('change'); } });
+        const $c = $('#filterChips').empty();
+        chips.forEach(function (chip, i) {
+            $('<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="cursor:pointer;font-size:.8rem">'
+                + chip.label + ' &times;</span>')
+                .on('click', chip.clear).appendTo($c);
+        });
+    }
+
+    $('#filterStatus, #filterIndustry, #filterCountry, #filterSize').on('change', applyFilters);
+
+    // CSV Export — only visible (non-hidden) rows
+    $('#btnExportCsv').on('click', function () {
+        const rows  = [];
+        const heads = [];
+        $('#tenantTable thead th').each(function (i, th) {
+            const t = $(th).text().trim();
+            if (i < $(th).closest('table').find('thead th').length - 1) heads.push(t);
+        });
+        rows.push(heads.map(function (h) { return '"' + h.replace(/"/g, '""') + '"'; }).join(','));
+        table.rows().every(function () {
+            const node = $(this.node());
+            if (!node.is(':visible')) return;
+            const cols = [];
+            node.find('td').each(function (i, td) {
+                if (i < node.find('td').length - 1) {
+                    cols.push('"' + $(td).text().trim().replace(/\s+/g, ' ').replace(/"/g, '""') + '"');
+                }
             });
-        }
+            rows.push(cols.join(','));
+        });
+        const csv  = rows.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'tenants_' + new Date().toISOString().slice(0,10) + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     });
 }
 
