@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-25 — fix(registration): enable Shop Mode + Supplier Access by default for self-registered tenants
+
+**Files:** `core/tenant_registration.php`
+
+- `applySelfRegistrationDefaults()` now also calls `setTenantShopMode($tenantId, true)` and `setTenantSupplierAccess($tenantId, true, false)` for every new self-registration.
+- Shop Mode ON: self-registered tenants are small retail shops — "Shop/Duka" wording fits better than "Warehouse/Ghala" from day one.
+- Supplier Access ON (not locked): a shop buys stock from suppliers and needs to record payments to them without the full Procurement module. Tenant admin can turn it off if not needed.
+- Both calls are best-effort (errors logged, never fail the registration itself) — consistent with the existing `setTenantPosSimpleMode` pattern.
+
 ## 2026-09-25 — feat(email): multi-provider platform email selector
 
 **Files:** `app/superadmin/settings.php`, `actions/superadmin_platform_settings.php`
