@@ -96,6 +96,23 @@
 
 ---
 
+## 2026-09-25 — fix(products): remove supplier_id from INSERT — crashes on new-tenant schema
+
+**Files:** `api/create_product.php`, `api/create_nip_product.php`, `api/generate_product_variants.php`
+
+- `supplier_id` was removed from `update_product.php` on 2026-07-30 but left in all three CREATE paths. New self-registered tenants have a schema without that column, causing every product creation to fail with `SQLSTATE[42S22]: Unknown column 'supplier_id'`.
+- Removed `supplier_id` from the insert data in all three files. Existing BJP-prod data is unaffected.
+
+## 2026-09-25 — feat(pos): mobile cart FAB + offcanvas bottom sheet
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`
+
+- Added a fixed-position floating cart button (FAB) in the bottom-right corner, visible on mobile only (`d-md-none`). Hidden when cart is empty; appears as soon as the first product is added.
+- FAB colour: `btn-primary` (blue), matching the POS primary action colour. Count badge is white with a blue border for clean contrast.
+- Tapping the FAB opens a Bootstrap 5 `offcanvas-bottom` bottom sheet (72 vh) showing a compact item list (name, price, qty, line total), the cart grand total mirrored from `#cartTotal`, and a green "PROCESS PAYMENT" button.
+- Added `updateMobileCartFab()` function in `pos_scripts_new.php`; called at the end of `updateCartDisplay()` after `calculateCartTotal()` so totals are always in sync.
+- Desktop layout completely unchanged.
+
 ## 2026-09-25 — feat(mobile-api): make period report endpoints Bearer-token-accessible
 
 **Files:** `api/account/get_sales_report.php`, `api/account/get_inventory_report.php`, `api/account/get_expense_report.php`, `api/account/get_user_sales_report.php`, `api/account/get_profit_report.php`
