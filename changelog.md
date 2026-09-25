@@ -13,6 +13,14 @@
 
 ---
 
+## 2026-09-25 — fix(pos-mobile): Bearer token support for 7 POS endpoints
+
+**Files:** `api/pos/generate_receipt_number.php`, `api/pos/get_price_groups.php`, `api/pos/get_price_group_products.php`, `api/pos/get_product_units.php`, `api/pos/get_available_serials.php`, `api/pos/email_receipt.php`, `api/pos/get_registers.php`
+
+- Added `require_once '../../core/mobile_auth.php'; mobileBearerAuth();` to each of the 7 files immediately after `require_once '../../roots.php';`, enabling Flutter Bearer token auth on these previously web-session-only endpoints.
+- `print_receipt.php` intentionally excluded — it returns raw HTML via `die()` and is not a JSON API endpoint.
+- Mobile API artifact updated to v7: loyalty points parameters documented in `process_sale`, `print_receipt.php` noted as web-only, full v7 changelog entry added.
+
 ## 2026-09-25 — feat(superadmin): P9 — broadcast messaging
 
 **Files:** `app/superadmin/broadcast.php` (new), `actions/superadmin_broadcast.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`
