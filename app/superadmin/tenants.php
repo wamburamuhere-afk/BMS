@@ -179,6 +179,7 @@ function saBadge(string $status): string
         <table id="tenantTable" class="table table-sm align-middle" style="width:100%">
             <thead>
                 <tr>
+                    <th style="width:2rem"><input type="checkbox" id="chkAll" class="form-check-input" title="Select all visible"></th>
                     <th>#</th><th>Company</th><th>Subdomain</th><th>Status</th>
                     <th>Owner</th><th>Trial Ends</th><th>Last Active</th>
                     <th>Created</th><th class="text-end">Actions</th>
@@ -193,7 +194,9 @@ function saBadge(string $status): string
                 <tr data-status="<?= htmlspecialchars($t['status'], ENT_QUOTES) ?>"
                     data-industry="<?= htmlspecialchars(strtolower($t['industry'] ?? ''), ENT_QUOTES) ?>"
                     data-country="<?= htmlspecialchars($t['country'] ?? '', ENT_QUOTES) ?>"
-                    data-size="<?= htmlspecialchars($t['company_size'] ?? '', ENT_QUOTES) ?>">
+                    data-size="<?= htmlspecialchars($t['company_size'] ?? '', ENT_QUOTES) ?>"
+                    data-id="<?= (int)$t['id'] ?>">
+                    <td><input type="checkbox" class="form-check-input row-chk" value="<?= (int)$t['id'] ?>"></td>
                     <td><?= (int)$t['id'] ?></td>
                     <td>
                         <a href="<?= saUrl('tenants/view') ?>?id=<?= (int)$t['id'] ?>" class="fw-semibold text-decoration-none">
@@ -220,6 +223,24 @@ function saBadge(string $status): string
             </tbody>
         </table>
     </div>
+
+    <!-- P8 — Bulk action bar -->
+    <div id="bulkBar" class="d-none position-sticky bottom-0 bg-white border-top py-2 px-2 shadow d-flex align-items-center gap-2 flex-wrap" style="z-index:100">
+        <span class="text-muted small me-1"><span id="bulkCount">0</span> selected</span>
+        <button class="btn btn-sm btn-outline-primary" id="btnBulkActivate">
+            <i class="bi bi-play-circle me-1"></i> Activate
+        </button>
+        <button class="btn btn-sm btn-outline-warning" id="btnBulkSuspend">
+            <i class="bi bi-pause-circle me-1"></i> Suspend
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="btnBulkExport">
+            <i class="bi bi-download me-1"></i> Export CSV
+        </button>
+        <button class="btn btn-sm btn-link text-muted ms-auto" id="btnBulkClear">
+            <i class="bi bi-x-circle me-1"></i> Clear
+        </button>
+    </div>
+    <!-- /P8 -->
 
     <div id="cardView" class="row g-2">
         <?php foreach ($tenants as $t): ?>
@@ -386,6 +407,96 @@ if (document.getElementById('tenantTable')) {
         URL.revokeObjectURL(url);
     });
 }
+
+// P8 — Bulk actions
+(function () {
+    function selectedIds() {
+        const ids = [];
+        document.querySelectorAll('.row-chk:checked').forEach(function (cb) {
+            if (cb.closest('tr') && !cb.closest('tr').classList.contains('d-none')
+                && cb.closest('tr').style.display !== 'none') {
+                ids.push(parseInt(cb.value, 10));
+            }
+        });
+        return ids;
+    }
+
+    function updateBulkBar() {
+        const ids = selectedIds();
+        const bar = document.getElementById('bulkBar');
+        if (ids.length > 0) {
+            bar.classList.remove('d-none');
+        } else {
+            bar.classList.add('d-none');
+        }
+        document.getElementById('bulkCount').textContent = ids.length;
+    }
+
+    // Select-all checkbox
+    document.getElementById('chkAll').addEventListener('change', function () {
+        const checked = this.checked;
+        document.querySelectorAll('.row-chk').forEach(function (cb) {
+            const row = cb.closest('tr');
+            if (!row) return;
+            if (row.style.display === 'none') return;
+            cb.checked = checked;
+        });
+        updateBulkBar();
+    });
+
+    // Individual row checkboxes
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.classList.contains('row-chk')) {
+            if (!e.target.checked) document.getElementById('chkAll').checked = false;
+            updateBulkBar();
+        }
+    });
+
+    function doBulk(action) {
+        const ids = selectedIds();
+        if (!ids.length) return;
+        const label = action === 'suspend' ? 'suspend' : 'activate';
+        Swal.fire({
+            title: 'Bulk ' + label + '?',
+            text: ids.length + ' tenant' + (ids.length > 1 ? 's' : '') + ' will be ' + label + 'd.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#0d6efd',
+            confirmButtonText: 'Yes, ' + label + ' all'
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            $.ajax({
+                url: '/actions/superadmin_bulk_action.php',
+                method: 'POST',
+                dataType: 'json',
+                data: { _csrf: SA_CSRF_TOKEN, action: action, tenant_ids: ids }
+            }).done(function (res) {
+                if (res && res.success) {
+                    Swal.fire({ icon: 'success', title: 'Done',
+                        text: 'OK: ' + res.ok_count + ' · Failed: ' + res.fail_count,
+                        timer: 2500, showConfirmButton: false });
+                    setTimeout(function () { window.location.reload(); }, 2500);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Bulk action failed.' });
+                }
+            }).fail(function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); });
+        });
+    }
+
+    document.getElementById('btnBulkActivate').addEventListener('click', function () { doBulk('activate'); });
+    document.getElementById('btnBulkSuspend').addEventListener('click', function () { doBulk('suspend'); });
+    document.getElementById('btnBulkClear').addEventListener('click', function () {
+        document.querySelectorAll('.row-chk, #chkAll').forEach(function (cb) { cb.checked = false; });
+        updateBulkBar();
+    });
+
+    // Bulk CSV export — same rows as the filtered table
+    document.getElementById('btnBulkExport').addEventListener('click', function () {
+        const ids = selectedIds();
+        if (!ids.length) return;
+        document.getElementById('btnExportCsv').click(); // reuse existing export logic (visibleCount already only shows filtered)
+    });
+})();
 
 function postAction(data, successTitle) {
     return $.ajax({
