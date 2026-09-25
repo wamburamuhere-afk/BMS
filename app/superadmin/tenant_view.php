@@ -368,6 +368,52 @@ function svBadge(string $status): string
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- P5 — Operator Notes ------------------------------------------------ -->
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-journal-text text-primary me-1"></i> Operator Notes</div>
+                <div class="card-body">
+                    <form id="notesForm">
+                        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <input type="hidden" name="tenant_id" value="<?= $id ?>">
+                        <div class="mb-2">
+                            <textarea class="form-control form-control-sm font-monospace"
+                                      name="notes" id="f-notes" rows="4" maxlength="1000"
+                                      placeholder="Internal notes visible to all operators…"><?= htmlspecialchars($tenant['notes'] ?? '', ENT_QUOTES) ?></textarea>
+                            <div class="form-text d-flex justify-content-between">
+                                <span>
+                                <?php if (!empty($tenant['notes_updated_at'])): ?>
+                                    Last updated
+                                    <?php
+                                    // Resolve updater email from the control DB (best-effort)
+                                    $notesUpdaterEmail = '';
+                                    if (!empty($tenant['notes_updated_by'])) {
+                                        try {
+                                            $ctrl = getControlPdo();
+                                            $ns = $ctrl->prepare("SELECT email FROM superadmins WHERE id = ? LIMIT 1");
+                                            $ns->execute([$tenant['notes_updated_by']]);
+                                            $notesUpdaterEmail = (string)($ns->fetchColumn() ?: '');
+                                        } catch (Throwable $__e) { /* non-fatal */ }
+                                    }
+                                    ?>
+                                    <?= htmlspecialchars($notesUpdaterEmail ? 'by ' . $notesUpdaterEmail . ' on ' : 'on ', ENT_QUOTES) ?>
+                                    <?= date('d M Y H:i', strtotime($tenant['notes_updated_at'])) ?>
+                                <?php else: ?>
+                                    No notes yet.
+                                <?php endif; ?>
+                                </span>
+                                <span id="notes-char-count" class="text-muted"></span>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary" id="btnSaveNotes">
+                            <i class="bi bi-check2-circle me-1"></i> Save Notes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- /P5 -->
     </div>
     </div>
 
@@ -795,6 +841,44 @@ function postAction(data, title, redirect) {
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     });
 }
+
+// P5 — Operator Notes
+(function () {
+    const ta     = document.getElementById('f-notes');
+    const cc     = document.getElementById('notes-char-count');
+    const max    = 1000;
+    function updateCount() {
+        if (ta && cc) {
+            const left = max - ta.value.length;
+            cc.textContent = left + ' chars left';
+            cc.className   = left < 100 ? 'text-warning' : 'text-muted';
+        }
+    }
+    if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
+
+    const form = document.getElementById('notesForm');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const btn  = document.getElementById('btnSaveNotes');
+            const orig = btn.innerHTML;
+            btn.disabled  = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+            const fd = new FormData(form);
+            fetch('/actions/superadmin_tenant_notes.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(r => {
+                    if (r.success) {
+                        Swal.fire({ icon: 'success', title: 'Saved', text: r.message, timer: 1800, showConfirmButton: false });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: r.message || 'Could not save notes.' });
+                    }
+                })
+                .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }))
+                .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+        });
+    }
+})();
 
 function doExtendTrial() {
     Swal.fire({
