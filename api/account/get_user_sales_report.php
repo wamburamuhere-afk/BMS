@@ -10,6 +10,8 @@
  * Project/warehouse-scoped per .claude/security.md §23.
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/pos_nav.php';
