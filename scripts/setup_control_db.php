@@ -378,6 +378,23 @@ try {
     ");
     say('  · reserved "blank" plan seeded');
 
+    // ── Broadcast log (superadmin_plan.md P9) ───────────────────────────────
+    // Records every bulk email sent to tenants from the superadmin broadcast page.
+    // sent_by has no FK — same denormalised-id convention as tenant_admin_log.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`broadcast_log` (
+            `id`                 INT AUTO_INCREMENT PRIMARY KEY,
+            `subject`            VARCHAR(255) NOT NULL,
+            `body`               TEXT         NOT NULL,
+            `audience_definition` VARCHAR(255) NOT NULL,
+            `recipients_count`   INT          NOT NULL DEFAULT 0,
+            `sent_by`            INT          NULL,
+            `sent_at`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_broadcast_sent` (`sent_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table broadcast_log ready');
+
     // ── Self-service module requests (tenant_module_control_plan.md, Phase C) ──
     // A tenant's own admin asking for a module they don't have, and a
     // superadmin approving/declining. Lives here, not in any tenant database,
@@ -457,12 +474,47 @@ try {
         // lives in the tenant's own database (system_settings.pos_supplier_access);
         // this is only the lock.
         'pos_supplier_access_locked' => "ADD COLUMN `pos_supplier_access_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pos_advanced_supplier_locked`",
+
+        // ── Professional tenant management columns (superadmin_plan.md P0) ────
+        // Trial lifecycle
+        'trial_ends_at'      => "ADD COLUMN `trial_ends_at` DATETIME NULL AFTER `suspended_at`",
+        'trial_extended_by'  => "ADD COLUMN `trial_extended_by` INT NULL AFTER `trial_ends_at`",
+        // Owner contact — mirrored from the tenant DB so superadmin never has to open it
+        'owner_first_name'   => "ADD COLUMN `owner_first_name` VARCHAR(100) NULL AFTER `owner_email`",
+        'owner_last_name'    => "ADD COLUMN `owner_last_name` VARCHAR(100) NULL AFTER `owner_first_name`",
+        'owner_phone'        => "ADD COLUMN `owner_phone` VARCHAR(20) NULL AFTER `owner_last_name`",
+        // Business classification
+        'country'            => "ADD COLUMN `country` VARCHAR(100) NULL AFTER `owner_phone`",
+        'industry'           => "ADD COLUMN `industry` VARCHAR(64) NULL AFTER `country`",
+        'company_size'       => "ADD COLUMN `company_size` VARCHAR(20) NULL AFTER `industry`",
+        // Engagement
+        'last_active_at'     => "ADD COLUMN `last_active_at` DATETIME NULL AFTER `company_size`",
+        // Operator notes
+        'notes'              => "ADD COLUMN `notes` TEXT NULL AFTER `last_active_at`",
+        'notes_updated_at'   => "ADD COLUMN `notes_updated_at` DATETIME NULL AFTER `notes`",
+        'notes_updated_by'   => "ADD COLUMN `notes_updated_by` INT NULL AFTER `notes_updated_at`",
+        // Billing
+        'billing_cycle'      => "ADD COLUMN `billing_cycle` ENUM('monthly','annual') NULL AFTER `notes_updated_by`",
+        'billing_amount_tzs' => "ADD COLUMN `billing_amount_tzs` INT NULL AFTER `billing_cycle`",
+        'next_billing_date'  => "ADD COLUMN `next_billing_date` DATE NULL AFTER `billing_amount_tzs`",
+        'payment_status'     => "ADD COLUMN `payment_status` ENUM('current','overdue','pending','none') NOT NULL DEFAULT 'none' AFTER `next_billing_date`",
+        // Comms opt-out
+        'unsubscribed_at'    => "ADD COLUMN `unsubscribed_at` DATETIME NULL AFTER `payment_status`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
             say("  + tenants.{$col} added");
         }
     }
+
+    // Backfill trial_ends_at for existing rows that pre-date the column.
+    // Uses created_at + 14 days as a proxy — safe to re-run (WHERE IS NULL).
+    $admin->exec("
+        UPDATE `{$controlDb}`.`tenants`
+           SET `trial_ends_at` = DATE_ADD(`created_at`, INTERVAL 14 DAY)
+         WHERE `trial_ends_at` IS NULL
+    ");
+    say('  · trial_ends_at backfilled for existing rows');
 
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
