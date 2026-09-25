@@ -655,6 +655,11 @@ if (!function_exists('createTenantAsOperator')) {
             'status'           => $status,
             'owner_first_name' => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'  => trim((string)($in['owner_last_name'] ?? '')),
+            'owner_phone'      => trim((string)($in['owner_phone']      ?? '')),
+            'country'          => trim((string)($in['country']          ?? '')),
+            'industry'         => trim((string)($in['industry']         ?? '')),
+            'company_size'     => trim((string)($in['company_size']     ?? '')),
+            'trial_ends_at'    => trim((string)($in['trial_ends_at']    ?? '')),
             // Optional company profile fields — passed straight through to
             // seedTenantCompanyProfile(); each is silently skipped when blank.
             'phone'   => trim((string)($in['phone']   ?? '')),

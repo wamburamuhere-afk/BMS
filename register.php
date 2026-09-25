@@ -205,6 +205,43 @@ $baseDom = tenantBaseDomain();
             </div>
         </div>
 
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-4">
+                <label for="country" class="form-label">Country <span class="text-danger">*</span></label>
+                <select class="form-select" id="country" name="country" required>
+                    <option value="">Select country…</option>
+                    <option value="Tanzania">Tanzania</option>
+                    <option value="Kenya">Kenya</option>
+                    <option value="Uganda">Uganda</option>
+                    <option value="Rwanda">Rwanda</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="industry" class="form-label">Industry</label>
+                <select class="form-select" id="industry" name="industry">
+                    <option value="">Select industry…</option>
+                    <option value="retail">Retail / Shop</option>
+                    <option value="restaurant">Restaurant / Café</option>
+                    <option value="services">Services / Consulting</option>
+                    <option value="manufacturing">Manufacturing</option>
+                    <option value="healthcare">Healthcare</option>
+                    <option value="transport">Transport / Logistics</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="company_size" class="form-label">Team size</label>
+                <select class="form-select" id="company_size" name="company_size">
+                    <option value="">Select size…</option>
+                    <option value="1-5">1–5 staff</option>
+                    <option value="6-20">6–20 staff</option>
+                    <option value="21-100">21–100 staff</option>
+                    <option value="100+">100+ staff</option>
+                </select>
+            </div>
+        </div>
+
         <button type="submit" class="btn btn-primary w-100" id="btnSubmit">
             <i class="bi bi-check-circle me-1"></i> Create my account
         </button>

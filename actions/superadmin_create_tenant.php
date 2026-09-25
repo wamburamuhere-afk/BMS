@@ -48,8 +48,15 @@ $r = createTenantAsOperator([
     'owner_password_confirm' => (string)($_POST['owner_password_confirm'] ?? ''),
     'owner_first_name'       => (string)($_POST['owner_first_name'] ?? ''),
     'owner_last_name'        => (string)($_POST['owner_last_name'] ?? ''),
+    'owner_phone'            => (string)($_POST['owner_phone']     ?? ''),
     'status'                 => (string)($_POST['status'] ?? 'active'),
     'plan_id'                => (string)($_POST['plan_id'] ?? ''),
+    'country'                => (string)($_POST['country']       ?? ''),
+    'industry'               => (string)($_POST['industry']      ?? ''),
+    'company_size'           => (string)($_POST['company_size']  ?? ''),
+    'trial_ends_at'          => !empty($_POST['trial_ends_at'])
+                                   ? date('Y-m-d 23:59:59', strtotime((string)$_POST['trial_ends_at']))
+                                   : '',
     // Optional company profile fields
     'phone'   => (string)($_POST['phone']   ?? ''),
     'email'   => (string)($_POST['email']   ?? ''),
