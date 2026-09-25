@@ -416,6 +416,26 @@ try {
     ");
     say('  · table tenant_payments ready');
 
+    // ── Superadmin notifications ─────────────────────────────────────────────
+    // One row per event (trial/subscription expired). Drives the bell badge in
+    // the superadmin header. Deduplicated per (tenant_id, type) per day.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`superadmin_notifications` (
+            `id`          INT AUTO_INCREMENT PRIMARY KEY,
+            `type`        ENUM('trial_expired','subscription_expired') NOT NULL,
+            `title`       VARCHAR(255)  NOT NULL,
+            `body`        VARCHAR(500)  NOT NULL,
+            `tenant_id`   INT          NULL,
+            `tenant_name` VARCHAR(255) NULL,
+            `subdomain`   VARCHAR(63)  NULL,
+            `is_read`     TINYINT(1)   NOT NULL DEFAULT 0,
+            `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_san_unread`   (`is_read`, `created_at`),
+            KEY `idx_san_tenant`   (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table superadmin_notifications ready');
+
     // ── Self-service module requests (tenant_module_control_plan.md, Phase C) ──
     // A tenant's own admin asking for a module they don't have, and a
     // superadmin approving/declining. Lives here, not in any tenant database,
@@ -523,6 +543,8 @@ try {
         'unsubscribed_at'    => "ADD COLUMN `unsubscribed_at` DATETIME NULL AFTER `payment_status`",
         // Subscription expiry (set automatically when a payment is recorded)
         'subscription_ends_at' => "ADD COLUMN `subscription_ends_at` DATE NULL AFTER `unsubscribed_at`",
+        // Why a tenant is currently suspended (set on auto-suspend; cleared on activate)
+        'suspension_reason'    => "ADD COLUMN `suspension_reason` ENUM('trial_expired','subscription_expired','manual') NULL AFTER `subscription_ends_at`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
