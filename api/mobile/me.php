@@ -101,8 +101,11 @@ try {
         // How many products to render in the grid on open (before any search/filter)
         'products_display_limit' => (int)get_setting('pos_products_display_limit', '20'),
 
-        // VAT is hidden and always 0 when simple_mode=true
-        'vat_enabled'          => !$simpleMode,
+        // VAT selector is shown in all POS modes (v3 change — Simple POS included)
+        'vat_enabled'          => true,
+
+        // Shop mode: true = "Duka/Shop" wording; false = "Ghala/Warehouse" wording
+        'shop_mode'            => get_setting('shop_mode', '0') === '1',
     ];
 
     // ── Tax rates ─────────────────────────────────────────────────────────────

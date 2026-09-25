@@ -9,6 +9,8 @@
  * feeds the summary, every chart, and the rows.
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileBearerAuth();
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/pos_nav.php';
