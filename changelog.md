@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(mobile-api): make period report endpoints Bearer-token-accessible
+
+**Files:** `api/account/get_sales_report.php`, `api/account/get_inventory_report.php`, `api/account/get_expense_report.php`, `api/account/get_user_sales_report.php`, `api/account/get_profit_report.php`
+
+- All five report endpoints previously required a PHP web session. Added `mobileBearerAuth()` to each (after `roots.php`) so the Flutter app can call them with a Bearer token.
+- Sales Report: returns summary, revenue trend, by-status/payment chart, top customers, detail rows. In Simple POS mode `source` is auto-forced to `'pos'`.
+- Inventory Report: current stock snapshot per product/warehouse with summary, three charts (by warehouse, stock status counts, top items), detail rows.
+- Expense Report: summary, monthly trend, by-account chart (pivots to by-shop in Simple POS), by-status chart, detail rows.
+- Sales by User Report (Simple POS only): cashier leaderboard (`mode=summary`), product drill-down for one cashier (`mode=items`), full Z-Report-style breakdown (`mode=detail`). Returns 404 if Simple POS is OFF.
+- Profit Report (Simple POS only): gross/net profit + monthly trend using canonical `glProfitLoss()` ledger engine. Returns 404 if Simple POS is OFF.
+- API doc updated to v6 at https://claude.ai/artifact/Ca1TnGk31veQuYnND4Xjka
+
+## 2026-09-25 — fix(mobile-api): add shop_mode to /me response; fix vat_enabled always true
+
+**Files:** `api/mobile/me.php`
+
+- Added `pos_settings.shop_mode` (bool): `true` = "Duka/Shop" wording; `false` = "Ghala/Warehouse" wording. Flutter app uses this to localise navigation labels. Always `true` for self-registered tenants.
+- Fixed `pos_settings.vat_enabled`: was `!$simpleMode` (false in Simple POS); now always `true` to match the v3 API contract. VAT selector shown in all POS modes.
+
 ## 2026-09-25 — fix(registration): enable Shop Mode + Supplier Access by default for self-registered tenants
 
 **Files:** `core/tenant_registration.php`
