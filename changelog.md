@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): P9 — broadcast messaging
+
+**Files:** `app/superadmin/broadcast.php` (new), `actions/superadmin_broadcast.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`
+
+- Compose form with audience picker (all active, all trial, expiring ≤7d, by plan, by industry), live recipient count, live preview, Swal confirmation.
+- Actions file handles `count` (return recipient count) and `send` (personalised emails via platform relay, skip unsubscribed, log to `broadcast_log`).
+- Broadcast history table shows past sends with date/subject/audience/recipients/sender.
+- Route `broadcast` added to `superadminRouteMap()`; nav item added to superadmin header.
+
+---
+
+## 2026-09-25 — feat(superadmin): P8 — bulk actions (suspend/activate/export)
+
+**Files:** `app/superadmin/tenants.php`, `actions/superadmin_bulk_action.php` (new)
+
+- Checkbox column with select-all; sticky bulk action bar (count, Activate, Suspend, Export CSV, Clear) shown when ≥1 row selected.
+- `superadmin_bulk_action.php`: accepts `action` + `tenant_ids[]`, processes each via `suspendTenant()`/`activateTenant()`, returns ok/fail counts; audit trail identical to N single actions.
+
+---
+
+## 2026-09-25 — feat(superadmin): P7 — billing tracking
+
+**Files:** `app/superadmin/tenant_view.php`, `app/superadmin/dashboard.php`, `app/superadmin/tenant_new.php`, `actions/superadmin_create_tenant.php`, `actions/superadmin_tenant_billing.php` (new), `core/tenant_admin.php`
+
+- Billing tab on tenant_view.php: cycle, amount, next billing date, payment status; saved via new action.
+- Dashboard: MRR stat tile; overdue payment attention; due-in-≤7d attention.
+- Tenant create form gets optional billing section; billing fields passed through `createTenantAsOperator`.
+
+---
+
+## 2026-09-25 — feat(superadmin): P6 — business classification filters + CSV export
+
+**Files:** `app/superadmin/tenants.php`
+
+- Filter dropdowns for Industry, Country, Company Size from live data; filter chips with ✕ to clear; visible-count in header; CSV export of filtered rows.
+
+---
+
+## 2026-09-25 — feat(superadmin): P5 — operator notes per tenant
+
+**Files:** `app/superadmin/tenant_view.php`, `actions/superadmin_tenant_notes.php` (new)
+
+- Notes card in Overview tab with textarea, char counter, last-edited metadata, save button.
+- Action saves notes + stamps `notes_updated_at`/`notes_updated_by`; logs `note_update`.
+
+---
+
 ## 2026-09-25 — feat(superadmin): P4 — tenant last_active_at updated on every tenant-user login
 
 **Files:** `actions/login.php`
