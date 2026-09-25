@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): Expires badge — "X days remaining for testing" + payment-derived subscription expiry
+
+**Files:** `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+- **Trial badge:** Any trial with ≤ 14 days left now reads "X days remaining for testing" (red ≤ 3d, amber ≤ 7d, blue ≤ 14d). Extended trials (> 14d) still show "Trial · date (Xd)". Expired shows "Trial expired".
+- **Active badge:** Label changed from "Sub · date" to "Expires date" — the date comes from `subscription_ends_at` which is set from the last recorded payment's `ends_at` in `tenant_payments`.
+- **Tenant detail view:** Trial row renamed "Trial Period" with same urgency label. New "Subscription Expires" row appears for active tenants showing the payment-derived end date and days left, labelled "(from last recorded payment)".
+
+---
+
 ## 2026-09-25 — feat(superadmin): suspension reason + in-app notification bell + email digest
 
 **Files:** `scripts/setup_control_db.php`, `core/superadmin_notifications.php` (new), `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php`, `actions/superadmin_mark_notifications_read.php` (new), `core/superadmin_ui.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`

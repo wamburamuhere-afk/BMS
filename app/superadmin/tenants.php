@@ -52,20 +52,24 @@ function expiresBadge(
         if ($trialEndsAt === null) return '<span class="text-muted">—</span>';
         $daysLeft = (int)floor((strtotime($trialEndsAt) - time()) / 86400);
         $date = date('d M Y', strtotime($trialEndsAt));
-        if ($daysLeft < 0)  return '<span class="badge bg-danger">Trial expired</span>';
+        if ($daysLeft < 0)   return '<span class="badge bg-danger">Trial expired</span>';
         if ($daysLeft === 0) return '<span class="badge bg-danger">Trial ends today</span>';
-        if ($daysLeft <= 3) return '<span class="badge bg-danger">Trial · ' . $date . ' (' . $daysLeft . 'd)</span>';
-        if ($daysLeft <= 7) return '<span class="badge bg-warning text-dark">Trial · ' . $date . ' (' . $daysLeft . 'd)</span>';
-        return '<span class="badge bg-info text-dark">Trial · ' . $date . '</span>';
+        // Within the standard 14-day window — show friendly "days remaining for testing"
+        if ($daysLeft <= 3)  return '<span class="badge bg-danger">' . $daysLeft . 'd remaining for testing</span>';
+        if ($daysLeft <= 7)  return '<span class="badge bg-warning text-dark">' . $daysLeft . 'd remaining for testing</span>';
+        if ($daysLeft <= 14) return '<span class="badge bg-info text-dark">' . $daysLeft . ' days remaining for testing</span>';
+        // Extended beyond 14 days
+        return '<span class="badge bg-info text-dark">Trial · ' . $date . ' (' . $daysLeft . 'd)</span>';
     }
     if ($status === 'active') {
+        // subscription_ends_at is set from the last recorded payment's ends_at
         if ($subscriptionEndsAt === null) return '<span class="text-muted small">—</span>';
         $daysLeft = (int)floor((strtotime($subscriptionEndsAt) - time()) / 86400);
         $date = date('d M Y', strtotime($subscriptionEndsAt));
-        if ($daysLeft < 0)   return '<span class="badge bg-danger">Sub expired ' . $date . '</span>';
-        if ($daysLeft <= 7)  return '<span class="badge bg-warning text-dark">Sub · ' . $date . ' (' . $daysLeft . 'd)</span>';
-        if ($daysLeft <= 30) return '<span class="badge bg-success">Sub · ' . $date . ' (' . $daysLeft . 'd)</span>';
-        return '<span class="badge bg-success">Sub · ' . $date . '</span>';
+        if ($daysLeft < 0)   return '<span class="badge bg-danger">Expired ' . $date . '</span>';
+        if ($daysLeft <= 7)  return '<span class="badge bg-warning text-dark">Expires ' . $date . ' (' . $daysLeft . 'd)</span>';
+        if ($daysLeft <= 30) return '<span class="badge bg-success">Expires ' . $date . ' (' . $daysLeft . 'd)</span>';
+        return '<span class="badge bg-success">Expires ' . $date . '</span>';
     }
     if ($status === 'suspended') {
         if ($suspensionReason === 'trial_expired') {

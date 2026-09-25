@@ -242,15 +242,34 @@ function svBadge(string $status): string
                         </div>
                         <?php if ($tenant['status'] === 'trial' && !empty($tenant['trial_ends_at'])):
                             $daysLeft = (int)floor((strtotime($tenant['trial_ends_at']) - time()) / 86400);
-                            $expiryColor = $daysLeft < 0 ? 'danger' : ($daysLeft <= 3 ? 'danger' : ($daysLeft <= 7 ? 'warning' : 'success'));
+                            if ($daysLeft < 0)       { $expiryColor = 'danger';  $expiryLabel = 'EXPIRED ' . abs($daysLeft) . 'd ago'; }
+                            elseif ($daysLeft === 0)  { $expiryColor = 'danger';  $expiryLabel = 'Ends today'; }
+                            elseif ($daysLeft <= 3)   { $expiryColor = 'danger';  $expiryLabel = $daysLeft . ' days remaining for testing'; }
+                            elseif ($daysLeft <= 7)   { $expiryColor = 'warning'; $expiryLabel = $daysLeft . ' days remaining for testing'; }
+                            elseif ($daysLeft <= 14)  { $expiryColor = 'info';    $expiryLabel = $daysLeft . ' days remaining for testing'; }
+                            else                      { $expiryColor = 'success'; $expiryLabel = $daysLeft . ' days remaining'; }
                         ?>
                         <div class="col-sm-12">
-                            <dt>Trial Expires</dt>
+                            <dt>Trial Period</dt>
                             <dd>
                                 <?= date('d M Y', strtotime($tenant['trial_ends_at'])) ?>
-                                <span class="badge bg-<?= $expiryColor ?> ms-1">
-                                    <?= $daysLeft < 0 ? 'EXPIRED ' . abs($daysLeft) . 'd ago' : $daysLeft . ' days left' ?>
-                                </span>
+                                <span class="badge bg-<?= $expiryColor ?> ms-1"><?= $expiryLabel ?></span>
+                            </dd>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($tenant['status'] === 'active' && !empty($tenant['subscription_ends_at'])):
+                            $subDaysLeft = (int)floor((strtotime($tenant['subscription_ends_at']) - time()) / 86400);
+                            if ($subDaysLeft < 0)      { $subColor = 'danger';  $subLabel = 'EXPIRED ' . abs($subDaysLeft) . 'd ago'; }
+                            elseif ($subDaysLeft <= 7)  { $subColor = 'warning'; $subLabel = $subDaysLeft . ' days left'; }
+                            elseif ($subDaysLeft <= 30) { $subColor = 'success'; $subLabel = $subDaysLeft . ' days left'; }
+                            else                        { $subColor = 'success'; $subLabel = $subDaysLeft . ' days left'; }
+                        ?>
+                        <div class="col-sm-12">
+                            <dt>Subscription Expires</dt>
+                            <dd>
+                                <?= date('d M Y', strtotime($tenant['subscription_ends_at'])) ?>
+                                <span class="badge bg-<?= $subColor ?> ms-1"><?= $subLabel ?></span>
+                                <small class="text-muted ms-1">(from last recorded payment)</small>
                             </dd>
                         </div>
                         <?php endif; ?>
