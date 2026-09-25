@@ -204,6 +204,31 @@ if (!function_exists('bmsConnectPdo')) {
                 'This account is not currently available. Please contact your administrator.');
         }
 
+        // Trial expiry gate (superadmin_plan.md P3) ─────────────────────────
+        // If the trial period ended, auto-suspend and block access. Best-effort
+        // write: a control-DB hiccup must not mask a real bad-status — the gate
+        // still fires even if the UPDATE fails (the old status is still 'trial'
+        // but we still block; the cron job will clean it up later).
+        if ($status === 'trial' && !empty($tenant['trial_ends_at'])
+            && strtotime((string)$tenant['trial_ends_at']) < time()
+        ) {
+            try {
+                require_once __DIR__ . '/control_db.php';
+                getControlPdo()->prepare(
+                    "UPDATE tenants SET status='suspended', suspended_at=NOW() WHERE id=? AND status='trial'"
+                )->execute([(int)$tenant['id']]);
+                // Log to tenant_admin_log so the operator can see the auto-suspension
+                getControlPdo()->prepare("
+                    INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
+                    VALUES (?, ?, 'auto_suspend_trial', 'Trial expired — auto-suspended at access attempt', NOW())
+                ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? '')]);
+            } catch (Throwable $_e) {
+                error_log('trial expiry auto-suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
+            }
+            bmsTenantHalt(402, 'Trial ended',
+                'Your free trial has ended. Please contact us to continue using ' . (string)($tenant['company_name'] ?? 'BMS') . '.');
+        }
+
         // ── Cross-tenant session guard ───────────────────────────────────────
         // A session cookie carrying another tenant's id must never be honoured
         // here. ternant.md put this in header.php; it lives here instead because
