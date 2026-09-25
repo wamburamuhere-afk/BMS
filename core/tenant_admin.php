@@ -60,17 +60,41 @@ if (!function_exists('logTenantAdminAction')) {
 }
 
 if (!function_exists('listTenants')) {
-    /** All tenants, newest first. Never returns encrypted credentials. */
-    function listTenants(?string $status = null): array
+    /**
+     * All tenants, newest first. Never returns encrypted credentials.
+     *
+     * @param string|null $status  Filter by status (trial/active/suspended/deleted)
+     * @param array       $filters Additional filters: country, industry, company_size
+     */
+    function listTenants(?string $status = null, array $filters = []): array
     {
         $sql = "SELECT id, company_name, subdomain, db_name, db_username, db_host,
-                       status, plan, owner_email, max_users, max_storage_mb,
+                       status, plan, owner_email,
+                       owner_first_name, owner_last_name, owner_phone,
+                       country, industry, company_size,
+                       trial_ends_at, last_active_at,
+                       billing_cycle, billing_amount_tzs, next_billing_date, payment_status,
+                       max_users, max_storage_mb,
                        created_at, activated_at, suspended_at
                 FROM tenants";
-        $args = [];
+        $args  = [];
+        $where = [];
         if ($status !== null && $status !== '') {
-            $sql .= " WHERE status = ?";
-            $args[] = $status;
+            if ($status === 'expired_trial') {
+                $where[] = "status = 'trial' AND trial_ends_at < NOW()";
+            } else {
+                $where[] = "status = ?";
+                $args[] = $status;
+            }
+        }
+        foreach (['country', 'industry', 'company_size'] as $f) {
+            if (!empty($filters[$f])) {
+                $where[] = "{$f} = ?";
+                $args[] = $filters[$f];
+            }
+        }
+        if ($where) {
+            $sql .= " WHERE " . implode(" AND ", $where);
         }
         $sql .= " ORDER BY created_at DESC, id DESC";
 
@@ -90,8 +114,14 @@ if (!function_exists('getTenant')) {
     {
         $st = getControlPdo()->prepare("
             SELECT id, company_name, subdomain, db_name, db_username, db_host,
-                   status, plan, owner_email, max_users, max_storage_mb,
-                       created_at, activated_at, suspended_at
+                   status, plan, owner_email,
+                   owner_first_name, owner_last_name, owner_phone,
+                   country, industry, company_size,
+                   trial_ends_at, trial_extended_by, last_active_at,
+                   notes, notes_updated_at, notes_updated_by,
+                   billing_cycle, billing_amount_tzs, next_billing_date, payment_status,
+                   unsubscribed_at, max_users, max_storage_mb,
+                   created_at, activated_at, suspended_at
             FROM tenants WHERE id = ? LIMIT 1
         ");
         $st->execute([$id]);
@@ -101,7 +131,7 @@ if (!function_exists('getTenant')) {
 }
 
 if (!function_exists('tenantStats')) {
-    /** Counts by status, with every status present even at zero. */
+    /** Counts by status plus trial-expiry urgency buckets. */
     function tenantStats(): array
     {
         $out = ['active' => 0, 'trial' => 0, 'suspended' => 0, 'deleted' => 0];
@@ -109,6 +139,22 @@ if (!function_exists('tenantStats')) {
             $out[$r['status']] = (int)$r['n'];
         }
         $out['total'] = array_sum($out);
+
+        // Trial urgency buckets (trials only, not yet expired)
+        $cpdo = getControlPdo();
+        $out['trial_expired'] = (int)$cpdo->query(
+            "SELECT COUNT(*) FROM tenants WHERE status='trial' AND trial_ends_at < NOW()"
+        )->fetchColumn();
+        $out['trial_expiring_3d'] = (int)$cpdo->query(
+            "SELECT COUNT(*) FROM tenants WHERE status='trial'
+             AND trial_ends_at >= NOW() AND trial_ends_at <= DATE_ADD(NOW(), INTERVAL 3 DAY)"
+        )->fetchColumn();
+        $out['trial_expiring_7d'] = (int)$cpdo->query(
+            "SELECT COUNT(*) FROM tenants WHERE status='trial'
+             AND trial_ends_at >= NOW() AND trial_ends_at <= DATE_ADD(NOW(), INTERVAL 7 DAY)"
+        )->fetchColumn();
+        $out['expiring_soon'] = $out['trial_expiring_7d']; // alias used by dashboard tile
+
         return $out;
     }
 }
