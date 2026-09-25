@@ -40,7 +40,7 @@ try {
         'description'       => !empty($_POST['description']) ? trim($_POST['description']) : null,
         'category_id'       => !empty($_POST['category_id']) ? intval($_POST['category_id']) : null,
         'brand_id'          => !empty($_POST['brand_id']) ? intval($_POST['brand_id']) : null,
-        'supplier_id'       => !empty($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null,
+        // supplier_id omitted — column removed from new-tenant schemas (2026-07-30)
         'tax_id'            => !empty($_POST['tax_id']) ? intval($_POST['tax_id']) : null,
         'unit'              => $_POST['unit'] ?? 'job',
         'cost_price'        => floatval($_POST['cost_price'] ?? 0),

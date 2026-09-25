@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-25 — fix(products): remove supplier_id from INSERT — crashes on new-tenant schema
+
+**Files:** `api/create_product.php`, `api/create_nip_product.php`, `api/generate_product_variants.php`
+
+- `supplier_id` was removed from `update_product.php` on 2026-07-30 but left in all three CREATE paths. New self-registered tenants have a schema without that column, causing every product creation to fail with `SQLSTATE[42S22]: Unknown column 'supplier_id'`.
+- Removed `supplier_id` from the insert data in all three files. Existing BJP-prod data is unaffected.
+
 ## 2026-09-25 — feat(mobile-api): make period report endpoints Bearer-token-accessible
 
 **Files:** `api/account/get_sales_report.php`, `api/account/get_inventory_report.php`, `api/account/get_expense_report.php`, `api/account/get_user_sales_report.php`, `api/account/get_profit_report.php`
