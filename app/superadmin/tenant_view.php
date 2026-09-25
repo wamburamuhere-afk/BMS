@@ -257,6 +257,24 @@ function svBadge(string $status): string
                             </dd>
                         </div>
                         <?php endif; ?>
+                        <?php if (!empty($tenant['grace_until']) && in_array($tenant['status'], ['trial', 'active'], true)):
+                            $graceDaysLeft = (int)floor((strtotime($tenant['grace_until']) - strtotime('today')) / 86400);
+                            $graceColor = $graceDaysLeft <= 1 ? 'danger' : ($graceDaysLeft <= 3 ? 'warning' : 'warning');
+                        ?>
+                        <div class="col-sm-12">
+                            <dt><i class="bi bi-hourglass-split text-warning me-1"></i>Grace Period</dt>
+                            <dd>
+                                <span class="badge bg-warning text-dark">
+                                    <?= $graceDaysLeft <= 0 ? 'Expires today' : $graceDaysLeft . ' day' . ($graceDaysLeft == 1 ? '' : 's') . ' remaining' ?>
+                                </span>
+                                <small class="text-muted ms-1">Until <?= date('d M Y', strtotime($tenant['grace_until'])) ?></small>
+                                <br><small class="text-muted">
+                                    <?= $tenant['status'] === 'trial' ? 'Trial' : 'Subscription' ?> expired —
+                                    tenant still has access. Reactivate after receiving payment to avoid auto-suspension.
+                                </small>
+                            </dd>
+                        </div>
+                        <?php endif; ?>
                         <?php if ($tenant['status'] === 'active' && !empty($tenant['subscription_ends_at'])):
                             $subDaysLeft = (int)floor((strtotime($tenant['subscription_ends_at']) - time()) / 86400);
                             if ($subDaysLeft < 0)      { $subColor = 'danger';  $subLabel = 'EXPIRED ' . abs($subDaysLeft) . 'd ago'; }

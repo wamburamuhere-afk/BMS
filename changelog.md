@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): grace period — notify-first, no immediate block on trial/subscription expiry
+
+**Files:** `scripts/setup_control_db.php`, `core/superadmin_notifications.php`, `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php`, `header.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+Professional SaaS grace-period model:
+- **DB:** Added `tenants.grace_until DATE NULL`; expanded `superadmin_notifications.type` ENUM with `trial_grace_started` + `subscription_grace_started`.
+- **New flow** (replaces immediate block): trial/subscription expires → 7-day grace period starts → superadmin notified → tenant still works (sees warning banner) → grace ends → auto-suspend. Reactivate at any point after recording payment; all data is preserved.
+- **`tenant_bootstrap.php`:** 3-phase gate: (1) expiry detected, grace not set → write `grace_until`, notify, allow access; (2) within grace → allow access, set `$_SESSION['_bms_grace_warning']`; (3) grace ended → suspend and halt.
+- **`trial_enforcement.php`:** Rewritten to 4 phases — A/C start grace for newly expired tenants; B/D suspend tenants whose grace window has closed. Email digest only fires on actual suspensions.
+- **`header.php`:** Dismissable amber banner ("Your trial/subscription has ended — X days remaining in grace period") shown in the tenant's own system during the grace window.
+- **`activateTenant()`:** Clears `grace_until = NULL` when superadmin reactivates.
+- **Tenants list:** Grace-period badge "Trial/Sub grace: Xd" (amber hourglass) while tenant is in grace.
+- **Tenant detail view:** New "Grace Period" row showing days remaining and expiry date with contextual note.
+
+---
+
 ## 2026-09-25 — feat(superadmin): Expires badge — "X days remaining for testing" + payment-derived subscription expiry
 
 **Files:** `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`

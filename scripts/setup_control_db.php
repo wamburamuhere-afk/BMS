@@ -545,6 +545,8 @@ try {
         'subscription_ends_at' => "ADD COLUMN `subscription_ends_at` DATE NULL AFTER `unsubscribed_at`",
         // Why a tenant is currently suspended (set on auto-suspend; cleared on activate)
         'suspension_reason'    => "ADD COLUMN `suspension_reason` ENUM('trial_expired','subscription_expired','manual') NULL AFTER `subscription_ends_at`",
+        // Grace period end date — set when trial/subscription expires; tenant stays accessible until this date
+        'grace_until'          => "ADD COLUMN `grace_until` DATE NULL AFTER `suspension_reason`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
@@ -560,6 +562,18 @@ try {
          WHERE `trial_ends_at` IS NULL
     ");
     say('  · trial_ends_at backfilled for existing rows');
+
+    // Expand superadmin_notifications.type ENUM to include grace-period event types.
+    $sanType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'superadmin_notifications' AND COLUMN_NAME = 'type'
+    ")->fetchColumn();
+    if ($sanType !== false && strpos((string)$sanType, 'trial_grace_started') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`superadmin_notifications`
+            MODIFY COLUMN `type` ENUM('trial_expired','subscription_expired','trial_grace_started','subscription_grace_started') NOT NULL");
+        say('  · superadmin_notifications.type ENUM expanded (grace types added)');
+    }
 
     // Expand billing_cycle ENUM to include quarterly and biannual (idempotent check).
     $bcType = $admin->query("
