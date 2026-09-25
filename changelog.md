@@ -1,5 +1,54 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): P4 — tenant last_active_at updated on every tenant-user login
+
+**Files:** `actions/login.php`
+
+- After successful tenant user login, fires `UPDATE tenants SET last_active_at = NOW()` on the control DB via `getControlPdo()` wrapped in try/catch so a control-DB hiccup never blocks login.
+
+---
+
+## 2026-09-25 — feat(superadmin): P3 — trial enforcement, reminders, extend-trial action
+
+**Files:** `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php` (new), `api/cron/trial_reminders.php` (new), `actions/superadmin_extend_trial.php` (new)
+
+- `core/tenant_bootstrap.php`: at-request gate auto-suspends expired trials on any tenant page load; logs to `tenant_admin_log`.
+- `api/cron/trial_enforcement.php`: Bearer-token daily batch that bulk-suspends all tenants with `status='trial'` past `trial_ends_at`.
+- `api/cron/trial_reminders.php`: daily batch sending trial-expiry reminder emails at 7d/3d/0d milestones with deduplication.
+- `actions/superadmin_extend_trial.php`: extends a trial by 1–365 days; restores suspended→trial if needed; logs action.
+
+---
+
+## 2026-09-25 — feat(superadmin): P2 — trial lifecycle display
+
+**Files:** `app/superadmin/dashboard.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+- Dashboard: tiered expiry alerts (expired/≤3d/≤7d); "Expiring ≤7d" stat tile.
+- Tenants list: owner full name + phone; trial expiry badge; last-active badge; status filter dropdown.
+- Tenant view: owner profile card (name/phone/country/industry/size); trial_ends_at colour-coded badge; Extend Trial button wired to P3 action.
+
+---
+
+## 2026-09-25 — feat(superadmin): P1 — registration handlers for new tenant fields
+
+**Files:** `core/tenant_provisioner.php`, `core/tenant_admin.php`, `core/tenant_registration.php`, `actions/register_tenant.php`, `actions/superadmin_create_tenant.php`, `register.php`, `app/superadmin/tenant_new.php`
+
+- `provisionTenant()` INSERT extended with 7 new fields (trial_ends_at, owner_first/last_name, owner_phone, country, industry, company_size).
+- Self-registration form gains country (required), industry, company_size dropdowns.
+- Superadmin create form gains all owner-profile fields + conditional trial date picker.
+
+---
+
+## 2026-09-25 — feat(superadmin): P0 — control DB schema foundation
+
+**Files:** `scripts/setup_control_db.php`
+
+- Added 17 new columns to `tenants` table: trial lifecycle (trial_ends_at, trial_extended_by), owner contact (first_name, last_name, phone), business classification (country, industry, company_size), engagement (last_active_at), notes (notes, notes_updated_at, notes_updated_by), billing (billing_cycle, billing_amount_tzs, next_billing_date, payment_status, unsubscribed_at).
+- Added `broadcast_log` table.
+- Backfill: `trial_ends_at = DATE_ADD(created_at, INTERVAL 14 DAY)` for existing tenants.
+
+---
+
 ## 2026-09-25 — feat(mobile-api): make period report endpoints Bearer-token-accessible
 
 **Files:** `api/account/get_sales_report.php`, `api/account/get_inventory_report.php`, `api/account/get_expense_report.php`, `api/account/get_user_sales_report.php`, `api/account/get_profit_report.php`
