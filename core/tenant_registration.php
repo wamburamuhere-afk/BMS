@@ -345,6 +345,22 @@ if (!function_exists('applySelfRegistrationDefaults')) {
             error_log('applySelfRegistrationDefaults: setTenantPosSimpleMode failed for tenant '
                 . $tenantId . ': ' . $sr['error']);
         }
+
+        // Shop Mode ON — self-registered tenants are small retail shops; "Shop/Duka"
+        // wording fits better than "Warehouse/Ghala" from day one.
+        $sm = setTenantShopMode($tenantId, true);
+        if (!$sm['ok']) {
+            error_log('applySelfRegistrationDefaults: setTenantShopMode failed for tenant '
+                . $tenantId . ': ' . $sm['error']);
+        }
+
+        // Supplier Access ON — a shop buys stock from suppliers and needs to record
+        // payments to them without the full Procurement module being enabled.
+        $sa = setTenantSupplierAccess($tenantId, true, false);
+        if (!$sa['ok']) {
+            error_log('applySelfRegistrationDefaults: setTenantSupplierAccess failed for tenant '
+                . $tenantId . ': ' . $sa['error']);
+        }
     }
 }
 
