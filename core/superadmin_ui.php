@@ -34,9 +34,12 @@ if (!function_exists('renderSuperadminHeader')) {
      */
     function renderSuperadminHeader(string $active, ?array $me = null): void
     {
+        require_once __DIR__ . '/superadmin_notifications.php';
         $me   = $me ?? currentSuperadmin();
         $name = trim((string)($me['name'] ?? ''));
         $initial = strtoupper(substr($name !== '' ? $name : 'A', 0, 1));
+        $unreadCount   = countUnreadSaNotifications();
+        $notifications = getRecentSaNotifications(15);
 
         $navItem = function (string $key, string $url, string $icon, string $label) use ($active) {
             $cls = 'nav-link' . ($active === $key ? ' active' : '');
@@ -58,6 +61,16 @@ if (!function_exists('renderSuperadminHeader')) {
             .sa-user-toggle:hover { background: rgba(255,255,255,.12); }
             .sa-user-toggle::after { display: none; }
             .sa-bottom-bar .dropdown-menu { border-top: 3px solid #0d6efd; }
+            .sa-bell-btn { position:relative; background:none; border:none; color:rgba(255,255,255,.85); padding:6px 10px; border-radius:8px; transition:background .15s; cursor:pointer; }
+            .sa-bell-btn:hover { background:rgba(255,255,255,.12); color:#fff; }
+            .sa-bell-badge { position:absolute; top:2px; right:2px; background:#dc3545; color:#fff; font-size:.55rem; font-weight:700; min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px; pointer-events:none; }
+            .sa-notif-dropdown { width:340px; max-height:420px; overflow-y:auto; border-top:3px solid #dc3545 !important; }
+            .sa-notif-item { padding:10px 14px; border-bottom:1px solid #f0f0f0; transition:background .1s; }
+            .sa-notif-item:hover { background:#f8f9fa; }
+            .sa-notif-item.unread { background:#fff8f8; }
+            .sa-notif-item .notif-icon { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+            .sa-notif-item .notif-icon.trial   { background:#fff3cd; color:#856404; }
+            .sa-notif-item .notif-icon.sub     { background:#f8d7da; color:#842029; }
             @media (max-width: 991px) {
                 .sa-bottom-bar .navbar-nav { padding: .4rem 0; }
                 .sa-user-toggle .d-xl-block { display: none !important; }
@@ -122,7 +135,59 @@ if (!function_exists('renderSuperadminHeader')) {
                                 </a>
                             </li>
                         </ul>
-                        <ul class="navbar-nav">
+                        <ul class="navbar-nav align-items-lg-center">
+
+                            <!-- Notification bell -->
+                            <li class="nav-item dropdown me-1">
+                                <button class="sa-bell-btn" id="saBellBtn" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                                    <i class="bi bi-bell-fill" style="font-size:1.05rem"></i>
+                                    <?php if ($unreadCount > 0): ?>
+                                    <span class="sa-bell-badge"><?= $unreadCount > 99 ? '99+' : $unreadCount ?></span>
+                                    <?php endif; ?>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0 sa-notif-dropdown" aria-labelledby="saBellBtn">
+                                    <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-white sticky-top">
+                                        <span class="fw-bold small">Notifications</span>
+                                        <?php if ($unreadCount > 0): ?>
+                                        <button class="btn btn-link btn-sm p-0 text-danger text-decoration-none" id="btnMarkAllRead" style="font-size:.75rem">Mark all read</button>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if (empty($notifications)): ?>
+                                    <div class="text-center text-muted py-4 small">
+                                        <i class="bi bi-bell-slash d-block mb-1" style="font-size:1.4rem;opacity:.4"></i>
+                                        No notifications yet
+                                    </div>
+                                    <?php else: ?>
+                                    <?php foreach ($notifications as $n):
+                                        $isUnread  = !(bool)$n['is_read'];
+                                        $isTrial   = $n['type'] === 'trial_expired';
+                                        $iconClass = $isTrial ? 'trial' : 'sub';
+                                        $iconBi    = $isTrial ? 'bi-hourglass-split' : 'bi-credit-card';
+                                        $timeAgo   = (int)floor((time() - strtotime((string)$n['created_at'])) / 60);
+                                        $timeLabel = $timeAgo < 60 ? $timeAgo . 'm ago'
+                                                   : ($timeAgo < 1440 ? floor($timeAgo/60) . 'h ago'
+                                                   : date('d M', strtotime((string)$n['created_at'])));
+                                        $tenantUrl = '/app/superadmin/tenant_view.php?id=' . (int)($n['tenant_id'] ?? 0);
+                                    ?>
+                                    <a href="<?= htmlspecialchars($tenantUrl, ENT_QUOTES) ?>"
+                                       class="d-flex align-items-start gap-2 text-decoration-none text-dark sa-notif-item<?= $isUnread ? ' unread' : '' ?>">
+                                        <span class="notif-icon <?= $iconClass ?> mt-1">
+                                            <i class="bi <?= $iconBi ?>" style="font-size:.85rem"></i>
+                                        </span>
+                                        <span class="flex-grow-1 overflow-hidden">
+                                            <span class="d-block fw-semibold small text-truncate"><?= htmlspecialchars((string)$n['title'], ENT_QUOTES) ?></span>
+                                            <span class="d-block text-muted" style="font-size:.72rem"><?= htmlspecialchars((string)$n['body'], ENT_QUOTES) ?></span>
+                                            <span class="d-block text-muted" style="font-size:.67rem;margin-top:2px"><?= htmlspecialchars($timeLabel, ENT_QUOTES) ?></span>
+                                        </span>
+                                        <?php if ($isUnread): ?>
+                                        <span class="mt-2 flex-shrink-0" style="width:7px;height:7px;border-radius:50%;background:#dc3545;display:inline-block"></span>
+                                        <?php endif; ?>
+                                    </a>
+                                    <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </li>
+
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle sa-user-toggle d-flex align-items-center" href="#" id="saUserDrop" data-bs-toggle="dropdown" aria-expanded="false">
                                     <span class="sa-avatar me-2"><?= htmlspecialchars($initial, ENT_QUOTES, 'UTF-8') ?></span>
@@ -146,6 +211,50 @@ if (!function_exists('renderSuperadminHeader')) {
                 </div>
             </nav>
         </div>
+        <?php if ($unreadCount > 0 || !empty($notifications)): ?>
+        <script>
+        (function () {
+            const CSRF = <?= json_encode(csrf_token()) ?>;
+            const bellBtn = document.getElementById('saBellBtn');
+            const markAllBtn = document.getElementById('btnMarkAllRead');
+            let marked = false;
+
+            function doMark() {
+                if (marked) return;
+                marked = true;
+                fetch('/actions/superadmin_mark_notifications_read.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: '_csrf=' + encodeURIComponent(CSRF)
+                }).then(function () {
+                    // Remove red badge
+                    const badge = bellBtn ? bellBtn.querySelector('.sa-bell-badge') : null;
+                    if (badge) badge.remove();
+                    // Dim unread dots
+                    document.querySelectorAll('.sa-notif-item.unread').forEach(function (el) {
+                        el.classList.remove('unread');
+                        const dot = el.querySelector('[style*="dc3545"]');
+                        if (dot) dot.remove();
+                    });
+                    if (markAllBtn) markAllBtn.remove();
+                }).catch(function () {});
+            }
+
+            // Mark read when bell dropdown opens
+            if (bellBtn) {
+                bellBtn.addEventListener('shown.bs.dropdown', doMark);
+            }
+            // Or via the "Mark all read" button
+            if (markAllBtn) {
+                markAllBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    doMark();
+                });
+            }
+        })();
+        </script>
+        <?php endif; ?>
         <?php
     }
 }

@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): suspension reason + in-app notification bell + email digest
+
+**Files:** `scripts/setup_control_db.php`, `core/superadmin_notifications.php` (new), `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php`, `actions/superadmin_mark_notifications_read.php` (new), `core/superadmin_ui.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+- **DB:** Added `suspension_reason ENUM('trial_expired','subscription_expired','manual')` column to `tenants`; created `superadmin_notifications` table (id, type, title, body, tenant_id, tenant_name, subdomain, is_read, created_at).
+- **Suspension reason:** `suspendTenant()` now sets `suspension_reason='manual'`; `activateTenant()` clears it. Both the at-request bootstrap gate and the cron sweep set `trial_expired` / `subscription_expired` automatically.
+- **Notification bell:** Bootstrap dropdown in the superadmin header — unread badge count, list of recent events (trial/subscription expirations), mark-all-read on open via AJAX to `actions/superadmin_mark_notifications_read.php`. Deduplication prevents double-entries from cron + bootstrap hitting the same day.
+- **Email digest:** After each cron sweep, if any tenants were suspended, a styled HTML summary email is sent to all superadmin accounts listing the company name, subdomain, and expiry reason/date.
+- **Tenants list:** "Expires" badge for suspended tenants now shows the specific reason (Trial ended / Sub ended / Manually suspended) with the relevant date.
+- **Tenant detail view:** Suspended status area now shows an alert card explaining WHY the tenant is suspended (trial expired, subscription expired, or manually suspended) with the relevant date.
+
+---
+
 ## 2026-09-25 — feat(superadmin): subscription lifecycle — payment recording + unified Expires column
 
 **Files:** `scripts/setup_control_db.php`, `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `actions/superadmin_record_payment.php` (new), `actions/superadmin_tenant_billing.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenants.php`, `api/cron/trial_enforcement.php`

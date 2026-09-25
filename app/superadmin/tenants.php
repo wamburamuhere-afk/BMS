@@ -35,30 +35,48 @@ foreach ($tenants as $t) {
 ksort($allIndustries); ksort($allCountries); ksort($allSizes);
 
 /**
- * Unified "Expires" badge.
- * - Trial tenants   → trial_ends_at
- * - Active (paid)   → subscription_ends_at (if set)
- * - Everything else → —
+ * Unified "Expires" badge — shows what matters for every tenant state.
+ *
+ * trial          → trial end date with days-left urgency colouring
+ * active (paid)  → subscription end date
+ * suspended      → why it was suspended (trial / subscription / manual)
+ * deleted        → —
  */
-function expiresBadge(?string $trialEndsAt, ?string $subscriptionEndsAt, string $status): string
-{
+function expiresBadge(
+    ?string $trialEndsAt,
+    ?string $subscriptionEndsAt,
+    string  $status,
+    ?string $suspensionReason = null
+): string {
     if ($status === 'trial') {
         if ($trialEndsAt === null) return '<span class="text-muted">—</span>';
         $daysLeft = (int)floor((strtotime($trialEndsAt) - time()) / 86400);
-        $label = 'Trial · ' . date('d M Y', strtotime($trialEndsAt));
-        if ($daysLeft < 0)  return '<span class="badge bg-danger">EXPIRED</span>';
-        if ($daysLeft <= 3) return '<span class="badge bg-danger">' . $label . '<br><small>' . $daysLeft . 'd left</small></span>';
-        if ($daysLeft <= 7) return '<span class="badge bg-warning text-dark">' . $label . '<br><small>' . $daysLeft . 'd left</small></span>';
-        return '<span class="badge bg-info text-dark">' . $label . '</span>';
+        $date = date('d M Y', strtotime($trialEndsAt));
+        if ($daysLeft < 0)  return '<span class="badge bg-danger">Trial expired</span>';
+        if ($daysLeft === 0) return '<span class="badge bg-danger">Trial ends today</span>';
+        if ($daysLeft <= 3) return '<span class="badge bg-danger">Trial · ' . $date . ' (' . $daysLeft . 'd)</span>';
+        if ($daysLeft <= 7) return '<span class="badge bg-warning text-dark">Trial · ' . $date . ' (' . $daysLeft . 'd)</span>';
+        return '<span class="badge bg-info text-dark">Trial · ' . $date . '</span>';
     }
     if ($status === 'active') {
-        if ($subscriptionEndsAt === null) return '<span class="text-muted small">Not set</span>';
+        if ($subscriptionEndsAt === null) return '<span class="text-muted small">—</span>';
         $daysLeft = (int)floor((strtotime($subscriptionEndsAt) - time()) / 86400);
-        $label = date('d M Y', strtotime($subscriptionEndsAt));
-        if ($daysLeft < 0)   return '<span class="badge bg-danger">EXPIRED ' . $label . '</span>';
-        if ($daysLeft <= 7)  return '<span class="badge bg-warning text-dark">' . $label . ' (' . $daysLeft . 'd)</span>';
-        if ($daysLeft <= 30) return '<span class="badge bg-success">' . $label . ' (' . $daysLeft . 'd)</span>';
-        return '<span class="badge bg-success">' . $label . '</span>';
+        $date = date('d M Y', strtotime($subscriptionEndsAt));
+        if ($daysLeft < 0)   return '<span class="badge bg-danger">Sub expired ' . $date . '</span>';
+        if ($daysLeft <= 7)  return '<span class="badge bg-warning text-dark">Sub · ' . $date . ' (' . $daysLeft . 'd)</span>';
+        if ($daysLeft <= 30) return '<span class="badge bg-success">Sub · ' . $date . ' (' . $daysLeft . 'd)</span>';
+        return '<span class="badge bg-success">Sub · ' . $date . '</span>';
+    }
+    if ($status === 'suspended') {
+        if ($suspensionReason === 'trial_expired') {
+            $date = $trialEndsAt ? date('d M Y', strtotime($trialEndsAt)) : '?';
+            return '<span class="badge bg-danger"><i class="bi bi-hourglass-split me-1"></i>Trial ended ' . $date . '</span>';
+        }
+        if ($suspensionReason === 'subscription_expired') {
+            $date = $subscriptionEndsAt ? date('d M Y', strtotime($subscriptionEndsAt)) : '?';
+            return '<span class="badge bg-danger"><i class="bi bi-credit-card me-1"></i>Sub ended ' . $date . '</span>';
+        }
+        return '<span class="badge bg-secondary">Manually suspended</span>';
     }
     return '<span class="text-muted">—</span>';
 }
@@ -224,7 +242,7 @@ function saBadge(string $status): string
                         <?php if (!empty($t['owner_phone'])): ?><br><small class="text-muted"><?= safe_output($t['owner_phone'], '') ?></small><?php endif; ?>
                     </td>
                     <td data-order="<?= htmlspecialchars($t['trial_ends_at'] ?? ($t['subscription_ends_at'] ?? ''), ENT_QUOTES) ?>">
-                        <?= expiresBadge($t['trial_ends_at'] ?? null, $t['subscription_ends_at'] ?? null, (string)$t['status']) ?>
+                        <?= expiresBadge($t['trial_ends_at'] ?? null, $t['subscription_ends_at'] ?? null, (string)$t['status'], $t['suspension_reason'] ?? null) ?>
                     </td>
                     <td data-order="<?= htmlspecialchars($t['last_active_at'] ?? '', ENT_QUOTES) ?>">
                         <?= lastActiveBadge($t['last_active_at'] ?? null) ?>
