@@ -135,7 +135,9 @@ try {
         'description' => !empty($_POST['description']) ? trim($_POST['description']) : null,
         'category_id' => $category_id,
         'brand_id' => $brand_id,
-        'supplier_id' => !empty($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null,
+        // supplier_id intentionally omitted — the "Preferred Supplier" field
+        // was removed from the add-product form (2026-07-30, same as update_product.php);
+        // new-tenant schemas do not carry this column so including it crashes the INSERT.
         'unit' => $_POST['unit'],
         'weight' => !empty($_POST['weight']) ? floatval($_POST['weight']) : 0.000,
         'dimensions' => $dimensions,

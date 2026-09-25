@@ -171,9 +171,26 @@ function svBadge(string $status): string
                             <dt>Web address</dt>
                             <dd><code><?= safe_output($tenant['subdomain'], '') ?></code></dd>
                             <dt>Owner</dt>
-                            <dd><?= safe_output($tenant['owner_email'], '') ?></dd>
+                            <dd>
+                                <?php
+                                $ownerName = trim(($tenant['owner_first_name'] ?? '') . ' ' . ($tenant['owner_last_name'] ?? ''));
+                                echo $ownerName !== '' ? htmlspecialchars($ownerName, ENT_QUOTES, 'UTF-8') . '<br>' : '';
+                                ?>
+                                <small><?= safe_output($tenant['owner_email'], '—') ?></small>
+                                <?php if (!empty($tenant['owner_phone'])): ?>
+                                <br><small class="text-muted"><i class="bi bi-telephone me-1"></i><?= safe_output($tenant['owner_phone'], '') ?></small>
+                                <?php endif; ?>
+                            </dd>
                             <dt>Plan</dt>
                             <dd><?= safe_output($tenant['plan'] ?? '', '—') ?></dd>
+                            <?php if (!empty($tenant['country']) || !empty($tenant['industry']) || !empty($tenant['company_size'])): ?>
+                            <dt>Classification</dt>
+                            <dd>
+                                <?= safe_output($tenant['country'] ?? '', '') ?>
+                                <?php if (!empty($tenant['industry'])): ?> · <?= safe_output($tenant['industry'], '') ?><?php endif; ?>
+                                <?php if (!empty($tenant['company_size'])): ?> · <?= safe_output($tenant['company_size'], '') ?> staff<?php endif; ?>
+                            </dd>
+                            <?php endif; ?>
                         </div>
                         <div class="col-sm-6">
                             <dt>Database</dt>
@@ -182,6 +199,17 @@ function svBadge(string $status): string
                             <dd><code><?= safe_output($tenant['db_username'], '—') ?></code></dd>
                             <dt>Host</dt>
                             <dd><?= safe_output($tenant['db_host'], '—') ?></dd>
+                            <dt>Last Active</dt>
+                            <dd>
+                            <?php if (!empty($tenant['last_active_at'])):
+                                $daysAgo = (int)floor((time() - strtotime($tenant['last_active_at'])) / 86400);
+                                $color = $daysAgo <= 7 ? 'success' : ($daysAgo <= 30 ? 'warning' : 'danger');
+                            ?>
+                                <span class="badge bg-<?= $color ?>-subtle text-<?= $color ?>"><?= $daysAgo ?>d ago</span>
+                            <?php else: ?>
+                                <span class="text-muted">Never</span>
+                            <?php endif; ?>
+                            </dd>
                         </div>
                         <div class="col-sm-4">
                             <dt>Registered</dt>
@@ -195,6 +223,20 @@ function svBadge(string $status): string
                             <dt>Suspended</dt>
                             <dd><?= safe_output($tenant['suspended_at'] ?? '', '—') ?></dd>
                         </div>
+                        <?php if ($tenant['status'] === 'trial' && !empty($tenant['trial_ends_at'])):
+                            $daysLeft = (int)floor((strtotime($tenant['trial_ends_at']) - time()) / 86400);
+                            $expiryColor = $daysLeft < 0 ? 'danger' : ($daysLeft <= 3 ? 'danger' : ($daysLeft <= 7 ? 'warning' : 'success'));
+                        ?>
+                        <div class="col-sm-12">
+                            <dt>Trial Expires</dt>
+                            <dd>
+                                <?= date('d M Y', strtotime($tenant['trial_ends_at'])) ?>
+                                <span class="badge bg-<?= $expiryColor ?> ms-1">
+                                    <?= $daysLeft < 0 ? 'EXPIRED ' . abs($daysLeft) . 'd ago' : $daysLeft . ' days left' ?>
+                                </span>
+                            </dd>
+                        </div>
+                        <?php endif; ?>
                     </dl>
                 </div>
             </div>
@@ -222,6 +264,11 @@ function svBadge(string $status): string
                         <button class="btn btn-primary w-100 mb-2" onclick="doSuspend()">
                             <i class="bi bi-pause-circle me-1"></i> Suspend
                         </button>
+                    <?php endif; ?>
+                    <?php if (in_array($tenant['status'], ['trial', 'suspended'], true)): ?>
+                    <button class="btn btn-outline-success w-100 mb-2" onclick="doExtendTrial()">
+                        <i class="bi bi-calendar-plus me-1"></i> Extend Trial
+                    </button>
                     <?php endif; ?>
                     <hr>
                     <p class="small text-danger mb-2">
@@ -746,6 +793,40 @@ function postAction(data, title, redirect) {
         let msg = 'Action failed.';
         try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    });
+}
+
+function doExtendTrial() {
+    Swal.fire({
+        title: 'Extend Trial',
+        html: '<select id="swalExtendDays" class="form-select mt-2">'
+            + '<option value="7">+ 7 days</option>'
+            + '<option value="14" selected>+ 14 days</option>'
+            + '<option value="30">+ 30 days</option>'
+            + '</select>',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Extend',
+        confirmButtonColor: '#198754',
+        preConfirm: function () {
+            return document.getElementById('swalExtendDays').value;
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: '/actions/superadmin_extend_trial.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, days: result.value }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Trial Extended', text: res.message, timer: 1800, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 1800);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not extend trial.' });
+            }
+        }).fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Request failed.' });
+        });
     });
 }
 

@@ -244,6 +244,10 @@ if (!function_exists('registerTenant')) {
             'status'            => 'active',      // so the owner can sign in immediately
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
+            'owner_phone'       => $phone,
+            'country'           => trim((string)($in['country']       ?? '')),
+            'industry'          => trim((string)($in['industry']      ?? '')),
+            'company_size'      => trim((string)($in['company_size']  ?? '')),
             'physical_address'  => trim((string)($in['company_physical_address'] ?? '')),
             'postal_address'    => trim((string)($in['company_postal_address'] ?? '')),
             'phone'             => $phone,

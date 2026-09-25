@@ -207,25 +207,72 @@ try {
     error_log('superadmin dashboard (provisioning): ' . $e->getMessage());
 }
 
+// Trial EXPIRED — past trial_ends_at, still in 'trial' status
 try {
     $rows = getControlPdo()->query("
-        SELECT id, company_name, subdomain, owner_email,
-               DATEDIFF(NOW(), created_at) AS days_old
+        SELECT id, company_name, subdomain, owner_email, trial_ends_at,
+               DATEDIFF(NOW(), trial_ends_at) AS days_overdue
         FROM tenants
-        WHERE status = 'trial' AND created_at <= DATE_SUB(NOW(), INTERVAL 14 DAY)
-        ORDER BY created_at ASC
+        WHERE status = 'trial' AND trial_ends_at < NOW()
+        ORDER BY trial_ends_at ASC
         LIMIT 30
     ")->fetchAll();
     if ($rows) {
-        $attention['stale_trials'] = [
-            'title' => 'Trials open 14+ days with no decision',
+        $attention['trial_expired'] = [
+            'title' => 'Trials EXPIRED — account not yet suspended',
+            'icon'  => 'bi-hourglass-bottom',
+            'color' => 'danger',
+            'items' => $rows,
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (trial expired): ' . $e->getMessage());
+}
+
+// Trial expiring ≤ 3 days
+try {
+    $rows = getControlPdo()->query("
+        SELECT id, company_name, subdomain, owner_email, trial_ends_at,
+               DATEDIFF(trial_ends_at, NOW()) AS days_left
+        FROM tenants
+        WHERE status = 'trial' AND trial_ends_at >= NOW()
+          AND trial_ends_at <= DATE_ADD(NOW(), INTERVAL 3 DAY)
+        ORDER BY trial_ends_at ASC
+        LIMIT 30
+    ")->fetchAll();
+    if ($rows) {
+        $attention['trial_urgent'] = [
+            'title' => 'Trials expiring in ≤ 3 days',
+            'icon'  => 'bi-clock-history',
+            'color' => 'danger',
+            'items' => $rows,
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (trial urgent): ' . $e->getMessage());
+}
+
+// Trial expiring 4–7 days
+try {
+    $rows = getControlPdo()->query("
+        SELECT id, company_name, subdomain, owner_email, trial_ends_at,
+               DATEDIFF(trial_ends_at, NOW()) AS days_left
+        FROM tenants
+        WHERE status = 'trial' AND trial_ends_at > DATE_ADD(NOW(), INTERVAL 3 DAY)
+          AND trial_ends_at <= DATE_ADD(NOW(), INTERVAL 7 DAY)
+        ORDER BY trial_ends_at ASC
+        LIMIT 30
+    ")->fetchAll();
+    if ($rows) {
+        $attention['trial_warning'] = [
+            'title' => 'Trials expiring in 4–7 days',
             'icon'  => 'bi-hourglass-split',
             'color' => 'warning',
             'items' => $rows,
         ];
     }
 } catch (Throwable $e) {
-    error_log('superadmin dashboard (stale trials): ' . $e->getMessage());
+    error_log('superadmin dashboard (trial warning): ' . $e->getMessage());
 }
 
 try {
@@ -516,6 +563,14 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
             </div>
         </div>
         <?php endforeach; ?>
+        <?php if (($stats['expiring_soon'] ?? 0) > 0): ?>
+        <div class="col-6 col-md-3">
+            <div class="card bg-danger text-white border-0 shadow-sm p-3">
+                <div class="small opacity-75"><i class="bi bi-clock-history me-1"></i>Expiring ≤7d</div>
+                <div class="value"><?= (int)$stats['expiring_soon'] ?></div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Charts -->

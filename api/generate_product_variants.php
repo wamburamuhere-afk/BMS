@@ -113,7 +113,7 @@ foreach ($existingStmt->fetchAll(PDO::FETCH_COLUMN) as $json) {
 }
 
 $insCols = [
-    'product_name', 'sku', 'barcode', 'description', 'category_id', 'brand_id', 'supplier_id', 'unit',
+    'product_name', 'sku', 'barcode', 'description', 'category_id', 'brand_id', 'unit',
     'weight', 'dimensions', 'cost_price', 'selling_price', 'min_selling_price', 'wholesale_price',
     'tax_id', 'tax_rate', 'discount_rate', 'reorder_level', 'min_stock_level', 'max_stock_level',
     'image_url', 'status', 'is_service', 'is_taxable', 'track_inventory', 'barcode_symbology',
@@ -145,7 +145,7 @@ try {
             'description'       => $parent['description'],
             'category_id'       => $parent['category_id'],
             'brand_id'          => $parent['brand_id'],
-            'supplier_id'       => $parent['supplier_id'],
+            // supplier_id omitted — column removed from new-tenant schemas (2026-07-30)
             'unit'              => $parent['unit'],
             'weight'            => $parent['weight'],
             'dimensions'        => $parent['dimensions'],

@@ -318,7 +318,9 @@ if (!function_exists('provisionTenant')) {
      *
      * @param array $opts  'status' => 'active'|'trial' (default 'active'),
      *                     'plan'   => string|null,
-     *                     'owner_first_name', 'owner_last_name' => string,
+     *                     'owner_first_name', 'owner_last_name', 'owner_phone' => string,
+     *                     'country', 'industry', 'company_size' => string|null,
+     *                     'trial_ends_at' => string|null (Y-m-d H:i:s; defaults to +14 days),
      *                     'physical_address', 'postal_address' => string,
      *                     'logo_tmp_path', 'logo_extension' => string|null
      * @return array{ok:bool, tenant_id:?int, subdomain:string, db_name:?string,
@@ -383,14 +385,32 @@ if (!function_exists('provisionTenant')) {
 
         // ── 2. Reserve the registry row to obtain the tenant id ──────────────
         // Placeholder db_name/username; filled in at step 8 once real.
+        // trial_ends_at defaults to NOW() + 14 days; caller may override.
+        $trialEndsAt = null;
+        if (!empty($opts['trial_ends_at'])) {
+            $trialEndsAt = $opts['trial_ends_at'];
+        } else {
+            $trialEndsAt = date('Y-m-d H:i:s', strtotime('+14 days'));
+        }
+        $ownerFirstName = trim((string)($opts['owner_first_name'] ?? ''));
+        $ownerLastName  = trim((string)($opts['owner_last_name']  ?? ''));
+        $ownerPhone     = trim((string)($opts['owner_phone']      ?? ''));
+        $country        = trim((string)($opts['country']          ?? '')) ?: null;
+        $industry       = trim((string)($opts['industry']         ?? '')) ?: null;
+        $companySize    = trim((string)($opts['company_size']     ?? '')) ?: null;
+
         try {
             $cpdo->prepare("
                 INSERT INTO tenants (company_name, subdomain, db_host, db_name, db_username,
-                                     db_password_encrypted, status, plan, owner_email)
-                VALUES (?,?,?,'','','', ?, ?, ?)
+                                     db_password_encrypted, status, plan, owner_email,
+                                     trial_ends_at, owner_first_name, owner_last_name, owner_phone,
+                                     country, industry, company_size)
+                VALUES (?,?,?,'','','', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ")->execute([
                 $companyName, $subdomain, controlDbSettings()['host'],
                 $status, $opts['plan'] ?? null, $ownerEmail,
+                $trialEndsAt, $ownerFirstName, $ownerLastName, $ownerPhone,
+                $country, $industry, $companySize,
             ]);
             $tenantId = (int)$cpdo->lastInsertId();
         } catch (PDOException $e) {
