@@ -553,6 +553,59 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
     </div>
 </div>
 
+<!-- ── Mobile Cart FAB ───────────────────────────────────────────────────
+     Fixed bottom-right button (phone-only: d-md-none). Shown only when the
+     cart has ≥1 item (JS controls display). Blue to match the POS primary
+     colour; count badge is white-on-blue for clean contrast without the
+     alarm-red that belongs only on errors/warnings.
+     ──────────────────────────────────────────────────────────────────────── -->
+<button id="mobileCartFab"
+        type="button"
+        class="d-md-none btn btn-primary shadow-lg"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#mobileCartOffcanvas"
+        aria-label="<?= t('View Cart') ?>"
+        style="position:fixed;bottom:24px;right:20px;width:58px;height:58px;border-radius:50%;font-size:1.25rem;z-index:1055;display:none;padding:0;">
+    <i class="bi bi-cart3"></i>
+    <span id="mobileCartBadge"
+          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-white text-primary fw-bold"
+          style="font-size:0.65rem;min-width:20px;padding:2px 5px;border:2px solid #0d6efd;">0</span>
+</button>
+
+<!-- ── Mobile Cart Offcanvas (bottom sheet) ──────────────────────────────
+     Slides up 72 % of the screen. Fully functional: item list + total +
+     Process Payment. The trigger (FAB) is d-md-none so desktop users never
+     see this; the offcanvas element itself has no display restriction so
+     Bootstrap can control its visibility normally.
+     ──────────────────────────────────────────────────────────────────────── -->
+<div class="offcanvas offcanvas-bottom"
+     id="mobileCartOffcanvas"
+     tabindex="-1"
+     style="height:72vh;max-height:72vh;border-radius:16px 16px 0 0;">
+    <div class="offcanvas-header border-bottom py-2 px-3">
+        <h6 class="offcanvas-title mb-0 fw-bold">
+            <i class="bi bi-cart3 me-1 text-primary"></i>
+            <?= t('Current Sale') ?>
+            <span id="mobileCartOffcanvasCount" class="badge bg-primary ms-1 fw-normal">0</span>
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="<?= t('Close') ?>"></button>
+    </div>
+    <div class="offcanvas-body px-3 py-0" style="overflow-y:auto;" id="mobileCartOffcanvasItems">
+        <!-- Populated by updateMobileCartFab() whenever the cart changes -->
+    </div>
+    <div class="p-3 border-top bg-white" style="flex-shrink:0;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold text-muted small"><?= t('Total:') ?></span>
+            <span class="fw-bold fs-6 text-success" id="mobileCartOffcanvasTotal"><?= htmlspecialchars($currency) ?> 0.00</span>
+        </div>
+        <button class="btn btn-success w-100 fw-bold"
+                data-bs-dismiss="offcanvas"
+                onclick="processPayment()">
+            <i class="bi bi-check-circle me-1"></i><?= t('PROCESS PAYMENT') ?>
+        </button>
+    </div>
+</div>
+
 <?php include 'pos_modals_new.php'; ?>
 <?php include 'pos_scripts_new.php'; ?>
 <script>

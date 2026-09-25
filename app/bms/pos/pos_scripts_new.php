@@ -1264,8 +1264,9 @@ function updateCartDisplay() {
         
         $('#cartItemCount').text(cart.length);
     }
-    
+
     calculateCartTotal();
+    updateMobileCartFab();
 }
 
 function updateCartQuantity(index, change) {
@@ -2988,4 +2989,47 @@ function updateCashBalanceUI() {
     window._posHandleScan    = handleBarcodeScanned;
     window._posScanAddToCart = scanAddToCart;
 })();
+
+// ── Mobile Cart FAB sync ─────────────────────────────────────────────────────
+// Called at the end of updateCartDisplay() (after calculateCartTotal() so that
+// #cartTotal already holds the formatted string we can copy directly).
+// Shows the FAB when cart has items, hides it when empty. Rebuilds the compact
+// item list inside the offcanvas and mirrors the total from #cartTotal so the
+// two totals are always identical without duplicating the tax/loyalty logic.
+function updateMobileCartFab() {
+    const count = cart.length;
+    if (count === 0) {
+        $('#mobileCartFab').hide();
+        return;
+    }
+
+    // Show FAB and sync badge counts
+    $('#mobileCartFab').show();
+    $('#mobileCartBadge, #mobileCartOffcanvasCount').text(count);
+
+    // Build compact item rows for the offcanvas body
+    let html = '';
+    cart.forEach(function(item) {
+        const lineTotal = (item.discounted_price * item.quantity)
+            .toLocaleString('en-US', {minimumFractionDigits: 2});
+        const hasDiscount = item.discounted_price < item.price;
+        const priceStr = hasDiscount
+            ? '<span class="text-decoration-line-through text-muted me-1">' + item.price.toLocaleString() + '</span>'
+              + '<span class="text-danger">' + item.discounted_price.toLocaleString() + '</span>'
+            : item.discounted_price.toLocaleString();
+        html += '<div class="d-flex justify-content-between align-items-center py-2 border-bottom">'
+            + '<div style="min-width:0;flex:1;padding-right:10px;">'
+            +   '<div class="fw-semibold text-truncate" style="font-size:0.82rem;">' + safeOutput(item.product_name) + '</div>'
+            +   '<div class="text-muted" style="font-size:0.72rem;">' + priceStr + ' &times; ' + item.quantity + '</div>'
+            + '</div>'
+            + '<div class="fw-bold text-end" style="font-size:0.82rem;white-space:nowrap;">'
+            +   POS_CURRENCY + ' ' + lineTotal
+            + '</div>'
+            + '</div>';
+    });
+    $('#mobileCartOffcanvasItems').html(html);
+
+    // Mirror the total already computed by calculateCartTotal() — always in sync
+    $('#mobileCartOffcanvasTotal').text($('#cartTotal').text());
+}
 </script>
