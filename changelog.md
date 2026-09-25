@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): subscription lifecycle — payment recording + unified Expires column
+
+**Files:** `scripts/setup_control_db.php`, `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `actions/superadmin_record_payment.php` (new), `actions/superadmin_tenant_billing.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenants.php`, `api/cron/trial_enforcement.php`
+
+- **DB:** Added `subscription_ends_at DATE` column to `tenants`; expanded `billing_cycle` ENUM to include `quarterly` (3m) and `biannual` (6m); created `tenant_payments` table (id, tenant_id, amount_tzs, duration_months, starts_at, ends_at, notes, recorded_by, recorded_at).
+- **Record Payment flow:** New `actions/superadmin_record_payment.php` — superadmin picks duration (1/3/6/12 months), amount, start date; system auto-calculates `subscription_ends_at`, inserts into `tenant_payments`, updates `billing_cycle` + `billing_amount_tzs` + `payment_status='current'`; optionally re-activates a suspended tenant in the same transaction.
+- **Billing tab rebuilt:** subscription status card (ends-at badge + days remaining), Record Payment modal with duration picker + live "runs until" preview + payment history table; old manual fields collapsed under "Manual Override" section.
+- **Tenants list:** "Trial Ends" column renamed to "Expires" — trial tenants show `trial_ends_at`; active paid tenants show `subscription_ends_at`; colour badges consistent with urgency.
+- **At-request gate:** `core/tenant_bootstrap.php` now auto-suspends and blocks `active` tenants whose `subscription_ends_at < today`.
+- **Cron batch:** `trial_enforcement.php` also sweeps expired subscriptions (`status='active' AND subscription_ends_at < CURDATE()`); response now reports `trials_suspended` and `subs_suspended` separately.
+
+---
+
 ## 2026-09-25 — fix(pos-mobile): Bearer token support for 7 POS endpoints
 
 **Files:** `api/pos/generate_receipt_number.php`, `api/pos/get_price_groups.php`, `api/pos/get_price_group_products.php`, `api/pos/get_product_units.php`, `api/pos/get_available_serials.php`, `api/pos/email_receipt.php`, `api/pos/get_registers.php`

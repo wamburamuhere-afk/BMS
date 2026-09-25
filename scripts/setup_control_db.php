@@ -395,6 +395,27 @@ try {
     ");
     say('  · table broadcast_log ready');
 
+    // ── Payment history (subscription_plan.md) ──────────────────────────────
+    // One row per recorded payment. Source of truth for subscription_ends_at:
+    // postPayment() inserts here and then updates tenants.subscription_ends_at.
+    // No FK — same denormalised-id convention as tenant_admin_log.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_payments` (
+            `id`              INT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`       INT          NOT NULL,
+            `amount_tzs`      INT          NOT NULL,
+            `duration_months` TINYINT      NOT NULL,
+            `starts_at`       DATE         NOT NULL,
+            `ends_at`         DATE         NOT NULL,
+            `notes`           VARCHAR(500) NULL,
+            `recorded_by`     INT          NULL,
+            `recorded_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_tp_tenant` (`tenant_id`),
+            KEY `idx_tp_ends`   (`ends_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table tenant_payments ready');
+
     // ── Self-service module requests (tenant_module_control_plan.md, Phase C) ──
     // A tenant's own admin asking for a module they don't have, and a
     // superadmin approving/declining. Lives here, not in any tenant database,
@@ -500,6 +521,8 @@ try {
         'payment_status'     => "ADD COLUMN `payment_status` ENUM('current','overdue','pending','none') NOT NULL DEFAULT 'none' AFTER `next_billing_date`",
         // Comms opt-out
         'unsubscribed_at'    => "ADD COLUMN `unsubscribed_at` DATETIME NULL AFTER `payment_status`",
+        // Subscription expiry (set automatically when a payment is recorded)
+        'subscription_ends_at' => "ADD COLUMN `subscription_ends_at` DATE NULL AFTER `unsubscribed_at`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
@@ -515,6 +538,18 @@ try {
          WHERE `trial_ends_at` IS NULL
     ");
     say('  · trial_ends_at backfilled for existing rows');
+
+    // Expand billing_cycle ENUM to include quarterly and biannual (idempotent check).
+    $bcType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'tenants' AND COLUMN_NAME = 'billing_cycle'
+    ")->fetchColumn();
+    if ($bcType !== false && strpos((string)$bcType, 'quarterly') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants`
+            MODIFY COLUMN `billing_cycle` ENUM('monthly','quarterly','biannual','annual') NULL");
+        say("  · tenants.billing_cycle ENUM expanded (quarterly, biannual added)");
+    }
 
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
