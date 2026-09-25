@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(email): multi-provider platform email selector
+
+**Files:** `app/superadmin/settings.php`, `actions/superadmin_platform_settings.php`
+
+- Added email provider selector to superadmin platform settings: Own Server, Amazon SES, Mailgun, SendGrid.
+- For managed providers (SES/Mailgun/SendGrid): host, port and encryption are pre-set server-side — no manual entry needed; reduces misconfiguration risk.
+- Amazon SES: added AWS region dropdown (14 regions) — host auto-resolves to `email-smtp.{region}.amazonaws.com`.
+- SendGrid: username auto-fills to the literal `apikey` string and is made read-only.
+- JS provider change handler: shows/hides relevant sections, updates labels, syncs hidden inputs so the test button and save both receive correct SMTP details regardless of provider.
+- `save_email` action: derives host/port/enc server-side for managed providers (POST values ignored for these), validates, and persists `email_provider` + `ses_region` keys alongside existing SMTP keys.
+- `getSmtpValue()` JS helper reads the active (non-disabled) field so the test button sends correct credentials to `superadmin_test_platform_email.php` for any provider.
+- Backward compatible: existing `own` server configs are preserved; `email_provider` defaults to `own` if not set.
+
 ## 2026-09-23 — feat(api): mobile self-registration endpoint
 
 **Files:** `api/mobile/register.php`
