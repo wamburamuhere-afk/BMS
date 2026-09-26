@@ -1077,6 +1077,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('mm_transactions')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_transactions') ?>"><i class="bi bi-arrow-left-right me-1"></i><?= t('Transactions') ?></a></li>
                                 <?php endif; ?>
+                                <?php if(canView('mm_shifts')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_shifts') ?>"><i class="bi bi-clock-history me-1"></i><?= t('Teller Shifts') ?></a></li>
+                                <?php endif; ?>
                                 <?php if(canView('mm_float')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_float') ?>"><i class="bi bi-cash-stack me-1"></i><?= t('Float Management') ?></a></li>
                                 <?php endif; ?>

@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 10 — Nav + UI Polish
+
+**Files:**
+- `header.php` — added Teller Shifts link (mm_shifts) to Mobile Money nav dropdown
+- `app/bms/mobile_money/mm_compliance.php` — rebuilt from stub with full KYC view (was mm_kyc.php, renamed to match route)
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 9 — Compliance / KYC
 
 **Files:**
