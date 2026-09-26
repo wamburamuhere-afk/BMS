@@ -33,8 +33,14 @@ if (empty($clean_uri) || $clean_uri === 'index.php') {
             exit();
         }
     } elseif (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
-        // User is logged in, redirect to dashboard
-        redirectTo('dashboard');
+        // Route to the most relevant landing page for this tenant's module set.
+        // tenantOnlyHasModule() is safe here — features are primed by roots.php.
+        require_once __DIR__ . '/core/feature_registry.php';
+        if (tenantOnlyHasModule('mobile_money')) {
+            redirectTo('mm_dashboard');
+        } else {
+            redirectTo('dashboard');
+        }
     } else {
         // User is not logged in, redirect to login
         redirectTo('login');
