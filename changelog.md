@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 9 — Compliance / KYC
+
+**Files:**
+- `app/bms/mobile_money/mm_kyc.php` — KYC records view (stats tiles, records table, pending-KYC tab)
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 8 — Reports (7 report types)
 
 **Files:**
