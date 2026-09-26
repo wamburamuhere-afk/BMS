@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): context-aware tenant_view landing + grace-start email digest
+
+**Files:** `app/superadmin/tenant_view.php`, `app/superadmin/dashboard.php`, `core/superadmin_ui.php`, `api/cron/trial_enforcement.php`
+
+Professional context-aware navigation when arriving at tenant_view from dashboard or notification bell:
+- **Back button** now reads "← Back to Dashboard" when `?from=dashboard` or `?from=notif`; otherwise "← Back to tenants".
+- **Action Required banner** shown above tabs with contextual message and icon (warning for grace period, danger for suspended, info for billing) based on `?from_cat` / `?notif_type`.
+- **Tab auto-open:** Billing tab opens automatically for subscription/payment events; Overview tab for lifecycle events (120 ms deferred Bootstrap Tab init).
+- **Grace-start email digest** (`trial_enforcement.php`): When Phases A/C set `grace_until` for any tenant, a separate immediate email is sent to all superadmins listing each tenant that entered grace + grace-end date. The suspension digest (Phases B/D) is unchanged.
+- **`dashboard.php`:** Added `in_grace` attention category, updated `trial_expired` query to exclude tenants still in grace, context params appended to all tenant links.
+- **`superadmin_ui.php`:** Bell notification links pass `&from=notif&notif_type=X`; grace notifications show hourglass icon.
+
 ## 2026-09-25 — feat(superadmin): grace period — notify-first, no immediate block on trial/subscription expiry
 
 **Files:** `scripts/setup_control_db.php`, `core/superadmin_notifications.php`, `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php`, `header.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`

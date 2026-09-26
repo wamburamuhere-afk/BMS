@@ -200,6 +200,75 @@ try {
         }
     }
 
+    // ── Grace-start email: notify superadmins when tenants enter grace ──────
+    $totalGraceStarted = $trialGraceStarted + $subGraceStarted;
+    if ($totalGraceStarted > 0) {
+        try {
+            $saEmails = $ctrl->query(
+                "SELECT name, email FROM superadmins WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+            )->fetchAll(\PDO::FETCH_ASSOC);
+
+            if ($saEmails) {
+                $todayLabel  = date('d M Y');
+                $graceSubject = "BMS — {$totalGraceStarted} tenant" . ($totalGraceStarted > 1 ? 's' : '') . " entered grace period ({$todayLabel})";
+
+                $trialGraceRows = '';
+                foreach ($newTrialGrace as $t) {
+                    $graceEnd = date('d M Y', strtotime($t['trial_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+                    $trialGraceRows .= '<tr>'
+                        . '<td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#856404">Trial expired ' . htmlspecialchars((string)$t['trial_ends_at'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#dc3545">' . $graceEnd . '</td>'
+                        . '</tr>';
+                }
+                $subGraceRows = '';
+                foreach ($newSubGrace as $t) {
+                    $graceEnd = date('d M Y', strtotime($t['subscription_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+                    $subGraceRows .= '<tr>'
+                        . '<td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#664d03">Subscription expired ' . htmlspecialchars((string)$t['subscription_ends_at'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#dc3545">' . $graceEnd . '</td>'
+                        . '</tr>';
+                }
+
+                $tableStyle = 'width:100%;border-collapse:collapse;font-size:14px';
+                $thStyle    = 'padding:8px 10px;background:#fff3cd;text-align:left;font-weight:600;border-bottom:2px solid #ffc107';
+
+                $graceBody = '
+                <p>This is a BMS grace-period notification for <strong>' . $todayLabel . '</strong>.</p>
+                <p>The following tenants have entered their <strong>' . GRACE_PERIOD_DAYS . '-day grace period</strong> — they can still log in, but will be automatically suspended when the grace period ends unless a payment is recorded.</p>
+                <table style="' . $tableStyle . '">
+                    <thead><tr>
+                        <th style="' . $thStyle . '">Company</th>
+                        <th style="' . $thStyle . '">Subdomain</th>
+                        <th style="' . $thStyle . '">Expired</th>
+                        <th style="' . $thStyle . '">Grace ends</th>
+                    </tr></thead>
+                    <tbody>' . $trialGraceRows . $subGraceRows . '</tbody>
+                </table>
+                <p style="margin-top:16px">
+                    Review and record payments in the Billing tab:<br>
+                    <a href="https://superadmin.bms.bjptechnologies.co.tz/tenants">
+                        superadmin.bms.bjptechnologies.co.tz/tenants
+                    </a>
+                </p>';
+
+                foreach ($saEmails as $sa) {
+                    sendEmail(
+                        $sa['email'],
+                        $graceSubject,
+                        '<p>Hi ' . htmlspecialchars((string)$sa['name'], ENT_QUOTES) . ',</p>' . $graceBody,
+                        ['wrap_brand' => 'BJP Technologies / BMS']
+                    );
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('trial_enforcement grace-start email: ' . $e->getMessage());
+        }
+    }
+
     // ── Email digest: only when tenants were actually suspended today ─────
     $totalSuspended = $trialSuspended + $subSuspended;
     if ($totalSuspended > 0) {
@@ -267,6 +336,7 @@ try {
         'sub_grace_started'       => $subGraceStarted,
         'sub_suspended'           => $subSuspended,
         'errors'                  => $errors,
+        'grace_email_sent'        => $totalGraceStarted > 0,
         'digest_sent'             => $totalSuspended > 0,
         'ran_at'                  => date('c'),
     ]);
