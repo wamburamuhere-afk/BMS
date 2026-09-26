@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 8 — Reports (7 report types)
+
+**Files:**
+- `app/bms/mobile_money/mm_reports.php` — unified reports page with date/network/agent filters;
+  7 tabs: Transaction Summary, Float Position, Commission, Agent Performance, Shift Summary,
+  Void & Suspicious, Network Comparison; DataTable with Excel export
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 7 — Dashboard
 
 **Files:**
