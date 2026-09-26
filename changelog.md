@@ -1,7 +1,23 @@
 # BMS Changelog
 
-<<<<<<< Updated upstream
-=======
+## 2026-09-26 — feat(mobile-money): Phase 2 — Transaction Engine (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `core/mm_posting.php` — GL posting engine: `mmGLAccountIds()`, `postMMTransaction()`, `postMMFloatMovement()`; implements full double-entry for all 8 transaction types (cash_in/out, send, bill_pay, airtime, bank_to_wallet, wallet_to_bank, international) with commission legs
+- `core/mm_float_service.php` — float service helpers: `mmComputeCommission()`, `mmRecordFloatMovement()`, `mmTakeFloatSnapshot()`
+- `api/mobile_money/save_transaction.php` — create + post MM transaction API; BOT KYC gate (≥TZS 1M); atomic DB transaction wrapping insert + GL post + status update
+- `api/mobile_money/void_transaction.php` — void a posted transaction + reverse GL journal
+- `app/bms/mobile_money/mm_transactions.php` — transaction list page: date/network/type/till filters, stats row, DataTable + mobile card view, inline new-transaction modal
+- `app/bms/mobile_money/mm_transaction_view.php` — transaction detail: GL entry link, void button (permission-gated)
+- `app/bms/mobile_money/mm_agents.php` — **schema fix**: remove nonexistent `network_id` column from queries; `phone`→`phone_primary`; `location`→`region`/`district`; `status` values active/suspended/closed
+- `app/bms/mobile_money/mm_agent_view.php` — **schema fix**: tills table uses `till_number`/`sim_msisdn`/`float_ceiling`/`cash_ceiling`; add network_id to till modals; remove `till_code`/`teller_name`/`phone` columns
+- `api/mobile_money/save_agent.php` — **schema fix**: correct column names throughout
+- `api/mobile_money/save_till.php` — **schema fix**: `till_number`+`network_id` required; `sim_msisdn`/`float_ceiling`/`cash_ceiling`; status active/suspended/closed
+
+E2E test passed: GL Dr=5250 Cr=5250 balanced. All 10 files pass PHP syntax check.
+
+---
+
 ## 2026-09-26 — ux(superadmin): Auto-open tenant login page after registration
 
 **Files:**
@@ -43,7 +59,8 @@ All 10 Phase 1 files pass PHP syntax check. GL accounts idempotent.
 
 13 tables verified in DB, 5 networks seeded, 10 permissions seeded. All edits to existing files are purely additive.
 
->>>>>>> Stashed changes
+---
+
 ## 2026-09-26 — fix(pos): show real server error instead of generic "An error occurred"
 
 **Files:** `app/bms/pos/pos_scripts_new.php`
