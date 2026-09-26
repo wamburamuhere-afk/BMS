@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): MM-only tenant routing — redirect to mm_dashboard when only MM is enabled
+
+**Files:**
+- `core/feature_registry.php` — added `tenantOnlyHasModule(string $module): bool`; returns true when the given module is the only non-core feature enabled for this tenant
+- `index.php` — after login, routes MM-only tenants to `mm_dashboard` instead of the general ERP dashboard
+- `app/dashboard.php` — redirect gate at top: if only MM is enabled, redirect to `mm_dashboard` (catches direct URL hits)
+
+**Why:** A tenant with only Mobile Money enabled was landing on the general ERP dashboard showing empty sales charts, stock alerts, invoice aging — all irrelevant to an MM agent operation. The nav already collapses correctly via `tenantFeatureEnabled()` gates; the only missing pieces were the landing page and the dashboard entry point.
+
+---
+
+## 2026-09-26 — feat(mobile-auth): Platform info endpoint + async registration committed locally
+
+**Files:**
+- `api/mobile/platform_info.php` — new: GET endpoint for Welcome screen branding (platform name, logo, tagline, registration availability, platform URL). No auth required, 1-hour cache. Reads from `platform_settings` in `bms_control`.
+- `api/mobile/tenant_info.php` — new (local): GET ?subdomain=<slug> returns company name and logo for branded login screen. Was deployed server-side in v11; now committed to repo.
+- `api/mobile/register.php` — rewritten to async: queues job in `registration_jobs`, returns 202 in <1 s with `job_id`. Was synchronous before; async version deployed server-side in v10, now committed.
+- `api/mobile/register_status.php` — new (local): GET ?job_id=<hex> polls provisioning status; returns 202 while pending, 200 ready with full token+user payload, or 200 failed. Committed from server-side v10 deployment.
+- `cron/process_registration_jobs.php` — new (local): background worker claiming one pending job per run via `SELECT ... FOR UPDATE SKIP LOCKED`. Committed from server-side deployment.
+
+**Why:** Enables Flutter app to: (a) show platform branding on Welcome screen before subdomain is entered; (b) show tenant logo/name on Login screen after subdomain is resolved; (c) remember tenant session across app restarts (token + subdomain + company stored in Flutter Secure Storage after first login).
+
+---
+
 ## 2026-09-26 — fix(mobile-money): Add missing code_generator.php includes in 4 API files
 
 **Files:**
