@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(pos): show real server error instead of generic "An error occurred"
+
+**Files:** `app/bms/pos/pos_scripts_new.php`
+
+The jQuery `.error` callback in `submitPayment()` was ignoring `xhr.responseText`, so any non-2xx response from `process_sale.php` (HTTP 409/422/500) always showed the generic "An error occurred. Please try again." — hiding the actual reason (e.g. "Please start a cash register shift", "A warehouse must be selected", insufficient stock, etc.). Fix: parse the response body in the error callback and show `response.message` when available, falling back to the generic text only when the body is not JSON.
+
 ## 2026-09-25 — feat(superadmin): context-aware tenant_view landing + grace-start email digest
 
 **Files:** `app/superadmin/tenant_view.php`, `app/superadmin/dashboard.php`, `core/superadmin_ui.php`, `api/cron/trial_enforcement.php`

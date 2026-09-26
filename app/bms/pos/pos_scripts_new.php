@@ -1685,11 +1685,16 @@ function submitPayment(paymentData) {
             }
             $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
         },
-        error: function() {
+        error: function(xhr) {
+            let msg = PT.genericErrorRetry;
+            try {
+                const resp = JSON.parse(xhr.responseText);
+                if (resp && resp.message) msg = resp.message;
+            } catch (e) {}
             Swal.fire({
                 icon: 'error',
                 title: PT.error,
-                text: PT.genericErrorRetry
+                text: msg
             });
             $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
         }
