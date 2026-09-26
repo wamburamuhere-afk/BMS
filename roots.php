@@ -63,6 +63,7 @@ define('STOCK_DIR', BMS_DIR . '/stock');
 define('BANKING_DIR', BMS_DIR . '/banking');
 define('GRN_DIR', BMS_DIR . '/grn');
 define('OPERATIONS_DIR', BMS_DIR . '/operations');
+define('MOBILE_MONEY_DIR', BMS_DIR . '/mobile_money'); // 2026-09-26: Mobile Money module
 define('TENDERS_DIR', BMS_DIR . '/tenders');
 define('CRM_DIR',     BMS_DIR . '/crm');
 define('RESTAURANT_DIR', BMS_DIR . '/restaurant');
@@ -502,6 +503,25 @@ $routes = [
     'api/crm/manage_stage'       => API_DIR . '/crm/manage_stage.php',
     'api/crm/export_leads'       => API_DIR . '/crm/export_leads.php',
     'api/crm/import_leads'       => API_DIR . '/crm/import_leads.php',
+
+    // ========================================================================
+    // MOBILE MONEY MODULE (2026-09-26)
+    // ========================================================================
+    'mm_dashboard'        => MOBILE_MONEY_DIR . '/mm_dashboard.php',
+    'mm_agents'           => MOBILE_MONEY_DIR . '/mm_agents.php',
+    'mm_agent_view'       => MOBILE_MONEY_DIR . '/mm_agent_view.php',
+    'mm_networks'         => MOBILE_MONEY_DIR . '/mm_networks.php',
+    'mm_transactions'     => MOBILE_MONEY_DIR . '/mm_transactions.php',
+    'mm_transaction_view' => MOBILE_MONEY_DIR . '/mm_transaction_view.php',
+    'mm_float'            => MOBILE_MONEY_DIR . '/mm_float.php',
+    'mm_commissions'      => MOBILE_MONEY_DIR . '/mm_commissions.php',
+    'mm_commission_rates' => MOBILE_MONEY_DIR . '/mm_commission_rates.php',
+    'mm_reconciliation'   => MOBILE_MONEY_DIR . '/mm_reconciliation.php',
+    'mm_recon_view'       => MOBILE_MONEY_DIR . '/mm_recon_view.php',
+    'mm_shifts'           => MOBILE_MONEY_DIR . '/mm_shifts.php',
+    'mm_shift_report'     => MOBILE_MONEY_DIR . '/mm_shift_report.php',
+    'mm_reports'          => MOBILE_MONEY_DIR . '/mm_reports.php',
+    'mm_compliance'       => MOBILE_MONEY_DIR . '/mm_compliance.php',
 
     // ========================================================================
     // SALES MODULE
