@@ -10,6 +10,34 @@
  * - Float balance snapshots
  */
 
+if (!function_exists('mmUserCanOnTill')) {
+    /**
+     * Check whether a user has a specific MM till permission.
+     * Admins always return true. A grant with till_id=NULL covers all tills of that agent.
+     *
+     * @param PDO    $pdo
+     * @param int    $userId
+     * @param int    $tillId
+     * @param string $ability  can_open_shift|can_record_transactions|can_close_shift|can_reconcile
+     */
+    function mmUserCanOnTill(PDO $pdo, int $userId, int $tillId, string $ability): bool {
+        if (isAdmin()) return true;
+        $allowed = ['can_open_shift', 'can_record_transactions', 'can_close_shift', 'can_reconcile'];
+        if (!in_array($ability, $allowed)) return false;
+        $stmt = $pdo->prepare(
+            "SELECT g.$ability FROM mm_user_agent_grants g
+             JOIN mm_tills t ON t.agent_id = g.agent_id
+             WHERE g.user_id = ?
+               AND t.till_id = ?
+               AND (g.till_id = ? OR g.till_id IS NULL)
+             ORDER BY g.till_id DESC
+             LIMIT 1"
+        );
+        $stmt->execute([$userId, $tillId, $tillId]);
+        return (bool)$stmt->fetchColumn();
+    }
+}
+
 if (!function_exists('mmComputeCommission')) {
     /**
      * Compute commission for a transaction using the active rate schedule.

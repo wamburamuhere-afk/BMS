@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 3 — Teller Shifts (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `core/mm_float_service.php` — added `mmUserCanOnTill()`: grant-aware till permission helper (admins bypass; agent-level or till-level grant; can_open_shift/can_close_shift/can_record_transactions/can_reconcile)
+- `app/bms/mobile_money/mm_shifts.php` — shifts list with date/status filter, stats row, Open Shift + Close Shift modals, DataTable + mobile card view
+- `api/mobile_money/open_shift.php` — open shift: enforces one-open-per-till, grant check, nextCode(MM-SFT), opening float snapshot
+- `api/mobile_money/close_shift.php` — close shift: computes expected cash/float from opening + SUM(cash_effect/float_effect), records variance, closing snapshot
+- `app/bms/mobile_money/mm_shift_report.php` — printable Z-report: cash/float reconciliation table, transaction breakdown by type, void list
+
+E2E test: open shift → 3 txns → close → cash_variance=+500 float_variance=-200 verified.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 2 — Transaction Engine (branch feat/mm-phase-0-foundation)
 
 **Files:**
