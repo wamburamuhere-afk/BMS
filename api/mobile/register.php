@@ -98,7 +98,8 @@ $result = registerTenant([
     'company_postal_address'   => $postAddr,
     'logo_tmp_path'            => null,  // logo can be added later via company settings
     'logo_extension'           => null,
-    'website'                  => '',   // honeypot — always empty for the API
+    'website'                  => '',    // honeypot — always empty for the API
+    'skip_welcome_email'       => true,  // avoid SMTP timeout on mobile path
 ], $ip);
 
 if (!$result['ok']) {
