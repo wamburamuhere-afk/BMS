@@ -600,7 +600,7 @@ try {
             `company_name`     VARCHAR(255) NOT NULL,
             `subdomain`        VARCHAR(100) NOT NULL,
             `owner_phone`      VARCHAR(100) NOT NULL,
-            `owner_pass_enc`   TEXT         NOT NULL DEFAULT '',
+            `owner_pass_enc`   TEXT         NOT NULL,
             `owner_first_name` VARCHAR(100) NOT NULL DEFAULT '',
             `owner_last_name`  VARCHAR(100) NOT NULL DEFAULT '',
             `owner_email`      VARCHAR(255) NOT NULL DEFAULT '',
