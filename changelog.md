@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 6 — Daily Reconciliation
+
+**Files:**
+- `app/bms/mobile_money/mm_reconciliation.php` — list with stats tiles, Start Reconciliation modal
+- `app/bms/mobile_money/mm_recon_view.php` — detail: balance table, txn breakdown, shifts, resolve/dispute actions
+- `api/mobile_money/save_reconciliation.php` — compute opening+computed balances from last shift/snapshot, insert recon row
+- `api/mobile_money/update_reconciliation.php` — resolve (actual counts → variance) or mark disputed
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 5 — Commission Tracking
 
 **Files:**
