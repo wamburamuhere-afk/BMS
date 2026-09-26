@@ -232,6 +232,20 @@ if (!function_exists('registerTenant')) {
             return $fail('That subdomain is already taken. Please choose another.', 'rejected', $phone, $sub);
         }
 
+        // ── Phone uniqueness — one account per phone number ──────────────────
+        try {
+            $phoneCheck = getControlPdo()->prepare(
+                "SELECT COUNT(*) FROM tenants WHERE owner_phone = ? AND status != 'deleted'"
+            );
+            $phoneCheck->execute([$phone]);
+            if ((int)$phoneCheck->fetchColumn() > 0) {
+                return $fail('An account with this phone number is already registered. Please log in instead.',
+                    'rejected', $phone, $sub);
+            }
+        } catch (Throwable $e) {
+            error_log('registerTenant phone uniqueness check failed: ' . $e->getMessage());
+        }
+
         // ── Provision ────────────────────────────────────────────────────────
         // provisionTenant() guarantees all-or-nothing: on failure there is no
         // orphaned database, MySQL user or registry row to clean up here.
@@ -252,8 +266,9 @@ if (!function_exists('registerTenant')) {
             'postal_address'    => trim((string)($in['company_postal_address'] ?? '')),
             'phone'             => $phone,
             'email'             => $ownerEmail,
-            'logo_tmp_path'     => $in['logo_tmp_path'] ?? null,
-            'logo_extension'    => $in['logo_extension'] ?? null,
+            'logo_tmp_path'       => $in['logo_tmp_path'] ?? null,
+            'logo_extension'      => $in['logo_extension'] ?? null,
+            'skip_welcome_email'  => !empty($in['skip_welcome_email']),
         ]);
 
         if (!$r['ok']) {
