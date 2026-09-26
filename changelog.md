@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 5 — Commission Tracking
+
+**Files:**
+- `core/mm_posting.php` — added `postMMCommissionReceived()`: Dr Bank | Cr Commission Income
+- `app/bms/mobile_money/mm_commissions.php` — full page: summary tiles, earned-by-network tab, received-payments tab, Record Received modal
+- `api/mobile_money/save_commission_received.php` — NEW: validates, inserts draft row, posts GL, marks posted
+
+---
+
+## 2026-09-26 — fix(mobile-auth): Three mobile auth/provisioning bugs (branch fix/mobile-auth-bugs)
+
+**Files:**
+- `migrations/tenant/2026_09_21_mobile_tokens.php` — fixed `expires_at DATETIME NOT NULL` → `DATETIME NULL DEFAULT NULL`; removed unused `idx_expires_at` index
+- `migrations/tenant/2026_09_26_mobile_tokens_create_missing.php` — NEW: catch-up migration; creates `mobile_tokens` on existing tenant DBs that are missing it, and fixes nullable if column was created NOT NULL
+- `schema/tenant_schema_template.sql` — added `mobile_tokens` table definition (with nullable `expires_at`) so all future tenants get the table at provisioning time
+- `core/tenant_provisioner.php` — added `skip_welcome_email` opt to `provisionTenant()`; when true, skips SMTP call so mobile provisioning can complete within the client's timeout window
+- `core/tenant_registration.php` — (a) passes `skip_welcome_email` through to provisioner; (b) added phone uniqueness check — rejects registration if `owner_phone` already exists in `tenants` (non-deleted)
+- `api/mobile/register.php` — passes `skip_welcome_email => true` so SMTP is never called on the mobile path
+
+**Bugs fixed:**
+1. `login.php` returned 500 on correct credentials → `mobile_tokens` table missing from tenant DBs provisioned before 2026-09-26; catch-up migration and schema template fix resolve it.
+2. `register.php` hung (client timeout, 0 bytes) → `sendTenantWelcomeEmail()` was synchronous inside `provisionTenant()`; mobile path now skips it.
+3. Same phone could register twice and get two tenants (`mussa` + `mussa-2`) → `registerTenant()` now rejects if `owner_phone` already exists.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 4 — Float Management (branch feat/mm-phase-0-foundation)
 
 **Files:**

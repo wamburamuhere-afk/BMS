@@ -127,6 +127,37 @@ if (!function_exists('postMMTransaction')) {
     }
 }
 
+if (!function_exists('postMMCommissionReceived')) {
+    /**
+     * Post a commission receipt from the network to the GL.
+     *
+     * Network pays out accumulated commissions → Dr Bank Account | Cr Commission Income
+     *
+     * @param PDO    $pdo
+     * @param int    $creditId    mm_commissions_received.credit_id
+     * @param int    $networkId
+     * @param float  $amount
+     * @param int    $bankAcctId  GL account for the bank side
+     * @param string $date        YYYY-MM-DD
+     * @param int    $userId
+     * @param string $reference
+     * @return int   entry_id
+     */
+    function postMMCommissionReceived(PDO $pdo, int $creditId, int $networkId, float $amount, int $bankAcctId, string $date, int $userId, string $reference): int {
+        require_once __DIR__ . '/ledger_post.php';
+        $accts    = mmGLAccountIds($pdo, $networkId);
+        $commAcct = $accts['commission'];
+        if (!$commAcct) {
+            throw new \RuntimeException("MM network $networkId has no commission GL account configured.");
+        }
+        $lines = [
+            ['account_id' => $bankAcctId, 'type' => 'debit',  'amount' => $amount, 'description' => 'Commission received from network'],
+            ['account_id' => $commAcct,   'type' => 'credit', 'amount' => $amount, 'description' => 'Commission income credited'],
+        ];
+        return postLedgerEntry($pdo, $reference, $lines, null, $creditId, 'mm_commission', $date, $userId, null);
+    }
+}
+
 if (!function_exists('postMMFloatMovement')) {
     require_once __DIR__ . '/ledger_post.php';
 
