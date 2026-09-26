@@ -8960,3 +8960,17 @@ CREATE TABLE IF NOT EXISTS `schema_migrations` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-08-31  1:59:11
+
+-- Mobile app Bearer tokens (added 2026-09-26; also in migrations/tenant/2026_09_21_mobile_tokens.php)
+CREATE TABLE IF NOT EXISTS `mobile_tokens` (
+  `token_id`     INT           NOT NULL AUTO_INCREMENT,
+  `token`        CHAR(64)      NOT NULL,
+  `user_id`      INT           NOT NULL,
+  `device_name`  VARCHAR(255)  NOT NULL DEFAULT '',
+  `last_used_at` TIMESTAMP     NULL DEFAULT NULL,
+  `expires_at`   DATETIME      NULL DEFAULT NULL,
+  `created_at`   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`token_id`),
+  UNIQUE KEY `uq_token` (`token`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

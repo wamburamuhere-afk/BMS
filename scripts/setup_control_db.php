@@ -587,6 +587,43 @@ try {
         say("  · tenants.billing_cycle ENUM expanded (quarterly, biannual added)");
     }
 
+    // Async mobile registration queue. Stores validated, pending registration
+    // requests so api/mobile/register.php can return in < 1s while the slow
+    // tenant provisioning (schema + seed + geography SQL) runs via cron.
+    // owner_pass_enc holds the password encrypted with encryptTenantSecret() and
+    // is cleared to '' immediately after the worker provisions the tenant.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`registration_jobs` (
+            `id`               BIGINT AUTO_INCREMENT PRIMARY KEY,
+            `job_id`           CHAR(64)     NOT NULL,
+            `status`           ENUM('pending','provisioning','ready','failed') NOT NULL DEFAULT 'pending',
+            `company_name`     VARCHAR(255) NOT NULL,
+            `subdomain`        VARCHAR(100) NOT NULL,
+            `owner_phone`      VARCHAR(100) NOT NULL,
+            `owner_pass_enc`   TEXT         NOT NULL,
+            `owner_first_name` VARCHAR(100) NOT NULL DEFAULT '',
+            `owner_last_name`  VARCHAR(100) NOT NULL DEFAULT '',
+            `owner_email`      VARCHAR(255) NOT NULL DEFAULT '',
+            `phys_address`     TEXT         NOT NULL,
+            `post_address`     TEXT         NOT NULL,
+            `device_name`      VARCHAR(255) NOT NULL DEFAULT 'Flutter App',
+            `ip_address`       VARCHAR(45)  NOT NULL DEFAULT '',
+            `tenant_id`        INT          DEFAULT NULL,
+            `tenant_url`       VARCHAR(500) DEFAULT NULL,
+            `token`            VARCHAR(128) DEFAULT NULL,
+            `error_message`    TEXT,
+            `created_at`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `started_at`       DATETIME     DEFAULT NULL,
+            `completed_at`     DATETIME     DEFAULT NULL,
+            UNIQUE KEY `uq_regjob_id`    (`job_id`),
+            KEY `idx_regjob_status`      (`status`),
+            KEY `idx_regjob_phone`       (`owner_phone`),
+            KEY `idx_regjob_subdomain`   (`subdomain`),
+            KEY `idx_regjob_created`     (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table registration_jobs ready');
+
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
         SELECT column_name FROM information_schema.columns

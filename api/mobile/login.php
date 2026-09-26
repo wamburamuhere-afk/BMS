@@ -2,13 +2,15 @@
 /**
  * api/mobile/login.php
  *
- * POST  phone, password, device_name
+ * POST  username (or phone), password, device_name
  *
- * Returns a 30-day Bearer token plus the user/company context the Flutter
- * app needs to initialise its home screen without a separate /me call.
+ * Returns a Bearer token plus the user/company context the Flutter app needs
+ * to initialise its home screen without a separate /me call.
  *
- * Note: "phone" is the BMS `username` field — BMS stores the owner's phone
- * number there during tenant provisioning.
+ * The login credential is the BMS `users.username` field.  At tenant
+ * registration the owner's phone number is stored there, but an admin can
+ * change any user's username to any free-form value via Settings → Users.
+ * Accept both "username" and "phone" so older app builds keep working.
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
@@ -19,13 +21,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$phone       = trim($_POST['phone'] ?? '');
+// Accept "username" (preferred) or "phone" (legacy alias)
+$phone       = trim($_POST['username'] ?? $_POST['phone'] ?? '');
 $password    = $_POST['password'] ?? '';
 $device_name = trim($_POST['device_name'] ?? 'Unknown device');
 
 if ($phone === '' || $password === '') {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Phone and password are required']);
+    echo json_encode(['success' => false, 'message' => 'Username and password are required']);
     exit;
 }
 
@@ -36,9 +39,38 @@ try {
     $stmt->execute([$phone]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user || !password_verify($password, $user['password'])) {
+    if (!$user) {
+        // Before returning a generic 401, check if this phone is still being
+        // provisioned — so a brand-new user who logs in too early gets a helpful
+        // message instead of a confusing "invalid credentials".
+        try {
+            require_once __DIR__ . '/../../core/control_db.php';
+            $jobStmt = getControlPdo()->prepare("
+                SELECT status FROM registration_jobs
+                WHERE owner_phone = ? AND status IN ('pending','provisioning')
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $jobStmt->execute([$phone]);
+            if ($jobStmt->fetchColumn()) {
+                http_response_code(202);
+                echo json_encode([
+                    'success' => false,
+                    'status'  => 'provisioning',
+                    'message' => 'Your account is still being set up. Please try logging in again in about 1 minute.',
+                ]);
+                exit;
+            }
+        } catch (Throwable $e) {
+            // Control DB unavailable — fall through to the normal 401
+        }
         http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Invalid phone number or password']);
+        echo json_encode(['success' => false, 'message' => 'Invalid username or password']);
+        exit;
+    }
+
+    if (!password_verify($password, $user['password'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Invalid username or password']);
         exit;
     }
 
