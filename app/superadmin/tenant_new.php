@@ -344,11 +344,13 @@ $('#newTenantForm').on('submit', function (e) {
     }).done(function (res) {
         if (res && res.success) {
             const url = res.login_url || '';
+            if (url) { window.open(url, '_blank', 'noopener,noreferrer'); }
             Swal.fire({
                 icon: 'success',
                 title: 'Company created',
                 html: 'Its database, database user and owner account are ready.'
-                    + (url ? '<br><br><a href="' + $('<div>').text(url).html() + '" target="_blank" rel="noopener">'
+                    + (url ? '<br><small class="text-muted">Login page opened in a new tab.</small>'
+                           + '<br><a href="' + $('<div>').text(url).html() + '" target="_blank" rel="noopener">'
                            + $('<div>').text(url).html() + '</a>' : ''),
                 confirmButtonColor: '#0d6efd',
                 confirmButtonText: 'Back to tenants'
