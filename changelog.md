@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 7 — Dashboard
+
+**Files:**
+- `app/bms/mobile_money/mm_dashboard.php` — KPI tiles (today/month), daily volume bar chart,
+  network donut chart, type breakdown table, top-5 agents table; Chart.js from CDN
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 6 — Daily Reconciliation
 
 **Files:**
