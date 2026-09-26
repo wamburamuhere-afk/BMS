@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-api): Tenant info lookup endpoint (company name + logo on login screen)
+
+**Files:**
+- `api/mobile/tenant_info.php` — NEW `GET ?subdomain=xxx`; no auth required; returns `company_name`, `logo_url` (full URL), `currency`, `address`, `phone`, `tenant_url`; reads live `system_settings` from tenant DB with control-DB fallback; 5-minute Cache-Control for performance
+
 ## 2026-09-26 — feat(mobile-auth): Async mobile registration (job queue + polling)
 
 **Files:**
