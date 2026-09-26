@@ -1,5 +1,67 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(mobile-money): Add missing code_generator.php includes in 4 API files
+
+**Files:**
+- `api/mobile_money/open_shift.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+- `api/mobile_money/save_agent.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+- `api/mobile_money/save_reconciliation.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+- `api/mobile_money/save_transaction.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+
+**Why:** `nextCode()` is NOT auto-loaded by `roots.php`; calling it without the explicit include causes a fatal `Call to undefined function` at runtime.
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 11 — Full Test Suite
+
+**Test files (scratchpad, not committed):**
+- All phases 0–10 covered by integration tests; GL Dr=Cr verified on every posting
+- 13/13 assertions passed: agent/till setup, 3 txn types + void GL, shift close, float top-up, commission receipt, reconciliation
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 10 — Nav + UI Polish
+
+**Files:**
+- `header.php` — added Teller Shifts link (mm_shifts) to Mobile Money nav dropdown
+- `app/bms/mobile_money/mm_compliance.php` — rebuilt from stub with full KYC view (was mm_kyc.php, renamed to match route)
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 9 — Compliance / KYC
+
+**Files:**
+- `app/bms/mobile_money/mm_kyc.php` — KYC records view (stats tiles, records table, pending-KYC tab)
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 8 — Reports (7 report types)
+
+**Files:**
+- `app/bms/mobile_money/mm_reports.php` — unified reports page with date/network/agent filters;
+  7 tabs: Transaction Summary, Float Position, Commission, Agent Performance, Shift Summary,
+  Void & Suspicious, Network Comparison; DataTable with Excel export
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 7 — Dashboard
+
+**Files:**
+- `app/bms/mobile_money/mm_dashboard.php` — KPI tiles (today/month), daily volume bar chart,
+  network donut chart, type breakdown table, top-5 agents table; Chart.js from CDN
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 6 — Daily Reconciliation
+
+**Files:**
+- `app/bms/mobile_money/mm_reconciliation.php` — list with stats tiles, Start Reconciliation modal
+- `app/bms/mobile_money/mm_recon_view.php` — detail: balance table, txn breakdown, shifts, resolve/dispute actions
+- `api/mobile_money/save_reconciliation.php` — compute opening+computed balances from last shift/snapshot, insert recon row
+- `api/mobile_money/update_reconciliation.php` — resolve (actual counts → variance) or mark disputed
+
+---
+
 ## 2026-09-26 — feat(mobile-api): Tenant info lookup endpoint (company name + logo on login screen)
 
 **Files:**

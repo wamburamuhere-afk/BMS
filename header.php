@@ -1064,6 +1064,53 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
 
+                        <!-- Mobile Money (2026-09-26) -->
+                        <?php if(tenantFeatureEnabled('mobile_money') && (canView('mm_dashboard') || canView('mm_transactions') || canView('mm_agents'))): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="mmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-phone-vibrate"></i> <?= t('Mobile Money') ?>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="mmDropdown">
+                                <?php if(canView('mm_dashboard')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_dashboard') ?>"><i class="bi bi-speedometer2 me-1"></i><?= t('Dashboard') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_transactions')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_transactions') ?>"><i class="bi bi-arrow-left-right me-1"></i><?= t('Transactions') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_shifts')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_shifts') ?>"><i class="bi bi-clock-history me-1"></i><?= t('Teller Shifts') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_float')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_float') ?>"><i class="bi bi-cash-stack me-1"></i><?= t('Float Management') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_commissions')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_commissions') ?>"><i class="bi bi-coin me-1"></i><?= t('Commissions') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_reconciliation')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reconciliation') ?>"><i class="bi bi-check2-square me-1"></i><?= t('Reconciliation') ?></a></li>
+                                <?php endif; ?>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header"><?= t('Setup') ?></h6></li>
+                                <?php if(canView('mm_agents')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_agents') ?>"><i class="bi bi-shop-window me-1"></i><?= t('Agents / Outlets') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_networks')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_commission_rates')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_commission_rates') ?>"><i class="bi bi-percent me-1"></i><?= t('Commission Rates') ?></a></li>
+                                <?php endif; ?>
+                                <li><hr class="dropdown-divider"></li>
+                                <?php if(canView('mm_reports')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>"><i class="bi bi-bar-chart me-1"></i><?= t('Reports') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(canView('mm_compliance')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_compliance') ?>"><i class="bi bi-shield-check me-1"></i><?= t('Compliance / KYC') ?></a></li>
+                                <?php endif; ?>
+                            </ul>
+                        </li>
+                        <?php endif; ?>
+
                         <!-- Sales -->
                         <?php
                         // 'sales_orders' is the flagship page_key for the whole Sales
