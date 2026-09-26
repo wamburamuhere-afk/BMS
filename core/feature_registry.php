@@ -745,6 +745,35 @@ if (!function_exists('tenantFeatureEnabled')) {
     }
 }
 
+if (!function_exists('tenantOnlyHasModule')) {
+    /**
+     * Returns true when $module is the ONLY non-core feature enabled for this
+     * tenant. Core features (finance, settings, users) are always-on and do
+     * not count toward the "other modules" check.
+     *
+     * Usage: redirect to a module-specific landing page instead of the
+     * generic ERP dashboard when a tenant subscribed to a single vertical.
+     *   if (tenantOnlyHasModule('mobile_money')) { redirect to mm_dashboard; }
+     */
+    function tenantOnlyHasModule(string $module): bool
+    {
+        $f = $GLOBALS['__bms_features'] ?? null;
+        if (!is_array($f)) return false; // features not primed — stay safe
+
+        // Always-on core keys are not optional modules; exclude them.
+        $coreKeys = ['finance', 'settings', 'hr_basic', 'core'];
+
+        $enabled = [];
+        foreach ($f as $key => $on) {
+            if ($on && !in_array($key, $coreKeys, true)) {
+                $enabled[] = $key;
+            }
+        }
+
+        return $enabled === [$module];
+    }
+}
+
 if (!function_exists('bmsFeatureBlockingPath')) {
     /**
      * Which feature BLOCKS this file/request path, or null if nothing does.

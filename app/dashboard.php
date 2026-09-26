@@ -4,6 +4,16 @@
 // not deferred. See changelog.md 2026-07-27 for the audit that closed the last gaps.
 // File: dashboard.php
 require_once __DIR__ . '/../roots.php';
+require_once ROOT_DIR . '/core/feature_registry.php';
+
+// When Mobile Money is the only enabled module, the general ERP dashboard is
+// meaningless (no sales, no stock, no invoices). Send the user straight to the
+// MM dashboard so they land on their relevant KPIs without an extra click.
+if (tenantOnlyHasModule('mobile_money')) {
+    header('Location: ' . getUrl('mm_dashboard'));
+    exit;
+}
+
 require_once ROOT_DIR . '/core/financial_reports.php';   // glProfitLoss() — ledger revenue
 require_once ROOT_DIR . '/core/pos_nav.php';              // posSimpleModeEnabled()
 require_once ROOT_DIR . '/header.php';

@@ -36,11 +36,6 @@ require_once __DIR__ . '/../../core/tenant_registration.php';
 require_once __DIR__ . '/../../core/tenant_crypto.php';
 require_once __DIR__ . '/../../core/control_db.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// ── Method guard ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
