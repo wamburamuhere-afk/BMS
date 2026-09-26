@@ -1,9 +1,119 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(mobile-auth): Login accepts username not phone-only
+
+**Files:**
+- `api/mobile/login.php` — reads `$_POST['username'] ?? $_POST['phone']` (legacy alias); updated validation message to "Username and password are required"; updated auth-failure message to "Invalid username or password" (matches web login)
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 5 — Commission Tracking
+
+**Files:**
+- `core/mm_posting.php` — added `postMMCommissionReceived()`: Dr Bank | Cr Commission Income
+- `app/bms/mobile_money/mm_commissions.php` — full page: summary tiles, earned-by-network tab, received-payments tab, Record Received modal
+- `api/mobile_money/save_commission_received.php` — NEW: validates, inserts draft row, posts GL, marks posted
+
+---
+
+## 2026-09-26 — fix(mobile-auth): Three mobile auth/provisioning bugs (branch fix/mobile-auth-bugs)
+
+**Files:**
+- `migrations/tenant/2026_09_21_mobile_tokens.php` — fixed `expires_at DATETIME NOT NULL` → `DATETIME NULL DEFAULT NULL`; removed unused `idx_expires_at` index
+- `migrations/tenant/2026_09_26_mobile_tokens_create_missing.php` — NEW: catch-up migration; creates `mobile_tokens` on existing tenant DBs that are missing it, and fixes nullable if column was created NOT NULL
+- `schema/tenant_schema_template.sql` — added `mobile_tokens` table definition (with nullable `expires_at`) so all future tenants get the table at provisioning time
+- `core/tenant_provisioner.php` — added `skip_welcome_email` opt to `provisionTenant()`; when true, skips SMTP call so mobile provisioning can complete within the client's timeout window
+- `core/tenant_registration.php` — (a) passes `skip_welcome_email` through to provisioner; (b) added phone uniqueness check — rejects registration if `owner_phone` already exists in `tenants` (non-deleted)
+- `api/mobile/register.php` — passes `skip_welcome_email => true` so SMTP is never called on the mobile path
+
+**Bugs fixed:**
+1. `login.php` returned 500 on correct credentials → `mobile_tokens` table missing from tenant DBs provisioned before 2026-09-26; catch-up migration and schema template fix resolve it.
+2. `register.php` hung (client timeout, 0 bytes) → `sendTenantWelcomeEmail()` was synchronous inside `provisionTenant()`; mobile path now skips it.
+3. Same phone could register twice and get two tenants (`mussa` + `mussa-2`) → `registerTenant()` now rejects if `owner_phone` already exists.
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 4 — Float Management (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `app/bms/mobile_money/mm_float.php` — float movements list with date/till/type filter, stats row, Float Top-up + Float Withdrawal modals (both with till Select2 + bank account Select2 + GL post)
+- `api/mobile_money/save_float_movement.php` — POST handler: validates till/type/amount; calls `mmRecordFloatMovement()` which creates movement row + posts GL (`float_topup: Dr E-Float | Cr Bank`; `float_withdrawal: Dr Bank | Cr E-Float`)
+
+E2E test passed: Top-up TZS 500,000 → Dr E-Float=500K Cr Bank=500K, GL balanced.
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 3 — Teller Shifts (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `core/mm_float_service.php` — added `mmUserCanOnTill()`: grant-aware till permission helper (admins bypass; agent-level or till-level grant; can_open_shift/can_close_shift/can_record_transactions/can_reconcile)
+- `app/bms/mobile_money/mm_shifts.php` — shifts list with date/status filter, stats row, Open Shift + Close Shift modals, DataTable + mobile card view
+- `api/mobile_money/open_shift.php` — open shift: enforces one-open-per-till, grant check, nextCode(MM-SFT), opening float snapshot
+- `api/mobile_money/close_shift.php` — close shift: computes expected cash/float from opening + SUM(cash_effect/float_effect), records variance, closing snapshot
+- `app/bms/mobile_money/mm_shift_report.php` — printable Z-report: cash/float reconciliation table, transaction breakdown by type, void list
+
+E2E test: open shift → 3 txns → close → cash_variance=+500 float_variance=-200 verified.
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 2 — Transaction Engine (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `core/mm_posting.php` — GL posting engine: `mmGLAccountIds()`, `postMMTransaction()`, `postMMFloatMovement()`; implements full double-entry for all 8 transaction types (cash_in/out, send, bill_pay, airtime, bank_to_wallet, wallet_to_bank, international) with commission legs
+- `core/mm_float_service.php` — float service helpers: `mmComputeCommission()`, `mmRecordFloatMovement()`, `mmTakeFloatSnapshot()`
+- `api/mobile_money/save_transaction.php` — create + post MM transaction API; BOT KYC gate (≥TZS 1M); atomic DB transaction wrapping insert + GL post + status update
+- `api/mobile_money/void_transaction.php` — void a posted transaction + reverse GL journal
+- `app/bms/mobile_money/mm_transactions.php` — transaction list page: date/network/type/till filters, stats row, DataTable + mobile card view, inline new-transaction modal
+- `app/bms/mobile_money/mm_transaction_view.php` — transaction detail: GL entry link, void button (permission-gated)
+- `app/bms/mobile_money/mm_agents.php` — **schema fix**: remove nonexistent `network_id` column from queries; `phone`→`phone_primary`; `location`→`region`/`district`; `status` values active/suspended/closed
+- `app/bms/mobile_money/mm_agent_view.php` — **schema fix**: tills table uses `till_number`/`sim_msisdn`/`float_ceiling`/`cash_ceiling`; add network_id to till modals; remove `till_code`/`teller_name`/`phone` columns
+- `api/mobile_money/save_agent.php` — **schema fix**: correct column names throughout
+- `api/mobile_money/save_till.php` — **schema fix**: `till_number`+`network_id` required; `sim_msisdn`/`float_ceiling`/`cash_ceiling`; status active/suspended/closed
+
+E2E test passed: GL Dr=5250 Cr=5250 balanced. All 10 files pass PHP syntax check.
+
+---
+
 ## 2026-09-26 — ux(superadmin): Auto-open tenant login page after registration
 
 **Files:**
 - `app/superadmin/tenant_new.php` — On successful tenant creation, immediately open the new tenant's login URL in a new tab via `window.open`; dialog now shows "Login page opened in a new tab" with the link as a fallback.
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 1 — Master Data (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `migrations/tenant/2026_09_26_mm_gl_accounts.php` + `migrations/2026_09_26_mm_gl_accounts_legacy_db.php` — provisions 9 MM GL accounts (MM-1000 group + 5 per-network e-float accounts MM-1001..1005, MM-1050 cash float, MM-4100 commission income, MM-5100 agent expenses); wires `mm_networks.float_account_id + commission_account_id`; stores IDs in system_settings
+- `app/bms/mobile_money/mm_networks.php` — full CRUD for MM networks; shows e-float + commission account assignments; Select2 account pickers
+- `app/bms/mobile_money/mm_agents.php` — full CRUD agent list with DataTable + mobile card view; network badge, super-agent hierarchy, till count
+- `app/bms/mobile_money/mm_agent_view.php` — agent detail: tills management (add/edit/delete inline), sub-agents list
+- `app/bms/mobile_money/mm_commission_rates.php` — rate schedule with network/type filter, flat/percent rate bands, effective dates
+- `api/mobile_money/save_network.php` — create/update networks API
+- `api/mobile_money/save_agent.php` — create/update/soft-delete agents; uses nextCode(MM-AGT)
+- `api/mobile_money/save_till.php` — create/update/soft-delete tills; uses nextCode(MM-TIL)
+- `api/mobile_money/save_commission_rate.php` — create/update/supersede commission rate bands
+
+All 10 Phase 1 files pass PHP syntax check. GL accounts idempotent.
+
+## 2026-09-26 — feat(mobile-money): Phase 0 — Foundation (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `core/feature_registry.php` — added `mobile_money` feature entry (10 page_keys, sort_order 25)
+- `roots.php` — added `MOBILE_MONEY_DIR` constant + 16 URL slug entries
+- `core/gl_source.php` — added 3 MM GL source routes (`mm_transaction`, `mm_float_move`, `mm_commission`)
+- `header.php` — added Mobile Money nav menu block (feature-gated + permission-gated)
+- `migrations/tenant/2026_09_26_mm_core_tables.php` + `migrations/2026_09_26_mm_core_tables_legacy_db.php` — creates mm_networks, mm_agents, mm_tills, mm_commission_rates, mm_transactions
+- `migrations/tenant/2026_09_26_mm_shift_tables.php` + legacy — creates mm_shifts, mm_user_agent_grants
+- `migrations/tenant/2026_09_26_mm_float_and_commission_tables.php` + legacy — creates mm_float_movements, mm_commissions_received, mm_float_snapshots
+- `migrations/tenant/2026_09_26_mm_reconciliation_tables.php` + legacy — creates mm_reconciliations, mm_recon_items
+- `migrations/tenant/2026_09_26_mm_compliance_tables.php` + legacy — creates mm_kyc_records
+- `migrations/tenant/2026_09_26_mm_seed_networks.php` + legacy — seeds 5 MM networks (MPESA, AIRTEL, TIGO, HALOTEL, TPESA) + 16 M-Pesa commission bands
+- `migrations/tenant/2026_09_26_mm_permissions.php` + legacy — seeds 10 MM permission rows (module_name='Mobile Money')
+- `app/bms/mobile_money/` — 15 stub PHP pages (mm_dashboard + 14 others; all scope-audit: skip + autoEnforcePermission)
+- `mobile_money.md` — full implementation plan (12 phases, 8-component coverage, terminology dictionary, receipt specs)
+
+13 tables verified in DB, 5 networks seeded, 10 permissions seeded. All edits to existing files are purely additive.
 
 ---
 
