@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 0 — Foundation (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `core/feature_registry.php` — added `mobile_money` feature entry (10 page_keys, sort_order 25)
+- `roots.php` — added `MOBILE_MONEY_DIR` constant + 16 URL slug entries
+- `core/gl_source.php` — added 3 MM GL source routes (`mm_transaction`, `mm_float_move`, `mm_commission`)
+- `header.php` — added Mobile Money nav menu block (feature-gated + permission-gated)
+- `migrations/tenant/2026_09_26_mm_core_tables.php` + `migrations/2026_09_26_mm_core_tables_legacy_db.php` — creates mm_networks, mm_agents, mm_tills, mm_commission_rates, mm_transactions
+- `migrations/tenant/2026_09_26_mm_shift_tables.php` + legacy — creates mm_shifts, mm_user_agent_grants
+- `migrations/tenant/2026_09_26_mm_float_and_commission_tables.php` + legacy — creates mm_float_movements, mm_commissions_received, mm_float_snapshots
+- `migrations/tenant/2026_09_26_mm_reconciliation_tables.php` + legacy — creates mm_reconciliations, mm_recon_items
+- `migrations/tenant/2026_09_26_mm_compliance_tables.php` + legacy — creates mm_kyc_records
+- `migrations/tenant/2026_09_26_mm_seed_networks.php` + legacy — seeds 5 MM networks (MPESA, AIRTEL, TIGO, HALOTEL, TPESA) + 16 M-Pesa commission bands
+- `migrations/tenant/2026_09_26_mm_permissions.php` + legacy — seeds 10 MM permission rows (module_name='Mobile Money')
+- `app/bms/mobile_money/` — 15 stub PHP pages (mm_dashboard + 14 others; all scope-audit: skip + autoEnforcePermission)
+- `mobile_money.md` — full implementation plan (12 phases, 8-component coverage, terminology dictionary, receipt specs)
+
+13 tables verified in DB, 5 networks seeded, 10 permissions seeded. All edits to existing files are purely additive.
+
 ## 2026-09-26 — fix(pos): show real server error instead of generic "An error occurred"
 
 **Files:** `app/bms/pos/pos_scripts_new.php`
