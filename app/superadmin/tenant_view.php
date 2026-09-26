@@ -17,6 +17,21 @@ requireSuperadmin();
 $me = currentSuperadmin();
 $id = (int)($_GET['id'] ?? 0);
 
+// Navigation context — set by dashboard arrow links and notification bell links
+$fromCtx    = $_GET['from']      ?? '';    // 'dashboard' | 'notif' | ''
+$fromCat    = $_GET['from_cat']  ?? '';    // dashboard category key, e.g. 'in_grace'
+$notifType  = $_GET['notif_type'] ?? '';   // notification type, e.g. 'trial_grace_started'
+
+// Derive tab to auto-open and back-button destination from context
+$openTab = 'overview';
+$billingCategories = ['billing_overdue', 'billing_due_soon', 'subscription_grace_started', 'subscription_expired'];
+if (in_array($fromCat, $billingCategories, true) || in_array($notifType, $billingCategories, true)) {
+    $openTab = 'billing';
+}
+$hasContext = in_array($fromCtx, ['dashboard', 'notif'], true);
+$backUrl   = $hasContext ? saUrl('dashboard') : saUrl('tenants');
+$backLabel = $hasContext ? 'Back to Dashboard' : 'Back to tenants';
+
 $tenant = null;
 $log    = [];
 $error  = null;
@@ -131,7 +146,7 @@ function svBadge(string $status): string
 
 <div class="container-fluid p-3">
     <div class="d-flex align-items-center gap-2 mb-3">
-        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
+        <a href="<?= $backUrl ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left me-1"></i><?= htmlspecialchars($backLabel) ?></a>
         <h5 class="mb-0 fw-bold text-muted">Tenant details</h5>
     </div>
 
@@ -144,6 +159,63 @@ function svBadge(string $status): string
         <div class="mt-3"><a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-primary">Back to tenants</a></div>
     </div>
 <?php else: ?>
+
+<?php
+// Contextual "Action Required" banner — shown when arriving from dashboard or notification bell
+if ($hasContext ?? false):
+    $bannerIcon  = 'bi-bell-fill';
+    $bannerClass = 'alert-warning';
+    $bannerTitle = 'Action Required';
+    $bannerBody  = '';
+    $contextKey  = $fromCat ?: $notifType;
+    switch ($contextKey) {
+        case 'trial_grace_started':
+        case 'in_grace':
+            $bannerIcon  = 'bi-hourglass-split';
+            $bannerClass = 'alert-warning';
+            $bannerTitle = 'Trial grace period active';
+            $bannerBody  = 'This tenant\'s free trial has ended. A ' . BMS_GRACE_PERIOD_DAYS . '-day grace period is in progress. Review the Billing tab to record a payment or take action.';
+            break;
+        case 'subscription_grace_started':
+            $bannerIcon  = 'bi-hourglass';
+            $bannerClass = 'alert-warning';
+            $bannerTitle = 'Subscription grace period active';
+            $bannerBody  = 'This tenant\'s subscription has expired. A ' . BMS_GRACE_PERIOD_DAYS . '-day grace period is in progress. Review the Billing tab to record a payment or contact the tenant.';
+            break;
+        case 'trial_expired':
+            $bannerIcon  = 'bi-hourglass-bottom';
+            $bannerClass = 'alert-danger';
+            $bannerTitle = 'Trial expired — tenant suspended';
+            $bannerBody  = 'This tenant\'s free trial expired and was automatically suspended after the grace period. Record a payment to reactivate.';
+            break;
+        case 'subscription_expired':
+            $bannerIcon  = 'bi-credit-card-2-front';
+            $bannerClass = 'alert-danger';
+            $bannerTitle = 'Subscription expired — tenant suspended';
+            $bannerBody  = 'This tenant\'s subscription expired and was automatically suspended after the grace period. Record a payment to reactivate.';
+            break;
+        case 'billing_overdue':
+        case 'billing_due_soon':
+            $bannerIcon  = 'bi-receipt';
+            $bannerClass = 'alert-info';
+            $bannerTitle = 'Billing attention needed';
+            $bannerBody  = 'Review the Billing tab below for the outstanding subscription details.';
+            break;
+        default:
+            $bannerIcon  = 'bi-bell-fill';
+            $bannerClass = 'alert-warning';
+            $bannerTitle = 'Attention required';
+            $bannerBody  = 'You were directed here because this tenant requires your attention.';
+    }
+?>
+    <div class="alert <?= $bannerClass ?> d-flex align-items-start gap-2 py-2 px-3 mb-3 rounded-3 border-0 shadow-sm" role="alert">
+        <i class="bi <?= $bannerIcon ?> fs-5 mt-1 flex-shrink-0"></i>
+        <div>
+            <strong><?= $bannerTitle ?></strong>
+            <?php if ($bannerBody): ?> — <?= $bannerBody ?><?php endif; ?>
+        </div>
+    </div>
+<?php endif; ?>
 
     <ul class="nav nav-tabs mb-3" id="tenantTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -242,15 +314,52 @@ function svBadge(string $status): string
                         </div>
                         <?php if ($tenant['status'] === 'trial' && !empty($tenant['trial_ends_at'])):
                             $daysLeft = (int)floor((strtotime($tenant['trial_ends_at']) - time()) / 86400);
-                            $expiryColor = $daysLeft < 0 ? 'danger' : ($daysLeft <= 3 ? 'danger' : ($daysLeft <= 7 ? 'warning' : 'success'));
+                            if ($daysLeft < 0)       { $expiryColor = 'danger';  $expiryLabel = 'EXPIRED ' . abs($daysLeft) . 'd ago'; }
+                            elseif ($daysLeft === 0)  { $expiryColor = 'danger';  $expiryLabel = 'Ends today'; }
+                            elseif ($daysLeft <= 3)   { $expiryColor = 'danger';  $expiryLabel = $daysLeft . ' days remaining for testing'; }
+                            elseif ($daysLeft <= 7)   { $expiryColor = 'warning'; $expiryLabel = $daysLeft . ' days remaining for testing'; }
+                            elseif ($daysLeft <= 14)  { $expiryColor = 'info';    $expiryLabel = $daysLeft . ' days remaining for testing'; }
+                            else                      { $expiryColor = 'success'; $expiryLabel = $daysLeft . ' days remaining'; }
                         ?>
                         <div class="col-sm-12">
-                            <dt>Trial Expires</dt>
+                            <dt>Trial Period</dt>
                             <dd>
                                 <?= date('d M Y', strtotime($tenant['trial_ends_at'])) ?>
-                                <span class="badge bg-<?= $expiryColor ?> ms-1">
-                                    <?= $daysLeft < 0 ? 'EXPIRED ' . abs($daysLeft) . 'd ago' : $daysLeft . ' days left' ?>
+                                <span class="badge bg-<?= $expiryColor ?> ms-1"><?= $expiryLabel ?></span>
+                            </dd>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($tenant['grace_until']) && in_array($tenant['status'], ['trial', 'active'], true)):
+                            $graceDaysLeft = (int)floor((strtotime($tenant['grace_until']) - strtotime('today')) / 86400);
+                            $graceColor = $graceDaysLeft <= 1 ? 'danger' : ($graceDaysLeft <= 3 ? 'warning' : 'warning');
+                        ?>
+                        <div class="col-sm-12">
+                            <dt><i class="bi bi-hourglass-split text-warning me-1"></i>Grace Period</dt>
+                            <dd>
+                                <span class="badge bg-warning text-dark">
+                                    <?= $graceDaysLeft <= 0 ? 'Expires today' : $graceDaysLeft . ' day' . ($graceDaysLeft == 1 ? '' : 's') . ' remaining' ?>
                                 </span>
+                                <small class="text-muted ms-1">Until <?= date('d M Y', strtotime($tenant['grace_until'])) ?></small>
+                                <br><small class="text-muted">
+                                    <?= $tenant['status'] === 'trial' ? 'Trial' : 'Subscription' ?> expired —
+                                    tenant still has access. Reactivate after receiving payment to avoid auto-suspension.
+                                </small>
+                            </dd>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($tenant['status'] === 'active' && !empty($tenant['subscription_ends_at'])):
+                            $subDaysLeft = (int)floor((strtotime($tenant['subscription_ends_at']) - time()) / 86400);
+                            if ($subDaysLeft < 0)      { $subColor = 'danger';  $subLabel = 'EXPIRED ' . abs($subDaysLeft) . 'd ago'; }
+                            elseif ($subDaysLeft <= 7)  { $subColor = 'warning'; $subLabel = $subDaysLeft . ' days left'; }
+                            elseif ($subDaysLeft <= 30) { $subColor = 'success'; $subLabel = $subDaysLeft . ' days left'; }
+                            else                        { $subColor = 'success'; $subLabel = $subDaysLeft . ' days left'; }
+                        ?>
+                        <div class="col-sm-12">
+                            <dt>Subscription Expires</dt>
+                            <dd>
+                                <?= date('d M Y', strtotime($tenant['subscription_ends_at'])) ?>
+                                <span class="badge bg-<?= $subColor ?> ms-1"><?= $subLabel ?></span>
+                                <small class="text-muted ms-1">(from last recorded payment)</small>
                             </dd>
                         </div>
                         <?php endif; ?>
@@ -1824,6 +1933,23 @@ function doDelete() {
         }
     }).then(r => { if (r.isConfirmed) postAction({ action: 'delete', confirm_name: r.value }, 'Deleted', 'tenants.php'); });
 }
+
+// Context-aware tab auto-open — open Billing tab for payment/subscription events
+(function () {
+    const openTab = <?= json_encode($openTab ?? 'overview') ?>;
+    if (openTab && openTab !== 'overview') {
+        const btnId = 'tab-btn-' + openTab;
+        const el = document.getElementById(btnId);
+        if (el) {
+            // Defer slightly so Bootstrap has time to initialise
+            setTimeout(function () {
+                const tab = new bootstrap.Tab(el);
+                tab.show();
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 120);
+        }
+    }
+})();
 </script>
 </body>
 </html>

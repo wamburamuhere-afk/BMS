@@ -1705,6 +1705,39 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     }
     ?>
 
+    <!-- Grace-period warning banner — shown when the tenant is past expiry but still within the grace window -->
+    <?php if (!empty($_SESSION['_bms_grace_warning'])): ?>
+    <?php $__gw = $_SESSION['_bms_grace_warning']; ?>
+    <div id="bmsGraceBanner" class="alert alert-warning alert-dismissible fade show mb-0 rounded-0 border-0 border-bottom border-warning" role="alert" style="font-size:.88rem">
+        <div class="container-fluid d-flex align-items-center gap-2 px-4">
+            <?php if (($__gw['type'] ?? '') === 'trial'): ?>
+                <i class="bi bi-hourglass-split flex-shrink-0"></i>
+                <span>
+                    <strong>Your free trial has ended.</strong>
+                    <?php if (($__gw['days_left'] ?? 0) > 0): ?>
+                        You have <strong><?= (int)$__gw['days_left'] ?> day<?= $__gw['days_left'] == 1 ? '' : 's' ?></strong> remaining in your grace period.
+                    <?php else: ?>
+                        Your grace period expires today.
+                    <?php endif; ?>
+                    Please contact your service provider to continue.
+                </span>
+            <?php else: ?>
+                <i class="bi bi-credit-card flex-shrink-0"></i>
+                <span>
+                    <strong>Your subscription has expired.</strong>
+                    <?php if (($__gw['days_left'] ?? 0) > 0): ?>
+                        You have <strong><?= (int)$__gw['days_left'] ?> day<?= $__gw['days_left'] == 1 ? '' : 's' ?></strong> remaining in your grace period.
+                    <?php else: ?>
+                        Your grace period expires today.
+                    <?php endif; ?>
+                    Please contact your service provider to renew.
+                </span>
+            <?php endif; ?>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Content Area -->
     <div class="container-fluid mt-4">
 

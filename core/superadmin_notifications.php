@@ -19,7 +19,8 @@ if (!function_exists('insertSaNotification')) {
      */
     function insertSaNotification(int $tenantId, string $type, string $tenantName, string $subdomain): void
     {
-        if (!in_array($type, ['trial_expired', 'subscription_expired'], true)) return;
+        $allowed = ['trial_expired', 'subscription_expired', 'trial_grace_started', 'subscription_grace_started'];
+        if (!in_array($type, $allowed, true)) return;
         try {
             $ctrl = getControlPdo();
             // Deduplicate: one notification per (tenant_id, type) per calendar day
@@ -32,12 +33,20 @@ if (!function_exists('insertSaNotification')) {
             if ($dup->fetchColumn()) return;
 
             $typeLabels = [
-                'trial_expired'        => 'Free trial expired',
-                'subscription_expired' => 'Subscription expired',
+                'trial_expired'               => 'Free trial expired',
+                'subscription_expired'        => 'Subscription expired',
+                'trial_grace_started'         => 'Trial grace period started',
+                'subscription_grace_started'  => 'Subscription grace period started',
+            ];
+            $typeBodies = [
+                'trial_expired'               => 'free trial has expired. Awaiting your action.',
+                'subscription_expired'        => 'subscription has expired. Awaiting your action.',
+                'trial_grace_started'         => 'free trial ended. Grace period is active — reactivate before it closes.',
+                'subscription_grace_started'  => 'subscription ended. Grace period is active — record a payment before it closes.',
             ];
             $label = $typeLabels[$type];
             $title = $label . ' — ' . $tenantName;
-            $body  = $tenantName . ' (' . $subdomain . ') — ' . strtolower($label) . ' today.';
+            $body  = $tenantName . ' (' . $subdomain . ') — ' . ($typeBodies[$type] ?? strtolower($label) . '.');
 
             $ctrl->prepare("
                 INSERT INTO superadmin_notifications (type, title, body, tenant_id, tenant_name, subdomain)

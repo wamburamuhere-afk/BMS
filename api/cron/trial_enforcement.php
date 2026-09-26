@@ -2,18 +2,24 @@
 /**
  * api/cron/trial_enforcement.php
  * -----------------------------------------------------------------------
- * Daily batch: suspend every tenant whose trial has expired but still has
- * status = 'trial'. Complements the at-request gate in tenant_bootstrap.php
- * (which fires when the tenant user actually logs in). This ensures tenants
- * that have been inactive since expiry are still marked suspended and will
- * not slip through if the bootstrap gate is later bypassed.
+ * Daily batch: grace-period lifecycle for expired trials and subscriptions.
+ *
+ * Four phases per run:
+ *   Phase A — Trial expired, grace not started yet
+ *             → set grace_until = trial_ends_at + 7 days, notify superadmin.
+ *   Phase B — Trial in grace, grace window now closed
+ *             → suspend (status = 'suspended', suspension_reason = 'trial_expired').
+ *   Phase C — Subscription expired, grace not started yet
+ *             → set grace_until = subscription_ends_at + 7 days, notify superadmin.
+ *   Phase D — Subscription in grace, grace window now closed
+ *             → suspend (status = 'suspended', suspension_reason = 'subscription_expired').
+ *
+ * Email digest: sent to all superadmins when any tenants are newly suspended today.
  *
  * Authentication: Bearer token matching CRON_SECRET env variable.
  * Schedule example (server cron):
  *   0 1 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
  *              https://superadmin.bms.example.com/api/cron/trial_enforcement.php
- *
- * Also callable by the GitHub Actions deploy workflow for on-demand runs.
  */
 
 require_once __DIR__ . '/../../roots.php';
@@ -47,57 +53,128 @@ if (!hash_equals('Bearer ' . $expectedSecret, trim($authHeader))) {
 ignore_user_abort(true);
 set_time_limit(120);
 
+define('GRACE_PERIOD_DAYS', 7);
+
 try {
-    $ctrl = getControlPdo();
+    $ctrl   = getControlPdo();
+    $errors = 0;
 
-    // Fetch expired trials
-    $stmt = $ctrl->prepare(
-        "SELECT id, subdomain, owner_email, company_name, trial_ends_at
+    // ── Phase A: Trial expired, no grace period set yet ──────────────────
+    $stmtA = $ctrl->prepare(
+        "SELECT id, subdomain, company_name, trial_ends_at
            FROM tenants
-          WHERE status = 'trial' AND trial_ends_at < NOW()"
+          WHERE status = 'trial'
+            AND trial_ends_at < NOW()
+            AND grace_until IS NULL"
     );
-    $stmt->execute();
-    $expired = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmtA->execute();
+    $newTrialGrace = $stmtA->fetchAll(PDO::FETCH_ASSOC);
 
-    $suspended = 0;
-    $errors    = 0;
+    $trialGraceStarted = 0;
+    foreach ($newTrialGrace as $t) {
+        try {
+            $graceDate = date('Y-m-d', strtotime($t['trial_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+            $ctrl->prepare(
+                "UPDATE tenants SET grace_until = ? WHERE id = ? AND status = 'trial' AND grace_until IS NULL"
+            )->execute([$graceDate, $t['id']]);
+            logTenantAdminAction(
+                (int)$t['id'], (string)$t['subdomain'],
+                'grace_period_started',
+                'Trial expired ' . $t['trial_ends_at'] . ' — grace period started, ends ' . $graceDate
+            );
+            insertSaNotification(
+                (int)$t['id'], 'trial_grace_started',
+                (string)($t['company_name'] ?? $t['subdomain']),
+                (string)$t['subdomain']
+            );
+            $trialGraceStarted++;
+        } catch (Throwable $e) {
+            error_log('trial_enforcement Phase A tenant ' . $t['id'] . ': ' . $e->getMessage());
+            $errors++;
+        }
+    }
 
-    foreach ($expired as $t) {
+    // ── Phase B: Trial grace window closed — suspend ─────────────────────
+    $stmtB = $ctrl->prepare(
+        "SELECT id, subdomain, company_name, trial_ends_at
+           FROM tenants
+          WHERE status = 'trial'
+            AND grace_until IS NOT NULL
+            AND grace_until < CURDATE()"
+    );
+    $stmtB->execute();
+    $expiredTrials = $stmtB->fetchAll(PDO::FETCH_ASSOC);
+
+    $trialSuspended = 0;
+    foreach ($expiredTrials as $t) {
         try {
             $ctrl->prepare(
                 "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='trial_expired'
                   WHERE id=? AND status='trial'"
             )->execute([$t['id']]);
             logTenantAdminAction(
-                (int)$t['id'],
-                (string)$t['subdomain'],
+                (int)$t['id'], (string)$t['subdomain'],
                 'auto_suspend_trial',
-                'Trial expired ' . ($t['trial_ends_at'] ?? '?') . ' — batch enforcement'
+                'Grace period ended — trial expired ' . ($t['trial_ends_at'] ?? '?') . ' — batch enforcement'
             );
             insertSaNotification(
                 (int)$t['id'], 'trial_expired',
                 (string)($t['company_name'] ?? $t['subdomain']),
                 (string)$t['subdomain']
             );
-            $suspended++;
+            $trialSuspended++;
         } catch (Throwable $e) {
-            error_log('trial_enforcement: tenant ' . $t['id'] . ' error: ' . $e->getMessage());
+            error_log('trial_enforcement Phase B tenant ' . $t['id'] . ': ' . $e->getMessage());
             $errors++;
         }
     }
 
-    $trialSuspended = $suspended;
-
-    // Also suspend active tenants whose subscription has expired
-    $stmt2 = $ctrl->prepare(
-        "SELECT id, subdomain, owner_email, company_name, subscription_ends_at
+    // ── Phase C: Subscription expired, no grace period set yet ───────────
+    $stmtC = $ctrl->prepare(
+        "SELECT id, subdomain, company_name, subscription_ends_at
            FROM tenants
           WHERE status = 'active'
             AND subscription_ends_at IS NOT NULL
-            AND subscription_ends_at < CURDATE()"
+            AND subscription_ends_at < CURDATE()
+            AND grace_until IS NULL"
     );
-    $stmt2->execute();
-    $expiredSubs = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    $stmtC->execute();
+    $newSubGrace = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+
+    $subGraceStarted = 0;
+    foreach ($newSubGrace as $t) {
+        try {
+            $graceDate = date('Y-m-d', strtotime($t['subscription_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+            $ctrl->prepare(
+                "UPDATE tenants SET grace_until = ? WHERE id = ? AND status = 'active' AND grace_until IS NULL"
+            )->execute([$graceDate, $t['id']]);
+            logTenantAdminAction(
+                (int)$t['id'], (string)$t['subdomain'],
+                'grace_period_started',
+                'Subscription expired ' . $t['subscription_ends_at'] . ' — grace period started, ends ' . $graceDate
+            );
+            insertSaNotification(
+                (int)$t['id'], 'subscription_grace_started',
+                (string)($t['company_name'] ?? $t['subdomain']),
+                (string)$t['subdomain']
+            );
+            $subGraceStarted++;
+        } catch (Throwable $e) {
+            error_log('trial_enforcement Phase C tenant ' . $t['id'] . ': ' . $e->getMessage());
+            $errors++;
+        }
+    }
+
+    // ── Phase D: Subscription grace window closed — suspend ───────────────
+    $stmtD = $ctrl->prepare(
+        "SELECT id, subdomain, company_name, subscription_ends_at
+           FROM tenants
+          WHERE status = 'active'
+            AND grace_until IS NOT NULL
+            AND grace_until < CURDATE()"
+    );
+    $stmtD->execute();
+    $expiredSubs = $stmtD->fetchAll(PDO::FETCH_ASSOC);
 
     $subSuspended = 0;
     foreach ($expiredSubs as $t) {
@@ -107,10 +184,9 @@ try {
                   WHERE id=? AND status='active'"
             )->execute([$t['id']]);
             logTenantAdminAction(
-                (int)$t['id'],
-                (string)$t['subdomain'],
+                (int)$t['id'], (string)$t['subdomain'],
                 'auto_suspend_subscription',
-                'Subscription expired ' . ($t['subscription_ends_at'] ?? '?') . ' — batch enforcement'
+                'Grace period ended — subscription expired ' . ($t['subscription_ends_at'] ?? '?') . ' — batch enforcement'
             );
             insertSaNotification(
                 (int)$t['id'], 'subscription_expired',
@@ -119,12 +195,81 @@ try {
             );
             $subSuspended++;
         } catch (Throwable $e) {
-            error_log('trial_enforcement (subscription): tenant ' . $t['id'] . ' error: ' . $e->getMessage());
+            error_log('trial_enforcement Phase D tenant ' . $t['id'] . ': ' . $e->getMessage());
             $errors++;
         }
     }
 
-    // Email digest to all superadmins when anything expired today
+    // ── Grace-start email: notify superadmins when tenants enter grace ──────
+    $totalGraceStarted = $trialGraceStarted + $subGraceStarted;
+    if ($totalGraceStarted > 0) {
+        try {
+            $saEmails = $ctrl->query(
+                "SELECT name, email FROM superadmins WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+            )->fetchAll(\PDO::FETCH_ASSOC);
+
+            if ($saEmails) {
+                $todayLabel  = date('d M Y');
+                $graceSubject = "BMS — {$totalGraceStarted} tenant" . ($totalGraceStarted > 1 ? 's' : '') . " entered grace period ({$todayLabel})";
+
+                $trialGraceRows = '';
+                foreach ($newTrialGrace as $t) {
+                    $graceEnd = date('d M Y', strtotime($t['trial_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+                    $trialGraceRows .= '<tr>'
+                        . '<td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#856404">Trial expired ' . htmlspecialchars((string)$t['trial_ends_at'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#dc3545">' . $graceEnd . '</td>'
+                        . '</tr>';
+                }
+                $subGraceRows = '';
+                foreach ($newSubGrace as $t) {
+                    $graceEnd = date('d M Y', strtotime($t['subscription_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+                    $subGraceRows .= '<tr>'
+                        . '<td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#664d03">Subscription expired ' . htmlspecialchars((string)$t['subscription_ends_at'], ENT_QUOTES) . '</td>'
+                        . '<td style="padding:6px 10px;color:#dc3545">' . $graceEnd . '</td>'
+                        . '</tr>';
+                }
+
+                $tableStyle = 'width:100%;border-collapse:collapse;font-size:14px';
+                $thStyle    = 'padding:8px 10px;background:#fff3cd;text-align:left;font-weight:600;border-bottom:2px solid #ffc107';
+
+                $graceBody = '
+                <p>This is a BMS grace-period notification for <strong>' . $todayLabel . '</strong>.</p>
+                <p>The following tenants have entered their <strong>' . GRACE_PERIOD_DAYS . '-day grace period</strong> — they can still log in, but will be automatically suspended when the grace period ends unless a payment is recorded.</p>
+                <table style="' . $tableStyle . '">
+                    <thead><tr>
+                        <th style="' . $thStyle . '">Company</th>
+                        <th style="' . $thStyle . '">Subdomain</th>
+                        <th style="' . $thStyle . '">Expired</th>
+                        <th style="' . $thStyle . '">Grace ends</th>
+                    </tr></thead>
+                    <tbody>' . $trialGraceRows . $subGraceRows . '</tbody>
+                </table>
+                <p style="margin-top:16px">
+                    Review and record payments in the Billing tab:<br>
+                    <a href="https://superadmin.bms.bjptechnologies.co.tz/tenants">
+                        superadmin.bms.bjptechnologies.co.tz/tenants
+                    </a>
+                </p>';
+
+                foreach ($saEmails as $sa) {
+                    sendEmail(
+                        $sa['email'],
+                        $graceSubject,
+                        '<p>Hi ' . htmlspecialchars((string)$sa['name'], ENT_QUOTES) . ',</p>' . $graceBody,
+                        ['wrap_brand' => 'BJP Technologies / BMS']
+                    );
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('trial_enforcement grace-start email: ' . $e->getMessage());
+        }
+    }
+
+    // ── Email digest: only when tenants were actually suspended today ─────
     $totalSuspended = $trialSuspended + $subSuspended;
     if ($totalSuspended > 0) {
         try {
@@ -134,19 +279,19 @@ try {
 
             if ($saEmails) {
                 $todayLabel = date('d M Y');
-                $subject    = "BMS — {$totalSuspended} tenant" . ($totalSuspended > 1 ? 's' : '') . " expired today ({$todayLabel})";
+                $subject    = "BMS — {$totalSuspended} tenant" . ($totalSuspended > 1 ? 's' : '') . " suspended today ({$todayLabel})";
 
                 $trialRows = '';
-                foreach ($expired as $t) {
+                foreach ($expiredTrials as $t) {
                     $trialRows .= '<tr><td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
                         . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
-                        . '<td style="padding:6px 10px;color:#dc3545">Trial expired ' . htmlspecialchars((string)$t['trial_ends_at'], ENT_QUOTES) . '</td></tr>';
+                        . '<td style="padding:6px 10px;color:#dc3545">Trial expired ' . htmlspecialchars((string)$t['trial_ends_at'], ENT_QUOTES) . ' (grace ended)</td></tr>';
                 }
                 $subRows = '';
                 foreach ($expiredSubs as $t) {
                     $subRows .= '<tr><td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
                         . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
-                        . '<td style="padding:6px 10px;color:#fd7e14">Subscription expired ' . htmlspecialchars((string)$t['subscription_ends_at'], ENT_QUOTES) . '</td></tr>';
+                        . '<td style="padding:6px 10px;color:#fd7e14">Subscription expired ' . htmlspecialchars((string)$t['subscription_ends_at'], ENT_QUOTES) . ' (grace ended)</td></tr>';
                 }
 
                 $tableStyle = 'width:100%;border-collapse:collapse;font-size:14px';
@@ -154,6 +299,7 @@ try {
 
                 $body = '
                 <p>This is your daily BMS enforcement summary for <strong>' . $todayLabel . '</strong>.</p>
+                <p>The following tenants completed their ' . GRACE_PERIOD_DAYS . '-day grace period and were automatically suspended.</p>
                 <table style="' . $tableStyle . '">
                     <thead><tr>
                         <th style="' . $thStyle . '">Company</th>
@@ -163,7 +309,7 @@ try {
                     <tbody>' . $trialRows . $subRows . '</tbody>
                 </table>
                 <p style="margin-top:16px">
-                    These tenants are now suspended. Log in to extend a trial, record a payment, or take action:<br>
+                    Log in to reactivate after receiving payment:<br>
                     <a href="https://superadmin.bms.bjptechnologies.co.tz/tenants">
                         superadmin.bms.bjptechnologies.co.tz/tenants
                     </a>
@@ -184,14 +330,15 @@ try {
     }
 
     echo json_encode([
-        'ok'                 => true,
-        'trials_found'       => count($expired),
-        'trials_suspended'   => $trialSuspended,
-        'subs_found'         => count($expiredSubs),
-        'subs_suspended'     => $subSuspended,
-        'errors'             => $errors,
-        'digest_sent'        => $totalSuspended > 0,
-        'ran_at'             => date('c'),
+        'ok'                      => true,
+        'trial_grace_started'     => $trialGraceStarted,
+        'trial_suspended'         => $trialSuspended,
+        'sub_grace_started'       => $subGraceStarted,
+        'sub_suspended'           => $subSuspended,
+        'errors'                  => $errors,
+        'grace_email_sent'        => $totalGraceStarted > 0,
+        'digest_sent'             => $totalSuspended > 0,
+        'ran_at'                  => date('c'),
     ]);
 
 } catch (Throwable $e) {

@@ -1,5 +1,43 @@
 # BMS Changelog
 
+## 2026-09-25 — feat(superadmin): context-aware tenant_view landing + grace-start email digest
+
+**Files:** `app/superadmin/tenant_view.php`, `app/superadmin/dashboard.php`, `core/superadmin_ui.php`, `api/cron/trial_enforcement.php`
+
+Professional context-aware navigation when arriving at tenant_view from dashboard or notification bell:
+- **Back button** now reads "← Back to Dashboard" when `?from=dashboard` or `?from=notif`; otherwise "← Back to tenants".
+- **Action Required banner** shown above tabs with contextual message and icon (warning for grace period, danger for suspended, info for billing) based on `?from_cat` / `?notif_type`.
+- **Tab auto-open:** Billing tab opens automatically for subscription/payment events; Overview tab for lifecycle events (120 ms deferred Bootstrap Tab init).
+- **Grace-start email digest** (`trial_enforcement.php`): When Phases A/C set `grace_until` for any tenant, a separate immediate email is sent to all superadmins listing each tenant that entered grace + grace-end date. The suspension digest (Phases B/D) is unchanged.
+- **`dashboard.php`:** Added `in_grace` attention category, updated `trial_expired` query to exclude tenants still in grace, context params appended to all tenant links.
+- **`superadmin_ui.php`:** Bell notification links pass `&from=notif&notif_type=X`; grace notifications show hourglass icon.
+
+## 2026-09-25 — feat(superadmin): grace period — notify-first, no immediate block on trial/subscription expiry
+
+**Files:** `scripts/setup_control_db.php`, `core/superadmin_notifications.php`, `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php`, `header.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+Professional SaaS grace-period model:
+- **DB:** Added `tenants.grace_until DATE NULL`; expanded `superadmin_notifications.type` ENUM with `trial_grace_started` + `subscription_grace_started`.
+- **New flow** (replaces immediate block): trial/subscription expires → 7-day grace period starts → superadmin notified → tenant still works (sees warning banner) → grace ends → auto-suspend. Reactivate at any point after recording payment; all data is preserved.
+- **`tenant_bootstrap.php`:** 3-phase gate: (1) expiry detected, grace not set → write `grace_until`, notify, allow access; (2) within grace → allow access, set `$_SESSION['_bms_grace_warning']`; (3) grace ended → suspend and halt.
+- **`trial_enforcement.php`:** Rewritten to 4 phases — A/C start grace for newly expired tenants; B/D suspend tenants whose grace window has closed. Email digest only fires on actual suspensions.
+- **`header.php`:** Dismissable amber banner ("Your trial/subscription has ended — X days remaining in grace period") shown in the tenant's own system during the grace window.
+- **`activateTenant()`:** Clears `grace_until = NULL` when superadmin reactivates.
+- **Tenants list:** Grace-period badge "Trial/Sub grace: Xd" (amber hourglass) while tenant is in grace.
+- **Tenant detail view:** New "Grace Period" row showing days remaining and expiry date with contextual note.
+
+---
+
+## 2026-09-25 — feat(superadmin): Expires badge — "X days remaining for testing" + payment-derived subscription expiry
+
+**Files:** `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+- **Trial badge:** Any trial with ≤ 14 days left now reads "X days remaining for testing" (red ≤ 3d, amber ≤ 7d, blue ≤ 14d). Extended trials (> 14d) still show "Trial · date (Xd)". Expired shows "Trial expired".
+- **Active badge:** Label changed from "Sub · date" to "Expires date" — the date comes from `subscription_ends_at` which is set from the last recorded payment's `ends_at` in `tenant_payments`.
+- **Tenant detail view:** Trial row renamed "Trial Period" with same urgency label. New "Subscription Expires" row appears for active tenants showing the payment-derived end date and days left, labelled "(from last recorded payment)".
+
+---
+
 ## 2026-09-25 — feat(superadmin): suspension reason + in-app notification bell + email digest
 
 **Files:** `scripts/setup_control_db.php`, `core/superadmin_notifications.php` (new), `core/tenant_admin.php`, `core/tenant_bootstrap.php`, `api/cron/trial_enforcement.php`, `actions/superadmin_mark_notifications_read.php` (new), `core/superadmin_ui.php`, `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`

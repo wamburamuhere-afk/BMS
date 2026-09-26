@@ -204,62 +204,113 @@ if (!function_exists('bmsConnectPdo')) {
                 'This account is not currently available. Please contact your administrator.');
         }
 
-        // Trial expiry gate (superadmin_plan.md P3) ─────────────────────────
-        // If the trial period ended, auto-suspend and block access. Best-effort
-        // write: a control-DB hiccup must not mask a real bad-status — the gate
-        // still fires even if the UPDATE fails (the old status is still 'trial'
-        // but we still block; the cron job will clean it up later).
-        if ($status === 'trial' && !empty($tenant['trial_ends_at'])
-            && strtotime((string)$tenant['trial_ends_at']) < time()
-        ) {
-            try {
-                require_once __DIR__ . '/control_db.php';
-                require_once __DIR__ . '/superadmin_notifications.php';
-                getControlPdo()->prepare(
-                    "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='trial_expired' WHERE id=? AND status='trial'"
-                )->execute([(int)$tenant['id']]);
-                getControlPdo()->prepare("
-                    INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
-                    VALUES (?, ?, 'auto_suspend_trial', 'Trial expired — auto-suspended at access attempt', NOW())
-                ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? '')]);
-                insertSaNotification(
-                    (int)$tenant['id'], 'trial_expired',
-                    (string)($tenant['company_name'] ?? $tenant['subdomain'] ?? ''),
-                    (string)($tenant['subdomain'] ?? '')
-                );
-            } catch (Throwable $_e) {
-                error_log('trial expiry auto-suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
-            }
-            bmsTenantHalt(402, 'Trial ended',
-                'Your free trial has ended. Please contact us to continue using ' . (string)($tenant['company_name'] ?? 'BMS') . '.');
-        }
+        // Trial / subscription expiry gate — grace-period model ─────────────
+        //
+        // Professional SaaS behaviour (instead of immediate block):
+        //   1. Expiry detected, grace_until not yet set
+        //      → write grace_until = expiry + 7 days, notify superadmin, ALLOW access.
+        //   2. grace_until is in the future
+        //      → ALLOW access, set a session flag so header.php shows a warning banner.
+        //   3. grace_until has passed
+        //      → auto-suspend and block.
+        //
+        // The cron (trial_enforcement.php) does the same sweep nightly so inactive
+        // tenants (who never visit) are caught too. Both paths are idempotent:
+        // the grace_until IS NULL check prevents double-setting, and
+        // insertSaNotification deduplicates per (tenant_id, type) per day.
 
-        // Subscription expiry gate ─────────────────────────────────────────
-        // If a paid subscription has expired, auto-suspend and block access.
-        if ($status === 'active'
+        define('BMS_GRACE_PERIOD_DAYS', 7);
+
+        $trialExpired = ($status === 'trial')
+            && !empty($tenant['trial_ends_at'])
+            && strtotime((string)$tenant['trial_ends_at']) < time();
+
+        $subExpired = ($status === 'active')
             && !empty($tenant['subscription_ends_at'])
-            && strtotime((string)$tenant['subscription_ends_at']) < strtotime('today')
-        ) {
-            try {
-                require_once __DIR__ . '/control_db.php';
-                require_once __DIR__ . '/superadmin_notifications.php';
-                getControlPdo()->prepare(
-                    "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='subscription_expired' WHERE id=? AND status='active'"
-                )->execute([(int)$tenant['id']]);
-                getControlPdo()->prepare("
-                    INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
-                    VALUES (?, ?, 'auto_suspend_subscription', 'Subscription expired — auto-suspended at access attempt', NOW())
-                ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? '')]);
-                insertSaNotification(
-                    (int)$tenant['id'], 'subscription_expired',
-                    (string)($tenant['company_name'] ?? $tenant['subdomain'] ?? ''),
-                    (string)($tenant['subdomain'] ?? '')
-                );
-            } catch (Throwable $_e) {
-                error_log('subscription expiry auto-suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
+            && strtotime((string)$tenant['subscription_ends_at']) < strtotime('today');
+
+        if ($trialExpired || $subExpired) {
+            $graceUntil = $tenant['grace_until'] ?? null;   // from SELECT * in resolver
+
+            if ($graceUntil === null) {
+                // Step 1: first time we detect expiry — start the grace period
+                $expiryDate = $trialExpired
+                    ? (string)$tenant['trial_ends_at']
+                    : (string)$tenant['subscription_ends_at'];
+                $graceDate = date('Y-m-d', strtotime($expiryDate . ' +' . BMS_GRACE_PERIOD_DAYS . ' days'));
+                $notifType  = $trialExpired ? 'trial_grace_started' : 'subscription_grace_started';
+
+                try {
+                    require_once __DIR__ . '/control_db.php';
+                    require_once __DIR__ . '/superadmin_notifications.php';
+                    getControlPdo()->prepare(
+                        "UPDATE tenants SET grace_until = ? WHERE id = ? AND grace_until IS NULL"
+                    )->execute([$graceDate, (int)$tenant['id']]);
+                    getControlPdo()->prepare("
+                        INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
+                        VALUES (?, ?, 'grace_period_started', ?, NOW())
+                    ")->execute([
+                        (int)$tenant['id'],
+                        (string)($tenant['subdomain'] ?? ''),
+                        ($trialExpired ? 'Trial' : 'Subscription') . ' expired — grace period started, ends ' . $graceDate,
+                    ]);
+                    insertSaNotification(
+                        (int)$tenant['id'], $notifType,
+                        (string)($tenant['company_name'] ?? $tenant['subdomain'] ?? ''),
+                        (string)($tenant['subdomain'] ?? '')
+                    );
+                } catch (Throwable $_e) {
+                    error_log('grace_period_start failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
+                }
+                $graceUntil = $graceDate;   // use it for the warning flag below
             }
-            bmsTenantHalt(402, 'Subscription ended',
-                'Your subscription has expired. Please contact us to renew and continue using ' . (string)($tenant['company_name'] ?? 'BMS') . '.');
+
+            // Step 3: grace window has closed — suspend now
+            if ($graceUntil !== null && strtotime((string)$graceUntil) < strtotime('today')) {
+                $suspReason = $trialExpired ? 'trial_expired' : 'subscription_expired';
+                $logAction  = $trialExpired ? 'auto_suspend_trial' : 'auto_suspend_subscription';
+                $notifType  = $trialExpired ? 'trial_expired' : 'subscription_expired';
+                $haltTitle  = $trialExpired ? 'Trial ended' : 'Subscription ended';
+                $haltMsg    = $trialExpired
+                    ? 'Your free trial has ended. Please contact us to continue.'
+                    : 'Your subscription has expired. Please contact us to renew.';
+
+                try {
+                    require_once __DIR__ . '/control_db.php';
+                    require_once __DIR__ . '/superadmin_notifications.php';
+                    $suspSql = $trialExpired
+                        ? "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='trial_expired' WHERE id=? AND status='trial'"
+                        : "UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='subscription_expired' WHERE id=? AND status='active'";
+                    getControlPdo()->prepare($suspSql)->execute([(int)$tenant['id']]);
+                    getControlPdo()->prepare("
+                        INSERT INTO tenant_admin_log (tenant_id, subdomain, action, detail, created_at)
+                        VALUES (?, ?, ?, 'Grace period ended — auto-suspended at access attempt', NOW())
+                    ")->execute([(int)$tenant['id'], (string)($tenant['subdomain'] ?? ''), $logAction]);
+                    insertSaNotification(
+                        (int)$tenant['id'], $notifType,
+                        (string)($tenant['company_name'] ?? $tenant['subdomain'] ?? ''),
+                        (string)($tenant['subdomain'] ?? '')
+                    );
+                } catch (Throwable $_e) {
+                    error_log('grace_period_suspend failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
+                }
+                bmsTenantHalt(402, $haltTitle, $haltMsg . ' using ' . (string)($tenant['company_name'] ?? 'BMS') . '.');
+            }
+
+            // Step 2: still within grace — allow access, flag for warning banner
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                $daysLeft = max(0, (int)floor((strtotime((string)$graceUntil) - strtotime('today')) / 86400));
+                $_SESSION['_bms_grace_warning'] = [
+                    'type'       => $trialExpired ? 'trial' : 'subscription',
+                    'days_left'  => $daysLeft,
+                    'grace_until'=> $graceUntil,
+                ];
+            }
+        } else {
+            // Clear stale grace warning if tenant is now fully active/paid
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                unset($_SESSION['_bms_grace_warning']);
+            }
         }
 
         // ── Cross-tenant session guard ───────────────────────────────────────

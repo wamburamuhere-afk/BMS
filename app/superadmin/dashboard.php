@@ -207,19 +207,46 @@ try {
     error_log('superadmin dashboard (provisioning): ' . $e->getMessage());
 }
 
-// Trial EXPIRED — past trial_ends_at, still in 'trial' status
+// In grace period — trial or subscription expired but within the 7-day grace window
 try {
     $rows = getControlPdo()->query("
-        SELECT id, company_name, subdomain, owner_email, trial_ends_at,
+        SELECT id AS tenant_id, company_name, subdomain, owner_email,
+               status, trial_ends_at, subscription_ends_at, grace_until,
+               DATEDIFF(grace_until, CURDATE()) AS grace_days_left
+        FROM tenants
+        WHERE status IN ('trial','active')
+          AND grace_until IS NOT NULL
+          AND grace_until >= CURDATE()
+        ORDER BY grace_until ASC
+        LIMIT 30
+    ")->fetchAll();
+    if ($rows) {
+        $attention['in_grace'] = [
+            'title' => 'Tenants in grace period — awaiting payment or extension',
+            'icon'  => 'bi-hourglass-split',
+            'color' => 'warning',
+            'items' => $rows,
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (in grace): ' . $e->getMessage());
+}
+
+// Trial EXPIRED with grace window now CLOSED — should already be suspended by cron,
+// but show here as a safety net in case the cron hasn't run yet today.
+try {
+    $rows = getControlPdo()->query("
+        SELECT id, company_name, subdomain, owner_email, trial_ends_at, grace_until,
                DATEDIFF(NOW(), trial_ends_at) AS days_overdue
         FROM tenants
         WHERE status = 'trial' AND trial_ends_at < NOW()
+          AND (grace_until IS NULL OR grace_until < CURDATE())
         ORDER BY trial_ends_at ASC
         LIMIT 30
     ")->fetchAll();
     if ($rows) {
         $attention['trial_expired'] = [
-            'title' => 'Trials EXPIRED — account not yet suspended',
+            'title' => 'Trials EXPIRED & grace ended — pending suspension',
             'icon'  => 'bi-hourglass-bottom',
             'color' => 'danger',
             'items' => $rows,
@@ -421,7 +448,7 @@ try {
 function saAttentionItemHtml(string $key, array $it): string
 {
     $tenantLink = isset($it['tenant_id']) && $it['tenant_id']
-        ? saUrl('tenants/view') . '?id=' . (int)$it['tenant_id']
+        ? saUrl('tenants/view') . '?id=' . (int)$it['tenant_id'] . '&from=dashboard&from_cat=' . urlencode($key)
         : null;
 
     switch ($key) {
@@ -450,6 +477,12 @@ function saAttentionItemHtml(string $key, array $it): string
             $body = '<div class="fw-semibold small">IP ' . safe_output($it['ip_address'], '') . '</div>'
                   . '<div class="text-muted" style="font-size:.75rem;">' . (int)$it['attempts'] . ' blocked attempts · last ' . saTimeAgo((string)$it['last_attempt']) . '</div>';
             $tenantLink = null; // no single tenant to jump to
+            break;
+        case 'in_grace':
+            $gLabel = ($it['status'] ?? '') === 'trial' ? 'Trial' : 'Subscription';
+            $gDays  = (int)($it['grace_days_left'] ?? 0);
+            $body = '<div class="fw-semibold small">' . safe_output($it['company_name'] ?? $it['subdomain'], 'Unknown') . ' <span class="text-muted fw-normal">(' . safe_output($it['subdomain'], '') . ')</span></div>'
+                  . '<div class="text-muted" style="font-size:.75rem;">' . $gLabel . ' expired · <strong>' . $gDays . ' day' . ($gDays === 1 ? '' : 's') . '</strong> left in grace · auto-suspends ' . safe_output($it['grace_until'] ?? '?', '?') . '</div>';
             break;
         case 'billing_overdue':
         case 'billing_due_soon':

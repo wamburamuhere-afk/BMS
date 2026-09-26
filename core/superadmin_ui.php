@@ -160,14 +160,17 @@ if (!function_exists('renderSuperadminHeader')) {
                                     <?php else: ?>
                                     <?php foreach ($notifications as $n):
                                         $isUnread  = !(bool)$n['is_read'];
-                                        $isTrial   = $n['type'] === 'trial_expired';
+                                        $nType     = (string)$n['type'];
+                                        $isTrial   = in_array($nType, ['trial_expired', 'trial_grace_started'], true);
+                                        $isGrace   = in_array($nType, ['trial_grace_started', 'subscription_grace_started'], true);
                                         $iconClass = $isTrial ? 'trial' : 'sub';
-                                        $iconBi    = $isTrial ? 'bi-hourglass-split' : 'bi-credit-card';
+                                        $iconBi    = $isGrace ? 'bi-hourglass' : ($isTrial ? 'bi-hourglass-split' : 'bi-credit-card');
                                         $timeAgo   = (int)floor((time() - strtotime((string)$n['created_at'])) / 60);
                                         $timeLabel = $timeAgo < 60 ? $timeAgo . 'm ago'
                                                    : ($timeAgo < 1440 ? floor($timeAgo/60) . 'h ago'
                                                    : date('d M', strtotime((string)$n['created_at'])));
-                                        $tenantUrl = '/app/superadmin/tenant_view.php?id=' . (int)($n['tenant_id'] ?? 0);
+                                        $tenantUrl = saUrl('tenants/view') . '?id=' . (int)($n['tenant_id'] ?? 0)
+                                                   . '&from=notif&notif_type=' . urlencode($nType);
                                     ?>
                                     <a href="<?= htmlspecialchars($tenantUrl, ENT_QUOTES) ?>"
                                        class="d-flex align-items-start gap-2 text-decoration-none text-dark sa-notif-item<?= $isUnread ? ' unread' : '' ?>">

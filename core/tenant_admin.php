@@ -74,7 +74,7 @@ if (!function_exists('listTenants')) {
                        country, industry, company_size,
                        trial_ends_at, last_active_at,
                        billing_cycle, billing_amount_tzs, next_billing_date, payment_status,
-                       subscription_ends_at, suspension_reason,
+                       subscription_ends_at, suspension_reason, grace_until,
                        max_users, max_storage_mb,
                        created_at, activated_at, suspended_at
                 FROM tenants";
@@ -121,7 +121,7 @@ if (!function_exists('getTenant')) {
                    trial_ends_at, trial_extended_by, last_active_at,
                    notes, notes_updated_at, notes_updated_by,
                    billing_cycle, billing_amount_tzs, next_billing_date, payment_status,
-                   subscription_ends_at, suspension_reason, unsubscribed_at, max_users, max_storage_mb,
+                   subscription_ends_at, suspension_reason, grace_until, unsubscribed_at, max_users, max_storage_mb,
                    created_at, activated_at, suspended_at
             FROM tenants WHERE id = ? LIMIT 1
         ");
@@ -211,7 +211,7 @@ if (!function_exists('activateTenant')) {
 
         getControlPdo()->prepare("
             UPDATE tenants
-               SET status='active', suspended_at=NULL, suspension_reason=NULL,
+               SET status='active', suspended_at=NULL, suspension_reason=NULL, grace_until=NULL,
                    activated_at = IFNULL(activated_at, NOW())
              WHERE id = ?
         ")->execute([$id]);
