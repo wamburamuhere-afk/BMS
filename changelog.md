@@ -1,5 +1,29 @@
 # BMS Changelog
 
+<<<<<<< Updated upstream
+=======
+## 2026-09-26 — ux(superadmin): Auto-open tenant login page after registration
+
+**Files:**
+- `app/superadmin/tenant_new.php` — On successful tenant creation, immediately open the new tenant's login URL in a new tab via `window.open`; dialog now shows "Login page opened in a new tab" with the link as a fallback.
+
+---
+
+## 2026-09-26 — feat(mobile-money): Phase 1 — Master Data (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `migrations/tenant/2026_09_26_mm_gl_accounts.php` + `migrations/2026_09_26_mm_gl_accounts_legacy_db.php` — provisions 9 MM GL accounts (MM-1000 group + 5 per-network e-float accounts MM-1001..1005, MM-1050 cash float, MM-4100 commission income, MM-5100 agent expenses); wires `mm_networks.float_account_id + commission_account_id`; stores IDs in system_settings
+- `app/bms/mobile_money/mm_networks.php` — full CRUD for MM networks; shows e-float + commission account assignments; Select2 account pickers
+- `app/bms/mobile_money/mm_agents.php` — full CRUD agent list with DataTable + mobile card view; network badge, super-agent hierarchy, till count
+- `app/bms/mobile_money/mm_agent_view.php` — agent detail: tills management (add/edit/delete inline), sub-agents list
+- `app/bms/mobile_money/mm_commission_rates.php` — rate schedule with network/type filter, flat/percent rate bands, effective dates
+- `api/mobile_money/save_network.php` — create/update networks API
+- `api/mobile_money/save_agent.php` — create/update/soft-delete agents; uses nextCode(MM-AGT)
+- `api/mobile_money/save_till.php` — create/update/soft-delete tills; uses nextCode(MM-TIL)
+- `api/mobile_money/save_commission_rate.php` — create/update/supersede commission rate bands
+
+All 10 Phase 1 files pass PHP syntax check. GL accounts idempotent.
+
 ## 2026-09-26 — feat(mobile-money): Phase 0 — Foundation (branch feat/mm-phase-0-foundation)
 
 **Files:**
@@ -19,6 +43,7 @@
 
 13 tables verified in DB, 5 networks seeded, 10 permissions seeded. All edits to existing files are purely additive.
 
+>>>>>>> Stashed changes
 ## 2026-09-26 — fix(pos): show real server error instead of generic "An error occurred"
 
 **Files:** `app/bms/pos/pos_scripts_new.php`
