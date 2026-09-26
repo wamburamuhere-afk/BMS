@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 4 — Float Management (branch feat/mm-phase-0-foundation)
+
+**Files:**
+- `app/bms/mobile_money/mm_float.php` — float movements list with date/till/type filter, stats row, Float Top-up + Float Withdrawal modals (both with till Select2 + bank account Select2 + GL post)
+- `api/mobile_money/save_float_movement.php` — POST handler: validates till/type/amount; calls `mmRecordFloatMovement()` which creates movement row + posts GL (`float_topup: Dr E-Float | Cr Bank`; `float_withdrawal: Dr Bank | Cr E-Float`)
+
+E2E test passed: Top-up TZS 500,000 → Dr E-Float=500K Cr Bank=500K, GL balanced.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 3 — Teller Shifts (branch feat/mm-phase-0-foundation)
 
 **Files:**
