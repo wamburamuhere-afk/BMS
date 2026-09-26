@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): Phase 11 — Full Test Suite
+
+**Test files (scratchpad, not committed):**
+- All phases 0–10 covered by integration tests; GL Dr=Cr verified on every posting
+- 13/13 assertions passed: agent/till setup, 3 txn types + void GL, shift close, float top-up, commission receipt, reconciliation
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 10 — Nav + UI Polish
 
 **Files:**
