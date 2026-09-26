@@ -2,13 +2,15 @@
 /**
  * api/mobile/login.php
  *
- * POST  phone, password, device_name
+ * POST  username (or phone), password, device_name
  *
- * Returns a 30-day Bearer token plus the user/company context the Flutter
- * app needs to initialise its home screen without a separate /me call.
+ * Returns a Bearer token plus the user/company context the Flutter app needs
+ * to initialise its home screen without a separate /me call.
  *
- * Note: "phone" is the BMS `username` field — BMS stores the owner's phone
- * number there during tenant provisioning.
+ * The login credential is the BMS `users.username` field.  At tenant
+ * registration the owner's phone number is stored there, but an admin can
+ * change any user's username to any free-form value via Settings → Users.
+ * Accept both "username" and "phone" so older app builds keep working.
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
@@ -19,13 +21,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$phone       = trim($_POST['phone'] ?? '');
+// Accept "username" (preferred) or "phone" (legacy alias)
+$phone       = trim($_POST['username'] ?? $_POST['phone'] ?? '');
 $password    = $_POST['password'] ?? '';
 $device_name = trim($_POST['device_name'] ?? 'Unknown device');
 
 if ($phone === '' || $password === '') {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Phone and password are required']);
+    echo json_encode(['success' => false, 'message' => 'Username and password are required']);
     exit;
 }
 
@@ -38,7 +41,7 @@ try {
 
     if (!$user || !password_verify($password, $user['password'])) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Invalid phone number or password']);
+        echo json_encode(['success' => false, 'message' => 'Invalid username or password']);
         exit;
     }
 
