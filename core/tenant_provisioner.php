@@ -322,6 +322,7 @@ if (!function_exists('provisionTenant')) {
      *                     'country', 'industry', 'company_size' => string|null,
      *                     'trial_ends_at' => string|null (Y-m-d H:i:s; defaults to +14 days),
      *                     'physical_address', 'postal_address' => string,
+     *                     'skip_welcome_email' => bool (default false) — omit SMTP on mobile/API paths
      *                     'logo_tmp_path', 'logo_extension' => string|null
      * @return array{ok:bool, tenant_id:?int, subdomain:string, db_name:?string,
      *                db_username:?string, error:?string, steps:array}
@@ -588,19 +589,21 @@ if (!function_exists('provisionTenant')) {
             }
 
             // ── 9.6 Welcome email — best-effort, same discipline as 9.5 ──────
-            // tenant_provisioning_log.status is ENUM('started','ok','failed',
-            // 'rolled_back') — not sending because platform email simply isn't
-            // configured yet is a benign, expected outcome here, not a
-            // provisioning failure, so it logs 'ok' with the reason in the
-            // message rather than inventing an enum value the column doesn't have.
-            try {
-                $sent = sendTenantWelcomeEmail($companyName, $subdomain, $ownerEmail);
-                $step('welcome_email', 'ok', $sent ? 'sent' : 'skipped (platform email not configured)');
-                logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'ok',
-                    $sent ? 'sent' : 'skipped (platform email not configured, or no base domain resolved)');
-            } catch (Throwable $e) {
-                $step('welcome_email', 'failed', $e->getMessage());
-                logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'failed', $e->getMessage());
+            // skip_welcome_email=true lets mobile/API callers opt out of SMTP so
+            // a slow mail server cannot push provisioning past the client timeout.
+            if (!empty($opts['skip_welcome_email'])) {
+                $step('welcome_email', 'ok', 'skipped (caller opted out)');
+                logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'ok', 'skipped (caller opted out)');
+            } else {
+                try {
+                    $sent = sendTenantWelcomeEmail($companyName, $subdomain, $ownerEmail);
+                    $step('welcome_email', 'ok', $sent ? 'sent' : 'skipped (platform email not configured)');
+                    logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'ok',
+                        $sent ? 'sent' : 'skipped (platform email not configured, or no base domain resolved)');
+                } catch (Throwable $e) {
+                    $step('welcome_email', 'failed', $e->getMessage());
+                    logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'failed', $e->getMessage());
+                }
             }
 
             $result['ok'] = true;
