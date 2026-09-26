@@ -1,6 +1,7 @@
 <?php
 // scope-audit: skip — MM tables are agent-scoped via mm_user_agent_grants.
 require_once __DIR__ . '/../../roots.php';
+require_once ROOT_DIR . '/core/code_generator.php';
 require_once ROOT_DIR . '/core/mm_float_service.php';
 header('Content-Type: application/json');
 

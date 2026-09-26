@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(mobile-money): Add missing code_generator.php includes in 4 API files
+
+**Files:**
+- `api/mobile_money/open_shift.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+- `api/mobile_money/save_agent.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+- `api/mobile_money/save_reconciliation.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+- `api/mobile_money/save_transaction.php` — added `require_once ROOT_DIR . '/core/code_generator.php'`
+
+**Why:** `nextCode()` is NOT auto-loaded by `roots.php`; calling it without the explicit include causes a fatal `Call to undefined function` at runtime.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): Phase 11 — Full Test Suite
 
 **Test files (scratchpad, not committed):**
