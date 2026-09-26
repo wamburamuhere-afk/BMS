@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-auth): Async mobile registration (job queue + polling)
+
+**Files:**
+- `scripts/setup_control_db.php` — added `registration_jobs` table to control DB (job_id, status, encrypted password, company/owner fields, tenant_id, token; cleared after provisioning)
+- `api/mobile/register.php` — rewritten: validates + queues job + returns `202` in < 1 s; fires background worker best-effort; response includes `job_id`, `username`, `subdomain`, `tenant_url`, `poll_url`
+- `api/mobile/register_status.php` — NEW polling endpoint `GET ?job_id=xxx`; returns `provisioning` (202) or `ready` (200, with token + user + company) or `failed`
+- `cron/process_registration_jobs.php` — NEW background worker; atomically claims one pending job via `SELECT FOR UPDATE`; calls `provisionTenant()` directly; issues Bearer token; clears `owner_pass_enc` on completion; schedule every 1 minute
+- `api/mobile/login.php` — when user lookup fails, checks `registration_jobs` for a pending/provisioning job; returns `202 { status:"provisioning" }` with a clear "still setting up" message instead of a generic 401
+
+**Gaps closed:**
+1. App no longer times out — `POST /register` returns in < 1 s
+2. App receives `username`, `subdomain`, `tenant_url` immediately; full token once polling returns `ready`
+3. Failed provisioning recorded in `registration_jobs.error_message`
+4. Login during setup returns informative message instead of "invalid credentials"
+
+---
+
 ## 2026-09-26 — fix(mobile-auth): Login accepts username not phone-only
 
 **Files:**

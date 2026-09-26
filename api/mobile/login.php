@@ -39,7 +39,36 @@ try {
     $stmt->execute([$phone]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user || !password_verify($password, $user['password'])) {
+    if (!$user) {
+        // Before returning a generic 401, check if this phone is still being
+        // provisioned — so a brand-new user who logs in too early gets a helpful
+        // message instead of a confusing "invalid credentials".
+        try {
+            require_once __DIR__ . '/../../core/control_db.php';
+            $jobStmt = getControlPdo()->prepare("
+                SELECT status FROM registration_jobs
+                WHERE owner_phone = ? AND status IN ('pending','provisioning')
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $jobStmt->execute([$phone]);
+            if ($jobStmt->fetchColumn()) {
+                http_response_code(202);
+                echo json_encode([
+                    'success' => false,
+                    'status'  => 'provisioning',
+                    'message' => 'Your account is still being set up. Please try logging in again in about 1 minute.',
+                ]);
+                exit;
+            }
+        } catch (Throwable $e) {
+            // Control DB unavailable — fall through to the normal 401
+        }
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Invalid username or password']);
+        exit;
+    }
+
+    if (!password_verify($password, $user['password'])) {
         http_response_code(401);
         echo json_encode(['success' => false, 'message' => 'Invalid username or password']);
         exit;
