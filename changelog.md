@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-26 — ux(superadmin): Auto-open tenant login page after registration
+
+**Files:**
+- `app/superadmin/tenant_new.php` — On successful tenant creation, immediately open the new tenant's login URL in a new tab via `window.open`; dialog now shows "Login page opened in a new tab" with the link as a fallback.
+
+---
+
 ## 2026-09-26 — fix(pos): show real server error instead of generic "An error occurred"
 
 **Files:** `app/bms/pos/pos_scripts_new.php`
