@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(pos-api): add mobileBearerAuth to simple dashboard chart endpoint
+
+**Files:**
+- `api/pos/get_simple_dashboard_chart.php` — added `mobileBearerAuth()` so Flutter Bearer token calls are authenticated; previously used only `isAuthenticated()` which requires a web session, causing HTTP 401 for all mobile callers
+
+---
+
 ## 2026-09-27 — fix(mobile-money): Settings button JS fix + Swahili "Shukiwa" correction
 
 **Files:**
