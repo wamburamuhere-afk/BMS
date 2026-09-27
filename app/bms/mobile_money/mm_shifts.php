@@ -65,6 +65,34 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         <?php endif; ?>
     </div>
 
+    <!-- Stats -->
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
+                <div class="fs-4 fw-bold text-success"><?= $openCount ?></div>
+                <div class="small text-muted"><?= t('Open Shifts') ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
+                <div class="fs-4 fw-bold text-primary"><?= $closedCount ?></div>
+                <div class="small text-muted"><?= t('Closed Shifts') ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
+                <div class="fs-5 fw-bold text-info"><?= number_format(array_sum(array_column($shifts, 'txn_volume'))) ?></div>
+                <div class="small text-muted"><?= t('Total Volume (TZS)') ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
+                <div class="fs-5 fw-bold text-warning"><?= number_format(array_sum(array_column($shifts, 'txn_commission'))) ?></div>
+                <div class="small text-muted"><?= t('Commission (TZS)') ?></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Filter bar -->
     <form method="GET" action="" class="row g-2 mb-3 align-items-end">
         <div class="col-md-2">
@@ -89,35 +117,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         </div>
     </form>
 
-    <!-- Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-4 fw-bold text-success"><?= $openCount ?></div>
-                <div class="small text-muted"><?= t('Open Shifts') ?></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-4 fw-bold text-primary"><?= $closedCount ?></div>
-                <div class="small text-muted"><?= t('Closed Shifts') ?></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-5 fw-bold text-info"><?= number_format(array_sum(array_column($shifts, 'txn_volume'))) ?></div>
-                <div class="small text-muted"><?= t('Total Volume (TZS)') ?></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-5 fw-bold text-warning"><?= number_format(array_sum(array_column($shifts, 'txn_commission'))) ?></div>
-                <div class="small text-muted"><?= t('Commission (TZS)') ?></div>
-            </div>
-        </div>
-    </div>
-
 <style>
+.mm-stat-card{background:#d1e7dd!important;border-color:#badbcc!important;border-radius:12px;transition:transform .2s}
+.mm-stat-card:hover{transform:translateY(-3px)}
+.mm-stat-card .fw-bold,.mm-stat-card .fs-3,.mm-stat-card .fs-4,.mm-stat-card .fs-5{color:#0f5132!important}
+.mm-stat-card .text-muted,.mm-stat-card .small{color:#0f5132!important;opacity:.85}
 .mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
 .mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
 .mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
