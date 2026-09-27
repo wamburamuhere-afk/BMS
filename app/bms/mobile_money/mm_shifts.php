@@ -174,13 +174,19 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                                         <?= ucfirst(str_replace('_', ' ', safe_output($sh['status']))) ?>
                                     </span>
                                 </td>
-                                <td class="text-end d-flex gap-1 justify-content-end">
-                                    <a href="<?= getUrl('mm_shift_report') ?>?id=<?= $sh['shift_id'] ?>" class="btn btn-sm btn-outline-secondary" title="<?= t('Report') ?>"><i class="bi bi-printer"></i></a>
-                                    <?php if ($sh['status'] === 'open' && $can_close): ?>
-                                    <button class="btn btn-sm btn-outline-danger" onclick='closeShift(<?= json_encode(['id'=>$sh['shift_id'],'code'=>$sh['shift_code'],'till_number'=>$sh['till_number'],'agent'=>$sh['agent_name']]) ?>)' title="<?= t('Close') ?>">
-                                        <i class="bi bi-stop-circle"></i>
-                                    </button>
-                                    <?php endif; ?>
+                                <td class="text-center">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:140px;font-size:.85rem">
+                                            <li><a class="dropdown-item" href="<?= getUrl('mm_shift_report') ?>?id=<?= $sh['shift_id'] ?>"><i class="bi bi-printer me-2 text-secondary"></i><?= t('Report') ?></a></li>
+                                            <?php if ($sh['status'] === 'open' && $can_close): ?>
+                                            <li><hr class="dropdown-divider my-1"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" onclick='closeShift(<?= htmlspecialchars(json_encode(['id'=>$sh['shift_id'],'code'=>$sh['shift_code'],'till_number'=>$sh['till_number'],'agent'=>$sh['agent_name']]),ENT_QUOTES) ?>);return false'><i class="bi bi-stop-circle me-2"></i><?= t('Close') ?></a></li>
+                                            <?php endif; ?>
+                                        </ul>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -280,7 +286,7 @@ $(document).ready(function () {
         $('#shiftsTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[4,'desc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
             language: { emptyTable: '<?= addslashes(t('No shifts found.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
-            drawCallback: function() { renderCards(this.api().rows({page:'current'}).nodes()); }
+            drawCallback: function() { renderCards(this.api().rows({page:'current'}).nodes()); applyView(); }
         });
     }
     function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
@@ -297,7 +303,7 @@ $(document).ready(function () {
         btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
         $.ajax({url:'<?= buildUrl('api/mobile_money/open_shift.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
             success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Shift Opened!') ?>',text:r.message,timer:1800,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
+            error:(xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
             complete:()=>btn.prop('disabled',false).html(orig)
         });
     });
@@ -308,7 +314,7 @@ $(document).ready(function () {
         btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
         $.ajax({url:'<?= buildUrl('api/mobile_money/close_shift.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
             success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Shift Closed!') ?>',text:r.message,timer:2000,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
+            error:(xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
             complete:()=>btn.prop('disabled',false).html(orig)
         });
     });

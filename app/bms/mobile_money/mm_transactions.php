@@ -54,7 +54,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
 
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right text-primary me-2"></i><?= t('MM Transactions') ?></h4>
+        <h4 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right text-primary me-2"></i><?= t('Transactions') ?></h4>
         <?php if ($can_create): ?>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newTxnModal">
             <i class="bi bi-plus-circle me-1"></i> <?= t('New Transaction') ?>
