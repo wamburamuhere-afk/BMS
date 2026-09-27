@@ -112,7 +112,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                         <span class="badge bg-<?= $badge[$r['status']] ?? 'secondary' ?>"><?= safe_output(ucfirst($r['status'])) ?></span>
                     </td>
                     <td class="text-end">
-                        <a href="<?= getUrl('mobile_money/mm_recon_view') ?>?id=<?= $r['recon_id'] ?>" class="btn btn-sm btn-outline-info">
+                        <a href="<?= getUrl('mm_recon_view') ?>?id=<?= $r['recon_id'] ?>" class="btn btn-sm btn-outline-info">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>
@@ -182,7 +182,7 @@ $(document).ready(function () {
             success: function (res) {
                 if (res.success) {
                     Swal.fire({ icon: 'success', title: '<?= t('Started!') ?>', timer: 1800, showConfirmButton: false })
-                        .then(() => window.location = '<?= getUrl('mobile_money/mm_recon_view') ?>?id=' + res.recon_id);
+                        .then(() => window.location = '<?= getUrl('mm_recon_view') ?>?id=' + res.recon_id);
                 } else { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message }); }
             },
             error: function () { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); },
