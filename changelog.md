@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(mobile-money): Settings button JS fix + Swahili "Shukiwa" correction
+
+**Files:**
+- `header.php` — MM-only Settings (≡) button: replaced `data-bs-toggle/target` with direct `bootstrap.Offcanvas.getOrCreateInstance().show()` call; also dismisses any open Reports/More sheet first — fixes button appearing active but sheet not opening when another offcanvas is already on screen
+- `lang/sw.php` — 'Void & Suspicious': "Zinazohusuwa" → "Zinazoshukiwa" (everyday Tanzanian Swahili)
+
+---
+
 ## 2026-09-27 — fix(mobile-money): Mobile nav restructure + Floti terminology
 
 **Files:**
