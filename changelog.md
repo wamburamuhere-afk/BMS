@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(mobile-money): mm_reports 500 on shift_summary and void_suspicious
+
+**Files:**
+- `app/bms/mobile_money/mm_reports.php` — fixed `u.name` and `v.name` in shift_summary and void_suspicious queries; `users` table has `first_name`+`last_name` not `name`; replaced with `CONCAT(u.first_name, ' ', u.last_name)` and `CONCAT(v.first_name, ' ', v.last_name)`
+
+**Why:** Same `users.name` column bug that caused 500s in mm_shifts/mm_float — overlooked in mm_reports.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): MM-only desktop nav overhaul — spread-out first-class nav links
 
 **Files:**
