@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(i18n): complete MM Swahili translations + resolve duplicate-key conflicts in sw.php
+
+**Files:**
+- `lang/sw.php` — added 4 missing MM keys: `Today's Transactions`, `Today's Commission`, `Edit Agent`, `Transaction`; fixed 4 duplicate-key conflicts where later definitions overrode better earlier translations: `In Stock` (Zipo→Inapatikana, customer-facing shop catalog), `Out of Stock` (Hazipo→Haipatikani), `Movements` (Harakati→Mienendo for financial float context), `Cash Balance` (Salio la Fedha→Salio la Fedha Taslimu for physical cash at till). MM coverage is now 326/326 keys.
+
+**Why:** Gap analysis via PHP script confirmed 4 keys were missing; duplicate-key scan found the shop_catalog.php section was overriding inventory management terms with weaker colloquial translations.
+
+---
+
 ## 2026-09-27 — fix(mobile-money): resolve 500 errors on mm_shifts, mm_reports, mm_transactions, mm_float, mm_shift_report, mm_transaction_view, mm_commissions, void_transaction API
 
 **Files:**
