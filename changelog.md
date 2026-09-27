@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(mobile-money): mm_reports tab links produce 404 on all clicks
+
+**Files:**
+- `app/bms/mobile_money/mm_reports.php` — tab links and Reset used `getUrl('mobile_money/mm_reports')` which has no registered route (route key is `mm_reports`); changed to `getUrl('mm_reports')` in both the tab nav (line 223) and Reset link (line 213); added `language.emptyTable` to DataTables for proper empty-state message
+
+**Why:** Router maps `mm_reports` → the PHP file; the `mobile_money/mm_reports` path is not registered, so every tab click 404'd with "not found".
+
+---
+
 ## 2026-09-26 — fix(mobile-money): u.name sweep — compliance, recon_view, reconciliation
 
 **Files:**

@@ -210,7 +210,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </div>
             <div class="col-12 col-md-2 d-flex gap-1">
                 <button type="submit" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-search me-1"></i><?= t('Run') ?></button>
-                <a href="<?= getUrl('mobile_money/mm_reports') ?>" class="btn btn-sm btn-outline-secondary"><?= t('Reset') ?></a>
+                <a href="<?= getUrl('mm_reports') ?>" class="btn btn-sm btn-outline-secondary"><?= t('Reset') ?></a>
             </div>
         </div>
     </form>
@@ -220,7 +220,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
         <?php foreach ($reportTabs as $key => $label): ?>
         <li class="nav-item">
             <a class="nav-link <?= $reportTab === $key ? 'active' : '' ?>"
-               href="<?= getUrl('mobile_money/mm_reports') ?>?report=<?= $key ?>&from=<?= $fromDate ?>&to=<?= $toDate ?><?= $networkId ? '&network_id='.$networkId : '' ?><?= $agentId ? '&agent_id='.$agentId : '' ?>">
+               href="<?= getUrl('mm_reports') ?>?report=<?= $key ?>&from=<?= $fromDate ?>&to=<?= $toDate ?><?= $networkId ? '&network_id='.$networkId : '' ?><?= $agentId ? '&agent_id='.$agentId : '' ?>">
                 <?= $label ?>
             </a>
         </li>
@@ -356,7 +356,9 @@ $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#reportTable')) {
         const dt = $('#reportTable').DataTable({
             responsive: false, scrollX: true, pageLength: 50, order: [],
-            dom: 'rtipB', buttons: [{ extend: 'excelHtml5', className: 'd-none', filename: 'mm-report', exportOptions: { columns: ':not(:last-child)' } }]
+            dom: 'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No records found for the selected filters.')) ?>' },
+            buttons: [{ extend: 'excelHtml5', className: 'd-none', filename: 'mm-report', exportOptions: { columns: ':not(:last-child)' } }]
         });
         $('#exportBtn')?.on('click', function () { dt.button('.buttons-excel').trigger(); });
     }
