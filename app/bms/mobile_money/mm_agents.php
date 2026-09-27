@@ -112,15 +112,19 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                                         <?= ucfirst(safe_output($a['status'])) ?>
                                     </span>
                                 </td>
-                                <td class="text-end">
-                                    <a href="<?= getUrl('mm_agent_view') ?>?id=<?= $a['agent_id'] ?>" class="btn btn-sm btn-outline-secondary" title="<?= t('View') ?>">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <?php if ($can_edit): ?>
-                                    <button class="btn btn-sm btn-outline-primary" onclick='editAgent(<?= json_encode($a) ?>)' title="<?= t('Edit') ?>">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <?php endif; ?>
+                                <td class="text-center">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
+                                            <li><a class="dropdown-item" href="<?= getUrl('mm_agent_view') ?>?id=<?= $a['agent_id'] ?>"><i class="bi bi-eye me-2 text-info"></i><?= t('View') ?></a></li>
+                                            <?php if ($can_edit): ?>
+                                            <li><hr class="dropdown-divider my-1"></li>
+                                            <li><a class="dropdown-item" href="#" onclick="editAgent(window.__mmAgentData[<?= (int)$a['agent_id'] ?>]);return false"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
+                                            <?php endif; ?>
+                                        </ul>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

@@ -118,10 +118,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                                 </span>
                             </td>
                             <?php if ($can_edit): ?>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-primary" onclick='editNetwork(<?= json_encode($n) ?>)'>
-                                    <i class="bi bi-pencil"></i>
-                                </button>
+                            <td class="text-center">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-gear-fill"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:120px;font-size:.85rem">
+                                        <li><a class="dropdown-item mm-net-edit" href="#" data-net-id="<?= (int)$n['network_id'] ?>"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
+                                    </ul>
+                                </div>
                             </td>
                             <?php endif; ?>
                         </tr>
