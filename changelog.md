@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): MM-only desktop nav overhaul — spread-out first-class nav links
+
+**Files:**
+- `header.php` — moved `$__mm_only` computation to before the desktop nav; when MM is the sole module, replaces the compressed "Mobile Money" dropdown with spread-out first-class nav links (Dashboard, Transactions, Teller Shifts, Float, Agents as direct links; MM-specific Reports dropdown with 7 report types; More dropdown for Commissions, Reconciliation, Compliance/KYC, Networks, Commission Rates; Expenses and Settings sections kept as user requested); other module sections (Core, Finance, Sales, generic Reports) are hidden for MM-only tenants; multi-module tenants are unaffected (else branch)
+- `header.php` — renamed "Mobile Money" dropdown label to `t('Mobile Transactions')` in the multi-module nav
+- `lang/sw.php` — added `'Mobile Transactions' => 'Miamala ya Simu'`
+
+**Why:** When only the Mobile Money module is enabled, the nav should reflect that dominance — all MM pages accessible at top level, no irrelevant module sections cluttering the menu.
+
+---
+
 ## 2026-09-27 — fix(mobile-money): mm_networks blank page + DataTables TN/18 in mm_shifts, mm_agents, mm_commission_rates, mm_float
 
 **Files:**
