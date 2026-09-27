@@ -152,30 +152,36 @@ function restoreFromFile($filepath) {
 // ─────────────────────────────────────────────
 switch ($action) {
 
-    // ── CREATE BACKUP ──────────────────────────
+    // ── CREATE BACKUP (full ZIP: DB + uploads/) ────────────────────
     case 'create_backup':
         try {
-            $filename = 'bms_backup_' . date('Y-m-d_H-i-s') . '.sql';
-            $filepath = $backupsDir . $filename;
-            writeDump($pdo, $filepath);
-            $size = round(filesize($filepath) / 1024, 2);
-            $sizeLabel = $size >= 1024 ? round($size / 1024, 2) . ' MB' : $size . ' KB';
+            $filename   = 'bms_backup_' . date('Y-m-d_H-i-s') . '.zip';
+            $filepath   = $backupsDir . $filename;
+            $uploadsDir = ROOT_DIR . '/uploads';
+            $stats      = bms_write_zip_backup($pdo, $filepath, $uploadsDir);
 
-            logActivity($pdo, $_SESSION['user_id'], "Created Database Backup", "File: $filename, Size: $sizeLabel");
+            $bytes      = filesize($filepath);
+            $sizeLabel  = $bytes >= 1048576
+                ? round($bytes / 1048576, 2) . ' MB'
+                : round($bytes / 1024, 2) . ' KB';
+
+            logActivity($pdo, $_SESSION['user_id'], "Created Full Backup",
+                "File: $filename, Size: $sizeLabel, DB: {$stats['db_size_mb']} MB, Files: {$stats['files_count']}");
 
             echo json_encode([
-                'success'  => true,
-                'message'  => "Backup created successfully.",
-                'filename' => $filename,
-                'size'     => $sizeLabel
+                'success'     => true,
+                'message'     => "Full backup created successfully (database + {$stats['files_count']} uploaded file(s)).",
+                'filename'    => $filename,
+                'size'        => $sizeLabel,
+                'files_count' => $stats['files_count'],
             ]);
         } catch (Exception $e) {
-            if (isset($filepath) && file_exists($filepath)) unlink($filepath);
+            if (isset($filepath) && file_exists($filepath)) @unlink($filepath);
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         break;
 
-    // ── RESTORE FROM EXISTING BACKUP ───────────
+    // ── RESTORE FROM EXISTING BACKUP (.zip or .sql) ────────────────
     case 'restore_backup':
         $filename = basename($_POST['filename'] ?? '');
         $filepath = $backupsDir . $filename;
@@ -185,35 +191,56 @@ switch ($action) {
             break;
         }
 
-        // Safety net: snapshot the CURRENT state before overwriting it, so a
-        // bad restore is recoverable. Failure to snapshot aborts the restore.
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['sql', 'zip'], true)) {
+            echo json_encode(['success' => false, 'message' => 'Unsupported backup format. Only .zip and .sql files are accepted.']);
+            break;
+        }
+
+        // Safety net: DB snapshot before overwriting — SQL only (fast; captures
+        // the data risk; file-only changes are additive so no file pre-restore needed).
+        // A truncated pre-restore dump is deleted and the restore is aborted —
+        // same policy as the original; see the 2026-09-03 incident note above.
         $preRestorePath = $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql';
         try {
             bms_write_dump($pdo, $preRestorePath);
         } catch (Exception $e) {
-            // Delete the half-written file. bms_write_dump() streams row by row,
-            // so a failure partway leaves a TRUNCATED dump on disk — and a
-            // truncated dump is the most dangerous artefact this system can
-            // produce: it lists in the UI like any other restore point, and
-            // restoring it silently loses everything past the cut. Observed for
-            // real as pre_restore_2026-09-03_09-49-54.sql, which survived a
-            // failed snapshot and sat in the backup list looking valid.
             if (is_file($preRestorePath)) @unlink($preRestorePath);
             echo json_encode(['success' => false, 'message' => 'Aborted — could not create a pre-restore safety backup: ' . $e->getMessage()]);
             break;
         }
 
         try {
-            $errors = restoreFromFile($filepath);
+            $filesCopied = 0;
+            if ($ext === 'zip') {
+                $extracted = bms_extract_zip_backup($filepath);
+                try {
+                    $errors = restoreFromFile($extracted['sql_path']);
+                    if (empty($errors) && $extracted['uploads_path'] !== null) {
+                        $filesCopied = bms_copy_dir($extracted['uploads_path'], ROOT_DIR . '/uploads');
+                    }
+                } finally {
+                    bms_delete_dir($extracted['temp_dir']);
+                }
+                $manifest = $extracted['manifest'];
+            } else {
+                $errors = restoreFromFile($filepath);
+            }
+
             if (empty($errors)) {
-                logActivity($pdo, $_SESSION['user_id'], "Restored Database Backup", "File: $filename");
-                echo json_encode(['success' => true, 'message' => "Database restored successfully from $filename."]);
+                $msg = ($ext === 'zip')
+                    ? "Database and {$filesCopied} uploaded file(s) restored successfully from $filename."
+                    : "Database restored successfully from $filename. Note: this was a database-only backup — uploaded files were not included.";
+                logActivity($pdo, $_SESSION['user_id'], "Restored Backup", "File: $filename, Files copied: $filesCopied");
+                echo json_encode(['success' => true, 'message' => $msg,
+                    'files_copied' => $filesCopied, 'format' => $ext]);
             } else {
                 $count = count($errors);
                 error_log("Restore errors from $filename: " . implode(' | ', array_slice($errors, 0, 10)));
+                $preview = implode('; ', array_slice($errors, 0, 3));
                 echo json_encode([
                     'success' => false,
-                    'message' => "Restore completed with $count error(s). Check the server error log for details."
+                    'message' => "Restore completed with $count error(s): $preview",
                 ]);
             }
         } catch (Exception $e) {
@@ -270,23 +297,36 @@ switch ($action) {
         }
 
         $ext = strtolower(pathinfo($_FILES['backup_file']['name'], PATHINFO_EXTENSION));
-        if ($ext !== 'sql') {
-            echo json_encode(['success' => false, 'message' => 'Invalid file type. Only .sql files allowed.']);
+        if (!in_array($ext, ['sql', 'zip'], true)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid file type. Only .sql and .zip backup files are allowed.']);
             break;
         }
 
-        // Content validation — first non-empty line must look like SQL
-        $tmpHandle = fopen($_FILES['backup_file']['tmp_name'], 'r');
-        $firstLine = '';
-        while (!feof($tmpHandle) && trim($firstLine) === '') $firstLine = fgets($tmpHandle);
-        fclose($tmpHandle);
-        $firstLine = trim($firstLine);
-        $validStart = str_starts_with($firstLine, '--') || str_starts_with($firstLine, '/*')
-                   || str_starts_with($firstLine, 'SET ') || str_starts_with($firstLine, 'CREATE ')
-                   || str_starts_with($firstLine, 'INSERT ');
-        if (!$validStart) {
-            echo json_encode(['success' => false, 'message' => 'File does not appear to be a valid SQL dump.']);
-            break;
+        // Content validation by magic bytes / first-line inspection
+        $tmpPath = $_FILES['backup_file']['tmp_name'];
+        if ($ext === 'zip') {
+            // ZIP magic: PK\x03\x04
+            $fh = fopen($tmpPath, 'rb');
+            $magic = fread($fh, 4);
+            fclose($fh);
+            if ($magic !== "PK\x03\x04") {
+                echo json_encode(['success' => false, 'message' => 'File does not appear to be a valid ZIP archive.']);
+                break;
+            }
+        } else {
+            // SQL: first non-empty line must look like a SQL statement
+            $tmpHandle = fopen($tmpPath, 'r');
+            $firstLine = '';
+            while (!feof($tmpHandle) && trim($firstLine) === '') $firstLine = fgets($tmpHandle);
+            fclose($tmpHandle);
+            $firstLine = trim($firstLine);
+            $validStart = str_starts_with($firstLine, '--') || str_starts_with($firstLine, '/*')
+                       || str_starts_with($firstLine, 'SET ') || str_starts_with($firstLine, 'CREATE ')
+                       || str_starts_with($firstLine, 'INSERT ');
+            if (!$validStart) {
+                echo json_encode(['success' => false, 'message' => 'File does not appear to be a valid SQL dump.']);
+                break;
+            }
         }
 
         $safeOrigName = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', basename($_FILES['backup_file']['name']));
@@ -316,16 +356,35 @@ switch ($action) {
         }
 
         try {
-            $errors = restoreFromFile($destination);
+            $filesCopied = 0;
+            if ($ext === 'zip') {
+                $extracted = bms_extract_zip_backup($destination);
+                try {
+                    $errors = restoreFromFile($extracted['sql_path']);
+                    if (empty($errors) && $extracted['uploads_path'] !== null) {
+                        $filesCopied = bms_copy_dir($extracted['uploads_path'], ROOT_DIR . '/uploads');
+                    }
+                } finally {
+                    bms_delete_dir($extracted['temp_dir']);
+                }
+            } else {
+                $errors = restoreFromFile($destination);
+            }
+
             if (empty($errors)) {
-                logActivity($pdo, $_SESSION['user_id'], "Uploaded & Restored Database Backup", "File: $filename");
-                echo json_encode(['success' => true, 'message' => "File uploaded and database restored successfully."]);
+                $msg = ($ext === 'zip')
+                    ? "File uploaded. Database and {$filesCopied} uploaded file(s) restored successfully."
+                    : "File uploaded and database restored successfully. Note: this was a database-only backup — uploaded files were not included.";
+                logActivity($pdo, $_SESSION['user_id'], "Uploaded & Restored Backup", "File: $filename, Files copied: $filesCopied");
+                echo json_encode(['success' => true, 'message' => $msg,
+                    'files_copied' => $filesCopied, 'format' => $ext]);
             } else {
                 $count = count($errors);
-                error_log("Upload restore errors: " . implode(' | ', array_slice($errors, 0, 10)));
+                error_log("Upload restore errors from $filename: " . implode(' | ', array_slice($errors, 0, 10)));
+                $preview = implode('; ', array_slice($errors, 0, 3));
                 echo json_encode([
                     'success' => false,
-                    'message' => "Restore completed with $count error(s). Check the server error log."
+                    'message' => "Restore completed with $count error(s): $preview",
                 ]);
             }
         } catch (Exception $e) {

@@ -263,13 +263,15 @@ check(!is_file($root . '/api/save_backup_settings.php'), 'api/save_backup_settin
 
 $dlPageSrc = is_file($dlPage) ? file_get_contents($dlPage) : '';
 
-// Canonical path = ROOT_DIR . '/backups/' (top-level backups folder).
-// Every component must point at this same physical directory.
+// Canonical path is now resolved via bmsBackupDir() (from core/tenant_bootstrap.php)
+// which returns ROOT_DIR/backups/ for the default install and a tenant-specific
+// subdirectory for multi-tenant deployments. Every component calls this same
+// function so they always agree on the physical directory.
 
 check(
-    (bool) preg_match("#\\\$backupsDir\\s*=\\s*ROOT_DIR\\s*\\.\\s*['\"]/backups/['\"]#", $api),
-    'API uses ROOT_DIR . \'/backups/\' as the backup directory',
-    'API uses a non-canonical backup directory path'
+    str_contains($api, 'bmsBackupDir()'),
+    'API resolves the backup directory via bmsBackupDir()',
+    'API does not call bmsBackupDir() — directory mismatch between components possible'
 );
 
 check(
@@ -279,15 +281,15 @@ check(
 );
 
 check(
-    (bool) preg_match("#\\\$backupsDir\\s*=\\s*__DIR__\\s*\\.\\s*['\"]/\\.\\./\\.\\./\\.\\./backups/['\"]#", $ui),
-    'Page uses __DIR__ . \'/../../../backups/\' (resolves to ROOT_DIR/backups/)',
-    'Page no longer uses the canonical backups/ path'
+    str_contains($ui, 'bmsBackupDir()'),
+    'Page resolves the backup directory via bmsBackupDir()',
+    'Page does not call bmsBackupDir() — directory mismatch between components possible'
 );
 
 check(
-    str_contains($dlPageSrc, "__DIR__ . '/../../../backups/'"),
-    'app/constant/settings/download_backup.php uses __DIR__ . \'/../../../backups/\'',
-    'app/constant/settings/download_backup.php no longer matches the canonical path'
+    str_contains($dlPageSrc, 'bmsBackupDir()'),
+    'app/constant/settings/download_backup.php uses bmsBackupDir()',
+    'app/constant/settings/download_backup.php does not call bmsBackupDir() — download may resolve the wrong directory'
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
