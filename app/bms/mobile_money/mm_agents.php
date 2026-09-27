@@ -32,6 +32,16 @@ $suspended = count(array_filter($agents, fn($a) => $a['status'] === 'suspended')
 logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money agents list');
 ?>
 
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-shop-window text-primary me-2"></i><?= t('Agent Outlets') ?></h4>
@@ -70,23 +80,25 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table id="agentsTable" class="table table-hover align-middle mb-0 w-100">
-                        <thead class="table-dark">
+                        <thead class="mm-thead">
                             <tr>
-                                <th><?= t('Agent Code') ?></th>
-                                <th><?= t('Agent Name') ?></th>
-                                <th><?= t('Type') ?></th>
-                                <th><?= t('Networks (Tills)') ?></th>
-                                <th><?= t('Phone') ?></th>
-                                <th><?= t('Region') ?></th>
-                                <th><?= t('Super-Agent') ?></th>
+                                <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                                <th class="text-center"><?= t('Agent Code') ?></th>
+                                <th class="text-center"><?= t('Agent Name') ?></th>
+                                <th class="text-center"><?= t('Type') ?></th>
+                                <th class="text-center"><?= t('Networks (Tills)') ?></th>
+                                <th class="text-center"><?= t('Phone') ?></th>
+                                <th class="text-center"><?= t('Region') ?></th>
+                                <th class="text-center"><?= t('Super-Agent') ?></th>
                                 <th class="text-center"><?= t('Tills') ?></th>
-                                <th><?= t('Status') ?></th>
-                                <th class="text-end"><?= t('Actions') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
+                                <th class="text-center"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($agents as $a): ?>
-                            <tr>
+                            <?php $sno = 1; foreach ($agents as $a): ?>
+                            <tr data-id="<?= (int)$a['agent_id'] ?>" data-name="<?= htmlspecialchars($a['agent_name']) ?>" data-code="<?= htmlspecialchars($a['agent_code'] ?: '') ?>" data-outlet-type="<?= htmlspecialchars($a['outlet_type'] ?: '') ?>" data-phone="<?= htmlspecialchars($a['phone_primary'] ?: '') ?>" data-region="<?= htmlspecialchars($a['region'] ?: '') ?>" data-district="<?= htmlspecialchars($a['district'] ?: '') ?>" data-street="<?= htmlspecialchars($a['street'] ?: '') ?>" data-bot-license="<?= htmlspecialchars($a['bot_license'] ?: '') ?>" data-status="<?= htmlspecialchars($a['status']) ?>" data-networks="<?= htmlspecialchars($a['networks_str'] ?: '—') ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>">
+                                <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code><?= safe_output($a['agent_code']) ?></code></td>
                                 <td class="fw-semibold"><?= safe_output($a['agent_name']) ?></td>
                                 <td><span class="badge bg-light text-dark"><?= ucfirst(str_replace('_', ' ', $a['outlet_type'])) ?></span></td>
@@ -267,10 +279,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#agentsTable')) {
         $('#agentsTable').DataTable({
-            responsive:false, scrollX:true, pageLength:25, order:[[1,'asc']], dom:'rtipB',
+            responsive:false, scrollX:true, pageLength:25, order:[[2,'asc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
             language: { emptyTable: '<?= addslashes(t('No agents found. Add your first agent outlet.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
-            drawCallback: function(){ renderCards(this.api().rows({page:'current'}).data().toArray()); }
+            drawCallback: function(){ renderCards(this.api().rows({page:'current'}).nodes()); }
         });
     }
     function applyView() {
@@ -321,14 +333,39 @@ function editAgent(a) {
     new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 
-function renderCards(rows) {
-    if(!rows.length){$('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No agents found') ?></div>');return;}
-    let html='';
-    rows.forEach(r=>{
-        html+=`<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
-            <div class="fw-bold">${safeOutput(r[1])}</div>
-            <div class="small text-muted">${safeOutput(r[3])} · ${safeOutput(r[5])}</div>
-            </div></div></div>`;
+function renderCards(nodes) {
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No agents found') ?></div>'); return; }
+    window.__mmAgentData = window.__mmAgentData || {};
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const id = $tr.data('id'), sno = idx + 1;
+        const name = $tr.data('name'), code = $tr.data('code');
+        const outletType = $tr.data('outlet-type'), phone = $tr.data('phone');
+        const region = $tr.data('region'), district = $tr.data('district');
+        const networks = $tr.data('networks'), status = $tr.data('status');
+        const canEdit = $tr.data('can-edit') == 1;
+        window.__mmAgentData[id] = { agent_id: id, agent_name: name, outlet_type: outletType, phone_primary: phone, region: region, district: district, street: $tr.data('street'), bot_license: $tr.data('bot-license'), status: status };
+        const sBadge = status === 'active' ? 'bg-success' : (status === 'suspended' ? 'bg-warning text-dark' : 'bg-secondary');
+        const loc = [region, district].filter(Boolean).join(', ') || '—';
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem">${safeOutput(name)}</div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Code') ?></span><span class="kv-val"><code>${safeOutput(code)}</code></span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Type') ?></span><span class="kv-val">${safeOutput(outletType)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Networks') ?></span><span class="kv-val">${safeOutput(networks)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Phone') ?></span><span class="kv-val">${safeOutput(phone||'—')}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Location') ?></span><span class="kv-val">${safeOutput(loc)}</span></div>
+          </div>
+          <div class="mm-card-foot">
+            <a href="<?= getUrl('mm_agent_view') ?>?id=${id}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1"></i><?= t('View') ?></a>
+            ${canEdit ? `<button class="btn btn-sm btn-outline-primary" onclick="editAgent(window.__mmAgentData[${id}])"><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button>` : ''}
+          </div>
+        </div></div>`;
     });
     $('#cardView').html(html);
 }
