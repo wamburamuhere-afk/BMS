@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-26 — fix(mobile-money): u.name sweep — compliance, recon_view, reconciliation
+
+**Files:**
+- `app/bms/mobile_money/mm_compliance.php` — `u.name` → `CONCAT(u.first_name, ' ', u.last_name)` (captured_by_name)
+- `app/bms/mobile_money/mm_recon_view.php` — same fix for created_by_name and teller_name (2 occurrences)
+- `app/bms/mobile_money/mm_reconciliation.php` — same fix for created_by_name
+
+**Why:** Complete sweep of all remaining `u.name`/`v.name` references across the MM module; users table has first_name+last_name, not name.
+
+---
+
 ## 2026-09-26 — fix(mobile-money): mm_reports 500 on shift_summary and void_suspicious
 
 **Files:**
