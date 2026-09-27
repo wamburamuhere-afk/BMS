@@ -111,10 +111,42 @@ function trendBadge($pct): string {
 }
 ?>
 <div class="container-fluid py-4 px-4">
-    <div class="d-flex align-items-center gap-2 mb-4">
+    <div class="d-flex align-items-center gap-2 mb-3">
         <i class="bi bi-speedometer2 text-primary fs-4"></i>
         <h4 class="mb-0 fw-bold"><?= t('Mobile Money Dashboard') ?></h4>
         <span class="text-muted small ms-2"><?= t('Today:') ?> <?= $today ?></span>
+    </div>
+
+    <!-- Quick Actions — one-tap shortcuts visible on all screen sizes -->
+    <div class="row g-2 mb-4">
+        <?php if (canCreate('mm_transactions')): ?>
+        <div class="col-6 col-md-3">
+            <a href="<?= getUrl('mm_transactions') ?>" class="btn btn-primary w-100 py-2">
+                <i class="bi bi-arrow-left-right me-1"></i><?= t('New Transaction') ?>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if (canCreate('mm_shifts')): ?>
+        <div class="col-6 col-md-3">
+            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-success w-100 py-2">
+                <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if (canCreate('mm_float')): ?>
+        <div class="col-6 col-md-3">
+            <a href="<?= getUrl('mm_float') ?>" class="btn btn-warning w-100 py-2">
+                <i class="bi bi-currency-exchange me-1"></i><?= t('Float Top-up') ?>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if (canView('mm_agents')): ?>
+        <div class="col-6 col-md-3">
+            <a href="<?= getUrl('mm_agents') ?>" class="btn btn-outline-secondary w-100 py-2">
+                <i class="bi bi-shop-window me-1"></i><?= t('Agents') ?>
+            </a>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- KPI row 1 — Today -->
