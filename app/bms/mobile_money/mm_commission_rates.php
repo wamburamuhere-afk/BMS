@@ -144,13 +144,21 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                             <td class="small"><?= safe_output($r['effective_from']) ?></td>
                             <td class="small"><?= $r['effective_to'] ?: '<span class="text-muted">—</span>' ?></td>
                             <?php if ($can_edit || $can_delete): ?>
-                            <td class="text-end">
-                                <?php if ($can_edit): ?>
-                                <button class="btn btn-sm btn-outline-primary" onclick='editRate(<?= json_encode($r) ?>)'><i class="bi bi-pencil"></i></button>
-                                <?php endif; ?>
-                                <?php if ($can_delete): ?>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteRate(<?= $r['rate_id'] ?>)"><i class="bi bi-trash"></i></button>
-                                <?php endif; ?>
+                            <td class="text-center">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-gear-fill"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
+                                        <?php if ($can_edit): ?>
+                                        <li><a class="dropdown-item mm-rate-edit" href="#" data-rate-id="<?= (int)$r['rate_id'] ?>"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
+                                        <?php endif; ?>
+                                        <?php if ($can_delete): ?>
+                                        <li><hr class="dropdown-divider my-1"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteRate(<?= (int)$r['rate_id'] ?>);return false"><i class="bi bi-trash me-2"></i><?= t('Delete') ?></a></li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
                             </td>
                             <?php endif; ?>
                         </tr>
