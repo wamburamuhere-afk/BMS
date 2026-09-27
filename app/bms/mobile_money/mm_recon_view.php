@@ -6,7 +6,7 @@ autoEnforcePermission('mm_reconciliation');
 $can_edit = canEdit('mm_reconciliation');
 
 $reconId = intval($_GET['id'] ?? 0);
-if (!$reconId) { header("Location: " . getUrl('mobile_money/mm_reconciliation')); exit; }
+if (!$reconId) { header("Location: " . getUrl('mm_reconciliation')); exit; }
 
 $recon = $pdo->prepare("
     SELECT r.*,
@@ -23,7 +23,7 @@ $recon = $pdo->prepare("
 ");
 $recon->execute([$reconId]);
 $recon = $recon->fetch(PDO::FETCH_ASSOC);
-if (!$recon) { header("Location: " . getUrl('mobile_money/mm_reconciliation')); exit; }
+if (!$recon) { header("Location: " . getUrl('mm_reconciliation')); exit; }
 
 $txnSummary = $pdo->prepare("
     SELECT txn_type, COUNT(*) AS cnt,
@@ -53,7 +53,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Recon', 'Viewed MM Recon #' . $rec
 ?>
 <div class="container-fluid py-4 px-4">
     <div class="d-flex align-items-center gap-2 mb-3">
-        <a href="<?= getUrl('mobile_money/mm_reconciliation') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+        <a href="<?= getUrl('mm_reconciliation') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
         <i class="bi bi-clipboard-check text-info fs-4"></i>
         <h4 class="mb-0 fw-bold"><?= t('Reconciliation') ?>: <?= safe_output($recon['recon_code']) ?></h4>
         <?php $badge = ['open'=>'warning','resolved'=>'success','disputed'=>'danger','closed'=>'secondary']; ?>

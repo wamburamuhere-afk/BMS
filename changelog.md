@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(mobile-money): mm_reconciliation and mm_recon_view wrong getUrl paths
+
+**Files:**
+- `app/bms/mobile_money/mm_reconciliation.php` — two occurrences of `getUrl('mobile_money/mm_recon_view')` → `getUrl('mm_recon_view')` (view link and modal redirect)
+- `app/bms/mobile_money/mm_recon_view.php` — three occurrences of `getUrl('mobile_money/mm_reconciliation')` → `getUrl('mm_reconciliation')` (two PHP redirects, one Back button link)
+
+**Why:** Router registers routes as `mm_recon_view` and `mm_reconciliation` (short keys); using the full path prefix `mobile_money/` produced 404 on all navigation between these pages.
+
+---
+
 ## 2026-09-26 — fix(mobile-money): mm_reports tab links produce 404 on all clicks
 
 **Files:**
