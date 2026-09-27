@@ -138,27 +138,39 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
         </div>
     </div>
 
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
     <!-- Table -->
     <div id="tableView">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table id="floatTable" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
-                        <thead class="table-dark">
+                        <thead class="mm-thead">
                             <tr>
-                                <th><?= t('Code') ?></th>
-                                <th><?= t('Date') ?></th>
-                                <th><?= t('Outlet / Till') ?></th>
-                                <th><?= t('Type') ?></th>
-                                <th class="text-end"><?= t('Amount (TZS)') ?></th>
-                                <th><?= t('Bank Account') ?></th>
-                                <th><?= t('Reference') ?></th>
-                                <th><?= t('Status') ?></th>
+                                <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                                <th class="text-center"><?= t('Code') ?></th>
+                                <th class="text-center"><?= t('Date') ?></th>
+                                <th class="text-center"><?= t('Outlet / Till') ?></th>
+                                <th class="text-center"><?= t('Type') ?></th>
+                                <th class="text-center"><?= t('Amount (TZS)') ?></th>
+                                <th class="text-center"><?= t('Bank Account') ?></th>
+                                <th class="text-center"><?= t('Reference') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($movements as $m): ?>
-                            <tr>
+                            <?php $sno = 1; foreach ($movements as $m): ?>
+                            <tr data-id="<?= (int)$m['movement_id'] ?>" data-code="<?= htmlspecialchars($m['movement_code']) ?>" data-date="<?= htmlspecialchars($m['movement_date']) ?>" data-outlet="<?= htmlspecialchars($m['agent_name'].' / '.$m['till_number']) ?>" data-type="<?= htmlspecialchars($movLabels[$m['movement_type']] ?? $m['movement_type']) ?>" data-amount="<?= number_format((float)$m['amount']) ?>" data-status="<?= htmlspecialchars($m['status']) ?>">
+                                <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code class="small"><?= safe_output($m['movement_code']) ?></code></td>
                                 <td class="small"><?= safe_output($m['movement_date']) ?></td>
                                 <td class="small">
@@ -310,10 +322,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#floatTable')) {
-        $('#floatTable').DataTable({responsive:false,scrollX:true,pageLength:25,order:[[1,'desc']],dom:'rtipB',
+        $('#floatTable').DataTable({responsive:false,scrollX:true,pageLength:25,order:[[2,'desc']],columnDefs:[{orderable:false,targets:0}],dom:'rtipB',
             language: { emptyTable: '<?= addslashes(t('No float movements found.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
-            drawCallback:function(){renderCards(this.api().rows({page:'current'}).data().toArray());}
+            drawCallback:function(){renderCards(this.api().rows({page:'current'}).nodes());}
         });
     }
     function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
@@ -340,10 +352,31 @@ $(document).ready(function () {
     $('.modal').on('hidden.bs.modal', function(){$(this).find('form')[0]?.reset();});
 });
 
-function renderCards(rows){
-    if(!rows.length){$('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No movements') ?></div>');return;}
-    let html='';
-    rows.forEach(r=>{html+=`<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3"><div class="fw-bold">${safeOutput(r[0])}</div><div class="small text-muted">${safeOutput(r[2])}</div></div></div></div>`;});
+function renderCards(nodes) {
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No movements') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const sno = idx + 1;
+        const code = $tr.data('code'), date = $tr.data('date');
+        const outlet = $tr.data('outlet'), type = $tr.data('type');
+        const amount = $tr.data('amount'), status = $tr.data('status');
+        const sBadge = status === 'posted' ? 'bg-success' : (status === 'void' ? 'bg-danger' : 'bg-secondary');
+        const typeBadge = type.toLowerCase().includes('top') ? 'bg-success' : (type.toLowerCase().includes('withdraw') ? 'bg-warning text-dark' : 'bg-info text-dark');
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem"><code>${safeOutput(code)}</code></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Date') ?></span><span class="kv-val">${safeOutput(date)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Outlet / Till') ?></span><span class="kv-val">${safeOutput(outlet)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Type') ?></span><span class="kv-val"><span class="badge ${typeBadge}" style="font-size:.73rem">${safeOutput(type)}</span></span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Amount (TZS)') ?></span><span class="kv-val fw-bold">${safeOutput(amount)}</span></div>
+          </div>
+        </div></div>`;
+    });
     $('#cardView').html(html);
 }
 </script>
