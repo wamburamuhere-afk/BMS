@@ -97,7 +97,7 @@ if ($reportTab === 'txn_summary') {
     $stmt = $pdo->prepare("
         SELECT s.shift_code, s.opened_at, s.closed_at,
                t.till_number, a.agent_name,
-               u.name AS teller_name,
+               CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
                s.opening_cash, s.closing_cash, s.cash_variance,
                s.opening_float, s.closing_float, s.float_variance,
                s.status
@@ -117,7 +117,8 @@ if ($reportTab === 'txn_summary') {
         SELECT t.txn_code, t.txn_date, t.txn_type, t.principal_amount, t.status,
                t.suspicious_flag, t.void_reason,
                ti.till_number, a.agent_name, n.network_name, n.color_hex,
-               u.name AS teller_name, v.name AS voided_by_name
+               CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
+               CONCAT(v.first_name, ' ', v.last_name) AS voided_by_name
         FROM mm_transactions t
         JOIN mm_tills ti    ON ti.till_id   = t.till_id
         JOIN mm_agents a    ON a.agent_id   = t.agent_id

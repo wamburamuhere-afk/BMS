@@ -24,7 +24,7 @@ $kycRecords = $pdo->query("
     SELECT k.*,
            t.txn_code, t.txn_date, t.txn_type, t.principal_amount,
            a.agent_name, n.network_name, n.color_hex,
-           u.name AS captured_by_name
+           CONCAT(u.first_name, ' ', u.last_name) AS captured_by_name
     FROM mm_kyc_records k
     JOIN mm_transactions t ON t.mm_txn_id  = k.mm_txn_id
     JOIN mm_agents a        ON a.agent_id   = t.agent_id
