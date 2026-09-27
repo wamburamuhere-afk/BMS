@@ -303,7 +303,7 @@ $(document).ready(function () {
                     Swal.fire({icon:'success',title:'<?= t('Transaction Posted!') ?>',text:msg,timer:2500,showConfirmButton:false}).then(()=>location.reload());
                 } else { Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:res.message}); }
             },
-            error: ()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
+            error: (xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
             complete: ()=>btn.prop('disabled',false).html(orig)
         });
     });

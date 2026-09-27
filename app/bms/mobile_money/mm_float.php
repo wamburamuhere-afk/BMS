@@ -343,7 +343,7 @@ $(document).ready(function () {
             btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
             $.ajax({url:'<?= buildUrl('api/mobile_money/save_float_movement.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
                 success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Posted!') ?>',text:r.message,timer:2000,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-                error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
+                error:(xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
                 complete:()=>btn.prop('disabled',false).html(orig)
             });
         });
