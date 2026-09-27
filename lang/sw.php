@@ -4491,7 +4491,7 @@ return [
     'Agent'                      => 'Wakala',
     'Till'                       => 'Kaunta',
     'Teller'                     => 'Mhudumu wa Pesa',
-    'Float'                      => 'Salio la Elektroniki',
+    'Float'                      => 'Floti',
     'Volume'                     => 'Kiasi cha Muamala',
     'Txns'                       => 'Miam.',
     'Variance'                   => 'Tofauti',

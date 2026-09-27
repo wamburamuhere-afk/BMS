@@ -167,6 +167,9 @@ $reportTabs = [
 includeHeader();
 logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $reportTab");
 ?>
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+</style>
 <div class="container-fluid py-4 px-4">
     <div class="d-flex align-items-center gap-2 mb-4">
         <i class="bi bi-bar-chart text-warning fs-4"></i>
@@ -231,7 +234,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
     <div class="table-responsive">
         <table id="reportTable" class="table table-hover align-middle w-100">
             <?php if ($reportTab === 'txn_summary'): ?>
-            <thead class="table-dark"><tr><th><?= t('Type') ?></th><th class="text-end"><?= t('Count') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Fees (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Type') ?></th><th class="text-end"><?= t('Count') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Fees (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th></tr></thead>
             <tbody>
                 <?php $totV=0; $totF=0; $totC=0; $totN=0;
                       foreach ($reportData as $r): $totV+=$r['volume']; $totF+=$r['fees']; $totC+=$r['commission']; $totN+=$r['cnt']; ?>
@@ -243,11 +246,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                     <td class="text-end"><?= number_format((float)$r['commission']) ?></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="table-dark fw-bold"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totF) ?></td><td class="text-end"><?= number_format($totC) ?></td></tr>
+                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totF) ?></td><td class="text-end"><?= number_format($totC) ?></td></tr>
             </tbody>
 
             <?php elseif ($reportTab === 'float_position'): ?>
-            <thead class="table-dark"><tr><th><?= t('Agent') ?></th><th><?= t('Till') ?></th><th><?= t('Network') ?></th><th class="text-end"><?= t('Float Balance') ?></th><th class="text-end"><?= t('Cash Balance') ?></th><th><?= t('Snapshot At') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Agent') ?></th><th><?= t('Till') ?></th><th><?= t('Network') ?></th><th class="text-end"><?= t('Float Balance') ?></th><th class="text-end"><?= t('Cash Balance') ?></th><th><?= t('Snapshot At') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
@@ -262,7 +265,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'commission'): ?>
-            <thead class="table-dark"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Earned (TZS)') ?></th><th class="text-end"><?= t('Received (TZS)') ?></th><th class="text-end"><?= t('Outstanding (TZS)') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Earned (TZS)') ?></th><th class="text-end"><?= t('Received (TZS)') ?></th><th class="text-end"><?= t('Outstanding (TZS)') ?></th></tr></thead>
             <tbody>
                 <?php $totE=0; $totR=0;
                       foreach ($reportData as $r): $totE+=$r['earned']; $totR+=$r['received'];
@@ -274,11 +277,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                     <td class="text-end <?= $outstanding > 0 ? 'text-warning fw-bold' : '' ?>"><?= number_format($outstanding) ?></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="table-dark fw-bold"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totE) ?></td><td class="text-end"><?= number_format($totR) ?></td><td class="text-end"><?= number_format(max(0,$totE-$totR)) ?></td></tr>
+                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totE) ?></td><td class="text-end"><?= number_format($totR) ?></td><td class="text-end"><?= number_format(max(0,$totE-$totR)) ?></td></tr>
             </tbody>
 
             <?php elseif ($reportTab === 'agent_perf'): ?>
-            <thead class="table-dark"><tr><th><?= t('Code') ?></th><th><?= t('Agent') ?></th><th><?= t('Region') ?></th><th class="text-end"><?= t('Txns') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Tills') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Code') ?></th><th><?= t('Agent') ?></th><th><?= t('Region') ?></th><th class="text-end"><?= t('Txns') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Tills') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
@@ -294,7 +297,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'shift_summary'): ?>
-            <thead class="table-dark"><tr><th><?= t('Code') ?></th><th><?= t('Till') ?></th><th><?= t('Agent') ?></th><th><?= t('Teller') ?></th><th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Cash Var') ?></th><th class="text-end"><?= t('Float Var') ?></th><th><?= t('Status') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Code') ?></th><th><?= t('Till') ?></th><th><?= t('Agent') ?></th><th><?= t('Teller') ?></th><th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Cash Var') ?></th><th class="text-end"><?= t('Float Var') ?></th><th><?= t('Status') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
@@ -312,7 +315,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'void_suspicious'): ?>
-            <thead class="table-dark"><tr><th><?= t('Code') ?></th><th><?= t('Date') ?></th><th><?= t('Type') ?></th><th><?= t('Network') ?></th><th><?= t('Agent') ?></th><th class="text-end"><?= t('Amount') ?></th><th><?= t('Status') ?></th><th><?= t('Reason') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Code') ?></th><th><?= t('Date') ?></th><th><?= t('Type') ?></th><th><?= t('Network') ?></th><th><?= t('Agent') ?></th><th class="text-end"><?= t('Amount') ?></th><th><?= t('Status') ?></th><th><?= t('Reason') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
@@ -332,7 +335,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'network_comparison'): ?>
-            <thead class="table-dark"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Transactions') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Active Agents') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Transactions') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Active Agents') ?></th></tr></thead>
             <tbody>
                 <?php $totV=0; $totC=0; $totN=0;
                       foreach ($reportData as $r): $totV+=$r['volume']; $totC+=$r['commission']; $totN+=$r['txn_count']; ?>
@@ -344,7 +347,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                     <td class="text-end"><?= $r['agents'] ?></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="table-dark fw-bold"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totC) ?></td><td></td></tr>
+                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totC) ?></td><td></td></tr>
             </tbody>
             <?php endif; ?>
         </table>
