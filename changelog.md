@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(mobile-money): mm_networks blank page + DataTables TN/18 in mm_shifts, mm_agents, mm_commission_rates, mm_float
+
+**Files:**
+- `app/bms/mobile_money/mm_networks.php` — fix fatal SQL: subquery used `mm_agents.network_id` which doesn't exist; agents link to networks via mm_tills — corrected to `COUNT(DISTINCT t.agent_id) FROM mm_tills t WHERE t.network_id = n.network_id AND t.status = 'active'`; the fatal error was causing a blank page and preventing footer.php (Bootstrap JS) from loading, hence the secondary "bootstrap is not defined" JS error
+- `app/bms/mobile_money/mm_shifts.php` — DataTables TN/18: removed static `<td colspan="11">` empty-state row; added `language.emptyTable` to DataTables config
+- `app/bms/mobile_money/mm_agents.php` — same TN/18 fix (colspan 10)
+- `app/bms/mobile_money/mm_commission_rates.php` — same TN/18 fix (colspan 11)
+- `app/bms/mobile_money/mm_float.php` — same TN/18 fix (colspan 8)
+
+**Why:** mm_agents table has no network_id column — agents are scoped to networks via mm_tills (agent→till→network). Static colspan empty-state rows in DataTables tbody cause column-count mismatch alerts when tables are empty.
+
+---
+
 ## 2026-09-27 — fix(i18n): complete MM Swahili translations + resolve duplicate-key conflicts in sw.php
 
 **Files:**

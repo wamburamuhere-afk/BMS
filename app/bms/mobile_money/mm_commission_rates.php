@@ -142,9 +142,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                             <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
-                        <?php if (empty($rates)): ?>
-                        <tr><td colspan="11" class="text-center text-muted py-4"><?= t('No rate bands found.') ?></td></tr>
-                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -316,7 +313,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#ratesTable')) {
-        $('#ratesTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[0,'asc'],[1,'asc'],[2,'asc']], dom:'rtipB' });
+        $('#ratesTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[0,'asc'],[1,'asc'],[2,'asc']], dom:'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No rate bands found.')) ?>' } });
     }
 
     ['#addModal','#editModal'].forEach(m => {
