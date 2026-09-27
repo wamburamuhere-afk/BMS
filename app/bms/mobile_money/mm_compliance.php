@@ -58,25 +58,25 @@ logActivity($pdo, $_SESSION['user_id'], 'View Compliance/KYC', 'Viewed MM KYC Re
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-primary"><?= (int)$stats['total'] ?></div>
                 <div class="small text-muted"><?= t('KYC Records') ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-info"><?= (int)$stats['unique_customers'] ?></div>
                 <div class="small text-muted"><?= t('Unique Customers') ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-success"><?= (int)$stats['nida_count'] ?></div>
                 <div class="small text-muted"><?= t('NIDA Verified') ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-<?= $pendingCount > 0 ? 'danger' : 'secondary' ?>"><?= $pendingCount ?></div>
                 <div class="small text-muted"><?= t('Pending KYC') ?></div>
             </div>
@@ -89,6 +89,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View Compliance/KYC', 'Viewed MM KYC Re
     </ul>
 
 <style>
+.mm-stat-card{background:#d1e7dd!important;border-color:#badbcc!important;border-radius:12px;transition:transform .2s}
+.mm-stat-card:hover{transform:translateY(-3px)}
+.mm-stat-card .fw-bold,.mm-stat-card .fs-3,.mm-stat-card .fs-4,.mm-stat-card .fs-5{color:#0f5132!important}
+.mm-stat-card .text-muted,.mm-stat-card .small{color:#0f5132!important;opacity:.85}
 .mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
 .mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
 </style>

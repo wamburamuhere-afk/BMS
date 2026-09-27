@@ -110,6 +110,12 @@ function trendBadge($pct): string {
     return "<span class='badge bg-{$cls} ms-1'><i class='bi {$icon}'></i> " . abs($pct) . "%</span>";
 }
 ?>
+<style>
+.mm-stat-card{background:#d1e7dd!important;border-color:#badbcc!important;border-radius:12px;transition:transform .2s}
+.mm-stat-card:hover{transform:translateY(-3px)}
+.mm-stat-card .fw-bold,.mm-stat-card .fs-3,.mm-stat-card .fs-4,.mm-stat-card .fs-5{color:#0f5132!important}
+.mm-stat-card .text-muted,.mm-stat-card .small{color:#0f5132!important;opacity:.85}
+</style>
 <div class="container-fluid py-4 px-4">
     <div class="d-flex align-items-center gap-2 mb-3">
         <i class="bi bi-speedometer2 text-primary fs-4"></i>
@@ -152,28 +158,28 @@ function trendBadge($pct): string {
     <!-- KPI row 1 — Today -->
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t("Today's Transactions") ?></div>
                 <div class="fs-3 fw-bold text-primary"><?= number_format((int)$today_kpi['txn_count']) ?></div>
                 <div class="small text-muted"><?= t('Volume:') ?> <strong><?= number_format((float)$today_kpi['volume']) ?></strong> TZS</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t("Today's Commission") ?></div>
                 <div class="fs-3 fw-bold text-success"><?= number_format((float)$today_kpi['commission']) ?></div>
                 <div class="small text-muted">TZS</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t('Open Shifts') ?></div>
                 <div class="fs-3 fw-bold text-<?= $openShifts > 0 ? 'warning' : 'secondary' ?>"><?= $openShifts ?></div>
                 <div class="small text-muted"><?= $tillCount ?> <?= t('active tills') ?>, <?= $agentCount ?> <?= t('agents') ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t('Open Reconciliations') ?></div>
                 <div class="fs-3 fw-bold text-<?= $openRecons > 0 ? 'danger' : 'secondary' ?>"><?= $openRecons ?></div>
                 <div class="small text-muted"><?= $today_kpi['void_count'] > 0 ? $today_kpi['void_count'] . ' ' . t('voided today') : t('No voids today') ?></div>
@@ -184,25 +190,25 @@ function trendBadge($pct): string {
     <!-- KPI row 2 — This month -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t('Month Transactions') ?></div>
                 <div class="fs-4 fw-bold text-primary"><?= number_format((int)$month_kpi['txn_count']) ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t('Month Volume (TZS)') ?></div>
                 <div class="fs-4 fw-bold text-info"><?= number_format((float)$month_kpi['volume']) ?> <?= trendBadge($vol_trend) ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t('Month Commission (TZS)') ?></div>
                 <div class="fs-4 fw-bold text-success"><?= number_format((float)$month_kpi['commission']) ?> <?= trendBadge($comm_trend) ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted mb-1"><?= t('Prev Month Volume (TZS)') ?></div>
                 <div class="fs-4 fw-bold text-secondary"><?= number_format((float)$prev_month_kpi['volume']) ?></div>
             </div>

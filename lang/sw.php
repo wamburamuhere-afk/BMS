@@ -1501,8 +1501,8 @@ return [
     'May' => 'Mei',
     'Method' => 'Njia',
     'Min' => 'Kiwango cha Chini',
-    'Mobile Money' => 'Pesa ya Simu',
-    'Mobile Transactions' => 'Miamala ya Simu',
+    'Mobile Money' => 'Miamala',
+    'Mobile Transactions' => 'Miamala',
     'Month' => 'Mwezi',
     'Net Sales' => 'Mauzo Halisi',
     'Net Sales (excl. VAT)' => 'Mauzo Halisi (bila VAT)',
@@ -2531,7 +2531,7 @@ return [
     'e.g. Bejundas Financial Services' => 'mfano, Bejundas Financial Services',
     'Account Number' => 'Namba ya Akaunti',
     'SWIFT / BIC Code' => 'Msimbo wa SWIFT / BIC',
-    'Mobile Money & Checks' => 'Pesa za Simu na Hundi',
+    'Mobile Money & Checks' => 'Miamala na Hundi',
     'M-Pesa / Tigo Pesa Paybill' => 'M-Pesa / Tigo Pesa Paybill',
     'e.g. 123456' => 'mfano, 123456',
     'Account Number (Reference)' => 'Namba ya Akaunti (Rejea)',
@@ -2552,7 +2552,7 @@ return [
     'Name:' => 'Jina:',
     'Acc No:' => 'Namba ya Akaunti:',
     'Swift:' => 'Swift:',
-    'Mobile Money:' => 'Pesa za Simu:',
+    'Mobile Money:' => 'Miamala:',
     'Paybill:' => 'Paybill:',
     'Account:' => 'Akaunti:',
     'Checks:' => 'Hundi:',
@@ -4518,7 +4518,7 @@ return [
     'No data yet'                => 'Hakuna data bado',
 
     // -- mm_dashboard.php --
-    'Mobile Money Dashboard'                 => 'Dashibodi ya Pesa ya Simu',
+    'Mobile Money Dashboard'                 => 'Dashibodi ya Miamala',
     'Today:'                                 => 'Leo:',
     "Today's Transactions"                   => 'Miamala ya Leo',
     "Today's Commission"                     => 'Kamisheni ya Leo',
@@ -4581,7 +4581,7 @@ return [
     'Yes, Close'                             => 'Ndiyo, Funga',
 
     // -- mm_networks.php --
-    'Mobile Money Networks'                  => 'Mitandao ya Pesa ya Simu',
+    'Mobile Money Networks'                  => 'Mitandao',
     'Add Network'                            => 'Ongeza Mtandao',
     'Total Networks'                         => 'Jumla ya Mitandao',
     'Short Code'                             => 'Nambari Fupi',
@@ -4597,14 +4597,14 @@ return [
     'Edit Network'                           => 'Hariri Mtandao',
 
     // -- mm_transactions.php --
-    'MM Transactions'                        => 'Miamala ya Pesa ya Simu',
+    'MM Transactions'                        => 'Miamala',
     'New Transaction'                        => 'Muamala Mpya',
     'Total Volume (TZS)'                     => 'Kiasi cha Jumla (TZS)',
     'Commission Earned (TZS)'               => 'Kamisheni Iliyopatikana (TZS)',
     'Outlet / Till'                          => 'Tawi / Kaunta',
     'Amount (TZS)'                           => 'Kiasi (TZS)',
     'No transactions found for the selected filters.' => 'Hakuna miamala iliyopatikana kwa vichujio vilivyochaguliwa.',
-    'New MM Transaction'                     => 'Muamala Mpya wa Pesa ya Simu',
+    'New MM Transaction'                     => 'Muamala Mpya',
     'Transaction Type'                       => 'Aina ya Muamala',
     'Transaction Date'                       => 'Tarehe ya Muamala',
     'BOT KYC required: customer name/phone is mandatory for TZS 1,000,000 or above.' => 'BOT KYC inahitajika: jina/simu ya mteja ni lazima kwa TZS 1,000,000 au zaidi.',
@@ -4662,7 +4662,7 @@ return [
     'Marked Disputed'                       => 'Imewekwa kama Inazozwa',
 
     // -- mm_commissions.php --
-    'MM Commissions'                        => 'Kamisheni za Pesa ya Simu',
+    'MM Commissions'                        => 'Kamisheni',
     'Record Received'                       => 'Rekodi Iliyopokelewa',
     'Total Earned (TZS)'                    => 'Jumla Iliyopatikana (TZS)',
     'Total Received (TZS)'                  => 'Jumla Iliyopokelewa (TZS)',
@@ -4756,7 +4756,7 @@ return [
     'Shift Summary'                         => 'Muhtasari wa Zamu',
     'Void & Suspicious'                     => 'Zilizobatilishwa na Zinazohusuwa',
     'Network Comparison'                    => 'Ulinganisho wa Mitandao',
-    'Mobile Money Reports'                  => 'Ripoti za Pesa ya Simu',
+    'Mobile Money Reports'                  => 'Ripoti za Miamala',
     'Fees (TZS)'                            => 'Ada (TZS)',
     'Commission (TZS)'                      => 'Kamisheni (TZS)',
     'Float Balance'                         => 'Salio la Elektroniki',
