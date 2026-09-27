@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(mobile-money): Mobile nav restructure + Floti terminology
+
+**Files:**
+- `lang/sw.php` — Replaced all remaining "Salio la Elektroniki" float labels with "Floti": Float Management, Float Top-up, Float Withdrawal, Opening Float, Counted Float, Float Position, Float Balance, Cash & Float Reconciliation, Float (TZS)
+- `header.php` — MM-only mobile nav restructured:
+  - Removed left hamburger for MM-only; added language + Settings (≡) buttons on right side of top bar (matching POS pattern)
+  - Settings (≡) button opens new `mmSettingsSheet` — mirrors desktop Settings dropdown (Admin, Teller Shifts, Commissions, Reconciliation, Compliance/KYC, Networks, Commission Rates) + Profile section (My HR, My Profile & Settings, Language toggle, Logout)
+  - More (⋯) tab now only shows operational pages NOT in bottom tabs: Float Management, Agent Outlets; hidden if user can view neither
+  - More tab and More sheet no longer contain items duplicated elsewhere (Settings items, Reports items, user profile — all moved to Settings sheet)
+
+---
+
 ## 2026-09-27 — fix(mobile-money): Mobile hamburger (≡) now opens MM More sheet on MM-only tenants
 
 **Files:**
