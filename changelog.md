@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): MM-only phone bottom nav + dashboard quick actions + Swahili translations
+
+**Files:**
+- `header.php` — added `$__mm_only` gate (`tenantOnlyHasModule('mobile_money')`); when true, renders MM-specific mobile bottom nav (5 tabs: Dashboard, Transactions, Shifts, Reports offcanvas, More offcanvas) instead of the Simple POS bar; `d-lg-none` on all elements — desktop completely unchanged; existing POS block moved to `elseif (posSimpleModeEnabled())`
+- `app/bms/mobile_money/mm_dashboard.php` — added Quick Action row (New Transaction, Open Shift, Float Top-up, Agents) with permission gates, visible above KPI cards on all screen sizes
+- `lang/sw.php` — added ~200 MM-specific Swahili translation strings covering all 15 MM pages (mm_dashboard, mm_agents, mm_agent_view, mm_networks, mm_transactions, mm_transaction_view, mm_reconciliation, mm_recon_view, mm_commissions, mm_compliance, mm_commission_rates, mm_float, mm_shifts, mm_reports, mm_shift_report); 0 duplicate keys confirmed
+
+**Why:** When a tenant has only Mobile Money enabled the phone showed a POS nav (Dashboard/Products/Expenses) with no way to reach MM transactions, shifts, float, reconciliation, or commissions. All MM pages also lacked Swahili labels.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): MM-only tenant routing — redirect to mm_dashboard when only MM is enabled
 
 **Files:**

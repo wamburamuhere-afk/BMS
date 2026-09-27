@@ -1570,7 +1570,194 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
     </div><!-- /.header-wrapper -->
 
-    <?php if (posSimpleModeEnabled()): ?>
+    <?php
+    // Compute once; used by both the MM-only block and the posSimpleModeEnabled block.
+    $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
+    ?>
+
+    <?php if ($__mm_only): ?>
+    <?php
+    // ── Mobile Money · phone bottom navigation bar ──────────────────────────
+    // Appears only when this tenant's sole non-core feature is 'mobile_money'
+    // (tenantOnlyHasModule('mobile_money') === true). Mirrors the Simple POS
+    // bar pattern exactly — same CSS classes, same d-lg-none rule, same JS.
+    // Desktop (>= 992 px) is completely untouched. 5 tabs: Dashboard,
+    // Transactions, Shifts, Reports (offcanvas list), More (offcanvas menu).
+    $__bn_dark = (($_SESSION['theme'] ?? 'light') === 'dark');
+    $__bn_cur  = rtrim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+    $__bn_on   = function (string $page) use ($__bn_cur): bool {
+        $p = rtrim((string)parse_url(getUrl($page), PHP_URL_PATH), '/');
+        return $p !== '' && ($__bn_cur === $p || str_starts_with($__bn_cur, $p . '/'));
+    };
+    $__bn_reports_on = $__bn_on('mm_reports');
+    ?>
+    <style>
+        .bms-bnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
+            background: <?= $__bn_dark ? '#24282d' : '#ffffff' ?>;
+            border-top: 1px solid <?= $__bn_dark ? '#3a3f45' : '#dee2e6' ?>;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.10);
+            padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
+        .bms-bnav .bn-item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+            padding: 4px 1px; background: none; border: 0; text-decoration: none;
+            color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; font-size: clamp(0.54rem, 2.1vw, 0.68rem); font-weight: 500; line-height: 1.15; }
+        .bms-bnav .bn-item i { font-size: clamp(1.05rem, 3.8vw, 1.3rem); line-height: 1; }
+        .bms-bnav .bn-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bms-bnav .bn-item.active { color: #0d6efd; font-weight: 700; }
+        .bms-sheet { height: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0;
+            <?= $__bn_dark ? 'background:#24282d;color:#e1e7ec;' : '' ?> }
+        .bms-sheet .list-group-item { display: flex; align-items: center; gap: 10px; padding: 0.8rem 0.25rem; font-size: 0.95rem;
+            <?= $__bn_dark ? 'background:transparent;color:#e1e7ec;border-color:#3a3f45;' : 'background:transparent;' ?> }
+        .bms-sheet .list-group-item i { width: 1.4rem; text-align: center; color: #0d6efd; }
+        .bms-sheet .bn-group { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: #6c757d; padding: 0.9rem 0.25rem 0.2rem; }
+        .bms-sheet .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
+        @media (max-width: 991.98px) {
+            body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
+            .bottom-header .navbar-toggler { display: none !important; }
+            .bottom-header .header-nav-bar { display: none !important; }
+            body.bms-kb-open .bms-bnav { display: none !important; }
+        }
+    </style>
+
+    <!-- MM bottom nav bar (mobile only) -->
+    <nav class="bms-bnav d-flex d-lg-none d-print-none" aria-label="<?= htmlspecialchars(t('Main Menu')) ?>">
+        <?php if (canView('mm_dashboard')): ?>
+        <a class="bn-item<?= $__bn_on('mm_dashboard') ? ' active' : '' ?>" href="<?= getUrl('mm_dashboard') ?>">
+            <i class="bi bi-speedometer2"></i><span><?= t('Dashboard') ?></span>
+        </a>
+        <?php endif; ?>
+        <?php if (canView('mm_transactions')): ?>
+        <a class="bn-item<?= $__bn_on('mm_transactions') ? ' active' : '' ?>" href="<?= getUrl('mm_transactions') ?>">
+            <i class="bi bi-arrow-left-right"></i><span><?= t('Transactions') ?></span>
+        </a>
+        <?php endif; ?>
+        <?php if (canView('mm_shifts')): ?>
+        <a class="bn-item<?= $__bn_on('mm_shifts') ? ' active' : '' ?>" href="<?= getUrl('mm_shifts') ?>">
+            <i class="bi bi-clock-history"></i><span><?= t('Shifts') ?></span>
+        </a>
+        <?php endif; ?>
+        <?php if (canView('mm_reports')): ?>
+        <button type="button" class="bn-item<?= $__bn_reports_on ? ' active' : '' ?>"
+                data-bs-toggle="offcanvas" data-bs-target="#mmReportsSheet" aria-controls="mmReportsSheet">
+            <i class="bi bi-graph-up"></i><span><?= t('Reports') ?></span>
+        </button>
+        <?php endif; ?>
+        <button type="button" class="bn-item"
+                data-bs-toggle="offcanvas" data-bs-target="#mmMoreSheet" aria-controls="mmMoreSheet">
+            <i class="bi bi-three-dots"></i><span><?= t('More') ?></span>
+        </button>
+    </nav>
+
+    <?php if (canView('mm_reports')): ?>
+    <!-- MM Reports offcanvas — all 7 report types as a bottom slide-up list -->
+    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
+         id="mmReportsSheet" aria-labelledby="mmReportsSheetLabel">
+        <div class="offcanvas-header pb-0">
+            <h6 class="offcanvas-title fw-bold" id="mmReportsSheetLabel">
+                <i class="bi bi-bar-chart text-warning me-1"></i><?= t('Mobile Money Reports') ?>
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-1">
+            <div class="list-group list-group-flush">
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=txn_summary">
+                    <i class="bi bi-arrow-left-right"></i><?= t('Transaction Summary') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=float_position">
+                    <i class="bi bi-currency-exchange"></i><?= t('Float Position') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=commission">
+                    <i class="bi bi-coin"></i><?= t('Commission') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=agent_perf">
+                    <i class="bi bi-person-check"></i><?= t('Agent Performance') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=shift_summary">
+                    <i class="bi bi-clock-history"></i><?= t('Shift Summary') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=void_suspicious">
+                    <i class="bi bi-exclamation-triangle"></i><?= t('Void & Suspicious') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=network_comparison">
+                    <i class="bi bi-broadcast"></i><?= t('Network Comparison') ?></a>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- MM More offcanvas — operations, configuration, and account -->
+    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
+         id="mmMoreSheet" aria-labelledby="mmMoreSheetLabel">
+        <div class="offcanvas-header pb-0">
+            <h6 class="offcanvas-title fw-bold" id="mmMoreSheetLabel">
+                <i class="bi bi-phone text-primary me-1"></i><?= t('Mobile Money') ?>
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-0">
+            <div class="bn-group"><?= t('Operations') ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (canView('mm_float')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_float') ?>">
+                    <i class="bi bi-currency-exchange"></i><?= t('Float Management') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_agents')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_agents') ?>">
+                    <i class="bi bi-shop-window"></i><?= t('Agent Outlets') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_reconciliation')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reconciliation') ?>">
+                    <i class="bi bi-clipboard-check"></i><?= t('Daily Reconciliation') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_commissions')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commissions') ?>">
+                    <i class="bi bi-coin"></i><?= t('MM Commissions') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_compliance')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_compliance') ?>">
+                    <i class="bi bi-shield-check"></i><?= t('Compliance / KYC') ?></a>
+                <?php endif; ?>
+            </div>
+            <div class="bn-group"><?= t('Configuration') ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (canView('mm_networks')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_networks') ?>">
+                    <i class="bi bi-broadcast"></i><?= t('Mobile Money Networks') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_commission_rates')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commission_rates') ?>">
+                    <i class="bi bi-percent"></i><?= t('Commission Rate Schedule') ?></a>
+                <?php endif; ?>
+            </div>
+            <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (!empty($_SESSION['employee_id'])): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_hr') ?>">
+                    <i class="bi bi-person-workspace"></i><?= t('My HR') ?></a>
+                <?php endif; ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>">
+                    <i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
+                <a class="list-group-item list-group-item-action text-danger fw-bold" href="<?= getUrl('logout') ?>">
+                    <i class="bi bi-box-arrow-right text-danger"></i><?= t('Logout') ?></a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            var menu = document.getElementById('navbarNav');
+            if (menu && window.bootstrap) {
+                menu.addEventListener('show.bs.collapse', function () { document.body.classList.add('bms-menu-open'); });
+                menu.addEventListener('hidden.bs.collapse', function () { document.body.classList.remove('bms-menu-open'); });
+            }
+        });
+        if (window.visualViewport) {
+            var maxH = window.innerHeight;
+            var check = function () {
+                maxH = Math.max(maxH, window.innerHeight);
+                document.body.classList.toggle('bms-kb-open', window.visualViewport.height < maxH * 0.75);
+            };
+            window.visualViewport.addEventListener('resize', check);
+            window.addEventListener('orientationchange', function () { maxH = 0; setTimeout(function () { maxH = window.innerHeight; check(); }, 300); });
+        }
+    })();
+    </script>
+
+    <?php elseif (posSimpleModeEnabled()): ?>
     <?php
     // ── Simple POS · phone bottom navigation bar ───────────────────────────
     // On phones the header menu sits behind the ☰ button, so every action
@@ -1728,7 +1915,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
     })();
     </script>
-    <?php endif; // posSimpleModeEnabled() bottom bar ?>
+    <?php endif; // MM-only or posSimpleModeEnabled() bottom bar ?>
 
     <script>
     /* Runs synchronously — header is in the DOM, body content not yet rendered */
