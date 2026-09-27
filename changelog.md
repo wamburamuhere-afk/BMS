@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-27 — feat(mobile-money): Replace "Pesa ya Simu" with "Miamala" across all Swahili translations
+
+**Files:**
+- `lang/sw.php` — removed all 9 occurrences of "Pesa ya Simu" / "Pesa za Simu" in MM-related translations:
+  - `'Mobile Money'` → `'Miamala'` (generic label: sidebar nav, POS dropdowns, payment forms)
+  - `'Mobile Transactions'` → `'Miamala'`
+  - `'Mobile Money & Checks'` → `'Miamala na Hundi'`
+  - `'Mobile Money:'` → `'Miamala:'`
+  - `'Mobile Money Dashboard'` → `'Dashibodi ya Miamala'`
+  - `'Mobile Money Networks'` → `'Mitandao'`
+  - `'MM Transactions'` → `'Miamala'`
+  - `'New MM Transaction'` → `'Muamala Mpya'`
+  - `'MM Commissions'` → `'Kamisheni'`
+  - `'Mobile Money Reports'` → `'Ripoti za Miamala'`
+
+---
+
 ## 2026-09-27 — feat(mobile-money): S/No column + white headers + Title Case + mobile card view on all MM table pages
 
 **Files:**
