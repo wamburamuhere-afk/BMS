@@ -940,7 +940,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
                     </button>
                     <button type="button" class="btn btn-outline-light"
-                        data-bs-toggle="offcanvas" data-bs-target="#mmSettingsSheet" aria-controls="mmSettingsSheet"
+                        onclick="event.stopPropagation();if(window.bootstrap){['mmReportsSheet','mmMoreSheet'].forEach(function(id){var e=document.getElementById(id);if(e){var o=bootstrap.Offcanvas.getInstance(e);if(o)o.hide();}});bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('mmSettingsSheet')).show();}"
                         title="<?= htmlspecialchars(t('Settings')) ?>"
                         style="font-size:0.8rem;padding:2px 6px;line-height:1.4;">
                         <i class="bi bi-list"></i>

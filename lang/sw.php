@@ -4754,7 +4754,7 @@ return [
     'Float Position'                        => 'Hali ya Floti',
     'Agent Performance'                     => 'Utendaji wa Wakala',
     'Shift Summary'                         => 'Muhtasari wa Zamu',
-    'Void & Suspicious'                     => 'Zilizobatilishwa na Zinazohusuwa',
+    'Void & Suspicious'                     => 'Zilizobatilishwa na Zinazoshukiwa',
     'Network Comparison'                    => 'Ulinganisho wa Mitandao',
     'Mobile Money Reports'                  => 'Ripoti za Miamala',
     'Fees (TZS)'                            => 'Ada (TZS)',
