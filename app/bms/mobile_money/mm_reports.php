@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('mm_reports');
 
-$can_export = canExport('mm_reports');
+$can_export = canEdit('mm_reports');
 
 $today      = date('Y-m-d');
 $monthStart = date('Y-m-01');

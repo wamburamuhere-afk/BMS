@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('mm_commissions');
 
 $can_create = canCreate('mm_commissions');
-$can_void   = canVoid('mm_commissions');
+$can_void   = canDelete('mm_commissions');
 
 // --- Summary figures ---
 // Earned: sum of commission_earned from posted transactions

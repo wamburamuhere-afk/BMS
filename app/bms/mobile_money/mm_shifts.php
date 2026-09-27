@@ -31,7 +31,8 @@ if ($filterStatus) { $where[] = 's.status = :status'; $params[':status'] = $filt
 $shifts = $pdo->prepare("
     SELECT s.*,
            t.till_number, a.agent_name, a.agent_code, n.network_name, n.color_hex,
-           u.full_name AS teller_name, uc.full_name AS closed_by_name,
+           CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
+           CONCAT(uc.first_name, ' ', uc.last_name) AS closed_by_name,
            (SELECT COUNT(*) FROM mm_transactions mt WHERE mt.shift_id = s.shift_id AND mt.status = 'posted') AS txn_count,
            (SELECT SUM(mt.principal_amount) FROM mm_transactions mt WHERE mt.shift_id = s.shift_id AND mt.status = 'posted') AS txn_volume,
            (SELECT SUM(mt.commission_earned) FROM mm_transactions mt WHERE mt.shift_id = s.shift_id AND mt.status = 'posted') AS txn_commission

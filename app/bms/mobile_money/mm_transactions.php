@@ -175,9 +175,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($txns)): ?>
-                            <tr><td colspan="10" class="text-center text-muted py-5"><?= t('No transactions found for the selected filters.') ?></td></tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -261,6 +258,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#txnTable')) {
         $('#txnTable').DataTable({ responsive:false, scrollX:true, pageLength:50, order:[[1,'desc']], dom:'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No transactions found for the selected filters.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
             drawCallback: function () { renderCards(this.api().rows({page:'current'}).data().toArray()); }
         });
