@@ -1502,6 +1502,7 @@ return [
     'Method' => 'Njia',
     'Min' => 'Kiwango cha Chini',
     'Mobile Money' => 'Pesa ya Simu',
+    'Mobile Transactions' => 'Miamala ya Simu',
     'Month' => 'Mwezi',
     'Net Sales' => 'Mauzo Halisi',
     'Net Sales (excl. VAT)' => 'Mauzo Halisi (bila VAT)',

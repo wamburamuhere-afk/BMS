@@ -180,9 +180,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($movements)): ?>
-                            <tr><td colspan="8" class="text-center text-muted py-5"><?= t('No float movements found.') ?></td></tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -314,6 +311,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#floatTable')) {
         $('#floatTable').DataTable({responsive:false,scrollX:true,pageLength:25,order:[[1,'desc']],dom:'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No float movements found.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
             drawCallback:function(){renderCards(this.api().rows({page:'current'}).data().toArray());}
         });

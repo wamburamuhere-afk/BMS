@@ -13,7 +13,7 @@ $networks = $pdo->query("
     SELECT n.*,
            a_f.account_code AS float_code, a_f.account_name AS float_name,
            a_c.account_code AS comm_code,  a_c.account_name AS comm_name,
-           (SELECT COUNT(*) FROM mm_agents ag WHERE ag.network_id = n.network_id AND ag.status != 'deleted') AS agent_count
+           (SELECT COUNT(DISTINCT t.agent_id) FROM mm_tills t WHERE t.network_id = n.network_id AND t.status = 'active') AS agent_count
     FROM mm_networks n
     LEFT JOIN accounts a_f ON a_f.account_id = n.float_account_id
     LEFT JOIN accounts a_c ON a_c.account_id = n.commission_account_id

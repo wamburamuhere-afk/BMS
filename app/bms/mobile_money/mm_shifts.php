@@ -172,9 +172,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($shifts)): ?>
-                            <tr><td colspan="11" class="text-center text-muted py-5"><?= t('No shifts found.') ?></td></tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -269,6 +266,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#shiftsTable')) {
         $('#shiftsTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[3,'desc']], dom:'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No shifts found.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
             drawCallback: function() { renderCards(this.api().rows({page:'current'}).data().toArray()); }
         });
