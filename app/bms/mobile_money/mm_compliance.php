@@ -225,7 +225,7 @@ $(document).ready(function () {
                     Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message });
                 }
             },
-            error: function () { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); },
+            error: function (xhr) { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>' }); },
             complete: function () { btn.prop('disabled', false).html(orig); }
         });
     });

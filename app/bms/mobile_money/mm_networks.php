@@ -322,7 +322,7 @@ $(document).ready(function () {
                     Swal.fire({ icon: 'success', title: '<?= t('Saved!') ?>', text: res.message, timer: 1800, showConfirmButton: false }).then(() => location.reload());
                 } else { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message }); }
             },
-            error: function () { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); },
+            error: function (xhr) { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>' }); },
             complete: function () { btn.prop('disabled', false).html(orig); }
         });
     });
@@ -339,7 +339,7 @@ $(document).ready(function () {
                     Swal.fire({ icon: 'success', title: '<?= t('Updated!') ?>', text: res.message, timer: 1800, showConfirmButton: false }).then(() => location.reload());
                 } else { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message }); }
             },
-            error: function () { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); },
+            error: function (xhr) { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>' }); },
             complete: function () { btn.prop('disabled', false).html(orig); }
         });
     });
