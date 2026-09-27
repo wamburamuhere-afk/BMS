@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-27 — feat(mobile-money): Stat cards first + green card color across all MM pages
+
+**Files (10 pages):**
+- `app/bms/mobile_money/mm_transactions.php` — stats moved above filter bar; `mm-stat-card` class on all 3 cards
+- `app/bms/mobile_money/mm_float.php` — stats moved above filter bar; `mm-stat-card` class on all 3 cards
+- `app/bms/mobile_money/mm_shifts.php` — stats moved above filter bar; `mm-stat-card` class on all 4 cards
+- `app/bms/mobile_money/mm_commission_rates.php` — stats moved above filter; `mm-stat-card` class on card
+- `app/bms/mobile_money/mm_agents.php` — `mm-stat-card` class on all 3 cards
+- `app/bms/mobile_money/mm_commissions.php` — `mm-stat-card` class on all 3 cards
+- `app/bms/mobile_money/mm_networks.php` — `mm-stat-card` class on all 3 cards
+- `app/bms/mobile_money/mm_reconciliation.php` — `mm-stat-card` class on all 4 cards
+- `app/bms/mobile_money/mm_compliance.php` — `mm-stat-card` class on all 4 cards
+- `app/bms/mobile_money/mm_dashboard.php` — `mm-stat-card` class on all 8 KPI cards; CSS style block added
+- CSS added to each page: `background:#d1e7dd`, `border:#badbcc`, text `#0f5132` matching expenses page palette
+
+---
+
 ## 2026-09-27 — feat(mobile-money): Replace "Pesa ya Simu" with "Miamala" across all Swahili translations
 
 **Files:**
