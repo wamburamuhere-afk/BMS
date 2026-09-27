@@ -124,29 +124,41 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
         </div>
     </div>
 
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
     <!-- Table -->
     <div id="tableView">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table id="txnTable" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
-                        <thead class="table-dark">
+                        <thead class="mm-thead">
                             <tr>
-                                <th><?= t('Code') ?></th>
-                                <th><?= t('Date') ?></th>
-                                <th><?= t('Network') ?></th>
-                                <th><?= t('Type') ?></th>
-                                <th><?= t('Outlet / Till') ?></th>
-                                <th class="text-end"><?= t('Amount (TZS)') ?></th>
-                                <th class="text-end"><?= t('Commission') ?></th>
-                                <th><?= t('Customer') ?></th>
-                                <th><?= t('Status') ?></th>
-                                <th class="text-end"><?= t('') ?></th>
+                                <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                                <th class="text-center"><?= t('Code') ?></th>
+                                <th class="text-center"><?= t('Date') ?></th>
+                                <th class="text-center"><?= t('Network') ?></th>
+                                <th class="text-center"><?= t('Type') ?></th>
+                                <th class="text-center"><?= t('Outlet / Till') ?></th>
+                                <th class="text-center"><?= t('Amount (TZS)') ?></th>
+                                <th class="text-center"><?= t('Commission') ?></th>
+                                <th class="text-center"><?= t('Customer') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
+                                <th class="text-center"><?= t('View') ?></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($txns as $tx): ?>
-                            <tr>
+                            <?php $sno = 1; foreach ($txns as $tx): ?>
+                            <tr data-id="<?= (int)$tx['mm_txn_id'] ?>" data-code="<?= htmlspecialchars($tx['txn_code']) ?>" data-date="<?= htmlspecialchars($tx['txn_date']) ?>" data-network="<?= htmlspecialchars($tx['network_name']) ?>" data-type="<?= htmlspecialchars($txnLabels[$tx['txn_type']] ?? $tx['txn_type']) ?>" data-outlet="<?= htmlspecialchars($tx['agent_name'].' / '.$tx['till_number']) ?>" data-amount="<?= number_format((float)$tx['principal_amount']) ?>" data-commission="<?= $tx['commission_earned'] > 0 ? number_format((float)$tx['commission_earned']) : '—' ?>" data-status="<?= htmlspecialchars($tx['status']) ?>">
+                                <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code class="small"><?= safe_output($tx['txn_code']) ?></code></td>
                                 <td class="small"><?= safe_output($tx['txn_date']) ?></td>
                                 <td>
@@ -257,10 +269,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#txnTable')) {
-        $('#txnTable').DataTable({ responsive:false, scrollX:true, pageLength:50, order:[[1,'desc']], dom:'rtipB',
+        $('#txnTable').DataTable({ responsive:false, scrollX:true, pageLength:50, order:[[2,'desc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
             language: { emptyTable: '<?= addslashes(t('No transactions found for the selected filters.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
-            drawCallback: function () { renderCards(this.api().rows({page:'current'}).data().toArray()); }
+            drawCallback: function () { renderCards(this.api().rows({page:'current'}).nodes()); }
         });
     }
     function applyView() {
@@ -303,16 +315,35 @@ function checkKYC(val) {
     document.getElementById('kyc_notice').classList.toggle('d-none', parseFloat(val) < 1000000);
 }
 
-function renderCards(rows) {
-    if(!rows.length){$('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No transactions') ?></div>');return;}
-    let html='';
-    rows.forEach(r=>{
-        html+=`<div class="col-12"><div class="card border-0 shadow-sm">
-            <div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${safeOutput(r[0])}</span><span class="text-muted small">${safeOutput(r[1])}</span></div>
-                <div class="small">${safeOutput(r[3])} · ${safeOutput(r[2])}</div>
-                <div class="fw-semibold">TZS ${parseFloat(r[5]).toLocaleString()}</div>
-            </div></div></div>`;
+function renderCards(nodes) {
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No transactions') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const id = $tr.data('id'), sno = idx + 1;
+        const code = $tr.data('code'), date = $tr.data('date');
+        const network = $tr.data('network'), type = $tr.data('type');
+        const outlet = $tr.data('outlet'), amount = $tr.data('amount');
+        const commission = $tr.data('commission'), status = $tr.data('status');
+        const sBadge = status === 'posted' ? 'bg-success' : 'bg-secondary';
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem"><code>${safeOutput(code)}</code></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Date') ?></span><span class="kv-val">${safeOutput(date)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Network') ?></span><span class="kv-val">${safeOutput(network)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Type') ?></span><span class="kv-val">${safeOutput(type)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Outlet') ?></span><span class="kv-val">${safeOutput(outlet)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Amount (TZS)') ?></span><span class="kv-val fw-bold">${safeOutput(amount)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Commission') ?></span><span class="kv-val">${safeOutput(commission)}</span></div>
+          </div>
+          <div class="mm-card-foot">
+            <a href="<?= getUrl('mm_transaction_view') ?>?id=${id}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1"></i><?= t('View') ?></a>
+          </div>
+        </div></div>`;
     });
     $('#cardView').html(html);
 }

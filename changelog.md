@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-09-27 — feat(mobile-money): S/No column + white headers + Title Case + mobile card view on all MM table pages
+
+**Files:**
+- `app/bms/mobile_money/mm_agents.php` — white thead (mm-thead), S/No column, Title Case centered headers, mobile card view (renderCards via DataTable drawCallback + DOM data-attrs)
+- `app/bms/mobile_money/mm_transactions.php` — same treatment; card shows code/date/network/type/outlet/amount/commission; View button
+- `app/bms/mobile_money/mm_shifts.php` — same treatment; card shows code/outlet/teller/opened/volume; Report + conditional Close buttons
+- `app/bms/mobile_money/mm_float.php` — same treatment; card shows code/date/outlet/type/amount; type badge color-coded
+- `app/bms/mobile_money/mm_networks.php` — added DataTable initialization (previously none); full tableView/cardView; card shows network name with color dot, Code/Agents kv, Edit button
+- `app/bms/mobile_money/mm_commission_rates.php` — added cardView to existing DataTable; full rate JSON stored in data-rate attr; card shows network/type/amount range/rate; Edit button
+- `app/bms/mobile_money/mm_commissions.php` — white headers (mm-thead) + S/No on earnedTab and receivedTab; columnDefs no-sort on S/No column
+- `app/bms/mobile_money/mm_reconciliation.php` — added tableView/cardView wrapper; card shows code/date/till/agent; View button
+- `app/bms/mobile_money/mm_compliance.php` — kycTable + pendingTable: white headers, S/No column, Title Case centered headers, tableView/cardView per tab, renderKycCards + renderPendingCards functions
+
+**Why:** User requested all "Miamala ya Simu" (Mobile Money) module tables to have: (1) S/No first column, (2) white table headers everywhere, (3) Title Case + center-aligned column headers on desktop, (4) mobile card view by default matching the system's card UX pattern.
+
 ## 2026-09-27 — fix(mobile-money): mm_reconciliation and mm_recon_view wrong getUrl paths
 
 **Files:**

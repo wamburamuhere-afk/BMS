@@ -77,23 +77,36 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
         </div>
     </div>
 
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
+    <div id="tableView">
     <div class="table-responsive">
         <table id="reconTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark">
+            <thead class="mm-thead">
                 <tr>
-                    <th><?= t('Code') ?></th>
-                    <th><?= t('Date') ?></th>
-                    <th><?= t('Till') ?></th>
-                    <th><?= t('Agent') ?></th>
-                    <th class="text-end"><?= t('Cash Var') ?></th>
-                    <th class="text-end"><?= t('Float Var') ?></th>
-                    <th><?= t('Status') ?></th>
-                    <th class="text-end"><?= t('Actions') ?></th>
+                    <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                    <th class="text-center"><?= t('Code') ?></th>
+                    <th class="text-center"><?= t('Date') ?></th>
+                    <th class="text-center"><?= t('Till') ?></th>
+                    <th class="text-center"><?= t('Agent') ?></th>
+                    <th class="text-center"><?= t('Cash Var') ?></th>
+                    <th class="text-center"><?= t('Float Var') ?></th>
+                    <th class="text-center"><?= t('Status') ?></th>
+                    <th class="text-center"><?= t('Actions') ?></th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($recons as $r): ?>
-                <tr>
+                <?php $sno = 1; foreach ($recons as $r): ?>
+                <tr data-id="<?= (int)$r['recon_id'] ?>" data-code="<?= htmlspecialchars($r['recon_code']) ?>" data-date="<?= htmlspecialchars($r['recon_date']) ?>" data-till="<?= htmlspecialchars($r['till_number']) ?>" data-agent="<?= htmlspecialchars($r['agent_name']) ?>" data-status="<?= htmlspecialchars($r['status']) ?>">
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><code><?= safe_output($r['recon_code']) ?></code></td>
                     <td><?= safe_output($r['recon_date']) ?></td>
                     <td>
@@ -121,6 +134,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
             </tbody>
         </table>
     </div>
+    </div><!-- end tableView -->
+    <div id="cardView" class="row g-2 d-none mt-2"></div>
 </div>
 
 <?php if ($can_create): ?>
@@ -162,8 +177,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#reconTable')) {
-        $('#reconTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[1,'desc']] });
+        $('#reconTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[2,'desc']], columnDefs:[{orderable:false,targets:0}],
+            drawCallback: function(){ renderCards(this.api().rows({page:'current'}).nodes()); }
+        });
     }
+    function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
+    applyView(); $(window).on('resize',applyView);
     $('#startReconModal').on('shown.bs.modal', function () {
         $(this).find('.select2-static').each(function () {
             if (!$(this).hasClass('select2-hidden-accessible')) {
@@ -191,5 +210,33 @@ $(document).ready(function () {
     });
     $('.modal').on('hidden.bs.modal', function () { $(this).find('form')[0]?.reset(); $(this).find('[id$="-message"]').html(''); });
 });
+
+function renderCards(nodes) {
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No reconciliations found') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const id = $tr.data('id'), sno = idx + 1;
+        const code = $tr.data('code'), date = $tr.data('date');
+        const till = $tr.data('till'), agent = $tr.data('agent'), status = $tr.data('status');
+        const sBadge = status === 'resolved' ? 'bg-success' : (status === 'open' ? 'bg-warning text-dark' : (status === 'disputed' ? 'bg-danger' : 'bg-secondary'));
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem"><code>${safeOutput(code)}</code></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Date') ?></span><span class="kv-val">${safeOutput(date)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Till') ?></span><span class="kv-val">${safeOutput(till)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Agent') ?></span><span class="kv-val">${safeOutput(agent)}</span></div>
+          </div>
+          <div class="mm-card-foot">
+            <a href="<?= getUrl('mm_recon_view') ?>?id=${id}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye me-1"></i><?= t('View') ?></a>
+          </div>
+        </div></div>`;
+    });
+    $('#cardView').html(html);
+}
 </script>
 <?php includeFooter(); ?>

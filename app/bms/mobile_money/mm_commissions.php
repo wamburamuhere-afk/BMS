@@ -95,19 +95,31 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
     </ul>
 
     <div class="tab-content">
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
         <!-- Earned tab -->
         <div class="tab-pane fade show active" id="earnedTab">
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
-                    <thead class="table-dark">
+                    <thead class="mm-thead">
                         <tr>
-                            <th><?= t('Network') ?></th>
-                            <th class="text-end"><?= t('Earned (TZS)') ?></th>
+                            <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                            <th class="text-center"><?= t('Network') ?></th>
+                            <th class="text-center"><?= t('Earned (TZS)') ?></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($networkEarned as $row): ?>
+                        <?php $sno = 1; foreach ($networkEarned as $row): ?>
                         <tr>
+                            <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
                                 <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= safe_output($row['network_name']) ?></span>
                             </td>
@@ -123,19 +135,21 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
         <div class="tab-pane fade" id="receivedTab">
             <div class="table-responsive">
                 <table id="receivedTable" class="table table-hover align-middle w-100">
-                    <thead class="table-dark">
+                    <thead class="mm-thead">
                         <tr>
-                            <th><?= t('Network') ?></th>
-                            <th><?= t('Period') ?></th>
-                            <th class="text-end"><?= t('Amount (TZS)') ?></th>
-                            <th><?= t('Bank Account') ?></th>
-                            <th><?= t('Reference') ?></th>
-                            <th><?= t('Status') ?></th>
+                            <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                            <th class="text-center"><?= t('Network') ?></th>
+                            <th class="text-center"><?= t('Period') ?></th>
+                            <th class="text-center"><?= t('Amount (TZS)') ?></th>
+                            <th class="text-center"><?= t('Bank Account') ?></th>
+                            <th class="text-center"><?= t('Reference') ?></th>
+                            <th class="text-center"><?= t('Status') ?></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($receivedRows as $row): ?>
+                        <?php $rsno = 1; foreach ($receivedRows as $row): ?>
                         <tr>
+                            <td class="text-center text-muted small"><?= $rsno++ ?></td>
                             <td>
                                 <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= safe_output($row['network_name']) ?></span>
                             </td>
@@ -232,7 +246,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#receivedTable')) {
-        $('#receivedTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[0,'asc']] });
+        $('#receivedTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[1,'asc']], columnDefs:[{orderable:false,targets:0}] });
     }
 
     $('#receiveModal').on('shown.bs.modal', function () {

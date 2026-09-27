@@ -117,30 +117,42 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         </div>
     </div>
 
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
     <!-- Table -->
     <div id="tableView">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table id="shiftsTable" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
-                        <thead class="table-dark">
+                        <thead class="mm-thead">
                             <tr>
-                                <th><?= t('Code') ?></th>
-                                <th><?= t('Outlet / Till') ?></th>
-                                <th><?= t('Teller') ?></th>
-                                <th><?= t('Opened') ?></th>
-                                <th><?= t('Closed') ?></th>
-                                <th class="text-end"><?= t('Txns') ?></th>
-                                <th class="text-end"><?= t('Volume (TZS)') ?></th>
-                                <th class="text-end"><?= t('Cash Var.') ?></th>
-                                <th class="text-end"><?= t('Float Var.') ?></th>
-                                <th><?= t('Status') ?></th>
-                                <th class="text-end"><?= t('Actions') ?></th>
+                                <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                                <th class="text-center"><?= t('Code') ?></th>
+                                <th class="text-center"><?= t('Outlet / Till') ?></th>
+                                <th class="text-center"><?= t('Teller') ?></th>
+                                <th class="text-center"><?= t('Opened') ?></th>
+                                <th class="text-center"><?= t('Closed') ?></th>
+                                <th class="text-center"><?= t('Txns') ?></th>
+                                <th class="text-center"><?= t('Volume (TZS)') ?></th>
+                                <th class="text-center"><?= t('Cash Var.') ?></th>
+                                <th class="text-center"><?= t('Float Var.') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
+                                <th class="text-center"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($shifts as $sh): ?>
-                            <tr>
+                            <?php $sno = 1; foreach ($shifts as $sh): ?>
+                            <tr data-id="<?= (int)$sh['shift_id'] ?>" data-code="<?= htmlspecialchars($sh['shift_code']) ?>" data-outlet="<?= htmlspecialchars($sh['agent_name'].' / '.$sh['till_number']) ?>" data-teller="<?= htmlspecialchars($sh['teller_name'] ?: '—') ?>" data-opened="<?= date('d M H:i', strtotime($sh['opened_at'])) ?>" data-volume="<?= $sh['txn_volume'] ? number_format((float)$sh['txn_volume']) : '—' ?>" data-status="<?= htmlspecialchars($sh['status']) ?>" data-can-close="<?= ($sh['status'] === 'open' && $can_close) ? '1' : '0' ?>" data-shift='<?= htmlspecialchars(json_encode(['id'=>$sh['shift_id'],'code'=>$sh['shift_code'],'till_number'=>$sh['till_number'],'agent'=>$sh['agent_name']]),ENT_QUOTES) ?>'>
+                                <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code class="small"><?= safe_output($sh['shift_code']) ?></code></td>
                                 <td class="small">
                                     <span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:<?= htmlspecialchars($sh['color_hex'] ?: '#999') ?>"></span>
@@ -265,10 +277,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#shiftsTable')) {
-        $('#shiftsTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[3,'desc']], dom:'rtipB',
+        $('#shiftsTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[4,'desc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
             language: { emptyTable: '<?= addslashes(t('No shifts found.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
-            drawCallback: function() { renderCards(this.api().rows({page:'current'}).data().toArray()); }
+            drawCallback: function() { renderCards(this.api().rows({page:'current'}).nodes()); }
         });
     }
     function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
@@ -310,10 +322,35 @@ function closeShift(s){
     new bootstrap.Modal(document.getElementById('closeShiftModal')).show();
 }
 
-function renderCards(rows){
-    if(!rows.length){$('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No shifts') ?></div>');return;}
-    let html='';
-    rows.forEach(r=>{html+=`<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3"><div class="fw-bold">${safeOutput(r[0])}</div><div class="small text-muted">${safeOutput(r[1])}</div></div></div></div>`;});
+function renderCards(nodes) {
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No shifts') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const id = $tr.data('id'), sno = idx + 1;
+        const code = $tr.data('code'), outlet = $tr.data('outlet');
+        const teller = $tr.data('teller'), opened = $tr.data('opened');
+        const volume = $tr.data('volume'), status = $tr.data('status');
+        const canClose = $tr.data('can-close') == 1, shiftData = $tr.data('shift');
+        const sBadge = status === 'open' ? 'bg-success' : (status === 'forced_close' ? 'bg-danger' : 'bg-secondary');
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem"><code>${safeOutput(code)}</code></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Outlet / Till') ?></span><span class="kv-val">${safeOutput(outlet)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Teller') ?></span><span class="kv-val">${safeOutput(teller)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Opened') ?></span><span class="kv-val">${safeOutput(opened)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Volume (TZS)') ?></span><span class="kv-val fw-bold">${safeOutput(volume)}</span></div>
+          </div>
+          <div class="mm-card-foot">
+            <a href="<?= getUrl('mm_shift_report') ?>?id=${id}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer me-1"></i><?= t('Report') ?></a>
+            ${canClose ? `<button class="btn btn-sm btn-outline-danger" onclick='closeShift(${JSON.stringify(shiftData)})'><i class="bi bi-stop-circle me-1"></i><?= t('Close') ?></button>` : ''}
+          </div>
+        </div></div>`;
+    });
     $('#cardView').html(html);
 }
 </script>

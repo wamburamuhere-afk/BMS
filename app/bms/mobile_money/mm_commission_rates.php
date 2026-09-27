@@ -90,29 +90,42 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
         </div>
     </div>
 
+<style>
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
     <!-- Rates table -->
+    <div id="tableView">
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table id="ratesTable" class="table table-hover align-middle mb-0 w-100">
-                    <thead class="table-dark">
+                    <thead class="mm-thead">
                         <tr>
-                            <th><?= t('Network') ?></th>
-                            <th><?= t('Transaction Type') ?></th>
-                            <th class="text-end"><?= t('Amount From (TZS)') ?></th>
-                            <th class="text-end"><?= t('Amount To (TZS)') ?></th>
-                            <th><?= t('Rate Type') ?></th>
-                            <th class="text-end"><?= t('Rate Value') ?></th>
-                            <th class="text-end"><?= t('Min Commission') ?></th>
-                            <th class="text-end"><?= t('Max Commission') ?></th>
-                            <th><?= t('From Date') ?></th>
-                            <th><?= t('To Date') ?></th>
-                            <?php if ($can_edit || $can_delete): ?><th class="text-end"><?= t('Actions') ?></th><?php endif; ?>
+                            <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                            <th class="text-center"><?= t('Network') ?></th>
+                            <th class="text-center"><?= t('Transaction Type') ?></th>
+                            <th class="text-center"><?= t('Amount From (TZS)') ?></th>
+                            <th class="text-center"><?= t('Amount To (TZS)') ?></th>
+                            <th class="text-center"><?= t('Rate Type') ?></th>
+                            <th class="text-center"><?= t('Rate Value') ?></th>
+                            <th class="text-center"><?= t('Min Commission') ?></th>
+                            <th class="text-center"><?= t('Max Commission') ?></th>
+                            <th class="text-center"><?= t('From Date') ?></th>
+                            <th class="text-center"><?= t('To Date') ?></th>
+                            <?php if ($can_edit || $can_delete): ?><th class="text-center"><?= t('Actions') ?></th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($rates as $r): ?>
-                        <tr>
+                        <?php $sno = 1; foreach ($rates as $r): ?>
+                        <tr data-id="<?= (int)$r['rate_id'] ?>" data-rate='<?= htmlspecialchars(json_encode($r, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP), ENT_QUOTES) ?>' data-network="<?= htmlspecialchars($r['network_name']) ?>" data-type="<?= htmlspecialchars($txnLabels[$r['txn_type']] ?? $r['txn_type']) ?>" data-amount-from="<?= number_format((float)$r['amount_from']) ?>" data-amount-to="<?= $r['amount_to'] ? number_format((float)$r['amount_to']) : '—' ?>" data-rate-type="<?= htmlspecialchars($r['rate_type']) ?>" data-rate-value="<?= $r['rate_type']==='percent' ? number_format((float)$r['rate_value'],2).'%' : number_format((float)$r['rate_value']).' TZS' ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>" data-can-delete="<?= $can_delete ? '1' : '0' ?>">
+                            <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
                                 <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($r['color_hex'] ?: '#999') ?>"></span>
                                 <?= safe_output($r['network_name']) ?>
@@ -147,6 +160,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
             </div>
         </div>
     </div>
+    </div><!-- end tableView -->
+    <div id="cardView" class="row g-2 d-none"></div>
 </div>
 
 <!-- Add Modal -->
@@ -313,9 +328,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#ratesTable')) {
-        $('#ratesTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[0,'asc'],[1,'asc'],[2,'asc']], dom:'rtipB',
-            language: { emptyTable: '<?= addslashes(t('No rate bands found.')) ?>' } });
+        $('#ratesTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[1,'asc'],[2,'asc'],[3,'asc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No rate bands found.')) ?>' },
+            drawCallback: function(){ renderCards(this.api().rows({page:'current'}).nodes()); }
+        });
     }
+    function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
+    applyView(); $(window).on('resize',applyView);
 
     ['#addModal','#editModal'].forEach(m => {
         $(m).on('shown.bs.modal', function () {
@@ -350,6 +369,42 @@ $(document).ready(function () {
     });
 
     $('.modal').on('hidden.bs.modal', function(){$(this).find('form')[0]?.reset();});
+});
+
+function renderCards(nodes) {
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No rate bands found') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const id = $tr.data('id'), sno = idx + 1;
+        const network = $tr.data('network'), type = $tr.data('type');
+        const from = $tr.data('amount-from'), to = $tr.data('amount-to');
+        const rateType = $tr.data('rate-type'), rateVal = $tr.data('rate-value');
+        const canEdit = $tr.data('can-edit') == 1, canDel = $tr.data('can-delete') == 1;
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${rateType==='flat'?'bg-info':'bg-warning text-dark'}" style="font-size:.73rem">${safeOutput(rateType.charAt(0).toUpperCase()+rateType.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem">${safeOutput(network)} · ${safeOutput(type)}</div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Amount From') ?></span><span class="kv-val">${safeOutput(from)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Amount To') ?></span><span class="kv-val">${safeOutput(to)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Rate Value') ?></span><span class="kv-val fw-bold">${safeOutput(rateVal)}</span></div>
+          </div>
+          ${(canEdit||canDel) ? `<div class="mm-card-foot">
+            ${canEdit ? `<button class="btn btn-sm btn-outline-primary mm-rate-edit" data-rate-id="${id}"><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button>` : ''}
+            ${canDel ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteRate(${id})"><i class="bi bi-trash me-1"></i><?= t('Delete') ?></button>` : ''}
+          </div>` : ''}
+        </div></div>`;
+    });
+    $('#cardView').html(html);
+}
+$(document).on('click', '.mm-rate-edit', function () {
+    const id = $(this).data('rate-id');
+    const allNodes = $('#ratesTable').DataTable().rows().nodes();
+    const $tr = $(allNodes).filter(function () { return $(this).data('id') == id; });
+    if ($tr.length) { editRate($tr.data('rate')); }
 });
 
 function toggleRateLabel(sel, hintId) {
