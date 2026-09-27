@@ -42,7 +42,7 @@ $movements = $pdo->prepare("
     SELECT fm.*,
            t.till_number, a.agent_name, n.network_name, n.color_hex,
            ac.account_code AS bank_acct_code, ac.account_name AS bank_acct_name,
-           u.full_name AS created_by_name
+           CONCAT(u.first_name, ' ', u.last_name) AS created_by_name
     FROM mm_float_movements fm
     JOIN mm_tills t    ON t.till_id    = fm.till_id
     JOIN mm_agents a   ON a.agent_id   = t.agent_id

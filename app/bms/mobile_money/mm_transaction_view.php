@@ -12,7 +12,7 @@ if (!$id) { echo '<div class="alert alert-danger m-4">' . t('Invalid transaction
 $tx = $pdo->prepare("
     SELECT mt.*, n.network_name, n.network_code, n.color_hex,
            ti.till_number, a.agent_name, a.agent_code, a.region, a.district,
-           u.full_name AS teller_name
+           CONCAT(u.first_name, ' ', u.last_name) AS teller_name
     FROM mm_transactions mt
     JOIN mm_networks n ON n.network_id = mt.network_id
     JOIN mm_tills ti   ON ti.till_id   = mt.till_id
@@ -31,7 +31,7 @@ $txnLabels = [
 ];
 
 $page_title = 'MM Txn: ' . $tx['txn_code'];
-$can_void = canVoid('mm_transactions') && $tx['status'] === 'posted';
+$can_void = canDelete('mm_transactions') && $tx['status'] === 'posted';
 
 logActivity($pdo, $_SESSION['user_id'], 'View MM Transaction', 'Viewed: ' . $tx['txn_code']);
 ?>
