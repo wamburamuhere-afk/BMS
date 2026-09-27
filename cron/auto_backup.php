@@ -57,13 +57,14 @@ function bms_cron_log(string $logFile, string $msg): void {
 try {
     global $pdo;
 
-    $filename = 'auto_backup_' . date('Y-m-d_H-i-s') . '.sql';
-    $filepath = $backupsDir . $filename;
+    $filename   = 'auto_backup_' . date('Y-m-d_H-i-s') . '.zip';
+    $filepath   = $backupsDir . $filename;
+    $uploadsDir = (defined('ROOT_DIR') ? ROOT_DIR : dirname(__DIR__)) . '/uploads';
 
-    bms_write_dump($pdo, $filepath);
-    $sizeKb = round(filesize($filepath) / 1024, 2);
-    $sizeLabel = $sizeKb >= 1024 ? round($sizeKb / 1024, 2) . ' MB' : $sizeKb . ' KB';
-    bms_cron_log($logFile, "Backup created: $filename ($sizeLabel)");
+    $stats  = bms_write_zip_backup($pdo, $filepath, $uploadsDir);
+    $bytes  = filesize($filepath);
+    $sizeLabel = $bytes >= 1048576 ? round($bytes / 1048576, 2) . ' MB' : round($bytes / 1024, 2) . ' KB';
+    bms_cron_log($logFile, "Full backup created: $filename ($sizeLabel, DB: {$stats['db_size_mb']} MB, Files: {$stats['files_count']})");
 
     // Prune auto/pre_restore backups older than the retention window.
     $deleted = bms_prune_backups($backupsDir, $retentionDays);
@@ -76,7 +77,7 @@ try {
 
     // Audit trail (system user_id 0 — no session in cron context).
     if (function_exists('logActivity')) {
-        try { logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Scheduled Database Backup', "File: $filename, Size: $sizeLabel"); } catch (Throwable $e) {}
+        try { logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Scheduled Full Backup', "File: $filename, Size: $sizeLabel, Files: {$stats['files_count']}"); } catch (Throwable $e) {}
     }
 
     bms_cron_log($logFile, "Done.");

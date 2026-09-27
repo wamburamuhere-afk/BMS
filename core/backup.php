@@ -302,6 +302,7 @@ if (!function_exists('bms_write_dump')) {
      * Delete auto/pre-restore backups older than $days days (by file mtime).
      * Manual ("bms_backup_*") and uploaded ("uploaded_*") files are NEVER
      * touched — only "auto_backup_*" and "pre_restore_*" are auto-pruned.
+     * Handles both .sql and .zip formats.
      *
      * @return string[]  filenames deleted
      */
@@ -310,7 +311,7 @@ if (!function_exists('bms_write_dump')) {
         $cutoff  = time() - ($days * 86400);
         $deleted = [];
 
-        foreach (['auto_backup_*.sql', 'pre_restore_*.sql'] as $pattern) {
+        foreach (['auto_backup_*.sql', 'pre_restore_*.sql', 'auto_backup_*.zip', 'pre_restore_*.zip'] as $pattern) {
             foreach ((glob($dir . $pattern) ?: []) as $file) {
                 if (is_file($file) && filemtime($file) < $cutoff) {
                     if (@unlink($file)) $deleted[] = basename($file);
@@ -318,5 +319,245 @@ if (!function_exists('bms_write_dump')) {
             }
         }
         return $deleted;
+    }
+
+    /**
+     * Write a full backup ZIP: database dump + uploads/ folder + manifest.json.
+     *
+     * This is the canonical full-backup writer used by the UI, the cron, and the
+     * pre-restore safety snapshot. A .zip backup can be restored to recover BOTH
+     * the database and every uploaded file (images, documents, attachments).
+     *
+     * ZIP layout:
+     *   database.sql        — full SQL dump (same as bms_write_dump output)
+     *   uploads/<path>      — every file under $uploadsDir, relative structure kept
+     *   manifest.json       — metadata for integrity checks on restore
+     *
+     * @param  PDO    $pdo         Connected, tenant-scoped PDO handle.
+     * @param  string $zipPath     Absolute path for the output .zip file.
+     * @param  string $uploadsDir  Absolute path to the uploads root (ROOT_DIR/uploads).
+     * @return array{files_count:int, db_size_mb:float, files_size_mb:float}
+     * @throws Exception on failure (partial .zip is deleted before throwing).
+     */
+    function bms_write_zip_backup(PDO $pdo, string $zipPath, string $uploadsDir): array
+    {
+        @set_time_limit(0);
+
+        if (!class_exists('ZipArchive')) {
+            throw new Exception(
+                'PHP ZipArchive extension is not available. ' .
+                'Enable php_zip in php.ini and restart Apache/PHP-FPM.'
+            );
+        }
+
+        // Write the SQL dump to a temp file first so ZipArchive can stream it
+        // on close() without loading the whole dump into memory.
+        $tempSql = tempnam(sys_get_temp_dir(), 'bms_sql_');
+        if ($tempSql === false) {
+            throw new Exception('Cannot create a temporary file for the SQL dump.');
+        }
+
+        $zip       = new ZipArchive();
+        $zipOpened = false;
+
+        try {
+            bms_write_dump($pdo, $tempSql);
+
+            $res = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            if ($res !== true) {
+                throw new Exception("Cannot create ZIP archive (ZipArchive error code $res): $zipPath");
+            }
+            $zipOpened = true;
+
+            // Queue the SQL dump — ZipArchive reads this file on close()
+            $zip->addFile($tempSql, 'database.sql');
+
+            // Add every file under uploads/, preserving the relative path
+            $filesCount = 0;
+            $filesSize  = 0;
+            if (is_dir($uploadsDir)) {
+                $realUploads = realpath($uploadsDir);
+                if ($realUploads !== false) {
+                    $it = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator(
+                            $uploadsDir,
+                            RecursiveDirectoryIterator::SKIP_DOTS
+                        )
+                    );
+                    foreach ($it as $file) {
+                        if (!$file->isFile()) continue;
+                        $realFile = realpath($file->getPathname());
+                        if ($realFile === false) continue;
+                        // Symlink guard — only files physically under uploadsDir
+                        $prefix = $realUploads . DIRECTORY_SEPARATOR;
+                        if (strpos($realFile, $prefix) !== 0) continue;
+                        $relPath = 'uploads/' . str_replace(
+                            DIRECTORY_SEPARATOR, '/',
+                            substr($realFile, strlen($prefix))
+                        );
+                        $zip->addFile($realFile, $relPath);
+                        $filesCount++;
+                        $filesSize += $file->getSize();
+                    }
+                }
+            }
+
+            // Manifest — written last so file counts are accurate
+            $dbSizeMb    = round(filesize($tempSql) / 1048576, 2);
+            $filesSizeMb = round($filesSize / 1048576, 2);
+            $zip->addFromString('manifest.json', json_encode([
+                'bms_backup_format' => '1.0',
+                'created_at'        => date('c'),
+                'db_size_mb'        => $dbSizeMb,
+                'files_count'       => $filesCount,
+                'files_size_mb'     => $filesSizeMb,
+            ], JSON_PRETTY_PRINT));
+
+            // Finalize the archive — ZipArchive reads addFile() sources here
+            if (!$zip->close()) {
+                $zipOpened = false;
+                throw new Exception('ZipArchive::close() failed — archive may be incomplete.');
+            }
+            $zipOpened = false;
+
+            @unlink($tempSql);
+
+            return [
+                'files_count'  => $filesCount,
+                'db_size_mb'   => $dbSizeMb,
+                'files_size_mb'=> $filesSizeMb,
+            ];
+
+        } catch (Throwable $e) {
+            if ($zipOpened) @$zip->close();
+            if (is_file($zipPath)) @unlink($zipPath);
+            @unlink($tempSql);
+            throw $e instanceof Exception ? $e : new Exception($e->getMessage());
+        }
+    }
+
+    /**
+     * Extract and validate a BMS backup ZIP into a temporary directory.
+     *
+     * Validates that the archive contains the required entries (manifest.json +
+     * database.sql) before returning. On failure the temp directory is cleaned
+     * up and an exception is thrown.
+     *
+     * The CALLER must call bms_delete_dir($result['temp_dir']) after it is
+     * finished with the extracted files to free the disk space.
+     *
+     * @param  string $zipPath  Absolute path to a .zip backup file.
+     * @return array{temp_dir:string, sql_path:string, uploads_path:string|null, manifest:array}
+     * @throws Exception if the file is not a valid BMS backup.
+     */
+    function bms_extract_zip_backup(string $zipPath): array
+    {
+        if (!class_exists('ZipArchive')) {
+            throw new Exception('PHP ZipArchive extension is not available.');
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath) !== true) {
+            throw new Exception('Cannot open ZIP file — it may be corrupt or not a valid ZIP.');
+        }
+
+        // Validate required entries before extracting anything
+        if ($zip->locateName('database.sql') === false) {
+            $zip->close();
+            throw new Exception('Invalid backup: missing database.sql inside the ZIP.');
+        }
+        if ($zip->locateName('manifest.json') === false) {
+            $zip->close();
+            throw new Exception('Invalid backup: missing manifest.json — this may be a non-BMS archive.');
+        }
+
+        $manifestJson = $zip->getFromName('manifest.json');
+        $zip->close();
+
+        $manifest = @json_decode($manifestJson, true);
+        if (!is_array($manifest) || empty($manifest['bms_backup_format'])) {
+            throw new Exception('Invalid backup: manifest.json is malformed or unrecognised format.');
+        }
+
+        // Extract to an isolated temp directory
+        $tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'bms_restore_' . bin2hex(random_bytes(8));
+        if (!mkdir($tempDir, 0700, true)) {
+            throw new Exception("Cannot create temp extraction directory: $tempDir");
+        }
+
+        $zip2 = new ZipArchive();
+        if ($zip2->open($zipPath) !== true) {
+            bms_delete_dir($tempDir);
+            throw new Exception('Cannot re-open ZIP for extraction.');
+        }
+
+        if (!$zip2->extractTo($tempDir)) {
+            $zip2->close();
+            bms_delete_dir($tempDir);
+            throw new Exception('ZIP extraction failed — possible disk space or permissions issue.');
+        }
+        $zip2->close();
+
+        $sqlPath     = $tempDir . DIRECTORY_SEPARATOR . 'database.sql';
+        $uploadsPath = $tempDir . DIRECTORY_SEPARATOR . 'uploads';
+
+        if (!is_file($sqlPath)) {
+            bms_delete_dir($tempDir);
+            throw new Exception('Extraction succeeded but database.sql is missing from the extracted files.');
+        }
+
+        return [
+            'temp_dir'     => $tempDir,
+            'sql_path'     => $sqlPath,
+            'uploads_path' => is_dir($uploadsPath) ? $uploadsPath : null,
+            'manifest'     => $manifest,
+        ];
+    }
+
+    /**
+     * Recursively copy $src directory into $dst, creating $dst if needed.
+     * Overwrites existing files; does not delete files absent from $src.
+     *
+     * @return int  Number of files copied.
+     */
+    function bms_copy_dir(string $src, string $dst): int
+    {
+        if (!is_dir($src)) return 0;
+        if (!is_dir($dst)) @mkdir($dst, 0755, true);
+
+        $count = 0;
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($src, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($it as $file) {
+            $dest = $dst . DIRECTORY_SEPARATOR . $it->getSubPathname();
+            if ($file->isDir()) {
+                if (!is_dir($dest)) @mkdir($dest, 0755, true);
+            } else {
+                // Ensure parent directory exists
+                $destDir = dirname($dest);
+                if (!is_dir($destDir)) @mkdir($destDir, 0755, true);
+                if (@copy($file->getPathname(), $dest)) $count++;
+            }
+        }
+        return $count;
+    }
+
+    /**
+     * Recursively delete a directory and all its contents.
+     * Used to clean up temp extraction directories after restore.
+     */
+    function bms_delete_dir(string $dir): void
+    {
+        if (!is_dir($dir)) return;
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($it as $file) {
+            $file->isDir() ? @rmdir($file->getPathname()) : @unlink($file->getPathname());
+        }
+        @rmdir($dir);
     }
 }
