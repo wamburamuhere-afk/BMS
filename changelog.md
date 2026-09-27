@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(mobile-money): Mobile hamburger (≡) now opens MM More sheet on MM-only tenants
+
+**Files:**
+- `header.php` — Moved `$__mm_only` computation above the hamburger button; MM-only hamburger now targets `#mmMoreSheet` offcanvas (was targeting `#navbarNav` which is hidden on mobile); removed CSS that was suppressing the hamburger; added Teller Shifts and Admin Settings links to the mobile mmMoreSheet Configuration section
+
+---
+
 ## 2026-09-27 — feat(mobile-money): Desktop nav cleanup + Float rename + white report headers
 
 **Files:**
