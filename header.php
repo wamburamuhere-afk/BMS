@@ -905,9 +905,19 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         <!-- BOTTOM NAVIGATION BAR -->
         <nav class="navbar navbar-expand-lg navbar-dark bottom-header">
             <div class="container-fluid px-4">
+                <?php
+                // Compute before the hamburger so we can decide its target.
+                $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
+                ?>
+                <?php if ($__mm_only): ?>
+                <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="offcanvas" data-bs-target="#mmMoreSheet" aria-controls="mmMoreSheet" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <?php else: ?>
                 <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
+                <?php endif; ?>
                 <?php if (posSimpleModeEnabled()): ?>
                 <!-- Simple POS mobile: Language + 3-dots (Settings & Account). Desktop: hidden. -->
                 <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
@@ -925,12 +935,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                     </button>
                 </div>
                 <?php endif; ?>
-
-                <?php
-                // Compute once here — used by both the desktop nav (MM-only spread)
-                // and the phone bottom nav block further below.
-                $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
-                ?>
 
                 <!-- Bottom Row: Navigation Modules -->
                 <div class="header-nav-bar w-100">
@@ -1707,7 +1711,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         .bms-sheet .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
         @media (max-width: 991.98px) {
             body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
-            .bottom-header .navbar-toggler { display: none !important; }
             .bottom-header .header-nav-bar { display: none !important; }
             body.bms-kb-open .bms-bnav { display: none !important; }
         }
@@ -1808,6 +1811,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             </div>
             <div class="bn-group"><?= t('Configuration') ?></div>
             <div class="list-group list-group-flush">
+                <?php if (canView('mm_shifts')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_shifts') ?>">
+                    <i class="bi bi-clock-history"></i><?= t('Teller Shifts') ?></a>
+                <?php endif; ?>
                 <?php if (canView('mm_networks')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_networks') ?>">
                     <i class="bi bi-broadcast"></i><?= t('Mobile Money Networks') ?></a>
@@ -1815,6 +1822,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <?php if (canView('mm_commission_rates')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commission_rates') ?>">
                     <i class="bi bi-percent"></i><?= t('Commission Rate Schedule') ?></a>
+                <?php endif; ?>
+                <?php if (isAdmin()): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>">
+                    <i class="bi bi-gear"></i><?= t('Admin Settings') ?></a>
                 <?php endif; ?>
             </div>
             <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
