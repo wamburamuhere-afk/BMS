@@ -909,11 +909,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 // Compute before the hamburger so we can decide its target.
                 $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
                 ?>
-                <?php if ($__mm_only): ?>
-                <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="offcanvas" data-bs-target="#mmMoreSheet" aria-controls="mmMoreSheet" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <?php else: ?>
+                <?php if (!$__mm_only): ?>
                 <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -929,6 +925,22 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                     </button>
                     <button type="button" class="btn btn-outline-light"
                         data-bs-toggle="offcanvas" data-bs-target="#bmsAccountSheet" aria-controls="bmsAccountSheet"
+                        title="<?= htmlspecialchars(t('Settings')) ?>"
+                        style="font-size:0.8rem;padding:2px 6px;line-height:1.4;">
+                        <i class="bi bi-list"></i>
+                    </button>
+                </div>
+                <?php elseif ($__mm_only): ?>
+                <!-- MM-only mobile: Language + Settings list. Desktop: hidden. -->
+                <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
+                    <button type="button" class="btn btn-outline-light"
+                        onclick="event.stopPropagation();bmsToggleLang();"
+                        title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>"
+                        style="font-size:0.65rem;padding:1px 7px;border-radius:14px;font-weight:700;letter-spacing:0.3px;line-height:1.4;">
+                        <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
+                    </button>
+                    <button type="button" class="btn btn-outline-light"
+                        data-bs-toggle="offcanvas" data-bs-target="#mmSettingsSheet" aria-controls="mmSettingsSheet"
                         title="<?= htmlspecialchars(t('Settings')) ?>"
                         style="font-size:0.8rem;padding:2px 6px;line-height:1.4;">
                         <i class="bi bi-list"></i>
@@ -1739,10 +1751,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <i class="bi bi-graph-up"></i><span><?= t('Reports') ?></span>
         </button>
         <?php endif; ?>
+        <?php if (canView('mm_float') || canView('mm_agents')): ?>
         <button type="button" class="bn-item"
                 data-bs-toggle="offcanvas" data-bs-target="#mmMoreSheet" aria-controls="mmMoreSheet">
             <i class="bi bi-three-dots"></i><span><?= t('More') ?></span>
         </button>
+        <?php endif; ?>
     </nav>
 
     <?php if (canView('mm_reports')): ?>
@@ -1776,17 +1790,16 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </div>
     <?php endif; ?>
 
-    <!-- MM More offcanvas — operations, configuration, and account -->
+    <!-- MM More offcanvas — operational pages not already in bottom tabs (Float, Agents) -->
     <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
          id="mmMoreSheet" aria-labelledby="mmMoreSheetLabel">
         <div class="offcanvas-header pb-0">
             <h6 class="offcanvas-title fw-bold" id="mmMoreSheetLabel">
-                <i class="bi bi-phone text-primary me-1"></i><?= t('Mobile Money') ?>
+                <i class="bi bi-three-dots text-primary me-1"></i><?= t('More') ?>
             </h6>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
-        <div class="offcanvas-body pt-0">
-            <div class="bn-group"><?= t('Operations') ?></div>
+        <div class="offcanvas-body pt-1">
             <div class="list-group list-group-flush">
                 <?php if (canView('mm_float')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_float') ?>">
@@ -1796,38 +1809,53 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_agents') ?>">
                     <i class="bi bi-shop-window"></i><?= t('Agent Outlets') ?></a>
                 <?php endif; ?>
-                <?php if (canView('mm_reconciliation')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reconciliation') ?>">
-                    <i class="bi bi-clipboard-check"></i><?= t('Daily Reconciliation') ?></a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MM Settings offcanvas — mirrors desktop Settings dropdown + profile/account -->
+    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
+         id="mmSettingsSheet" aria-labelledby="mmSettingsSheetLabel">
+        <div class="offcanvas-header pb-0">
+            <h6 class="offcanvas-title fw-bold" id="mmSettingsSheetLabel">
+                <i class="bi bi-sliders text-primary me-1"></i><?= t('Settings') ?>
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-0">
+            <?php if (isAdmin() || canView('mm_shifts') || canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance') || canView('mm_networks') || canView('mm_commission_rates')): ?>
+            <div class="bn-group"><?= t('Settings') ?></div>
+            <div class="list-group list-group-flush">
+                <?php if (isAdmin()): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>">
+                    <i class="bi bi-gear"></i><?= t('Admin') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_shifts')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_shifts') ?>">
+                    <i class="bi bi-clock-history"></i><?= t('Teller Shifts') ?></a>
                 <?php endif; ?>
                 <?php if (canView('mm_commissions')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commissions') ?>">
-                    <i class="bi bi-coin"></i><?= t('MM Commissions') ?></a>
+                    <i class="bi bi-coin"></i><?= t('Commissions') ?></a>
+                <?php endif; ?>
+                <?php if (canView('mm_reconciliation')): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reconciliation') ?>">
+                    <i class="bi bi-clipboard-check"></i><?= t('Reconciliation') ?></a>
                 <?php endif; ?>
                 <?php if (canView('mm_compliance')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_compliance') ?>">
                     <i class="bi bi-shield-check"></i><?= t('Compliance / KYC') ?></a>
                 <?php endif; ?>
-            </div>
-            <div class="bn-group"><?= t('Configuration') ?></div>
-            <div class="list-group list-group-flush">
-                <?php if (canView('mm_shifts')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_shifts') ?>">
-                    <i class="bi bi-clock-history"></i><?= t('Teller Shifts') ?></a>
-                <?php endif; ?>
                 <?php if (canView('mm_networks')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_networks') ?>">
-                    <i class="bi bi-broadcast"></i><?= t('Mobile Money Networks') ?></a>
+                    <i class="bi bi-broadcast"></i><?= t('Networks') ?></a>
                 <?php endif; ?>
                 <?php if (canView('mm_commission_rates')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commission_rates') ?>">
-                    <i class="bi bi-percent"></i><?= t('Commission Rate Schedule') ?></a>
-                <?php endif; ?>
-                <?php if (isAdmin()): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>">
-                    <i class="bi bi-gear"></i><?= t('Admin Settings') ?></a>
+                    <i class="bi bi-percent"></i><?= t('Commission Rates') ?></a>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
             <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
             <div class="list-group list-group-flush">
                 <?php if (!empty($_SESSION['employee_id'])): ?>
@@ -1836,6 +1864,11 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <?php endif; ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>">
                     <i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
+                <button type="button" class="list-group-item list-group-item-action text-start fw-normal"
+                    style="background:none;border:0;border-bottom:1px solid var(--bs-list-group-border-color,rgba(0,0,0,.125));border-radius:0;padding:0.8rem 0.25rem;"
+                    onclick="bmsToggleLang();">
+                    <i class="bi bi-globe2" style="width:1.4rem;text-align:center;color:#0d6efd;display:inline-block;margin-right:10px;"></i><?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>
+                </button>
                 <a class="list-group-item list-group-item-action text-danger fw-bold" href="<?= getUrl('logout') ?>">
                     <i class="bi bi-box-arrow-right text-danger"></i><?= t('Logout') ?></a>
             </div>
