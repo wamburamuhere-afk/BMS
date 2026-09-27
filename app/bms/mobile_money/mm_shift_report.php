@@ -13,7 +13,8 @@ $shift = $pdo->prepare("
     SELECT s.*,
            t.till_number, a.agent_name, a.agent_code, a.region, a.district,
            n.network_name, n.network_code, n.color_hex,
-           u.full_name AS teller_name, uc.full_name AS closed_by_name
+           CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
+           CONCAT(uc.first_name, ' ', uc.last_name) AS closed_by_name
     FROM mm_shifts s
     JOIN mm_tills t    ON t.till_id   = s.till_id
     JOIN mm_agents a   ON a.agent_id  = t.agent_id

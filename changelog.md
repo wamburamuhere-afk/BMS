@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-27 — fix(mobile-money): resolve 500 errors on mm_shifts, mm_reports, mm_transactions, mm_float, mm_shift_report, mm_transaction_view, mm_commissions, void_transaction API
+
+**Files:**
+- `app/bms/mobile_money/mm_shifts.php` — fix PDOException: `u.full_name` → `CONCAT(u.first_name, ' ', u.last_name)`; same for `uc` alias (closed_by)
+- `app/bms/mobile_money/mm_reports.php` — fix fatal: `canExport()` undefined → replaced with `canEdit()`
+- `app/bms/mobile_money/mm_transactions.php` — fix DataTables TN/18 alert: removed static empty-state `<tr colspan>` row from HTML; added `language.emptyTable` to DataTables config instead
+- `app/bms/mobile_money/mm_float.php` — fix PDOException: `u.full_name` → `CONCAT(u.first_name, ' ', u.last_name)`
+- `app/bms/mobile_money/mm_shift_report.php` — same `full_name` fix for teller_name + closed_by_name
+- `app/bms/mobile_money/mm_transaction_view.php` — `full_name` fix + `canVoid()` → `canDelete()`
+- `app/bms/mobile_money/mm_commissions.php` — `canVoid()` → `canDelete()`
+- `api/mobile_money/void_transaction.php` — `canVoid()` → `canDelete()`
+
+**Why:** `users` table has `first_name`/`last_name` columns, not `full_name`. `canVoid()`, `canExport()` are not defined in `core/permissions.php` (only canView/Create/Edit/Delete/Review/Approve/Submit/Reject exist). Static colspan empty-state row in DataTables tbody causes TN/18 column-count mismatch alert when table is empty.
+
+---
+
 ## 2026-09-26 — feat(mobile-money): MM-only phone bottom nav + dashboard quick actions + Swahili translations
 
 **Files:**
