@@ -32,17 +32,18 @@ $autoBackupNotice = '';
 // Fires when an admin opens this page and a day has passed since the last
 // auto backup. The authoritative scheduled backup is cron/auto_backup.php
 // (Task Scheduler / crontab at 00:00); this is a best-effort safety net for
-// servers where the cron isn't configured. Uses the shared dump helper so
-// views are handled, and prunes auto/pre_restore files older than 7 days.
+// servers where the cron isn't configured. Creates a full ZIP (DB + uploads/)
+// so the auto backup is also a complete restore point.
 function runAutoBackup($pdo, $backupsDir) {
     $markerFile = $backupsDir . '.last_auto_backup';
     $lastRun = file_exists($markerFile) ? (int)file_get_contents($markerFile) : 0;
     if ((time() - $lastRun) < 86400) return null;
 
-    $filename = 'auto_backup_' . date('Y-m-d_H-i-s') . '.sql';
+    $filename = 'auto_backup_' . date('Y-m-d_H-i-s') . '.zip';
     $filepath = $backupsDir . $filename;
+    $uploadsDir = defined('ROOT_DIR') ? ROOT_DIR . '/uploads' : dirname(__DIR__, 3) . '/uploads';
     try {
-        bms_write_dump($pdo, $filepath);
+        bms_write_zip_backup($pdo, $filepath, $uploadsDir);
         file_put_contents($markerFile, time());
         bms_prune_backups($backupsDir, 7);
         return $filename;
@@ -73,10 +74,12 @@ if ($autoResult) $autoBackupNotice = $autoResult;
 // The legacy per-page generateCsrfToken() was removed because the JS below
 // sends the global token, and a second parallel session key only caused the
 // "Invalid or expired request" failure we just fixed.
-$backups     = array_filter(glob($backupsDir . '*.sql'), 'is_file');
+$sqlBackups = glob($backupsDir . '*.sql') ?: [];
+$zipBackups = glob($backupsDir . '*.zip') ?: [];
+$backups    = array_filter(array_merge($sqlBackups, $zipBackups), 'is_file');
 rsort($backups);
-$dbSize      = getDatabaseSize($pdo);
-$apiUrl = getUrl('api/backup_actions.php');
+$dbSize  = getDatabaseSize($pdo);
+$apiUrl  = getUrl('api/backup_actions.php');
 ?>
 
 <div class="container-fluid">
@@ -111,7 +114,7 @@ $apiUrl = getUrl('api/backup_actions.php');
                         <i class="bi bi-cloud-arrow-down text-primary" style="font-size:3rem;"></i>
                     </div>
                     <h5 class="fw-bold"><?= t('Create New Backup') ?></h5>
-                    <p class="text-muted small mb-4"><?= t('Generate a complete snapshot of your current database state.') ?></p>
+                    <p class="text-muted small mb-4"><?= t('Generate a complete backup: database + all uploaded files (images, documents, attachments).') ?></p>
                     <button type="button" class="btn btn-primary w-100 py-2" onclick="createBackup()">
                         <i class="bi bi-plus-circle me-2"></i><?= t('Generate Backup') ?>
                     </button>
@@ -127,9 +130,9 @@ $apiUrl = getUrl('api/backup_actions.php');
                         <i class="bi bi-cloud-arrow-up text-success" style="font-size:3rem;"></i>
                     </div>
                     <h5 class="fw-bold"><?= t('Restore from File') ?></h5>
-                    <p class="text-muted small mb-4"><?= t('Upload a .sql file to restore your database to a previous state.') ?></p>
+                    <p class="text-muted small mb-4"><?= t('Upload a .zip (full backup) or .sql (database only) file to restore.') ?></p>
                     <div class="input-group mb-3">
-                        <input type="file" class="form-control" id="uploadBackupFile" accept=".sql">
+                        <input type="file" class="form-control" id="uploadBackupFile" accept=".sql,.zip">
                     </div>
                     <button type="button" class="btn btn-success w-100 py-2" onclick="uploadRestore()">
                         <i class="bi bi-upload me-2"></i><?= t('Upload & Restore') ?>
@@ -144,10 +147,12 @@ $apiUrl = getUrl('api/backup_actions.php');
                 <div class="card-body p-4">
                     <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i><?= t('Important Notes') ?></h5>
                     <ul class="text-muted small ps-3 mb-0">
+                        <li class="mb-2"><strong><?= t('.zip backups') ?></strong> <?= t('include the database AND all uploaded files (images, documents, attachments).') ?></li>
+                        <li class="mb-2"><strong><?= t('.sql backups') ?></strong> <?= t('include database only — uploaded files are NOT restored.') ?></li>
                         <li class="mb-2"><?= t('Restoring a backup will') ?> <strong><?= t('overwrite') ?></strong> <?= t('all current data.') ?></li>
-                        <li class="mb-2"><?= t('Create a new backup before restoring an old one.') ?></li>
+                        <li class="mb-2"><?= t('A safety snapshot of the current database is created automatically before every restore.') ?></li>
                         <li class="mb-2"><?= t('Auto backups run daily and keep the last 7 files.') ?></li>
-                        <li><?= t('Large restores may take a few minutes.') ?></li>
+                        <li><?= t('Large restores may take a few minutes — do not close the page.') ?></li>
                     </ul>
                 </div>
             </div>
@@ -182,11 +187,21 @@ $apiUrl = getUrl('api/backup_actions.php');
                                             : round($bytes / 1024, 2) . ' KB';
                                         $fdate   = date('d M Y, h:i A', filemtime($backup));
                                         $fnJs    = addslashes($fn);
+                                        $isZip   = strtolower(pathinfo($fn, PATHINFO_EXTENSION)) === 'zip';
                                     ?>
                                         <tr id="row-<?= md5($fn) ?>">
                                             <td class="ps-4 fw-bold text-dark">
-                                                <i class="bi bi-file-earmark-code text-secondary me-2"></i>
+                                                <?php if ($isZip): ?>
+                                                    <i class="bi bi-file-zip text-success me-2"></i>
+                                                <?php else: ?>
+                                                    <i class="bi bi-file-earmark-code text-secondary me-2"></i>
+                                                <?php endif; ?>
                                                 <?= htmlspecialchars($fn) ?>
+                                                <?php if ($isZip): ?>
+                                                    <span class="badge bg-success ms-1" style="font-size:.65rem;"><?= t('Full backup') ?></span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary ms-1" style="font-size:.65rem;"><?= t('DB only') ?></span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="text-muted"><?= htmlspecialchars($fdate) ?></td>
                                             <td><?= htmlspecialchars($fsize) ?></td>
@@ -314,11 +329,16 @@ function createBackup() {
 
 // ── RESTORE FROM EXISTING BACKUP ────────────────────────────────
 function restoreBackup(filename) {
+    const isZip = filename.toLowerCase().endsWith('.zip');
+    const scopeNote = isZip
+        ? <?= json_encode(t('This will restore the database AND all uploaded files.')) ?>
+        : <?= json_encode(t('This will restore the database only (uploaded files are not included in .sql backups).')) ?>;
     Swal.fire({
         icon: 'warning',
-        title: <?= json_encode(t('Restore Database?')) ?>,
+        title: <?= json_encode(t('Restore Backup?')) ?>,
         html: `<p>${<?= json_encode(t('You are about to restore:')) ?>}</p>
                <p class="fw-bold text-dark">${filename}</p>
+               <p class="text-muted small mb-1">${scopeNote}</p>
                <p class="text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>
                ${<?= json_encode(t('This will')) ?>} <strong>${<?= json_encode(t('overwrite all current data')) ?>}</strong>. ${<?= json_encode(t('This action cannot be undone.')) ?>}</p>`,
         showCancelButton: true,
@@ -354,16 +374,23 @@ function uploadRestore() {
         return;
     }
     const file = fileInput.files[0];
-    if (!file.name.toLowerCase().endsWith('.sql')) {
-        Swal.fire({ icon: 'error', title: <?= json_encode(t('Invalid File')) ?>, text: <?= json_encode(t('Only .sql files are allowed.')) ?> });
+    const ext  = file.name.split('.').pop().toLowerCase();
+    if (ext !== 'sql' && ext !== 'zip') {
+        Swal.fire({ icon: 'error', title: <?= json_encode(t('Invalid File')) ?>, text: <?= json_encode(t('Only .zip (full backup) or .sql (database only) files are allowed.')) ?> });
         return;
     }
+
+    const isZip = ext === 'zip';
+    const scopeNote = isZip
+        ? <?= json_encode(t('This will restore the database AND all uploaded files.')) ?>
+        : <?= json_encode(t('This will restore the database only (uploaded files are not included in .sql backups).')) ?>;
 
     Swal.fire({
         icon: 'warning',
         title: <?= json_encode(t('Upload & Restore?')) ?>,
         html: `<p>${<?= json_encode(t('You are about to upload and restore:')) ?>}</p>
                <p class="fw-bold text-dark">${file.name}</p>
+               <p class="text-muted small mb-1">${scopeNote}</p>
                <p class="text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>
                ${<?= json_encode(t('This will')) ?>} <strong>${<?= json_encode(t('overwrite all current data')) ?>}</strong>. ${<?= json_encode(t('This action cannot be undone.')) ?>}</p>`,
         showCancelButton: true,

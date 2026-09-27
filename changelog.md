@@ -9,6 +9,20 @@
 
 ---
 
+## 2026-09-27 — feat(backup): Full ZIP backup — database + uploaded files
+
+**Files:**
+- `core/backup.php` — Added `bms_write_zip_backup()` (DB + uploads/ + manifest.json), `bms_extract_zip_backup()`, `bms_copy_dir()`, `bms_delete_dir()`; extended `bms_prune_backups()` to handle `.zip` patterns
+- `api/backup_actions.php` — `create_backup` now writes `.zip` (not `.sql`); `restore_backup` and `upload_restore` handle both `.zip` (DB + files) and `.sql` (DB only, backward compat); actual error text now shown in UI (no longer "check server log"); ZIP magic-byte validation on upload
+- `app/constant/settings/backup_restore.php` — File listing includes `.zip` files; type badges (Full backup / DB only); icons; file input accepts `.zip`; Important Notes updated; restore dialogs show scope note; `runAutoBackup()` creates `.zip`
+- `cron/auto_backup.php` — Creates `auto_backup_*.zip` (full backup) instead of `.sql`
+- `tests/test_backup_zip_cli.php` — **New**: 73-assertion suite covering all layers (core helpers, API actions, UI invariants, functional fixture-ZIP extraction, security gates)
+- `tests/test_backup_restore_csrf_cli.php` — Updated stale directory-path assertions to reflect `bmsBackupDir()` canonical pattern (62 assertions, all green)
+
+**Why:** Database-only `.sql` backups left uploaded files (images, documents, attachments) unprotected. A restore recovered the database but silently omitted all files. Also: restore failures showed "check server log" with no detail visible to the admin.
+
+---
+
 ## 2026-09-27 — feat(mobile-money): Stat cards first + green card color across all MM pages
 
 **Files (10 pages):**
