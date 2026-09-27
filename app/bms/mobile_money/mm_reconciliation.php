@@ -18,7 +18,7 @@ $recons = $pdo->query("
     SELECT r.*,
            t.till_number, a.agent_name,
            n.network_name, n.color_hex,
-           u.name AS created_by_name
+           CONCAT(u.first_name, ' ', u.last_name) AS created_by_name
     FROM mm_reconciliations r
     JOIN mm_tills t    ON t.till_id    = r.till_id
     JOIN mm_agents a   ON a.agent_id   = t.agent_id

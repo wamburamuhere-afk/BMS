@@ -13,7 +13,7 @@ $recon = $pdo->prepare("
            t.till_number, t.agent_id,
            a.agent_name,
            n.network_name, n.color_hex,
-           u.name AS created_by_name
+           CONCAT(u.first_name, ' ', u.last_name) AS created_by_name
     FROM mm_reconciliations r
     JOIN mm_tills t    ON t.till_id    = r.till_id
     JOIN mm_agents a   ON a.agent_id   = t.agent_id
@@ -39,7 +39,7 @@ $txnSummary->execute([$recon['till_id'], $recon['recon_date']]);
 $txnSummary = $txnSummary->fetchAll(PDO::FETCH_ASSOC);
 
 $shifts = $pdo->prepare("
-    SELECT s.*, u.name AS teller_name
+    SELECT s.*, CONCAT(u.first_name, ' ', u.last_name) AS teller_name
     FROM mm_shifts s
     LEFT JOIN users u ON u.user_id = s.teller_user_id
     WHERE s.till_id=? AND DATE(s.opened_at)=?
