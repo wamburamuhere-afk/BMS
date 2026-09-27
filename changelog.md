@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-26 — feat(mobile-money): MM-only desktop nav overhaul — spread-out first-class nav links
+
+**Files:**
+- `header.php` — moved `$__mm_only` computation to before the desktop nav; when MM is the sole module, replaces the compressed "Mobile Money" dropdown with spread-out first-class nav links (Dashboard, Transactions, Teller Shifts, Float, Agents as direct links; MM-specific Reports dropdown with 7 report types; More dropdown for Commissions, Reconciliation, Compliance/KYC, Networks, Commission Rates; Expenses and Settings sections kept as user requested); other module sections (Core, Finance, Sales, generic Reports) are hidden for MM-only tenants; multi-module tenants are unaffected (else branch)
+- `header.php` — renamed "Mobile Money" dropdown label to `t('Mobile Transactions')` in the multi-module nav
+- `lang/sw.php` — added `'Mobile Transactions' => 'Miamala ya Simu'`
+
+**Why:** When only the Mobile Money module is enabled, the nav should reflect that dominance — all MM pages accessible at top level, no irrelevant module sections cluttering the menu.
+
+---
+
+## 2026-09-27 — fix(mobile-money): mm_networks blank page + DataTables TN/18 in mm_shifts, mm_agents, mm_commission_rates, mm_float
+
+**Files:**
+- `app/bms/mobile_money/mm_networks.php` — fix fatal SQL: subquery used `mm_agents.network_id` which doesn't exist; agents link to networks via mm_tills — corrected to `COUNT(DISTINCT t.agent_id) FROM mm_tills t WHERE t.network_id = n.network_id AND t.status = 'active'`; the fatal error was causing a blank page and preventing footer.php (Bootstrap JS) from loading, hence the secondary "bootstrap is not defined" JS error
+- `app/bms/mobile_money/mm_shifts.php` — DataTables TN/18: removed static `<td colspan="11">` empty-state row; added `language.emptyTable` to DataTables config
+- `app/bms/mobile_money/mm_agents.php` — same TN/18 fix (colspan 10)
+- `app/bms/mobile_money/mm_commission_rates.php` — same TN/18 fix (colspan 11)
+- `app/bms/mobile_money/mm_float.php` — same TN/18 fix (colspan 8)
+
+**Why:** mm_agents table has no network_id column — agents are scoped to networks via mm_tills (agent→till→network). Static colspan empty-state rows in DataTables tbody cause column-count mismatch alerts when tables are empty.
+
+---
+
 ## 2026-09-27 — fix(i18n): complete MM Swahili translations + resolve duplicate-key conflicts in sw.php
 
 **Files:**

@@ -926,10 +926,128 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 </div>
                 <?php endif; ?>
 
+                <?php
+                // Compute once here — used by both the desktop nav (MM-only spread)
+                // and the phone bottom nav block further below.
+                $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
+                ?>
+
                 <!-- Bottom Row: Navigation Modules -->
                 <div class="header-nav-bar w-100">
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
+                        <?php if ($__mm_only): ?>
+                        <!-- ── MM-only desktop nav ──────────────────────────────────────────
+                             When this tenant's sole non-core feature is mobile_money, MM
+                             items spread out as first-class nav links instead of being
+                             compressed into one dropdown. Other module sections are hidden.
+                        ─────────────────────────────────────────────────────────────────── -->
+                        <?php if (canView('mm_dashboard')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('mm_dashboard') ?>">
+                                <i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (canView('mm_transactions')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('mm_transactions') ?>">
+                                <i class="bi bi-arrow-left-right"></i> <?= t('Transactions') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (canView('mm_shifts')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('mm_shifts') ?>">
+                                <i class="bi bi-clock-history"></i> <?= t('Teller Shifts') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (canView('mm_float')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('mm_float') ?>">
+                                <i class="bi bi-cash-stack"></i> <?= t('Float') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (canView('mm_agents')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('mm_agents') ?>">
+                                <i class="bi bi-shop-window"></i> <?= t('Agents') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (canView('mm_reports')): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="mmReportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-graph-up"></i> <?= t('Reports') ?>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="mmReportsDropdown">
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=txn_summary"><i class="bi bi-table me-1"></i><?= t('Transaction Summary') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=float_position"><i class="bi bi-cash-stack me-1"></i><?= t('Float Position') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=commission"><i class="bi bi-coin me-1"></i><?= t('Commission Report') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=agent_perf"><i class="bi bi-person-check me-1"></i><?= t('Agent Performance') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=shift_summary"><i class="bi bi-clock-history me-1"></i><?= t('Shift Summary') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=void_suspicious"><i class="bi bi-exclamation-triangle me-1"></i><?= t('Void & Suspicious') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=network_comparison"><i class="bi bi-broadcast me-1"></i><?= t('Network Comparison') ?></a></li>
+                            </ul>
+                        </li>
+                        <?php endif; ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="mmMoreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-grid"></i> <?= t('More') ?>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="mmMoreDropdown">
+                                <?php if (canView('mm_commissions')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_commissions') ?>"><i class="bi bi-coin me-1"></i><?= t('Commissions') ?></a></li>
+                                <?php endif; ?>
+                                <?php if (canView('mm_reconciliation')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_reconciliation') ?>"><i class="bi bi-check2-square me-1"></i><?= t('Reconciliation') ?></a></li>
+                                <?php endif; ?>
+                                <?php if (canView('mm_compliance')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_compliance') ?>"><i class="bi bi-shield-check me-1"></i><?= t('Compliance / KYC') ?></a></li>
+                                <?php endif; ?>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header"><?= t('Setup') ?></h6></li>
+                                <?php if (canView('mm_networks')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li>
+                                <?php endif; ?>
+                                <?php if (canView('mm_commission_rates')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_commission_rates') ?>"><i class="bi bi-percent me-1"></i><?= t('Commission Rates') ?></a></li>
+                                <?php endif; ?>
+                            </ul>
+                        </li>
+                        <?php if (canView('expenses')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('expenses') ?>">
+                                <i class="bi bi-receipt"></i> <?= t('Expenses') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php
+                        $_set_sys_visible = isAdmin() || canView('pos_config_settings') || canView('color_settings');
+                        $_set_biz_visible = canView('tax_settings');
+                        ?>
+                        <?php if ($_set_sys_visible || $_set_biz_visible): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="mmSettingsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-sliders"></i> <?= t('Settings') ?>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="mmSettingsDropdown">
+                                <?php if ($_set_sys_visible): ?>
+                                <li><h6 class="dropdown-header"><?= t('System Configuration') ?></h6></li>
+                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> <?= t('Admin') ?></a></li><?php endif; ?>
+                                <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> <?= t('POS Settings') ?></a></li><?php endif; ?>
+                                <?php if (canView('color_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> <?= t('Color Setting') ?></a></li><?php endif; ?>
+                                <?php endif; ?>
+                                <?php if ($_set_biz_visible): ?>
+                                <li><h6 class="dropdown-header"><?= t('Business Settings') ?></h6></li>
+                                <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> <?= t('Tax') ?></a></li><?php endif; ?>
+                                <?php endif; ?>
+                            </ul>
+                        </li>
+                        <?php endif; ?>
+                        <?php else: // not $__mm_only — show the full multi-module nav ?>
                         <!-- Core Modules -->
                         <?php if(canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')): ?>
                         <li class="nav-item dropdown">
@@ -1068,7 +1186,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(tenantFeatureEnabled('mobile_money') && (canView('mm_dashboard') || canView('mm_transactions') || canView('mm_agents'))): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="mmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-phone-vibrate"></i> <?= t('Mobile Money') ?>
+                                <i class="bi bi-phone-vibrate"></i> <?= t('Mobile Transactions') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="mmDropdown">
                                 <?php if(canView('mm_dashboard')): ?>
@@ -1529,6 +1647,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </ul>
                         </li>
                         <?php endif; ?>
+                        <?php endif; // $__mm_only — multi-module nav ends here ?>
                     </ul>
 
                     <!-- User Account (right side of bottom nav — matches Vikundi) -->
@@ -1571,8 +1690,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </div><!-- /.header-wrapper -->
 
     <?php
-    // Compute once; used by both the MM-only block and the posSimpleModeEnabled block.
-    $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
+    // $__mm_only was computed before the desktop nav above — still in scope here.
     ?>
 
     <?php if ($__mm_only): ?>

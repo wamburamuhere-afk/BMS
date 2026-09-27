@@ -112,9 +112,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($agents)): ?>
-                            <tr><td colspan="10" class="text-center text-muted py-4"><?= t('No agents found. Add your first agent outlet.') ?></td></tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -271,6 +268,7 @@ $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#agentsTable')) {
         $('#agentsTable').DataTable({
             responsive:false, scrollX:true, pageLength:25, order:[[1,'asc']], dom:'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No agents found. Add your first agent outlet.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
             drawCallback: function(){ renderCards(this.api().rows({page:'current'}).data().toArray()); }
         });
