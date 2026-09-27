@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-27 — feat(mobile-money): Desktop nav cleanup + Float rename + white report headers
+
+**Files:**
+- `header.php` — MM-only desktop nav: removed "Teller Shifts" direct link; removed "More" dropdown entirely; moved Shifts, Commissions, Reconciliation, Compliance/KYC, Networks, Commission Rates into Settings dropdown (System Configuration → Teller Shifts under Admin; Operations section; Setup section); stripped Color Setting and Tax from MM-only Settings (not relevant)
+- `lang/sw.php` — `'Float' => 'Salio la Elektroniki'` → `'Floti'`
+- `app/bms/mobile_money/mm_reports.php` — replaced all `table-dark` thead/tr with `mm-thead` (white); added `.mm-thead` CSS block
+
+---
+
 ## 2026-09-27 — feat(backup): Full ZIP backup — database + uploaded files
 
 **Files:**
@@ -11,6 +20,8 @@
 - `tests/test_backup_restore_csrf_cli.php` — Updated stale directory-path assertions to reflect `bmsBackupDir()` canonical pattern (62 assertions, all green)
 
 **Why:** Database-only `.sql` backups left uploaded files (images, documents, attachments) unprotected. A restore recovered the database but silently omitted all files. Also: restore failures showed "check server log" with no detail visible to the admin.
+
+---
 
 ## 2026-09-27 — feat(mobile-money): Stat cards first + green card color across all MM pages
 
