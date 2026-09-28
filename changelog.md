@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(backup): global DEFINER strip covers all object types on restore
+
+**Files:**
+- `core/backup.php` — added four `preg_replace` calls at the top of `bms_upgrade_legacy_dump` to strip `DEFINER=\`...\`@\`...\`` globally before line-by-line processing; covers VIEW, PROCEDURE, FUNCTION, TRIGGER, EVENT, and phpMyAdmin `/*!50013 DEFINER=...*/` comment format; fixes "Access denied; you need SYSTEM_USER privilege" on cross-system restore
+
+---
+
 ## 2026-09-27 — fix(pos-api): add mobileBearerAuth to simple dashboard chart endpoint
 
 **Files:**
