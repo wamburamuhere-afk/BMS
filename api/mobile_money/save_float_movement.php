@@ -47,7 +47,7 @@ try {
         'movement_id' => $movId,
     ]);
 
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("save_float_movement.php: " . $e->getMessage());
     http_response_code(500);
