@@ -43,6 +43,18 @@ $tillCount  = (int)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='acti
 $agentCount = (int)$pdo->query("SELECT COUNT(*) FROM mm_agents WHERE status='active'")->fetchColumn();
 $openShifts = (int)$pdo->query("SELECT COUNT(*) FROM mm_shifts WHERE status='open'")->fetchColumn();
 
+// Current user's own open shift (used to show Open vs Close Shift in Quick Actions)
+$myShiftStmt = $pdo->prepare("
+    SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name
+    FROM mm_shifts s
+    JOIN mm_tills t ON t.till_id = s.till_id
+    JOIN mm_agents a ON a.agent_id = t.agent_id
+    WHERE s.teller_user_id = ? AND s.status = 'open'
+    LIMIT 1
+");
+$myShiftStmt->execute([$_SESSION['user_id']]);
+$myActiveShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
+
 // --- Daily volume last 14 days (chart) ---
 $dailyVol = $pdo->prepare("
     SELECT txn_date, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
@@ -112,6 +124,25 @@ function mmTrendBadge($pct): string {
         <span class="text-muted small ms-2"><?= t('Today:') ?> <?= $today ?></span>
     </div>
 
+    <!-- Shift banner (Change C) -->
+    <?php if ($myActiveShift): ?>
+    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-play-circle-fill me-2"></i>
+        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
+        &nbsp;·&nbsp; <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
+        &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
+        </span>
+        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
+    </div>
+    <?php else: ?>
+    <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift. Open a shift before recording transactions.') ?></span>
+        <?php if (canCreate('mm_shifts')): ?>
+        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-primary ms-2"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></a>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Quick Actions — dashboard.php style: card with bg-light header, flex-fill buttons -->
     <div class="row mb-4">
         <div class="col-12">
@@ -129,12 +160,20 @@ function mmTrendBadge($pct): string {
                             </a>
                         </div>
                         <?php endif; ?>
-                        <?php if (canCreate('mm_shifts')): ?>
+                        <?php if (canView('mm_shifts')): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-success w-100 h-100 py-3">
-                                <i class="bi bi-play-circle display-6"></i>
-                                <div class="mt-2"><?= t('Open Shift') ?></div>
+                            <?php if ($myActiveShift): ?>
+                            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-danger w-100 h-100 py-3">
+                                <i class="bi bi-stop-circle display-6"></i>
+                                <div class="mt-2"><?= t('Close Shift') ?></div>
+                                <div class="small mt-1 opacity-75"><?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?></div>
                             </a>
+                            <?php else: ?>
+                            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
+                                <i class="bi bi-play-circle display-6"></i>
+                                <div class="mt-2"><?= t('Fungua Zamu') ?></div>
+                            </a>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                         <?php if (canCreate('mm_float')): ?>
