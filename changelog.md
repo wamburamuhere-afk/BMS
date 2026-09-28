@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_agent_view): DataTable + gear-dropdown + mm-stat-card colors; dashboard shift banner → small badge
+
+**Files:**
+- `app/bms/mobile_money/mm_agent_view.php` — Info cards: added `mm-stat-card` green color + all CSS constants. Tills table: added `S/No` first column, DataTable init with `scrollX+pageLength:25`, gear-fill dropdown action (settings+caret) replacing separate edit/delete buttons, mobile card view (`#tillsCardView`) with `renderTillCards()`, data-attributes on `<tr>` for card renderer
+- `app/bms/mobile_money/mm_dashboard.php` — Removed large shift banner (alert strip); replaced with small green badge inline in title row showing active till number and linking to mm_shifts; no badge shown when no shift (clean look)
+
+---
+
 ## 2026-09-28 — feat(mm_shifts): full shift UX overhaul — till grants, busy indicator, shift banners, auto-float, proper alerts
 
 **Files:**

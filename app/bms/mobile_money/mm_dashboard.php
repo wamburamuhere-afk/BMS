@@ -118,30 +118,17 @@ function mmTrendBadge($pct): string {
 }
 ?>
 <div class="container-fluid py-4 px-4">
-    <div class="d-flex align-items-center gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <i class="bi bi-speedometer2 text-primary fs-4"></i>
         <h4 class="mb-0 fw-bold"><?= t('Mobile Money Dashboard') ?></h4>
-        <span class="text-muted small ms-2"><?= t('Today:') ?> <?= $today ?></span>
-    </div>
-
-    <!-- Shift banner (Change C) -->
-    <?php if ($myActiveShift): ?>
-    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-play-circle-fill me-2"></i>
-        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
-        &nbsp;·&nbsp; <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
-        &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
-        </span>
-        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
-    </div>
-    <?php else: ?>
-    <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift. Open a shift before recording transactions.') ?></span>
-        <?php if (canCreate('mm_shifts')): ?>
-        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-primary ms-2"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></a>
+        <span class="text-muted small ms-1"><?= t('Today:') ?> <?= $today ?></span>
+        <?php if ($myActiveShift): ?>
+        <a href="<?= getUrl('mm_shifts') ?>" class="badge bg-success text-decoration-none ms-1"
+           title="<?= t('Active Shift') ?>: <?= safe_output($myActiveShift['shift_code']) ?> · <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>">
+            <i class="bi bi-play-circle-fill me-1"></i><?= safe_output($myActiveShift['till_number']) ?>
+        </a>
         <?php endif; ?>
     </div>
-    <?php endif; ?>
 
     <!-- Quick Actions — dashboard.php style: card with bg-light header, flex-fill buttons -->
     <div class="row mb-4">
