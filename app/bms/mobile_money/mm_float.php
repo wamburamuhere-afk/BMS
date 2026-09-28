@@ -337,6 +337,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 <?php endif; ?>
 
 <script>
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+
 // Embed agent→tills map for dynamic till selection
 window.__mmTillsByAgent = <?= json_encode($agentTillsMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
