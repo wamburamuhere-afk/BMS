@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_float_service): missing code_generator require + Throwable catch
+
+**Files:**
+- `core/mm_float_service.php` — Added `require_once __DIR__ . '/code_generator.php'` inside the `mmRecordFloatMovement` guard block so `nextCode()` is available. Without it, calling the function caused an uncaught `\Error` (undefined function), resulting in an empty 500 response.
+- `api/mobile_money/save_float_movement.php` — Changed `catch (\Exception $e)` to `catch (\Throwable $e)` so PHP `\Error` instances (fatal errors that aren't `\Exception`) are caught and returned as JSON instead of silently swallowing the response.
+- `app/bms/mobile_money/mm_float.php` — Added `function safeOutput(s)` JS helper before `mmPopulateTills` which was calling it without it being defined on this page, causing agent selection to fail silently.
+
+---
+
+## 2026-09-28 — fix(mm_forms): method=post + inline onsubmit on all MM modal forms
+
+**Files:**
+- `app/bms/mobile_money/mm_agents.php` — Added `method="post"` + `onsubmit="mmAgentSubmit(...)"` to addForm/editForm; extracted global `mmAgentSubmit` before `$(document).ready()`; removed duplicate jQuery `.on('submit')` handlers. Fixes URL-exposure GET bug on agent create.
+- `app/bms/mobile_money/mm_float.php` — Changed both modal headers/buttons to `bg-primary`/`btn-primary`; replaced flat till dropdown with agent selector → dynamic multi-till checkboxes (each with per-till reference-no field); added `method="post"` + `onsubmit="mmFloatSubmit(...)"` to both forms; `mmFloatSubmit` fires one API call per checked till via Promise.all.
+- `app/bms/mobile_money/mm_commissions.php`, `mm_commission_rates.php`, `mm_networks.php`, `mm_reconciliation.php`, `mm_recon_view.php`, `mm_shifts.php`, `mm_transactions.php` — Added `method="post"` to all modal forms as GET-exposure guard.
+
+---
+
 ## 2026-09-28 — fix(mm_agent_view): move form AJAX to inline onsubmit to fix save not working
 
 **Files:**
