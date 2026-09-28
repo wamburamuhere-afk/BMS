@@ -212,7 +212,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i><?= t('Add Till') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="addTillForm" method="post" autocomplete="off">
+            <form id="addTillForm" method="post" autocomplete="off" onsubmit="mmSubmitForm(event,'<?= addslashes(buildUrl('api/mobile_money/save_till.php')) ?>','<?= addslashes(t('Saved!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="agent_id" value="<?= $id ?>">
@@ -274,7 +274,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i><?= t('Edit Till') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editTillForm" method="post" autocomplete="off">
+            <form id="editTillForm" method="post" autocomplete="off" onsubmit="mmSubmitForm(event,'<?= addslashes(buildUrl('api/mobile_money/save_till.php')) ?>','<?= addslashes(t('Updated!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="till_id" id="edit_till_id">
@@ -337,7 +337,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i><?= t('Edit Agent') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editAgentForm" method="post" autocomplete="off">
+            <form id="editAgentForm" method="post" autocomplete="off" onsubmit="mmSubmitForm(event,'<?= addslashes(buildUrl('api/mobile_money/save_agent.php')) ?>','<?= addslashes(t('Updated!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="agent_id" id="ea_id">
@@ -391,6 +391,38 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 <?php endif; ?>
 
 <script>
+// Inline-safe submit handler — lives outside document.ready so it fires even
+// before deferred CDN scripts (DataTables, SweetAlert) have finished loading.
+function mmSubmitForm(e, url, successTitle) {
+    e.preventDefault();
+    const form = e.target;
+    const btn  = form.querySelector('[type=submit]');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+    $.ajax({
+        url: url, type: 'POST',
+        data: new FormData(form), contentType: false, processData: false, dataType: 'json',
+        success: function(r) {
+            if (r.success) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({icon:'success',title:successTitle,timer:1500,showConfirmButton:false})
+                        .then(function(){ location.reload(); });
+                } else { location.reload(); }
+            } else {
+                if (typeof Swal !== 'undefined') Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});
+                else alert(r.message);
+                btn.disabled = false; btn.innerHTML = orig;
+            }
+        },
+        error: function() {
+            if (typeof Swal !== 'undefined') Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'});
+            else alert('<?= t('Server error.') ?>');
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    });
+}
+
 $(document).ready(function () {
     // DataTable for tills
     if (!$.fn.DataTable.isDataTable('#tillsTable')) {
@@ -412,36 +444,6 @@ $(document).ready(function () {
     }
     applyView(); $(window).on('resize', applyView);
 
-    $('#addTillForm').on('submit', function (e) {
-        e.preventDefault();
-        const btn = $(this).find('[type=submit]'), orig = btn.html();
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/save_till.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Saved!') ?>',timer:1500,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
-        });
-    });
-    $('#editTillForm').on('submit', function (e) {
-        e.preventDefault();
-        const btn = $(this).find('[type=submit]'), orig = btn.html();
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/save_till.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Updated!') ?>',timer:1500,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
-        });
-    });
-    $('#editAgentForm').on('submit', function (e) {
-        e.preventDefault();
-        const btn = $(this).find('[type=submit]'), orig = btn.html();
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/save_agent.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Updated!') ?>',timer:1500,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
-        });
-    });
     $('#addTillModal, #editTillModal').on('shown.bs.modal', function(){
         const modal=$(this);
         modal.find('.select2-static').each(function(){
