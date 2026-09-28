@@ -24,9 +24,6 @@ if (!$tillId)                              { echo json_encode(['success' => fals
 if (!in_array($movType, $validTypes))      { echo json_encode(['success' => false, 'message' => 'Invalid movement type']); exit; }
 if ($amount <= 0)                          { echo json_encode(['success' => false, 'message' => 'Amount must be greater than 0']); exit; }
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) { echo json_encode(['success' => false, 'message' => 'Invalid date']); exit; }
-if (in_array($movType, ['float_topup', 'float_withdrawal']) && !$bankAcctId) {
-    echo json_encode(['success' => false, 'message' => 'Bank account is required for top-ups and withdrawals']); exit;
-}
 
 try {
     // Verify till exists
