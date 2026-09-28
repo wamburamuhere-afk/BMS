@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_agent_view): add descriptive placeholders + form-text hints for ceiling fields
+
+**Files:**
+- `app/bms/mobile_money/mm_agent_view.php` — Float Ceiling: placeholder "e.g. 5,000,000" + hint "Max e-money balance allowed on this SIM/wallet". Cash Ceiling: placeholder "e.g. 2,000,000" + hint "Max physical cash allowed in the till drawer". Applied to both Add Till and Edit Till modals.
+
+---
+
 ## 2026-09-28 — fix(mm_agent_view): info cards → single flex row; Add/Edit Till modals → blue
 
 **Files:**

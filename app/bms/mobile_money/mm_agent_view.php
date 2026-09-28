@@ -236,11 +236,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Float Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="float_ceiling" min="0" step="1000">
+                            <input type="number" class="form-control" name="float_ceiling" min="0" step="1000"
+                                placeholder="<?= t('e.g. 5,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-phone me-1"></i><?= t('Max e-money balance allowed on this SIM/wallet') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Cash Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="cash_ceiling" min="0" step="1000">
+                            <input type="number" class="form-control" name="cash_ceiling" min="0" step="1000"
+                                placeholder="<?= t('e.g. 2,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-cash-stack me-1"></i><?= t('Max physical cash allowed in the till drawer') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Status') ?></label>
@@ -295,11 +299,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Float Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="float_ceiling" id="edit_till_float_ceil" min="0" step="1000">
+                            <input type="number" class="form-control" name="float_ceiling" id="edit_till_float_ceil" min="0" step="1000"
+                                placeholder="<?= t('e.g. 5,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-phone me-1"></i><?= t('Max e-money balance allowed on this SIM/wallet') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Cash Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="cash_ceiling" id="edit_till_cash_ceil" min="0" step="1000">
+                            <input type="number" class="form-control" name="cash_ceiling" id="edit_till_cash_ceil" min="0" step="1000"
+                                placeholder="<?= t('e.g. 2,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-cash-stack me-1"></i><?= t('Max physical cash allowed in the till drawer') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Status') ?></label>
