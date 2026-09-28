@@ -74,37 +74,27 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 .mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
 .mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
 </style>
-    <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted"><?= t('Outlet Type') ?></div>
-                <div class="fw-semibold"><?= safe_output(ucfirst(str_replace('_', ' ', $agent['outlet_type'] ?? ''))) ?></div>
-            </div>
+    <div class="d-flex gap-3 mb-4 flex-wrap">
+        <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
+            <div class="small text-muted"><?= t('Outlet Type') ?></div>
+            <div class="fw-semibold"><?= safe_output(ucfirst(str_replace('_', ' ', $agent['outlet_type'] ?? ''))) ?></div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted"><?= t('Phone') ?></div>
-                <div class="fw-semibold"><?= safe_output($agent['phone_primary'] ?: '—') ?></div>
-            </div>
+        <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
+            <div class="small text-muted"><?= t('Phone') ?></div>
+            <div class="fw-semibold"><?= safe_output($agent['phone_primary'] ?: '—') ?></div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted"><?= t('Location') ?></div>
-                <div class="fw-semibold"><?= safe_output(implode(', ', array_filter([$agent['region'], $agent['district'], $agent['ward']])) ?: '—') ?></div>
-            </div>
+        <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:160px">
+            <div class="small text-muted"><?= t('Location') ?></div>
+            <div class="fw-semibold"><?= safe_output(implode(', ', array_filter([$agent['region'], $agent['district'], $agent['ward']])) ?: '—') ?></div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted"><?= t('Super-Agent') ?></div>
-                <div class="fw-semibold"><?= $agent['parent_name'] ? safe_output($agent['parent_name']) : '—' ?></div>
-            </div>
+        <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
+            <div class="small text-muted"><?= t('Super-Agent') ?></div>
+            <div class="fw-semibold"><?= $agent['parent_name'] ? safe_output($agent['parent_name']) : '—' ?></div>
         </div>
         <?php if ($agent['bot_license']): ?>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted"><?= t('BOT License') ?></div>
-                <div class="fw-semibold"><?= safe_output($agent['bot_license']) ?></div>
-            </div>
+        <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
+            <div class="small text-muted"><?= t('BOT License') ?></div>
+            <div class="fw-semibold"><?= safe_output($agent['bot_license']) ?></div>
         </div>
         <?php endif; ?>
     </div>
@@ -218,7 +208,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 <div class="modal fade" id="addTillModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i><?= t('Add Till') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -246,11 +236,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Float Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="float_ceiling" min="0" step="1000">
+                            <input type="number" class="form-control" name="float_ceiling" min="0" step="1000"
+                                placeholder="<?= t('e.g. 5,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-phone me-1"></i><?= t('Max e-money balance allowed on this SIM/wallet') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Cash Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="cash_ceiling" min="0" step="1000">
+                            <input type="number" class="form-control" name="cash_ceiling" min="0" step="1000"
+                                placeholder="<?= t('e.g. 2,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-cash-stack me-1"></i><?= t('Max physical cash allowed in the till drawer') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Status') ?></label>
@@ -263,7 +257,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
                 </div>
             </form>
         </div>
@@ -276,9 +270,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 <div class="modal fade" id="editTillModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i><?= t('Edit Till') ?></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="editTillForm" autocomplete="off">
                 <div class="modal-body">
@@ -305,11 +299,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Float Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="float_ceiling" id="edit_till_float_ceil" min="0" step="1000">
+                            <input type="number" class="form-control" name="float_ceiling" id="edit_till_float_ceil" min="0" step="1000"
+                                placeholder="<?= t('e.g. 5,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-phone me-1"></i><?= t('Max e-money balance allowed on this SIM/wallet') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Cash Ceiling (TZS)') ?></label>
-                            <input type="number" class="form-control" name="cash_ceiling" id="edit_till_cash_ceil" min="0" step="1000">
+                            <input type="number" class="form-control" name="cash_ceiling" id="edit_till_cash_ceil" min="0" step="1000"
+                                placeholder="<?= t('e.g. 2,000,000') ?>">
+                            <div class="form-text"><i class="bi bi-cash-stack me-1"></i><?= t('Max physical cash allowed in the till drawer') ?></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Status') ?></label>
@@ -322,7 +320,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle me-1"></i><?= t('Update') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Update') ?></button>
                 </div>
             </form>
         </div>
