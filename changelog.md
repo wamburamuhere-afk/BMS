@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_float): hide bank account field + fix step= bug
+
+**Files:**
+- `app/bms/mobile_money/mm_float.php` — removed "Source/Destination Bank Account" select from both modals + removed Bank Account table column + removed `$bankAccts` query + fixed `step="100"` → `step="any"` on amount inputs (min=1+step=100 caused browser to reject round numbers like 120,000,000)
+- `api/mobile_money/save_float_movement.php` — removed validation that required `bank_account_id` for top-ups/withdrawals
+- `core/mm_float_service.php` — when no bank account supplied, initial status is now `posted` directly (skip GL); GL path unchanged when bank account is present
+
+---
+
 ## 2026-09-28 — fix(backup): global DEFINER strip covers all object types on restore
 
 **Files:**

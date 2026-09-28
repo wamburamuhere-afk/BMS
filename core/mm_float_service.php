@@ -107,15 +107,20 @@ if (!function_exists('mmRecordFloatMovement')) {
 
         $code = nextCode($pdo, 'MM-FLT');
 
+        // When no bank account is provided, skip GL and post immediately.
+        // When a bank account is given, start as draft and promote to posted after GL succeeds.
+        $needsGl      = in_array($movType, ['float_topup', 'float_withdrawal']) && $bankAcctId;
+        $initialStatus = $needsGl ? 'draft' : 'posted';
+
         $pdo->prepare(
             "INSERT INTO mm_float_movements
                 (movement_code, till_id, movement_type, movement_date, amount, bank_account_id, reference_no, notes, status, created_by, created_at)
              VALUES (?,?,?,?,?,?,?,?,?,?,NOW())"
-        )->execute([$code, $tillId, $movType, $date, $amount, $bankAcctId ?: null, $ref, $ref, 'draft', $userId]);
+        )->execute([$code, $tillId, $movType, $date, $amount, $bankAcctId ?: null, $ref, $ref, $initialStatus, $userId]);
         $movId = (int)$pdo->lastInsertId();
 
-        // Post GL for top-ups and withdrawals
-        if (in_array($movType, ['float_topup', 'float_withdrawal']) && $bankAcctId) {
+        // Post GL for top-ups and withdrawals (only when a bank account was supplied)
+        if ($needsGl) {
             $desc = strtoupper(str_replace('_', ' ', $movType)) . " TZS " . number_format($amount) . " — $code";
             $entryId = postMMFloatMovement($pdo, $movId, $networkId, $movType, $amount, $bankAcctId, $date, $userId, $desc);
             if ($entryId) {
