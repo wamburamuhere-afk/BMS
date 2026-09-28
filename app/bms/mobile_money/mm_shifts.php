@@ -278,7 +278,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                 <h5 class="modal-title"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="openShiftForm" autocomplete="off">
+            <form id="openShiftForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div class="row g-3">
@@ -325,7 +325,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                 <h5 class="modal-title"><i class="bi bi-stop-circle me-1"></i><?= t('Close Shift') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="closeShiftForm" autocomplete="off">
+            <form id="closeShiftForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="shift_id" id="close_shift_id">
