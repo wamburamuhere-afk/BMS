@@ -24,15 +24,6 @@ $tills = $pdo->query("
     ORDER BY a.agent_name, t.till_number
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Bank/cash accounts for GL
-$bankAccts = $pdo->query("
-    SELECT account_id, account_code, account_name
-    FROM accounts
-    WHERE account_type IN ('asset', 'bank')
-      AND status != 'inactive'
-    ORDER BY account_code
-")->fetchAll(PDO::FETCH_ASSOC);
-
 $where  = ["fm.movement_date BETWEEN :df AND :dt"];
 $params = [':df' => $filterFrom, ':dt' => $filterTo];
 if ($filterTill) { $where[] = 'fm.till_id = :till_id'; $params[':till_id'] = $filterTill; }
@@ -166,7 +157,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                                 <th class="text-center"><?= t('Outlet / Till') ?></th>
                                 <th class="text-center"><?= t('Type') ?></th>
                                 <th class="text-center"><?= t('Amount (TZS)') ?></th>
-                                <th class="text-center"><?= t('Bank Account') ?></th>
                                 <th class="text-center"><?= t('Reference') ?></th>
                                 <th class="text-center"><?= t('Status') ?></th>
                             </tr>
@@ -187,7 +177,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                                     </span>
                                 </td>
                                 <td class="text-end fw-semibold"><?= number_format((float)$m['amount']) ?></td>
-                                <td class="small text-muted"><?= $m['bank_acct_code'] ? safe_output($m['bank_acct_code'].' — '.$m['bank_acct_name']) : '—' ?></td>
                                 <td class="small text-muted"><?= safe_output($m['reference_no'] ?: '—') ?></td>
                                 <td>
                                     <span class="badge <?= $m['status']==='posted'?'bg-success':($m['status']==='void'?'bg-danger':'bg-secondary') ?>">
@@ -230,20 +219,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Amount (TZS)') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" min="1" step="100" required>
+                            <input type="number" class="form-control" name="amount" min="1" step="any" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Date') ?> <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="movement_date" value="<?= date('Y-m-d') ?>" required>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label"><?= t('Source Bank Account') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="bank_account_id" required>
-                                <option value=""></option>
-                                <?php foreach ($bankAccts as $ba): ?>
-                                <option value="<?= $ba['account_id'] ?>"><?= safe_output($ba['account_code'].' — '.$ba['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
                         </div>
                         <div class="col-12">
                             <label class="form-label"><?= t('Reference No.') ?></label>
@@ -288,20 +268,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Amount (TZS)') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" min="1" step="100" required>
+                            <input type="number" class="form-control" name="amount" min="1" step="any" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Date') ?> <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="movement_date" value="<?= date('Y-m-d') ?>" required>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label"><?= t('Destination Bank Account') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="bank_account_id" required>
-                                <option value=""></option>
-                                <?php foreach ($bankAccts as $ba): ?>
-                                <option value="<?= $ba['account_id'] ?>"><?= safe_output($ba['account_code'].' — '.$ba['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
                         </div>
                         <div class="col-12">
                             <label class="form-label"><?= t('Reference No.') ?></label>
