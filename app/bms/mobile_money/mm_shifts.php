@@ -9,15 +9,58 @@ includeHeader();
 $can_open  = canCreate('mm_shifts');
 $can_close = canEdit('mm_shifts');
 
-// Get all active tills with agent name for dropdowns
-$tillsForOpen = $pdo->query("
-    SELECT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
-    FROM mm_tills t
+// Current user's own open shift — used to swap Open/Close button
+$myShiftStmt = $pdo->prepare("
+    SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name
+    FROM mm_shifts s
+    JOIN mm_tills t ON t.till_id = s.till_id
     JOIN mm_agents a ON a.agent_id = t.agent_id
-    JOIN mm_networks n ON n.network_id = t.network_id
-    WHERE t.status = 'active'
-    ORDER BY a.agent_name, t.till_number
+    WHERE s.teller_user_id = ? AND s.status = 'open'
+    LIMIT 1
+");
+$myShiftStmt->execute([$_SESSION['user_id']]);
+$myOpenShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
+
+// Get tills the current user may open shifts on (Change A: filter by grants for non-admins)
+if (isAdmin()) {
+    $tillsForOpen = $pdo->query("
+        SELECT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
+        FROM mm_tills t
+        JOIN mm_agents a ON a.agent_id = t.agent_id
+        JOIN mm_networks n ON n.network_id = t.network_id
+        WHERE t.status = 'active'
+        ORDER BY a.agent_name, t.till_number
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $tillsStmt = $pdo->prepare("
+        SELECT DISTINCT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
+        FROM mm_tills t
+        JOIN mm_agents a ON a.agent_id = t.agent_id
+        JOIN mm_networks n ON n.network_id = t.network_id
+        JOIN mm_user_agent_grants g ON g.agent_id = t.agent_id
+            AND (g.till_id IS NULL OR g.till_id = t.till_id)
+        WHERE t.status = 'active'
+          AND g.user_id = ?
+          AND g.can_open_shift = 1
+        ORDER BY a.agent_name, t.till_number
+    ");
+    $tillsStmt->execute([$_SESSION['user_id']]);
+    $tillsForOpen = $tillsStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Change B: fetch currently busy tills (open shifts) — keyed by till_id
+$busyTillsRaw = $pdo->query("
+    SELECT s.till_id, s.shift_code,
+           CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
+           TIME_FORMAT(s.opened_at, '%H:%i') AS opened_time
+    FROM mm_shifts s
+    JOIN users u ON u.user_id = s.teller_user_id
+    WHERE s.status = 'open'
 ")->fetchAll(PDO::FETCH_ASSOC);
+$busyTills = [];
+foreach ($busyTillsRaw as $bt) {
+    $busyTills[(int)$bt['till_id']] = $bt;
+}
 
 // Filters
 $filterFrom   = $_GET['date_from'] ?? date('Y-m-01');
@@ -58,15 +101,37 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i><?= t('Teller Shifts') ?></h4>
-        <?php if ($can_open): ?>
-        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
+        <?php if (!isAdmin() && $myOpenShift): ?>
+        <button class="btn btn-danger btn-sm" onclick='closeShift(<?= htmlspecialchars(json_encode(['id'=>$myOpenShift['shift_id'],'code'=>$myOpenShift['shift_code'],'till_number'=>$myOpenShift['till_number'],'agent'=>$myOpenShift['agent_name']]),ENT_QUOTES) ?>)'>
+            <i class="bi bi-stop-circle me-1"></i><?= t('Close Shift') ?> — <?= safe_output($myOpenShift['till_number']) ?>
+        </button>
+        <?php elseif ($can_open): ?>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
             <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
         </button>
         <?php endif; ?>
     </div>
 
+    <!-- Shift banner (Change C) -->
+    <?php if ($myOpenShift): ?>
+    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-play-circle-fill me-2"></i>
+        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myOpenShift['shift_code']) ?>
+        &nbsp;·&nbsp; <?= safe_output($myOpenShift['agent_name'].' / '.$myOpenShift['till_number']) ?>
+        </span>
+    </div>
+    <?php else: ?>
+    <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift.') ?></span>
+        <?php if ($can_open): ?>
+        <button class="btn btn-sm btn-primary ms-2" data-bs-toggle="modal" data-bs-target="#openShiftModal"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Stats -->
     <div class="row g-3 mb-3">
+        <?php if (isAdmin()): ?>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-success"><?= $openCount ?></div>
@@ -79,6 +144,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                 <div class="small text-muted"><?= t('Closed Shifts') ?></div>
             </div>
         </div>
+        <?php endif; ?>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-5 fw-bold text-info"><?= number_format(array_sum(array_column($shifts, 'txn_volume'))) ?></div>
@@ -208,7 +274,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <div class="modal fade" id="openShiftModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -218,10 +284,14 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label"><?= t('Till') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="till_id" required>
+                            <select class="form-select select2-static" name="till_id" id="open_till_select" required>
                                 <option value=""></option>
-                                <?php foreach ($tillsForOpen as $t): ?>
-                                <option value="<?= $t['till_id'] ?>"><?= safe_output($t['agent_name'].' / '.$t['till_number'].' ('.$t['network_name'].')') ?></option>
+                                <?php foreach ($tillsForOpen as $t):
+                                    $busy = $busyTills[(int)$t['till_id']] ?? null; ?>
+                                <option value="<?= $t['till_id'] ?>" <?= $busy ? 'disabled' : '' ?>>
+                                    <?= safe_output($t['agent_name'].' / '.$t['till_number'].' ('.$t['network_name'].')') ?>
+                                    <?= $busy ? ' — '.t('in use by').' '.safe_output($busy['teller_name']).' '.t('since').' '.$busy['opened_time'] : '' ?>
+                                </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -230,14 +300,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                             <input type="number" class="form-control" name="opening_cash" min="0" step="100" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label"><?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="opening_float" min="0" step="100" required>
+                            <label id="open_float_label" class="form-label"><?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="opening_float" id="open_float_input" min="0" step="100" required placeholder="<?= t('Select till first…') ?>">
+                            <div id="open_float_hint" class="form-text d-none"></div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
                 </div>
             </form>
         </div>
@@ -298,7 +369,40 @@ $(document).ready(function () {
 
     $('#openShiftModal').on('shown.bs.modal', function(){
         const modal=$(this);
-        modal.find('.select2-static').each(function(){if(!$(this).hasClass('select2-hidden-accessible'))$(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select till…') ?>',allowClear:true,width:'100%'});});
+        modal.find('.select2-static').each(function(){
+            if(!$(this).hasClass('select2-hidden-accessible'))
+                $(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select till…') ?>',allowClear:true,width:'100%'});
+        });
+    });
+
+    // Auto-fill Opening Float when till is selected (Change: auto-float)
+    $(document).on('select2:select', '#open_till_select', function(){
+        const tillId = $(this).val();
+        if (!tillId) { $('#open_float_hint').addClass('d-none').text(''); return; }
+        $('#open_float_hint').removeClass('d-none').html('<span class="text-muted"><?= t('Fetching expected float…') ?></span>');
+        $.getJSON('<?= buildUrl('api/mobile_money/get_till_float.php') ?>', {till_id: tillId}, function(res){
+            if (!res.success) { $('#open_float_hint').html('<span class="text-danger">'+res.message+'</span>'); return; }
+            const $inp = $('#open_float_input');
+            $inp.val(res.expected_float);
+            if (res.is_new_till) {
+                $inp.addClass('border-warning');
+                $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span> <small class="text-warning fw-normal"><?= t('(new till — enter actual SIM balance)') ?></small>');
+                $('#open_float_hint').html('<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i><?= t('No prior snapshot. Enter the current SIM e-money balance.') ?></span>');
+            } else {
+                $inp.removeClass('border-warning');
+                const dt = res.last_snapshot_at ? new Date(res.last_snapshot_at).toLocaleString() : '';
+                $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span>');
+                $('#open_float_hint').html('<span class="text-success"><i class="bi bi-check-circle me-1"></i><?= t('Expected from last snapshot') ?>'+(dt?' ('+dt+')':'')+'. <?= t('Adjust if needed.') ?></span>');
+            }
+        }).fail(function(){
+            $('#open_float_hint').html('<span class="text-danger"><?= t('Could not load expected float.') ?></span>');
+        });
+    });
+
+    $(document).on('select2:clear', '#open_till_select', function(){
+        $('#open_float_input').val('').removeClass('border-warning');
+        $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span>');
+        $('#open_float_hint').addClass('d-none').text('');
     });
 
     $('#openShiftForm').on('submit', function(e){
@@ -306,9 +410,27 @@ $(document).ready(function () {
         const btn=$(this).find('[type=submit]'), orig=btn.html();
         btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
         $.ajax({url:'<?= buildUrl('api/mobile_money/open_shift.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Shift Opened!') ?>',text:r.message,timer:1800,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:(xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
+            success: function(r) {
+                btn.prop('disabled',false).html(orig);
+                if (r.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('openShiftModal'))?.hide();
+                    Swal.fire({
+                        icon: 'success',
+                        title: '<?= t('Shift Opened!') ?>',
+                        html: r.message.replace(/\n/g,'<br>'),
+                        timer: 4000,
+                        timerProgressBar: true,
+                        showConfirmButton: true,
+                        confirmButtonText: '<?= t('OK') ?>'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: r.message});
+                }
+            },
+            error: (xhr) => {
+                btn.prop('disabled',false).html(orig);
+                Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>'});
+            }
         });
     });
 
@@ -317,13 +439,46 @@ $(document).ready(function () {
         const btn=$(this).find('[type=submit]'), orig=btn.html();
         btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
         $.ajax({url:'<?= buildUrl('api/mobile_money/close_shift.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Shift Closed!') ?>',text:r.message,timer:2000,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:(xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
+            success: function(r) {
+                btn.prop('disabled',false).html(orig);
+                if (r.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('closeShiftModal'))?.hide();
+                    const cashVar  = parseFloat(r.cash_variance  ?? 0);
+                    const floatVar = parseFloat(r.float_variance ?? 0);
+                    const hasVar   = cashVar !== 0 || floatVar !== 0;
+                    const cashClass  = cashVar  === 0 ? 'text-muted' : (cashVar  > 0 ? 'text-warning' : 'text-danger');
+                    const floatClass = floatVar === 0 ? 'text-muted' : (floatVar > 0 ? 'text-warning' : 'text-danger');
+                    let html = '<p><?= t('Shift closed successfully.') ?></p>';
+                    html += '<div class="d-flex justify-content-between border-top pt-2 mt-2">';
+                    html += '<span><?= t('Cash Variance:') ?></span><span class="fw-bold '+cashClass+'">'+(cashVar >= 0 ? '+' : '')+cashVar.toLocaleString()+' TZS</span></div>';
+                    html += '<div class="d-flex justify-content-between">';
+                    html += '<span><?= t('Float Variance:') ?></span><span class="fw-bold '+floatClass+'">'+(floatVar >= 0 ? '+' : '')+floatVar.toLocaleString()+' TZS</span></div>';
+                    Swal.fire({
+                        icon: hasVar ? 'warning' : 'success',
+                        title: '<?= t('Shift Closed!') ?>',
+                        html: html,
+                        showConfirmButton: true,
+                        confirmButtonText: '<?= t('OK') ?>'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: r.message});
+                }
+            },
+            error: (xhr) => {
+                btn.prop('disabled',false).html(orig);
+                Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>'});
+            }
         });
     });
 
-    $('.modal').on('hidden.bs.modal', function(){$(this).find('form')[0]?.reset();});
+    $('.modal').on('hidden.bs.modal', function(){
+        $(this).find('form')[0]?.reset();
+        if (this.id === 'openShiftModal') {
+            $('#open_float_input').removeClass('border-warning');
+            $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span>');
+            $('#open_float_hint').addClass('d-none').text('');
+        }
+    });
 });
 
 function closeShift(s){

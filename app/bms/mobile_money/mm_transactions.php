@@ -7,8 +7,21 @@ require_once ROOT_DIR . '/core/mm_float_service.php';
 autoEnforcePermission('mm_transactions');
 includeHeader();
 
-$can_create = canCreate('mm_transactions');
-$can_view   = canView('mm_transactions');
+$can_create     = canCreate('mm_transactions');
+$can_view       = canView('mm_transactions');
+$can_open_shift = canCreate('mm_shifts');
+
+// Current user's active shift (for banner + transaction gate)
+$myShiftStmt = $pdo->prepare("
+    SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name, s.opened_at
+    FROM mm_shifts s
+    JOIN mm_tills t ON t.till_id = s.till_id
+    JOIN mm_agents a ON a.agent_id = t.agent_id
+    WHERE s.teller_user_id = ? AND s.status = 'open'
+    LIMIT 1
+");
+$myShiftStmt->execute([$_SESSION['user_id']]);
+$myActiveShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
 
 // Filters
 $filterNet    = intval($_GET['network_id'] ?? 0);
@@ -56,11 +69,31 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right text-primary me-2"></i><?= t('Transactions') ?></h4>
         <?php if ($can_create): ?>
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newTxnModal">
+        <button class="btn btn-primary btn-sm"
+            <?= $myActiveShift ? 'data-bs-toggle="modal" data-bs-target="#newTxnModal"' : 'disabled title="'.t('Open a shift first').'"' ?>>
             <i class="bi bi-plus-circle me-1"></i> <?= t('New Transaction') ?>
         </button>
         <?php endif; ?>
     </div>
+
+    <!-- Shift banner (Change C + D) -->
+    <?php if ($myActiveShift): ?>
+    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-play-circle-fill me-2"></i>
+        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
+        &nbsp;·&nbsp; <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
+        &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
+        </span>
+        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
+    </div>
+    <?php else: ?>
+    <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift — new transactions require an open shift.') ?></span>
+        <?php if ($can_open_shift): ?>
+        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-primary ms-2"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></a>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <!-- Stats -->
     <div class="row g-3 mb-3">
