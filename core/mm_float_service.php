@@ -83,6 +83,7 @@ if (!function_exists('mmComputeCommission')) {
 
 if (!function_exists('mmRecordFloatMovement')) {
     require_once __DIR__ . '/mm_posting.php';
+    require_once __DIR__ . '/code_generator.php';
 
     /**
      * Record a float top-up, withdrawal, or adjustment.
