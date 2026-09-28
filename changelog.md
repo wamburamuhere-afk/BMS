@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-28 — feat(mm_shifts): full shift UX overhaul — till grants, busy indicator, shift banners, auto-float, proper alerts
+
+**Files:**
+- `api/mobile_money/get_till_float.php` — NEW: AJAX endpoint; given `till_id`, returns `{expected_float, last_snapshot_at, is_new_till}` computed from last `mm_float_snapshots` balance + net `float_effect` of posted transactions since that snapshot
+- `app/bms/mobile_money/mm_shifts.php` — (A) `$tillsForOpen`: non-admins now see only tills where `mm_user_agent_grants.can_open_shift=1`; admins see all. (B) `$busyTills`: open-shift tills appear disabled in dropdown with "in use by [teller] since HH:MM". (C) Persistent shift banner added above stats. Auto-float: on till select, AJAX pre-fills Opening Float with hint (new till = yellow + "enter actual SIM balance"). Alert fixes: open-shift success = timer:4000 + OK button + full details; close-shift success = no timer + shows cash/float variance in color; errors = no timer
+- `app/bms/mobile_money/mm_transactions.php` — (C) Persistent shift banner; (D) "New Transaction" button disabled + warning banner when no active shift; added `$myActiveShift` query and `$can_open_shift` flag
+- `app/bms/mobile_money/mm_float.php` — (C) Persistent shift banner (informational; float movements not blocked); added `$myActiveShift` query
+- `app/bms/mobile_money/mm_dashboard.php` — (C) Persistent shift banner added below page title
+
+---
+
+## 2026-09-28 — feat(mm_shifts): smart Open/Close Shift UX and non-admin access fix (PR #2273)
+
+**Files:**
+- `app/bms/mobile_money/mm_dashboard.php` — "Fungua Zamu" now gated by `canView('mm_shifts')` (was `canCreate`); button shows "Close Shift + till name" when user has active shift, "Fungua Zamu" (blue) otherwise; added `$myActiveShift` query
+- `app/bms/mobile_money/mm_shifts.php` — Open Shift modal header + submit button changed from green to blue; header button swaps to "Close Shift — {till}" for non-admins with an active shift; "Open Shifts" count stat card now admin-only; added `$myOpenShift` query
+
+---
+
 ## 2026-09-28 — fix(backup): close remaining DEFINER-strip gaps and add diagnostics (PR #2270)
 
 **Files:**
