@@ -173,6 +173,15 @@ if (!function_exists('bms_write_dump')) {
      */
     function bms_upgrade_legacy_dump(string $sql): array
     {
+        // Strip DEFINER clauses globally before line-by-line processing.
+        // Covers ALL object types: VIEW, PROCEDURE, FUNCTION, TRIGGER, EVENT —
+        // across BMS legacy backups, cross-account migrations, and phpMyAdmin exports.
+        // Uses \s+DEFINER (not \bDEFINER) to avoid false-matching inside quoted data.
+        $sql = preg_replace('/\s+DEFINER\s*=\s*`(?:[^`]|``)*`@`(?:[^`]|``)*`/i', '', $sql);
+        $sql = preg_replace('/\s+DEFINER\s*=\s*CURRENT_USER\b/i', '', $sql);
+        $sql = preg_replace('/\bSQL\s+SECURITY\s+DEFINER\b/i', 'SQL SECURITY INVOKER', $sql);
+        $sql = preg_replace('/\/\*![0-9]+\s+DEFINER=[^*]*\*\//i', '', $sql); // phpMyAdmin format
+
         $lines    = preg_split("/\r\n|\n|\r/", $sql);
         $out      = [];
         $columns  = [];      // table => ordered column names
