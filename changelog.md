@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-28 — feat(mm_dashboard): redesign dashboard to match dashboard.php style
+
+**Files:**
+- `app/bms/mobile_money/mm_dashboard.php` — removed "Open Reconciliations", "Month Volume", "Prev Month Volume" cards; replaced all-green `.mm-stat-card` with 5 distinct colored clickable cards (primary/info/success/warning/dark) each linking to specific data; converted Quick Actions to dashboard.php style (card with bg-light header, flex-fill buttons with display-6 icons in one full-width row); cards use `d-flex flex-wrap gap-3 flex-fill` so they always span the full row regardless of count
+
+---
+
 ## 2026-09-28 — fix(mm_float): hide bank account field + fix step= bug
 
 **Files:**

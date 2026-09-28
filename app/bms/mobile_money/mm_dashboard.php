@@ -13,10 +13,9 @@ $prevMonthEnd   = date('Y-m-t', strtotime('-1 month'));
 $todayStats = $pdo->prepare("
     SELECT COUNT(*) AS txn_count,
            COALESCE(SUM(principal_amount),0) AS volume,
-           COALESCE(SUM(commission_earned),0) AS commission,
-           COALESCE(SUM(CASE WHEN status='void' THEN 1 ELSE 0 END),0) AS void_count
+           COALESCE(SUM(commission_earned),0) AS commission
     FROM mm_transactions
-    WHERE txn_date=? AND status IN ('posted','void')
+    WHERE txn_date=? AND status='posted'
 ");
 $todayStats->execute([$today]);
 $today_kpi = $todayStats->fetch(PDO::FETCH_ASSOC);
@@ -32,19 +31,19 @@ $monthStats = $pdo->prepare("
 $monthStats->execute([$monthStart, $monthEnd]);
 $month_kpi = $monthStats->fetch(PDO::FETCH_ASSOC);
 
-// Previous month for trend
+// Previous month commission for trend badge
 $monthStats->execute([$prevMonthStart, $prevMonthEnd]);
 $prev_month_kpi = $monthStats->fetch(PDO::FETCH_ASSOC);
+$comm_trend = $prev_month_kpi['commission'] > 0
+    ? round((($month_kpi['commission'] - $prev_month_kpi['commission']) / $prev_month_kpi['commission']) * 100, 1)
+    : null;
 
-$vol_trend  = $prev_month_kpi['volume']     > 0 ? round((($month_kpi['volume'] - $prev_month_kpi['volume']) / $prev_month_kpi['volume']) * 100, 1) : null;
-$comm_trend = $prev_month_kpi['commission'] > 0 ? round((($month_kpi['commission'] - $prev_month_kpi['commission']) / $prev_month_kpi['commission']) * 100, 1) : null;
-
-// --- Active tills / agents ---
+// --- Active tills / agents / shifts ---
 $tillCount  = (int)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='active'")->fetchColumn();
 $agentCount = (int)$pdo->query("SELECT COUNT(*) FROM mm_agents WHERE status='active'")->fetchColumn();
 $openShifts = (int)$pdo->query("SELECT COUNT(*) FROM mm_shifts WHERE status='open'")->fetchColumn();
 
-// --- Daily volume last 14 days (for chart) ---
+// --- Daily volume last 14 days (chart) ---
 $dailyVol = $pdo->prepare("
     SELECT txn_date, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
     FROM mm_transactions
@@ -86,12 +85,8 @@ $networkVol = $pdo->prepare("
 $networkVol->execute([$monthStart, $monthEnd]);
 $networkData = $networkVol->fetchAll(PDO::FETCH_ASSOC);
 
-// --- Open recons ---
-$openRecons = (int)$pdo->query("SELECT COUNT(*) FROM mm_reconciliations WHERE status='open'")->fetchColumn();
-
 // Build chart data JSON
-$chartDates  = [];
-$chartVols   = [];
+$chartDates = []; $chartVols = [];
 foreach ($dailyData as $d) { $chartDates[] = $d['txn_date']; $chartVols[] = (float)$d['vol']; }
 
 $typeLabels = []; $typeVols = [];
@@ -103,19 +98,13 @@ foreach ($networkData as $d) { $networkLabels[] = $d['network_name']; $networkVo
 includeHeader();
 logActivity($pdo, $_SESSION['user_id'], 'View MM Dashboard', 'Viewed Mobile Money Dashboard');
 
-function trendBadge($pct): string {
+function mmTrendBadge($pct): string {
     if ($pct === null) return '';
     $cls  = $pct >= 0 ? 'success' : 'danger';
     $icon = $pct >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
     return "<span class='badge bg-{$cls} ms-1'><i class='bi {$icon}'></i> " . abs($pct) . "%</span>";
 }
 ?>
-<style>
-.mm-stat-card{background:#d1e7dd!important;border-color:#badbcc!important;border-radius:12px;transition:transform .2s}
-.mm-stat-card:hover{transform:translateY(-3px)}
-.mm-stat-card .fw-bold,.mm-stat-card .fs-3,.mm-stat-card .fs-4,.mm-stat-card .fs-5{color:#0f5132!important}
-.mm-stat-card .text-muted,.mm-stat-card .small{color:#0f5132!important;opacity:.85}
-</style>
 <div class="container-fluid py-4 px-4">
     <div class="d-flex align-items-center gap-2 mb-3">
         <i class="bi bi-speedometer2 text-primary fs-4"></i>
@@ -123,96 +112,171 @@ function trendBadge($pct): string {
         <span class="text-muted small ms-2"><?= t('Today:') ?> <?= $today ?></span>
     </div>
 
-    <!-- Quick Actions — one-tap shortcuts visible on all screen sizes -->
-    <div class="row g-2 mb-4">
-        <?php if (canCreate('mm_transactions')): ?>
-        <div class="col-6 col-md-3">
-            <a href="<?= getUrl('mm_transactions') ?>" class="btn btn-primary w-100 py-2">
-                <i class="bi bi-arrow-left-right me-1"></i><?= t('New Transaction') ?>
-            </a>
-        </div>
-        <?php endif; ?>
-        <?php if (canCreate('mm_shifts')): ?>
-        <div class="col-6 col-md-3">
-            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-success w-100 py-2">
-                <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
-            </a>
-        </div>
-        <?php endif; ?>
-        <?php if (canCreate('mm_float')): ?>
-        <div class="col-6 col-md-3">
-            <a href="<?= getUrl('mm_float') ?>" class="btn btn-warning w-100 py-2">
-                <i class="bi bi-currency-exchange me-1"></i><?= t('Float Top-up') ?>
-            </a>
-        </div>
-        <?php endif; ?>
-        <?php if (canView('mm_agents')): ?>
-        <div class="col-6 col-md-3">
-            <a href="<?= getUrl('mm_agents') ?>" class="btn btn-outline-secondary w-100 py-2">
-                <i class="bi bi-shop-window me-1"></i><?= t('Agents') ?>
-            </a>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- KPI row 1 — Today -->
-    <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t("Today's Transactions") ?></div>
-                <div class="fs-3 fw-bold text-primary"><?= number_format((int)$today_kpi['txn_count']) ?></div>
-                <div class="small text-muted"><?= t('Volume:') ?> <strong><?= number_format((float)$today_kpi['volume']) ?></strong> TZS</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t("Today's Commission") ?></div>
-                <div class="fs-3 fw-bold text-success"><?= number_format((float)$today_kpi['commission']) ?></div>
-                <div class="small text-muted">TZS</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t('Open Shifts') ?></div>
-                <div class="fs-3 fw-bold text-<?= $openShifts > 0 ? 'warning' : 'secondary' ?>"><?= $openShifts ?></div>
-                <div class="small text-muted"><?= $tillCount ?> <?= t('active tills') ?>, <?= $agentCount ?> <?= t('agents') ?></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t('Open Reconciliations') ?></div>
-                <div class="fs-3 fw-bold text-<?= $openRecons > 0 ? 'danger' : 'secondary' ?>"><?= $openRecons ?></div>
-                <div class="small text-muted"><?= $today_kpi['void_count'] > 0 ? $today_kpi['void_count'] . ' ' . t('voided today') : t('No voids today') ?></div>
+    <!-- Quick Actions — dashboard.php style: card with bg-light header, flex-fill buttons -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-link-45deg"></i> <?= t('Quick Actions') ?></h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-3">
+                        <?php if (canCreate('mm_transactions')): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <a href="<?= getUrl('mm_transactions') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
+                                <i class="bi bi-arrow-left-right display-6"></i>
+                                <div class="mt-2"><?= t('New Transaction') ?></div>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (canCreate('mm_shifts')): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-success w-100 h-100 py-3">
+                                <i class="bi bi-play-circle display-6"></i>
+                                <div class="mt-2"><?= t('Open Shift') ?></div>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (canCreate('mm_float')): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <a href="<?= getUrl('mm_float') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                                <i class="bi bi-currency-exchange display-6"></i>
+                                <div class="mt-2"><?= t('Float Top-up') ?></div>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (canView('mm_agents')): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <a href="<?= getUrl('mm_agents') ?>" class="btn btn-outline-secondary w-100 h-100 py-3">
+                                <i class="bi bi-shop-window display-6"></i>
+                                <div class="mt-2"><?= t('Agents') ?></div>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- KPI row 2 — This month -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t('Month Transactions') ?></div>
-                <div class="fs-4 fw-bold text-primary"><?= number_format((int)$month_kpi['txn_count']) ?></div>
+    <!-- KPI Cards — flex-fill so all 5 cards share the full row width -->
+    <div class="d-flex flex-wrap gap-3 mb-4">
+
+        <!-- 1. Today's Transactions — blue -->
+        <a class="flex-fill text-decoration-none" style="min-width: 200px;"
+           href="<?= getUrl('mm_transactions') ?>">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= number_format((int)$today_kpi['txn_count']) ?></h4>
+                            <p class="mb-0"><?= t("Today's Transactions") ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-arrow-left-right" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small><i class="bi bi-cash-stack"></i>
+                            <?= number_format((float)$today_kpi['volume']) ?> TZS <?= t('volume') ?>
+                        </small>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t('Month Volume (TZS)') ?></div>
-                <div class="fs-4 fw-bold text-info"><?= number_format((float)$month_kpi['volume']) ?> <?= trendBadge($vol_trend) ?></div>
+        </a>
+
+        <!-- 2. Month Transactions — cyan -->
+        <a class="flex-fill text-decoration-none" style="min-width: 200px;"
+           href="<?= getUrl('mm_transactions') ?>">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= number_format((int)$month_kpi['txn_count']) ?></h4>
+                            <p class="mb-0"><?= t('Month Transactions') ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-calendar-month" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small><i class="bi bi-cash-stack"></i>
+                            <?= number_format((float)$month_kpi['volume']) ?> TZS <?= t('volume') ?>
+                        </small>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t('Month Commission (TZS)') ?></div>
-                <div class="fs-4 fw-bold text-success"><?= number_format((float)$month_kpi['commission']) ?> <?= trendBadge($comm_trend) ?></div>
+        </a>
+
+        <!-- 3. Today's Commission — green -->
+        <a class="flex-fill text-decoration-none" style="min-width: 200px;"
+           href="<?= getUrl('mm_transactions') ?>">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= number_format((float)$today_kpi['commission']) ?></h4>
+                            <p class="mb-0"><?= t("Today's Commission") ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-coin" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small><i class="bi bi-currency-dollar"></i> TZS</small>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm p-3 mm-stat-card">
-                <div class="small text-muted mb-1"><?= t('Prev Month Volume (TZS)') ?></div>
-                <div class="fs-4 fw-bold text-secondary"><?= number_format((float)$prev_month_kpi['volume']) ?></div>
+        </a>
+
+        <!-- 4. Month Commission — yellow (with trend) -->
+        <a class="flex-fill text-decoration-none" style="min-width: 200px;"
+           href="<?= getUrl('mm_transactions') ?>">
+            <div class="card bg-warning text-dark h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">
+                                <?= number_format((float)$month_kpi['commission']) ?>
+                                <?= mmTrendBadge($comm_trend) ?>
+                            </h4>
+                            <p class="mb-0"><?= t('Month Commission') ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-graph-up-arrow" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small><i class="bi bi-currency-dollar"></i> TZS</small>
+                    </div>
+                </div>
             </div>
-        </div>
+        </a>
+
+        <!-- 5. Open Shifts / Active Tills — dark -->
+        <a class="flex-fill text-decoration-none" style="min-width: 200px;"
+           href="<?= getUrl('mm_shifts') ?>">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= $openShifts ?></h4>
+                            <p class="mb-0"><?= t('Open Shifts') ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-toggles" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small>
+                            <i class="bi bi-display"></i> <?= $tillCount ?> <?= t('tills') ?>,
+                            <i class="bi bi-person-badge"></i> <?= $agentCount ?> <?= t('agents') ?>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </a>
+
     </div>
 
     <!-- Charts row -->
@@ -251,6 +315,9 @@ function trendBadge($pct): string {
                                 <td class="text-end"><?= number_format((int)$row['cnt']) ?></td>
                             </tr>
                             <?php endforeach; ?>
+                            <?php if (empty($typeData)): ?>
+                            <tr><td colspan="3" class="text-center text-muted py-2"><?= t('No data yet') ?></td></tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -285,7 +352,6 @@ function trendBadge($pct): string {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 (function() {
-    // Daily volume bar chart
     const dailyCtx = document.getElementById('dailyChart').getContext('2d');
     new Chart(dailyCtx, {
         type: 'bar',
@@ -296,7 +362,6 @@ function trendBadge($pct): string {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } } }
     });
 
-    // Network donut chart
     const netCtx = document.getElementById('networkChart').getContext('2d');
     new Chart(netCtx, {
         type: 'doughnut',
