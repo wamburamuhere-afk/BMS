@@ -182,7 +182,7 @@ if (!function_exists('runTenantMigrations')) {
 
                 $output = [];
                 $exitCode = 0;
-                exec('php ' . escapeshellarg($file) . ' 2>&1', $output, $exitCode);
+                exec(PHP_BINARY . ' ' . escapeshellarg($file) . ' 2>&1', $output, $exitCode);
 
                 putenv('TENANT_MIGRATION_DB_HOST');
                 putenv('TENANT_MIGRATION_DB_NAME');
