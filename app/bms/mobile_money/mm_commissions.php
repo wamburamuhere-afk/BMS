@@ -188,7 +188,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                 <h5 class="modal-title"><i class="bi bi-coin me-1"></i><?= t('Record Commission Received') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="receiveForm" autocomplete="off">
+            <form id="receiveForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="receive-message" class="mb-2"></div>

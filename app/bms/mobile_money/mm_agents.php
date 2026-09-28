@@ -150,7 +150,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> <?= t('Add Agent Outlet') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="addForm" autocomplete="off">
+            <form id="addForm" method="post" autocomplete="off" onsubmit="mmAgentSubmit(event,'<?= addslashes(buildUrl('api/mobile_money/save_agent.php')) ?>','<?= addslashes(t('Saved!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="add-message" class="mb-2"></div>
@@ -225,7 +225,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> <?= t('Edit Agent Outlet') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editForm" autocomplete="off">
+            <form id="editForm" method="post" autocomplete="off" onsubmit="mmAgentSubmit(event,'<?= addslashes(buildUrl('api/mobile_money/save_agent.php')) ?>','<?= addslashes(t('Updated!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="agent_id" id="edit_id">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
@@ -284,6 +284,35 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
 <?php endif; ?>
 
 <script>
+function mmAgentSubmit(e, url, successTitle) {
+    e.preventDefault();
+    const form = e.target;
+    const btn  = form.querySelector('[type=submit]');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+    $.ajax({
+        url: url, type: 'POST',
+        data: new FormData(form), contentType: false, processData: false, dataType: 'json',
+        success: function(r) {
+            if (r.success) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({icon:'success',title:successTitle,timer:1500,showConfirmButton:false}).then(function(){ location.reload(); });
+                } else { location.reload(); }
+            } else {
+                if (typeof Swal !== 'undefined') Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});
+                else alert(r.message);
+                btn.disabled = false; btn.innerHTML = orig;
+            }
+        },
+        error: function() {
+            if (typeof Swal !== 'undefined') Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'});
+            else alert('<?= t('Server error.') ?>');
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    });
+}
+
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#agentsTable')) {
         $('#agentsTable').DataTable({
@@ -304,28 +333,6 @@ $(document).ready(function () {
         modal.find('.select2-static').each(function(){
             if(!$(this).hasClass('select2-hidden-accessible'))
                 $(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select…') ?>',allowClear:true,width:'100%'});
-        });
-    });
-
-    $('#addForm').on('submit', function(e){
-        e.preventDefault();
-        const btn=$(this).find('[type=submit]'), orig=btn.html();
-        btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/save_agent.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Saved!') ?>',timer:1500,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
-        });
-    });
-
-    $('#editForm').on('submit', function(e){
-        e.preventDefault();
-        const btn=$(this).find('[type=submit]'), orig=btn.html();
-        btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/save_agent.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Updated!') ?>',timer:1500,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-            error:()=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:'<?= t('Server error.') ?>'}),
-            complete:()=>btn.prop('disabled',false).html(orig)
         });
     });
 

@@ -185,7 +185,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> <?= t('Add Rate Band') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="addForm" autocomplete="off">
+            <form id="addForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div class="row g-3">
@@ -265,7 +265,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> <?= t('Edit Rate Band') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editForm" autocomplete="off">
+            <form id="editForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="rate_id" id="edit_id">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">

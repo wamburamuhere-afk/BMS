@@ -29,13 +29,29 @@ $filterTill   = intval($_GET['till_id'] ?? 0);
 $filterType   = $_GET['mov_type'] ?? '';
 
 $tills = $pdo->query("
-    SELECT t.till_id, t.till_number, a.agent_name, n.network_name
+    SELECT t.till_id, t.till_number, a.agent_id, a.agent_name, n.network_name
     FROM mm_tills t
     JOIN mm_agents a ON a.agent_id = t.agent_id
     JOIN mm_networks n ON n.network_id = t.network_id
     WHERE t.status = 'active'
     ORDER BY a.agent_name, t.till_number
 ")->fetchAll(PDO::FETCH_ASSOC);
+
+// Build agent → tills map for dynamic multi-till UI
+$agentTillsMap = [];
+$agentList     = [];
+foreach ($tills as $tt) {
+    $aid = (int)$tt['agent_id'];
+    if (!isset($agentTillsMap[$aid])) {
+        $agentTillsMap[$aid] = ['name' => $tt['agent_name'], 'tills' => []];
+        $agentList[$aid]     = $tt['agent_name'];
+    }
+    $agentTillsMap[$aid]['tills'][] = [
+        'id'      => (int)$tt['till_id'],
+        'number'  => $tt['till_number'],
+        'network' => $tt['network_name'],
+    ];
+}
 
 $where  = ["fm.movement_date BETWEEN :df AND :dt"];
 $params = [':df' => $filterFrom, ':dt' => $filterTo];
@@ -231,24 +247,25 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 <div class="modal fade" id="topupModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-arrow-down-circle me-1"></i><?= t('Float Top-up') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="topupForm" autocomplete="off">
+            <form id="topupForm" method="post" autocomplete="off" onsubmit="mmFloatSubmit(event,'<?= addslashes(buildUrl('api/mobile_money/save_float_movement.php')) ?>','<?= addslashes(t('Posted!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="movement_type" value="float_topup">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label"><?= t('Till') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="till_id" required>
+                            <label class="form-label"><?= t('Agent') ?> <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" id="topup-agent-sel">
                                 <option value=""></option>
-                                <?php foreach ($tills as $t): ?>
-                                <option value="<?= $t['till_id'] ?>"><?= safe_output($t['agent_name'].' / '.$t['till_number'].' ('.$t['network_name'].')') ?></option>
+                                <?php foreach ($agentList as $aid => $aname): ?>
+                                <option value="<?= $aid ?>"><?= safe_output($aname) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div id="topup-tills-wrap" class="col-12 d-none"></div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Amount (TZS)') ?> <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" min="1" step="any" required>
@@ -258,10 +275,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                             <input type="date" class="form-control" name="movement_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label"><?= t('Reference No.') ?></label>
-                            <input type="text" class="form-control" name="reference_no" placeholder="<?= t('Bank transfer / slip number') ?>">
-                        </div>
-                        <div class="col-12">
                             <label class="form-label"><?= t('Notes') ?></label>
                             <input type="text" class="form-control" name="notes">
                         </div>
@@ -269,7 +282,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i><?= t('Post Top-up') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Post Top-up') ?></button>
                 </div>
             </form>
         </div>
@@ -280,24 +293,25 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 <div class="modal fade" id="withdrawModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-arrow-up-circle me-1"></i><?= t('Float Withdrawal') ?></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="withdrawForm" autocomplete="off">
+            <form id="withdrawForm" method="post" autocomplete="off" onsubmit="mmFloatSubmit(event,'<?= addslashes(buildUrl('api/mobile_money/save_float_movement.php')) ?>','<?= addslashes(t('Posted!')) ?>')">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="movement_type" value="float_withdrawal">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label"><?= t('Till') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="till_id" required>
+                            <label class="form-label"><?= t('Agent') ?> <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" id="withdraw-agent-sel">
                                 <option value=""></option>
-                                <?php foreach ($tills as $t): ?>
-                                <option value="<?= $t['till_id'] ?>"><?= safe_output($t['agent_name'].' / '.$t['till_number'].' ('.$t['network_name'].')') ?></option>
+                                <?php foreach ($agentList as $aid => $aname): ?>
+                                <option value="<?= $aid ?>"><?= safe_output($aname) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div id="withdraw-tills-wrap" class="col-12 d-none"></div>
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Amount (TZS)') ?> <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" min="1" step="any" required>
@@ -307,10 +321,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                             <input type="date" class="form-control" name="movement_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label"><?= t('Reference No.') ?></label>
-                            <input type="text" class="form-control" name="reference_no">
-                        </div>
-                        <div class="col-12">
                             <label class="form-label"><?= t('Notes') ?></label>
                             <input type="text" class="form-control" name="notes">
                         </div>
@@ -318,7 +328,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle me-1"></i><?= t('Post Withdrawal') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Post Withdrawal') ?></button>
                 </div>
             </form>
         </div>
@@ -327,6 +337,124 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 <?php endif; ?>
 
 <script>
+// Embed agent→tills map for dynamic till selection
+window.__mmTillsByAgent = <?= json_encode($agentTillsMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+function mmPopulateTills(agentId, prefix) {
+    const wrap = document.getElementById(prefix + '-tills-wrap');
+    if (!agentId || !window.__mmTillsByAgent[agentId]) {
+        wrap.innerHTML = '';
+        wrap.classList.add('d-none');
+        return;
+    }
+    const tills = window.__mmTillsByAgent[agentId].tills;
+    if (tills.length === 1) {
+        const t = tills[0];
+        wrap.innerHTML =
+            '<input type="hidden" name="till_id" value="' + t.id + '">' +
+            '<div class="border rounded p-3 bg-light">' +
+                '<div class="small fw-semibold mb-2 text-muted">' +
+                    '<span class="badge bg-secondary me-1">' + safeOutput(t.network) + '</span>' +
+                    safeOutput(t.number) +
+                '</div>' +
+                '<label class="form-label small mb-1"><?= addslashes(t('Reference No.')) ?></label>' +
+                '<input type="text" class="form-control form-control-sm" name="reference_no" placeholder="<?= addslashes(t('Bank transfer / slip number')) ?>">' +
+            '</div>';
+    } else {
+        let html = '<div class="small fw-semibold text-muted mb-2"><?= addslashes(t('Select Tills:')) ?></div>';
+        tills.forEach(function(till) {
+            html +=
+                '<div class="border rounded p-2 mb-2">' +
+                    '<div class="form-check mb-1">' +
+                        '<input class="form-check-input mm-till-chk" type="checkbox"' +
+                               ' name="till_ids[]" value="' + till.id + '"' +
+                               ' id="' + prefix + '-chk-' + till.id + '">' +
+                        '<label class="form-check-label fw-semibold" for="' + prefix + '-chk-' + till.id + '">' +
+                            '<span class="badge bg-secondary me-1">' + safeOutput(till.network) + '</span>' +
+                            safeOutput(till.number) +
+                        '</label>' +
+                    '</div>' +
+                    '<div class="mm-ref-wrap d-none ps-4">' +
+                        '<input type="text" class="form-control form-control-sm" name="ref_' + till.id + '"' +
+                               ' placeholder="<?= addslashes(t('Reference No.')) ?>">' +
+                    '</div>' +
+                '</div>';
+        });
+        wrap.innerHTML = html;
+        wrap.querySelectorAll('.mm-till-chk').forEach(function(chk) {
+            chk.addEventListener('change', function() {
+                chk.closest('.border').querySelector('.mm-ref-wrap').classList.toggle('d-none', !chk.checked);
+            });
+        });
+    }
+    wrap.classList.remove('d-none');
+}
+
+function mmFloatSubmit(e, url, successTitle) {
+    e.preventDefault();
+    const form = e.target;
+    const btn  = form.querySelector('[type=submit]');
+    const orig = btn.innerHTML;
+
+    const checkedTills   = [...form.querySelectorAll('.mm-till-chk:checked')];
+    const singleTillInp  = form.querySelector('input[name="till_id"]');
+
+    if (checkedTills.length === 0 && (!singleTillInp || !singleTillInp.value)) {
+        if (typeof Swal !== 'undefined') Swal.fire({icon:'warning',title:'<?= t('Required') ?>',text:'<?= t('Select at least one till.') ?>'});
+        else alert('<?= t('Select at least one till.') ?>');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+
+    const csrf    = form.querySelector('[name="_csrf"]').value;
+    const movType = form.querySelector('[name="movement_type"]').value;
+    const amount  = form.querySelector('[name="amount"]').value;
+    const movDate = form.querySelector('[name="movement_date"]').value;
+    const notes   = (form.querySelector('[name="notes"]') || {}).value || '';
+
+    const post = function(tillId, refNo) {
+        return new Promise(function(resolve, reject) {
+            const fd = new FormData();
+            fd.append('_csrf', csrf);
+            fd.append('movement_type', movType);
+            fd.append('amount', amount);
+            fd.append('movement_date', movDate);
+            fd.append('notes', notes);
+            fd.append('till_id', tillId);
+            fd.append('reference_no', refNo);
+            $.ajax({url: url, type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
+                success: resolve,
+                error: function(xhr) { reject(xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : '<?= t('Server error.') ?>'); }
+            });
+        });
+    };
+
+    const tillCalls = checkedTills.length > 0
+        ? checkedTills.map(function(chk) {
+            const refInp = form.querySelector('[name="ref_' + chk.value + '"]');
+            return [chk.value, refInp ? refInp.value : ''];
+          })
+        : [[singleTillInp.value, (form.querySelector('[name="reference_no"]') || {}).value || '']];
+
+    Promise.all(tillCalls.map(function(pair) {
+        return post(pair[0], pair[1]).catch(function(msg) { return {success: false, message: msg}; });
+    })).then(function(results) {
+        const failed = results.filter(function(r) { return !r.success; });
+        if (failed.length === 0) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({icon:'success',title:successTitle,timer:1500,showConfirmButton:false}).then(function(){ location.reload(); });
+            } else { location.reload(); }
+        } else {
+            const msg = failed.map(function(r) { return r.message; }).join(' | ');
+            if (typeof Swal !== 'undefined') Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:msg});
+            else alert(msg);
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    });
+}
+
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#floatTable')) {
         $('#floatTable').DataTable({responsive:false,scrollX:true,pageLength:25,order:[[2,'desc']],columnDefs:[{orderable:false,targets:0}],dom:'rtipB',
@@ -338,25 +466,22 @@ $(document).ready(function () {
     function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
     applyView(); $(window).on('resize',applyView);
 
+    // Agent → tills cascade for both modals
+    $('#topup-agent-sel').on('change', function() { mmPopulateTills($(this).val(), 'topup'); });
+    $('#withdraw-agent-sel').on('change', function() { mmPopulateTills($(this).val(), 'withdraw'); });
+
     $('#topupModal, #withdrawModal').on('shown.bs.modal', function(){
         const modal=$(this);
-        modal.find('.select2-static').each(function(){if(!$(this).hasClass('select2-hidden-accessible'))$(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select…') ?>',allowClear:true,width:'100%'});});
+        modal.find('.select2-static').each(function(){
+            if(!$(this).hasClass('select2-hidden-accessible'))
+                $(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select…') ?>',allowClear:true,width:'100%'});
+        });
     });
 
-    function submitFloatForm(formId) {
-        $(formId).on('submit', function(e){
-            e.preventDefault();
-            const btn=$(this).find('[type=submit]'), orig=btn.html();
-            btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-            $.ajax({url:'<?= buildUrl('api/mobile_money/save_float_movement.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-                success:r=>{if(r.success){Swal.fire({icon:'success',title:'<?= t('Posted!') ?>',text:r.message,timer:2000,showConfirmButton:false}).then(()=>location.reload());}else{Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:r.message});}},
-                error:(xhr)=>Swal.fire({icon:'error',title:'<?= t('Error') ?>',text:xhr.responseJSON?.message||'<?= t('Server error.') ?>'}),
-                complete:()=>btn.prop('disabled',false).html(orig)
-            });
-        });
-    }
-    submitFloatForm('#topupForm'); submitFloatForm('#withdrawForm');
-    $('.modal').on('hidden.bs.modal', function(){$(this).find('form')[0]?.reset();});
+    $('.modal').on('hidden.bs.modal', function(){
+        $(this).find('form')[0]?.reset();
+        $(this).find('[id$="-tills-wrap"]').addClass('d-none').html('');
+    });
 });
 
 function renderCards(nodes) {

@@ -210,7 +210,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Recon', 'Viewed MM Recon #' . $rec
                 <h5 class="modal-title"><i class="bi bi-check2-all me-1"></i><?= t('Resolve Reconciliation') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="resolveForm" autocomplete="off">
+            <form id="resolveForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="recon_id" value="<?= $reconId ?>">

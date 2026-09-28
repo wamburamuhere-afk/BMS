@@ -150,7 +150,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                 <h5 class="modal-title"><i class="bi bi-clipboard-plus me-1"></i><?= t('Start Reconciliation') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="startReconForm" autocomplete="off">
+            <form id="startReconForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="start-recon-message" class="mb-2"></div>

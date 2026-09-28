@@ -242,7 +242,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i><?= t('New MM Transaction') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="newTxnForm" autocomplete="off">
+            <form id="newTxnForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="txn-message" class="mb-2"></div>
