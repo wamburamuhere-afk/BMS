@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_agent_view): move form AJAX to inline onsubmit to fix save not working
+
+**Files:**
+- `app/bms/mobile_money/mm_agent_view.php` — Replaced `$(document).ready()` submit handlers on addTillForm/editTillForm/editAgentForm with a shared `mmSubmitForm(event, url, title)` global function called via inline `onsubmit` attributes. Root cause: deferred CDN scripts (DataTables) can abort the ready() block before the submit handlers register, leaving forms to submit natively. Inline onsubmit fires immediately with `e.preventDefault()` and AJAX, regardless of CDN loading state.
+
+---
+
 ## 2026-09-28 — fix(mm_agent_view): add method="post" to modal forms to prevent GET-submission bug
 
 **Files:**
