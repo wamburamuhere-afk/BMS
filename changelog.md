@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_float): migration to make bank_account_id nullable (fixes 500 on save)
+
+**Files:**
+- `migrations/2026_09_28_mm_float_bank_account_nullable.php` — ALTER TABLE mm_float_movements to allow NULL on bank_account_id (idempotent; skips if already nullable). Servers with an existing NOT NULL column would get a 500 when saving without a bank account.
+
+---
+
 ## 2026-09-28 — feat(mm_dashboard): redesign dashboard to match dashboard.php style
 
 **Files:**
