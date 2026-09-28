@@ -9,6 +9,18 @@ includeHeader();
 $can_open  = canCreate('mm_shifts');
 $can_close = canEdit('mm_shifts');
 
+// Current user's own open shift — used to swap Open/Close button
+$myShiftStmt = $pdo->prepare("
+    SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name
+    FROM mm_shifts s
+    JOIN mm_tills t ON t.till_id = s.till_id
+    JOIN mm_agents a ON a.agent_id = t.agent_id
+    WHERE s.teller_user_id = ? AND s.status = 'open'
+    LIMIT 1
+");
+$myShiftStmt->execute([$_SESSION['user_id']]);
+$myOpenShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
+
 // Get all active tills with agent name for dropdowns
 $tillsForOpen = $pdo->query("
     SELECT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
@@ -58,8 +70,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i><?= t('Teller Shifts') ?></h4>
-        <?php if ($can_open): ?>
-        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
+        <?php if (!isAdmin() && $myOpenShift): ?>
+        <button class="btn btn-danger btn-sm" onclick='closeShift(<?= htmlspecialchars(json_encode(['id'=>$myOpenShift['shift_id'],'code'=>$myOpenShift['shift_code'],'till_number'=>$myOpenShift['till_number'],'agent'=>$myOpenShift['agent_name']]),ENT_QUOTES) ?>)'>
+            <i class="bi bi-stop-circle me-1"></i><?= t('Close Shift') ?> — <?= safe_output($myOpenShift['till_number']) ?>
+        </button>
+        <?php elseif ($can_open): ?>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
             <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
         </button>
         <?php endif; ?>
@@ -67,6 +83,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 
     <!-- Stats -->
     <div class="row g-3 mb-3">
+        <?php if (isAdmin()): ?>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-success"><?= $openCount ?></div>
@@ -79,6 +96,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                 <div class="small text-muted"><?= t('Closed Shifts') ?></div>
             </div>
         </div>
+        <?php endif; ?>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-5 fw-bold text-info"><?= number_format(array_sum(array_column($shifts, 'txn_volume'))) ?></div>
@@ -208,7 +226,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <div class="modal fade" id="openShiftModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -237,7 +255,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
                 </div>
             </form>
         </div>

@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(backup): close remaining DEFINER-strip gaps and add diagnostics (PR #2270)
+
+**Files:**
+- `core/backup.php` — `bms_upgrade_legacy_dump()`: added 2 more DEFINER patterns (unquoted `user@host`, `CURRENT_USER()` with parens); fixed phpMyAdmin regex `\s+` → `\s*`; added post-strip diagnostic that logs any surviving `DEFINER=` to PHP error log
+- `api/backup_actions.php` — `restoreFromFile()`: added statement-level SYSTEM_USER/access-denied logging (logs statement number + first 300 chars) so next occurrence is identifiable in error log
+
+---
+
 ## 2026-09-28 — fix(mm_float): migration to make bank_account_id nullable (fixes 500 on save)
 
 **Files:**
