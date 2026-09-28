@@ -212,7 +212,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i><?= t('Add Till') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="addTillForm" autocomplete="off">
+            <form id="addTillForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="agent_id" value="<?= $id ?>">
@@ -274,7 +274,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i><?= t('Edit Till') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editTillForm" autocomplete="off">
+            <form id="editTillForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="till_id" id="edit_till_id">
@@ -337,7 +337,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i><?= t('Edit Agent') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editAgentForm" autocomplete="off">
+            <form id="editAgentForm" method="post" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="agent_id" id="ea_id">

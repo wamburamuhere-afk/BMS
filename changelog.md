@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-28 — fix(mm_agent_view): add method="post" to modal forms to prevent GET-submission bug
+
+**Files:**
+- `app/bms/mobile_money/mm_agent_view.php` — Added `method="post"` to `#addTillForm`, `#editTillForm`, and `#editAgentForm`. Without this, if JavaScript hadn't fully loaded when the user clicked Save, the browser would fall back to a native GET submission, replacing `?id=X` in the URL with form fields and triggering "Invalid agent ID" on reload.
+
+---
+
 ## 2026-09-28 — fix(mm_agent_view): add descriptive placeholders + form-text hints for ceiling fields
 
 **Files:**
