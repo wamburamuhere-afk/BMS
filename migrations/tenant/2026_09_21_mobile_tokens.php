@@ -25,7 +25,7 @@ try {
             `created_at`   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`token_id`),
             UNIQUE KEY `uq_token` (`token`),
-            KEY `idx_user_id` (`user_id`),
+            KEY `idx_user_id` (`user_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     echo "  + table mobile_tokens ready.\n";
