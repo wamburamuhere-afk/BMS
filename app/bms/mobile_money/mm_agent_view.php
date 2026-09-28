@@ -60,34 +60,48 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
     </div>
 
     <!-- Agent info cards -->
+<style>
+.mm-stat-card{background:#d1e7dd!important;border-color:#badbcc!important;border-radius:12px;transition:transform .2s}
+.mm-stat-card:hover{transform:translateY(-3px)}
+.mm-stat-card .fw-semibold,.mm-stat-card .fw-bold{color:#0f5132!important}
+.mm-stat-card .small,.mm-stat-card .text-muted{color:#0f5132!important;opacity:.85}
+.mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
+.mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+</style>
     <div class="row g-3 mb-4">
         <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted"><?= t('Outlet Type') ?></div>
                 <div class="fw-semibold"><?= safe_output(ucfirst(str_replace('_', ' ', $agent['outlet_type'] ?? ''))) ?></div>
             </div>
         </div>
         <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted"><?= t('Phone') ?></div>
                 <div class="fw-semibold"><?= safe_output($agent['phone_primary'] ?: '—') ?></div>
             </div>
         </div>
         <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted"><?= t('Location') ?></div>
                 <div class="fw-semibold"><?= safe_output(implode(', ', array_filter([$agent['region'], $agent['district'], $agent['ward']])) ?: '—') ?></div>
             </div>
         </div>
         <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted"><?= t('Super-Agent') ?></div>
                 <div class="fw-semibold"><?= $agent['parent_name'] ? safe_output($agent['parent_name']) : '—' ?></div>
             </div>
         </div>
         <?php if ($agent['bot_license']): ?>
         <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm p-3">
+            <div class="card border-0 shadow-sm p-3 mm-stat-card">
                 <div class="small text-muted"><?= t('BOT License') ?></div>
                 <div class="fw-semibold"><?= safe_output($agent['bot_license']) ?></div>
             </div>
@@ -104,51 +118,74 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
         </button>
         <?php endif; ?>
     </div>
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th><?= t('Till Number') ?></th>
-                        <th><?= t('Network') ?></th>
-                        <th><?= t('SIM MSISDN') ?></th>
-                        <th><?= t('Float Ceil.') ?></th>
-                        <th><?= t('Cash Ceil.') ?></th>
-                        <th><?= t('Status') ?></th>
-                        <?php if ($can_edit || $can_delete): ?><th class="text-end"><?= t('Actions') ?></th><?php endif; ?>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($tills as $till): ?>
-                    <tr>
-                        <td><code><?= safe_output($till['till_number']) ?></code></td>
-                        <td>
-                            <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($till['color_hex'] ?: '#999') ?>"></span>
-                            <?= safe_output($till['network_name'] ?: '—') ?>
-                        </td>
-                        <td><?= safe_output($till['sim_msisdn'] ?: '—') ?></td>
-                        <td class="text-muted small"><?= $till['float_ceiling'] ? 'TZS '.number_format((float)$till['float_ceiling']) : '—' ?></td>
-                        <td class="text-muted small"><?= $till['cash_ceiling'] ? 'TZS '.number_format((float)$till['cash_ceiling']) : '—' ?></td>
-                        <td><span class="badge <?= $till['status']==='active'?'bg-success':($till['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>"><?= ucfirst(safe_output($till['status'])) ?></span></td>
-                        <?php if ($can_edit || $can_delete): ?>
-                        <td class="text-end">
-                            <?php if ($can_edit): ?>
-                            <button class="btn btn-sm btn-outline-primary" onclick='editTill(<?= json_encode($till) ?>)'><i class="bi bi-pencil"></i></button>
-                            <?php endif; ?>
-                            <?php if ($can_delete): ?>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteTill(<?= $till['till_id'] ?>, '<?= addslashes($till['till_number']) ?>')"><i class="bi bi-trash"></i></button>
-                            <?php endif; ?>
-                        </td>
-                        <?php endif; ?>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($tills)): ?>
-                    <tr><td colspan="7" class="text-center text-muted py-3"><?= t('No tills added yet.') ?></td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+    <div id="tillsTableView">
+        <div class="card border-0 shadow-sm mb-2">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table id="tillsTable" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
+                        <thead class="mm-thead">
+                            <tr>
+                                <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                                <th><?= t('Till Number') ?></th>
+                                <th><?= t('Network') ?></th>
+                                <th><?= t('SIM MSISDN') ?></th>
+                                <th><?= t('Float Ceil.') ?></th>
+                                <th><?= t('Cash Ceil.') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
+                                <?php if ($can_edit || $can_delete): ?><th class="text-center"><?= t('Actions') ?></th><?php endif; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $sno = 1; foreach ($tills as $till): ?>
+                            <tr data-id="<?= (int)$till['till_id'] ?>"
+                                data-till='<?= htmlspecialchars(json_encode($till), ENT_QUOTES) ?>'
+                                data-number="<?= htmlspecialchars($till['till_number']) ?>"
+                                data-network="<?= htmlspecialchars($till['network_name'] ?: '—') ?>"
+                                data-sim="<?= htmlspecialchars($till['sim_msisdn'] ?: '—') ?>"
+                                data-float="<?= $till['float_ceiling'] ? number_format((float)$till['float_ceiling']) : '—' ?>"
+                                data-cash="<?= $till['cash_ceiling'] ? number_format((float)$till['cash_ceiling']) : '—' ?>"
+                                data-status="<?= htmlspecialchars($till['status']) ?>">
+                                <td class="text-center text-muted small"><?= $sno++ ?></td>
+                                <td><code class="small"><?= safe_output($till['till_number']) ?></code></td>
+                                <td>
+                                    <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($till['color_hex'] ?: '#999') ?>"></span>
+                                    <span class="small"><?= safe_output($till['network_name'] ?: '—') ?></span>
+                                </td>
+                                <td class="small"><?= safe_output($till['sim_msisdn'] ?: '—') ?></td>
+                                <td class="small text-muted"><?= $till['float_ceiling'] ? 'TZS '.number_format((float)$till['float_ceiling']) : '—' ?></td>
+                                <td class="small text-muted"><?= $till['cash_ceiling'] ? 'TZS '.number_format((float)$till['cash_ceiling']) : '—' ?></td>
+                                <td class="text-center">
+                                    <span class="badge <?= $till['status']==='active'?'bg-success':($till['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>" style="font-size:.72rem">
+                                        <?= ucfirst(safe_output($till['status'])) ?>
+                                    </span>
+                                </td>
+                                <?php if ($can_edit || $can_delete): ?>
+                                <td class="text-center">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:140px;font-size:.85rem">
+                                            <?php if ($can_edit): ?>
+                                            <li><a class="dropdown-item" href="#" onclick='editTill(<?= htmlspecialchars(json_encode($till), ENT_QUOTES) ?>);return false'><i class="bi bi-pencil me-2 text-primary"></i><?= t('Edit') ?></a></li>
+                                            <?php endif; ?>
+                                            <?php if ($can_delete): ?>
+                                            <li><hr class="dropdown-divider my-1"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteTill(<?= $till['till_id'] ?>, '<?= addslashes($till['till_number']) ?>');return false"><i class="bi bi-x-circle me-2"></i><?= t('Close') ?></a></li>
+                                            <?php endif; ?>
+                                        </ul>
+                                    </div>
+                                </td>
+                                <?php endif; ?>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
+    <div id="tillsCardView" class="row g-2 mb-4 d-none"></div>
 
     <!-- Sub-agents section -->
     <?php if (!empty($subAgents)): ?>
@@ -357,6 +394,26 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 
 <script>
 $(document).ready(function () {
+    // DataTable for tills
+    if (!$.fn.DataTable.isDataTable('#tillsTable')) {
+        $('#tillsTable').DataTable({
+            responsive: false, scrollX: true, pageLength: 25,
+            order: [[1, 'asc']], columnDefs: [{orderable: false, targets: 0}],
+            dom: 'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No tills added yet.')) ?>' },
+            buttons: [{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
+            drawCallback: function () { renderTillCards(this.api().rows({page:'current'}).nodes()); applyView(); }
+        });
+    }
+    function applyView() {
+        if (window.innerWidth < 768) {
+            $('#tillsTableView').addClass('d-none'); $('#tillsCardView').removeClass('d-none');
+        } else {
+            $('#tillsTableView').removeClass('d-none'); $('#tillsCardView').addClass('d-none');
+        }
+    }
+    applyView(); $(window).on('resize', applyView);
+
     $('#addTillForm').on('submit', function (e) {
         e.preventDefault();
         const btn = $(this).find('[type=submit]'), orig = btn.html();
@@ -426,6 +483,39 @@ function editAgent(a) {
     $('#ea_region').val(a.region); $('#ea_district').val(a.district); $('#ea_street').val(a.street);
     $('#ea_status').val(a.status);
     new bootstrap.Modal(document.getElementById('editAgentModal')).show();
+}
+
+function renderTillCards(nodes) {
+    if (!nodes.length) { $('#tillsCardView').html('<div class="col-12 text-center py-4 text-muted"><?= t('No tills added yet.') ?></div>'); return; }
+    const canEdit = <?= json_encode($can_edit) ?>, canDelete = <?= json_encode($can_delete) ?>;
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const sno = idx + 1, id = $tr.data('id');
+        const number = $tr.data('number'), network = $tr.data('network');
+        const sim = $tr.data('sim'), floatCeil = $tr.data('float');
+        const cashCeil = $tr.data('cash'), status = $tr.data('status');
+        const tillData = JSON.stringify($tr.data('till')).replace(/'/g,"&#39;");
+        const sBadge = status === 'active' ? 'bg-success' : (status === 'suspended' ? 'bg-warning text-dark' : 'bg-secondary');
+        let foot = '';
+        if (canEdit) foot += `<button class="btn btn-sm btn-outline-primary" onclick='editTill(${JSON.stringify($tr.data('till'))})'><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button>`;
+        if (canDelete) foot += `<button class="btn btn-sm btn-outline-danger" onclick="deleteTill(${id},'${safeOutput(number)}')" ><i class="bi bi-x-circle me-1"></i><?= t('Close') ?></button>`;
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${sno}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem"><code>${safeOutput(number)}</code></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Network') ?></span><span class="kv-val">${safeOutput(network)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('SIM MSISDN') ?></span><span class="kv-val">${safeOutput(sim)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Float Ceil.') ?></span><span class="kv-val">${safeOutput(floatCeil)}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Cash Ceil.') ?></span><span class="kv-val">${safeOutput(cashCeil)}</span></div>
+          </div>
+          ${foot ? `<div class="mm-card-foot">${foot}</div>` : ''}
+        </div></div>`;
+    });
+    $('#tillsCardView').html(html);
 }
 </script>
 
