@@ -606,6 +606,35 @@ if (!function_exists('provisionTenant')) {
                 }
             }
 
+            // ── 9.7 Apply all pending per-tenant migrations to the new DB ────
+            // The schema template is a point-in-time snapshot; new modules add
+            // tables via migrations/tenant/ which normally run on deploy. Without
+            // this step, a tenant registered after a migration deploy would be
+            // missing those tables until the next deploy. Best-effort — a failure
+            // here is logged but never blocks the registration itself (the owner
+            // can already sign in and a superadmin can retry via
+            //   php core/tenant_migration_runner.php --tenant=<id>
+            try {
+                require_once __DIR__ . '/tenant_migration_runner.php';
+                $mr = runTenantMigrations($tenantId);
+                if ($mr['ran'] && !empty($mr['tenants'][0])) {
+                    $t0  = $mr['tenants'][0];
+                    $msg = $t0['failed']
+                        ? 'migration failed at ' . $t0['failed'] . ': ' . ($t0['error'] ?? '')
+                        : (count($t0['applied']) > 0
+                            ? 'applied: ' . implode(', ', $t0['applied'])
+                            : 'no pending migrations');
+                } else {
+                    $msg = 'runner noop: ' . ($mr['reason'] ?? 'no tenants found');
+                }
+                $step('apply_tenant_migrations', 'ok', $msg);
+                logProvisioningStep($tenantId, $subdomain, 'apply_tenant_migrations', 'ok', $msg);
+            } catch (Throwable $e) {
+                $step('apply_tenant_migrations', 'failed', $e->getMessage());
+                logProvisioningStep($tenantId, $subdomain, 'apply_tenant_migrations', 'failed', $e->getMessage());
+                error_log("provisionTenant: apply_tenant_migrations failed for {$subdomain}: " . $e->getMessage());
+            }
+
             $result['ok'] = true;
             logProvisioningStep($tenantId, $subdomain, 'complete', 'ok');
             return $result;
