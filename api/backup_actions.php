@@ -133,12 +133,35 @@ function restoreFromFile($filepath) {
     // next_result() returns false and exits the loop before anything reads
     // $mysqli->error. A restore could therefore abort halfway and report
     // nothing. Each result is now checked explicitly, including the failing one.
+    $stmtNum = 0;
     do {
+        $stmtNum++;
         if ($result = $mysqli->store_result()) $result->free();
-        if ($mysqli->errno) $errors[] = $mysqli->error;
+        if ($mysqli->errno) {
+            $err = $mysqli->error;
+            $errors[] = $err;
+            // Extra diagnostic when SYSTEM_USER or access-denied; find the SQL context.
+            if (stripos($err, 'SYSTEM_USER') !== false || stripos($err, 'Access denied') !== false) {
+                // Split on statement boundaries to find the failing one.
+                // Use a rough split (may break inside strings but good enough for logging).
+                $stmts = preg_split('/;\s*\n/', $sql, -1, PREG_SPLIT_NO_EMPTY);
+                $failStmt = isset($stmts[$stmtNum - 1]) ? trim($stmts[$stmtNum - 1]) : '(unknown)';
+                error_log('restoreFromFile: statement #' . $stmtNum . ' failed (' . $err . '): '
+                    . substr($failStmt, 0, 300));
+            }
+        }
         if (!$mysqli->more_results()) break;
         if (!$mysqli->next_result()) {
-            if ($mysqli->errno) $errors[] = $mysqli->error;
+            if ($mysqli->errno) {
+                $err = $mysqli->error;
+                $errors[] = $err;
+                if (stripos($err, 'SYSTEM_USER') !== false || stripos($err, 'Access denied') !== false) {
+                    $stmts = preg_split('/;\s*\n/', $sql, -1, PREG_SPLIT_NO_EMPTY);
+                    $failStmt = isset($stmts[$stmtNum]) ? trim($stmts[$stmtNum]) : '(unknown)';
+                    error_log('restoreFromFile: statement #' . ($stmtNum + 1) . ' failed (' . $err . '): '
+                        . substr($failStmt, 0, 300));
+                }
+            }
             break;
         }
     } while (true);

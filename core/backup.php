@@ -178,9 +178,17 @@ if (!function_exists('bms_write_dump')) {
         // across BMS legacy backups, cross-account migrations, and phpMyAdmin exports.
         // Uses \s+DEFINER (not \bDEFINER) to avoid false-matching inside quoted data.
         $sql = preg_replace('/\s+DEFINER\s*=\s*`(?:[^`]|``)*`@`(?:[^`]|``)*`/i', '', $sql);
-        $sql = preg_replace('/\s+DEFINER\s*=\s*CURRENT_USER\b/i', '', $sql);
+        $sql = preg_replace('/\s+DEFINER\s*=\s*CURRENT_USER\s*(\(\s*\))?\b/i', '', $sql); // also CURRENT_USER()
+        $sql = preg_replace('/\s+DEFINER\s*=\s*[a-zA-Z0-9_$]+@[a-zA-Z0-9_$.%]+/i', '', $sql); // unquoted user@host
         $sql = preg_replace('/\bSQL\s+SECURITY\s+DEFINER\b/i', 'SQL SECURITY INVOKER', $sql);
-        $sql = preg_replace('/\/\*![0-9]+\s+DEFINER=[^*]*\*\//i', '', $sql); // phpMyAdmin format
+        $sql = preg_replace('/\/\*![0-9]+\s*DEFINER=[^*]*\*\//i', '', $sql); // phpMyAdmin (space optional)
+
+        // Diagnostic: warn if any DEFINER= still remains after stripping (shouldn't happen).
+        if (preg_match('/\bDEFINER\s*=/i', $sql, $dm, PREG_OFFSET_CAPTURE)) {
+            $pos = (int)$dm[0][1];
+            error_log('bms_upgrade_legacy_dump: UNSTRIPPED DEFINER at offset ' . $pos . ': ...'
+                . substr($sql, max(0, $pos - 40), 120) . '...');
+        }
 
         $lines    = preg_split("/\r\n|\n|\r/", $sql);
         $out      = [];
