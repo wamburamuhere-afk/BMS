@@ -102,11 +102,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i><?= t('Teller Shifts') ?></h4>
-        <?php if (!isAdmin() && $myOpenShift): ?>
+        <?php if ($myOpenShift): ?>
         <button class="btn btn-danger btn-sm" onclick='closeShift(<?= htmlspecialchars(json_encode(['id'=>$myOpenShift['shift_id'],'code'=>$myOpenShift['shift_code'],'till_number'=>$myOpenShift['till_number'],'agent'=>$myOpenShift['agent_name']]),ENT_QUOTES) ?>)'>
             <i class="bi bi-stop-circle me-1"></i><?= t('Close Shift') ?> — <?= safe_output($myOpenShift['till_number']) ?>
         </button>
-        <?php elseif ($can_open): ?>
+        <?php elseif ($can_open && count($tillsForOpen) > 0): ?>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
             <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
         </button>
@@ -365,7 +365,7 @@ $(document).ready(function () {
     function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
     applyView(); $(window).on('resize',applyView);
 
-    <?php if (($_GET['action'] ?? '') === 'open' && $can_open && !$myOpenShift): ?>
+    <?php if (($_GET['action'] ?? '') === 'open' && $can_open && !$myOpenShift && count($tillsForOpen) > 0): ?>
     new bootstrap.Modal(document.getElementById('openShiftModal')).show();
     <?php endif; ?>
 
