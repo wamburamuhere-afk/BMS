@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-29 — fix(mm_posting): commission receipt double-counted Commission Income
+
+**Files:**
+- `core/mm_posting.php` — `postMMCommissionReceived()` now posts `Dr Bank | Cr E-Float` instead of `Dr Bank | Cr Commission Income`. Income is already recognised per transaction in `postMMTransaction()` (`Dr E-Float | Cr Commission Income`), so crediting income again on receipt doubled it on the P&L.
+- `tests/test_mm_commission_receipt_posting_cli.php` — new CLI test: source contract + runtime posting (rolled back) asserting the two legs.
+
+---
+
 ## 2026-09-28 — fix(mm_float_service): missing code_generator require + Throwable catch
 
 **Files:**

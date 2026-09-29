@@ -131,7 +131,9 @@ if (!function_exists('postMMCommissionReceived')) {
     /**
      * Post a commission receipt from the network to the GL.
      *
-     * Network pays out accumulated commissions → Dr Bank Account | Cr Commission Income
+     * Network pays out accumulated commissions → Dr Bank Account | Cr E-Float
+     * Income was already recognised per transaction in postMMTransaction()
+     * (Dr E-Float | Cr Commission Income); crediting income again here double-counts it.
      *
      * @param PDO    $pdo
      * @param int    $creditId    mm_commissions_received.credit_id
@@ -145,14 +147,11 @@ if (!function_exists('postMMCommissionReceived')) {
      */
     function postMMCommissionReceived(PDO $pdo, int $creditId, int $networkId, float $amount, int $bankAcctId, string $date, int $userId, string $reference): int {
         require_once __DIR__ . '/ledger_post.php';
-        $accts    = mmGLAccountIds($pdo, $networkId);
-        $commAcct = $accts['commission'];
-        if (!$commAcct) {
-            throw new \RuntimeException("MM network $networkId has no commission GL account configured.");
-        }
+        $accts  = mmGLAccountIds($pdo, $networkId);
+        $efloat = $accts['efloat'];
         $lines = [
             ['account_id' => $bankAcctId, 'type' => 'debit',  'amount' => $amount, 'description' => 'Commission received from network'],
-            ['account_id' => $commAcct,   'type' => 'credit', 'amount' => $amount, 'description' => 'Commission income credited'],
+            ['account_id' => $efloat,     'type' => 'credit', 'amount' => $amount, 'description' => 'Accrued commission settled to bank'],
         ];
         return postLedgerEntry($pdo, $reference, $lines, null, $creditId, 'mm_commission', $date, $userId, null);
     }
