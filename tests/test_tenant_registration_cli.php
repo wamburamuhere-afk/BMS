@@ -24,6 +24,7 @@ require_once "$root/roots.php";
 require_once "$root/core/control_db.php";
 require_once "$root/core/tenant_provisioner.php";
 require_once "$root/core/tenant_registration.php";
+require_once "$root/core/tenant_admin.php";
 
 $pass = 0; $fail = 0;
 function ok($c,$m){ global $pass,$fail; if($c){$pass++; echo "  \033[32m✅\033[0m $m\n";} else {$fail++; echo "  \033[31m❌ $m\033[0m\n";} }
@@ -174,6 +175,7 @@ try {
             'company_name'     => 'Registration Test Ltd',
             'subdomain'        => $sub,
             'owner_email'      => "owner@$sub.test",
+            'owner_phone'      => '2557' . random_int(10000000, 99999999),
             'owner_password'   => $pw,
             'owner_first_name' => 'Ada',
             'owner_last_name'  => 'Lovelace',
@@ -213,6 +215,44 @@ try {
     $st->execute([$sub]); $att = $st->fetch();
     ok(($att['outcome'] ?? '') === 'success', 'the signup is recorded as a success');
     ok((int)($att['tenant_id'] ?? 0) === $res['tenant_id'], 'the audit row links to the tenant');
+
+    section('6a. POS "More" sub-features start OFF even when the platform default is ON');
+    $subDefs = ['pos_advanced', 'restaurant_pos'];
+    $priorDefaults = [];
+    $q = $cpdo->prepare("SELECT default_enabled FROM features WHERE feature_key = ?");
+    foreach ($subDefs as $k) { $q->execute([$k]); $priorDefaults[$k] = $q->fetchColumn(); }
+    try {
+        // Reproduce the demo platform: "Default on" switched on for both.
+        $cpdo->prepare("UPDATE features SET default_enabled = 1 WHERE feature_key IN ('pos_advanced','restaurant_pos')")->execute();
+        $subA = 'regtestsub' . $sfx;
+        $resA = withTenancy(function () use ($subA) {
+            return registerTenant([
+                'company_name'   => 'Sub Feature Test Ltd',
+                'subdomain'      => $subA,
+                'owner_email'    => "owner@$subA.test",
+                'owner_phone'    => '2556' . random_int(10000000, 99999999),
+                'owner_password' => 'OwnerPass1',
+            ], '198.51.100.151');
+        });
+        ok($resA['ok'] === true, 'registration with platform defaults ON succeeded');
+        if ($resA['ok']) {
+            $made['tenants'][]   = $resA['tenant_id'];
+            $made['databases'][] = 'bms_t' . $resA['tenant_id'];
+            $made['users'][]     = 'bms_u' . $resA['tenant_id'];
+            $matrix = [];
+            foreach (tenantFeatureMatrix((int)$resA['tenant_id']) as $f) $matrix[$f['key']] = $f;
+            foreach ($subDefs as $k) {
+                ok(isset($matrix[$k]) && $matrix[$k]['effective'] === false,
+                    "$k is OFF in Point of Sale > More for the new tenant (" . ($matrix[$k]['reason'] ?? 'missing') . ')');
+            }
+            ok(isset($matrix['pos']) && $matrix['pos']['effective'] === true, 'POS itself is still ON');
+            ok(isset($matrix['warehouses']) && $matrix['warehouses']['effective'] === true, 'Warehouses is still ON');
+            $cpdo->prepare("DELETE FROM tenant_features WHERE tenant_id = ?")->execute([(int)$resA['tenant_id']]);
+        }
+    } finally {
+        $r = $cpdo->prepare("UPDATE features SET default_enabled = ? WHERE feature_key = ?");
+        foreach ($priorDefaults as $k => $v) { if ($v !== false) $r->execute([(int)$v, $k]); }
+    }
 
     section('6b. Provisioning-switch = "none" -> self-registration gets the blank plan (tenant_module_control_plan.md 5.1)');
     $priorMode = getPlatformSetting('tenant_default_provisioning', 'all');
