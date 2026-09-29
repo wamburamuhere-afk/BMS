@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-29 — fix(mm_shifts): Close Shift button did nothing (safeOutput undefined)
+
+**Files:**
+- `app/bms/mobile_money/mm_shifts.php` — added the page-local `safeOutput()` JS helper (same as `mm_float.php`). `closeShift()` called it before opening the modal; with no global definition it threw `ReferenceError: safeOutput is not defined`, so the Close Shift modal never opened. The same missing helper also broke the mobile card view (`renderCards()`). Verified on wakala.demo: before — ReferenceError, modal not shown; after — modal opens with the shift details.
+
+---
+
 ## 2026-09-29 — fix(tenant_registration): POS Advanced and Restaurant POS start OFF for self-registered companies
 
 **Files:**
