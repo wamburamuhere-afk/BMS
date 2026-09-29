@@ -70,6 +70,7 @@ $filterStatus = $_GET['status']    ?? '';
 $where  = ["s.opened_at >= :df", "s.opened_at <= :dt"];
 $params = [':df' => $filterFrom . ' 00:00:00', ':dt' => $filterTo . ' 23:59:59'];
 if ($filterStatus) { $where[] = 's.status = :status'; $params[':status'] = $filterStatus; }
+if (!isAdmin()) { $where[] = 's.teller_user_id = :uid'; $params[':uid'] = $_SESSION['user_id']; }
 
 $shifts = $pdo->prepare("
     SELECT s.*,
@@ -121,11 +122,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         </span>
     </div>
     <?php else: ?>
-    <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift.') ?></span>
-        <?php if ($can_open): ?>
-        <button class="btn btn-sm btn-primary ms-2" data-bs-toggle="modal" data-bs-target="#openShiftModal"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
-        <?php endif; ?>
+    <div class="alert alert-warning py-2 mb-3" style="border-radius:8px">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift.') ?>
     </div>
     <?php endif; ?>
 
@@ -366,6 +364,10 @@ $(document).ready(function () {
     }
     function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
     applyView(); $(window).on('resize',applyView);
+
+    <?php if (($_GET['action'] ?? '') === 'open' && $can_open && !$myOpenShift): ?>
+    new bootstrap.Modal(document.getElementById('openShiftModal')).show();
+    <?php endif; ?>
 
     $('#openShiftModal').on('shown.bs.modal', function(){
         const modal=$(this);

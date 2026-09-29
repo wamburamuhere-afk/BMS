@@ -156,7 +156,7 @@ function mmTrendBadge($pct): string {
                                 <div class="small mt-1 opacity-75"><?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?></div>
                             </a>
                             <?php else: ?>
-                            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
+                            <a href="<?= getUrl('mm_shifts') ?>?action=open" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-play-circle display-6"></i>
                                 <div class="mt-2"><?= t('Fungua Zamu') ?></div>
                             </a>
