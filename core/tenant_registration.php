@@ -348,6 +348,9 @@ if (!function_exists('applySelfRegistrationDefaults')) {
             'sales', 'procurement', 'tenders', 'hr', 'assets', 'projects',
             'ai_assistant', 'esignature', 'crm', 'communication', 'documents',
             'compliance', 'finance',
+            // POS "More" sub-features — explicit so they start off even when the
+            // platform's new-tenant default for them is on.
+            'pos_advanced', 'restaurant_pos',
         ] as $key) {
             $desired[$key] = false;
         }

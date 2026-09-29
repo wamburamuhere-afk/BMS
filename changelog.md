@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-29 — fix(tenant_registration): POS Advanced and Restaurant POS start OFF for self-registered companies
+
+**Files:**
+- `core/tenant_registration.php` — `applySelfRegistrationDefaults()` now also denies `pos_advanced` and `restaurant_pos`. They were missing from its switch-off list, so a new company followed the platform's new-tenant default for them — which is ON on the demo platform — and both showed ticked under Tenant → Point of Sale → More.
+- `tests/test_tenant_registration_cli.php` — new section 6a reproduces the demo state (platform "Default on" for both), registers through the real `registerTenant()`, and asserts both are OFF while POS and Warehouses stay ON; restores the platform defaults afterwards. Also passes the now-required `owner_phone` in the section 6 signup so the test reaches it.
+
+---
+
 ## 2026-09-29 — feat(tenant_provisioner): new tenants start with Simple POS, Shop Mode and Supplier Access ON
 
 **Files:**
