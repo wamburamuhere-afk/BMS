@@ -159,6 +159,17 @@ function tenantSetting(PDO $tPdo, string $key) {
     $v = $st->fetchColumn();
     return $v === false ? null : $v;
 }
+function tenantFeatureEnabledFor(PDO $c, int $tenantId, string $key): bool {
+    $st = $c->prepare("SELECT f.is_available, f.default_enabled, tf.is_enabled
+                         FROM features f
+                         LEFT JOIN tenant_features tf ON tf.feature_key = f.feature_key AND tf.tenant_id = ?
+                        WHERE f.feature_key = ?");
+    $st->execute([$tenantId, $key]);
+    $row = $st->fetch();
+    if (!$row) return false;
+    return (int)$row['is_available'] === 1
+        && ($row['is_enabled'] === null ? (int)$row['default_enabled'] === 1 : (int)$row['is_enabled'] === 1);
+}
 function controlLockFlag(PDO $c, int $tenantId): int {
     $st = $c->prepare("SELECT pos_simple_mode_locked FROM tenants WHERE id = ?");
     $st->execute([$tenantId]);
@@ -168,13 +179,26 @@ function controlLockFlag(PDO $c, int $tenantId): int {
 // ─────────────────────────────────────────────────────────────────────────────
 section('1. tenantPosSimpleModeStatus()/setTenantPosSimpleMode() — real cross-DB read/write');
 
-ok('fresh tenant has no pos_simple_mode row yet', tenantSetting($tPdo, 'pos_simple_mode') === null);
-ok('fresh tenant is not locked', controlLockFlag($c, $tenantId) === 0);
+// provisionTenant() seeds Simple Mode ON + locked (seedTenantPosDefaults()).
+ok('fresh tenant starts with pos_simple_mode=1', tenantSetting($tPdo, 'pos_simple_mode') === '1');
+ok('fresh tenant starts locked', controlLockFlag($c, $tenantId) === 1);
+ok('fresh tenant starts with shop_mode=1', tenantSetting($tPdo, 'shop_mode') === '1');
+ok('fresh tenant starts with pos_supplier_access=1', tenantSetting($tPdo, 'pos_supplier_access') === '1');
+foreach (['pos_advanced_product', 'pos_advanced_customer', 'pos_advanced_supplier'] as $offKey) {
+    ok("fresh tenant leaves $offKey off (superadmin enables it)", tenantSetting($tPdo, $offKey) === null);
+}
+ok('POS Advanced is not granted by default', !tenantFeatureEnabledFor($c, $tenantId, 'pos_advanced'));
+ok('Restaurant POS is not granted by default', !tenantFeatureEnabledFor($c, $tenantId, 'restaurant_pos'));
+$seedStep = array_values(array_filter($r['steps'], fn($s) => ($s['step'] ?? $s['name'] ?? '') === 'seed_pos_defaults'))[0] ?? null;
+ok('provisioning reported the seed_pos_defaults step as ok', $seedStep !== null && ($seedStep['status'] ?? '') === 'ok', json_encode($seedStep));
 
 $status0 = tenantPosSimpleModeStatus($tenantId);
 ok('status() returns an array for a real tenant', is_array($status0));
-ok('status() reports enabled=false by default', $status0 !== null && $status0['enabled'] === false);
-ok('status() reports locked=false by default', $status0 !== null && $status0['locked'] === false);
+ok('status() reports enabled=true by default', $status0 !== null && $status0['enabled'] === true);
+ok('status() reports locked=true by default', $status0 !== null && $status0['locked'] === true);
+
+$set0 = setTenantPosSimpleMode($tenantId, false, false);
+ok('reset to off/unlocked so the write checks below start from a known state', $set0['ok'] === true);
 
 $set1 = setTenantPosSimpleMode($tenantId, true, true);
 ok('setTenantPosSimpleMode(true, true) reports ok', $set1['ok'] === true, (string)($set1['error'] ?? ''));
