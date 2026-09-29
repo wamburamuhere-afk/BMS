@@ -55,6 +55,15 @@ $myShiftStmt = $pdo->prepare("
 $myShiftStmt->execute([$_SESSION['user_id']]);
 $myActiveShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
 
+// Does this user have at least one till they can open a shift on?
+if (isAdmin()) {
+    $canOpenShiftOnAny = (bool)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='active'")->fetchColumn();
+} else {
+    $coStmt = $pdo->prepare("SELECT COUNT(*) FROM mm_user_agent_grants WHERE user_id=? AND can_open_shift=1");
+    $coStmt->execute([$_SESSION['user_id']]);
+    $canOpenShiftOnAny = (bool)$coStmt->fetchColumn();
+}
+
 // --- Daily volume last 14 days (chart) ---
 $dailyVol = $pdo->prepare("
     SELECT txn_date, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
@@ -156,10 +165,18 @@ function mmTrendBadge($pct): string {
                                 <div class="small mt-1 opacity-75"><?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?></div>
                             </a>
                             <?php else: ?>
+                            <?php if ($canOpenShiftOnAny): ?>
                             <a href="<?= getUrl('mm_shifts') ?>?action=open" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-play-circle display-6"></i>
                                 <div class="mt-2"><?= t('Fungua Zamu') ?></div>
                             </a>
+                            <?php else: ?>
+                            <div class="btn btn-outline-secondary w-100 h-100 py-3 disabled opacity-50">
+                                <i class="bi bi-play-circle display-6"></i>
+                                <div class="mt-2"><?= t('Fungua Zamu') ?></div>
+                                <div class="small mt-1 opacity-75"><?= t('No tills assigned') ?></div>
+                            </div>
+                            <?php endif; ?>
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
