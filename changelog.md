@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-09-29 — feat(tenant_provisioner): new tenants start with Simple POS, Shop Mode and Supplier Access ON
+
+**Files:**
+- `core/tenant_provisioner.php` — new `seedTenantPosDefaults()` + provisioning step 9.55: writes `pos_simple_mode=1`, `shop_mode=1`, `pos_supplier_access=1` into the new tenant's `system_settings` and sets `pos_simple_mode_locked=1`, `pos_supplier_access_locked=1` in the control DB. POS Advanced, Restaurant POS, Advanced Product/Customer/Supplier stay off until a superadmin enables them (Tenant → Point of Sale → More). Best-effort step, same as company-profile seeding.
+- `tests/test_superadmin_pos_simple_mode_cli.php` — asserts the new defaults (Simple/Shop/Supplier Access on, the rest off, step reported ok) instead of the old "fresh tenant has no Simple Mode" expectation.
+- `tests/test_supplier_access_simple_pos_cli.php` — asserts Supplier Access starts on, then switches it (and Simple Mode, before the Procurement-tabs section) off so the existing baseline sections still test what they were written for.
+
+---
+
 ## 2026-09-28 — fix(mm_float_service): missing code_generator require + Throwable catch
 
 **Files:**
