@@ -470,18 +470,23 @@ function tenantModal(string $host, int $userId): string {
 
 $ownerUserId = (int)$tPdo->query("SELECT user_id FROM users ORDER BY user_id LIMIT 1")->fetchColumn();
 
-ok('fresh tenant has no pos_supplier_access row yet', tenantSetting($tPdo, 'pos_supplier_access') === null);
-ok('fresh tenant is not locked (supplier access)', controlLockFlag($c, $tenantId, 'pos_supplier_access_locked') === 0);
+// provisionTenant() seeds Supplier Access ON + locked (seedTenantPosDefaults()).
+ok('fresh tenant starts with pos_supplier_access=1', tenantSetting($tPdo, 'pos_supplier_access') === '1');
+ok('fresh tenant starts locked (supplier access)', controlLockFlag($c, $tenantId, 'pos_supplier_access_locked') === 1);
 
 $status0 = tenantSupplierAccessStatus($tenantId);
 ok('status() returns an array for a real tenant', is_array($status0));
-ok('status() reports enabled=false by default', $status0 !== null && $status0['enabled'] === false);
+ok('status() reports enabled=true by default', $status0 !== null && $status0['enabled'] === true);
 
 ok('...independent of Advanced Supplier (still off, untouched)', tenantSetting($tPdo, 'pos_advanced_supplier') === null);
 $setAdvSupp = setTenantAdvancedSupplier($tenantId, true, true);
 ok('turning Advanced Supplier on separately reports ok', $setAdvSupp['ok'] === true);
-ok('...Supplier Access is UNAFFECTED by the Advanced Supplier write', tenantSetting($tPdo, 'pos_supplier_access') === null);
+ok('...Supplier Access is UNAFFECTED by the Advanced Supplier write', tenantSetting($tPdo, 'pos_supplier_access') === '1');
 setTenantAdvancedSupplier($tenantId, false, false); // reset
+
+// Sections 7-8 exercise the "Supplier Access OFF" baseline — switch it off first.
+$offSa = setTenantSupplierAccess($tenantId, false, false);
+ok('reset Supplier Access to off for the baseline sections below', $offSa['ok'] === true);
 
 $r = endpoint('actions/superadmin_tenant_supplier_access.php', ['tenant_id' => $tenantId, 'action' => 'status'], ['auth' => true]);
 ok('POSITIVE CONTROL: an authenticated operator CAN read status', str_contains($r['out'], '"success":true'), substr($r['out'], 0, 200));
@@ -626,6 +631,10 @@ section('12. Live tenant — re-enabling Procurement brings the tabs back (fix d
 // (a global COUNT(*), not scoped to any one tenant).
 $on = setTenantFeatures($tenantId, ['procurement' => true, 'projects' => true]);
 ok('setTenantFeatures() turns Procurement (and Projects) back on', $on['ok'] === true, (string)($on['error'] ?? ''));
+// New tenants start in Simple Mode, which hides procurement tabs by design
+// (supplier_details.php $hideProcurementTabs) — switch it off to test Procurement alone.
+$simpleOff = setTenantPosSimpleMode($tenantId, false, false);
+ok('Simple Mode switched off so only Procurement decides the tabs', $simpleOff['ok'] === true);
 
 $sd2 = tenantRoute($tenantHost, '/suppliers/view?id=' . $testSupplierId, $ownerUserId);
 ok('Recent Payments tab REAPPEARS once Procurement is genuinely on', str_contains($sd2, 'id="pane-payments"'));

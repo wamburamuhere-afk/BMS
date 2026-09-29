@@ -312,6 +312,29 @@ if (!function_exists('seedTenantCompanyProfile')) {
     }
 }
 
+if (!function_exists('seedTenantPosDefaults')) {
+    /**
+     * Point of Sale "More" defaults for every new tenant: Simple Mode, Shop Mode
+     * and Supplier Access ON; every other POS sub-option stays off until a
+     * superadmin enables it. Same keys/lock columns as the setTenant*() writers
+     * in core/tenant_admin.php, which remain the only way to change them later.
+     */
+    function seedTenantPosDefaults(PDO $tpdo, PDO $cpdo, int $tenantId): void
+    {
+        $stmt = $tpdo->prepare("
+            INSERT INTO system_settings (setting_key, setting_value, updated_at)
+            VALUES (?, '1', NOW())
+            ON DUPLICATE KEY UPDATE setting_value = '1', updated_at = NOW()
+        ");
+        foreach (['pos_simple_mode', 'shop_mode', 'pos_supplier_access'] as $key) {
+            $stmt->execute([$key]);
+        }
+
+        $cpdo->prepare("UPDATE tenants SET pos_simple_mode_locked = 1, pos_supplier_access_locked = 1 WHERE id = ?")
+             ->execute([$tenantId]);
+    }
+}
+
 if (!function_exists('provisionTenant')) {
     /**
      * Create a fully working tenant.
@@ -586,6 +609,18 @@ if (!function_exists('provisionTenant')) {
             } catch (Throwable $e) {
                 $step('seed_company_profile', 'failed', $e->getMessage());
                 logProvisioningStep($tenantId, $subdomain, 'seed_company_profile', 'failed', $e->getMessage());
+            }
+
+            // ── 9.55 POS defaults (Simple Mode, Shop Mode, Supplier Access) ──
+            // Best-effort, same discipline as 9.5 — a superadmin can still set
+            // them from Tenant > Point of Sale > More if this ever fails.
+            try {
+                seedTenantPosDefaults($tpdo, $cpdo, $tenantId);
+                $step('seed_pos_defaults', 'ok');
+                logProvisioningStep($tenantId, $subdomain, 'seed_pos_defaults', 'ok');
+            } catch (Throwable $e) {
+                $step('seed_pos_defaults', 'failed', $e->getMessage());
+                logProvisioningStep($tenantId, $subdomain, 'seed_pos_defaults', 'failed', $e->getMessage());
             }
 
             // ── 9.6 Welcome email — best-effort, same discipline as 9.5 ──────
