@@ -354,6 +354,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 <?php endif; ?>
 
 <script>
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#shiftsTable')) {
         $('#shiftsTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[4,'desc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
