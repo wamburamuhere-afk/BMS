@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency
+
+**Files:**
+- `api/pos/process_sale.php` — Per-line `discount_percentage`, `discount_amount`, and `discount` fields are now respected: when `discounted_price` is absent the server derives it from whichever discount field was sent. Previously only `discounted_price` was read, so all other discount field names were silently ignored and the sale posted at full price. Added guard: for non-credit payment methods (`cash`, `card`, `mobile_money`, etc.) a `balance_due > 0` after server-side recalculation returns HTTP 422 instead of silently creating a partial-sale record.
+- `api/pos/quick_restock.php` — Added `client_uuid` idempotency: self-heals `product_batches.client_uuid` column (DDL outside transaction), checks for duplicate before opening the transaction, stamps the uuid onto the new batch row so the second call is detected and returns the original result without re-adding stock.
+
+---
+
 ## 2026-09-30 — fix(mobile-api): tenant migration re-apply with correct top-level format
 
 **Files:**

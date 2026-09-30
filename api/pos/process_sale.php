@@ -539,6 +539,21 @@ try {
             }
         }
 
+        // Normalise per-line discount: clients may send discount_percentage /
+        // discount_amount / discount instead of a pre-computed discounted_price.
+        // discounted_price takes priority when present; otherwise derive it here
+        // so the price resolution and discount calculation below work correctly.
+        if (!isset($item['discounted_price']) || $item['discounted_price'] === null || $item['discounted_price'] === '') {
+            $_rawPx   = floatval($item['price'] ?? 0);
+            $_discPct = floatval($item['discount_percentage'] ?? $item['discount_percent'] ?? $item['discount_rate'] ?? 0);
+            $_discAmt = floatval($item['discount_amount'] ?? $item['discount'] ?? 0);
+            if ($_discPct > 0) {
+                $item['discounted_price'] = round($_rawPx * (1 - $_discPct / 100), 4);
+            } elseif ($_discAmt > 0) {
+                $item['discounted_price'] = max(0.0, $_rawPx - $_discAmt);
+            }
+        }
+
         // Validate Price
         $requested_price = floatval($item['discounted_price'] ?? $item['price'] ?? 0);
         $min_price = floatval($db_product['min_selling_price']);
@@ -742,6 +757,18 @@ try {
     elseif ($amount_paid_now > 0.01)                       $final_payment_status = 'partial';
     else                                                   $final_payment_status = 'pending';
     $balance_due = round($calculated_total - $amount_paid_now, 2);
+
+    // Non-credit payment methods must collect the full amount at the register.
+    // A balance_due here means the client's total was stale (e.g. discounts
+    // ignored on a previous attempt). Reject with a clear error rather than
+    // silently leaving the customer with an unexpected debt.
+    if (!$is_credit && $balance_due > 0.01) {
+        throw new Exception(
+            sprintf(t('Amount tendered (%s) is less than the sale total (%s). Check your discounts or totals and resubmit.'),
+                number_format($amount_paid_now, 2), number_format($calculated_total, 2)),
+            422
+        );
+    }
 
     // Phase 19 (pos_upgrade_plan.md §8) — customer credit-limit enforcement.
     // Only a real credit EXPOSURE (balance_due > 0) is checked — a "credit"
