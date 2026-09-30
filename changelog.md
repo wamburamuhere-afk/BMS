@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-09-30 — fix(mm): CRUD gap fixes — close/deactivate/cancel+edit for agents, networks, reconciliations
+
+**Root cause:** Three MM list pages had create+edit but no delete/close action, leaving orphaned records with no removal path.
+
+**Files:**
+- `app/bms/mobile_money/mm_agents.php` — Added "Close Agent" dropdown item + `closeAgent()` JS function; `data-can-delete` on tr; `renderCards()` close button; gated by `$can_delete`
+- `app/bms/mobile_money/mm_networks.php` — Added `$can_delete`; "Deactivate" dropdown item; `deleteNetwork()` JS + card button; action column header now `$can_edit || $can_delete`
+- `api/mobile_money/save_network.php` — Added DELETE handler: sets `status='inactive'`, `logActivity` + `logAudit`
+- `app/bms/mobile_money/mm_reconciliation.php` — Added `$can_delete`; actions column replaced with dropdown (View / Edit / Cancel); Edit modal for `recon_date` + notes; `editRecon()` + `cancelRecon()` JS; card view buttons; edit/cancel shown for `status='open'` only
+- `api/mobile_money/save_reconciliation.php` — Added EDIT handler (`_method=EDIT`: updates `recon_date`/notes, only for open); DELETE handler (`_method=DELETE`: sets `status='closed'`, only for open); both gate on `canEdit`/`canDelete`, `logActivity`+`logAudit`
+- `tests/test_mm_crud_gaps_cli.php` — New: 50 assertions (static + lint + live rolled-back), all passing
+
+## 2026-09-30 — fix(pos): receive_payment idempotency false positive + process_sale sold_at time loss
+
+**Files:**
+- `api/pos/receive_payment.php` — Replaced aggregate idempotency query (SUM without GROUP BY returned a synthetic NULL row, triggering idempotent guard on every first call) with a simple point-lookup JOIN; no more false "Payment already recorded" on the first request
+- `api/pos/process_sale.php` — `$sold_at` now defaults to server NOW instead of null; credit sales (and any sale where the client omits `sold_at`) no longer store `NULL` or `YYYY-MM-DD 00:00:00` — the server time is used when the client doesn't supply a precise timestamp
+
 ## 2026-09-30 — fix(mobile-api): master-data API bug fixes + schema catch-up migration
 
 **Root cause:** tenant DBs provisioned before `2026_09_23_master_data_offline_sync` lacked `client_uuid` and several optional columns; API endpoints always referenced those columns → "Server error" on create/list/get.

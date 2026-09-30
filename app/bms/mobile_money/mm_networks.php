@@ -8,6 +8,7 @@ includeHeader();
 
 $can_create = canCreate('mm_networks');
 $can_edit   = canEdit('mm_networks');
+$can_delete = canDelete('mm_networks');
 
 $networks = $pdo->query("
     SELECT n.*,
@@ -99,12 +100,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <th class="text-center"><?= t('Commission Account') ?></th>
                             <th class="text-center"><?= t('Agents') ?></th>
                             <th class="text-center"><?= t('Status') ?></th>
-                            <?php if ($can_edit): ?><th class="text-center"><?= t('Actions') ?></th><?php endif; ?>
+                            <?php if ($can_edit || $can_delete): ?><th class="text-center"><?= t('Actions') ?></th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $sno = 1; foreach ($networks as $n): ?>
-                        <tr data-id="<?= (int)$n['network_id'] ?>" data-name="<?= htmlspecialchars($n['network_name']) ?>" data-code="<?= htmlspecialchars($n['network_code']) ?>" data-status="<?= htmlspecialchars($n['status']) ?>" data-color="<?= htmlspecialchars($n['color_hex'] ?: '#6c757d') ?>" data-agents="<?= (int)$n['agent_count'] ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>">
+                        <tr data-id="<?= (int)$n['network_id'] ?>" data-name="<?= htmlspecialchars($n['network_name']) ?>" data-code="<?= htmlspecialchars($n['network_code']) ?>" data-status="<?= htmlspecialchars($n['status']) ?>" data-color="<?= htmlspecialchars($n['color_hex'] ?: '#6c757d') ?>" data-agents="<?= (int)$n['agent_count'] ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>" data-can-delete="<?= $can_delete ? '1' : '0' ?>">
                             <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
                                 <span class="d-inline-block me-2" style="width:12px;height:12px;border-radius:50%;background:<?= htmlspecialchars($n['color_hex'] ?: '#999') ?>"></span>
@@ -121,14 +122,20 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                                     <?= ucfirst(safe_output($n['status'])) ?>
                                 </span>
                             </td>
-                            <?php if ($can_edit): ?>
+                            <?php if ($can_edit || $can_delete): ?>
                             <td class="text-center">
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="bi bi-gear-fill"></i>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:120px;font-size:.85rem">
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
+                                        <?php if ($can_edit): ?>
                                         <li><a class="dropdown-item mm-net-edit" href="#" data-net-id="<?= (int)$n['network_id'] ?>"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
+                                        <?php endif; ?>
+                                        <?php if ($can_delete): ?>
+                                        <?php if ($can_edit): ?><li><hr class="dropdown-divider my-1"></li><?php endif; ?>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteNetwork(<?= (int)$n['network_id'] ?>,'<?= addslashes(htmlspecialchars($n['network_name'])) ?>');return false"><i class="bi bi-x-circle me-2"></i><?= t('Deactivate') ?></a></li>
+                                        <?php endif; ?>
                                     </ul>
                                 </div>
                             </td>
@@ -359,6 +366,34 @@ $(document).ready(function () {
     });
 });
 
+function deleteNetwork(id, name) {
+    Swal.fire({
+        title: '<?= t('Deactivate Network?') ?>',
+        html: '<?= t('This will deactivate') ?> <strong>' + name + '</strong>.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: '<?= t('Yes, Deactivate') ?>',
+        cancelButtonText: '<?= t('Cancel') ?>'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/save_network.php') ?>',
+            type: 'POST',
+            data: { _method: 'DELETE', network_id: id, _csrf: '<?= csrf_token() ?>' },
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: '<?= t('Deactivated!') ?>', timer: 1500, showConfirmButton: false }).then(function(){ location.reload(); });
+                } else {
+                    Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message });
+                }
+            },
+            error: function() { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); }
+        });
+    });
+}
+
 function renderCards(nodes) {
     if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No networks configured') ?></div>'); return; }
     window.__mmNetData = window.__mmNetData || {};
@@ -369,6 +404,7 @@ function renderCards(nodes) {
         const name = $tr.data('name'), code = $tr.data('code');
         const status = $tr.data('status'), color = $tr.data('color');
         const agents = $tr.data('agents'), canEdit = $tr.data('can-edit') == 1;
+        const canDelete = $tr.data('can-delete') == 1;
         window.__mmNetData[id] = JSON.parse($tr.attr('data-agent') || 'null') || {};
         const sBadge = status === 'active' ? 'bg-success' : 'bg-secondary';
         html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
@@ -383,7 +419,10 @@ function renderCards(nodes) {
             <div class="mm-kv"><span class="kv-lbl"><?= t('Code') ?></span><span class="kv-val"><code>${safeOutput(code)}</code></span></div>
             <div class="mm-kv"><span class="kv-lbl"><?= t('Agents') ?></span><span class="kv-val">${safeOutput(String(agents))}</span></div>
           </div>
-          ${canEdit ? `<div class="mm-card-foot"><button class="btn btn-sm btn-outline-primary mm-net-edit" data-net-id="${id}"><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button></div>` : ''}
+          ${(canEdit || canDelete) ? `<div class="mm-card-foot">
+            ${canEdit ? `<button class="btn btn-sm btn-outline-primary mm-net-edit" data-net-id="${id}"><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button>` : ''}
+            ${canDelete ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork(${id},'${name.replace(/'/g,&quot;\\&apos;&quot;)}')"><i class="bi bi-x-circle me-1"></i><?= t('Deactivate') ?></button>` : ''}
+          </div>` : ''}
         </div></div>`;
     });
     $('#cardView').html(html);

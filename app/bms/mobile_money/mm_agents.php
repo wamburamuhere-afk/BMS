@@ -101,7 +101,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                         </thead>
                         <tbody>
                             <?php $sno = 1; foreach ($agents as $a): ?>
-                            <tr data-id="<?= (int)$a['agent_id'] ?>" data-name="<?= htmlspecialchars($a['agent_name']) ?>" data-code="<?= htmlspecialchars($a['agent_code'] ?: '') ?>" data-outlet-type="<?= htmlspecialchars($a['outlet_type'] ?: '') ?>" data-phone="<?= htmlspecialchars($a['phone_primary'] ?: '') ?>" data-region="<?= htmlspecialchars($a['region'] ?: '') ?>" data-district="<?= htmlspecialchars($a['district'] ?: '') ?>" data-street="<?= htmlspecialchars($a['street'] ?: '') ?>" data-bot-license="<?= htmlspecialchars($a['bot_license'] ?: '') ?>" data-status="<?= htmlspecialchars($a['status']) ?>" data-networks="<?= htmlspecialchars($a['networks_str'] ?: '—') ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>">
+                            <tr data-id="<?= (int)$a['agent_id'] ?>" data-name="<?= htmlspecialchars($a['agent_name']) ?>" data-code="<?= htmlspecialchars($a['agent_code'] ?: '') ?>" data-outlet-type="<?= htmlspecialchars($a['outlet_type'] ?: '') ?>" data-phone="<?= htmlspecialchars($a['phone_primary'] ?: '') ?>" data-region="<?= htmlspecialchars($a['region'] ?: '') ?>" data-district="<?= htmlspecialchars($a['district'] ?: '') ?>" data-street="<?= htmlspecialchars($a['street'] ?: '') ?>" data-bot-license="<?= htmlspecialchars($a['bot_license'] ?: '') ?>" data-status="<?= htmlspecialchars($a['status']) ?>" data-networks="<?= htmlspecialchars($a['networks_str'] ?: '—') ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>" data-can-delete="<?= $can_delete ? '1' : '0' ?>">
                                 <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code><?= safe_output($a['agent_code']) ?></code></td>
                                 <td class="fw-semibold"><?= safe_output($a['agent_name']) ?></td>
@@ -126,6 +126,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                                             <?php if ($can_edit): ?>
                                             <li><hr class="dropdown-divider my-1"></li>
                                             <li><a class="dropdown-item" href="#" onclick="editAgent(window.__mmAgentData[<?= (int)$a['agent_id'] ?>]);return false"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
+                                            <?php endif; ?>
+                                            <?php if ($can_delete): ?>
+                                            <li><hr class="dropdown-divider my-1"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="closeAgent(<?= (int)$a['agent_id'] ?>,'<?= addslashes(htmlspecialchars($a['agent_name'])) ?>');return false"><i class="bi bi-x-circle me-2"></i><?= t('Close Agent') ?></a></li>
                                             <?php endif; ?>
                                         </ul>
                                     </div>
@@ -339,6 +343,34 @@ $(document).ready(function () {
     $('.modal').on('hidden.bs.modal', function(){$(this).find('form')[0]?.reset();});
 });
 
+function closeAgent(id, name) {
+    Swal.fire({
+        title: '<?= t('Close Agent?') ?>',
+        html: '<?= t('This will close') ?> <strong>' + name + '</strong>. <?= t('This action cannot be undone.') ?>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: '<?= t('Yes, Close') ?>',
+        cancelButtonText: '<?= t('Cancel') ?>'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/save_agent.php') ?>',
+            type: 'POST',
+            data: { _method: 'DELETE', agent_id: id, _csrf: '<?= csrf_token() ?>' },
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: '<?= t('Closed!') ?>', timer: 1500, showConfirmButton: false }).then(function(){ location.reload(); });
+                } else {
+                    Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message });
+                }
+            },
+            error: function() { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); }
+        });
+    });
+}
+
 function editAgent(a) {
     $('#edit_id').val(a.agent_id); $('#edit_name').val(a.agent_name);
     $('#edit_outlet_type').val(a.outlet_type); $('#edit_phone').val(a.phone_primary);
@@ -360,6 +392,7 @@ function renderCards(nodes) {
         const region = $tr.data('region'), district = $tr.data('district');
         const networks = $tr.data('networks'), status = $tr.data('status');
         const canEdit = $tr.data('can-edit') == 1;
+        const canDelete = $tr.data('can-delete') == 1;
         window.__mmAgentData[id] = { agent_id: id, agent_name: name, outlet_type: outletType, phone_primary: phone, region: region, district: district, street: $tr.data('street'), bot_license: $tr.data('bot-license'), status: status };
         const sBadge = status === 'active' ? 'bg-success' : (status === 'suspended' ? 'bg-warning text-dark' : 'bg-secondary');
         const loc = [region, district].filter(Boolean).join(', ') || '—';
@@ -379,6 +412,7 @@ function renderCards(nodes) {
           <div class="mm-card-foot">
             <a href="<?= getUrl('mm_agent_view') ?>?id=${id}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1"></i><?= t('View') ?></a>
             ${canEdit ? `<button class="btn btn-sm btn-outline-primary" onclick="editAgent(window.__mmAgentData[${id}])"><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button>` : ''}
+            ${canDelete ? `<button class="btn btn-sm btn-outline-danger" onclick="closeAgent(${id},window.__mmAgentData[${id}].agent_name)"><i class="bi bi-x-circle me-1"></i><?= t('Close') ?></button>` : ''}
           </div>
         </div></div>`;
     });

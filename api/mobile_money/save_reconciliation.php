@@ -6,10 +6,59 @@ require_once ROOT_DIR . '/core/code_generator.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canCreate('mm_reconciliation')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 
 csrf_check();
+
+$method = $_POST['_method'] ?? '';
+
+// DELETE — cancel an open reconciliation
+if ($method === 'DELETE') {
+    if (!canDelete('mm_reconciliation')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+    $id = intval($_POST['recon_id'] ?? 0);
+    if (!$id) { echo json_encode(['success' => false, 'message' => 'Invalid ID']); exit; }
+    $rec = $pdo->prepare("SELECT recon_code, status FROM mm_reconciliations WHERE recon_id=?");
+    $rec->execute([$id]);
+    $rec = $rec->fetch(PDO::FETCH_ASSOC);
+    if (!$rec) { echo json_encode(['success' => false, 'message' => 'Reconciliation not found']); exit; }
+    if ($rec['status'] !== 'open') { echo json_encode(['success' => false, 'message' => 'Only open reconciliations can be cancelled']); exit; }
+    try {
+        $pdo->prepare("UPDATE mm_reconciliations SET status='closed', closed_at=NOW(), closed_by=? WHERE recon_id=?")->execute([$_SESSION['user_id'], $id]);
+        logActivity($pdo, $_SESSION['user_id'], "Cancelled MM reconciliation {$rec['recon_code']} (id=$id)");
+        logAudit($pdo, $_SESSION['user_id'], 'mm_recon_cancel', ['entity_type' => 'mm_reconciliation', 'entity_id' => $id, 'old_values' => ['status' => 'open'], 'new_values' => ['status' => 'closed']]);
+        echo json_encode(['success' => true, 'message' => 'Reconciliation cancelled.']);
+    } catch (Exception $e) {
+        error_log("save_reconciliation DELETE: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Database error.']);
+    }
+    exit;
+}
+
+// EDIT — update date/notes for an open reconciliation
+if ($method === 'EDIT') {
+    if (!canEdit('mm_reconciliation')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+    $id        = intval($_POST['recon_id'] ?? 0);
+    $reconDate = trim($_POST['recon_date'] ?? '');
+    $notes     = trim($_POST['notes'] ?? '');
+    if (!$id || !$reconDate) { echo json_encode(['success' => false, 'message' => 'ID and date are required']); exit; }
+    $rec = $pdo->prepare("SELECT recon_code, status FROM mm_reconciliations WHERE recon_id=?");
+    $rec->execute([$id]);
+    $rec = $rec->fetch(PDO::FETCH_ASSOC);
+    if (!$rec) { echo json_encode(['success' => false, 'message' => 'Reconciliation not found']); exit; }
+    if ($rec['status'] !== 'open') { echo json_encode(['success' => false, 'message' => 'Only open reconciliations can be edited']); exit; }
+    try {
+        $pdo->prepare("UPDATE mm_reconciliations SET recon_date=?, resolved_notes=? WHERE recon_id=?")->execute([$reconDate, $notes ?: null, $id]);
+        logActivity($pdo, $_SESSION['user_id'], "Edited MM reconciliation {$rec['recon_code']} (id=$id)");
+        logAudit($pdo, $_SESSION['user_id'], 'mm_recon_edit', ['entity_type' => 'mm_reconciliation', 'entity_id' => $id, 'new_values' => ['recon_date' => $reconDate, 'resolved_notes' => $notes]]);
+        echo json_encode(['success' => true, 'message' => 'Reconciliation updated.']);
+    } catch (Exception $e) {
+        error_log("save_reconciliation EDIT: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Database error.']);
+    }
+    exit;
+}
+
+if (!canCreate('mm_reconciliation')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 
 $tillId    = intval($_POST['till_id'] ?? 0);
 $reconDate = trim($_POST['recon_date'] ?? '');
