@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-09-30 — fix(mobile-api): master-data API bug fixes + schema catch-up migration
+
+**Root cause:** tenant DBs provisioned before `2026_09_23_master_data_offline_sync` lacked `client_uuid` and several optional columns; API endpoints always referenced those columns → "Server error" on create/list/get.
+
+**Files:**
+- `api/mobile/customers/create.php` — Replaced self-heal DDL with defensive `SHOW COLUMNS LIKE 'client_uuid'` check; INSERT skips the column when absent; correct on all tenants
+- `api/mobile/suppliers/create.php` — Same `client_uuid` defensive fix
+- `api/mobile/suppliers/list.php` — Full query (with `contact_person`, `city`, `supplier_type`, `notes`, `updated_at`) tried first; PDOException fallback uses core-only SELECT + WHERE, returning empty strings for missing fields
+- `api/mobile/products/get.php` — Full query with `brands`/`tax_rates` JOIN tried first; PDOException fallback returns NULL for `brand_name`, `tax_name`, `min_selling_price`, `discount_rate`
+- `migrations/tenant/2026_09_30_mobile_api_schema.php` — NEW: idempotent catch-up migration adding `client_uuid` (+ unique index) to 5 tables, optional supplier columns, optional product columns, and stub `brands`/`tax_rates` tables
+- **API docs artifact (v14→v15):** corrected `customer_type` values (`retail/wholesale/corporate` → `individual/business`) in 3 spots; added v15 changelog entry; updated badge
+
 ## 2026-09-30 — feat(mm): MM Agent/Till Access grant management page
 
 **Files:**
