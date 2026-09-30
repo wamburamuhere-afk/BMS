@@ -75,6 +75,17 @@ try {
 } catch (Throwable $_e) {}
 $pos_due_date_expr = $pos_has_due_date ? 'ps.due_date' : 'NULL';
 
+// Check whether pos_sale_payments exists (added by the credit-sale migration).
+// When present, compute actual amount paid; otherwise fall back to payment_status.
+$pos_has_pay_table = false;
+try {
+    global $pdo;
+    $pos_has_pay_table = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetch();
+} catch (Throwable $_e) {}
+$pos_paid_expr = $pos_has_pay_table
+    ? "COALESCE((SELECT SUM(psp.amount) FROM pos_sale_payments psp WHERE psp.sale_id = ps.sale_id), 0)"
+    : "CASE WHEN ps.payment_status = 'paid' THEN ps.grand_total ELSE 0 END";
+
 try {
     global $pdo;
 
@@ -128,8 +139,8 @@ try {
              WHERE $eff_inv_where
             UNION ALL
             SELECT ps.grand_total,
-                   ps.grand_total AS paid_amount,
-                   0              AS balance_due,
+                   {$pos_paid_expr}                                   AS paid_amount,
+                   ps.grand_total - ({$pos_paid_expr})                AS balance_due,
                    ps.customer_id AS cust_id
               FROM pos_sales ps
              WHERE $eff_pos_where
@@ -225,8 +236,8 @@ try {
                    $pos_due_date_expr                                                        AS due_date,
                    COALESCE(ps.customer_name, c2.customer_name, 'Walk-in')                  AS customer_name,
                    ps.grand_total,
-                   ps.grand_total                                                            AS paid_amount,
-                   0                                                                         AS balance_due,
+                   {$pos_paid_expr}                                                          AS paid_amount,
+                   ps.grand_total - ({$pos_paid_expr})                                       AS balance_due,
                    ps.discount_amount, ps.tax_amount,
                    ps.payment_status                                                         AS status,
                    ps.payment_method,

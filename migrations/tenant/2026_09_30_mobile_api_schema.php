@@ -8,11 +8,16 @@
  *   - brands table (if not present) and brand_id, tax_rate_id, min_selling_price, discount_rate on products
  *   - contact_person, city, supplier_type, notes, updated_at on suppliers
  *
- * All ALTER TABLE statements are guarded by addColIfMissing() — safe to run multiple times.
+ * All ALTER TABLE statements are guarded — safe to run multiple times.
  */
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 
-function run(PDO $pdo): void
-{
+require_once __DIR__ . '/../../core/tenant_migration_bootstrap.php';
+global $pdo;
+
+echo "Starting tenant migration: mobile API schema columns...\n";
+
+try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // -------------------------------------------------------------------------
@@ -21,25 +26,27 @@ function run(PDO $pdo): void
     $addColIfMissing = function (string $table, string $column, string $definition) use ($pdo): void {
         $r = $pdo->query("SHOW COLUMNS FROM `$table` LIKE '$column'");
         if ($r && $r->fetch()) {
-            return; // already present
+            echo "  · $table.$column already exists.\n";
+            return;
         }
         $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
+        echo "  + $table.$column added.\n";
     };
 
     // Helper: create a table if it does not exist
     $createTableIfMissing = function (string $table, string $ddl) use ($pdo): void {
         $r = $pdo->query("SHOW TABLES LIKE '$table'");
         if ($r && $r->fetch()) {
+            echo "  · table $table already exists.\n";
             return;
         }
         $pdo->exec($ddl);
+        echo "  + table $table created.\n";
     };
 
     // =========================================================================
     // 1. client_uuid — offline idempotency key on 5 tables
     // =========================================================================
-    $uuidDef = "VARCHAR(36) NULL DEFAULT NULL AFTER `" ;
-
     foreach ([
         ['customers',  'customer_id'],
         ['suppliers',  'supplier_id'],
@@ -49,7 +56,8 @@ function run(PDO $pdo): void
     ] as [$table, $idCol]) {
         $r = $pdo->query("SHOW TABLES LIKE '$table'");
         if (!($r && $r->fetch())) {
-            continue; // table does not exist on this tenant — skip
+            echo "  · table $table not present — skipping.\n";
+            continue;
         }
         $addColIfMissing($table, 'client_uuid', "VARCHAR(36) NULL DEFAULT NULL AFTER `$idCol`");
         // Unique index (nullable — MySQL allows multiple NULLs in a unique index)
@@ -57,20 +65,24 @@ function run(PDO $pdo): void
         if (!($idxCheck && $idxCheck->fetch())) {
             try {
                 $pdo->exec("ALTER TABLE `$table` ADD UNIQUE KEY `uq_{$table}_client_uuid` (`client_uuid`)");
+                echo "  + uq_{$table}_client_uuid index added.\n";
             } catch (PDOException $e) {
                 // Duplicate values already exist — add as plain index instead
                 $pdo->exec("ALTER TABLE `$table` ADD INDEX `idx_{$table}_client_uuid` (`client_uuid`)");
+                echo "  + idx_{$table}_client_uuid (plain) index added — duplicates existed.\n";
             }
+        } else {
+            echo "  · uq_{$table}_client_uuid index already exists.\n";
         }
     }
 
     // =========================================================================
-    // 2. suppliers — optional columns the list/get endpoints SELECT
+    // 2. suppliers — optional columns the list/get/create endpoints use
     // =========================================================================
     $addColIfMissing('suppliers', 'contact_person', "VARCHAR(191) NULL DEFAULT NULL AFTER `supplier_name`");
     $addColIfMissing('suppliers', 'city',           "VARCHAR(100) NULL DEFAULT NULL AFTER `address`");
     $addColIfMissing('suppliers', 'supplier_type',  "VARCHAR(50)  NULL DEFAULT NULL AFTER `city`");
-    $addColIfMissing('suppliers', 'notes',          "TEXT         NULL DEFAULT NULL AFTER `supplier_type`");
+    $addColIfMissing('suppliers', 'notes',          "TEXT         NULL DEFAULT NULL");
     $addColIfMissing('suppliers', 'updated_at',     "TIMESTAMP    NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER `created_at`");
 
     // =========================================================================
@@ -87,20 +99,26 @@ function run(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    $addColIfMissing('products', 'brand_id',          "INT UNSIGNED NULL DEFAULT NULL AFTER `category_id`");
-    $addColIfMissing('products', 'tax_rate_id',        "INT UNSIGNED NULL DEFAULT NULL AFTER `brand_id`");
-    $addColIfMissing('products', 'min_selling_price',  "DECIMAL(15,4) NOT NULL DEFAULT 0 AFTER `selling_price`");
-    $addColIfMissing('products', 'discount_rate',      "DECIMAL(5,2)  NOT NULL DEFAULT 0 AFTER `min_selling_price`");
+    $addColIfMissing('products', 'brand_id',         "INT UNSIGNED NULL DEFAULT NULL AFTER `category_id`");
+    $addColIfMissing('products', 'tax_rate_id',       "INT UNSIGNED NULL DEFAULT NULL AFTER `brand_id`");
+    $addColIfMissing('products', 'min_selling_price', "DECIMAL(15,4) NOT NULL DEFAULT 0 AFTER `selling_price`");
+    $addColIfMissing('products', 'discount_rate',     "DECIMAL(5,2)  NOT NULL DEFAULT 0 AFTER `min_selling_price`");
 
     // tax_rates table (referenced by LEFT JOIN in products/get.php)
     $createTableIfMissing('tax_rates', "
         CREATE TABLE `tax_rates` (
-            `rate_id`   INT UNSIGNED     NOT NULL AUTO_INCREMENT,
-            `rate_name` VARCHAR(100)     NOT NULL,
-            `rate`      DECIMAL(5,2)     NOT NULL DEFAULT 0,
-            `status`    ENUM('active','inactive') NOT NULL DEFAULT 'active',
-            `created_at` TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `rate_id`    INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+            `rate_name`  VARCHAR(100)     NOT NULL,
+            `rate`       DECIMAL(5,2)     NOT NULL DEFAULT 0,
+            `status`     ENUM('active','inactive') NOT NULL DEFAULT 'active',
+            `created_at` TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`rate_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    echo "Migration complete.\n";
+
+} catch (PDOException $e) {
+    echo "Migration failed: " . $e->getMessage() . "\n";
+    exit(1);
 }
