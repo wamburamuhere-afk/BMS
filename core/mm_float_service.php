@@ -22,19 +22,10 @@ if (!function_exists('mmUserCanOnTill')) {
      */
     function mmUserCanOnTill(PDO $pdo, int $userId, int $tillId, string $ability): bool {
         if (isAdmin()) return true;
-        $allowed = ['can_open_shift', 'can_record_transactions', 'can_close_shift', 'can_reconcile'];
-        if (!in_array($ability, $allowed)) return false;
-        $stmt = $pdo->prepare(
-            "SELECT g.$ability FROM mm_user_agent_grants g
-             JOIN mm_tills t ON t.agent_id = g.agent_id
-             WHERE g.user_id = ?
-               AND t.till_id = ?
-               AND (g.till_id = ? OR g.till_id IS NULL)
-             ORDER BY g.till_id DESC
-             LIMIT 1"
-        );
-        $stmt->execute([$userId, $tillId, $tillId]);
-        return (bool)$stmt->fetchColumn();
+        if (!in_array($ability, MM_SCOPE_ABILITIES, true)) return false;
+        // Write decisions always read fresh grants, never the per-request cache.
+        mmScopeReset();
+        return mmTillInScope($tillId, $ability, $userId);
     }
 }
 

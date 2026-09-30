@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-30 — feat(mm): agent-scoped access (non-admins see only granted agents)
+
+**Plan:** `mm_agent_scope_plan.md`. Effective access for a non-admin = role permission AND `mm_user_agent_grants` grant. In an MM-only tenant a user with no grant sees only MM Dashboard (empty state), profile and personal settings.
+
+**Files:**
+- `mm_agent_scope_plan.md` — Phase 0: plan + re-scout results (query checklist, whitelist keys, baseline 153 assertions green)
+- `core/mm_scope.php` — Phase 1 (new): scope engine — `mmScopeGrantMap/mmScopeAgentIds/mmScopeTillIds/mmTillInScope/mmAgentInScope/mmScopeSql/mmHasAnyGrant/mmHasOwnOpenShift/mmGrantAllowsPage/mmRequireTill/mmDenyToDashboard`; per-request cache (`mmScopeReset()`); closed agent = no access, suspended = view only
+- `roots.php` — Phase 1: loads `core/mm_scope.php` after permissions
+- `core/mm_float_service.php` — Phase 1: `mmUserCanOnTill()` now delegates to the engine (fresh read), gaining closed/suspended rules
+
 ## 2026-09-30 — fix(mobile-api): migration format + sale_date datetime + balance_due + get_sales limit + ghost cleanup
 
 **Files:**
