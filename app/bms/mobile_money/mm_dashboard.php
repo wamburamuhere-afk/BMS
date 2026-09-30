@@ -43,25 +43,47 @@ $tillCount  = (int)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='acti
 $agentCount = (int)$pdo->query("SELECT COUNT(*) FROM mm_agents WHERE status='active'")->fetchColumn();
 $openShifts = (int)$pdo->query("SELECT COUNT(*) FROM mm_shifts WHERE status='open'")->fetchColumn();
 
-// Current user's own open shift (used to show Open vs Close Shift in Quick Actions)
-$myShiftStmt = $pdo->prepare("
-    SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name
-    FROM mm_shifts s
-    JOIN mm_tills t ON t.till_id = s.till_id
-    JOIN mm_agents a ON a.agent_id = t.agent_id
-    WHERE s.teller_user_id = ? AND s.status = 'open'
-    LIMIT 1
-");
-$myShiftStmt->execute([$_SESSION['user_id']]);
-$myActiveShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
-
-// Does this user have at least one till they can open a shift on?
+// All of the current user's open shifts (no LIMIT 1)
 if (isAdmin()) {
-    $canOpenShiftOnAny = (bool)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='active'")->fetchColumn();
+    $myActiveShifts = $pdo->query("
+        SELECT s.shift_id, s.shift_code, t.till_id, t.till_number, a.agent_name
+        FROM mm_shifts s
+        JOIN mm_tills t ON t.till_id = s.till_id
+        JOIN mm_agents a ON a.agent_id = t.agent_id
+        WHERE s.status = 'open'
+        ORDER BY s.opened_at
+    ")->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $coStmt = $pdo->prepare("SELECT COUNT(*) FROM mm_user_agent_grants WHERE user_id=? AND can_open_shift=1");
-    $coStmt->execute([$_SESSION['user_id']]);
-    $canOpenShiftOnAny = (bool)$coStmt->fetchColumn();
+    $myShiftStmt = $pdo->prepare("
+        SELECT s.shift_id, s.shift_code, t.till_id, t.till_number, a.agent_name
+        FROM mm_shifts s
+        JOIN mm_tills t ON t.till_id = s.till_id
+        JOIN mm_agents a ON a.agent_id = t.agent_id
+        WHERE s.teller_user_id = ? AND s.status = 'open'
+        ORDER BY s.opened_at
+    ");
+    $myShiftStmt->execute([$_SESSION['user_id']]);
+    $myActiveShifts = $myShiftStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+$myActiveShift = $myActiveShifts[0] ?? null; // kept for the active-shift chip
+
+// Can this user still open more shifts? (assigned tills with no current open shift)
+if (isAdmin()) {
+    $canOpenMore = (bool)$pdo->query("
+        SELECT COUNT(*) FROM mm_tills
+        WHERE status = 'active'
+          AND till_id NOT IN (SELECT till_id FROM mm_shifts WHERE status = 'open')
+    ")->fetchColumn();
+} else {
+    $canOpenMoreStmt = $pdo->prepare("
+        SELECT COUNT(*) FROM mm_tills t
+        JOIN mm_user_agent_grants g ON g.agent_id = t.agent_id
+            AND (g.till_id IS NULL OR g.till_id = t.till_id)
+        WHERE t.status = 'active' AND g.user_id = ? AND g.can_open_shift = 1
+          AND t.till_id NOT IN (SELECT till_id FROM mm_shifts WHERE status = 'open')
+    ");
+    $canOpenMoreStmt->execute([$_SESSION['user_id']]);
+    $canOpenMore = (bool)$canOpenMoreStmt->fetchColumn();
 }
 
 // --- Daily volume last 14 days (chart) ---
@@ -131,12 +153,12 @@ function mmTrendBadge($pct): string {
         <i class="bi bi-speedometer2 text-primary fs-4"></i>
         <h4 class="mb-0 fw-bold"><?= t('Mobile Money Dashboard') ?></h4>
         <span class="text-muted small ms-1"><?= t('Today:') ?> <?= $today ?></span>
-        <?php if ($myActiveShift): ?>
+        <?php foreach ($myActiveShifts as $sh): ?>
         <a href="<?= getUrl('mm_shifts') ?>" class="badge bg-success text-decoration-none ms-1"
-           title="<?= t('Active Shift') ?>: <?= safe_output($myActiveShift['shift_code']) ?> · <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>">
-            <i class="bi bi-play-circle-fill me-1"></i><?= safe_output($myActiveShift['till_number']) ?>
+           title="<?= t('Active Shift') ?>: <?= safe_output($sh['shift_code']) ?> · <?= safe_output($sh['agent_name'].' / '.$sh['till_number']) ?>">
+            <i class="bi bi-play-circle-fill me-1"></i><?= safe_output($sh['till_number']) ?>
         </a>
-        <?php endif; ?>
+        <?php endforeach; ?>
     </div>
 
     <!-- Quick Actions — dashboard.php style: card with bg-light header, flex-fill buttons -->
@@ -157,28 +179,31 @@ function mmTrendBadge($pct): string {
                         </div>
                         <?php endif; ?>
                         <?php if (canView('mm_shifts')): ?>
+                        <?php if ($canOpenMore): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <?php if ($myActiveShift): ?>
+                            <a href="<?= getUrl('mm_shifts') ?>?action=open" class="btn btn-outline-primary w-100 h-100 py-3">
+                                <i class="bi bi-play-circle display-6"></i>
+                                <div class="mt-2"><?= t('Open Shift') ?></div>
+                            </a>
+                        </div>
+                        <?php elseif (empty($myActiveShifts)): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <div class="btn btn-outline-secondary w-100 h-100 py-3 disabled opacity-50">
+                                <i class="bi bi-play-circle display-6"></i>
+                                <div class="mt-2"><?= t('Open Shift') ?></div>
+                                <div class="small mt-1 opacity-75"><?= t('No tills assigned') ?></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($myActiveShifts)): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-danger w-100 h-100 py-3">
                                 <i class="bi bi-stop-circle display-6"></i>
                                 <div class="mt-2"><?= t('Close Shift') ?></div>
-                                <div class="small mt-1 opacity-75"><?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?></div>
+                                <div class="small mt-1 opacity-75"><?= count($myActiveShifts) ?> <?= t('open') ?></div>
                             </a>
-                            <?php else: ?>
-                            <?php if ($canOpenShiftOnAny): ?>
-                            <a href="<?= getUrl('mm_shifts') ?>?action=open" class="btn btn-outline-primary w-100 h-100 py-3">
-                                <i class="bi bi-play-circle display-6"></i>
-                                <div class="mt-2"><?= t('Fungua Zamu') ?></div>
-                            </a>
-                            <?php else: ?>
-                            <div class="btn btn-outline-secondary w-100 h-100 py-3 disabled opacity-50">
-                                <i class="bi bi-play-circle display-6"></i>
-                                <div class="mt-2"><?= t('Fungua Zamu') ?></div>
-                                <div class="small mt-1 opacity-75"><?= t('No tills assigned') ?></div>
-                            </div>
-                            <?php endif; ?>
-                            <?php endif; ?>
                         </div>
+                        <?php endif; ?>
                         <?php endif; ?>
                         <?php if (canCreate('mm_float')): ?>
                         <div class="flex-fill" style="min-width: 130px;">
