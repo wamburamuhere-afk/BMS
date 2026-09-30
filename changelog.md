@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-30 — fix(mm): move agents/networks/grants to Settings > Admin (nav + page gates)
+
+**Problem:** mm_agents and mm_networks were accessible via `canView()` in the nav and visible to non-admins despite the page having an `isAdmin()` gate, causing broken links. mm_user_agent_grants had no nav entry at all.
+
+**Files:**
+- `header.php` — All 6 navigation locations updated: MM-only top-nav agents link, MM-only Settings dropdown Setup section, multi-module MM dropdown Setup section, MM mobile "More" sheet, MM mobile Settings sheet; all now `isAdmin()`-gated. Agents/Networks/User Access Grants all appear under **Setup** subsections. Outer visibility conditions updated (removed `canView('mm_agents')`, `canView('mm_networks')` from dropdown gate checks).
+- `app/bms/mobile_money/mm_networks.php` — Page gate changed from `autoEnforcePermission('mm_networks')` to `isAdmin()` redirect, matching mm_agents.php
+
 ## 2026-09-30 — fix(mm): CRUD gap fixes — close/deactivate/cancel+edit for agents, networks, reconciliations
 
 **Root cause:** Three MM list pages had create+edit but no delete/close action, leaving orphaned records with no removal path.
