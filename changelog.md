@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-30 — feat(mm_shifts): bulk open/close shifts for multi-till operations
+
+**Files:**
+- `api/mobile_money/batch_open_shifts.php` — NEW: batch-opens one shift per selected till in a single transaction; per-till grant check; one-shift-per-till guard; float snapshot per till
+- `api/mobile_money/batch_close_shifts.php` — NEW: batch-closes multiple open shifts; computes cash/float variance per shift; float snapshot per till; full transaction atomicity
+- `app/bms/mobile_money/mm_shifts.php` — Replaced LIMIT 1 with full array of open shifts; Open Shift modal redesigned to multi-row table (one row per till, checkbox, opening cash + float); "Close All Shifts" bulk modal added (counted cash/float/notes per shift, notes as textarea); individual Close Shift notes upgraded from `<input>` to `<textarea>`; separate Open + Close All header buttons shown independently; auto-fetch expected float per till on modal open
+- `app/bms/mobile_money/mm_dashboard.php` — Removed LIMIT 1; all open shift chips shown in header; Open Shift and Close Shift Quick Action buttons decoupled (both can appear simultaneously); `$canOpenMore` checks free tills
+- `tests/test_mm_shifts_bulk_cli.php` — NEW: 37 assertions covering static contract + live data-model (rolled-back transaction)
+
+---
+
 ## 2026-09-29 — fix(mm_shifts): Close Shift button did nothing (safeOutput undefined)
 
 **Files:**

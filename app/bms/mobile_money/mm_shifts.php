@@ -9,19 +9,48 @@ includeHeader();
 $can_open  = canCreate('mm_shifts');
 $can_close = canEdit('mm_shifts');
 
-// Current user's own open shift — used to swap Open/Close button
-$myShiftStmt = $pdo->prepare("
+// All of the current user's open shifts (no LIMIT 1)
+$myOpenShiftsStmt = $pdo->prepare("
     SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name
     FROM mm_shifts s
     JOIN mm_tills t ON t.till_id = s.till_id
     JOIN mm_agents a ON a.agent_id = t.agent_id
     WHERE s.teller_user_id = ? AND s.status = 'open'
-    LIMIT 1
+    ORDER BY s.opened_at
 ");
-$myShiftStmt->execute([$_SESSION['user_id']]);
-$myOpenShift = $myShiftStmt->fetch(PDO::FETCH_ASSOC);
+$myOpenShiftsStmt->execute([$_SESSION['user_id']]);
+$myOpenShifts = $myOpenShiftsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get tills the current user may open shifts on (Change A: filter by grants for non-admins)
+// All open shifts for "Close All" — admin sees all system-wide, non-admin sees own
+if (isAdmin()) {
+    $allOpenForClose = $pdo->query("
+        SELECT s.shift_id, s.shift_code, s.opened_at,
+               t.till_number, a.agent_name,
+               CONCAT(u.first_name, ' ', u.last_name) AS teller_name
+        FROM mm_shifts s
+        JOIN mm_tills t ON t.till_id = s.till_id
+        JOIN mm_agents a ON a.agent_id = t.agent_id
+        LEFT JOIN users u ON u.user_id = s.teller_user_id
+        WHERE s.status = 'open'
+        ORDER BY s.opened_at
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $closeAllStmt = $pdo->prepare("
+        SELECT s.shift_id, s.shift_code, s.opened_at,
+               t.till_number, a.agent_name,
+               CONCAT(u.first_name, ' ', u.last_name) AS teller_name
+        FROM mm_shifts s
+        JOIN mm_tills t ON t.till_id = s.till_id
+        JOIN mm_agents a ON a.agent_id = t.agent_id
+        LEFT JOIN users u ON u.user_id = s.teller_user_id
+        WHERE s.status = 'open' AND s.teller_user_id = ?
+        ORDER BY s.opened_at
+    ");
+    $closeAllStmt->execute([$_SESSION['user_id']]);
+    $allOpenForClose = $closeAllStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Tills this user may open a shift on
 if (isAdmin()) {
     $tillsForOpen = $pdo->query("
         SELECT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
@@ -48,7 +77,7 @@ if (isAdmin()) {
     $tillsForOpen = $tillsStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Change B: fetch currently busy tills (open shifts) — keyed by till_id
+// Currently busy tills (keyed by till_id)
 $busyTillsRaw = $pdo->query("
     SELECT s.till_id, s.shift_code,
            CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
@@ -61,6 +90,9 @@ $busyTills = [];
 foreach ($busyTillsRaw as $bt) {
     $busyTills[(int)$bt['till_id']] = $bt;
 }
+
+// Free tills: assigned to this user but not yet open
+$freeTillCount = count(array_filter($tillsForOpen, fn($t) => !isset($busyTills[(int)$t['till_id']])));
 
 // Filters
 $filterFrom   = $_GET['date_from'] ?? date('Y-m-01');
@@ -81,8 +113,8 @@ $shifts = $pdo->prepare("
            (SELECT SUM(mt.principal_amount) FROM mm_transactions mt WHERE mt.shift_id = s.shift_id AND mt.status = 'posted') AS txn_volume,
            (SELECT SUM(mt.commission_earned) FROM mm_transactions mt WHERE mt.shift_id = s.shift_id AND mt.status = 'posted') AS txn_commission
     FROM mm_shifts s
-    JOIN mm_tills t   ON t.till_id = s.till_id
-    JOIN mm_agents a  ON a.agent_id = t.agent_id
+    JOIN mm_tills t    ON t.till_id  = s.till_id
+    JOIN mm_agents a   ON a.agent_id = t.agent_id
     JOIN mm_networks n ON n.network_id = t.network_id
     LEFT JOIN users u  ON u.user_id = s.teller_user_id
     LEFT JOIN users uc ON uc.user_id = s.closed_by
@@ -100,26 +132,36 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 ?>
 
 <div class="container-fluid mt-3 mb-5">
+    <!-- Page header with dual Open / Close All buttons -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i><?= t('Teller Shifts') ?></h4>
-        <?php if ($myOpenShift): ?>
-        <button class="btn btn-danger btn-sm" onclick='closeShift(<?= htmlspecialchars(json_encode(['id'=>$myOpenShift['shift_id'],'code'=>$myOpenShift['shift_code'],'till_number'=>$myOpenShift['till_number'],'agent'=>$myOpenShift['agent_name']]),ENT_QUOTES) ?>)'>
-            <i class="bi bi-stop-circle me-1"></i><?= t('Close Shift') ?> — <?= safe_output($myOpenShift['till_number']) ?>
-        </button>
-        <?php elseif ($can_open && count($tillsForOpen) > 0): ?>
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
-            <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
-        </button>
-        <?php endif; ?>
+        <div class="d-flex gap-2 flex-wrap">
+            <?php if ($can_open && $freeTillCount > 0): ?>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
+                <i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?>
+                <?php if ($freeTillCount > 1): ?>
+                <span class="badge bg-white text-primary ms-1"><?= $freeTillCount ?></span>
+                <?php endif; ?>
+            </button>
+            <?php endif; ?>
+            <?php if ($can_close && count($allOpenForClose) > 0): ?>
+            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#closeAllShiftsModal">
+                <i class="bi bi-stop-circle me-1"></i><?= t('Close All Shifts') ?>
+                <span class="badge bg-white text-danger ms-1"><?= count($allOpenForClose) ?></span>
+            </button>
+            <?php endif; ?>
+        </div>
     </div>
 
-    <!-- Shift banner (Change C) -->
-    <?php if ($myOpenShift): ?>
-    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-play-circle-fill me-2"></i>
-        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myOpenShift['shift_code']) ?>
-        &nbsp;·&nbsp; <?= safe_output($myOpenShift['agent_name'].' / '.$myOpenShift['till_number']) ?>
+    <!-- Active shift banner — lists all open shifts as chips -->
+    <?php if (!empty($myOpenShifts)): ?>
+    <div class="alert alert-success d-flex flex-wrap align-items-center gap-2 py-2 mb-3" style="border-radius:8px">
+        <span><i class="bi bi-play-circle-fill me-1"></i><strong><?= t('Active Shifts:') ?></strong></span>
+        <?php foreach ($myOpenShifts as $sh): ?>
+        <span class="badge bg-white text-success border border-success" style="font-size:.82rem">
+            <?= safe_output($sh['shift_code']) ?> · <?= safe_output($sh['agent_name'] . ' / ' . $sh['till_number']) ?>
         </span>
+        <?php endforeach; ?>
     </div>
     <?php else: ?>
     <div class="alert alert-warning py-2 mb-3" style="border-radius:8px">
@@ -170,8 +212,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         <div class="col-md-2">
             <select name="status" class="form-select form-select-sm">
                 <option value=""><?= t('All Statuses') ?></option>
-                <option value="open" <?= $filterStatus==='open'?'selected':'' ?>><?= t('Open') ?></option>
-                <option value="closed" <?= $filterStatus==='closed'?'selected':'' ?>><?= t('Closed') ?></option>
+                <option value="open"         <?= $filterStatus==='open'?'selected':'' ?>><?= t('Open') ?></option>
+                <option value="closed"       <?= $filterStatus==='closed'?'selected':'' ?>><?= t('Closed') ?></option>
                 <option value="forced_close" <?= $filterStatus==='forced_close'?'selected':'' ?>><?= t('Force-closed') ?></option>
             </select>
         </div>
@@ -194,7 +236,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 .mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
 .mm-card-foot{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #f3f4f6}
 .mm-card-foot .btn{flex:1;font-size:.78rem;padding:3px 6px}
+/* Close-all notes wrap */
+.close-all-notes{resize:vertical;min-height:36px;white-space:pre-wrap;word-break:break-word}
 </style>
+
     <!-- Table -->
     <div id="tableView">
         <div class="card border-0 shadow-sm">
@@ -267,46 +312,88 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
     <div id="cardView" class="row g-2 d-none"></div>
 </div>
 
-<!-- Open Shift Modal -->
+<!-- ══════════════════════════════════════════
+     OPEN SHIFT MODAL — multi-till table
+     ══════════════════════════════════════════ -->
 <?php if ($can_open): ?>
 <div class="modal fade" id="openShiftModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="openShiftForm" method="post" autocomplete="off">
-                <div class="modal-body">
+            <form id="openShiftForm" autocomplete="off">
+                <div class="modal-body p-0">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label"><?= t('Till') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="till_id" id="open_till_select" required>
-                                <option value=""></option>
+                    <?php if (empty($tillsForOpen)): ?>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-display fs-2 d-block mb-2"></i><?= t('No tills assigned to you.') ?>
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" style="font-size:.88rem">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:44px" class="text-center">
+                                        <input type="checkbox" id="selectAllTills" checked title="<?= t('Select all') ?>">
+                                    </th>
+                                    <th><?= t('Outlet / Till') ?></th>
+                                    <th style="min-width:150px"><?= t('Opening Cash (TZS)') ?> <span class="text-danger">*</span></th>
+                                    <th style="min-width:150px"><?= t('Opening Float (TZS)') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 <?php foreach ($tillsForOpen as $t):
                                     $busy = $busyTills[(int)$t['till_id']] ?? null; ?>
-                                <option value="<?= $t['till_id'] ?>" <?= $busy ? 'disabled' : '' ?>>
-                                    <?= safe_output($t['agent_name'].' / '.$t['till_number'].' ('.$t['network_name'].')') ?>
-                                    <?= $busy ? ' — '.t('in use by').' '.safe_output($busy['teller_name']).' '.t('since').' '.$busy['opened_time'] : '' ?>
-                                </option>
+                                <tr class="till-row <?= $busy ? 'table-secondary' : '' ?>" data-till-id="<?= (int)$t['till_id'] ?>">
+                                    <td class="text-center">
+                                        <?php if ($busy): ?>
+                                        <i class="bi bi-lock-fill text-secondary" title="<?= t('In use by') ?> <?= htmlspecialchars($busy['teller_name']) ?>"></i>
+                                        <?php else: ?>
+                                        <input type="checkbox" class="till-checkbox" value="<?= (int)$t['till_id'] ?>" checked>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:<?= htmlspecialchars($t['color_hex'] ?: '#999') ?>"></span>
+                                        <strong><?= safe_output($t['agent_name'] . ' / ' . $t['till_number']) ?></strong>
+                                        <small class="text-muted ms-1"><?= safe_output($t['network_name']) ?></small>
+                                        <?php if ($busy): ?>
+                                        <span class="badge bg-warning text-dark ms-1" style="font-size:.72rem">
+                                            <?= t('Open') ?> · <?= safe_output($busy['teller_name']) ?> <?= t('since') ?> <?= $busy['opened_time'] ?>
+                                        </span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                               class="form-control form-control-sm open-cash"
+                                               name="opening_cash_<?= (int)$t['till_id'] ?>"
+                                               min="0" step="100"
+                                               <?= $busy ? 'disabled' : '' ?>>
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                               class="form-control form-control-sm open-float"
+                                               name="opening_float_<?= (int)$t['till_id'] ?>"
+                                               data-till-id="<?= (int)$t['till_id'] ?>"
+                                               min="0" step="100"
+                                               <?= $busy ? 'disabled' : '' ?>
+                                               placeholder="<?= $busy ? '—' : t('Loading…') ?>">
+                                    </td>
+                                </tr>
                                 <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label"><?= t('Opening Cash (TZS)') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="opening_cash" min="0" step="100" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label id="open_float_label" class="form-label"><?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="opening_float" id="open_float_input" min="0" step="100" required placeholder="<?= t('Select till first…') ?>">
-                            <div id="open_float_hint" class="form-text d-none"></div>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-play-circle me-1"></i><?= t('Open Shift') ?></button>
+                    <?php if (!empty($tillsForOpen)): ?>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-play-circle me-1"></i><?= t('Open Selected Shifts') ?>
+                    </button>
+                    <?php endif; ?>
                 </div>
             </form>
         </div>
@@ -314,7 +401,78 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 </div>
 <?php endif; ?>
 
-<!-- Close Shift Modal -->
+<!-- ══════════════════════════════════════════
+     CLOSE ALL SHIFTS MODAL — multi-row table
+     ══════════════════════════════════════════ -->
+<?php if ($can_close && !empty($allOpenForClose)): ?>
+<div class="modal fade" id="closeAllShiftsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-stop-circle me-1"></i><?= t('Close All Open Shifts') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="closeAllShiftsForm" autocomplete="off">
+                <div class="modal-body p-0">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <p class="text-muted small px-3 pt-3 mb-0"><?= t('Enter the physically counted amounts for each shift, then click Close All.') ?></p>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" style="font-size:.88rem">
+                            <thead class="table-light">
+                                <tr>
+                                    <th><?= t('Shift') ?></th>
+                                    <th><?= t('Outlet / Till') ?></th>
+                                    <th><?= t('Teller') ?></th>
+                                    <th><?= t('Opened') ?></th>
+                                    <th style="min-width:155px"><?= t('Counted Cash (TZS)') ?> <span class="text-danger">*</span></th>
+                                    <th style="min-width:155px"><?= t('Counted Float (TZS)') ?> <span class="text-danger">*</span></th>
+                                    <th style="min-width:180px"><?= t('Notes') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($allOpenForClose as $sh): ?>
+                                <tr data-shift-id="<?= (int)$sh['shift_id'] ?>">
+                                    <td><code class="small"><?= safe_output($sh['shift_code']) ?></code></td>
+                                    <td class="small"><?= safe_output($sh['agent_name'] . ' / ' . $sh['till_number']) ?></td>
+                                    <td class="small"><?= safe_output($sh['teller_name'] ?: '—') ?></td>
+                                    <td class="small"><?= date('d M H:i', strtotime($sh['opened_at'])) ?></td>
+                                    <td>
+                                        <input type="number"
+                                               class="form-control form-control-sm close-all-cash"
+                                               min="0" step="100" required>
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                               class="form-control form-control-sm close-all-float"
+                                               min="0" step="100" required>
+                                    </td>
+                                    <td>
+                                        <textarea class="form-control form-control-sm close-all-notes"
+                                                  rows="2"
+                                                  style="resize:vertical;min-height:36px;white-space:pre-wrap;word-break:break-word"
+                                                  placeholder="<?= t('Issues or comments…') ?>"></textarea>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-danger btn-lg">
+                        <i class="bi bi-stop-circle me-1"></i><?= t('Close All') ?> (<?= count($allOpenForClose) ?>)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ══════════════════════════════════════════
+     INDIVIDUAL CLOSE SHIFT MODAL
+     ══════════════════════════════════════════ -->
 <?php if ($can_close): ?>
 <div class="modal fade" id="closeShiftModal" tabindex="-1">
     <div class="modal-dialog">
@@ -323,7 +481,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                 <h5 class="modal-title"><i class="bi bi-stop-circle me-1"></i><?= t('Close Shift') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="closeShiftForm" method="post" autocomplete="off">
+            <form id="closeShiftForm" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="shift_id" id="close_shift_id">
@@ -339,7 +497,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                         </div>
                         <div class="col-12">
                             <label class="form-label"><?= t('Close Notes') ?></label>
-                            <input type="text" class="form-control" name="close_notes" id="close_notes_field" placeholder="<?= t('Any issues or comments…') ?>">
+                            <textarea class="form-control"
+                                      name="close_notes"
+                                      id="close_notes_field"
+                                      rows="3"
+                                      style="resize:vertical;white-space:pre-wrap;word-break:break-word"
+                                      placeholder="<?= t('Any issues or comments…') ?>"></textarea>
                         </div>
                     </div>
                 </div>
@@ -357,137 +520,226 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
 function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 
 $(document).ready(function () {
+    // ── DataTable ──────────────────────────────────────────────────────────────
     if (!$.fn.DataTable.isDataTable('#shiftsTable')) {
-        $('#shiftsTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[4,'desc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
+        $('#shiftsTable').DataTable({
+            responsive: false, scrollX: true, pageLength: 25, order: [[4, 'desc']],
+            columnDefs: [{orderable: false, targets: 0}], dom: 'rtipB',
             language: { emptyTable: '<?= addslashes(t('No shifts found.')) ?>' },
-            buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
-            drawCallback: function() { renderCards(this.api().rows({page:'current'}).nodes()); applyView(); }
+            buttons: [{extend: 'excelHtml5', className: 'd-none', exportOptions: {columns: ':not(:last-child)'}}],
+            drawCallback: function () { renderCards(this.api().rows({page: 'current'}).nodes()); applyView(); }
         });
     }
-    function applyView(){if(window.innerWidth<768){$('#tableView').addClass('d-none');$('#cardView').removeClass('d-none');}else{$('#tableView').removeClass('d-none');$('#cardView').addClass('d-none');}}
-    applyView(); $(window).on('resize',applyView);
+    function applyView() {
+        if (window.innerWidth < 768) {
+            $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+        } else {
+            $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none');
+        }
+    }
+    applyView(); $(window).on('resize', applyView);
 
-    <?php if (($_GET['action'] ?? '') === 'open' && $can_open && !$myOpenShift && count($tillsForOpen) > 0): ?>
+    // ── Auto-open Open Shift modal from dashboard link ─────────────────────────
+    <?php if (($_GET['action'] ?? '') === 'open' && $can_open && $freeTillCount > 0): ?>
     new bootstrap.Modal(document.getElementById('openShiftModal')).show();
     <?php endif; ?>
 
-    $('#openShiftModal').on('shown.bs.modal', function(){
-        const modal=$(this);
-        modal.find('.select2-static').each(function(){
-            if(!$(this).hasClass('select2-hidden-accessible'))
-                $(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select till…') ?>',allowClear:true,width:'100%'});
+    // ── Open Shift Modal: auto-fetch expected float per till ───────────────────
+    $('#openShiftModal').on('shown.bs.modal', function () {
+        $('.open-float:not([disabled])').each(function () {
+            const $inp = $(this);
+            const tillId = $inp.data('till-id');
+            $inp.val('').attr('placeholder', '<?= t('Loading…') ?>');
+            $.getJSON('<?= buildUrl('api/mobile_money/get_till_float.php') ?>', {till_id: tillId}, function (res) {
+                if (res.success) {
+                    $inp.val(res.expected_float).attr('placeholder', '');
+                } else {
+                    $inp.val('').attr('placeholder', '<?= t('Enter float') ?>');
+                }
+            }).fail(function () {
+                $inp.attr('placeholder', '<?= t('Enter float') ?>');
+            });
         });
     });
 
-    // Auto-fill Opening Float when till is selected (Change: auto-float)
-    $(document).on('select2:select', '#open_till_select', function(){
-        const tillId = $(this).val();
-        if (!tillId) { $('#open_float_hint').addClass('d-none').text(''); return; }
-        $('#open_float_hint').removeClass('d-none').html('<span class="text-muted"><?= t('Fetching expected float…') ?></span>');
-        $.getJSON('<?= buildUrl('api/mobile_money/get_till_float.php') ?>', {till_id: tillId}, function(res){
-            if (!res.success) { $('#open_float_hint').html('<span class="text-danger">'+res.message+'</span>'); return; }
-            const $inp = $('#open_float_input');
-            $inp.val(res.expected_float);
-            if (res.is_new_till) {
-                $inp.addClass('border-warning');
-                $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span> <small class="text-warning fw-normal"><?= t('(new till — enter actual SIM balance)') ?></small>');
-                $('#open_float_hint').html('<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i><?= t('No prior snapshot. Enter the current SIM e-money balance.') ?></span>');
-            } else {
-                $inp.removeClass('border-warning');
-                const dt = res.last_snapshot_at ? new Date(res.last_snapshot_at).toLocaleString() : '';
-                $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span>');
-                $('#open_float_hint').html('<span class="text-success"><i class="bi bi-check-circle me-1"></i><?= t('Expected from last snapshot') ?>'+(dt?' ('+dt+')':'')+'. <?= t('Adjust if needed.') ?></span>');
-            }
-        }).fail(function(){
-            $('#open_float_hint').html('<span class="text-danger"><?= t('Could not load expected float.') ?></span>');
-        });
+    // ── Select All tills checkbox ──────────────────────────────────────────────
+    $('#selectAllTills').on('change', function () {
+        $('.till-checkbox').prop('checked', this.checked);
+    });
+    $(document).on('change', '.till-checkbox', function () {
+        const total   = $('.till-checkbox').length;
+        const checked = $('.till-checkbox:checked').length;
+        $('#selectAllTills').prop('indeterminate', checked > 0 && checked < total)
+                            .prop('checked', checked === total);
     });
 
-    $(document).on('select2:clear', '#open_till_select', function(){
-        $('#open_float_input').val('').removeClass('border-warning');
-        $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span>');
-        $('#open_float_hint').addClass('d-none').text('');
-    });
-
-    $('#openShiftForm').on('submit', function(e){
+    // ── Open Shift Form Submit (batch) ─────────────────────────────────────────
+    $('#openShiftForm').on('submit', function (e) {
         e.preventDefault();
-        const btn=$(this).find('[type=submit]'), orig=btn.html();
-        btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/open_shift.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success: function(r) {
-                btn.prop('disabled',false).html(orig);
+        const selected = [];
+        let valid = true;
+
+        $('.till-checkbox:checked').each(function () {
+            const $cb   = $(this);
+            const tillId = $cb.val();
+            const $row  = $cb.closest('tr');
+            const cash  = $row.find('.open-cash').val();
+
+            if (cash === '' || isNaN(parseFloat(cash)) || parseFloat(cash) < 0) {
+                Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Enter opening cash for every selected till.') ?>'});
+                valid = false;
+                return false;
+            }
+            selected.push({
+                till_id:       tillId,
+                opening_cash:  cash,
+                opening_float: $row.find('.open-float').val() || 0
+            });
+        });
+
+        if (!valid) return;
+        if (!selected.length) {
+            Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Select at least one till.') ?>'});
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('_csrf', '<?= csrf_token() ?>');
+        fd.append('tills', JSON.stringify(selected));
+
+        const btn = $(this).find('[type=submit]'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/batch_open_shifts.php') ?>',
+            type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
+            success: function (r) {
+                btn.prop('disabled', false).html(orig);
                 if (r.success) {
                     bootstrap.Modal.getInstance(document.getElementById('openShiftModal'))?.hide();
-                    Swal.fire({
-                        icon: 'success',
-                        title: '<?= t('Shift Opened!') ?>',
-                        html: r.message.replace(/\n/g,'<br>'),
-                        timer: 4000,
-                        timerProgressBar: true,
-                        showConfirmButton: true,
-                        confirmButtonText: '<?= t('OK') ?>'
-                    }).then(() => location.reload());
+                    let html = `<p class="mb-2">${r.opened} <?= t('shift(s) opened.') ?></p>`;
+                    r.results.forEach(res => {
+                        if (res.success) html += `<div class="small text-success"><i class="bi bi-check-circle me-1"></i>${safeOutput(res.shift_code)} · Till ${safeOutput(res.till_number)}</div>`;
+                        else             html += `<div class="small text-danger"><i class="bi bi-x-circle me-1"></i>Till ${safeOutput(res.till_number || '?')}: ${safeOutput(res.message)}</div>`;
+                    });
+                    Swal.fire({icon: 'success', title: '<?= t('Shifts Opened!') ?>', html: html, timer: 4000, timerProgressBar: true, showConfirmButton: true})
+                        .then(() => location.reload());
                 } else {
-                    Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: r.message});
+                    Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: r.message});
                 }
             },
             error: (xhr) => {
-                btn.prop('disabled',false).html(orig);
-                Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>'});
+                btn.prop('disabled', false).html(orig);
+                Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: xhr.responseJSON?.message || '<?= t('Server error.') ?>'});
             }
         });
     });
 
-    $('#closeShiftForm').on('submit', function(e){
+    // ── Close All Shifts Form Submit (batch) ───────────────────────────────────
+    $('#closeAllShiftsForm').on('submit', function (e) {
         e.preventDefault();
-        const btn=$(this).find('[type=submit]'), orig=btn.html();
-        btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-        $.ajax({url:'<?= buildUrl('api/mobile_money/close_shift.php') ?>',type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
-            success: function(r) {
-                btn.prop('disabled',false).html(orig);
+        const shiftsPayload = [];
+        let valid = true;
+
+        $(this).find('tr[data-shift-id]').each(function () {
+            const $tr     = $(this);
+            const shiftId = $tr.data('shift-id');
+            const cash    = $tr.find('.close-all-cash').val();
+            const float_  = $tr.find('.close-all-float').val();
+            const notes   = $tr.find('.close-all-notes').val();
+
+            if (cash === '' || isNaN(parseFloat(cash)) || parseFloat(cash) < 0 ||
+                float_ === '' || isNaN(parseFloat(float_)) || parseFloat(float_) < 0) {
+                Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Fill in counted cash and float for every shift.') ?>'});
+                valid = false;
+                return false;
+            }
+            shiftsPayload.push({shift_id: shiftId, closing_cash: cash, closing_float: float_, close_notes: notes});
+        });
+
+        if (!valid) return;
+
+        const fd = new FormData();
+        fd.append('_csrf', '<?= csrf_token() ?>');
+        fd.append('shifts', JSON.stringify(shiftsPayload));
+
+        const btn = $(this).find('[type=submit]'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/batch_close_shifts.php') ?>',
+            type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
+            success: function (r) {
+                btn.prop('disabled', false).html(orig);
+                if (r.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('closeAllShiftsModal'))?.hide();
+                    let html = `<p class="mb-2">${r.closed} <?= t('shift(s) closed.') ?></p>`;
+                    const anyVar = r.results.some(res => res.success && (parseFloat(res.cash_variance) !== 0 || parseFloat(res.float_variance) !== 0));
+                    r.results.forEach(res => {
+                        if (res.success) {
+                            const cv  = parseFloat(res.cash_variance), fv = parseFloat(res.float_variance);
+                            const cvC = cv  === 0 ? 'text-muted' : (cv  > 0 ? 'text-warning' : 'text-danger');
+                            const fvC = fv  === 0 ? 'text-muted' : (fv  > 0 ? 'text-warning' : 'text-danger');
+                            html += `<div class="small border-top pt-1 mt-1"><strong>${safeOutput(res.shift_code)}</strong> · Till ${safeOutput(res.till_number)}: `;
+                            html += `Cash <span class="${cvC}">${cv >= 0 ? '+' : ''}${cv.toLocaleString()} TZS</span>, `;
+                            html += `Float <span class="${fvC}">${fv >= 0 ? '+' : ''}${fv.toLocaleString()} TZS</span></div>`;
+                        } else {
+                            html += `<div class="small text-danger">${safeOutput(res.shift_code || 'Shift')}: ${safeOutput(res.message)}</div>`;
+                        }
+                    });
+                    Swal.fire({icon: anyVar ? 'warning' : 'success', title: '<?= t('Shifts Closed!') ?>', html: html, showConfirmButton: true})
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: r.message});
+                }
+            },
+            error: (xhr) => {
+                btn.prop('disabled', false).html(orig);
+                Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: xhr.responseJSON?.message || '<?= t('Server error.') ?>'});
+            }
+        });
+    });
+
+    // ── Individual Close Shift Form Submit ─────────────────────────────────────
+    $('#closeShiftForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type=submit]'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/close_shift.php') ?>',
+            type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (r) {
+                btn.prop('disabled', false).html(orig);
                 if (r.success) {
                     bootstrap.Modal.getInstance(document.getElementById('closeShiftModal'))?.hide();
                     const cashVar  = parseFloat(r.cash_variance  ?? 0);
                     const floatVar = parseFloat(r.float_variance ?? 0);
                     const hasVar   = cashVar !== 0 || floatVar !== 0;
-                    const cashClass  = cashVar  === 0 ? 'text-muted' : (cashVar  > 0 ? 'text-warning' : 'text-danger');
-                    const floatClass = floatVar === 0 ? 'text-muted' : (floatVar > 0 ? 'text-warning' : 'text-danger');
+                    const cvC = cashVar  === 0 ? 'text-muted' : (cashVar  > 0 ? 'text-warning' : 'text-danger');
+                    const fvC = floatVar === 0 ? 'text-muted' : (floatVar > 0 ? 'text-warning' : 'text-danger');
                     let html = '<p><?= t('Shift closed successfully.') ?></p>';
-                    html += '<div class="d-flex justify-content-between border-top pt-2 mt-2">';
-                    html += '<span><?= t('Cash Variance:') ?></span><span class="fw-bold '+cashClass+'">'+(cashVar >= 0 ? '+' : '')+cashVar.toLocaleString()+' TZS</span></div>';
-                    html += '<div class="d-flex justify-content-between">';
-                    html += '<span><?= t('Float Variance:') ?></span><span class="fw-bold '+floatClass+'">'+(floatVar >= 0 ? '+' : '')+floatVar.toLocaleString()+' TZS</span></div>';
-                    Swal.fire({
-                        icon: hasVar ? 'warning' : 'success',
-                        title: '<?= t('Shift Closed!') ?>',
-                        html: html,
-                        showConfirmButton: true,
-                        confirmButtonText: '<?= t('OK') ?>'
-                    }).then(() => location.reload());
+                    html += `<div class="d-flex justify-content-between border-top pt-2 mt-2"><span><?= t('Cash Variance:') ?></span><span class="fw-bold ${cvC}">${cashVar >= 0 ? '+' : ''}${cashVar.toLocaleString()} TZS</span></div>`;
+                    html += `<div class="d-flex justify-content-between"><span><?= t('Float Variance:') ?></span><span class="fw-bold ${fvC}">${floatVar >= 0 ? '+' : ''}${floatVar.toLocaleString()} TZS</span></div>`;
+                    Swal.fire({icon: hasVar ? 'warning' : 'success', title: '<?= t('Shift Closed!') ?>', html: html, showConfirmButton: true})
+                        .then(() => location.reload());
                 } else {
-                    Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: r.message});
+                    Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: r.message});
                 }
             },
             error: (xhr) => {
-                btn.prop('disabled',false).html(orig);
-                Swal.fire({icon:'error', title:'<?= t('Error') ?>', text: xhr.responseJSON?.message||'<?= t('Server error.') ?>'});
+                btn.prop('disabled', false).html(orig);
+                Swal.fire({icon: 'error', title: '<?= t('Error') ?>', text: xhr.responseJSON?.message || '<?= t('Server error.') ?>'});
             }
         });
     });
 
-    $('.modal').on('hidden.bs.modal', function(){
-        $(this).find('form')[0]?.reset();
-        if (this.id === 'openShiftModal') {
-            $('#open_float_input').removeClass('border-warning');
-            $('#open_float_label').html('<?= t('Opening Float (TZS)') ?> <span class="text-danger">*</span>');
-            $('#open_float_hint').addClass('d-none').text('');
-        }
-    });
+    // ── Reset modals on close ──────────────────────────────────────────────────
+    $('.modal').on('hidden.bs.modal', function () { $(this).find('form')[0]?.reset(); });
 });
 
-function closeShift(s){
+function closeShift(s) {
     $('#close_shift_id').val(s.id);
-    $('#close_shift_info').html('<strong><?= t('Shift:') ?> '+safeOutput(s.code)+'</strong> · '+safeOutput(s.agent)+' / '+safeOutput(s.till_number));
+    $('#close_shift_info').html('<strong><?= t('Shift:') ?> ' + safeOutput(s.code) + '</strong> · ' + safeOutput(s.agent) + ' / ' + safeOutput(s.till_number));
     new bootstrap.Modal(document.getElementById('closeShiftModal')).show();
 }
 

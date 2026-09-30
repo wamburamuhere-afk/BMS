@@ -37,6 +37,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception(t("Full name and email are required."));
             }
 
+            // Split full name into first / last (everything after first space is last name)
+            $nameParts  = explode(' ', $full_name, 2);
+            $first_name = $nameParts[0];
+            $last_name  = $nameParts[1] ?? '';
+
             // Check if email is already in use by another user
             $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
             $check->execute([$email, $user_id]);
@@ -44,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception(t("This email is already in use by another account."));
             }
 
-            $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, phone = ? WHERE user_id = ?");
-            $stmt->execute([$full_name, $email, $phone, $user_id]);
+            $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ?, phone = ? WHERE user_id = ?");
+            $stmt->execute([$first_name, $last_name, $email, $phone, $user_id]);
 
             // Refresh user data
             $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ?");
@@ -199,7 +204,7 @@ $prefs = [
 
                                     <div class="col-md-6">
                                         <label for="full_name" class="form-label"><?= t('Full Name') ?> <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="full_name" name="full_name" value="<?= htmlspecialchars($current_user['full_name'] ?? '') ?>" required>
+                                        <input type="text" class="form-control" id="full_name" name="full_name" value="<?= htmlspecialchars(trim(($current_user['first_name'] ?? '') . ' ' . ($current_user['last_name'] ?? ''))) ?>" required>
                                     </div>
 
                                     <div class="col-md-6">
@@ -232,7 +237,7 @@ $prefs = [
                                     <i class="bi bi-person-fill text-primary" style="font-size: 2.5rem;"></i>
                                 </div>
                             </div>
-                            <h5 class="fw-bold mb-1"><?= htmlspecialchars($current_user['full_name'] ?? $current_user['username']) ?></h5>
+                            <h5 class="fw-bold mb-1"><?= htmlspecialchars(trim(($current_user['first_name'] ?? '') . ' ' . ($current_user['last_name'] ?? '')) ?: ($current_user['username'] ?? '')) ?></h5>
                             <p class="text-muted small mb-3"><?= htmlspecialchars($current_user['email'] ?? '') ?></p>
                             <span class="badge bg-primary rounded-pill px-3 py-2"><?= htmlspecialchars(t($user_role)) ?></span>
 
