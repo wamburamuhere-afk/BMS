@@ -6,6 +6,25 @@
 - `api/pos/process_sale.php` — Per-line `discount_percentage`, `discount_amount`, and `discount` fields are now respected: when `discounted_price` is absent the server derives it from whichever discount field was sent. Previously only `discounted_price` was read, so all other discount field names were silently ignored and the sale posted at full price. Added guard: for non-credit payment methods (`cash`, `card`, `mobile_money`, etc.) a `balance_due > 0` after server-side recalculation returns HTTP 422 instead of silently creating a partial-sale record.
 - `api/pos/quick_restock.php` — Added `client_uuid` idempotency: self-heals `product_batches.client_uuid` column (DDL outside transaction), checks for duplicate before opening the transaction, stamps the uuid onto the new batch row so the second call is detected and returns the original result without re-adding stock.
 
+---
+
+## 2026-09-30 — fix(mobile-api): tenant migration re-apply with correct top-level format
+
+**Files:**
+- `migrations/tenant/2026_09_30_mobile_api_schema_fix.php` — New migration that actually runs the schema changes from the original `2026_09_30_mobile_api_schema.php` which wrapped all DDL in a `function run()` that was never called (the runner only `include()`s files); adds client_uuid+indexes to 6 tables (including product_batches), optional supplier columns, brands/tax_rates tables, and optional product columns
+
+---
+
+## 2026-09-30 — fix(mobile-api): migration format + sale_date datetime + balance_due + get_sales limit + ghost cleanup
+
+**Files:**
+- `migrations/tenant/2026_09_30_mobile_api_schema.php` — Rewrote migration as top-level CLI code (was wrapped in an unexecuted `run()` function — DDL never ran); added `suppliers.notes` which is absent from the tenant template; now correctly adds client_uuid + indexes to 5 tables, optional supplier columns, brands/tax_rates tables, and optional product columns
+- `migrations/tenant/2026_09_30_cleanup_probe_products.php` — New: soft-deletes products where `name LIKE 'ZZ %'` (probe test records IDs 126/127/128 on shop tenant)
+- `api/mobile/suppliers/create.php` — Added "Unknown column" fallback INSERT (retries with core columns when optional schema columns are absent on unpatched tenants); resolves "Server error" before the schema migration runs
+- `api/pos/process_sale.php` — `sale_date` column now stores full datetime `date('Y-m-d H:i:s')` instead of date-only `date('Y-m-d')`; was storing `YYYY-MM-DD 00:00:00` because a DATETIME column received a date-only string
+- `api/account/get_sales_report.php` — POS arm now reads actual `amount_paid` from `pos_sale_payments` instead of hardcoding `grand_total`; `balance_due` is now correct for partial credit sales; guarded with `$pos_has_pay_table` for tenants without the payments table
+- `api/pos/get_sales.php` — Added `limit` GET parameter; SQL query now appends `LIMIT n` when provided (previously ignored, returned all rows)
+
 ## 2026-09-30 — fix(mm): move agents/networks/grants to Settings > Admin (nav + page gates)
 
 **Problem:** mm_agents and mm_networks were accessible via `canView()` in the nav and visible to non-admins despite the page having an `isAdmin()` gate, causing broken links. mm_user_agent_grants had no nav entry at all.

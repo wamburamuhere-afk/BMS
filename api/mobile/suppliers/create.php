@@ -56,44 +56,51 @@ $status          = in_array($body['status'] ?? 'active', ['active','inactive'], 
 try {
     $supplier_code = nextCode($pdo, 'SUP');
 
-    if ($hasClientUuid) {
-        $stmt = $pdo->prepare("
-            INSERT INTO suppliers
-                (client_uuid, supplier_code, supplier_name, contact_person, phone, email, address, city,
-                 supplier_type, notes, status, created_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-        ");
-        $stmt->execute([
-            $client_uuid ?: null,
-            $supplier_code, $supplier_name,
-            $contact_person !== '' ? $contact_person : null,
-            $phone          !== '' ? $phone          : null,
-            $email          !== '' ? $email          : null,
-            $address        !== '' ? $address        : null,
-            $city           !== '' ? $city           : null,
-            $supplier_type  !== '' ? $supplier_type  : null,
-            $notes          !== '' ? $notes          : null,
-            $status, $_SESSION['user_id'],
-        ]);
-    } else {
-        $stmt = $pdo->prepare("
-            INSERT INTO suppliers
-                (supplier_code, supplier_name, contact_person, phone, email, address, city,
-                 supplier_type, notes, status, created_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-        ");
-        $stmt->execute([
-            $supplier_code, $supplier_name,
-            $contact_person !== '' ? $contact_person : null,
-            $phone          !== '' ? $phone          : null,
-            $email          !== '' ? $email          : null,
-            $address        !== '' ? $address        : null,
-            $city           !== '' ? $city           : null,
-            $supplier_type  !== '' ? $supplier_type  : null,
-            $notes          !== '' ? $notes          : null,
-            $status, $_SESSION['user_id'],
-        ]);
-    }
+    // Full INSERT — includes optional columns added by the 2026_09_30 migration.
+    // Falls back to core-only columns on "Unknown column" for tenants where the
+    // migration has not yet run (e.g. supplier.notes absent from older schemas).
+    $doInsert = function (bool $withUuid) use ($pdo, $client_uuid, $supplier_code, $supplier_name,
+        $contact_person, $phone, $email, $address, $city, $supplier_type, $notes, $status): void {
+
+        $cols   = $withUuid
+            ? "(client_uuid, supplier_code, supplier_name, contact_person, phone, email, address, city, supplier_type, notes, status, created_at, created_by)"
+            : "(supplier_code, supplier_name, contact_person, phone, email, address, city, supplier_type, notes, status, created_at, created_by)";
+        $ph     = $withUuid ? "?,?,?,?,?,?,?,?,?,?,?,NOW(),?" : "?,?,?,?,?,?,?,?,?,?,NOW(),?";
+        $params = $withUuid
+            ? [$client_uuid ?: null, $supplier_code, $supplier_name,
+               $contact_person !== '' ? $contact_person : null,
+               $phone !== '' ? $phone : null, $email !== '' ? $email : null,
+               $address !== '' ? $address : null, $city !== '' ? $city : null,
+               $supplier_type !== '' ? $supplier_type : null, $notes !== '' ? $notes : null,
+               $status, $_SESSION['user_id']]
+            : [$supplier_code, $supplier_name,
+               $contact_person !== '' ? $contact_person : null,
+               $phone !== '' ? $phone : null, $email !== '' ? $email : null,
+               $address !== '' ? $address : null, $city !== '' ? $city : null,
+               $supplier_type !== '' ? $supplier_type : null, $notes !== '' ? $notes : null,
+               $status, $_SESSION['user_id']];
+
+        try {
+            $pdo->prepare("INSERT INTO suppliers $cols VALUES ($ph)")->execute($params);
+        } catch (PDOException $e) {
+            if (stripos($e->getMessage(), 'Unknown column') === false) throw $e;
+            // Older tenant schema missing optional columns — retry with guaranteed core columns only.
+            error_log('mobile/suppliers/create.php schema fallback (run tenant migration 2026_09_30): ' . $e->getMessage());
+            $coreParams = $withUuid
+                ? [$client_uuid ?: null, $supplier_code, $supplier_name,
+                   $phone !== '' ? $phone : null, $email !== '' ? $email : null,
+                   $address !== '' ? $address : null, $status, $_SESSION['user_id']]
+                : [$supplier_code, $supplier_name,
+                   $phone !== '' ? $phone : null, $email !== '' ? $email : null,
+                   $address !== '' ? $address : null, $status, $_SESSION['user_id']];
+            $coreCols = $withUuid
+                ? "(client_uuid, supplier_code, supplier_name, phone, email, address, status, created_at, created_by)"
+                : "(supplier_code, supplier_name, phone, email, address, status, created_at, created_by)";
+            $corePh = $withUuid ? "?,?,?,?,?,?,?,NOW(),?" : "?,?,?,?,?,?,NOW(),?";
+            $pdo->prepare("INSERT INTO suppliers $coreCols VALUES ($corePh)")->execute($coreParams);
+        }
+    };
+    $doInsert($hasClientUuid);
     $supplier_id = (int)$pdo->lastInsertId();
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: created supplier $supplier_name ($supplier_code)");
