@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-30 — feat(mm): MM Agent/Till Access grant management page
+
+**Files:**
+- `app/constant/settings/mm_user_agent_grants.php` — NEW: 3-column drill-down (Roles → Users → Agents/Tills) for assigning MM agent/till access; per-till 4 ability checkboxes; "All tills (default)" NULL row support; full-replace save with logActivity + logAudit; admin-only
+- `roots.php` — route `mm_user_agent_grants` registered
+- `core/permissions.php` — permission key `mm_user_agent_grants.php` registered
+- `tests/test_mm_user_agent_grants_cli.php` — NEW: 34 assertions (static contract + DB schema + NULL-row override mechanics)
+
 ## 2026-09-30 — feat(mm_agents): restrict agent/till management to admins only
 
 **Files:**

@@ -552,6 +552,7 @@ function getPagePermissionMapping()
         'users.php' => 'users',
         'user_roles.php' => 'user_roles',
         'user_projects.php' => 'user_projects',
+        'mm_user_agent_grants.php' => 'mm_user_agent_grants',
         'system_settings.php' => 'system_settings',
         'company_profile.php' => 'company_profile',
         'backup_restore.php' => 'backup_restore',
