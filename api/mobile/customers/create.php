@@ -14,31 +14,30 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 $body = $_POST;
 if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body = json_decode($raw, true) ?: []; } }
 
-// Self-heal DDL (outside any transaction — MySQL DDL causes implicit commit).
+// Check if the idempotency column is available (migration may not have run on this tenant yet).
+$hasClientUuid = false;
 try {
-    if (!$pdo->query("SHOW COLUMNS FROM customers LIKE 'client_uuid'")->fetch()) {
-        $pdo->exec("ALTER TABLE customers ADD COLUMN client_uuid VARCHAR(36) NULL");
-        try { $pdo->exec("ALTER TABLE customers ADD UNIQUE KEY ux_customers_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
-    }
-} catch (PDOException $_ddlE) {}
+    $r = $pdo->query("SHOW COLUMNS FROM customers LIKE 'client_uuid'");
+    $hasClientUuid = (bool)($r && $r->fetch());
+} catch (PDOException $_) {}
 
-// Parse idempotency key.
+// Parse idempotency key and do duplicate check only when column exists.
 $client_uuid = '';
-$rawUuid = trim($body['client_uuid'] ?? '');
-if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
-    $client_uuid = $rawUuid;
-}
-
-// Idempotency pre-check.
-if ($client_uuid !== '') {
-    try {
-        $dupChk = $pdo->prepare("SELECT customer_id, customer_code, customer_name FROM customers WHERE client_uuid = ? LIMIT 1");
-        $dupChk->execute([$client_uuid]);
-        if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
-            echo json_encode(['success' => true, 'idempotent' => true, 'customer_id' => (int)$dup['customer_id'], 'customer_code' => $dup['customer_code'], 'customer_name' => $dup['customer_name'], 'message' => 'Customer already exists.']);
-            exit;
-        }
-    } catch (PDOException $_idemp) { $client_uuid = ''; }
+if ($hasClientUuid) {
+    $rawUuid = trim($body['client_uuid'] ?? '');
+    if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
+        $client_uuid = $rawUuid;
+    }
+    if ($client_uuid !== '') {
+        try {
+            $dupChk = $pdo->prepare("SELECT customer_id, customer_code, customer_name FROM customers WHERE client_uuid = ? LIMIT 1");
+            $dupChk->execute([$client_uuid]);
+            if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+                echo json_encode(['success' => true, 'idempotent' => true, 'customer_id' => (int)$dup['customer_id'], 'customer_code' => $dup['customer_code'], 'customer_name' => $dup['customer_name'], 'message' => 'Customer already exists.']);
+                exit;
+            }
+        } catch (PDOException $_idemp) { $client_uuid = ''; }
+    }
 }
 
 $customer_name = trim($body['customer_name'] ?? '');
@@ -57,23 +56,42 @@ $status        = in_array($body['status'] ?? 'active', ['active','inactive'], tr
 try {
     $customer_code = nextCode($pdo, 'CUST');
 
-    $stmt = $pdo->prepare("
-        INSERT INTO customers
-            (client_uuid, customer_code, customer_name, phone, email, address, city,
-             customer_type, credit_limit, notes, status, created_at, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-    ");
-    $stmt->execute([
-        $client_uuid ?: null,
-        $customer_code, $customer_name,
-        $phone  !== '' ? $phone  : null,
-        $email  !== '' ? $email  : null,
-        $address!== '' ? $address: null,
-        $city   !== '' ? $city   : null,
-        $customer_type, $credit_limit,
-        $notes  !== '' ? $notes  : null,
-        $status, $_SESSION['user_id'],
-    ]);
+    if ($hasClientUuid) {
+        $stmt = $pdo->prepare("
+            INSERT INTO customers
+                (client_uuid, customer_code, customer_name, phone, email, address, city,
+                 customer_type, credit_limit, notes, status, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute([
+            $client_uuid ?: null,
+            $customer_code, $customer_name,
+            $phone  !== '' ? $phone  : null,
+            $email  !== '' ? $email  : null,
+            $address!== '' ? $address: null,
+            $city   !== '' ? $city   : null,
+            $customer_type, $credit_limit,
+            $notes  !== '' ? $notes  : null,
+            $status, $_SESSION['user_id'],
+        ]);
+    } else {
+        $stmt = $pdo->prepare("
+            INSERT INTO customers
+                (customer_code, customer_name, phone, email, address, city,
+                 customer_type, credit_limit, notes, status, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute([
+            $customer_code, $customer_name,
+            $phone  !== '' ? $phone  : null,
+            $email  !== '' ? $email  : null,
+            $address!== '' ? $address: null,
+            $city   !== '' ? $city   : null,
+            $customer_type, $credit_limit,
+            $notes  !== '' ? $notes  : null,
+            $status, $_SESSION['user_id'],
+        ]);
+    }
     $customer_id = (int)$pdo->lastInsertId();
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: created customer $customer_name ($customer_code)");

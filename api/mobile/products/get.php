@@ -11,21 +11,44 @@ $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Invalid product ID']); exit; }
 
 try {
-    $stmt = $pdo->prepare("
-        SELECT p.product_id, p.product_name, p.sku, p.barcode, p.unit,
-               p.selling_price, p.cost_price, p.purchase_price, p.current_stock,
-               p.reorder_level, p.is_service, p.category_id, c.category_name,
-               p.brand_id, b.brand_name, p.tax_rate_id, t.rate_name AS tax_name,
-               p.status, p.description, p.image_url, p.min_selling_price,
-               p.discount_rate, p.created_at, p.updated_at
-          FROM products p
-          LEFT JOIN categories c ON c.category_id = p.category_id
-          LEFT JOIN brands     b ON b.brand_id     = p.brand_id
-          LEFT JOIN tax_rates  t ON t.rate_id       = p.tax_rate_id
-         WHERE p.product_id = ? AND p.status != 'deleted'
-    ");
-    $stmt->execute([$id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $row = null;
+
+    // Try full query (brands, tax_rates, optional columns); fall back if tenant schema is older.
+    try {
+        $stmt = $pdo->prepare("
+            SELECT p.product_id, p.product_name, p.sku, p.barcode, p.unit,
+                   p.selling_price, p.cost_price, p.purchase_price, p.current_stock,
+                   p.reorder_level, p.is_service, p.category_id, c.category_name,
+                   p.brand_id, b.brand_name, p.tax_rate_id, t.rate_name AS tax_name,
+                   p.status, p.description, p.image_url, p.min_selling_price,
+                   p.discount_rate, p.created_at, p.updated_at
+              FROM products p
+              LEFT JOIN categories c ON c.category_id = p.category_id
+              LEFT JOIN brands     b ON b.brand_id     = p.brand_id
+              LEFT JOIN tax_rates  t ON t.rate_id       = p.tax_rate_id
+             WHERE p.product_id = ? AND p.status != 'deleted'
+        ");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $fullE) {
+        // Older tenant DB may be missing brands table or optional product columns.
+        error_log('mobile/products/get.php full query failed (schema mismatch — run tenant migration 2026_09_30): ' . $fullE->getMessage());
+        $stmt = $pdo->prepare("
+            SELECT p.product_id, p.product_name, p.sku, p.barcode, p.unit,
+                   p.selling_price, p.cost_price, p.purchase_price, p.current_stock,
+                   p.reorder_level, p.is_service, p.category_id, c.category_name,
+                   NULL AS brand_id, NULL AS brand_name,
+                   p.tax_rate_id, NULL AS tax_name,
+                   p.status, p.description, p.image_url,
+                   NULL AS min_selling_price, NULL AS discount_rate,
+                   p.created_at, p.updated_at
+              FROM products p
+              LEFT JOIN categories c ON c.category_id = p.category_id
+             WHERE p.product_id = ? AND p.status != 'deleted'
+        ");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 
     if (!$row) { http_response_code(404); echo json_encode(['success'=>false,'message'=>'Product not found']); exit; }
 
