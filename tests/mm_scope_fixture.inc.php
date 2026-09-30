@@ -23,6 +23,20 @@ function mmFixtureDestroy(PDO $pdo): void
                    ->fetchAll(PDO::FETCH_COLUMN);
     if ($tillIds) {
         $in = implode(',', array_map('intval', $tillIds));
+        // Ledger entries posted by API tests for fixture transactions / float movements (incl. void reversals).
+        $txnIds = $pdo->query("SELECT mm_txn_id FROM mm_transactions WHERE till_id IN ($in)")->fetchAll(PDO::FETCH_COLUMN);
+        $movIds = $pdo->query("SELECT movement_id FROM mm_float_movements WHERE till_id IN ($in)")->fetchAll(PDO::FETCH_COLUMN);
+        $conds = [];
+        if ($txnIds) $conds[] = "(entity_type='mm_transaction' AND entity_id IN (" . implode(',', array_map('intval', $txnIds)) . "))";
+        if ($movIds) $conds[] = "(entity_type='mm_float_move' AND entity_id IN (" . implode(',', array_map('intval', $movIds)) . "))";
+        if ($conds) {
+            $jeIds = $pdo->query("SELECT entry_id FROM journal_entries WHERE " . implode(' OR ', $conds))->fetchAll(PDO::FETCH_COLUMN);
+            if ($jeIds) {
+                $jin = implode(',', array_map('intval', $jeIds));
+                $pdo->exec("DELETE FROM journal_entry_items WHERE entry_id IN ($jin)");
+                $pdo->exec("DELETE FROM journal_entries WHERE entry_id IN ($jin)");
+            }
+        }
         $pdo->exec("DELETE FROM mm_kyc_records WHERE mm_txn_id IN (SELECT mm_txn_id FROM mm_transactions WHERE till_id IN ($in))");
         foreach (['mm_transactions', 'mm_shifts', 'mm_float_movements', 'mm_float_snapshots', 'mm_reconciliations'] as $t) {
             $pdo->exec("DELETE FROM $t WHERE till_id IN ($in)");
@@ -194,10 +208,16 @@ function mmFixtureRun(string $relPath, int $userId, bool $mmOnly, array $get = [
     $harness = __DIR__ . '/mm_scope_harness.php';
     $payload = base64_encode(json_encode(['path' => $relPath, 'user' => $userId, 'mm_only' => $mmOnly,
                                           'get' => $get, 'post' => $post, 'session' => $session]));
+    // Real CGI invocation (SCRIPT_FILENAME, no -f): "-f" puts php-cgi in no-headers mode,
+    // where session_start() refuses to run and API JSON gets prefixed with warnings.
     putenv('MMSCOPE_PAYLOAD=' . $payload);
-    putenv('REDIRECT_STATUS=1');
+    putenv('REDIRECT_STATUS=200');
+    putenv('GATEWAY_INTERFACE=CGI/1.1');
+    putenv('REQUEST_METHOD=GET');
+    putenv('SCRIPT_FILENAME=' . $harness);
+    putenv('QUERY_STRING=');
     $cgi = dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . (DIRECTORY_SEPARATOR === '\\' ? 'php-cgi.exe' : 'php-cgi');
-    $cmd = escapeshellarg($cgi) . ' -f ' . escapeshellarg($harness) . ' 2>&1';
+    $cmd = escapeshellarg($cgi) . ' 2>&1';
     $lines = []; $rc = 0;
     exec($cmd, $lines, $rc);
     $raw = implode("\n", $lines);

@@ -32,8 +32,15 @@ try {
     $till = $till->fetch(PDO::FETCH_ASSOC);
     if (!$till) { echo json_encode(['success' => false, 'message' => 'Till not found or inactive']); exit; }
 
+    // Agent grant (D2): float moves use can_record_transactions on a live till (admins bypass).
+    if (!mmUserCanOnTill($pdo, $userId, $tillId, 'can_record_transactions')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not granted to move float on this till']);
+        exit;
+    }
+
     $networkId = (int)$till['network_id'];
-    $ref = $referenceNo ?: ($notes ?: strtoupper(str_replace('_', ' ', $movType)));
+    $ref =$referenceNo ?: ($notes ?: strtoupper(str_replace('_', ' ', $movType)));
 
     $movId = mmRecordFloatMovement($pdo, $tillId, $networkId, $movType, $amount, $date, $userId, $ref, $bankAcctId);
 

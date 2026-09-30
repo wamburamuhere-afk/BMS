@@ -59,6 +59,13 @@ try {
     $till = $till->fetch(\PDO::FETCH_ASSOC);
     if (!$till) { echo json_encode(['success' => false, 'message' => 'Till not found or inactive']); exit; }
 
+    // Agent grant: can_record_transactions on this till, agent + till active (admins bypass).
+    if (!mmUserCanOnTill($pdo, (int)$_SESSION['user_id'], $tillId, 'can_record_transactions')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not granted to record transactions on this till']);
+        exit;
+    }
+
     $networkId = (int)$till['network_id'];
     $agentId   = (int)$till['agent_id'];
 

@@ -29,6 +29,19 @@ if (!function_exists('mmUserCanOnTill')) {
     }
 }
 
+if (!function_exists('mmUserCanCloseShift')) {
+    /**
+     * can_close_shift on the shift's till — or, when the teller has lost every grant on
+     * that till (revoked / agent closed), they may still close their OWN open shift so it
+     * is never orphaned. An explicit can_close_shift = 0 grant still blocks.
+     */
+    function mmUserCanCloseShift(PDO $pdo, int $userId, array $shift): bool {
+        $tillId = (int)$shift['till_id'];
+        if (mmUserCanOnTill($pdo, $userId, $tillId, 'can_close_shift')) return true;
+        return (int)$shift['teller_user_id'] === $userId && !mmTillInScope($tillId, null, $userId);
+    }
+}
+
 if (!function_exists('mmComputeCommission')) {
     /**
      * Compute commission for a transaction using the active rate schedule.
