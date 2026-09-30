@@ -979,7 +979,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </a>
                         </li>
                         <?php endif; ?>
-                        <?php if (canView('mm_agents')): ?>
+                        <?php if (isAdmin()): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('mm_agents') ?>">
                                 <i class="bi bi-shop-window"></i> <?= t('Agents') ?>
@@ -1013,7 +1013,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         $_mm_settings_visible = isAdmin()
                             || canView('mm_shifts') || canView('mm_commissions')
                             || canView('mm_reconciliation') || canView('mm_compliance')
-                            || canView('mm_networks') || canView('mm_commission_rates');
+                            || canView('mm_commission_rates');
                         ?>
                         <?php if ($_mm_settings_visible): ?>
                         <li class="nav-item dropdown">
@@ -1031,11 +1031,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if (canView('mm_commissions')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_commissions') ?>"><i class="bi bi-coin me-1"></i><?= t('Commissions') ?></a></li><?php endif; ?>
                                 <?php if (canView('mm_reconciliation')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_reconciliation') ?>"><i class="bi bi-check2-square me-1"></i><?= t('Reconciliation') ?></a></li><?php endif; ?>
                                 <?php if (canView('mm_compliance')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_compliance') ?>"><i class="bi bi-shield-check me-1"></i><?= t('Compliance / KYC') ?></a></li><?php endif; ?>
-                                <?php if (canView('mm_networks') || canView('mm_commission_rates')): ?>
+                                <?php if (isAdmin() || canView('mm_commission_rates')): ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header"><?= t('Setup') ?></h6></li>
                                 <?php endif; ?>
-                                <?php if (canView('mm_networks')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li><?php endif; ?>
+                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('mm_agents') ?>"><i class="bi bi-shop-window me-1"></i><?= t('Agents / Outlets') ?></a></li><?php endif; ?>
+                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li><?php endif; ?>
+                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('mm_user_agent_grants') ?>"><i class="bi bi-person-check me-1"></i><?= t('User Access Grants') ?></a></li><?php endif; ?>
                                 <?php if (canView('mm_commission_rates')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_commission_rates') ?>"><i class="bi bi-percent me-1"></i><?= t('Commission Rates') ?></a></li><?php endif; ?>
                             </ul>
                         </li>
@@ -1176,7 +1178,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- Mobile Money (2026-09-26) -->
-                        <?php if(tenantFeatureEnabled('mobile_money') && (canView('mm_dashboard') || canView('mm_transactions') || canView('mm_agents'))): ?>
+                        <?php if(tenantFeatureEnabled('mobile_money') && (canView('mm_dashboard') || canView('mm_transactions') || isAdmin())): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="mmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-phone-vibrate"></i> <?= t('Mobile Transactions') ?>
@@ -1200,13 +1202,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('mm_reconciliation')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_reconciliation') ?>"><i class="bi bi-check2-square me-1"></i><?= t('Reconciliation') ?></a></li>
                                 <?php endif; ?>
+                                <?php if (isAdmin() || canView('mm_commission_rates')): ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header"><?= t('Setup') ?></h6></li>
-                                <?php if(canView('mm_agents')): ?>
+                                <?php endif; ?>
+                                <?php if(isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_agents') ?>"><i class="bi bi-shop-window me-1"></i><?= t('Agents / Outlets') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('mm_networks')): ?>
+                                <?php if(isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(isAdmin()): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_user_agent_grants') ?>"><i class="bi bi-person-check me-1"></i><?= t('User Access Grants') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('mm_commission_rates')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_commission_rates') ?>"><i class="bi bi-percent me-1"></i><?= t('Commission Rates') ?></a></li>
@@ -1751,7 +1758,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <i class="bi bi-graph-up"></i><span><?= t('Reports') ?></span>
         </button>
         <?php endif; ?>
-        <?php if (canView('mm_float') || canView('mm_agents')): ?>
+        <?php if (canView('mm_float') || isAdmin()): ?>
         <button type="button" class="bn-item"
                 data-bs-toggle="offcanvas" data-bs-target="#mmMoreSheet" aria-controls="mmMoreSheet">
             <i class="bi bi-three-dots"></i><span><?= t('More') ?></span>
@@ -1805,7 +1812,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_float') ?>">
                     <i class="bi bi-currency-exchange"></i><?= t('Float Management') ?></a>
                 <?php endif; ?>
-                <?php if (canView('mm_agents')): ?>
+                <?php if (isAdmin()): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_agents') ?>">
                     <i class="bi bi-shop-window"></i><?= t('Agent Outlets') ?></a>
                 <?php endif; ?>
@@ -1823,7 +1830,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body pt-0">
-            <?php if (isAdmin() || canView('mm_shifts') || canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance') || canView('mm_networks') || canView('mm_commission_rates')): ?>
+            <?php if (isAdmin() || canView('mm_shifts') || canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance') || canView('mm_commission_rates')): ?>
             <div class="bn-group"><?= t('Settings') ?></div>
             <div class="list-group list-group-flush">
                 <?php if (isAdmin()): ?>
@@ -1846,14 +1853,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_compliance') ?>">
                     <i class="bi bi-shield-check"></i><?= t('Compliance / KYC') ?></a>
                 <?php endif; ?>
-                <?php if (canView('mm_networks')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_networks') ?>">
-                    <i class="bi bi-broadcast"></i><?= t('Networks') ?></a>
-                <?php endif; ?>
                 <?php if (canView('mm_commission_rates')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commission_rates') ?>">
                     <i class="bi bi-percent"></i><?= t('Commission Rates') ?></a>
                 <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (isAdmin()): ?>
+            <div class="bn-group"><?= t('Setup') ?></div>
+            <div class="list-group list-group-flush">
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_agents') ?>">
+                    <i class="bi bi-shop-window"></i><?= t('Agents / Outlets') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_networks') ?>">
+                    <i class="bi bi-broadcast"></i><?= t('Networks') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_user_agent_grants') ?>">
+                    <i class="bi bi-person-check"></i><?= t('User Access Grants') ?></a>
             </div>
             <?php endif; ?>
             <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
