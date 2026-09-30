@@ -143,7 +143,7 @@ try {
     }
     // Offline-sync: idempotency key (validated above) + client-supplied sale timestamp.
     $client_uuid     = $_preClientUuid; // '' when not provided or format invalid
-    $sold_at         = null;
+    $sold_at         = date('Y-m-d H:i:s'); // default to server NOW; overridden below if client provides a valid timestamp
     $sale_date_value = date('Y-m-d');
     if (!empty($input['sold_at'])) {
         $ts = strtotime((string)$input['sold_at']);

@@ -48,11 +48,11 @@ if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     $pay_client_uuid = $rawPayUuid;
     try {
         global $pdo;
-        $pDupChk = $pdo->prepare("SELECT psp.payment_id, ps.payment_status, ps.grand_total,
-                                          COALESCE(SUM(psp2.amount),0) AS total_paid
+        // Simple point-lookup — no aggregate so MySQL returns 0 rows (not a
+        // synthetic NULL row) when nothing matches, preventing false idempotent hits.
+        $pDupChk = $pdo->prepare("SELECT psp.payment_id, ps.payment_status
                                      FROM pos_sale_payments psp
                                      JOIN pos_sales ps ON ps.sale_id = psp.sale_id
-                                LEFT JOIN pos_sale_payments psp2 ON psp2.sale_id = psp.sale_id
                                     WHERE psp.client_uuid = ? LIMIT 1");
         $pDupChk->execute([$pay_client_uuid]);
         if ($pDup = $pDupChk->fetch(PDO::FETCH_ASSOC)) {

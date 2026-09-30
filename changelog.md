@@ -12,6 +12,12 @@
 - `api/mobile_money/save_reconciliation.php` — Added EDIT handler (`_method=EDIT`: updates `recon_date`/notes, only for open); DELETE handler (`_method=DELETE`: sets `status='closed'`, only for open); both gate on `canEdit`/`canDelete`, `logActivity`+`logAudit`
 - `tests/test_mm_crud_gaps_cli.php` — New: 50 assertions (static + lint + live rolled-back), all passing
 
+## 2026-09-30 — fix(pos): receive_payment idempotency false positive + process_sale sold_at time loss
+
+**Files:**
+- `api/pos/receive_payment.php` — Replaced aggregate idempotency query (SUM without GROUP BY returned a synthetic NULL row, triggering idempotent guard on every first call) with a simple point-lookup JOIN; no more false "Payment already recorded" on the first request
+- `api/pos/process_sale.php` — `$sold_at` now defaults to server NOW instead of null; credit sales (and any sale where the client omits `sold_at`) no longer store `NULL` or `YYYY-MM-DD 00:00:00` — the server time is used when the client doesn't supply a precise timestamp
+
 ## 2026-09-30 — fix(mobile-api): master-data API bug fixes + schema catch-up migration
 
 **Root cause:** tenant DBs provisioned before `2026_09_23_master_data_offline_sync` lacked `client_uuid` and several optional columns; API endpoints always referenced those columns → "Server error" on create/list/get.
