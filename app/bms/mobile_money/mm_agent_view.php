@@ -3,10 +3,14 @@
 ob_start();
 $page_title = 'Agent View';
 require_once __DIR__ . '/../../../roots.php';
-if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
+$id = intval($_GET['id'] ?? 0);
+// Admin: any agent. Non-admin: read-only view of an agent they are assigned to.
+if (!isAdmin()) {
+    if (!isAuthenticated()) { header('Location: ' . getUrl('login')); exit; }
+    if (!$id || !mmAgentInScope($id)) { mmDenyToDashboard(); }
+}
 includeHeader();
 
-$id = intval($_GET['id'] ?? 0);
 if (!$id) { echo '<div class="alert alert-danger m-4">' . t('Invalid agent ID.') . '</div>'; includeFooter(); exit; }
 
 $agent = $pdo->prepare("
@@ -23,13 +27,13 @@ $tillsStmt = $pdo->prepare("
     SELECT t.*, n.network_name, n.network_code, n.color_hex
     FROM mm_tills t
     LEFT JOIN mm_networks n ON n.network_id = t.network_id
-    WHERE t.agent_id=? AND t.status!='closed'
+    WHERE t.agent_id=? AND t.status!='closed' " . mmScopeSql('t.till_id') . "
     ORDER BY t.till_number
 ");
 $tillsStmt->execute([$id]);
 $tills = $tillsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$subStmt = $pdo->prepare("SELECT * FROM mm_agents WHERE parent_agent_id=? AND status!='closed' ORDER BY agent_name");
+$subStmt = $pdo->prepare("SELECT * FROM mm_agents WHERE parent_agent_id=? AND status!='closed' " . mmScopeSql('agent_id', 'agent') . " ORDER BY agent_name");
 $subStmt->execute([$id]);
 $subAgents = $subStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -46,7 +50,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
-        <a href="<?= getUrl('mm_agents') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+        <a href="<?= getUrl(isAdmin() ? 'mm_agents' : 'mm_dashboard') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
         <h4 class="mb-0 fw-bold"><?= safe_output($agent['agent_name']) ?></h4>
         <code class="text-muted"><?= safe_output($agent['agent_code']) ?></code>
         <span class="badge <?= $agent['status']==='active'?'bg-success':($agent['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>">

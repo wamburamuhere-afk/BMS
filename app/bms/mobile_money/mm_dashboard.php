@@ -9,13 +9,23 @@ $monthEnd   = date('Y-m-t');
 $prevMonthStart = date('Y-m-01', strtotime('-1 month'));
 $prevMonthEnd   = date('Y-m-t', strtotime('-1 month'));
 
+// Agent-grant scope: admin → '' (all); granted → their tills/agents; no grant → AND 1=0.
+$isScopedAdmin = mmScopeAll();
+$hasGrant      = mmHasAnyGrant();
+$scopeTxn      = mmScopeSql('till_id');
+$scopeTxnT     = mmScopeSql('t.till_id');
+$scopeTill     = mmScopeSql('till_id');
+$scopeAgent    = mmScopeSql('agent_id', 'agent');
+$scopeNotice   = $_SESSION['mm_scope_notice'] ?? null;
+unset($_SESSION['mm_scope_notice']);
+
 // --- Today's KPIs ---
 $todayStats = $pdo->prepare("
     SELECT COUNT(*) AS txn_count,
            COALESCE(SUM(principal_amount),0) AS volume,
            COALESCE(SUM(commission_earned),0) AS commission
     FROM mm_transactions
-    WHERE txn_date=? AND status='posted'
+    WHERE txn_date=? AND status='posted' $scopeTxn
 ");
 $todayStats->execute([$today]);
 $today_kpi = $todayStats->fetch(PDO::FETCH_ASSOC);
@@ -26,7 +36,7 @@ $monthStats = $pdo->prepare("
            COALESCE(SUM(principal_amount),0) AS volume,
            COALESCE(SUM(commission_earned),0) AS commission
     FROM mm_transactions
-    WHERE txn_date BETWEEN ? AND ? AND status='posted'
+    WHERE txn_date BETWEEN ? AND ? AND status='posted' $scopeTxn
 ");
 $monthStats->execute([$monthStart, $monthEnd]);
 $month_kpi = $monthStats->fetch(PDO::FETCH_ASSOC);
@@ -39,9 +49,9 @@ $comm_trend = $prev_month_kpi['commission'] > 0
     : null;
 
 // --- Active tills / agents / shifts ---
-$tillCount  = (int)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='active'")->fetchColumn();
-$agentCount = (int)$pdo->query("SELECT COUNT(*) FROM mm_agents WHERE status='active'")->fetchColumn();
-$openShifts = (int)$pdo->query("SELECT COUNT(*) FROM mm_shifts WHERE status='open'")->fetchColumn();
+$tillCount  = (int)$pdo->query("SELECT COUNT(*) FROM mm_tills WHERE status='active' $scopeTill")->fetchColumn();
+$agentCount = (int)$pdo->query("SELECT COUNT(*) FROM mm_agents WHERE status='active' $scopeAgent")->fetchColumn();
+$openShifts = (int)$pdo->query("SELECT COUNT(*) FROM mm_shifts WHERE status='open' $scopeTill")->fetchColumn();
 
 // All of the current user's open shifts (no LIMIT 1)
 if (isAdmin()) {
@@ -75,22 +85,37 @@ if (isAdmin()) {
           AND till_id NOT IN (SELECT till_id FROM mm_shifts WHERE status = 'open')
     ")->fetchColumn();
 } else {
-    $canOpenMoreStmt = $pdo->prepare("
+    // Grant engine applies the closed/suspended agent + till rules.
+    $scopeOpen = mmScopeSql('t.till_id', 'till', 'can_open_shift');
+    $canOpenMore = (bool)$pdo->query("
         SELECT COUNT(*) FROM mm_tills t
-        JOIN mm_user_agent_grants g ON g.agent_id = t.agent_id
-            AND (g.till_id IS NULL OR g.till_id = t.till_id)
-        WHERE t.status = 'active' AND g.user_id = ? AND g.can_open_shift = 1
+        WHERE t.status = 'active' $scopeOpen
           AND t.till_id NOT IN (SELECT till_id FROM mm_shifts WHERE status = 'open')
-    ");
-    $canOpenMoreStmt->execute([$_SESSION['user_id']]);
-    $canOpenMore = (bool)$canOpenMoreStmt->fetchColumn();
+    ")->fetchColumn();
+}
+$canRecordAny = $isScopedAdmin || !empty(mmScopeTillIds('can_record_transactions'));
+
+// --- "My Agents" (non-admin with grants): each granted agent with its in-scope tills ---
+$myAgents = [];
+if (!$isScopedAdmin && $hasGrant) {
+    $myAgents = $pdo->query("
+        SELECT a.agent_id, a.agent_code, a.agent_name, a.status, a.region, a.district,
+               (SELECT COUNT(*) FROM mm_tills t WHERE t.agent_id = a.agent_id AND t.status = 'active' $scopeTxnT) AS till_count,
+               (SELECT COUNT(*) FROM mm_shifts s JOIN mm_tills t ON t.till_id = s.till_id
+                 WHERE t.agent_id = a.agent_id AND s.status = 'open' $scopeTxnT) AS open_shifts,
+               (SELECT COALESCE(SUM(x.principal_amount),0) FROM mm_transactions x JOIN mm_tills t ON t.till_id = x.till_id
+                 WHERE t.agent_id = a.agent_id AND x.status = 'posted' AND x.txn_date = " . $pdo->quote($today) . " $scopeTxnT) AS today_volume
+        FROM mm_agents a
+        WHERE a.status <> 'closed' $scopeAgent
+        ORDER BY a.agent_name
+    ")->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // --- Daily volume last 14 days (chart) ---
 $dailyVol = $pdo->prepare("
     SELECT txn_date, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
     FROM mm_transactions
-    WHERE txn_date BETWEEN DATE_SUB(?, INTERVAL 13 DAY) AND ? AND status='posted'
+    WHERE txn_date BETWEEN DATE_SUB(?, INTERVAL 13 DAY) AND ? AND status='posted' $scopeTxn
     GROUP BY txn_date ORDER BY txn_date
 ");
 $dailyVol->execute([$today, $today]);
@@ -100,7 +125,7 @@ $dailyData = $dailyVol->fetchAll(PDO::FETCH_ASSOC);
 $typeVol = $pdo->prepare("
     SELECT txn_type, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
     FROM mm_transactions
-    WHERE txn_date BETWEEN ? AND ? AND status='posted'
+    WHERE txn_date BETWEEN ? AND ? AND status='posted' $scopeTxn
     GROUP BY txn_type ORDER BY vol DESC
 ");
 $typeVol->execute([$monthStart, $monthEnd]);
@@ -111,7 +136,7 @@ $topAgents = $pdo->prepare("
     SELECT a.agent_name, COALESCE(SUM(t.principal_amount),0) AS vol, COUNT(*) AS cnt
     FROM mm_transactions t
     JOIN mm_agents a ON a.agent_id = t.agent_id
-    WHERE t.txn_date BETWEEN ? AND ? AND t.status='posted'
+    WHERE t.txn_date BETWEEN ? AND ? AND t.status='posted' $scopeTxnT
     GROUP BY a.agent_id ORDER BY vol DESC LIMIT 5
 ");
 $topAgents->execute([$monthStart, $monthEnd]);
@@ -122,7 +147,7 @@ $networkVol = $pdo->prepare("
     SELECT n.network_name, n.color_hex, COALESCE(SUM(t.principal_amount),0) AS vol
     FROM mm_transactions t
     JOIN mm_networks n ON n.network_id = t.network_id
-    WHERE t.txn_date BETWEEN ? AND ? AND t.status='posted'
+    WHERE t.txn_date BETWEEN ? AND ? AND t.status='posted' $scopeTxnT
     GROUP BY n.network_id ORDER BY vol DESC
 ");
 $networkVol->execute([$monthStart, $monthEnd]);
@@ -161,6 +186,38 @@ function mmTrendBadge($pct): string {
         <?php endforeach; ?>
     </div>
 
+    <?php if ($scopeNotice): ?>
+    <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+        <i class="bi bi-shield-lock fs-5"></i>
+        <div><?= t('That page is not available to you. Mobile Money pages open only for the agents you are assigned to — contact your administrator.') ?></div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!$hasGrant): ?>
+    <!-- Not assigned to any agent: no company figures, only the way forward. -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-person-lock text-secondary" style="font-size:3.5rem"></i>
+            <h5 class="mt-3 fw-bold"><?= t('You are not assigned to any agent yet') ?></h5>
+            <p class="text-muted mb-4" style="max-width:520px;margin:0 auto">
+                <?= t('Shifts, transactions, float and reports appear here once an administrator assigns you to an agent outlet. Please contact your administrator.') ?>
+            </p>
+            <div class="d-flex justify-content-center flex-wrap gap-2">
+                <?php if (!empty($myActiveShifts) && canView('mm_shifts')): ?>
+                <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-danger">
+                    <i class="bi bi-stop-circle me-1"></i><?= t('Close my open shift') ?> (<?= count($myActiveShifts) ?>)
+                </a>
+                <?php endif; ?>
+                <a href="<?= getUrl('my_settings') ?>" class="btn btn-outline-primary">
+                    <i class="bi bi-person-gear me-1"></i><?= t('My Settings') ?>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<?php includeFooter(); return; ?>
+    <?php endif; ?>
+
     <!-- Quick Actions — dashboard.php style: card with bg-light header, flex-fill buttons -->
     <div class="row mb-4">
         <div class="col-12">
@@ -170,7 +227,7 @@ function mmTrendBadge($pct): string {
                 </div>
                 <div class="card-body">
                     <div class="d-flex flex-wrap gap-3">
-                        <?php if (canCreate('mm_transactions')): ?>
+                        <?php if (canCreate('mm_transactions') && $canRecordAny): ?>
                         <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('mm_transactions') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-arrow-left-right display-6"></i>
@@ -205,7 +262,7 @@ function mmTrendBadge($pct): string {
                         </div>
                         <?php endif; ?>
                         <?php endif; ?>
-                        <?php if (canCreate('mm_float')): ?>
+                        <?php if (canCreate('mm_float') && $canRecordAny): ?>
                         <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('mm_float') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
                                 <i class="bi bi-currency-exchange display-6"></i>
@@ -347,6 +404,45 @@ function mmTrendBadge($pct): string {
 
     </div>
 
+    <?php if (!empty($myAgents)): ?>
+    <!-- My Agents — the outlets this user is assigned to -->
+    <h6 class="fw-bold mb-2"><i class="bi bi-shop-window text-primary me-1"></i><?= t('My Agents') ?></h6>
+    <div class="row g-3 mb-4">
+        <?php foreach ($myAgents as $ag): ?>
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div class="fw-semibold"><?= safe_output($ag['agent_name']) ?></div>
+                            <code class="small text-muted"><?= safe_output($ag['agent_code']) ?></code>
+                        </div>
+                        <span class="badge <?= $ag['status'] === 'active' ? 'bg-success' : 'bg-warning text-dark' ?>"><?= ucfirst(safe_output($ag['status'])) ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between small border-top pt-2">
+                        <span class="text-muted"><?= t('Tills') ?></span><span class="fw-semibold"><?= (int)$ag['till_count'] ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted"><?= t('Open Shifts') ?></span><span class="fw-semibold"><?= (int)$ag['open_shifts'] ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted"><?= t("Today's Volume") ?></span><span class="fw-semibold">TZS <?= number_format((float)$ag['today_volume']) ?></span>
+                    </div>
+                    <?php if ($ag['status'] === 'suspended'): ?>
+                    <div class="small text-warning mt-2"><i class="bi bi-pause-circle me-1"></i><?= t('Suspended — history only, no new shifts or transactions.') ?></div>
+                    <?php endif; ?>
+                </div>
+                <div class="card-footer bg-white border-top-0 pt-0">
+                    <a href="<?= getUrl('mm_agent_view') ?>?id=<?= (int)$ag['agent_id'] ?>" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="bi bi-eye me-1"></i><?= t('View') ?>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Charts row -->
     <div class="row g-3 mb-4">
         <div class="col-md-8">
@@ -393,7 +489,7 @@ function mmTrendBadge($pct): string {
         </div>
         <div class="col-md-6">
             <div class="card border-0 shadow-sm">
-                <div class="card-header fw-bold bg-transparent"><?= t('Top 5 Agents — This Month') ?></div>
+                <div class="card-header fw-bold bg-transparent"><?= $isScopedAdmin ? t('Top 5 Agents — This Month') : t('My Agents — This Month') ?></div>
                 <div class="card-body p-0">
                     <table class="table table-sm mb-0">
                         <thead class="table-light"><tr><th>#</th><th><?= t('Agent') ?></th><th class="text-end"><?= t('Volume') ?></th><th class="text-end"><?= t('Txns') ?></th></tr></thead>

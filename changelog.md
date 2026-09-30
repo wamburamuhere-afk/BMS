@@ -12,6 +12,10 @@
 - `core/permissions.php` — Phase 2: `mmGrantAllowsPage()` hook in canView/canCreate/canEdit/canDelete/canReview/canApprove/canSubmit/canReject (after the admin bypass) — nav, page gates and APIs all obey grants; `requireViewPermission()` sends grant-denied users to `mm_dashboard`; MM-only tenant: `mm_dashboard` always opens (landing page); company-level MM writes (agents, networks, grants, commission rates, commission received) admin-only
 - `tests/mm_scope_fixture.inc.php`, `tests/mm_scope_harness.php` — Phase 2 (new): shared fixture (real users/roles/agents/tills, cleaned up) + php-cgi harness that runs real pages and captures redirects (refuses to run from a web request; `tests/` also 403 via .htaccess)
 - `tests/test_mm_scope_gate_cli.php` — Phase 2 (new): 104 assertions — hook placement, persona × tenant permission matrix, nav links per persona, grant-denied pages redirect to dashboard
+- `app/bms/mobile_money/mm_dashboard.php` — Phase 3: every KPI, counter, chart, Top-5 and network query scoped to the user's granted tills/agents; no grant → empty state ("not assigned to any agent", My Settings, Close-my-open-shift if revoked mid-shift) with no company figures; "page not available" notice after a grant redirect; new **My Agents** cards (tills, open shifts, today's volume, suspended flag, View link); New Transaction / Float quick actions only when a live till allows recording; Open Shift uses the grant engine
+- `app/bms/mobile_money/mm_agent_view.php` — Phase 3: non-admins may open (read-only) an agent they are granted; till list and sub-agents scoped; otherwise back to dashboard. Admin unchanged
+- `tests/test_mm_scope_dashboard_cli.php` — Phase 3 (new): 41 assertions (admin 15,500 vs FULL 3,500 vs TILL 1,000 vs DEAD 4,000; empty state; agent view scoping)
+- `tests/test_mm_agents_admin_only_cli.php` — Phase 3: agent-view assertion updated to the new granted-read-only rule
 - `migrations/2026_09_29_mm_shifts_permission_legacy_db.php` — (not changed) applied locally; the `mm_shifts` permission key was missing from the local DB
 
 ## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency
