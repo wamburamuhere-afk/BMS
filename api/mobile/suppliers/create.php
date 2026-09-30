@@ -14,31 +14,30 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 $body = $_POST;
 if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body = json_decode($raw, true) ?: []; } }
 
-// Self-heal DDL (outside any transaction — MySQL DDL causes implicit commit).
+// Check if the idempotency column is available (migration may not have run on this tenant yet).
+$hasClientUuid = false;
 try {
-    if (!$pdo->query("SHOW COLUMNS FROM suppliers LIKE 'client_uuid'")->fetch()) {
-        $pdo->exec("ALTER TABLE suppliers ADD COLUMN client_uuid VARCHAR(36) NULL");
-        try { $pdo->exec("ALTER TABLE suppliers ADD UNIQUE KEY ux_suppliers_client_uuid (client_uuid)"); } catch (PDOException $_ddlE) {}
-    }
-} catch (PDOException $_ddlE) {}
+    $r = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'client_uuid'");
+    $hasClientUuid = (bool)($r && $r->fetch());
+} catch (PDOException $_) {}
 
-// Parse idempotency key.
+// Parse idempotency key and do duplicate check only when column exists.
 $client_uuid = '';
-$rawUuid = trim($body['client_uuid'] ?? '');
-if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
-    $client_uuid = $rawUuid;
-}
-
-// Idempotency pre-check.
-if ($client_uuid !== '') {
-    try {
-        $dupChk = $pdo->prepare("SELECT supplier_id, supplier_code, supplier_name FROM suppliers WHERE client_uuid = ? LIMIT 1");
-        $dupChk->execute([$client_uuid]);
-        if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
-            echo json_encode(['success' => true, 'idempotent' => true, 'supplier_id' => (int)$dup['supplier_id'], 'supplier_code' => $dup['supplier_code'], 'supplier_name' => $dup['supplier_name'], 'message' => 'Supplier already exists.']);
-            exit;
-        }
-    } catch (PDOException $_idemp) { $client_uuid = ''; }
+if ($hasClientUuid) {
+    $rawUuid = trim($body['client_uuid'] ?? '');
+    if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawUuid)) {
+        $client_uuid = $rawUuid;
+    }
+    if ($client_uuid !== '') {
+        try {
+            $dupChk = $pdo->prepare("SELECT supplier_id, supplier_code, supplier_name FROM suppliers WHERE client_uuid = ? LIMIT 1");
+            $dupChk->execute([$client_uuid]);
+            if ($dup = $dupChk->fetch(PDO::FETCH_ASSOC)) {
+                echo json_encode(['success' => true, 'idempotent' => true, 'supplier_id' => (int)$dup['supplier_id'], 'supplier_code' => $dup['supplier_code'], 'supplier_name' => $dup['supplier_name'], 'message' => 'Supplier already exists.']);
+                exit;
+            }
+        } catch (PDOException $_idemp) { $client_uuid = ''; }
+    }
 }
 
 $supplier_name = trim($body['supplier_name'] ?? '');
@@ -57,24 +56,44 @@ $status          = in_array($body['status'] ?? 'active', ['active','inactive'], 
 try {
     $supplier_code = nextCode($pdo, 'SUP');
 
-    $stmt = $pdo->prepare("
-        INSERT INTO suppliers
-            (client_uuid, supplier_code, supplier_name, contact_person, phone, email, address, city,
-             supplier_type, notes, status, created_at, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-    ");
-    $stmt->execute([
-        $client_uuid ?: null,
-        $supplier_code, $supplier_name,
-        $contact_person !== '' ? $contact_person : null,
-        $phone          !== '' ? $phone          : null,
-        $email          !== '' ? $email          : null,
-        $address        !== '' ? $address        : null,
-        $city           !== '' ? $city           : null,
-        $supplier_type  !== '' ? $supplier_type  : null,
-        $notes          !== '' ? $notes          : null,
-        $status, $_SESSION['user_id'],
-    ]);
+    if ($hasClientUuid) {
+        $stmt = $pdo->prepare("
+            INSERT INTO suppliers
+                (client_uuid, supplier_code, supplier_name, contact_person, phone, email, address, city,
+                 supplier_type, notes, status, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute([
+            $client_uuid ?: null,
+            $supplier_code, $supplier_name,
+            $contact_person !== '' ? $contact_person : null,
+            $phone          !== '' ? $phone          : null,
+            $email          !== '' ? $email          : null,
+            $address        !== '' ? $address        : null,
+            $city           !== '' ? $city           : null,
+            $supplier_type  !== '' ? $supplier_type  : null,
+            $notes          !== '' ? $notes          : null,
+            $status, $_SESSION['user_id'],
+        ]);
+    } else {
+        $stmt = $pdo->prepare("
+            INSERT INTO suppliers
+                (supplier_code, supplier_name, contact_person, phone, email, address, city,
+                 supplier_type, notes, status, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute([
+            $supplier_code, $supplier_name,
+            $contact_person !== '' ? $contact_person : null,
+            $phone          !== '' ? $phone          : null,
+            $email          !== '' ? $email          : null,
+            $address        !== '' ? $address        : null,
+            $city           !== '' ? $city           : null,
+            $supplier_type  !== '' ? $supplier_type  : null,
+            $notes          !== '' ? $notes          : null,
+            $status, $_SESSION['user_id'],
+        ]);
+    }
     $supplier_id = (int)$pdo->lastInsertId();
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: created supplier $supplier_name ($supplier_code)");
