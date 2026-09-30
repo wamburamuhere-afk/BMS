@@ -3,7 +3,7 @@
 ob_start();
 $page_title = 'MM Agents';
 require_once __DIR__ . '/../../../roots.php';
-autoEnforcePermission('mm_agents');
+if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 includeHeader();
 
 $can_create = canCreate('mm_agents');
