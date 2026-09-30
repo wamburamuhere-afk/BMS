@@ -37,17 +37,17 @@ foreach (['mmScopeGrantMap','mmScopeAgentIds','mmScopeTillIds','mmHasAnyGrant','
 $pdo->beginTransaction();
 try {
     $fx = mmFixtureCreate($pdo);
-    $A = $fx['agents']; $T = $fx['tills'];
+    $A = $fx["agents"]; $T = $fx["tills"]; $U = $fx["users"];
 
     section('Admin — never scoped');
-    mmFixtureAs(1, true);
+    mmFixtureAs($pdo, $fx["admin_id"]);
     ok(mmScopeTillIds() === null && mmScopeAgentIds() === null, 'admin: till/agent ids = null (all)');
     ok(mmScopeSql('t.till_id') === '', 'admin: mmScopeSql = empty string');
     ok(mmHasAnyGrant(), 'admin: mmHasAnyGrant true');
     ok(mmTillInScope($T['D1'], 'can_open_shift'), 'admin: even closed-agent till allowed');
 
     section('U_FULL — agent-wide on A and B');
-    mmFixtureAs(MMF_U_FULL);
+    mmFixtureAs($pdo, $U["FULL"]);
     $ids = mmScopeTillIds(); sort($ids);
     $exp = [$T['A1'], $T['A2'], $T['A3'], $T['B1']]; sort($exp);
     ok($ids === $exp, 'view tills = A1,A2,A3(closed till history),B1');
@@ -62,7 +62,7 @@ try {
     ok(strpos(mmScopeSql('a.agent_id', 'agent'), 'a.agent_id IN (') !== false, "mmScopeSql kind=agent");
 
     section('U_TILL — till-only grant on A1, no reconcile');
-    mmFixtureAs(MMF_U_TILL);
+    mmFixtureAs($pdo, $U["TILL"]);
     ok(mmScopeTillIds() === [$T['A1']], 'only A1 visible (A2 not leaked)');
     ok(mmTillInScope($T['A1'], 'can_record_transactions'), 'A1 record allowed');
     ok(!mmTillInScope($T['A1'], 'can_reconcile'), 'A1 reconcile denied');
@@ -70,14 +70,14 @@ try {
     ok(mmAgentInScope($A['A']) && !mmAgentInScope($A['B']), 'agent A in scope, B not');
 
     section('U_NONE — no grant');
-    mmFixtureAs(MMF_U_NONE);
+    mmFixtureAs($pdo, $U["NONE"]);
     ok(mmScopeTillIds() === [] && mmScopeAgentIds() === [], 'empty tills and agents');
     ok(!mmHasAnyGrant(), 'mmHasAnyGrant false');
     ok(mmScopeSql('t.till_id') === ' AND 1=0 ', 'empty scope → AND 1=0 (never empty IN, never unfiltered)');
     ok(mmScopeSql('x.agent_id', 'agent') === ' AND 1=0 ', 'agent kind empty → AND 1=0');
 
     section('U_DEAD — grants on suspended C and closed D only');
-    mmFixtureAs(MMF_U_DEAD);
+    mmFixtureAs($pdo, $U["DEAD"]);
     ok(mmScopeAgentIds() === [$A['C']], 'closed agent D ignored; suspended C kept');
     ok(mmTillInScope($T['C1']), 'suspended agent till C1 viewable');
     ok(!mmTillInScope($T['C1'], 'can_open_shift'), 'suspended: cannot open shift');
@@ -86,34 +86,34 @@ try {
     ok(!mmTillInScope($T['D1']), 'closed agent till D1 not viewable');
 
     section('U_NOREC / U_MIXED — ability flags + override');
-    mmFixtureAs(MMF_U_NOREC);
+    mmFixtureAs($pdo, $U["NOREC"]);
     ok(!mmTillInScope($T['A1'], 'can_record_transactions'), 'NOREC: record denied');
     ok(mmTillInScope($T['A1'], 'can_open_shift'), 'NOREC: open allowed');
     ok(!mmTillInScope($T['A1'], 'bogus_flag'), 'unknown ability denied');
-    mmFixtureAs(MMF_U_MIXED);
+    mmFixtureAs($pdo, $U["MIXED"]);
     ok(!mmTillInScope($T['A1'], 'can_reconcile'), 'MIXED: agent-wide grant → A1 reconcile denied');
     ok(mmTillInScope($T['A2'], 'can_reconcile'), 'MIXED: till-specific override → A2 reconcile allowed');
 
     section('Cache + mmUserCanOnTill fresh read');
-    mmFixtureAs(MMF_U_TILL);
+    mmFixtureAs($pdo, $U["TILL"]);
     ok(mmTillInScope($T['A1']), 'A1 in scope (cached)');
-    $pdo->prepare("DELETE FROM mm_user_agent_grants WHERE user_id=?")->execute([MMF_U_TILL]);
+    $pdo->prepare("DELETE FROM mm_user_agent_grants WHERE user_id=?")->execute([$U["TILL"]]);
     ok(mmTillInScope($T['A1']), 'same request: cache still answers (per-request cache)');
-    ok(!mmUserCanOnTill($pdo, MMF_U_TILL, $T['A1'], 'can_open_shift'), 'mmUserCanOnTill reads fresh → revoked');
+    ok(!mmUserCanOnTill($pdo, $U["TILL"], $T['A1'], 'can_open_shift'), 'mmUserCanOnTill reads fresh → revoked');
     mmScopeReset();
     ok(!mmTillInScope($T['A1']), 'after mmScopeReset: revoked');
 
     section('mmHasOwnOpenShift');
     $pdo->prepare("INSERT INTO mm_shifts (shift_code, till_id, teller_user_id, opened_at, status) VALUES ('ZZSCOPE-S1', ?, ?, NOW(), 'open')")
-        ->execute([$T['A1'], MMF_U_TILL]);
-    mmFixtureAs(MMF_U_TILL);
+        ->execute([$T['A1'], $U["TILL"]]);
+    mmFixtureAs($pdo, $U["TILL"]);
     ok(mmHasOwnOpenShift(), 'revoked teller with an open shift detected');
-    mmFixtureAs(MMF_U_NONE);
+    mmFixtureAs($pdo, $U["NONE"]);
     ok(!mmHasOwnOpenShift(), 'U_NONE has no open shift');
 
     section('mmUserCanOnTill — admin bypass kept');
-    mmFixtureAs(1, true);
-    ok(mmUserCanOnTill($pdo, 1, $T['D1'], 'can_open_shift'), 'admin bypass');
+    mmFixtureAs($pdo, $fx["admin_id"]);
+    ok(mmUserCanOnTill($pdo, $fx["admin_id"], $T['D1'], 'can_open_shift'), 'admin bypass');
 } finally {
     $pdo->rollBack();
     echo "  (fixture transaction rolled back)\n";

@@ -9,6 +9,10 @@
 - `core/mm_scope.php` — Phase 1 (new): scope engine — `mmScopeGrantMap/mmScopeAgentIds/mmScopeTillIds/mmTillInScope/mmAgentInScope/mmScopeSql/mmHasAnyGrant/mmHasOwnOpenShift/mmGrantAllowsPage/mmRequireTill/mmDenyToDashboard`; per-request cache (`mmScopeReset()`); closed agent = no access, suspended = view only
 - `roots.php` — Phase 1: loads `core/mm_scope.php` after permissions
 - `core/mm_float_service.php` — Phase 1: `mmUserCanOnTill()` now delegates to the engine (fresh read), gaining closed/suspended rules
+- `core/permissions.php` — Phase 2: `mmGrantAllowsPage()` hook in canView/canCreate/canEdit/canDelete/canReview/canApprove/canSubmit/canReject (after the admin bypass) — nav, page gates and APIs all obey grants; `requireViewPermission()` sends grant-denied users to `mm_dashboard`; MM-only tenant: `mm_dashboard` always opens (landing page); company-level MM writes (agents, networks, grants, commission rates, commission received) admin-only
+- `tests/mm_scope_fixture.inc.php`, `tests/mm_scope_harness.php` — Phase 2 (new): shared fixture (real users/roles/agents/tills, cleaned up) + php-cgi harness that runs real pages and captures redirects (refuses to run from a web request; `tests/` also 403 via .htaccess)
+- `tests/test_mm_scope_gate_cli.php` — Phase 2 (new): 104 assertions — hook placement, persona × tenant permission matrix, nav links per persona, grant-denied pages redirect to dashboard
+- `migrations/2026_09_29_mm_shifts_permission_legacy_db.php` — (not changed) applied locally; the `mm_shifts` permission key was missing from the local DB
 
 ## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency
 
