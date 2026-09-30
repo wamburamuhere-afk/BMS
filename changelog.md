@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-09-30 — fix(mobile-api): tenant migration re-apply with correct top-level format
+
+**Files:**
+- `migrations/tenant/2026_09_30_mobile_api_schema_fix.php` — New migration that actually runs the schema changes from the original `2026_09_30_mobile_api_schema.php` which wrapped all DDL in a `function run()` that was never called (the runner only `include()`s files); adds client_uuid+indexes to 6 tables (including product_batches), optional supplier columns, brands/tax_rates tables, and optional product columns
+
+---
+
 ## 2026-09-30 — fix(mobile-api): migration format + sale_date datetime + balance_due + get_sales limit + ghost cleanup
 
 **Files:**
