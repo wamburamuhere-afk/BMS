@@ -64,6 +64,13 @@ $expiry_date            = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] 
 // on its own; only rejected if a non-empty value doesn't resolve to a real,
 // active supplier the user is allowed to see.
 $supplier_id            = (int)($_POST['supplier_id'] ?? 0);
+// Optional idempotency key — a UUID-v4 lets the Flutter app retry a restock
+// safely over a flaky connection without creating duplicate batches.
+$restock_uuid = '';
+$_rawRestockUuid = trim($_POST['client_uuid'] ?? '');
+if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $_rawRestockUuid)) {
+    $restock_uuid = $_rawRestockUuid;
+}
 
 // Simple Mode — the modal never shows an account picker for a "normal
 // business man" (pos_modals_new.php), so nothing is posted for
@@ -136,6 +143,32 @@ if ($supplier_id > 0) {
     }
 }
 
+// Self-heal: add client_uuid to product_batches if absent; DDL must be outside
+// the transaction (MySQL DDL auto-commits).
+if ($restock_uuid !== '') {
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM product_batches LIKE 'client_uuid'")->fetch()) {
+            $pdo->exec("ALTER TABLE product_batches ADD COLUMN client_uuid VARCHAR(36) NULL DEFAULT NULL");
+            try { $pdo->exec("ALTER TABLE product_batches ADD UNIQUE KEY uq_product_batches_client_uuid (client_uuid)"); } catch (PDOException $_) {}
+        }
+        // Idempotency pre-check.
+        $rDupChk = $pdo->prepare("SELECT batch_id, reference_number FROM product_batches WHERE client_uuid = ? LIMIT 1");
+        $rDupChk->execute([$restock_uuid]);
+        if ($rDup = $rDupChk->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode([
+                'success'          => true,
+                'idempotent'       => true,
+                'message'          => t('Restock already recorded.'),
+                'batch_id'         => (int)$rDup['batch_id'],
+                'reference_number' => $rDup['reference_number'] ?? '',
+            ]);
+            exit;
+        }
+    } catch (PDOException $_rIdemp) {
+        $restock_uuid = ''; // column unavailable — skip idempotency, proceed normally
+    }
+}
+
 try {
     $prod = $pdo->prepare("SELECT product_name, is_service, track_inventory FROM products WHERE product_id = ? AND status != 'deleted'");
     $prod->execute([$product_id]);
@@ -177,6 +210,14 @@ try {
         'created_by'       => $_SESSION['user_id'],
         'notes'            => "POS Restock: {$product['product_name']} x{$quantity}",
     ]);
+
+    // Stamp the idempotency key onto the batch row so retries are detected above.
+    if ($restock_uuid !== '' && !empty($intake['batch_id'])) {
+        try {
+            $pdo->prepare("UPDATE product_batches SET client_uuid = ? WHERE batch_id = ?")
+                ->execute([$restock_uuid, $intake['batch_id']]);
+        } catch (PDOException $_) {}
+    }
 
     // Live prices: Retail -> products.selling_price (what every sale, report,
     // and the Retail price-group's own fallback read); Wholesale -> the
