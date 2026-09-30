@@ -144,14 +144,14 @@ try {
     // Offline-sync: idempotency key (validated above) + client-supplied sale timestamp.
     $client_uuid     = $_preClientUuid; // '' when not provided or format invalid
     $sold_at         = date('Y-m-d H:i:s'); // default to server NOW; overridden below if client provides a valid timestamp
-    $sale_date_value = date('Y-m-d');
+    $sale_date_value = date('Y-m-d H:i:s'); // pos_sales.sale_date is DATETIME — always store full timestamp
     if (!empty($input['sold_at'])) {
         $ts = strtotime((string)$input['sold_at']);
         // Accept timestamps up to 30 days in the past and 5 minutes in the future
         // (tolerance for clock drift). Falls back to server time silently.
         if ($ts && $ts >= time() - 2592000 && $ts <= time() + 300) {
             $sold_at         = date('Y-m-d H:i:s', $ts);
-            $sale_date_value = date('Y-m-d', $ts);
+            $sale_date_value = date('Y-m-d H:i:s', $ts);
         }
     }
 

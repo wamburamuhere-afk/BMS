@@ -27,6 +27,7 @@ if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' =
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date']   ?? date('Y-m-t');
+$limit      = isset($_GET['limit']) && (int)$_GET['limit'] > 0 ? (int)$_GET['limit'] : 0;
 // Optional (2026-09-17, customer_details.php's Sales History tab) — narrows
 // to one customer's own sale history, on top of the existing date range and
 // project/warehouse scope, never replacing them.
@@ -54,7 +55,8 @@ try {
          LEFT JOIN customers c ON c.customer_id = ps.customer_id
          LEFT JOIN projects  pr ON pr.project_id = ps.project_id
              WHERE DATE(ps.sale_date) BETWEEN ? AND ?" . $customerFilter . $scope . "
-          ORDER BY ps.sale_date DESC, ps.sale_id DESC";
+          ORDER BY ps.sale_date DESC, ps.sale_id DESC"
+        . ($limit > 0 ? " LIMIT " . $limit : "");
     $st = $pdo->prepare($sql);
     $params = [$start_date, $end_date];
     if ($customer_id > 0) $params[] = $customer_id;

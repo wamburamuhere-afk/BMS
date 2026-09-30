@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-30 — fix(mobile-api): migration format + sale_date datetime + balance_due + get_sales limit + ghost cleanup
+
+**Files:**
+- `migrations/tenant/2026_09_30_mobile_api_schema.php` — Rewrote migration as top-level CLI code (was wrapped in an unexecuted `run()` function — DDL never ran); added `suppliers.notes` which is absent from the tenant template; now correctly adds client_uuid + indexes to 5 tables, optional supplier columns, brands/tax_rates tables, and optional product columns
+- `migrations/tenant/2026_09_30_cleanup_probe_products.php` — New: soft-deletes products where `name LIKE 'ZZ %'` (probe test records IDs 126/127/128 on shop tenant)
+- `api/mobile/suppliers/create.php` — Added "Unknown column" fallback INSERT (retries with core columns when optional schema columns are absent on unpatched tenants); resolves "Server error" before the schema migration runs
+- `api/pos/process_sale.php` — `sale_date` column now stores full datetime `date('Y-m-d H:i:s')` instead of date-only `date('Y-m-d')`; was storing `YYYY-MM-DD 00:00:00` because a DATETIME column received a date-only string
+- `api/account/get_sales_report.php` — POS arm now reads actual `amount_paid` from `pos_sale_payments` instead of hardcoding `grand_total`; `balance_due` is now correct for partial credit sales; guarded with `$pos_has_pay_table` for tenants without the payments table
+- `api/pos/get_sales.php` — Added `limit` GET parameter; SQL query now appends `LIMIT n` when provided (previously ignored, returned all rows)
+
 ## 2026-09-30 — fix(mm): move agents/networks/grants to Settings > Admin (nav + page gates)
 
 **Problem:** mm_agents and mm_networks were accessible via `canView()` in the nav and visible to non-admins despite the page having an `isAdmin()` gate, causing broken links. mm_user_agent_grants had no nav entry at all.
