@@ -24,6 +24,9 @@
 - `tests/mm_scope_fixture.inc.php` — harness now launches php-cgi as a real CGI request (no `-f`, which disabled sessions and polluted JSON); cleanup also removes ledger entries posted for fixture transactions/float moves
 - `tests/test_mm_shifts_bulk_cli.php` — batch_close assertion accepts the `mmUserCanCloseShift()` wrapper
 - `tests/test_mm_scope_edges_cli.php` — Phase 6 (new): 19 assertions — grant revoked between requests, agent closed after grant, suspended till, inconsistent grant row, duplicate grants, multi-module scoping (D1), admin unchanged. Re-scout found no MM data access outside the MM folders; report export is client-side from scoped rows. No code change needed
+- `api/mobile_money/save_transaction.php` — Phase 7 bug fix (found by the E2E test): transactions were never linked to a shift (`shift_id` always NULL), so every shift closed with a false cash/float variance equal to its whole day's activity. Now requires the teller's own open shift on that till (the UI already required a shift) and stores its `shift_id`
+- `app/bms/mobile_money/mm_transactions.php` — Phase 7: New Transaction form lists only tills where the teller has an open shift (button/hint unchanged)
+- `tests/test_mm_scope_e2e_cli.php` — Phase 7 (new): 25 assertions — full teller day via real APIs (open shift → cash-in → float top-up → close shift with correct expected cash/float → start + resolve reconciliation), each step refused on a foreign till; ledger postings balanced; everything cleaned up
 - `migrations/2026_09_29_mm_shifts_permission_legacy_db.php` — (not changed) applied locally; the `mm_shifts` permission key was missing from the local DB
 
 ## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency

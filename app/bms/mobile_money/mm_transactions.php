@@ -33,8 +33,15 @@ $filterTill   = intval($_GET['till_id'] ?? 0);
 $networks = $pdo->query("SELECT network_id, network_code, network_name, color_hex FROM mm_networks WHERE status='active' ORDER BY sort_order")->fetchAll(PDO::FETCH_ASSOC);
 // Filter list = tills the user can see; the New Transaction form = tills they may record on.
 $tills       = $pdo->query("SELECT t.till_id, t.till_number, a.agent_name FROM mm_tills t JOIN mm_agents a ON a.agent_id=t.agent_id WHERE t.status='active' " . mmScopeSql('t.till_id') . " ORDER BY a.agent_name, t.till_number")->fetchAll(PDO::FETCH_ASSOC);
-$recordTills = $pdo->query("SELECT t.till_id, t.till_number, a.agent_name FROM mm_tills t JOIN mm_agents a ON a.agent_id=t.agent_id WHERE t.status='active' AND a.status='active' " . mmScopeSql('t.till_id', 'till', 'can_record_transactions') . " ORDER BY a.agent_name, t.till_number")->fetchAll(PDO::FETCH_ASSOC);
-if (!$recordTills) $can_create = false;
+$scopeRecord = mmScopeSql('t.till_id', 'till', 'can_record_transactions');
+$canRecordAny = (bool)$pdo->query("SELECT COUNT(*) FROM mm_tills t JOIN mm_agents a ON a.agent_id=t.agent_id
+    WHERE t.status='active' AND a.status='active' $scopeRecord")->fetchColumn();
+if (!$canRecordAny) $can_create = false;
+// A transaction belongs to the teller's open shift on that till (save_transaction.php enforces it).
+$recordTills = $pdo->query("SELECT t.till_id, t.till_number, a.agent_name FROM mm_tills t JOIN mm_agents a ON a.agent_id=t.agent_id
+    WHERE t.status='active' AND a.status='active' $scopeRecord
+      AND t.till_id IN (SELECT till_id FROM mm_shifts WHERE status='open' AND teller_user_id=" . (int)$_SESSION['user_id'] . ")
+    ORDER BY a.agent_name, t.till_number")->fetchAll(PDO::FETCH_ASSOC);
 
 $where = ["mt.status != 'void'", "mt.txn_date BETWEEN :date_from AND :date_to"];
 $scopeTxn = trim(mmScopeSql('mt.till_id'));
