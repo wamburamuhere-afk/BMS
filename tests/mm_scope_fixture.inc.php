@@ -119,6 +119,48 @@ function mmFixtureTxn(PDO $pdo, array $fx, string $tillKey, float $amount, int $
     return (int)$pdo->lastInsertId();
 }
 
+/**
+ * Seed one of every MM record type on tills A1, A2, B1, C1, D1 (all dated today), codes
+ * ZZSCOPE-{TX|VD|SH|FM|RC}-<till>. Posted amounts A1=1000 A2=500 B1=2000 C1=4000 D1=8000
+ * (commission = 1%). Each posted txn gets a KYC row; each till gets a void+suspicious txn,
+ * an admin-teller closed shift, a float top-up of 100 and an open reconciliation.
+ * @return array{txn: array<string,int>, void: array<string,int>, shift: array<string,int>, recon: array<string,int>}
+ */
+function mmFixtureSeedActivity(PDO $pdo, array $fx): array
+{
+    $amounts = ['A1' => 1000, 'A2' => 500, 'B1' => 2000, 'C1' => 4000, 'D1' => 8000];
+    $out = ['txn' => [], 'void' => [], 'shift' => [], 'recon' => []];
+    foreach ($amounts as $k => $amt) {
+        $till = $fx['tills'][$k];
+        $st = $pdo->prepare("SELECT agent_id, network_id FROM mm_tills WHERE till_id=?");
+        $st->execute([$till]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        $ins = $pdo->prepare("INSERT INTO mm_transactions (txn_code, till_id, network_id, agent_id, txn_type, txn_date, txn_time,
+                   customer_phone, principal_amount, commission_earned, cash_effect, float_effect, teller_user_id,
+                   kyc_required, suspicious_flag, status, void_reason)
+                   VALUES (?, ?, ?, ?, 'cash_in', CURDATE(), CURTIME(), '255700000000', ?, ?, ?, ?, ?, 1, ?, ?, ?)");
+        $ins->execute(["ZZSCOPE-TX-$k", $till, $t['network_id'], $t['agent_id'], $amt, $amt / 100, $amt, -$amt, $fx['admin_id'], 0, 'posted', null]);
+        $out['txn'][$k] = (int)$pdo->lastInsertId();
+        $ins->execute(["ZZSCOPE-VD-$k", $till, $t['network_id'], $t['agent_id'], 7, 0, 7, -7, $fx['admin_id'], 1, 'void', 'fixture void']);
+        $out['void'][$k] = (int)$pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO mm_kyc_records (mm_txn_id, customer_phone, customer_name, id_type, id_number, captured_by)
+                       VALUES (?, '255700000000', ?, 'nida', ?, ?)")
+            ->execute([$out['txn'][$k], "ZZSCOPE KYC $k", "ZZSCOPE-ID-$k", $fx['admin_id']]);
+        $pdo->prepare("INSERT INTO mm_shifts (shift_code, till_id, teller_user_id, opened_at, closed_at, status, closed_by)
+                       VALUES (?, ?, ?, NOW(), NOW(), 'closed', ?)")
+            ->execute(["ZZSCOPE-SH-$k", $till, $fx['admin_id'], $fx['admin_id']]);
+        $out['shift'][$k] = (int)$pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO mm_float_movements (movement_code, till_id, movement_type, movement_date, amount, status, created_by)
+                       VALUES (?, ?, 'float_topup', CURDATE(), 100, 'posted', ?)")
+            ->execute(["ZZSCOPE-FM-$k", $till, $fx['admin_id']]);
+        $pdo->prepare("INSERT INTO mm_reconciliations (recon_code, till_id, recon_date, status, created_by)
+                       VALUES (?, ?, CURDATE(), 'open', ?)")
+            ->execute(["ZZSCOPE-RC-$k", $till, $fx['admin_id']]);
+        $out['recon'][$k] = (int)$pdo->lastInsertId();
+    }
+    return $out;
+}
+
 /** Switch the simulated in-process session user and load that user's real role permissions. */
 function mmFixtureAs(PDO $pdo, int $userId): void
 {

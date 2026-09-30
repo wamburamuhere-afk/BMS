@@ -6,20 +6,25 @@ autoEnforcePermission('mm_commissions');
 $can_create = canCreate('mm_commissions');
 $can_void   = canDelete('mm_commissions');
 
+// Earned follows the user's granted tills; commission RECEIVED from networks is
+// company-level money (not agent-scopable) → admin only.
+$scopeT       = mmScopeSql('t.till_id');
+$showReceived = mmScopeAll();
+
 // --- Summary figures ---
 // Earned: sum of commission_earned from posted transactions
 $earned = (float)$pdo->query("
     SELECT COALESCE(SUM(t.commission_earned),0)
     FROM mm_transactions t
-    WHERE t.status = 'posted'
+    WHERE t.status = 'posted' $scopeT
 ")->fetchColumn();
 
 // Received: sum of posted commission receipts
-$received = (float)$pdo->query("
+$received = $showReceived ? (float)$pdo->query("
     SELECT COALESCE(SUM(amount_received),0)
     FROM mm_commissions_received
     WHERE status = 'posted'
-")->fetchColumn();
+")->fetchColumn() : 0.0;
 
 $unreceived = max(0, $earned - $received);
 
@@ -28,21 +33,21 @@ $networkEarned = $pdo->query("
     SELECT n.network_id, n.network_name, n.color_hex,
            COALESCE(SUM(t.commission_earned),0) AS earned
     FROM mm_networks n
-    LEFT JOIN mm_transactions t ON t.network_id = n.network_id AND t.status = 'posted'
+    LEFT JOIN mm_transactions t ON t.network_id = n.network_id AND t.status = 'posted' $scopeT
     WHERE n.status = 'active'
     GROUP BY n.network_id
     ORDER BY n.sort_order
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // --- Received records ---
-$receivedRows = $pdo->query("
+$receivedRows = $showReceived ? $pdo->query("
     SELECT cr.*, n.network_name, n.color_hex,
            a.account_name AS bank_name
     FROM mm_commissions_received cr
     JOIN mm_networks n ON n.network_id = cr.network_id
     LEFT JOIN accounts a ON a.account_id = cr.bank_account_id
     ORDER BY cr.created_at DESC
-")->fetchAll(PDO::FETCH_ASSOC);
+")->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // --- For modal dropdowns ---
 $networks = $pdo->query("SELECT network_id, network_name FROM mm_networks WHERE status='active' ORDER BY sort_order")->fetchAll(PDO::FETCH_ASSOC);
@@ -70,6 +75,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                 <div class="small text-muted"><?= t('Total Earned (TZS)') ?></div>
             </div>
         </div>
+        <?php if ($showReceived): ?>
         <div class="col-6 col-md-4">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-success"><?= number_format($received) ?></div>
@@ -82,6 +88,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                 <div class="small text-muted"><?= t('Unreceived (TZS)') ?></div>
             </div>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Tabs -->
@@ -89,9 +96,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
         <li class="nav-item">
             <a class="nav-link active" data-bs-toggle="tab" href="#earnedTab"><?= t('Earned by Network') ?></a>
         </li>
+        <?php if ($showReceived): ?>
         <li class="nav-item">
             <a class="nav-link" data-bs-toggle="tab" href="#receivedTab"><?= t('Received Payments') ?></a>
         </li>
+        <?php endif; ?>
     </ul>
 
     <div class="tab-content">

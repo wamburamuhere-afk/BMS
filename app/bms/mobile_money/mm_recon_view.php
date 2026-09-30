@@ -24,6 +24,9 @@ $recon = $pdo->prepare("
 $recon->execute([$reconId]);
 $recon = $recon->fetch(PDO::FETCH_ASSOC);
 if (!$recon) { header("Location: " . getUrl('mm_reconciliation')); exit; }
+// Non-admin: only reconciliations on a till they are granted; resolve/dispute needs can_reconcile.
+if (!mmTillInScope((int)$recon['till_id'])) { mmDenyToDashboard(); }
+$can_edit = $can_edit && mmTillInScope((int)$recon['till_id'], 'can_reconcile');
 
 $txnSummary = $pdo->prepare("
     SELECT txn_type, COUNT(*) AS cnt,

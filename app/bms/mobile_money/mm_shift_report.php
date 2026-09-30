@@ -4,9 +4,19 @@ ob_start();
 $page_title = 'Shift Report';
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('mm_shifts');
-includeHeader();
 
 $id = intval($_GET['id'] ?? 0);
+// Non-admin: own shift, or a shift on a till they are granted.
+if ($id && !isAdmin()) {
+    $own = $pdo->prepare("SELECT till_id, teller_user_id FROM mm_shifts WHERE shift_id = ?");
+    $own->execute([$id]);
+    $own = $own->fetch(PDO::FETCH_ASSOC);
+    if (!$own || ((int)$own['teller_user_id'] !== (int)$_SESSION['user_id'] && !mmTillInScope((int)$own['till_id']))) {
+        mmDenyToDashboard();
+    }
+}
+includeHeader();
+
 if (!$id) { echo '<div class="alert alert-danger m-4">' . t('Invalid shift ID.') . '</div>'; includeFooter(); exit; }
 
 $shift = $pdo->prepare("

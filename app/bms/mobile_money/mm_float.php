@@ -33,9 +33,10 @@ $tills = $pdo->query("
     FROM mm_tills t
     JOIN mm_agents a ON a.agent_id = t.agent_id
     JOIN mm_networks n ON n.network_id = t.network_id
-    WHERE t.status = 'active'
+    WHERE t.status = 'active' AND a.status = 'active' " . mmScopeSql('t.till_id', 'till', 'can_record_transactions') . "
     ORDER BY a.agent_name, t.till_number
 ")->fetchAll(PDO::FETCH_ASSOC);
+if (!$tills) $can_create = false;   // no till this user may move float on
 
 // Build agent → tills map for dynamic multi-till UI
 $agentTillsMap = [];
@@ -54,6 +55,8 @@ foreach ($tills as $tt) {
 }
 
 $where  = ["fm.movement_date BETWEEN :df AND :dt"];
+$scopeFm = trim(mmScopeSql('fm.till_id'));
+if ($scopeFm !== '') $where[] = substr($scopeFm, 4);   // drop the leading "AND "
 $params = [':df' => $filterFrom, ':dt' => $filterTo];
 if ($filterTill) { $where[] = 'fm.till_id = :till_id'; $params[':till_id'] = $filterTill; }
 if ($filterType) { $where[] = 'fm.movement_type = :mov_type'; $params[':mov_type'] = $filterType; }

@@ -20,8 +20,15 @@ $reportTab = trim($_GET['report']  ?? 'txn_summary');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) $fromDate = $monthStart;
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate))   $toDate   = $today;
 
+// Agent-grant scope: every report reads only the user's granted tills/agents.
+if ($agentId && !mmAgentInScope($agentId)) { mmDenyToDashboard(); }
+$scT          = mmScopeSql('t.till_id');           // t = mm_transactions or mm_tills
+$scShift      = mmScopeSql('s.till_id');
+$scAgent      = mmScopeSql('a.agent_id', 'agent');
+$showReceived = mmScopeAll();                      // network remittances are company-level (admin only)
+
 // Build WHERE fragments
-$txnWhere  = "WHERE t.txn_date BETWEEN ? AND ? AND t.status='posted'";
+$txnWhere  = "WHERE t.txn_date BETWEEN ? AND ? AND t.status='posted' $scT";
 $txnParams = [$fromDate, $toDate];
 if ($networkId) { $txnWhere .= " AND t.network_id=?"; $txnParams[] = $networkId; }
 if ($agentId)   { $txnWhere .= " AND t.agent_id=?";   $txnParams[] = $agentId; }
@@ -52,7 +59,7 @@ if ($reportTab === 'txn_summary') {
         JOIN mm_networks n ON n.network_id = t.network_id
         LEFT JOIN mm_float_snapshots s ON s.till_id = t.till_id
             AND s.snapshot_at = (SELECT MAX(s2.snapshot_at) FROM mm_float_snapshots s2 WHERE s2.till_id=t.till_id)
-        WHERE t.status='active'
+        WHERE t.status='active' $scT
         " . ($networkId ? " AND t.network_id=$networkId" : "") . "
         " . ($agentId   ? " AND t.agent_id=$agentId"     : "") . "
         ORDER BY a.agent_name, t.till_number
@@ -61,19 +68,22 @@ if ($reportTab === 'txn_summary') {
     $reportData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } elseif ($reportTab === 'commission') {
+    $receivedSql = $showReceived
+        ? "COALESCE((SELECT SUM(cr.amount_received) FROM mm_commissions_received cr
+                     WHERE cr.network_id=n.network_id AND cr.status='posted'
+                       AND cr.period_from >= ? AND cr.period_to <= ?),0)"
+        : "0";
     $stmt = $pdo->prepare("
         SELECT n.network_name, n.color_hex,
                COALESCE(SUM(t.commission_earned),0) AS earned,
-               COALESCE((SELECT SUM(cr.amount_received) FROM mm_commissions_received cr
-                          WHERE cr.network_id=n.network_id AND cr.status='posted'
-                            AND cr.period_from >= ? AND cr.period_to <= ?),0) AS received
+               $receivedSql AS received
         FROM mm_networks n
         LEFT JOIN mm_transactions t ON t.network_id=n.network_id AND t.status='posted'
-            AND t.txn_date BETWEEN ? AND ?
+            AND t.txn_date BETWEEN ? AND ? $scT
         " . ($networkId ? " WHERE n.network_id=$networkId" : "") . "
         GROUP BY n.network_id ORDER BY earned DESC
     ");
-    $stmt->execute([$fromDate, $toDate, $fromDate, $toDate]);
+    $stmt->execute($showReceived ? [$fromDate, $toDate, $fromDate, $toDate] : [$fromDate, $toDate]);
     $reportData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } elseif ($reportTab === 'agent_perf') {
@@ -85,8 +95,8 @@ if ($reportTab === 'txn_summary') {
                COUNT(DISTINCT t.till_id) AS tills_used
         FROM mm_agents a
         LEFT JOIN mm_transactions t ON t.agent_id=a.agent_id AND t.status='posted'
-            AND t.txn_date BETWEEN ? AND ?
-        WHERE a.status='active'
+            AND t.txn_date BETWEEN ? AND ? $scT
+        WHERE a.status='active' $scAgent
         " . ($agentId ? " AND a.agent_id=$agentId" : "") . "
         GROUP BY a.agent_id ORDER BY volume DESC
     ");
@@ -105,7 +115,7 @@ if ($reportTab === 'txn_summary') {
         JOIN mm_tills t    ON t.till_id   = s.till_id
         JOIN mm_agents a   ON a.agent_id  = t.agent_id
         LEFT JOIN users u  ON u.user_id   = s.teller_user_id
-        WHERE DATE(s.opened_at) BETWEEN ? AND ?
+        WHERE DATE(s.opened_at) BETWEEN ? AND ? $scShift
         " . ($agentId ? " AND t.agent_id=$agentId" : "") . "
         ORDER BY s.opened_at DESC
     ");
@@ -126,7 +136,7 @@ if ($reportTab === 'txn_summary') {
         LEFT JOIN users u   ON u.user_id    = t.teller_user_id
         LEFT JOIN users v   ON v.user_id    = t.voided_by
         WHERE t.txn_date BETWEEN ? AND ?
-          AND (t.status='void' OR t.suspicious_flag=1)
+          AND (t.status='void' OR t.suspicious_flag=1) $scT
         " . ($agentId ? " AND t.agent_id=$agentId" : "") . "
         ORDER BY t.txn_date DESC
     ");
@@ -142,7 +152,7 @@ if ($reportTab === 'txn_summary') {
                COUNT(DISTINCT t.agent_id) AS agents
         FROM mm_networks n
         LEFT JOIN mm_transactions t ON t.network_id=n.network_id AND t.status='posted'
-            AND t.txn_date BETWEEN ? AND ?
+            AND t.txn_date BETWEEN ? AND ? $scT
         WHERE n.status='active'
         GROUP BY n.network_id ORDER BY volume DESC
     ");
@@ -152,7 +162,7 @@ if ($reportTab === 'txn_summary') {
 
 // Filter dropdowns
 $networks = $pdo->query("SELECT network_id, network_name FROM mm_networks WHERE status='active' ORDER BY sort_order")->fetchAll(PDO::FETCH_ASSOC);
-$agents   = $pdo->query("SELECT agent_id, agent_name FROM mm_agents WHERE status='active' ORDER BY agent_name")->fetchAll(PDO::FETCH_ASSOC);
+$agents   = $pdo->query("SELECT agent_id, agent_name FROM mm_agents WHERE status='active' " . mmScopeSql('agent_id', 'agent') . " ORDER BY agent_name")->fetchAll(PDO::FETCH_ASSOC);
 
 $reportTabs = [
     'txn_summary'       => t('Transaction Summary'),
@@ -265,7 +275,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'commission'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Earned (TZS)') ?></th><th class="text-end"><?= t('Received (TZS)') ?></th><th class="text-end"><?= t('Outstanding (TZS)') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Earned (TZS)') ?></th><?php if ($showReceived): ?><th class="text-end"><?= t('Received (TZS)') ?></th><th class="text-end"><?= t('Outstanding (TZS)') ?></th><?php endif; ?></tr></thead>
             <tbody>
                 <?php $totE=0; $totR=0;
                       foreach ($reportData as $r): $totE+=$r['earned']; $totR+=$r['received'];
@@ -273,11 +283,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <tr>
                     <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span></td>
                     <td class="text-end"><?= number_format((float)$r['earned']) ?></td>
+                    <?php if ($showReceived): ?>
                     <td class="text-end"><?= number_format((float)$r['received']) ?></td>
                     <td class="text-end <?= $outstanding > 0 ? 'text-warning fw-bold' : '' ?>"><?= number_format($outstanding) ?></td>
+                    <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totE) ?></td><td class="text-end"><?= number_format($totR) ?></td><td class="text-end"><?= number_format(max(0,$totE-$totR)) ?></td></tr>
+                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totE) ?></td><?php if ($showReceived): ?><td class="text-end"><?= number_format($totR) ?></td><td class="text-end"><?= number_format(max(0,$totE-$totR)) ?></td><?php endif; ?></tr>
             </tbody>
 
             <?php elseif ($reportTab === 'agent_perf'): ?>
