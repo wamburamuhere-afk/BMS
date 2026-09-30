@@ -5,6 +5,7 @@ autoEnforcePermission('mm_reconciliation');
 
 $can_create = canCreate('mm_reconciliation');
 $can_edit   = canEdit('mm_reconciliation');
+$can_delete = canDelete('mm_reconciliation');
 
 $stats = $pdo->query("
     SELECT COUNT(*) AS total,
@@ -109,7 +110,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
             </thead>
             <tbody>
                 <?php $sno = 1; foreach ($recons as $r): ?>
-                <tr data-id="<?= (int)$r['recon_id'] ?>" data-code="<?= htmlspecialchars($r['recon_code']) ?>" data-date="<?= htmlspecialchars($r['recon_date']) ?>" data-till="<?= htmlspecialchars($r['till_number']) ?>" data-agent="<?= htmlspecialchars($r['agent_name']) ?>" data-status="<?= htmlspecialchars($r['status']) ?>">
+                <tr data-id="<?= (int)$r['recon_id'] ?>" data-code="<?= htmlspecialchars($r['recon_code']) ?>" data-date="<?= htmlspecialchars($r['recon_date']) ?>" data-till="<?= htmlspecialchars($r['till_number']) ?>" data-agent="<?= htmlspecialchars($r['agent_name']) ?>" data-status="<?= htmlspecialchars($r['status']) ?>" data-notes="<?= htmlspecialchars($r['resolved_notes'] ?: '') ?>"
                     <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><code><?= safe_output($r['recon_code']) ?></code></td>
                     <td><?= safe_output($r['recon_date']) ?></td>
@@ -128,10 +129,25 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                         <?php $badge = ['open'=>'warning','resolved'=>'success','disputed'=>'danger','closed'=>'secondary']; ?>
                         <span class="badge bg-<?= $badge[$r['status']] ?? 'secondary' ?>"><?= safe_output(ucfirst($r['status'])) ?></span>
                     </td>
-                    <td class="text-end">
-                        <a href="<?= getUrl('mm_recon_view') ?>?id=<?= $r['recon_id'] ?>" class="btn btn-sm btn-outline-info">
-                            <i class="bi bi-eye"></i>
-                        </a>
+                    <td class="text-center">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear-fill"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
+                                <li><a class="dropdown-item" href="<?= getUrl('mm_recon_view') ?>?id=<?= $r['recon_id'] ?>"><i class="bi bi-eye me-2 text-info"></i><?= t('View') ?></a></li>
+                                <?php if ($r['status'] === 'open'): ?>
+                                <?php if ($can_edit): ?>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><a class="dropdown-item" href="#" onclick="editRecon(<?= (int)$r['recon_id'] ?>,'<?= addslashes(htmlspecialchars($r['recon_date'])) ?>','<?= addslashes(htmlspecialchars($r['resolved_notes'] ?: '')) ?>');return false"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
+                                <?php endif; ?>
+                                <?php if ($can_delete): ?>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="cancelRecon(<?= (int)$r['recon_id'] ?>,'<?= addslashes(htmlspecialchars($r['recon_code'])) ?>');return false"><i class="bi bi-x-circle me-2"></i><?= t('Cancel') ?></a></li>
+                                <?php endif; ?>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -141,6 +157,39 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
     </div><!-- end tableView -->
     <div id="cardView" class="row g-2 d-none mt-2"></div>
 </div>
+
+<?php if ($can_edit): ?>
+<div class="modal fade" id="editReconModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-pencil me-1"></i><?= t('Edit Reconciliation') ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editReconForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="_method" value="EDIT">
+                    <input type="hidden" name="recon_id" id="edit_recon_id">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <div id="edit-recon-message" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Reconciliation Date') ?> <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="recon_date" id="edit_recon_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Notes') ?></label>
+                        <textarea class="form-control" name="notes" id="edit_recon_notes" rows="3" placeholder="<?= t('Optional notes…') ?>"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle me-1"></i><?= t('Update') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if ($can_create): ?>
 <div class="modal fade" id="startReconModal" tabindex="-1">
@@ -212,8 +261,60 @@ $(document).ready(function () {
             complete: function () { btn.prop('disabled', false).html(orig); }
         });
     });
+    $('#editReconForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type=submit]'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span><?= t('Saving…') ?>');
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/save_reconciliation.php') ?>',
+            type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: '<?= t('Updated!') ?>', timer: 1500, showConfirmButton: false }).then(function(){ location.reload(); });
+                } else { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message }); }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
     $('.modal').on('hidden.bs.modal', function () { $(this).find('form')[0]?.reset(); $(this).find('[id$="-message"]').html(''); });
 });
+
+function editRecon(id, date, notes) {
+    $('#edit_recon_id').val(id);
+    $('#edit_recon_date').val(date);
+    $('#edit_recon_notes').val(notes);
+    new bootstrap.Modal(document.getElementById('editReconModal')).show();
+}
+
+function cancelRecon(id, code) {
+    Swal.fire({
+        title: '<?= t('Cancel Reconciliation?') ?>',
+        html: '<?= t('This will cancel') ?> <strong>' + code + '</strong>. <?= t('This cannot be undone.') ?>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: '<?= t('Yes, Cancel') ?>',
+        cancelButtonText: '<?= t('Keep') ?>'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/mobile_money/save_reconciliation.php') ?>',
+            type: 'POST',
+            data: { _method: 'DELETE', recon_id: id, _csrf: '<?= csrf_token() ?>' },
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: '<?= t('Cancelled!') ?>', timer: 1500, showConfirmButton: false }).then(function(){ location.reload(); });
+                } else {
+                    Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: res.message });
+                }
+            },
+            error: function() { Swal.fire({ icon: 'error', title: '<?= t('Error') ?>', text: '<?= t('Server error.') ?>' }); }
+        });
+    });
+}
 
 function renderCards(nodes) {
     if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No reconciliations found') ?></div>'); return; }
@@ -223,6 +324,10 @@ function renderCards(nodes) {
         const id = $tr.data('id'), sno = idx + 1;
         const code = $tr.data('code'), date = $tr.data('date');
         const till = $tr.data('till'), agent = $tr.data('agent'), status = $tr.data('status');
+        const notes = $tr.data('notes') || '';
+        const isOpen = status === 'open';
+        const canEdit = <?= json_encode((bool)$can_edit) ?>;
+        const canDelete = <?= json_encode((bool)$can_delete) ?>;
         const sBadge = status === 'resolved' ? 'bg-success' : (status === 'open' ? 'bg-warning text-dark' : (status === 'disputed' ? 'bg-danger' : 'bg-secondary'));
         html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
           <div class="card-body p-3 pb-2">
@@ -237,6 +342,8 @@ function renderCards(nodes) {
           </div>
           <div class="mm-card-foot">
             <a href="<?= getUrl('mm_recon_view') ?>?id=${id}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye me-1"></i><?= t('View') ?></a>
+            ${isOpen && canEdit ? `<button class="btn btn-sm btn-outline-primary" onclick="editRecon(${id},'${date}','${notes.replace(/'/g,&quot;\\&apos;&quot;)}')"><i class="bi bi-pencil me-1"></i><?= t('Edit') ?></button>` : ''}
+            ${isOpen && canDelete ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRecon(${id},'${safeOutput(code)}')"><i class="bi bi-x-circle me-1"></i><?= t('Cancel') ?></button>` : ''}
           </div>
         </div></div>`;
     });

@@ -4,9 +4,31 @@ require_once __DIR__ . '/../../roots.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canEdit('mm_networks') && !canCreate('mm_networks')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 csrf_check();
+
+// Handle DELETE (soft-deactivate)
+if (($_POST['_method'] ?? '') === 'DELETE') {
+    if (!canDelete('mm_networks')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+    $id = intval($_POST['network_id'] ?? 0);
+    if (!$id) { echo json_encode(['success' => false, 'message' => 'Invalid ID']); exit; }
+    $net = $pdo->prepare("SELECT network_name FROM mm_networks WHERE network_id=?");
+    $net->execute([$id]);
+    $net = $net->fetch(PDO::FETCH_ASSOC);
+    if (!$net) { echo json_encode(['success' => false, 'message' => 'Network not found']); exit; }
+    try {
+        $pdo->prepare("UPDATE mm_networks SET status='inactive' WHERE network_id=?")->execute([$id]);
+        logActivity($pdo, $_SESSION['user_id'], "Deactivated MM network: {$net['network_name']} (id=$id)");
+        logAudit($pdo, $_SESSION['user_id'], 'mm_network_deactivate', ['entity_type' => 'mm_network', 'entity_id' => $id, 'old_values' => ['status' => 'active'], 'new_values' => ['status' => 'inactive']]);
+        echo json_encode(['success' => true, 'message' => 'Network deactivated.']);
+    } catch (PDOException $e) {
+        error_log("save_network.php DELETE: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Database error.']);
+    }
+    exit;
+}
+
+if (!canEdit('mm_networks') && !canCreate('mm_networks')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 
 $id              = intval($_POST['network_id'] ?? 0);
 $name            = trim($_POST['network_name'] ?? '');
