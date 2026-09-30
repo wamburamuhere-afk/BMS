@@ -979,13 +979,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </a>
                         </li>
                         <?php endif; ?>
-                        <?php if (isAdmin()): ?>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('mm_agents') ?>">
-                                <i class="bi bi-shop-window"></i> <?= t('Agents') ?>
-                            </a>
-                        </li>
-                        <?php endif; ?>
                         <?php if (canView('mm_reports')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="mmReportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
