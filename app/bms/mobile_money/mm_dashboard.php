@@ -213,7 +213,7 @@ function mmTrendBadge($pct): string {
                             </a>
                         </div>
                         <?php endif; ?>
-                        <?php if (canView('mm_agents')): ?>
+                        <?php if (isAdmin()): ?>
                         <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('mm_agents') ?>" class="btn btn-outline-secondary w-100 h-100 py-3">
                                 <i class="bi bi-shop-window display-6"></i>
