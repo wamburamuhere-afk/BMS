@@ -3,7 +3,7 @@
 ob_start();
 $page_title = 'Agent View';
 require_once __DIR__ . '/../../../roots.php';
-autoEnforcePermission('mm_agents');
+if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 includeHeader();
 
 $id = intval($_GET['id'] ?? 0);
