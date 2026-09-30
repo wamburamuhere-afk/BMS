@@ -23,6 +23,7 @@
 - `tests/test_mm_scope_api_cli.php` — Phase 5 (new): 66 assertions — forged requests per persona against own/foreign tills on every MM API; real writes on granted tills succeed; posted ledger entries cleaned up (journal_entries count restored)
 - `tests/mm_scope_fixture.inc.php` — harness now launches php-cgi as a real CGI request (no `-f`, which disabled sessions and polluted JSON); cleanup also removes ledger entries posted for fixture transactions/float moves
 - `tests/test_mm_shifts_bulk_cli.php` — batch_close assertion accepts the `mmUserCanCloseShift()` wrapper
+- `tests/test_mm_scope_edges_cli.php` — Phase 6 (new): 19 assertions — grant revoked between requests, agent closed after grant, suspended till, inconsistent grant row, duplicate grants, multi-module scoping (D1), admin unchanged. Re-scout found no MM data access outside the MM folders; report export is client-side from scoped rows. No code change needed
 - `migrations/2026_09_29_mm_shifts_permission_legacy_db.php` — (not changed) applied locally; the `mm_shifts` permission key was missing from the local DB
 
 ## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency
