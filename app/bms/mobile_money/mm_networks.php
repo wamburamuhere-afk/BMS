@@ -3,7 +3,7 @@
 ob_start();
 $page_title = 'MM Networks';
 require_once __DIR__ . '/../../../roots.php';
-autoEnforcePermission('mm_networks');
+if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 includeHeader();
 
 $can_create = canCreate('mm_networks');
