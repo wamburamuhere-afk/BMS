@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-09-30 — feat(mm_agents): restrict agent/till management to admins only
+
+**Files:**
+- `app/bms/mobile_money/mm_agents.php` — Replaced `autoEnforcePermission` with `isAdmin()` gate; non-admins redirected to unauthorized
+- `app/bms/mobile_money/mm_agent_view.php` — Same admin-only gate; non-admins cannot access agent view or add/edit tills
+- `api/mobile_money/save_agent.php` — Added `isAdmin()` check; non-admin requests rejected with "Admin access required"
+- `api/mobile_money/save_till.php` — Same admin-only check added
+- `app/bms/mobile_money/mm_dashboard.php` — Agents quick action changed from `canView('mm_agents')` to `isAdmin()`; non-admins no longer see the Agents link
+- `tests/test_mm_agents_admin_only_cli.php` — NEW: 25 assertions covering static contract + live isAdmin() role verification
+
 ## 2026-09-30 — feat(mm_shifts): bulk open/close shifts for multi-till operations
 
 **Files:**
