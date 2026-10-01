@@ -109,22 +109,6 @@ $canRecordAny  = $isScopedAdmin || !empty(mmScopeTillIds('can_record_transaction
 // Used to distinguish "no grants" from "grants exist but all tills occupied"
 $hasAnyGrantedTill = $isScopedAdmin || !empty(mmScopeTillIds('can_open_shift'));
 
-// --- "My Agents" (non-admin with grants): each granted agent with its in-scope tills ---
-$myAgents = [];
-if (!$isScopedAdmin && $hasGrant) {
-    $myAgents = $pdo->query("
-        SELECT a.agent_id, a.agent_code, a.agent_name, a.status, a.region, a.district,
-               (SELECT COUNT(*) FROM mm_tills t WHERE t.agent_id = a.agent_id AND t.status = 'active' $scopeTxnT) AS till_count,
-               (SELECT COUNT(*) FROM mm_shifts s JOIN mm_tills t ON t.till_id = s.till_id
-                 WHERE t.agent_id = a.agent_id AND s.status = 'open' $scopeTxnT) AS open_shifts,
-               (SELECT COALESCE(SUM(x.principal_amount),0) FROM mm_transactions x JOIN mm_tills t ON t.till_id = x.till_id
-                 WHERE t.agent_id = a.agent_id AND x.status = 'posted' AND x.txn_date = " . $pdo->quote($today) . " $scopeTxnT) AS today_volume
-        FROM mm_agents a
-        WHERE a.status <> 'closed' $scopeAgent
-        ORDER BY a.agent_name
-    ")->fetchAll(PDO::FETCH_ASSOC);
-}
-
 // --- Daily volume last 14 days (chart) ---
 $dailyVol = $pdo->prepare("
     SELECT txn_date, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
@@ -243,7 +227,7 @@ function mmTrendBadge($pct): string {
                     <div class="d-flex flex-wrap gap-3">
                         <?php if (canCreate('mm_transactions') && $canRecordAny): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= getUrl('mm_transactions') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
+                            <a href="<?= getUrl('mm_transactions') ?>?action=new" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-arrow-left-right display-6"></i>
                                 <div class="mt-2"><?= t('New Transaction') ?></div>
                             </a>
@@ -268,7 +252,7 @@ function mmTrendBadge($pct): string {
                         <?php endif; ?>
                         <?php if (!empty($myActiveShifts)): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-outline-danger w-100 h-100 py-3">
+                            <a href="<?= getUrl('mm_shifts') ?>?action=close" class="btn btn-outline-danger w-100 h-100 py-3">
                                 <i class="bi bi-stop-circle display-6"></i>
                                 <div class="mt-2"><?= t('Close Shift') ?></div>
                                 <div class="small mt-1 opacity-75"><?= count($myActiveShifts) ?> <?= t('open') ?></div>
@@ -278,7 +262,7 @@ function mmTrendBadge($pct): string {
                         <?php endif; ?>
                         <?php if (canCreate('mm_float') && $canRecordAny): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= getUrl('mm_float') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                            <a href="<?= getUrl('mm_float') ?>?action=add" class="btn btn-outline-warning w-100 h-100 py-3">
                                 <i class="bi bi-currency-exchange display-6"></i>
                                 <div class="mt-2"><?= t('Float Top-up') ?></div>
                             </a>
@@ -418,44 +402,6 @@ function mmTrendBadge($pct): string {
 
     </div>
 
-    <?php if (!empty($myAgents)): ?>
-    <!-- My Agents — the outlets this user is assigned to -->
-    <h6 class="fw-bold mb-2"><i class="bi bi-shop-window text-primary me-1"></i><?= t('My Agents') ?></h6>
-    <div class="row g-3 mb-4">
-        <?php foreach ($myAgents as $ag): ?>
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div class="fw-semibold"><?= safe_output($ag['agent_name']) ?></div>
-                            <code class="small text-muted"><?= safe_output($ag['agent_code']) ?></code>
-                        </div>
-                        <span class="badge <?= $ag['status'] === 'active' ? 'bg-success' : 'bg-warning text-dark' ?>"><?= ucfirst(safe_output($ag['status'])) ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between small border-top pt-2">
-                        <span class="text-muted"><?= t('Tills') ?></span><span class="fw-semibold"><?= (int)$ag['till_count'] ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="text-muted"><?= t('Open Shifts') ?></span><span class="fw-semibold"><?= (int)$ag['open_shifts'] ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="text-muted"><?= t("Today's Volume") ?></span><span class="fw-semibold">TZS <?= number_format((float)$ag['today_volume']) ?></span>
-                    </div>
-                    <?php if ($ag['status'] === 'suspended'): ?>
-                    <div class="small text-warning mt-2"><i class="bi bi-pause-circle me-1"></i><?= t('Suspended — history only, no new shifts or transactions.') ?></div>
-                    <?php endif; ?>
-                </div>
-                <div class="card-footer bg-white border-top-0 pt-0">
-                    <a href="<?= getUrl('mm_agent_view') ?>?id=<?= (int)$ag['agent_id'] ?>" class="btn btn-sm btn-outline-secondary w-100">
-                        <i class="bi bi-eye me-1"></i><?= t('View') ?>
-                    </a>
-                </div>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
 
     <!-- Charts row -->
     <div class="row g-3 mb-4">

@@ -516,6 +516,9 @@ function renderCards(nodes) {
     });
     $('#cardView').html(html);
 }
+<?php if (($_GET['action'] ?? '') === 'add' && $can_create): ?>
+new bootstrap.Modal(document.getElementById('topupModal')).show();
+<?php endif; ?>
 </script>
 
 <?php includeFooter(); ?>
