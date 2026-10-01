@@ -51,7 +51,8 @@ $address         = trim($body['address']         ?? '');
 $city            = trim($body['city']            ?? '');
 $supplier_type   = trim($body['supplier_type']   ?? '');
 $notes           = trim($body['notes']           ?? '');
-$status          = in_array($body['status'] ?? 'active', ['active','inactive'], true) ? $body['status'] : 'active';
+$_st             = $body['status'] ?? 'active';
+$status          = in_array($_st, ['active','inactive'], true) ? $_st : 'active';
 
 try {
     $supplier_code = nextCode($pdo, 'SUP');
