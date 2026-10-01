@@ -487,6 +487,9 @@ $(document).ready(function () {
         $(this).find('form')[0]?.reset();
         $(this).find('[id$="-tills-wrap"]').addClass('d-none').html('');
     });
+<?php if (($_GET['action'] ?? '') === 'add' && $can_create): ?>
+    new bootstrap.Modal(document.getElementById('topupModal')).show();
+<?php endif; ?>
 });
 
 function renderCards(nodes) {
@@ -516,9 +519,6 @@ function renderCards(nodes) {
     });
     $('#cardView').html(html);
 }
-<?php if (($_GET['action'] ?? '') === 'add' && $can_create): ?>
-new bootstrap.Modal(document.getElementById('topupModal')).show();
-<?php endif; ?>
 </script>
 
 <?php includeFooter(); ?>
