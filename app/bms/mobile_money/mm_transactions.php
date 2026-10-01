@@ -358,6 +358,9 @@ $(document).ready(function () {
     });
 
     $('.modal').on('hidden.bs.modal', function(){$(this).find('form')[0]?.reset(); $('#kyc_notice').addClass('d-none');});
+<?php if (($_GET['action'] ?? '') === 'new' && $can_create && !empty($myActiveShift)): ?>
+    new bootstrap.Modal(document.getElementById('newTxnModal')).show();
+<?php endif; ?>
 });
 
 function checkKYC(val) {
@@ -396,9 +399,6 @@ function renderCards(nodes) {
     });
     $('#cardView').html(html);
 }
-<?php if (($_GET['action'] ?? '') === 'new' && $can_create && !empty($myActiveShift)): ?>
-new bootstrap.Modal(document.getElementById('newTxnModal')).show();
-<?php endif; ?>
 </script>
 
 <?php includeFooter(); ?>
