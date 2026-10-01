@@ -51,7 +51,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
 <div class="container-fluid mt-3 mb-5">
     <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
         <a href="<?= getUrl(isAdmin() ? 'mm_agents' : 'mm_dashboard') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-        <h4 class="mb-0 fw-bold"><?= safe_output($agent['agent_name']) ?></h4>
+        <h4 class="mb-0 fw-bold"><?= caseFormat($agent['agent_name']) ?></h4>
         <code class="text-muted"><?= safe_output($agent['agent_code']) ?></code>
         <span class="badge <?= $agent['status']==='active'?'bg-success':($agent['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>">
             <?= ucfirst(safe_output($agent['status'])) ?>
@@ -81,7 +81,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
     <div class="d-flex gap-3 mb-4 flex-wrap">
         <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
             <div class="small text-muted"><?= t('Outlet Type') ?></div>
-            <div class="fw-semibold"><?= safe_output(ucfirst(str_replace('_', ' ', $agent['outlet_type'] ?? ''))) ?></div>
+            <div class="fw-semibold"><?= caseFormat(str_replace('_', ' ', $agent['outlet_type'] ?? null)) ?></div>
         </div>
         <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
             <div class="small text-muted"><?= t('Phone') ?></div>
@@ -89,11 +89,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
         </div>
         <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:160px">
             <div class="small text-muted"><?= t('Location') ?></div>
-            <div class="fw-semibold"><?= safe_output(implode(', ', array_filter([$agent['region'], $agent['district'], $agent['ward']])) ?: '—') ?></div>
+            <div class="fw-semibold"><?= caseFormat(implode(', ', array_filter([$agent['region'], $agent['district'], $agent['ward']])) ?: null) ?></div>
         </div>
         <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
             <div class="small text-muted"><?= t('Super-Agent') ?></div>
-            <div class="fw-semibold"><?= $agent['parent_name'] ? safe_output($agent['parent_name']) : '—' ?></div>
+            <div class="fw-semibold"><?= $agent['parent_name'] ? caseFormat($agent['parent_name']) : '—' ?></div>
         </div>
         <?php if ($agent['bot_license']): ?>
         <div class="card border-0 shadow-sm p-3 mm-stat-card flex-fill" style="min-width:130px">
@@ -143,7 +143,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                                 <td><code class="small"><?= safe_output($till['till_number']) ?></code></td>
                                 <td>
                                     <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($till['color_hex'] ?: '#999') ?>"></span>
-                                    <span class="small"><?= safe_output($till['network_name'] ?: '—') ?></span>
+                                    <span class="small"><?= caseFormat($till['network_name'] ?: null) ?></span>
                                 </td>
                                 <td class="small"><?= safe_output($till['sim_msisdn'] ?: '—') ?></td>
                                 <td class="small text-muted"><?= $till['float_ceiling'] ? 'TZS '.number_format((float)$till['float_ceiling']) : '—' ?></td>
@@ -194,9 +194,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                     <?php foreach ($subAgents as $sa): ?>
                     <tr>
                         <td><code><?= safe_output($sa['agent_code']) ?></code></td>
-                        <td><a href="<?= getUrl('mm_agent_view') ?>?id=<?= $sa['agent_id'] ?>"><?= safe_output($sa['agent_name']) ?></a></td>
+                        <td><a href="<?= getUrl('mm_agent_view') ?>?id=<?= $sa['agent_id'] ?>"><?= caseFormat($sa['agent_name']) ?></a></td>
                         <td><?= safe_output($sa['phone_primary'] ?: '—') ?></td>
-                        <td class="small text-muted"><?= safe_output(implode(', ', array_filter([$sa['region'], $sa['district']])) ?: '—') ?></td>
+                        <td class="small text-muted"><?= caseFormat(implode(', ', array_filter([$sa['region'], $sa['district']])) ?: null) ?></td>
                         <td><span class="badge <?= $sa['status']==='active'?'bg-success':($sa['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>"><?= ucfirst(safe_output($sa['status'])) ?></span></td>
                     </tr>
                     <?php endforeach; ?>
@@ -226,7 +226,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                             <select class="form-select select2-static" name="network_id" required>
                                 <option value=""></option>
                                 <?php foreach ($networks_list as $n): ?>
-                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code'].' — '.$n['network_name']) ?></option>
+                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code']) ?> — <?= caseFormat($n['network_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -289,7 +289,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
                             <select class="form-select select2-static" name="network_id" id="edit_till_network" required>
                                 <option value=""></option>
                                 <?php foreach ($networks_list as $n): ?>
-                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code'].' — '.$n['network_name']) ?></option>
+                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code']) ?> — <?= caseFormat($n['network_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

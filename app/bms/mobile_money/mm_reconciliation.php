@@ -119,10 +119,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                     <td><code><?= safe_output($r['recon_code']) ?></code></td>
                     <td><?= safe_output($r['recon_date']) ?></td>
                     <td>
-                        <span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span>
+                        <span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span>
                         <?= safe_output($r['till_number']) ?>
                     </td>
-                    <td><?= safe_output($r['agent_name']) ?></td>
+                    <td><?= caseFormat($r['agent_name']) ?></td>
                     <td class="text-end <?= (float)($r['cash_variance'] ?? 0) != 0 ? 'text-danger fw-bold' : '' ?>">
                         <?= $r['cash_variance'] !== null ? number_format((float)$r['cash_variance']) : '—' ?>
                     </td>
@@ -212,7 +212,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                         <select class="form-select select2-static" name="till_id" required>
                             <option value=""></option>
                             <?php foreach ($tills as $ti): ?>
-                            <option value="<?= $ti['till_id'] ?>"><?= safe_output($ti['agent_name'] . ' / ' . $ti['till_number'] . ' (' . $ti['network_name'] . ')') ?></option>
+                            <option value="<?= $ti['till_id'] ?>"><?= caseFormat($ti['agent_name'] . ' / ' . $ti['till_number'] . ' (' . $ti['network_name'] . ')') ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

@@ -134,7 +134,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                         <tr>
                             <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
-                                <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= safe_output($row['network_name']) ?></span>
+                                <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($row['network_name']) ?></span>
                             </td>
                             <td class="text-end fw-bold"><?= number_format((float)$row['earned']) ?></td>
                         </tr>
@@ -164,11 +164,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                         <tr>
                             <td class="text-center text-muted small"><?= $rsno++ ?></td>
                             <td>
-                                <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= safe_output($row['network_name']) ?></span>
+                                <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($row['network_name']) ?></span>
                             </td>
                             <td><?= safe_output($row['period_from']) ?> → <?= safe_output($row['period_to']) ?></td>
                             <td class="text-end fw-bold"><?= number_format((float)$row['amount_received']) ?></td>
-                            <td><?= safe_output($row['bank_name'] ?? '—') ?></td>
+                            <td><?= caseFormat($row['bank_name'] ?? null) ?></td>
                             <td><?= safe_output($row['reference_no'] ?? '—') ?></td>
                             <td>
                                 <?php if ($row['status'] === 'posted'): ?>
@@ -206,7 +206,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                         <select class="form-select select2-static" name="network_id" required>
                             <option value=""></option>
                             <?php foreach ($networks as $n): ?>
-                            <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_name']) ?></option>
+                            <option value="<?= $n['network_id'] ?>"><?= caseFormat($n['network_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -229,7 +229,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                         <select class="form-select select2-static" name="bank_account_id" required>
                             <option value=""></option>
                             <?php foreach ($bankAccounts as $a): ?>
-                            <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code'] . ' — ' . $a['account_name']) ?></option>
+                            <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code']) ?> — <?= caseFormat($a['account_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

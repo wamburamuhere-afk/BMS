@@ -82,10 +82,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View Recon', 'Viewed MM Recon #' . $rec
                     <table class="table table-sm mb-0">
                         <tr><td class="text-muted"><?= t('Date') ?></td><td><?= safe_output($recon['recon_date']) ?></td></tr>
                         <tr><td class="text-muted"><?= t('Till') ?></td><td><?= safe_output($recon['till_number']) ?></td></tr>
-                        <tr><td class="text-muted"><?= t('Agent') ?></td><td><?= safe_output($recon['agent_name']) ?></td></tr>
+                        <tr><td class="text-muted"><?= t('Agent') ?></td><td><?= caseFormat($recon['agent_name']) ?></td></tr>
                         <tr><td class="text-muted"><?= t('Network') ?></td>
-                            <td><span class="badge rounded-pill" style="background:<?= safe_output($recon['color_hex'] ?: '#6c757d') ?>"><?= safe_output($recon['network_name']) ?></span></td></tr>
-                        <tr><td class="text-muted"><?= t('Created By') ?></td><td><?= safe_output($recon['created_by_name'] ?? '—') ?></td></tr>
+                            <td><span class="badge rounded-pill" style="background:<?= safe_output($recon['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($recon['network_name']) ?></span></td></tr>
+                        <tr><td class="text-muted"><?= t('Created By') ?></td><td><?= caseFormat($recon['created_by_name'] ?? null) ?></td></tr>
                     </table>
                 </div>
             </div>
@@ -143,7 +143,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Recon', 'Viewed MM Recon #' . $rec
                                   $totCnt+=$row['cnt']; $totVol+=$row['volume'];
                                   $totComm+=$row['commission']; $totCash+=$row['net_cash']; $totFloat+=$row['net_float']; ?>
                         <tr>
-                            <td><?= safe_output(ucwords(str_replace('_',' ',$row['txn_type']))) ?></td>
+                            <td><?= caseFormat(str_replace('_',' ',$row['txn_type'])) ?></td>
                             <td class="text-end"><?= $row['cnt'] ?></td>
                             <td class="text-end"><?= number_format((float)$row['volume']) ?></td>
                             <td class="text-end"><?= number_format((float)$row['commission']) ?></td>
@@ -185,7 +185,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Recon', 'Viewed MM Recon #' . $rec
                         <?php foreach ($shifts as $s): ?>
                         <tr>
                             <td><code><?= safe_output($s['shift_code']) ?></code></td>
-                            <td><?= safe_output($s['teller_name'] ?? '—') ?></td>
+                            <td><?= caseFormat($s['teller_name'] ?? null) ?></td>
                             <td><?= safe_output(substr($s['opened_at'],11,5)) ?></td>
                             <td><?= $s['closed_at'] ? safe_output(substr($s['closed_at'],11,5)) : '<span class="badge bg-warning">Open</span>' ?></td>
                             <td class="text-end <?= ($s['cash_variance'] ?? 0) != 0 ? 'text-danger' : '' ?>"><?= $s['cash_variance'] !== null ? number_format((float)$s['cash_variance']) : '—' ?></td>
@@ -201,7 +201,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Recon', 'Viewed MM Recon #' . $rec
     <?php endif; ?>
 
     <?php if (!empty($recon['resolved_notes'])): ?>
-    <div class="alert alert-info"><strong><?= t('Notes:') ?></strong> <?= safe_output($recon['resolved_notes']) ?></div>
+    <div class="alert alert-info"><strong><?= t('Notes:') ?></strong> <?= caseFormat($recon['resolved_notes']) ?></div>
     <?php endif; ?>
 </div>
 

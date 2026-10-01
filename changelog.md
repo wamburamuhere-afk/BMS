@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-10-01 — feat(mm): apply caseFormat() across all 15 MM module pages
+
+**Purpose:** Roll out the Text Display Case system (`caseFormat()`, 2026-09-18) to the entire Mobile Money module so every human-readable string (names, locations, notes, labels) honours the admin-configured case mode (default: title case).
+
+**Rules applied:**
+- `caseFormat($value)` — all display-only human strings (agent names, teller names, network names, customer names, locations, notes, txn type labels)
+- `safe_output($code)` kept for codes, dates, phone numbers, reference numbers, status enums, and till numbers
+- `htmlspecialchars()` kept for all `data-*` attributes that feed edit-form prefill (raw values must round-trip cleanly)
+- `caseFormat()` is **never** used inside `value=""` on editable inputs (guard verified by 15 static assertions in the test)
+
+**Files changed (all display-side only — no logic changes):**
+- `app/bms/mobile_money/mm_dashboard.php` — agent name/till title tooltip, txn type badge, top-5 agent name
+- `app/bms/mobile_money/mm_transactions.php` — active shift banner, filter dropdowns, data-network/data-outlet display attrs, table cells, customer name
+- `app/bms/mobile_money/mm_shifts.php` — active shift banner, table cells, open-shift modal agent/network, close-shift modal rows
+- `app/bms/mobile_money/mm_float.php` — active shift banner, filter dropdown option, data-outlet (display), table cell, topup/withdraw modal agent options
+- `app/bms/mobile_money/mm_transaction_view.php` — network, agent, location (region/district), teller, customer, notes
+- `app/bms/mobile_money/mm_shift_report.php` — network, agent, location, teller, closed-by, close notes
+- `app/bms/mobile_money/mm_agents.php` — table cells (name, networks, location, parent); parent agent dropdown option
+- `app/bms/mobile_money/mm_agent_view.php` — h4 name, outlet type, location, parent, till network, sub-agent table; Add/Edit Till network dropdowns
+- `app/bms/mobile_money/mm_commissions.php` — earned/received network badge, received bank name; record modal network + account dropdowns
+- `app/bms/mobile_money/mm_networks.php` — name, provider; float/commission account display cells; add/edit modal account dropdowns
+- `app/bms/mobile_money/mm_reconciliation.php` — network badge, agent name; till dropdown option
+- `app/bms/mobile_money/mm_recon_view.php` — agent, network, created-by, txn type, teller, resolved notes
+- `app/bms/mobile_money/mm_compliance.php` — KYC + pending tabs: customer, network, agent, txn type
+- `app/bms/mobile_money/mm_reports.php` — all 7 report tabs: filter dropdowns, all name/label table cells
+- `app/bms/mobile_money/mm_commission_rates.php` — filter dropdown, table cell, add/edit modal network dropdowns
+
+**Tests:**
+- `tests/test_mm_caseformat_cli.php` (new) — 63 assertions: caseFormat unit (all 6 modes + null/empty/HTML-entity), lint ×15, caseFormat present ×15, no `input value= caseFormat` guard ×15, codes use safe_output ×5
+
+---
+
 ## 2026-10-01 — feat(mobile-api): notification endpoints (list, mark_read, mark_all_read)
 
 **Files:**

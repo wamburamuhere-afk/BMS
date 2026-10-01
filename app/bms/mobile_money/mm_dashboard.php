@@ -178,7 +178,7 @@ function mmTrendBadge($pct): string {
         <span class="text-muted small ms-1"><?= t('Today:') ?> <?= $today ?></span>
         <?php foreach ($myActiveShifts as $sh): ?>
         <a href="<?= getUrl('mm_shifts') ?>" class="badge bg-success text-decoration-none ms-1"
-           title="<?= t('Active Shift') ?>: <?= safe_output($sh['shift_code']) ?> · <?= safe_output($sh['agent_name'].' / '.$sh['till_number']) ?>">
+           title="<?= t('Active Shift') ?>: <?= safe_output($sh['shift_code']) ?> · <?= caseFormat($sh['agent_name'].' / '.$sh['till_number']) ?>">
             <i class="bi bi-play-circle-fill me-1"></i><?= safe_output($sh['till_number']) ?>
         </a>
         <?php endforeach; ?>
@@ -434,7 +434,7 @@ function mmTrendBadge($pct): string {
                         <tbody>
                             <?php foreach ($typeData as $row): ?>
                             <tr>
-                                <td><?= safe_output(ucwords(str_replace('_',' ',$row['txn_type']))) ?></td>
+                                <td><?= caseFormat(str_replace('_',' ',$row['txn_type'])) ?></td>
                                 <td class="text-end"><?= number_format((float)$row['vol']) ?></td>
                                 <td class="text-end"><?= number_format((int)$row['cnt']) ?></td>
                             </tr>
@@ -457,7 +457,7 @@ function mmTrendBadge($pct): string {
                             <?php foreach ($topAgentsData as $i => $row): ?>
                             <tr>
                                 <td><?= $i+1 ?></td>
-                                <td><?= safe_output($row['agent_name']) ?></td>
+                                <td><?= caseFormat($row['agent_name']) ?></td>
                                 <td class="text-end"><?= number_format((float)$row['vol']) ?></td>
                                 <td class="text-end"><?= number_format((int)$row['cnt']) ?></td>
                             </tr>

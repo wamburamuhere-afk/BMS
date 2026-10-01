@@ -70,7 +70,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                 <option value=""><?= t('All Networks') ?></option>
                 <?php foreach ($networks as $n): ?>
                 <option value="<?= $n['network_id'] ?>" <?= $filterNet == $n['network_id'] ? 'selected' : '' ?>>
-                    <?= safe_output($n['network_name']) ?>
+                    <?= caseFormat($n['network_name']) ?>
                 </option>
                 <?php endforeach; ?>
             </select>
@@ -132,7 +132,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                             <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
                                 <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($r['color_hex'] ?: '#999') ?>"></span>
-                                <?= safe_output($r['network_name']) ?>
+                                <?= caseFormat($r['network_name']) ?>
                             </td>
                             <td><?= t($txnLabels[$r['txn_type']] ?? $r['txn_type']) ?></td>
                             <td class="text-end"><?= number_format((float)$r['amount_from']) ?></td>
@@ -194,7 +194,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                             <select class="form-select select2-static" name="network_id" required>
                                 <option value=""></option>
                                 <?php foreach ($networks as $n): ?>
-                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code'].' — '.$n['network_name']) ?></option>
+                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code']) ?> — <?= caseFormat($n['network_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -275,7 +275,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
                             <select class="form-select select2-static" name="network_id" id="edit_network" required>
                                 <option value=""></option>
                                 <?php foreach ($networks as $n): ?>
-                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code'].' — '.$n['network_name']) ?></option>
+                                <option value="<?= $n['network_id'] ?>"><?= safe_output($n['network_code']) ?> — <?= caseFormat($n['network_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
