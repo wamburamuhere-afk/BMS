@@ -29,7 +29,7 @@ try {
     if ($shift['status'] !== 'open') { echo json_encode(['success' => false, 'message' => 'Shift is not open']); exit; }
 
     // Check grant
-    if (!mmUserCanOnTill($pdo, $userId, $shift['till_id'], 'can_close_shift')) {
+    if (!mmUserCanCloseShift($pdo, $userId, $shift)) {
         echo json_encode(['success' => false, 'message' => 'You are not granted to close a shift on this till']);
         exit;
     }

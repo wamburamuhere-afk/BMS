@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_e
 
 $tillId = intval($_GET['till_id'] ?? 0);
 if (!$tillId) { echo json_encode(['success' => false, 'message' => 'Invalid till']); exit; }
+mmRequireTill($tillId);   // agent grant: read only tills the user can see (admins bypass)
 
 // Last snapshot for this till
 $snapStmt = $pdo->prepare("

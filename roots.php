@@ -105,6 +105,7 @@ if (in_array($bms_timezone, timezone_identifiers_list(), true)) {
 
 require_once ROOT_DIR . '/core/i18n.php'; // Load UI translation engine (t()/te()) — defaults to English
 require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
+require_once ROOT_DIR . '/core/mm_scope.php'; // Mobile Money agent-grant scoping (mmGrantAllowsPage/mmScopeSql)
 require_once ROOT_DIR . '/core/terminology.php'; // Tenant-conditional Warehouse/Shop display labels (wLabel/wLabelE)
 require_once ROOT_DIR . '/core/tenant_quotas.php'; // Phase 12 — usage quotas (assertUploadWithinQuota, tenantWithinUserLimit)
 require_once ROOT_DIR . '/core/text_display_case.php'; // Global "Text Display Case" setting — read-only display formatting (caseFormat/applyCaseMode)

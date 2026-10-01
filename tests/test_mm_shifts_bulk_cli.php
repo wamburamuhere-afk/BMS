@@ -60,7 +60,8 @@ ok(strpos($bo, 'logActivity') !== false,                 'batch_open logs activi
 section('A. Static contract — batch_close_shifts.php');
 ok(strpos($bc, "canEdit('mm_shifts')") !== false,        'batch_close gated on canEdit(mm_shifts)');
 ok(strpos($bc, 'csrf_check()') !== false,                'batch_close CSRF-checked');
-ok(strpos($bc, 'mmUserCanOnTill') !== false,             'batch_close checks per-till grant');
+ok(strpos($bc, 'mmUserCanOnTill') !== false || strpos($bc, 'mmUserCanCloseShift') !== false,
+   'batch_close checks per-till grant');
 ok(strpos($bc, "!== 'open'") !== false,                  'batch_close rejects non-open shifts');
 ok(strpos($bc, 'beginTransaction') !== false,            'batch_close wrapped in transaction');
 ok(strpos($bc, 'cash_variance') !== false,               'batch_close computes cash_variance');

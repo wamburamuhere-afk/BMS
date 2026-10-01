@@ -55,7 +55,9 @@ ok(strpos($ap, "getUrl('unauthorized')") !== false, 'mm_agents.php redirects to 
 $avp = src($agentViewPage);
 ok(strpos($avp, 'isAdmin()') !== false,          'mm_agent_view.php has isAdmin() check');
 ok(strpos($avp, 'autoEnforcePermission') === false, 'mm_agent_view.php no longer uses autoEnforcePermission');
-ok(strpos($avp, "getUrl('unauthorized')") !== false, 'mm_agent_view.php redirects to unauthorized');
+// 2026-09-30 agent-scope: non-admins may view (read-only) only agents they are granted.
+ok(strpos($avp, 'mmAgentInScope($id)') !== false && strpos($avp, 'mmDenyToDashboard()') !== false,
+   'mm_agent_view.php: non-admin limited to granted agents, else back to dashboard');
 
 section('A. Static — API gates');
 $sa = src($saveAgent);
