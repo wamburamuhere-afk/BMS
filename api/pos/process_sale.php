@@ -422,7 +422,7 @@ try {
         $shortfalls = checkComboAvailability($pdo, $pid, $qty, (int)$warehouse_id);
         if (!empty($shortfalls)) {
             $names = implode(', ', array_map(fn($s) => "{$s['product_name']} (need {$s['needed']}, have {$s['available']})", $shortfalls));
-            throw new Exception("Insufficient stock for combo '{$db_product['product_name']}' component(s): $names");
+            throw new Exception("Insufficient stock for combo '{$db_product['product_name']}' component(s): $names", 409);
         }
     }
 
@@ -552,7 +552,7 @@ try {
         // discounted_price takes priority when present; otherwise derive it here
         // so the price resolution and discount calculation below work correctly.
         if (!isset($item['discounted_price']) || $item['discounted_price'] === null || $item['discounted_price'] === '') {
-            $_rawPx   = floatval($item['price'] ?? 0);
+            $_rawPx   = floatval($item['price'] ?? $item['unit_price'] ?? 0);
             $_discPct = floatval($item['discount_percentage'] ?? $item['discount_percent'] ?? $item['discount_rate'] ?? 0);
             $_discAmt = floatval($item['discount_amount'] ?? $item['discount'] ?? 0);
             if ($_discPct > 0) {
@@ -563,12 +563,12 @@ try {
         }
 
         // Validate Price
-        $requested_price = floatval($item['discounted_price'] ?? $item['price'] ?? 0);
+        $requested_price = floatval($item['discounted_price'] ?? $item['price'] ?? $item['unit_price'] ?? 0);
         $min_price = floatval($db_product['min_selling_price']);
 
         // Allow a small epsilon for float comparison
         if ($requested_price < ($min_price - 0.01)) {
-            throw new Exception("Price for '{$db_product['product_name']}' is below minimum selling price.");
+            throw new Exception("Price for '{$db_product['product_name']}' is below minimum selling price.", 422);
         }
         
         // Calculate item values
@@ -587,7 +587,7 @@ try {
                 } else {
                     $msg .= "Available (excluding projects): $general_avail";
                 }
-                throw new Exception($msg);
+                throw new Exception($msg, 409);
             }
         }
 
