@@ -56,41 +56,36 @@ $status        = in_array($body['status'] ?? 'active', ['active','inactive'], tr
 try {
     $customer_code = nextCode($pdo, 'CUST');
 
-    if ($hasClientUuid) {
-        $stmt = $pdo->prepare("
-            INSERT INTO customers
-                (client_uuid, customer_code, customer_name, phone, email, address, city,
-                 customer_type, credit_limit, notes, status, created_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-        ");
-        $stmt->execute([
-            $client_uuid ?: null,
-            $customer_code, $customer_name,
-            $phone  !== '' ? $phone  : null,
-            $email  !== '' ? $email  : null,
-            $address!== '' ? $address: null,
-            $city   !== '' ? $city   : null,
-            $customer_type, $credit_limit,
-            $notes  !== '' ? $notes  : null,
-            $status, $_SESSION['user_id'],
-        ]);
-    } else {
-        $stmt = $pdo->prepare("
-            INSERT INTO customers
-                (customer_code, customer_name, phone, email, address, city,
-                 customer_type, credit_limit, notes, status, created_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-        ");
-        $stmt->execute([
-            $customer_code, $customer_name,
-            $phone  !== '' ? $phone  : null,
-            $email  !== '' ? $email  : null,
-            $address!== '' ? $address: null,
-            $city   !== '' ? $city   : null,
-            $customer_type, $credit_limit,
-            $notes  !== '' ? $notes  : null,
-            $status, $_SESSION['user_id'],
-        ]);
+    // $full=true: insert optional cols (city, customer_type, credit_limit, notes).
+    // $full=false: core-only fallback for older tenant schemas missing those columns.
+    $doInsert = function (bool $full) use (
+        $pdo, $hasClientUuid, $client_uuid,
+        $customer_code, $customer_name,
+        $phone, $email, $address, $city,
+        $customer_type, $credit_limit, $notes, $status
+    ): void {
+        if ($hasClientUuid && $full) {
+            $st = $pdo->prepare("INSERT INTO customers (client_uuid, customer_code, customer_name, phone, email, address, city, customer_type, credit_limit, notes, status, created_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),?)");
+            $st->execute([$client_uuid ?: null, $customer_code, $customer_name, $phone !== '' ? $phone : null, $email !== '' ? $email : null, $address !== '' ? $address : null, $city !== '' ? $city : null, $customer_type, $credit_limit, $notes !== '' ? $notes : null, $status, $_SESSION['user_id']]);
+        } elseif ($hasClientUuid) {
+            $st = $pdo->prepare("INSERT INTO customers (client_uuid, customer_code, customer_name, phone, email, address, status, created_at, created_by) VALUES (?,?,?,?,?,?,?,NOW(),?)");
+            $st->execute([$client_uuid ?: null, $customer_code, $customer_name, $phone !== '' ? $phone : null, $email !== '' ? $email : null, $address !== '' ? $address : null, $status, $_SESSION['user_id']]);
+        } elseif ($full) {
+            $st = $pdo->prepare("INSERT INTO customers (customer_code, customer_name, phone, email, address, city, customer_type, credit_limit, notes, status, created_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),?)");
+            $st->execute([$customer_code, $customer_name, $phone !== '' ? $phone : null, $email !== '' ? $email : null, $address !== '' ? $address : null, $city !== '' ? $city : null, $customer_type, $credit_limit, $notes !== '' ? $notes : null, $status, $_SESSION['user_id']]);
+        } else {
+            $st = $pdo->prepare("INSERT INTO customers (customer_code, customer_name, phone, email, address, status, created_at, created_by) VALUES (?,?,?,?,?,?,NOW(),?)");
+            $st->execute([$customer_code, $customer_name, $phone !== '' ? $phone : null, $email !== '' ? $email : null, $address !== '' ? $address : null, $status, $_SESSION['user_id']]);
+        }
+    };
+    try {
+        $doInsert(true);
+    } catch (PDOException $eOpt) {
+        if (stripos($eOpt->getMessage(), 'Unknown column') !== false) {
+            $doInsert(false);
+        } else {
+            throw $eOpt;
+        }
     }
     $customer_id = (int)$pdo->lastInsertId();
 
