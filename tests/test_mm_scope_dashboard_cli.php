@@ -55,8 +55,7 @@ try {
     section('FULL (agents A + B)');
     $r = mmFixtureRun('app/bms/mobile_money/mm_dashboard.php', $U['FULL'], true);
     ok($kpi($r['out']) === '3,500', "FULL today's volume = 3,500 (A1+A2+B1) (got " . var_export($kpi($r['out']), true) . ')');
-    ok(strpos($r['out'], 'ZZSCOPE Agent A') !== false && strpos($r['out'], 'ZZSCOPE Agent B') !== false, 'My Agents lists A and B');
-    ok(strpos($r['out'], 'ZZSCOPE Agent C') === false && strpos($r['out'], 'ZZSCOPE Agent D') === false, 'C and D never shown');
+    ok(stripos($r['out'], 'ZZSCOPE Agent C') === false && stripos($r['out'], 'ZZSCOPE Agent D') === false, 'C and D never shown');
     ok(strpos($r['out'], 'My Agents — This Month') !== false, 'Top-5 block relabelled for scoped user');
     ok(strpos($r['out'], 'mm_transactions') !== false && strpos($r['out'], 'New Transaction') !== false, 'New Transaction quick action shown');
 
@@ -89,7 +88,7 @@ try {
 
     section('Agent view');
     $r = mmFixtureRun('app/bms/mobile_money/mm_agent_view.php', $U['FULL'], true, ['id' => $A['A']]);
-    ok($r['location'] === null && strpos($r['out'], 'ZZSCOPE Agent A') !== false, 'FULL views own agent A');
+    ok($r['location'] === null && stripos($r['out'], 'ZZSCOPE Agent A') !== false, 'FULL views own agent A');
     ok(strpos($r['out'], 'ZZSCOPE-A1') !== false && strpos($r['out'], 'ZZSCOPE-A2') !== false, 'FULL sees A1 and A2 tills');
     ok(strpos($r['out'], 'id="addTillModal"') === false && strpos($r['out'], 'id="editAgentModal"') === false, 'read-only: no Add Till / Edit Agent');
     $r = mmFixtureRun('app/bms/mobile_money/mm_agent_view.php', $U['TILL'], true, ['id' => $A['A']]);

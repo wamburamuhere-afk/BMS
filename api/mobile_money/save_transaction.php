@@ -100,16 +100,21 @@ try {
     ]);
     $txnId = (int)$pdo->lastInsertId();
 
-    // 3. Post GL entry
+    // 3. Post GL entry (skipped in Simple Mode)
     $desc = strtoupper(str_replace('_', ' ', $txnType)) . " TZS " . number_format($amount, 0, '.', ',') . " — $txnCode";
     if ($customerName) $desc .= " ($customerName)";
     elseif ($customerPhone) $desc .= " ($customerPhone)";
 
     $entryId = postMMTransaction($pdo, $txnId, $networkId, $txnType, $amount, $commission, $txnDate, $_SESSION['user_id'], $desc);
 
-    // 4. Update with entry_id and mark posted
-    $pdo->prepare("UPDATE mm_transactions SET journal_entry_id=?, status='posted' WHERE mm_txn_id=?")
-        ->execute([$entryId, $txnId]);
+    // 4. Mark posted — with GL entry_id in advanced mode, NULL in simple mode
+    if ($entryId) {
+        $pdo->prepare("UPDATE mm_transactions SET journal_entry_id=?, status='posted' WHERE mm_txn_id=?")
+            ->execute([$entryId, $txnId]);
+    } else {
+        $pdo->prepare("UPDATE mm_transactions SET status='posted' WHERE mm_txn_id=?")
+            ->execute([$txnId]);
+    }
 
     $pdo->commit();
 
@@ -117,11 +122,11 @@ try {
 
     echo json_encode([
         'success'       => true,
-        'message'       => "Transaction $txnCode posted successfully.",
+        'message'       => "Transaction $txnCode saved successfully.",
         'txn_id'        => $txnId,
         'txn_code'      => $txnCode,
         'commission'    => $commission,
-        'entry_id'      => $entryId,
+        'entry_id'      => $entryId ?: null,
         'kyc_required'  => (bool)$kycRequired,
     ]);
 

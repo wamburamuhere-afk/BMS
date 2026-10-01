@@ -3,12 +3,14 @@
 ob_start();
 $page_title = 'MM Networks';
 require_once __DIR__ . '/../../../roots.php';
+require_once ROOT_DIR . '/core/mm_nav.php';
 if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 includeHeader();
 
 $can_create = canCreate('mm_networks');
 $can_edit   = canEdit('mm_networks');
 $can_delete = canDelete('mm_networks');
+$mm_simple  = mmSimpleModeEnabled();
 
 $networks = $pdo->query("
     SELECT n.*,
@@ -21,19 +23,22 @@ $networks = $pdo->query("
     ORDER BY n.sort_order, n.network_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Asset accounts for dropdown
-$assetAccounts = $pdo->query("
-    SELECT account_id, account_code, account_name
-    FROM accounts WHERE account_type = 'asset' AND status = 'active'
-    ORDER BY account_code
-")->fetchAll(PDO::FETCH_ASSOC);
+// GL account dropdowns — only needed in advanced (non-simple) mode
+$assetAccounts  = [];
+$incomeAccounts = [];
+if (!$mm_simple) {
+    $assetAccounts = $pdo->query("
+        SELECT account_id, account_code, account_name
+        FROM accounts WHERE account_type = 'asset' AND status = 'active'
+        ORDER BY account_code
+    ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Income accounts for dropdown
-$incomeAccounts = $pdo->query("
-    SELECT account_id, account_code, account_name
-    FROM accounts WHERE account_type = 'income' AND status = 'active'
-    ORDER BY account_code
-")->fetchAll(PDO::FETCH_ASSOC);
+    $incomeAccounts = $pdo->query("
+        SELECT account_id, account_code, account_name
+        FROM accounts WHERE account_type = 'income' AND status = 'active'
+        ORDER BY account_code
+    ")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money networks list');
 ?>
@@ -96,8 +101,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <th class="text-center"><?= t('Network') ?></th>
                             <th class="text-center"><?= t('Code') ?></th>
                             <th class="text-center"><?= t('Short Code') ?></th>
+                            <?php if (!$mm_simple): ?>
                             <th class="text-center"><?= t('E-Float Account') ?></th>
                             <th class="text-center"><?= t('Commission Account') ?></th>
+                            <?php endif; ?>
                             <th class="text-center"><?= t('Agents') ?></th>
                             <th class="text-center"><?= t('Status') ?></th>
                             <?php if ($can_edit || $can_delete): ?><th class="text-center"><?= t('Actions') ?></th><?php endif; ?>
@@ -114,8 +121,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             </td>
                             <td><code><?= safe_output($n['network_code']) ?></code></td>
                             <td><?= safe_output($n['short_code']) ?></td>
+                            <?php if (!$mm_simple): ?>
                             <td class="small text-muted"><?= $n['float_code'] ? safe_output($n['float_code']).' — '.caseFormat($n['float_name']) : '<span class="text-warning">Not set</span>' ?></td>
                             <td class="small text-muted"><?= $n['comm_code'] ? safe_output($n['comm_code']).' — '.caseFormat($n['comm_name']) : '<span class="text-warning">Not set</span>' ?></td>
+                            <?php endif; ?>
                             <td class="text-center"><span class="badge bg-secondary"><?= (int)$n['agent_count'] ?></span></td>
                             <td>
                                 <span class="badge <?= $n['status'] === 'active' ? 'bg-success' : 'bg-secondary' ?>">
@@ -188,6 +197,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <label class="form-label"><?= t('Colour') ?></label>
                             <input type="color" class="form-control form-control-color" name="color_hex" value="#198754">
                         </div>
+                        <?php if (!$mm_simple): ?>
                         <div class="col-12">
                             <label class="form-label"><?= t('E-Float Account') ?></label>
                             <select class="form-select select2-static" name="float_account_id">
@@ -206,6 +216,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php endif; ?>
                         <div class="col-md-4">
                             <label class="form-label"><?= t('Sort Order') ?></label>
                             <input type="number" class="form-control" name="sort_order" value="10" min="0">
@@ -264,6 +275,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <label class="form-label"><?= t('Colour') ?></label>
                             <input type="color" class="form-control form-control-color" name="color_hex" id="edit_color">
                         </div>
+                        <?php if (!$mm_simple): ?>
                         <div class="col-12">
                             <label class="form-label"><?= t('E-Float Account') ?></label>
                             <select class="form-select select2-static" name="float_account_id" id="edit_float_account">
@@ -282,6 +294,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php endif; ?>
                         <div class="col-md-4">
                             <label class="form-label"><?= t('Sort Order') ?></label>
                             <input type="number" class="form-control" name="sort_order" id="edit_sort">
@@ -443,10 +456,12 @@ function editNetwork(n) {
     $('#edit_sort').val(n.sort_order);
     $('#edit_status').val(n.status);
     const fm = new bootstrap.Modal(document.getElementById('editModal'));
-    // Set Select2 values after modal opens
+    // Set Select2 values after modal opens (GL fields only in advanced mode)
     $('#editModal').one('shown.bs.modal', function () {
+        <?php if (!$mm_simple): ?>
         $('#edit_float_account').val(n.float_account_id).trigger('change');
         $('#edit_comm_account').val(n.commission_account_id).trigger('change');
+        <?php endif; ?>
     });
     fm.show();
 }
