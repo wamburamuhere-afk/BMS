@@ -148,21 +148,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         </div>
     </div>
 
-    <!-- Active shift banner — lists all open shifts as chips -->
-    <?php if (!empty($myOpenShifts)): ?>
-    <div class="alert alert-success d-flex flex-wrap align-items-center gap-2 py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-play-circle-fill me-1"></i><strong><?= t('Active Shifts:') ?></strong></span>
-        <?php foreach ($myOpenShifts as $sh): ?>
-        <span class="badge bg-white text-success border border-success" style="font-size:.82rem">
-            <?= safe_output($sh['shift_code']) ?> · <?= caseFormat($sh['agent_name'] . ' / ' . $sh['till_number']) ?>
-        </span>
-        <?php endforeach; ?>
-    </div>
-    <?php else: ?>
-    <div class="alert alert-warning py-2 mb-3" style="border-radius:8px">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift.') ?>
-    </div>
-    <?php endif; ?>
 
     <!-- Stats -->
     <div class="row g-3 mb-3">
@@ -259,7 +244,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                         </thead>
                         <tbody>
                             <?php $sno = 1; foreach ($shifts as $sh): ?>
-                            <tr data-id="<?= (int)$sh['shift_id'] ?>" data-code="<?= htmlspecialchars($sh['shift_code']) ?>" data-outlet="<?= htmlspecialchars($sh['agent_name'].' / '.$sh['till_number']) ?>" data-teller="<?= htmlspecialchars($sh['teller_name'] ?: '—') ?>" data-opened="<?= date('d M H:i', strtotime($sh['opened_at'])) ?>" data-volume="<?= $sh['txn_volume'] ? number_format((float)$sh['txn_volume']) : '—' ?>" data-status="<?= htmlspecialchars($sh['status']) ?>" data-can-close="<?= ($sh['status'] === 'open' && $can_close) ? '1' : '0' ?>" data-shift='<?= htmlspecialchars(json_encode(['id'=>$sh['shift_id'],'code'=>$sh['shift_code'],'till_number'=>$sh['till_number'],'agent'=>$sh['agent_name']]),ENT_QUOTES) ?>'>
+                            <tr data-id="<?= (int)$sh['shift_id'] ?>" data-code="<?= htmlspecialchars($sh['shift_code']) ?>" data-outlet="<?= caseFormat($sh['agent_name'].' / '.$sh['till_number']) ?>" data-teller="<?= caseFormat($sh['teller_name'] ?: '—') ?>" data-opened="<?= date('d M H:i', strtotime($sh['opened_at'])) ?>" data-volume="<?= $sh['txn_volume'] ? number_format((float)$sh['txn_volume']) : '—' ?>" data-status="<?= htmlspecialchars($sh['status']) ?>" data-can-close="<?= ($sh['status'] === 'open' && $can_close) ? '1' : '0' ?>" data-shift='<?= htmlspecialchars(json_encode(['id'=>$sh['shift_id'],'code'=>$sh['shift_code'],'till_number'=>$sh['till_number'],'agent'=>$sh['agent_name']]),ENT_QUOTES) ?>'>
                                 <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code class="small"><?= safe_output($sh['shift_code']) ?></code></td>
                                 <td class="small">

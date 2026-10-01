@@ -1043,6 +1043,79 @@ if (!function_exists('setTenantPosSimpleMode')) {
     }
 }
 
+if (!function_exists('tenantMmSimpleModeStatus')) {
+    /**
+     * Same narrow "opens a tenant's own database" exception as
+     * tenantPosSimpleModeStatus() — reads the MM Simple Mode setting
+     * ('mm_simple_mode') from the tenant's own system_settings.
+     *
+     * @return array{enabled:bool}|null null if the tenant/DB can't be reached.
+     */
+    function tenantMmSimpleModeStatus(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $st2 = $tPdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'mm_simple_mode'");
+            $val = $st2 ? $st2->fetchColumn() : false;
+
+            // Default is '1' (simple mode ON) when not yet set
+            return ['enabled' => ($val === false || $val === '1')];
+        } catch (Throwable $e) {
+            error_log('tenantMmSimpleModeStatus(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('setTenantMmSimpleMode')) {
+    /**
+     * Writes 'mm_simple_mode' into ONE tenant's own database.
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function setTenantMmSimpleMode(int $tenantId, bool $enabled): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return ['ok' => false, 'error' => 'Tenant not found.'];
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return ['ok' => false, 'error' => 'Could not decrypt tenant credentials.'];
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+            $tPdo->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                VALUES ('mm_simple_mode', ?, NOW())
+                ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()
+            ")->execute([$enabled ? '1' : '0', $enabled ? '1' : '0']);
+
+            return ['ok' => true, 'error' => null];
+        } catch (Throwable $e) {
+            error_log('setTenantMmSimpleMode(' . $tenantId . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not update this tenant right now.'];
+        }
+    }
+}
+
 if (!function_exists('tenantAdvancedProductStatus')) {
     /**
      * Same narrow "opens a tenant's own database" exception as

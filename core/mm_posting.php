@@ -19,6 +19,8 @@
  *  float_withdraw: Dr Bank Account | Cr E-Float
  */
 
+require_once __DIR__ . '/mm_nav.php';
+
 if (!function_exists('mmGLAccountIds')) {
     function mmGLAccountIds(PDO $pdo, int $networkId): array {
         static $cache = [];
@@ -62,6 +64,7 @@ if (!function_exists('postMMTransaction')) {
      * @return int   entry_id
      */
     function postMMTransaction(PDO $pdo, int $txnId, int $networkId, string $txnType, float $amount, float $commission, string $date, int $userId, string $reference): int {
+        if (mmSimpleModeEnabled()) return 0;
         $accts = mmGLAccountIds($pdo, $networkId);
         $efloat    = $accts['efloat'];
         $cashFloat = $accts['cash_float'];
@@ -146,6 +149,7 @@ if (!function_exists('postMMCommissionReceived')) {
      * @return int   entry_id
      */
     function postMMCommissionReceived(PDO $pdo, int $creditId, int $networkId, float $amount, int $bankAcctId, string $date, int $userId, string $reference): int {
+        if (mmSimpleModeEnabled()) return 0;
         require_once __DIR__ . '/ledger_post.php';
         $accts  = mmGLAccountIds($pdo, $networkId);
         $efloat = $accts['efloat'];
@@ -178,6 +182,7 @@ if (!function_exists('postMMFloatMovement')) {
      * @return int   entry_id
      */
     function postMMFloatMovement(PDO $pdo, int $movementId, int $networkId, string $movType, float $amount, int $bankAcctId, string $date, int $userId, string $reference): int {
+        if (mmSimpleModeEnabled()) return 0;
         $accts = mmGLAccountIds($pdo, $networkId);
         $efloat = $accts['efloat'];
 

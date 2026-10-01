@@ -1,6 +1,7 @@
 <?php
 // scope-audit: skip — MM tables are agent-scoped via mm_user_agent_grants; no project/warehouse scope here.
 require_once __DIR__ . '/../../../roots.php';
+require_once ROOT_DIR . '/core/mm_nav.php';
 autoEnforcePermission('mm_commissions');
 
 $can_create = canCreate('mm_commissions');
@@ -50,8 +51,10 @@ $receivedRows = $showReceived ? $pdo->query("
 ")->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // --- For modal dropdowns ---
-$networks = $pdo->query("SELECT network_id, network_name FROM mm_networks WHERE status='active' ORDER BY sort_order")->fetchAll(PDO::FETCH_ASSOC);
-$bankAccounts = $pdo->query("SELECT account_id, account_code, account_name FROM accounts WHERE account_type='asset' AND status!='inactive' ORDER BY account_code")->fetchAll(PDO::FETCH_ASSOC);
+$networks     = $pdo->query("SELECT network_id, network_name FROM mm_networks WHERE status='active' ORDER BY sort_order")->fetchAll(PDO::FETCH_ASSOC);
+$mm_simple    = mmSimpleModeEnabled();
+// Bank account select is only needed in advanced (GL) mode
+$bankAccounts = $mm_simple ? [] : $pdo->query("SELECT account_id, account_code, account_name FROM accounts WHERE account_type='asset' AND status!='inactive' ORDER BY account_code")->fetchAll(PDO::FETCH_ASSOC);
 
 includeHeader();
 logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money Commissions');
@@ -224,6 +227,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                         <label class="form-label"><?= t('Amount Received (TZS)') ?> <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" name="amount_received" min="0.01" step="0.01" required>
                     </div>
+                    <?php if (!$mm_simple): ?>
                     <div class="mb-3">
                         <label class="form-label"><?= t('Bank Account') ?> <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" name="bank_account_id" required>
@@ -233,6 +237,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php endif; ?>
                     <div class="mb-3">
                         <label class="form-label"><?= t('Receipt Date') ?> <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" name="receipt_date" value="<?= date('Y-m-d') ?>" required>

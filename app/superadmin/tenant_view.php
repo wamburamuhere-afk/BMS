@@ -647,6 +647,11 @@ if ($hasContext ?? false):
                                             More
                                         </button>
                                         <?php endif; ?>
+                                        <?php if ($f['key'] === 'mobile_money'): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem" onclick="openMmMoreModal()">
+                                            More
+                                        </button>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="text-muted" style="font-size:.78rem">
                                         <?= safe_output($f['description'] ?? '', '') ?>
@@ -1895,6 +1900,63 @@ function openPosMoreModal() {
         });
     }).fail(function (xhr) {
         let msg = 'Could not read Simple Mode status for this tenant.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    });
+}
+
+function openMmMoreModal() {
+    Swal.fire({ title: 'Mobile Money — More', html: 'Loading current status…', showConfirmButton: false, didOpen: () => Swal.showLoading() });
+
+    $.ajax({
+        url: '/actions/superadmin_tenant_mm_simple_mode.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'status' }
+    }).done(function (res) {
+        if (!res || !res.success) {
+            Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read MM Simple Mode status for this tenant.' });
+            return;
+        }
+
+        Swal.fire({
+            title: 'Mobile Money — More',
+            html: '<div class="text-start">'
+                + '<div class="form-check mb-3 pb-3 border-bottom">'
+                + '<input class="form-check-input" type="checkbox" id="saMmSimpleEnabled"' + (res.enabled ? ' checked' : '') + '>'
+                + '<label class="form-check-label fw-semibold" for="saMmSimpleEnabled">Simple Mode (no GL)</label>'
+                + '<div class="text-muted small">Default ON. Transactions are saved and visible in all dashboards, shift reports and metrics — no GL accounts need to be configured. Turn OFF only when this tenant has a bookkeeper who will set up the double-entry accounts under Mobile Money → Networks.</div>'
+                + '</div>'
+                + '<div class="alert alert-info small mb-0 text-start">'
+                + '<strong>When Simple Mode is OFF (Advanced GL mode):</strong><br>'
+                + '1. Run the GL accounts migration: <code>php migrations/tenant/2026_09_26_mm_gl_accounts.php</code><br>'
+                + '2. Go to Mobile Money → Networks → Edit each network and assign its E-Float Account.<br>'
+                + 'Transactions will then post to the double-entry ledger and appear in Balance Sheet, P&L, and Trial Balance.'
+                + '</div>'
+                + '</div>',
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            preConfirm: function () {
+                return { simple: document.getElementById('saMmSimpleEnabled').checked };
+            }
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+            $.ajax({
+                url: '/actions/superadmin_tenant_mm_simple_mode.php',
+                method: 'POST', dataType: 'json',
+                data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'set', enabled: result.value.simple ? 1 : 0 }
+            }).done(function (r) {
+                if (r && r.success) {
+                    Swal.fire({ icon: 'success', title: 'Saved', text: 'MM Simple Mode updated.', timer: 1800, showConfirmButton: false })
+                        .then(function () { window.location.reload(); });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: (r && r.message) || 'Could not save.' });
+                }
+            }).fail(function () {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save.' });
+            });
+        });
+    }).fail(function (xhr) {
+        let msg = 'Could not read MM Simple Mode status for this tenant.';
         try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     });
