@@ -93,7 +93,9 @@ if (isAdmin()) {
           AND t.till_id NOT IN (SELECT till_id FROM mm_shifts WHERE status = 'open')
     ")->fetchColumn();
 }
-$canRecordAny = $isScopedAdmin || !empty(mmScopeTillIds('can_record_transactions'));
+$canRecordAny  = $isScopedAdmin || !empty(mmScopeTillIds('can_record_transactions'));
+// Used to distinguish "no grants" from "grants exist but all tills occupied"
+$hasAnyGrantedTill = $isScopedAdmin || !empty(mmScopeTillIds('can_open_shift'));
 
 // --- "My Agents" (non-admin with grants): each granted agent with its in-scope tills ---
 $myAgents = [];
@@ -248,7 +250,7 @@ function mmTrendBadge($pct): string {
                             <div class="btn btn-outline-secondary w-100 h-100 py-3 disabled opacity-50">
                                 <i class="bi bi-play-circle display-6"></i>
                                 <div class="mt-2"><?= t('Open Shift') ?></div>
-                                <div class="small mt-1 opacity-75"><?= t('No tills assigned') ?></div>
+                                <div class="small mt-1 opacity-75"><?= $hasAnyGrantedTill ? t('Till already has an open shift') : t('No tills assigned') ?></div>
                             </div>
                         </div>
                         <?php endif; ?>
