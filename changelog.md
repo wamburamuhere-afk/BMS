@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-01 — fix(mobile-api): create endpoints stored NULL status causing 500 / ghost 404
+
+**Files:**
+- `api/mobile/customers/create.php` — fix PHP ternary setting status and customer_type to null when the field is absent from request body; stops HTTP 500
+- `api/mobile/suppliers/create.php` — same fix for status field; stops ghost records (created but unfindable)
+- `api/mobile/products/create.php` — same fix for status field; stops ghost records
+- `migrations/tenant/2026_10_01_cleanup_api_ghost_records.php` — removes ghost test products and suppliers where name LIKE 'ZZ %' and status is NULL/invalid
+
+---
+
 ## 2026-10-01 — feat(mm-ui): attention section, auto-select till, full-width stat cards
 
 **Files:** `app/bms/mobile_money/mm_dashboard.php`, `mm_transactions.php`, `mm_float.php`, `mm_commissions.php`, `mm_commission_rates.php`

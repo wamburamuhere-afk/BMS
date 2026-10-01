@@ -48,10 +48,12 @@ $phone         = trim($body['phone']         ?? '');
 $email         = trim($body['email']         ?? '');
 $address       = trim($body['address']       ?? '');
 $city          = trim($body['city']          ?? '');
-$customer_type = in_array($body['customer_type'] ?? 'individual', ['individual','business'], true) ? $body['customer_type'] : 'individual';
+$_ct           = $body['customer_type'] ?? 'individual';
+$customer_type = in_array($_ct, ['individual','business'], true) ? $_ct : 'individual';
 $credit_limit  = max(0, (float)($body['credit_limit'] ?? 0));
 $notes         = trim($body['notes']         ?? '');
-$status        = in_array($body['status'] ?? 'active', ['active','inactive'], true) ? $body['status'] : 'active';
+$_st           = $body['status'] ?? 'active';
+$status        = in_array($_st, ['active','inactive'], true) ? $_st : 'active';
 
 try {
     $customer_code = nextCode($pdo, 'CUST');
