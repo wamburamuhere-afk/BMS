@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-10-01 — feat(mm-ui): attention section, auto-select till, full-width stat cards
+
+**Files:** `app/bms/mobile_money/mm_dashboard.php`, `mm_transactions.php`, `mm_float.php`, `mm_commissions.php`, `mm_commission_rates.php`
+
+**Changes:**
+
+1. **Needs Attention section (mm_dashboard.php):** Added a "Needs Attention" card above Quick Actions, shown only when there are actionable items:
+   - Granted teller with no active shift who can record transactions → "Open Shift" link
+   - Admin: any shift open for more than 12 hours → "View Shifts" link
+   - Admin: commission earned vs received gap > TZS 1,000 → "Record Receipt" link
+
+2. **Auto-select till when only one (mm_transactions.php):** In the New Transaction modal's `shown.bs.modal` handler, if `#txn_till` has exactly one non-empty option, it is selected automatically — users with a single assigned till no longer need to pick it manually.
+
+3. **Full-width stat cards:** Changed stat card column classes from `col-6 col-md-3` / `col-6 col-md-4` to `col-6 col-md` (Bootstrap equal-width auto) across `mm_transactions.php`, `mm_float.php`, `mm_commissions.php`. Cards now fill the full row width equally regardless of count.
+
+4. **mm_commission_rates.php:** Single "Rate Bands" card expanded to three equal cards (Rate Bands, Networks, Transaction Types) so the stat row fills the full width.
+
+---
+
 ## 2026-10-01 — feat(mm): Simple Mode — bypass GL for MM tenants without accountants
 
 **New files:** `core/mm_nav.php`, `actions/superadmin_tenant_mm_simple_mode.php`, `migrations/tenant/2026_10_01_mm_simple_mode_default.php`

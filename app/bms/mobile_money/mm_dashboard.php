@@ -109,6 +109,52 @@ $canRecordAny  = $isScopedAdmin || !empty(mmScopeTillIds('can_record_transaction
 // Used to distinguish "no grants" from "grants exist but all tills occupied"
 $hasAnyGrantedTill = $isScopedAdmin || !empty(mmScopeTillIds('can_open_shift'));
 
+// --- Attention items (shown above Quick Actions) ---
+$attentionItems = [];
+
+// 1. Granted teller with no active shift who can record transactions
+if (!$isScopedAdmin && $hasGrant && $canRecordAny && empty($myActiveShifts)) {
+    $attentionItems[] = [
+        'type'         => 'warning',
+        'icon'         => 'bi-exclamation-triangle-fill',
+        'text'         => t('You have no active shift. New transactions require an open shift.'),
+        'action_url'   => getUrl('mm_shifts'),
+        'action_label' => t('Open Shift'),
+    ];
+}
+
+// 2. Shifts open for more than 12 hours (admin only)
+if ($isScopedAdmin) {
+    $longShifts = (int)$pdo->query(
+        "SELECT COUNT(*) FROM mm_shifts WHERE status='open' AND opened_at < DATE_SUB(NOW(), INTERVAL 12 HOUR)"
+    )->fetchColumn();
+    if ($longShifts > 0) {
+        $attentionItems[] = [
+            'type'         => 'warning',
+            'icon'         => 'bi-clock-history',
+            'text'         => $longShifts . ' ' . t('shift(s) have been open for over 12 hours — please review and close if needed.'),
+            'action_url'   => getUrl('mm_shifts'),
+            'action_label' => t('View Shifts'),
+        ];
+    }
+}
+
+// 3. Commission earned but not received (admin only, gap > TZS 1,000)
+if ($isScopedAdmin) {
+    $commEarned   = (float)$pdo->query("SELECT COALESCE(SUM(commission_earned),0) FROM mm_transactions WHERE status='posted'")->fetchColumn();
+    $commReceived = (float)$pdo->query("SELECT COALESCE(SUM(amount_received),0) FROM mm_commissions_received WHERE status='posted'")->fetchColumn();
+    $commGap = $commEarned - $commReceived;
+    if ($commGap > 1000) {
+        $attentionItems[] = [
+            'type'         => 'info',
+            'icon'         => 'bi-coin',
+            'text'         => t('Commission earned but not yet received from networks') . ': TZS ' . number_format($commGap),
+            'action_url'   => getUrl('mm_commissions'),
+            'action_label' => t('Record Receipt'),
+        ];
+    }
+}
+
 // --- Daily volume last 14 days (chart) ---
 $dailyVol = $pdo->prepare("
     SELECT txn_date, COALESCE(SUM(principal_amount),0) AS vol, COUNT(*) AS cnt
@@ -214,6 +260,30 @@ function mmTrendBadge($pct): string {
     </div>
 </div>
 <?php includeFooter(); return; ?>
+    <?php endif; ?>
+
+    <!-- Needs Attention -->
+    <?php if (!empty($attentionItems)): ?>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-light d-flex align-items-center gap-2 py-2">
+            <i class="bi bi-bell-fill text-warning"></i>
+            <h6 class="mb-0"><?= t('Needs Attention') ?></h6>
+            <span class="badge bg-warning text-dark ms-1"><?= count($attentionItems) ?></span>
+        </div>
+        <div class="card-body p-0">
+            <?php foreach ($attentionItems as $item): ?>
+            <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi <?= $item['icon'] ?> text-<?= $item['type'] === 'info' ? 'primary' : $item['type'] ?>"></i>
+                    <span class="small"><?= $item['text'] ?></span>
+                </div>
+                <a href="<?= $item['action_url'] ?>" class="btn btn-sm btn-outline-<?= $item['type'] === 'info' ? 'primary' : $item['type'] ?> flex-shrink-0">
+                    <?= $item['action_label'] ?> <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
     <?php endif; ?>
 
     <!-- Quick Actions — dashboard.php style: card with bg-light header, flex-fill buttons -->

@@ -100,19 +100,19 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
 
     <!-- Stats -->
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-primary"><?= count($txns) ?></div>
                 <div class="small text-muted"><?= t('Transactions') ?></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-5 fw-bold text-info"><?= number_format($totalAmount) ?></div>
                 <div class="small text-muted"><?= t('Total Volume (TZS)') ?></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-5 fw-bold text-success"><?= number_format($totalCommission) ?></div>
                 <div class="small text-muted"><?= t('Commission Earned (TZS)') ?></div>
@@ -327,6 +327,12 @@ $(document).ready(function () {
             if(!$(this).hasClass('select2-hidden-accessible'))
                 $(this).select2({theme:'bootstrap-5',dropdownParent:modal,placeholder:'<?= t('Select…') ?>',allowClear:true,width:'100%'});
         });
+        // Auto-select the till when the user has only one option
+        const $till = $('#txn_till');
+        const validOpts = $till.find('option').filter((i, o) => $(o).val() !== '');
+        if (validOpts.length === 1) {
+            $till.val(validOpts.first().val()).trigger('change');
+        }
     });
 
     $('#newTxnForm').on('submit', function(e) {

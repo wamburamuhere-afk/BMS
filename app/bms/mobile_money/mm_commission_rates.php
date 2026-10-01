@@ -55,10 +55,22 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Commission Rates', 'Viewed comm
 
     <!-- Stats -->
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-primary"><?= count($rates) ?></div>
                 <div class="small text-muted"><?= t('Rate Bands') ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
+                <div class="fs-4 fw-bold text-info"><?= count($networks) ?></div>
+                <div class="small text-muted"><?= t('Networks') ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
+                <div class="fs-4 fw-bold text-success"><?= count($txnTypes) ?></div>
+                <div class="small text-muted"><?= t('Transaction Types') ?></div>
             </div>
         </div>
     </div>
