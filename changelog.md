@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-01 — fix(mobile-api): products/delete 500; get_sales param aliases + search; restore sale dates
+
+**Files:**
+- `api/mobile/products/delete.php` — replaced invalid soft-delete (status='deleted' not in products ENUM → strict-mode 500) with hard DELETE + cleanup of stock_movements/product_stocks, matching web app behaviour; wrapped in transaction
+- `api/pos/get_sales.php` — added `date_from`/`date_to` as aliases for `start_date`/`end_date`; added `search` query param filtering on receipt_number and customer name
+- `migrations/tenant/2026_10_01_restore_sale_dates_from_receipt.php` — restores sale_date from receipt number (RCP-YYYYMMDD-NNNN) for sales incorrectly stamped 2026-09-28 11:49-11:52; shifts start_time noted as needing manual review
+- `migrations/tenant/2026_10_01_cleanup_test_records_v2.php` — deletes active-status 'ZZ %' test products (no sales), suppliers, customers created after the status-ternary fix; NOTE: product 122 stock (+2) must be corrected manually via admin > Stock Adjustment
+
+---
+
 ## 2026-10-01 — fix(pos-api): process_sale business-rule errors return 500 instead of 409/422; unit_price alias
 
 **Files:**
