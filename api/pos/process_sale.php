@@ -24,6 +24,7 @@ require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 require_once __DIR__ . '/../../core/pos_credit_limit.php';
+require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
 mobileBearerAuth();
 
@@ -129,7 +130,10 @@ try {
     $discount_amount = floatval($input['discount_amount'] ?? 0);
     $tax = floatval($input['tax'] ?? 0);
     $total = floatval($input['total'] ?? 0);
-    $receipt_number = $input['receipt_number'] ?? ('RCP-' . date('Ymd') . '-' . mt_rand(1000, 9999));
+    // Server-side receipt numbers use an atomic daily sequence (code_sequences table)
+    // so concurrent sales never collide. Client-supplied numbers (offline POS) are
+    // accepted as-is; idempotency is handled above via client_uuid.
+    $receipt_number = $input['receipt_number'] ?? nextReceiptNumber($pdo);
     $split_details = $input['split_details'] ?? null;
 
     // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales only
