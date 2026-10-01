@@ -119,19 +119,19 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
 
     <!-- Stats -->
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-success"><?= number_format($totalTopup) ?></div>
                 <div class="small text-muted"><?= t('Top-ups (TZS)') ?></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-warning"><?= number_format($totalWithdr) ?></div>
                 <div class="small text-muted"><?= t('Withdrawals (TZS)') ?></div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-info"><?= count($movements) ?></div>
                 <div class="small text-muted"><?= t('Movements') ?></div>

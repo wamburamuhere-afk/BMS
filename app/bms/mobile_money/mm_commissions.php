@@ -72,20 +72,20 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
 
     <!-- Summary tiles -->
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-primary"><?= number_format($earned) ?></div>
                 <div class="small text-muted"><?= t('Total Earned (TZS)') ?></div>
             </div>
         </div>
         <?php if ($showReceived): ?>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-success"><?= number_format($received) ?></div>
                 <div class="small text-muted"><?= t('Total Received (TZS)') ?></div>
             </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md">
             <div class="card border-0 shadow-sm text-center p-3 mm-stat-card">
                 <div class="fs-4 fw-bold text-<?= $unreceived > 0 ? 'warning' : 'secondary' ?>"><?= number_format($unreceived) ?></div>
                 <div class="small text-muted"><?= t('Unreceived (TZS)') ?></div>
