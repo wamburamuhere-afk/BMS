@@ -16,7 +16,7 @@ $product_id = (int)($body['product_id'] ?? 0);
 if ($product_id <= 0) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Invalid product ID']); exit; }
 
 try {
-    $check = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ? AND status != 'deleted'");
+    $check = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ?");
     $check->execute([$product_id]);
     $name = $check->fetchColumn();
     if (!$name) { http_response_code(404); echo json_encode(['success'=>false,'message'=>'Product not found']); exit; }
@@ -30,12 +30,19 @@ try {
         exit;
     }
 
-    $pdo->prepare("UPDATE products SET status = 'deleted', updated_at = NOW(), updated_by = ? WHERE product_id = ?")
-        ->execute([$_SESSION['user_id'], $product_id]);
+    // Hard-delete matching the web app (api/delete_product.php).
+    // products.status ENUM does not include 'deleted', so a soft-delete UPDATE
+    // fails in strict-mode MySQL. The guard above ensures no sale references exist.
+    $pdo->beginTransaction();
+    $pdo->prepare("DELETE FROM stock_movements WHERE product_id = ?")->execute([$product_id]);
+    $pdo->prepare("DELETE FROM product_stocks WHERE product_id = ?")->execute([$product_id]);
+    $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$product_id]);
+    $pdo->commit();
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: deleted product #$product_id ($name)");
     echo json_encode(['success'=>true,'message'=>'Product deleted successfully']);
 } catch (Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('mobile/products/delete.php: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success'=>false,'message'=>'Server error']);
