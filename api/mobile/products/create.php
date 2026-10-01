@@ -56,7 +56,8 @@ $sku           = trim($body['sku']           ?? '');
 $barcode       = trim($body['barcode']       ?? '');
 $description   = trim($body['description']   ?? '');
 $category_id   = (int)($body['category_id']  ?? 0) ?: null;
-$status        = in_array($body['status'] ?? 'active', ['active','inactive'], true) ? $body['status'] : 'active';
+$_st           = $body['status'] ?? 'active';
+$status        = in_array($_st, ['active','inactive'], true) ? $_st : 'active';
 
 try {
     // Auto-generate SKU if not supplied
