@@ -210,6 +210,66 @@ if (!function_exists('logCodeChange')) {
     }
 }
 
+if (!function_exists('nextReceiptNumber')) {
+    /**
+     * Allocate the next sequential POS receipt number for the given date.
+     *
+     * Format: RCP-YYYYMMDD-NNNN  e.g. RCP-20261001-0001.
+     *
+     * Uses the same code_sequences table as nextCode() — a date-keyed row
+     * (sequence_name = 'RCP-YYYYMMDD') so the counter resets each day.
+     * The FOR UPDATE lock makes it atomic under concurrent inserts; no
+     * mt_rand() collision is possible regardless of daily volume.
+     *
+     * On the FIRST call for a given day the counter is seeded from the highest
+     * numeric suffix already in pos_sales for that date (safe migration from the
+     * old mt_rand scheme — the new sequential numbers never collide with the
+     * existing random-generated ones).
+     *
+     * Should be called INSIDE the caller's open transaction so a rolled-back
+     * sale also rolls back the sequence increment (same discipline as nextCode()).
+     * Opens its own tiny transaction if none is active.
+     *
+     * @param string $date  YYYYMMDD date override. Defaults to today. Tests use this.
+     */
+    function nextReceiptNumber(PDO $pdo, string $date = ''): string {
+        if ($date === '') $date = date('Ymd');
+        $seqKey  = 'RCP-' . $date;
+        $pattern = 'RCP-' . $date . '-%';
+
+        $ownTxn = !$pdo->inTransaction();
+        if ($ownTxn) $pdo->beginTransaction();
+        try {
+            // Seed from the highest existing suffix for this date on first call.
+            // ON DUPLICATE KEY is a strict no-op so an already-running sequence is untouched.
+            $pdo->prepare(
+                "INSERT INTO code_sequences (sequence_name, last_no, digits)
+                 SELECT ?, IFNULL(MAX(CAST(SUBSTRING_INDEX(receipt_number, '-', -1) AS UNSIGNED)), 0), 4
+                 FROM pos_sales WHERE receipt_number LIKE ?
+                 ON DUPLICATE KEY UPDATE sequence_name = sequence_name"
+            )->execute([$seqKey, $pattern]);
+
+            // Lock, read, bump — serialises concurrent callers.
+            $sel = $pdo->prepare(
+                "SELECT last_no FROM code_sequences WHERE sequence_name = ? FOR UPDATE"
+            );
+            $sel->execute([$seqKey]);
+            $row  = $sel->fetch(PDO::FETCH_ASSOC) ?: ['last_no' => 0];
+            $next = (int)$row['last_no'] + 1;
+
+            $pdo->prepare("UPDATE code_sequences SET last_no = ? WHERE sequence_name = ?")
+                ->execute([$next, $seqKey]);
+
+            if ($ownTxn) $pdo->commit();
+        } catch (Throwable $e) {
+            if ($ownTxn && $pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+
+        return 'RCP-' . $date . '-' . str_pad((string)$next, 4, '0', STR_PAD_LEFT);
+    }
+}
+
 if (!function_exists('codeForEdit')) {
     /**
      * Decide which code to persist when a record is EDITED & saved.

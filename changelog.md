@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-01 — fix(pos): replace mt_rand receipt numbers with atomic daily sequence
+
+**Files:**
+- `core/code_generator.php` — added `nextReceiptNumber(PDO, date?)`: uses `code_sequences` table with a date-keyed row (`RCP-YYYYMMDD`), `FOR UPDATE` lock for concurrent safety, seeds from `MAX` existing suffix on first call of the day (safe migration from old random numbers)
+- `api/pos/process_sale.php` — replaced `mt_rand(1000,9999)` with `nextReceiptNumber($pdo)`; added `require_once` for `code_generator.php`
+- `tests/test_pos_receipt_number_cli.php` — 18-assertion test: format, daily reset, seed-from-existing, 50-call uniqueness/gap-free, rollback safety
+
+**Root cause:** `mt_rand(1000, 9999)` has only 9 000 possible values per day; as daily sale volume grows, birthday-problem collisions become likely and any two concurrent requests landing the same random suffix cause a SQLSTATE[23000] duplicate key error on `pos_sales.receipt_number`.
+
 ## 2026-09-30 — feat(mm): agent-scoped access (non-admins see only granted agents)
 
 **Plan:** `mm_agent_scope_plan.md`. Effective access for a non-admin = role permission AND `mm_user_agent_grants` grant. In an MM-only tenant a user with no grant sees only MM Dashboard (empty state), profile and personal settings.
