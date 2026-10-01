@@ -64,16 +64,28 @@ if (isAdmin()) {
         ORDER BY s.opened_at
     ")->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $myShiftStmt = $pdo->prepare("
+    // Active shifts on the user's granted tills — regardless of who opened them.
+    $myActiveShifts = $pdo->query("
         SELECT s.shift_id, s.shift_code, t.till_id, t.till_number, a.agent_name
         FROM mm_shifts s
         JOIN mm_tills t ON t.till_id = s.till_id
         JOIN mm_agents a ON a.agent_id = t.agent_id
-        WHERE s.teller_user_id = ? AND s.status = 'open'
+        WHERE s.status = 'open' $scopeTxnT
         ORDER BY s.opened_at
-    ");
-    $myShiftStmt->execute([$_SESSION['user_id']]);
-    $myActiveShifts = $myShiftStmt->fetchAll(PDO::FETCH_ASSOC);
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    // D5: a teller whose grant was revoked mid-shift may still close their own open shift.
+    if (empty($myActiveShifts)) {
+        $ownStmt = $pdo->prepare("
+            SELECT s.shift_id, s.shift_code, t.till_id, t.till_number, a.agent_name
+            FROM mm_shifts s
+            JOIN mm_tills t ON t.till_id = s.till_id
+            JOIN mm_agents a ON a.agent_id = t.agent_id
+            WHERE s.teller_user_id = ? AND s.status = 'open'
+            ORDER BY s.opened_at
+        ");
+        $ownStmt->execute([$_SESSION['user_id']]);
+        $myActiveShifts = $ownStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 $myActiveShift = $myActiveShifts[0] ?? null; // kept for the active-shift chip
 
