@@ -88,17 +88,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
         <?php endif; ?>
     </div>
 
-    <!-- Shift banner (Change C + D) -->
-    <?php if ($myActiveShift): ?>
-    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-play-circle-fill me-2"></i>
-        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
-        &nbsp;·&nbsp; <?= caseFormat($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
-        &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
-        </span>
-        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
-    </div>
-    <?php else: ?>
+    <!-- Shift banner -->
+    <?php if (!$myActiveShift): ?>
     <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
         <span><i class="bi bi-exclamation-triangle-fill me-2"></i><?= t('No active shift — new transactions require an open shift.') ?></span>
         <?php if ($can_open_shift): ?>

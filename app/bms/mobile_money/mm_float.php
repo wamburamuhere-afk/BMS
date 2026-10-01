@@ -107,17 +107,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
         <?php endif; ?>
     </div>
 
-    <!-- Shift banner (Change C) -->
-    <?php if ($myActiveShift): ?>
-    <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
-        <span><i class="bi bi-play-circle-fill me-2"></i>
-        <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
-        &nbsp;·&nbsp; <?= caseFormat($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
-        &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
-        </span>
-        <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
-    </div>
-    <?php else: ?>
+    <!-- Shift banner -->
+    <?php if (!$myActiveShift): ?>
     <div class="alert alert-light d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px;border:1px solid #dee2e6">
         <span class="text-muted"><i class="bi bi-clock me-2"></i><?= t('No active shift. Float movements can still be recorded by authorized staff.') ?></span>
         <?php if ($can_open_shift): ?>
