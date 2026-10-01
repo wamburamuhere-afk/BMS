@@ -9,17 +9,19 @@ includeHeader();
 $can_open  = canCreate('mm_shifts');
 $can_close = canEdit('mm_shifts');
 
-// All of the current user's open shifts (no LIMIT 1)
-$myOpenShiftsStmt = $pdo->prepare("
+// Scope helpers: all open shifts on the user's granted tills.
+$scopeShiftTill = mmScopeSql('s.till_id');
+$scopeCloseTill = mmScopeSql('s.till_id', 'till', 'can_close_shift');
+
+// All open shifts on the user's granted tills (admin → all; teller → their tills).
+$myOpenShifts = $pdo->query("
     SELECT s.shift_id, s.shift_code, t.till_number, a.agent_name
     FROM mm_shifts s
     JOIN mm_tills t ON t.till_id = s.till_id
     JOIN mm_agents a ON a.agent_id = t.agent_id
-    WHERE s.teller_user_id = ? AND s.status = 'open'
+    WHERE s.status = 'open' $scopeShiftTill
     ORDER BY s.opened_at
-");
-$myOpenShiftsStmt->execute([$_SESSION['user_id']]);
-$myOpenShifts = $myOpenShiftsStmt->fetchAll(PDO::FETCH_ASSOC);
+")->fetchAll(PDO::FETCH_ASSOC);
 
 // All open shifts for "Close All" — admin sees all system-wide, non-admin sees own
 if (isAdmin()) {
@@ -35,7 +37,8 @@ if (isAdmin()) {
         ORDER BY s.opened_at
     ")->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $closeAllStmt = $pdo->prepare("
+    // Teller sees open shifts on tills where they hold can_close_shift.
+    $allOpenForClose = $pdo->query("
         SELECT s.shift_id, s.shift_code, s.opened_at,
                t.till_number, a.agent_name,
                CONCAT(u.first_name, ' ', u.last_name) AS teller_name
@@ -43,11 +46,9 @@ if (isAdmin()) {
         JOIN mm_tills t ON t.till_id = s.till_id
         JOIN mm_agents a ON a.agent_id = t.agent_id
         LEFT JOIN users u ON u.user_id = s.teller_user_id
-        WHERE s.status = 'open' AND s.teller_user_id = ?
+        WHERE s.status = 'open' $scopeCloseTill
         ORDER BY s.opened_at
-    ");
-    $closeAllStmt->execute([$_SESSION['user_id']]);
-    $allOpenForClose = $closeAllStmt->fetchAll(PDO::FETCH_ASSOC);
+    ")->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Tills this user may open a shift on
@@ -97,7 +98,6 @@ $filterStatus = $_GET['status']    ?? '';
 $where  = ["s.opened_at >= :df", "s.opened_at <= :dt"];
 $params = [':df' => $filterFrom . ' 00:00:00', ':dt' => $filterTo . ' 23:59:59'];
 if ($filterStatus) { $where[] = 's.status = :status'; $params[':status'] = $filterStatus; }
-if (!isAdmin()) { $where[] = 's.teller_user_id = :uid'; $params[':uid'] = $_SESSION['user_id']; }
 
 $shifts = $pdo->prepare("
     SELECT s.*,
@@ -113,7 +113,7 @@ $shifts = $pdo->prepare("
     JOIN mm_networks n ON n.network_id = t.network_id
     LEFT JOIN users u  ON u.user_id = s.teller_user_id
     LEFT JOIN users uc ON uc.user_id = s.closed_by
-    WHERE " . implode(' AND ', $where) . "
+    WHERE " . implode(' AND ', $where) . $scopeShiftTill . "
     ORDER BY s.opened_at DESC
     LIMIT 200
 ");

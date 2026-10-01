@@ -83,7 +83,9 @@ try {
     foreach (['A1', 'A2', 'B1'] as $k) ok(strpos($r['out'], "ZZSCOPE-$k") !== false, "FULL: open-shift list offers $k");
     ok(strpos($r['out'], 'ZZSCOPE-C1') === false && strpos($r['out'], 'ZZSCOPE-A3') === false, 'FULL: C1 / closed A3 not offered');
     $r = $page('mm_shifts', $U['DEAD']);
-    ok(strpos($r['out'], 'ZZSCOPE-C1') === false, 'DEAD: suspended C1 not offered for opening');
+    // DEAD can view C1 history (suspended = view only), but cannot open a new shift on it.
+    ok(strpos($r['out'], 'ZZSCOPE-C1') !== false, 'DEAD: C1 history visible in shift list');
+    ok(strpos($r['out'], 'data-bs-target="#openShiftModal"') === false, 'DEAD: no Open Shift button (no live tills)');
     $r = $page('mm_shift_report', $U['FULL'], ['id' => $act['shift']['C1']]);
     ok($r['location'] !== null && strpos($r['location'], 'mm_dashboard') !== false, 'FULL → C1 shift report redirected');
     $r = $page('mm_shift_report', $U['FULL'], ['id' => $act['shift']['B1']]);
