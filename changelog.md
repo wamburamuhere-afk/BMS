@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-01 — feat(mobile-api): notification endpoints (list, mark_read, mark_all_read)
+
+**Files:**
+- `api/mobile/notifications/list.php` — GET endpoint; Bearer token auth; mirrors `get_system_alerts()` + `get_pending_approvals()` from `app/dashboard.php` exactly (13 alert types, same RBAC gates, same project/warehouse scoping); returns `badge_count`, `groups[]`, `engine_notifications{}`; engine notifications paginated via `?notif_limit=&notif_offset=`
+- `api/mobile/notifications/mark_read.php` — POST endpoint; Bearer token auth; marks one engine notification as read (`notification_id` param); row-level scoped to `user_id`; returns updated `unread_count`
+- `api/mobile/notifications/mark_all_read.php` — POST endpoint; Bearer token auth; `action=mark_all_read` sets all unread to read, `action=clear_read` deletes all read notifications; row-level scoped to `user_id`; returns `affected` count + updated `unread_count`
+
+---
+
 ## 2026-10-01 — fix(mobile-api): schema fallback + offset + underpay + idempotency bugs
 
 **Files:**
