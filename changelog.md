@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-10-01 — feat(mm): Simple Mode — bypass GL for MM tenants without accountants
+
+**New files:** `core/mm_nav.php`, `actions/superadmin_tenant_mm_simple_mode.php`, `migrations/tenant/2026_10_01_mm_simple_mode_default.php`
+**Modified:** `core/mm_posting.php`, `core/tenant_admin.php`, `api/mobile_money/save_transaction.php`, `api/mobile_money/save_commission_received.php`, `app/bms/mobile_money/mm_networks.php`, `app/bms/mobile_money/mm_commissions.php`, `app/superadmin/tenant_view.php`
+
+**Problem fixed:** Every MM transaction save was crashing with "MM network X has no e-float GL account configured" because `postMMTransaction()` always required GL accounts set up on the network and `mm_gl_cash_float` in `system_settings`. This blocked all wakala agents who don't have an accountant setting up the chart of accounts.
+
+**What Simple Mode does (default ON):**
+- `postMMTransaction()`, `postMMCommissionReceived()`, `postMMFloatMovement()` each return 0 immediately — GL is never called
+- Transactions saved as `status='posted'` with `journal_entry_id=NULL` → visible in all dashboards, KPI cards, shift summaries, reports
+- `mm_networks.php`: hides "E-Float Account" and "Commission Account" columns/selects from Add+Edit modals; skips the GL account queries
+- `mm_commissions.php`: hides "Bank Account" select from the Record Commission Receipt modal; `bank_account_id` no longer required
+- `save_commission_received.php`: skips GL posting, saves with `status='posted'` directly
+
+**Superadmin UI:** "More" button added next to Mobile Money feature row in `tenant_view.php` → `openMmMoreModal()` dialog with Simple Mode toggle + step-by-step instructions for enabling Advanced GL mode (run migration, configure Networks, then switch this toggle OFF).
+
+**Migration:** `2026_10_01_mm_simple_mode_default.php` — idempotent upsert of `mm_simple_mode='1'` for any tenant that hasn't set it; existing advanced-mode tenants unchanged.
+
+**Already correct (no change needed):**
+- Float movements already skipped GL when no `bank_account_id` passed (float form never asked for one)
+- `void_transaction.php` already guarded GL reversal with `if ($tx['journal_entry_id'])`
+- `mm_transaction_view.php` GL journal link already conditional on `journal_entry_id`
+
 ## 2026-10-01 — fix(mm): remove active-shift banners; fix teller caseFormat in card view
 
 **Files:** `app/bms/mobile_money/mm_shifts.php`, `mm_transactions.php`, `mm_float.php`, `tests/test_mm_scope_dashboard_cli.php`
