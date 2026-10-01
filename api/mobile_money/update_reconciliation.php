@@ -21,6 +21,13 @@ $recon = $pdo->prepare("SELECT * FROM mm_reconciliations WHERE recon_id=?");
 $recon->execute([$reconId]);
 $recon = $recon->fetch(PDO::FETCH_ASSOC);
 if (!$recon) { echo json_encode(['success' => false, 'message' => 'Reconciliation not found.']); exit; }
+// Agent grant: can_reconcile on this till (admins bypass).
+require_once ROOT_DIR . '/core/mm_float_service.php';
+if (!mmUserCanOnTill($pdo, (int)$_SESSION['user_id'], (int)$recon['till_id'], 'can_reconcile')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You are not granted to reconcile this till']);
+    exit;
+}
 if ($recon['status'] !== 'open') {
     echo json_encode(['success' => false, 'message' => 'Only open reconciliations can be updated.']); exit;
 }

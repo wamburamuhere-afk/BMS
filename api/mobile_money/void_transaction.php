@@ -1,6 +1,7 @@
 <?php
 // scope-audit: skip — MM tables are agent-scoped via mm_user_agent_grants.
 require_once __DIR__ . '/../../roots.php';
+require_once ROOT_DIR . '/core/mm_float_service.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
@@ -15,11 +16,17 @@ if (!$txnId)         { echo json_encode(['success' => false, 'message' => 'Trans
 if (!$voidReason)    { echo json_encode(['success' => false, 'message' => 'Void reason is required']); exit; }
 
 try {
-    $tx = $pdo->prepare("SELECT mm_txn_id, txn_code, status, journal_entry_id FROM mm_transactions WHERE mm_txn_id=? LIMIT 1");
+    $tx = $pdo->prepare("SELECT mm_txn_id, txn_code, till_id, status, journal_entry_id FROM mm_transactions WHERE mm_txn_id=? LIMIT 1");
     $tx->execute([$txnId]);
     $tx = $tx->fetch(PDO::FETCH_ASSOC);
 
     if (!$tx)                        { echo json_encode(['success' => false, 'message' => 'Transaction not found']); exit; }
+    // Agent grant: only whoever may record on this till may void on it (admins bypass).
+    if (!mmUserCanOnTill($pdo, (int)$_SESSION['user_id'], (int)$tx['till_id'], 'can_record_transactions')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not granted to void transactions on this till']);
+        exit;
+    }
     if ($tx['status'] !== 'posted')  { echo json_encode(['success' => false, 'message' => 'Only posted transactions can be voided']); exit; }
 
     $pdo->beginTransaction();

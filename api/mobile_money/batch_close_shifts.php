@@ -42,7 +42,7 @@ try {
             $results[] = ['shift_id' => $shiftId, 'shift_code' => $shift['shift_code'], 'success' => false, 'message' => 'Shift is not open'];
             continue;
         }
-        if (!mmUserCanOnTill($pdo, $userId, $shift['till_id'], 'can_close_shift')) {
+        if (!mmUserCanCloseShift($pdo, $userId, $shift)) {
             $results[] = ['shift_id' => $shiftId, 'shift_code' => $shift['shift_code'], 'success' => false, 'message' => 'No grant to close shift on this till'];
             continue;
         }

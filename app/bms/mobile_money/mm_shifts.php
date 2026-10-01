@@ -61,30 +61,25 @@ if (isAdmin()) {
         ORDER BY a.agent_name, t.till_number
     ")->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $tillsStmt = $pdo->prepare("
-        SELECT DISTINCT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
+    // Grant engine: can_open_shift on a live (active agent + active till) till only.
+    $tillsForOpen = $pdo->query("
+        SELECT t.till_id, t.till_number, a.agent_name, n.network_name, n.color_hex
         FROM mm_tills t
         JOIN mm_agents a ON a.agent_id = t.agent_id
         JOIN mm_networks n ON n.network_id = t.network_id
-        JOIN mm_user_agent_grants g ON g.agent_id = t.agent_id
-            AND (g.till_id IS NULL OR g.till_id = t.till_id)
-        WHERE t.status = 'active'
-          AND g.user_id = ?
-          AND g.can_open_shift = 1
+        WHERE t.status = 'active' " . mmScopeSql('t.till_id', 'till', 'can_open_shift') . "
         ORDER BY a.agent_name, t.till_number
-    ");
-    $tillsStmt->execute([$_SESSION['user_id']]);
-    $tillsForOpen = $tillsStmt->fetchAll(PDO::FETCH_ASSOC);
+    ")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Currently busy tills (keyed by till_id)
+// Currently busy tills (keyed by till_id) — only tills this user can see
 $busyTillsRaw = $pdo->query("
     SELECT s.till_id, s.shift_code,
            CONCAT(u.first_name, ' ', u.last_name) AS teller_name,
            TIME_FORMAT(s.opened_at, '%H:%i') AS opened_time
     FROM mm_shifts s
     JOIN users u ON u.user_id = s.teller_user_id
-    WHERE s.status = 'open'
+    WHERE s.status = 'open' " . mmScopeSql('s.till_id') . "
 ")->fetchAll(PDO::FETCH_ASSOC);
 $busyTills = [];
 foreach ($busyTillsRaw as $bt) {

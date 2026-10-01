@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-09-30 — feat(mm): agent-scoped access (non-admins see only granted agents)
+
+**Plan:** `mm_agent_scope_plan.md`. Effective access for a non-admin = role permission AND `mm_user_agent_grants` grant. In an MM-only tenant a user with no grant sees only MM Dashboard (empty state), profile and personal settings.
+
+**Files:**
+- `mm_agent_scope_plan.md` — Phase 0: plan + re-scout results (query checklist, whitelist keys, baseline 153 assertions green)
+- `core/mm_scope.php` — Phase 1 (new): scope engine — `mmScopeGrantMap/mmScopeAgentIds/mmScopeTillIds/mmTillInScope/mmAgentInScope/mmScopeSql/mmHasAnyGrant/mmHasOwnOpenShift/mmGrantAllowsPage/mmRequireTill/mmDenyToDashboard`; per-request cache (`mmScopeReset()`); closed agent = no access, suspended = view only
+- `roots.php` — Phase 1: loads `core/mm_scope.php` after permissions
+- `core/mm_float_service.php` — Phase 1: `mmUserCanOnTill()` now delegates to the engine (fresh read), gaining closed/suspended rules
+- `core/permissions.php` — Phase 2: `mmGrantAllowsPage()` hook in canView/canCreate/canEdit/canDelete/canReview/canApprove/canSubmit/canReject (after the admin bypass) — nav, page gates and APIs all obey grants; `requireViewPermission()` sends grant-denied users to `mm_dashboard`; MM-only tenant: `mm_dashboard` always opens (landing page); company-level MM writes (agents, networks, grants, commission rates, commission received) admin-only
+- `tests/mm_scope_fixture.inc.php`, `tests/mm_scope_harness.php` — Phase 2 (new): shared fixture (real users/roles/agents/tills, cleaned up) + php-cgi harness that runs real pages and captures redirects (refuses to run from a web request; `tests/` also 403 via .htaccess)
+- `tests/test_mm_scope_gate_cli.php` — Phase 2 (new): 104 assertions — hook placement, persona × tenant permission matrix, nav links per persona, grant-denied pages redirect to dashboard
+- `app/bms/mobile_money/mm_dashboard.php` — Phase 3: every KPI, counter, chart, Top-5 and network query scoped to the user's granted tills/agents; no grant → empty state ("not assigned to any agent", My Settings, Close-my-open-shift if revoked mid-shift) with no company figures; "page not available" notice after a grant redirect; new **My Agents** cards (tills, open shifts, today's volume, suspended flag, View link); New Transaction / Float quick actions only when a live till allows recording; Open Shift uses the grant engine
+- `app/bms/mobile_money/mm_agent_view.php` — Phase 3: non-admins may open (read-only) an agent they are granted; till list and sub-agents scoped; otherwise back to dashboard. Admin unchanged
+- `tests/test_mm_scope_dashboard_cli.php` — Phase 3 (new): 41 assertions (admin 15,500 vs FULL 3,500 vs TILL 1,000 vs DEAD 4,000; empty state; agent view scoping)
+- `tests/test_mm_agents_admin_only_cli.php` — Phase 3: agent-view assertion updated to the new granted-read-only rule
+- Phase 4 — row-level scoping (`app/bms/mobile_money/`): `mm_transactions.php` (list + filter scoped; New Transaction form lists only tills with `can_record_transactions` on an active agent), `mm_transaction_view.php` (foreign id → dashboard; Void needs role + `can_record_transactions`), `mm_shifts.php` (open-shift tills via grant engine — closed/suspended excluded; busy list scoped), `mm_shift_report.php` (own shift or granted till only), `mm_float.php` (movements scoped; top-up/withdraw tills need `can_record_transactions`), `mm_reconciliation.php` (stats/list scoped; create/edit/cancel need `can_reconcile` per till; fixed unclosed `<tr>` tag), `mm_recon_view.php` (foreign id → dashboard; resolve/dispute need `can_reconcile`), `mm_compliance.php` (KYC + pending scoped via the transaction's till), `mm_commissions.php` (earned scoped; commission received from networks admin-only — D3), `mm_reports.php` (all 7 reports + agent filter scoped; foreign `agent_id` → dashboard; commission report hides Received/Outstanding for non-admins)
+- `tests/test_mm_scope_pages_cli.php` — Phase 4 (new): 76 assertions — every page × persona sees exactly its own tills' records
+- Phase 5 — API enforcement (`api/mobile_money/`): `save_transaction.php` and `void_transaction.php` require `can_record_transactions` on the till (was: ANY till); `save_float_movement.php` requires `can_record_transactions` (D2); `get_till_float.php` only for visible tills; `save_reconciliation.php` (create/EDIT/DELETE) and `update_reconciliation.php` require `can_reconcile`; `close_shift.php` / `batch_close_shifts.php` use new `mmUserCanCloseShift()` (D5: a teller who lost every grant on the till may still close their OWN open shift; an explicit `can_close_shift=0` still blocks). Company-level APIs (agent, till, network, commission rate, commission received) confirmed admin-only
+- `core/mm_float_service.php` — Phase 5: `mmUserCanCloseShift()`
+- `tests/test_mm_scope_api_cli.php` — Phase 5 (new): 66 assertions — forged requests per persona against own/foreign tills on every MM API; real writes on granted tills succeed; posted ledger entries cleaned up (journal_entries count restored)
+- `tests/mm_scope_fixture.inc.php` — harness now launches php-cgi as a real CGI request (no `-f`, which disabled sessions and polluted JSON); cleanup also removes ledger entries posted for fixture transactions/float moves
+- `tests/test_mm_shifts_bulk_cli.php` — batch_close assertion accepts the `mmUserCanCloseShift()` wrapper
+- `tests/test_mm_scope_edges_cli.php` — Phase 6 (new): 19 assertions — grant revoked between requests, agent closed after grant, suspended till, inconsistent grant row, duplicate grants, multi-module scoping (D1), admin unchanged. Re-scout found no MM data access outside the MM folders; report export is client-side from scoped rows. No code change needed
+- `api/mobile_money/save_transaction.php` — Phase 7 bug fix (found by the E2E test): transactions were never linked to a shift (`shift_id` always NULL), so every shift closed with a false cash/float variance equal to its whole day's activity. Now requires the teller's own open shift on that till (the UI already required a shift) and stores its `shift_id`
+- `app/bms/mobile_money/mm_transactions.php` — Phase 7: New Transaction form lists only tills where the teller has an open shift (button/hint unchanged)
+- `tests/test_mm_scope_e2e_cli.php` — Phase 7 (new): 25 assertions — full teller day via real APIs (open shift → cash-in → float top-up → close shift with correct expected cash/float → start + resolve reconciliation), each step refused on a foreign till; ledger postings balanced; everything cleaned up
+- `migrations/2026_09_29_mm_shifts_permission_legacy_db.php` — (not changed) applied locally; the `mm_shifts` permission key was missing from the local DB
+
 ## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency
 
 **Files:**

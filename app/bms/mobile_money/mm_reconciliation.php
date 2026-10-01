@@ -13,6 +13,7 @@ $stats = $pdo->query("
            SUM(status='resolved') AS resolved_count,
            SUM(status='disputed') AS disputed_count
     FROM mm_reconciliations
+    WHERE 1=1 " . mmScopeSql('till_id') . "
 ")->fetch(PDO::FETCH_ASSOC);
 
 $recons = $pdo->query("
@@ -25,17 +26,20 @@ $recons = $pdo->query("
     JOIN mm_agents a   ON a.agent_id   = t.agent_id
     JOIN mm_networks n ON n.network_id = t.network_id
     LEFT JOIN users u  ON u.user_id    = r.created_by
+    WHERE 1=1 " . mmScopeSql('r.till_id') . "
     ORDER BY r.recon_date DESC, r.created_at DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
+// New-reconciliation form: only tills this user may reconcile.
 $tills = $pdo->query("
     SELECT t.till_id, t.till_number, a.agent_name, n.network_name
     FROM mm_tills t
     JOIN mm_agents a   ON a.agent_id   = t.agent_id
     JOIN mm_networks n ON n.network_id = t.network_id
-    WHERE t.status = 'active'
+    WHERE t.status = 'active' " . mmScopeSql('t.till_id', 'till', 'can_reconcile') . "
     ORDER BY a.agent_name, t.till_number
 ")->fetchAll(PDO::FETCH_ASSOC);
+if (!$tills) $can_create = false;
 
 includeHeader();
 logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily Reconciliations');
@@ -109,8 +113,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                 </tr>
             </thead>
             <tbody>
-                <?php $sno = 1; foreach ($recons as $r): ?>
-                <tr data-id="<?= (int)$r['recon_id'] ?>" data-code="<?= htmlspecialchars($r['recon_code']) ?>" data-date="<?= htmlspecialchars($r['recon_date']) ?>" data-till="<?= htmlspecialchars($r['till_number']) ?>" data-agent="<?= htmlspecialchars($r['agent_name']) ?>" data-status="<?= htmlspecialchars($r['status']) ?>" data-notes="<?= htmlspecialchars($r['resolved_notes'] ?: '') ?>"
+                <?php $sno = 1; foreach ($recons as $r): $rowRec = mmTillInScope((int)$r['till_id'], 'can_reconcile'); ?>
+                <tr data-id="<?= (int)$r['recon_id'] ?>" data-code="<?= htmlspecialchars($r['recon_code']) ?>" data-date="<?= htmlspecialchars($r['recon_date']) ?>" data-till="<?= htmlspecialchars($r['till_number']) ?>" data-agent="<?= htmlspecialchars($r['agent_name']) ?>" data-status="<?= htmlspecialchars($r['status']) ?>" data-notes="<?= htmlspecialchars($r['resolved_notes'] ?: '') ?>" data-can-rec="<?= $rowRec ? '1' : '0' ?>">
                     <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><code><?= safe_output($r['recon_code']) ?></code></td>
                     <td><?= safe_output($r['recon_date']) ?></td>
@@ -137,11 +141,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View Reconciliations', 'Viewed MM Daily
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
                                 <li><a class="dropdown-item" href="<?= getUrl('mm_recon_view') ?>?id=<?= $r['recon_id'] ?>"><i class="bi bi-eye me-2 text-info"></i><?= t('View') ?></a></li>
                                 <?php if ($r['status'] === 'open'): ?>
-                                <?php if ($can_edit): ?>
+                                <?php if ($can_edit && $rowRec): ?>
                                 <li><hr class="dropdown-divider my-1"></li>
                                 <li><a class="dropdown-item" href="#" onclick="editRecon(<?= (int)$r['recon_id'] ?>,'<?= addslashes(htmlspecialchars($r['recon_date'])) ?>','<?= addslashes(htmlspecialchars($r['resolved_notes'] ?: '')) ?>');return false"><i class="bi bi-pencil me-2 text-warning"></i><?= t('Edit') ?></a></li>
                                 <?php endif; ?>
-                                <?php if ($can_delete): ?>
+                                <?php if ($can_delete && $rowRec): ?>
                                 <li><hr class="dropdown-divider my-1"></li>
                                 <li><a class="dropdown-item text-danger" href="#" onclick="cancelRecon(<?= (int)$r['recon_id'] ?>,'<?= addslashes(htmlspecialchars($r['recon_code'])) ?>');return false"><i class="bi bi-x-circle me-2"></i><?= t('Cancel') ?></a></li>
                                 <?php endif; ?>
@@ -326,8 +330,9 @@ function renderCards(nodes) {
         const till = $tr.data('till'), agent = $tr.data('agent'), status = $tr.data('status');
         const notes = $tr.data('notes') || '';
         const isOpen = status === 'open';
-        const canEdit = <?= json_encode((bool)$can_edit) ?>;
-        const canDelete = <?= json_encode((bool)$can_delete) ?>;
+        const canRec = $tr.data('can-rec') == 1;
+        const canEdit = <?= json_encode((bool)$can_edit) ?> && canRec;
+        const canDelete = <?= json_encode((bool)$can_delete) ?> && canRec;
         const sBadge = status === 'resolved' ? 'bg-success' : (status === 'open' ? 'bg-warning text-dark' : (status === 'disputed' ? 'bg-danger' : 'bg-secondary'));
         html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
           <div class="card-body p-3 pb-2">

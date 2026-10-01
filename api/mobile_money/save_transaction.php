@@ -59,6 +59,24 @@ try {
     $till = $till->fetch(\PDO::FETCH_ASSOC);
     if (!$till) { echo json_encode(['success' => false, 'message' => 'Till not found or inactive']); exit; }
 
+    // Agent grant: can_record_transactions on this till, agent + till active (admins bypass).
+    if (!mmUserCanOnTill($pdo, (int)$_SESSION['user_id'], $tillId, 'can_record_transactions')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not granted to record transactions on this till']);
+        exit;
+    }
+
+    // The teller's own open shift on this till — the transaction belongs to it, so the
+    // shift's expected cash/float at close includes it (the UI already requires a shift).
+    $shiftStmt = $pdo->prepare("SELECT shift_id FROM mm_shifts WHERE till_id=? AND teller_user_id=? AND status='open' ORDER BY opened_at DESC LIMIT 1");
+    $shiftStmt->execute([$tillId, (int)$_SESSION['user_id']]);
+    $shiftId = (int)$shiftStmt->fetchColumn();
+    if (!$shiftId) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Open a shift on this till before recording transactions']);
+        exit;
+    }
+
     $networkId = (int)$till['network_id'];
     $agentId   = (int)$till['agent_id'];
 
@@ -73,12 +91,12 @@ try {
         "INSERT INTO mm_transactions
             (txn_code, till_id, agent_id, network_id, txn_type, txn_date, txn_time,
              customer_phone, customer_name, reference_no, principal_amount, commission_earned,
-             cash_effect, float_effect, teller_user_id, kyc_required, notes, status, created_by, created_at)
-         VALUES (?,?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?,?,NOW())"
+             cash_effect, float_effect, teller_user_id, shift_id, kyc_required, notes, status, created_by, created_at)
+         VALUES (?,?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?,?,?,NOW())"
     )->execute([
         $txnCode, $tillId, $agentId, $networkId, $txnType, $txnDate, $txnTime,
         $customerPhone, $customerName, $networkRef, $amount, $commission,
-        $cashEffect, $floatEffect, $_SESSION['user_id'], $kycRequired, $notes, 'recorded', $_SESSION['user_id']
+        $cashEffect, $floatEffect, $_SESSION['user_id'], $shiftId, $kycRequired, $notes, 'recorded', $_SESSION['user_id']
     ]);
     $txnId = (int)$pdo->lastInsertId();
 

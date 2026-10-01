@@ -3,6 +3,8 @@
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('mm_compliance');
 
+$scopeT = mmScopeSql('t.till_id');   // KYC follows the transaction's till
+
 $stats = $pdo->query("
     SELECT COUNT(*) AS total,
            COUNT(DISTINCT customer_phone) AS unique_customers,
@@ -11,13 +13,13 @@ $stats = $pdo->query("
         SELECT t.customer_phone, k.id_type
         FROM mm_transactions t
         LEFT JOIN mm_kyc_records k ON k.mm_txn_id = t.mm_txn_id
-        WHERE t.status = 'posted'
+        WHERE t.status = 'posted' $scopeT
     ) sub
 ")->fetch(PDO::FETCH_ASSOC);
 
 $pendingCount = (int)$pdo->query("
     SELECT COUNT(*) FROM mm_transactions t
-    WHERE t.kyc_required=1 AND t.kyc_document_id IS NULL AND t.status='posted'
+    WHERE t.kyc_required=1 AND t.kyc_document_id IS NULL AND t.status='posted' $scopeT
 ")->fetchColumn();
 
 $kycRecords = $pdo->query("
@@ -30,6 +32,7 @@ $kycRecords = $pdo->query("
     JOIN mm_agents a        ON a.agent_id   = t.agent_id
     JOIN mm_networks n      ON n.network_id = t.network_id
     LEFT JOIN users u       ON u.user_id    = k.captured_by
+    WHERE 1=1 $scopeT
     ORDER BY k.captured_at DESC
     LIMIT 200
 ")->fetchAll(PDO::FETCH_ASSOC);
@@ -41,7 +44,7 @@ $pendingKyc = $pdo->query("
     FROM mm_transactions t
     JOIN mm_agents a    ON a.agent_id   = t.agent_id
     JOIN mm_networks n  ON n.network_id = t.network_id
-    WHERE t.kyc_required=1 AND t.kyc_document_id IS NULL AND t.status='posted'
+    WHERE t.kyc_required=1 AND t.kyc_document_id IS NULL AND t.status='posted' $scopeT
     ORDER BY t.txn_date DESC LIMIT 100
 ")->fetchAll(PDO::FETCH_ASSOC);
 

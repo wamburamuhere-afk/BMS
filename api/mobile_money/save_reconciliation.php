@@ -2,8 +2,19 @@
 // scope-audit: skip — MM tables are agent-scoped via mm_user_agent_grants; no project/warehouse scope here.
 require_once __DIR__ . '/../../roots.php';
 require_once ROOT_DIR . '/core/code_generator.php';
+require_once ROOT_DIR . '/core/mm_float_service.php';
 
 header('Content-Type: application/json');
+
+/** Agent grant: can_reconcile on this till (admins bypass) — else 403 + exit. */
+function mmReconRequireGrant(PDO $pdo, int $tillId): void
+{
+    if (!mmUserCanOnTill($pdo, (int)$_SESSION['user_id'], $tillId, 'can_reconcile')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not granted to reconcile this till']);
+        exit;
+    }
+}
 
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
@@ -17,10 +28,11 @@ if ($method === 'DELETE') {
     if (!canDelete('mm_reconciliation')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
     $id = intval($_POST['recon_id'] ?? 0);
     if (!$id) { echo json_encode(['success' => false, 'message' => 'Invalid ID']); exit; }
-    $rec = $pdo->prepare("SELECT recon_code, status FROM mm_reconciliations WHERE recon_id=?");
+    $rec = $pdo->prepare("SELECT recon_code, status, till_id FROM mm_reconciliations WHERE recon_id=?");
     $rec->execute([$id]);
     $rec = $rec->fetch(PDO::FETCH_ASSOC);
     if (!$rec) { echo json_encode(['success' => false, 'message' => 'Reconciliation not found']); exit; }
+    mmReconRequireGrant($pdo, (int)$rec['till_id']);
     if ($rec['status'] !== 'open') { echo json_encode(['success' => false, 'message' => 'Only open reconciliations can be cancelled']); exit; }
     try {
         $pdo->prepare("UPDATE mm_reconciliations SET status='closed', closed_at=NOW(), closed_by=? WHERE recon_id=?")->execute([$_SESSION['user_id'], $id]);
@@ -41,10 +53,11 @@ if ($method === 'EDIT') {
     $reconDate = trim($_POST['recon_date'] ?? '');
     $notes     = trim($_POST['notes'] ?? '');
     if (!$id || !$reconDate) { echo json_encode(['success' => false, 'message' => 'ID and date are required']); exit; }
-    $rec = $pdo->prepare("SELECT recon_code, status FROM mm_reconciliations WHERE recon_id=?");
+    $rec = $pdo->prepare("SELECT recon_code, status, till_id FROM mm_reconciliations WHERE recon_id=?");
     $rec->execute([$id]);
     $rec = $rec->fetch(PDO::FETCH_ASSOC);
     if (!$rec) { echo json_encode(['success' => false, 'message' => 'Reconciliation not found']); exit; }
+    mmReconRequireGrant($pdo, (int)$rec['till_id']);
     if ($rec['status'] !== 'open') { echo json_encode(['success' => false, 'message' => 'Only open reconciliations can be edited']); exit; }
     try {
         $pdo->prepare("UPDATE mm_reconciliations SET recon_date=?, resolved_notes=? WHERE recon_id=?")->execute([$reconDate, $notes ?: null, $id]);
@@ -72,6 +85,7 @@ $till = $pdo->prepare("SELECT * FROM mm_tills WHERE till_id=? AND status='active
 $till->execute([$tillId]);
 $till = $till->fetch(PDO::FETCH_ASSOC);
 if (!$till) { echo json_encode(['success' => false, 'message' => 'Invalid or inactive till.']); exit; }
+mmReconRequireGrant($pdo, $tillId);
 
 // Check for duplicate recon on same till+date
 $existing = $pdo->prepare("SELECT recon_id FROM mm_reconciliations WHERE till_id=? AND recon_date=? LIMIT 1");

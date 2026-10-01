@@ -4,9 +4,17 @@ ob_start();
 $page_title = 'Transaction View';
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('mm_transactions');
-includeHeader();
 
 $id = intval($_GET['id'] ?? 0);
+// Non-admin: only transactions on a till they are granted.
+if ($id && !isAdmin()) {
+    $own = $pdo->prepare("SELECT till_id FROM mm_transactions WHERE mm_txn_id = ?");
+    $own->execute([$id]);
+    $ownTill = $own->fetchColumn();
+    if ($ownTill === false || !mmTillInScope((int)$ownTill)) mmDenyToDashboard();
+}
+includeHeader();
+
 if (!$id) { echo '<div class="alert alert-danger m-4">' . t('Invalid transaction ID.') . '</div>'; includeFooter(); exit; }
 
 $tx = $pdo->prepare("
@@ -31,7 +39,8 @@ $txnLabels = [
 ];
 
 $page_title = 'MM Txn: ' . $tx['txn_code'];
-$can_void = canDelete('mm_transactions') && $tx['status'] === 'posted';
+$can_void = canDelete('mm_transactions') && $tx['status'] === 'posted'
+    && mmTillInScope((int)$tx['till_id'], 'can_record_transactions');
 
 logActivity($pdo, $_SESSION['user_id'], 'View MM Transaction', 'Viewed: ' . $tx['txn_code']);
 ?>
