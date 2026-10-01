@@ -29,6 +29,16 @@
 - `tests/test_mm_scope_e2e_cli.php` — Phase 7 (new): 25 assertions — full teller day via real APIs (open shift → cash-in → float top-up → close shift with correct expected cash/float → start + resolve reconciliation), each step refused on a foreign till; ledger postings balanced; everything cleaned up
 - `migrations/2026_09_29_mm_shifts_permission_legacy_db.php` — (not changed) applied locally; the `mm_shifts` permission key was missing from the local DB
 
+## 2026-10-01 — fix(mm): scope open/close shifts by granted tills; quick actions open forms directly; remove My Agents cards
+
+**Files:**
+- `app/bms/mobile_money/mm_dashboard.php` — (1) "My active shifts" now queries all open shifts on the user's granted tills (not just shifts the user personally opened); `$hasAnyGrantedTill` added so the disabled Open Shift button shows "Till already has an open shift" vs "No tills assigned" correctly; D5 fallback: if scoped query is empty, show own open shifts so a revoked teller can still close. (2) Quick Action links updated to `?action=` params (New Transaction → `mm_transactions.php?action=new`, Close Shift → `mm_shifts.php?action=close`, Float Top-up → `mm_float.php?action=add`). (3) My Agents summary cards removed (clutter; analytics chart kept).
+- `app/bms/mobile_money/mm_shifts.php` — Open-shift list and close-shift list scoped by granted tills (was: `teller_user_id`); main history list also scoped; `?action=close` auto-opens close modal.
+- `app/bms/mobile_money/mm_transactions.php` — `?action=new` auto-opens New Transaction modal when teller has an active shift.
+- `app/bms/mobile_money/mm_float.php` — `?action=add` auto-opens Float Top-up modal.
+- `tests/test_mm_scope_pages_cli.php` — DEAD persona assertions tightened: checks Open Shift button absent instead of till number absent from whole page.
+- `tests/test_mm_scope_dashboard_cli.php` — Removed 2 stale assertions for removed My Agents cards; 39 assertions green.
+
 ## 2026-09-30 — fix(pos): process_sale discounts ignored + quick_restock idempotency
 
 **Files:**
