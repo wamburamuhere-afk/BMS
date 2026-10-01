@@ -109,13 +109,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
                                 <span class="d-inline-block me-2" style="width:12px;height:12px;border-radius:50%;background:<?= htmlspecialchars($n['color_hex'] ?: '#999') ?>"></span>
-                                <strong><?= safe_output($n['network_name']) ?></strong>
-                                <?php if ($n['provider']): ?><small class="text-muted ms-1">(<?= safe_output($n['provider']) ?>)</small><?php endif; ?>
+                                <strong><?= caseFormat($n['network_name']) ?></strong>
+                                <?php if ($n['provider']): ?><small class="text-muted ms-1">(<?= caseFormat($n['provider']) ?>)</small><?php endif; ?>
                             </td>
                             <td><code><?= safe_output($n['network_code']) ?></code></td>
                             <td><?= safe_output($n['short_code']) ?></td>
-                            <td class="small text-muted"><?= $n['float_code'] ? safe_output($n['float_code'].' — '.$n['float_name']) : '<span class="text-warning">Not set</span>' ?></td>
-                            <td class="small text-muted"><?= $n['comm_code'] ? safe_output($n['comm_code'].' — '.$n['comm_name']) : '<span class="text-warning">Not set</span>' ?></td>
+                            <td class="small text-muted"><?= $n['float_code'] ? safe_output($n['float_code']).' — '.caseFormat($n['float_name']) : '<span class="text-warning">Not set</span>' ?></td>
+                            <td class="small text-muted"><?= $n['comm_code'] ? safe_output($n['comm_code']).' — '.caseFormat($n['comm_name']) : '<span class="text-warning">Not set</span>' ?></td>
                             <td class="text-center"><span class="badge bg-secondary"><?= (int)$n['agent_count'] ?></span></td>
                             <td>
                                 <span class="badge <?= $n['status'] === 'active' ? 'bg-success' : 'bg-secondary' ?>">
@@ -193,7 +193,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <select class="form-select select2-static" name="float_account_id">
                                 <option value=""></option>
                                 <?php foreach ($assetAccounts as $a): ?>
-                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code'].' — '.$a['account_name']) ?></option>
+                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code']) ?> — <?= caseFormat($a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -202,7 +202,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <select class="form-select select2-static" name="commission_account_id">
                                 <option value=""></option>
                                 <?php foreach ($incomeAccounts as $a): ?>
-                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code'].' — '.$a['account_name']) ?></option>
+                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code']) ?> — <?= caseFormat($a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -269,7 +269,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <select class="form-select select2-static" name="float_account_id" id="edit_float_account">
                                 <option value=""></option>
                                 <?php foreach ($assetAccounts as $a): ?>
-                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code'].' — '.$a['account_name']) ?></option>
+                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code']) ?> — <?= caseFormat($a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -278,7 +278,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Networks', 'Viewed Mobile Money
                             <select class="form-select select2-static" name="commission_account_id" id="edit_comm_account">
                                 <option value=""></option>
                                 <?php foreach ($incomeAccounts as $a): ?>
-                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code'].' — '.$a['account_name']) ?></option>
+                                <option value="<?= $a['account_id'] ?>"><?= safe_output($a['account_code']) ?> — <?= caseFormat($a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

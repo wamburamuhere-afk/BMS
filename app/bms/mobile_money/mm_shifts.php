@@ -154,7 +154,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
         <span><i class="bi bi-play-circle-fill me-1"></i><strong><?= t('Active Shifts:') ?></strong></span>
         <?php foreach ($myOpenShifts as $sh): ?>
         <span class="badge bg-white text-success border border-success" style="font-size:.82rem">
-            <?= safe_output($sh['shift_code']) ?> · <?= safe_output($sh['agent_name'] . ' / ' . $sh['till_number']) ?>
+            <?= safe_output($sh['shift_code']) ?> · <?= caseFormat($sh['agent_name'] . ' / ' . $sh['till_number']) ?>
         </span>
         <?php endforeach; ?>
     </div>
@@ -264,9 +264,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                                 <td><code class="small"><?= safe_output($sh['shift_code']) ?></code></td>
                                 <td class="small">
                                     <span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:<?= htmlspecialchars($sh['color_hex'] ?: '#999') ?>"></span>
-                                    <?= safe_output($sh['agent_name']) ?> / <?= safe_output($sh['till_number']) ?>
+                                    <?= caseFormat($sh['agent_name']) ?> / <?= safe_output($sh['till_number']) ?>
                                 </td>
-                                <td class="small"><?= safe_output($sh['teller_name'] ?: '—') ?></td>
+                                <td class="small"><?= caseFormat($sh['teller_name'] ?: '—') ?></td>
                                 <td class="small"><?= date('d M H:i', strtotime($sh['opened_at'])) ?></td>
                                 <td class="small"><?= $sh['closed_at'] ? date('d M H:i', strtotime($sh['closed_at'])) : '—' ?></td>
                                 <td class="text-end"><?= (int)$sh['txn_count'] ?></td>
@@ -351,11 +351,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                                     </td>
                                     <td>
                                         <span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:<?= htmlspecialchars($t['color_hex'] ?: '#999') ?>"></span>
-                                        <strong><?= safe_output($t['agent_name'] . ' / ' . $t['till_number']) ?></strong>
-                                        <small class="text-muted ms-1"><?= safe_output($t['network_name']) ?></small>
+                                        <strong><?= caseFormat($t['agent_name'] . ' / ' . $t['till_number']) ?></strong>
+                                        <small class="text-muted ms-1"><?= caseFormat($t['network_name']) ?></small>
                                         <?php if ($busy): ?>
                                         <span class="badge bg-warning text-dark ms-1" style="font-size:.72rem">
-                                            <?= t('Open') ?> · <?= safe_output($busy['teller_name']) ?> <?= t('since') ?> <?= $busy['opened_time'] ?>
+                                            <?= t('Open') ?> · <?= caseFormat($busy['teller_name']) ?> <?= t('since') ?> <?= $busy['opened_time'] ?>
                                         </span>
                                         <?php endif; ?>
                                     </td>
@@ -428,8 +428,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shifts', 'Viewed shifts list');
                                 <?php foreach ($allOpenForClose as $sh): ?>
                                 <tr data-shift-id="<?= (int)$sh['shift_id'] ?>">
                                     <td><code class="small"><?= safe_output($sh['shift_code']) ?></code></td>
-                                    <td class="small"><?= safe_output($sh['agent_name'] . ' / ' . $sh['till_number']) ?></td>
-                                    <td class="small"><?= safe_output($sh['teller_name'] ?: '—') ?></td>
+                                    <td class="small"><?= caseFormat($sh['agent_name'] . ' / ' . $sh['till_number']) ?></td>
+                                    <td class="small"><?= caseFormat($sh['teller_name'] ?: '—') ?></td>
                                     <td class="small"><?= date('d M H:i', strtotime($sh['opened_at'])) ?></td>
                                     <td>
                                         <input type="number"

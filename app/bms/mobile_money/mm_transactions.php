@@ -93,7 +93,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
     <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
         <span><i class="bi bi-play-circle-fill me-2"></i>
         <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
-        &nbsp;·&nbsp; <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
+        &nbsp;·&nbsp; <?= caseFormat($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
         &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
         </span>
         <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
@@ -143,7 +143,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
             <select name="network_id" class="form-select form-select-sm">
                 <option value=""><?= t('All Networks') ?></option>
                 <?php foreach ($networks as $n): ?>
-                <option value="<?= $n['network_id'] ?>" <?= $filterNet == $n['network_id'] ? 'selected' : '' ?>><?= safe_output($n['network_name']) ?></option>
+                <option value="<?= $n['network_id'] ?>" <?= $filterNet == $n['network_id'] ? 'selected' : '' ?>><?= caseFormat($n['network_name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -159,7 +159,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
             <select name="till_id" class="form-select form-select-sm">
                 <option value=""><?= t('All Tills') ?></option>
                 <?php foreach ($tills as $t): ?>
-                <option value="<?= $t['till_id'] ?>" <?= $filterTill == $t['till_id'] ? 'selected' : '' ?>><?= safe_output($t['agent_name'].' / '.$t['till_number']) ?></option>
+                <option value="<?= $t['till_id'] ?>" <?= $filterTill == $t['till_id'] ? 'selected' : '' ?>><?= caseFormat($t['agent_name'].' / '.$t['till_number']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -206,26 +206,26 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
                         </thead>
                         <tbody>
                             <?php $sno = 1; foreach ($txns as $tx): ?>
-                            <tr data-id="<?= (int)$tx['mm_txn_id'] ?>" data-code="<?= htmlspecialchars($tx['txn_code']) ?>" data-date="<?= htmlspecialchars($tx['txn_date']) ?>" data-network="<?= htmlspecialchars($tx['network_name']) ?>" data-type="<?= htmlspecialchars($txnLabels[$tx['txn_type']] ?? $tx['txn_type']) ?>" data-outlet="<?= htmlspecialchars($tx['agent_name'].' / '.$tx['till_number']) ?>" data-amount="<?= number_format((float)$tx['principal_amount']) ?>" data-commission="<?= $tx['commission_earned'] > 0 ? number_format((float)$tx['commission_earned']) : '—' ?>" data-status="<?= htmlspecialchars($tx['status']) ?>">
+                            <tr data-id="<?= (int)$tx['mm_txn_id'] ?>" data-code="<?= htmlspecialchars($tx['txn_code']) ?>" data-date="<?= htmlspecialchars($tx['txn_date']) ?>" data-network="<?= caseFormat($tx['network_name']) ?>" data-type="<?= htmlspecialchars($txnLabels[$tx['txn_type']] ?? $tx['txn_type']) ?>" data-outlet="<?= caseFormat($tx['agent_name'].' / '.$tx['till_number']) ?>" data-amount="<?= number_format((float)$tx['principal_amount']) ?>" data-commission="<?= $tx['commission_earned'] > 0 ? number_format((float)$tx['commission_earned']) : '—' ?>" data-status="<?= htmlspecialchars($tx['status']) ?>">
                                 <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code class="small"><?= safe_output($tx['txn_code']) ?></code></td>
                                 <td class="small"><?= safe_output($tx['txn_date']) ?></td>
                                 <td>
                                     <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($tx['color_hex'] ?: '#999') ?>"></span>
-                                    <span class="small"><?= safe_output($tx['network_name']) ?></span>
+                                    <span class="small"><?= caseFormat($tx['network_name']) ?></span>
                                 </td>
                                 <td>
                                     <span class="badge <?= in_array($tx['txn_type'], ['cash_in','bank_to_wallet']) ? 'bg-success' : (in_array($tx['txn_type'], ['cash_out','wallet_to_bank']) ? 'bg-warning text-dark' : 'bg-info text-dark') ?>" style="font-size:.72rem">
                                         <?= t($txnLabels[$tx['txn_type']] ?? $tx['txn_type']) ?>
                                     </span>
                                 </td>
-                                <td class="small"><?= safe_output($tx['agent_name'].' / '.$tx['till_number']) ?></td>
+                                <td class="small"><?= caseFormat($tx['agent_name'].' / '.$tx['till_number']) ?></td>
                                 <td class="text-end fw-semibold"><?= number_format((float)$tx['principal_amount']) ?></td>
                                 <td class="text-end <?= $tx['commission_earned'] > 0 ? 'text-success' : 'text-muted' ?>">
                                     <?= $tx['commission_earned'] > 0 ? number_format((float)$tx['commission_earned']) : '—' ?>
                                 </td>
                                 <td class="small text-muted">
-                                    <?= $tx['customer_name'] ? safe_output($tx['customer_name']) : ($tx['customer_phone'] ? safe_output($tx['customer_phone']) : '—') ?>
+                                    <?= $tx['customer_name'] ? caseFormat($tx['customer_name']) : ($tx['customer_phone'] ? safe_output($tx['customer_phone']) : '—') ?>
                                     <?php if ($tx['kyc_required']): ?><span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">KYC</span><?php endif; ?>
                                 </td>
                                 <td>
@@ -264,7 +264,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
                             <select class="form-select select2-static" name="till_id" id="txn_till" required>
                                 <option value=""></option>
                                 <?php foreach ($recordTills as $t): ?>
-                                <option value="<?= $t['till_id'] ?>"><?= safe_output($t['agent_name'].' / '.$t['till_number']) ?></option>
+                                <option value="<?= $t['till_id'] ?>"><?= caseFormat($t['agent_name'].' / '.$t['till_number']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

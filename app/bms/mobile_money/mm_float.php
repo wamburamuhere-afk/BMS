@@ -112,7 +112,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
     <div class="alert alert-success d-flex justify-content-between align-items-center py-2 mb-3" style="border-radius:8px">
         <span><i class="bi bi-play-circle-fill me-2"></i>
         <strong><?= t('Active Shift') ?>:</strong> <?= safe_output($myActiveShift['shift_code']) ?>
-        &nbsp;·&nbsp; <?= safe_output($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
+        &nbsp;·&nbsp; <?= caseFormat($myActiveShift['agent_name'].' / '.$myActiveShift['till_number']) ?>
         &nbsp;·&nbsp; <?= t('Started') ?>: <?= date('H:i', strtotime($myActiveShift['opened_at'])) ?>
         </span>
         <a href="<?= getUrl('mm_shifts') ?>" class="btn btn-sm btn-outline-success ms-2"><?= t('Shifts') ?> <i class="bi bi-arrow-right ms-1"></i></a>
@@ -162,7 +162,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
             <select name="till_id" class="form-select form-select-sm">
                 <option value=""><?= t('All Tills') ?></option>
                 <?php foreach ($tills as $t): ?>
-                <option value="<?= $t['till_id'] ?>" <?= $filterTill == $t['till_id'] ? 'selected' : '' ?>><?= safe_output($t['agent_name'].' / '.$t['till_number']) ?></option>
+                <option value="<?= $t['till_id'] ?>" <?= $filterTill == $t['till_id'] ? 'selected' : '' ?>><?= caseFormat($t['agent_name'].' / '.$t['till_number']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -214,13 +214,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                         </thead>
                         <tbody>
                             <?php $sno = 1; foreach ($movements as $m): ?>
-                            <tr data-id="<?= (int)$m['movement_id'] ?>" data-code="<?= htmlspecialchars($m['movement_code']) ?>" data-date="<?= htmlspecialchars($m['movement_date']) ?>" data-outlet="<?= htmlspecialchars($m['agent_name'].' / '.$m['till_number']) ?>" data-type="<?= htmlspecialchars($movLabels[$m['movement_type']] ?? $m['movement_type']) ?>" data-amount="<?= number_format((float)$m['amount']) ?>" data-status="<?= htmlspecialchars($m['status']) ?>">
+                            <tr data-id="<?= (int)$m['movement_id'] ?>" data-code="<?= htmlspecialchars($m['movement_code']) ?>" data-date="<?= htmlspecialchars($m['movement_date']) ?>" data-outlet="<?= caseFormat($m['agent_name'].' / '.$m['till_number']) ?>" data-type="<?= htmlspecialchars($movLabels[$m['movement_type']] ?? $m['movement_type']) ?>" data-amount="<?= number_format((float)$m['amount']) ?>" data-status="<?= htmlspecialchars($m['status']) ?>">
                                 <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code class="small"><?= safe_output($m['movement_code']) ?></code></td>
                                 <td class="small"><?= safe_output($m['movement_date']) ?></td>
                                 <td class="small">
                                     <span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:<?= htmlspecialchars($m['color_hex'] ?: '#999') ?>"></span>
-                                    <?= safe_output($m['agent_name']) ?> / <?= safe_output($m['till_number']) ?>
+                                    <?= caseFormat($m['agent_name']) ?> / <?= safe_output($m['till_number']) ?>
                                 </td>
                                 <td>
                                     <span class="badge <?= $m['movement_type']==='float_topup'?'bg-success':($m['movement_type']==='float_withdrawal'?'bg-warning text-dark':'bg-info text-dark') ?>">
@@ -264,7 +264,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                             <select class="form-select select2-static" id="topup-agent-sel">
                                 <option value=""></option>
                                 <?php foreach ($agentList as $aid => $aname): ?>
-                                <option value="<?= $aid ?>"><?= safe_output($aname) ?></option>
+                                <option value="<?= $aid ?>"><?= caseFormat($aname) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -310,7 +310,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Float', 'Viewed float movements
                             <select class="form-select select2-static" id="withdraw-agent-sel">
                                 <option value=""></option>
                                 <?php foreach ($agentList as $aid => $aname): ?>
-                                <option value="<?= $aid ?>"><?= safe_output($aname) ?></option>
+                                <option value="<?= $aid ?>"><?= caseFormat($aname) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
