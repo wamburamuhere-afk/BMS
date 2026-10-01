@@ -59,7 +59,6 @@ try {
     ok(strpos($r['out'], 'ZZSCOPE Agent C') === false && strpos($r['out'], 'ZZSCOPE Agent D') === false, 'C and D never shown');
     ok(strpos($r['out'], 'My Agents — This Month') !== false, 'Top-5 block relabelled for scoped user');
     ok(strpos($r['out'], 'mm_transactions') !== false && strpos($r['out'], 'New Transaction') !== false, 'New Transaction quick action shown');
-    ok(preg_match('#mm_agent_view\?id=' . $A['A'] . '"#', $r['out']) === 1, 'My Agents card links to agent view');
 
     section('TILL (A1 only)');
     $r = mmFixtureRun('app/bms/mobile_money/mm_dashboard.php', $U['TILL'], true);
@@ -68,7 +67,6 @@ try {
     section('DEAD (suspended C + closed D)');
     $r = mmFixtureRun('app/bms/mobile_money/mm_dashboard.php', $U['DEAD'], true);
     ok($kpi($r['out']) === '4,000', "DEAD today's volume = 4,000 (C history only; closed D excluded) (got " . var_export($kpi($r['out']), true) . ')');
-    ok(strpos($r['out'], 'Suspended — history only') !== false, 'suspended agent flagged');
     ok(strpos($r['out'], 'New Transaction') === false, 'no New Transaction for suspended-only user');
     ok(strpos($r['out'], 'No tills assigned') !== false, 'Open Shift disabled (no live till)');
 

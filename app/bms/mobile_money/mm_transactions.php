@@ -396,6 +396,9 @@ function renderCards(nodes) {
     });
     $('#cardView').html(html);
 }
+<?php if (($_GET['action'] ?? '') === 'new' && $can_create && !empty($myActiveShift)): ?>
+new bootstrap.Modal(document.getElementById('newTxnModal')).show();
+<?php endif; ?>
 </script>
 
 <?php includeFooter(); ?>

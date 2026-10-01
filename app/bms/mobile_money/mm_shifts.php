@@ -538,6 +538,10 @@ $(document).ready(function () {
     <?php if (($_GET['action'] ?? '') === 'open' && $can_open && $freeTillCount > 0): ?>
     new bootstrap.Modal(document.getElementById('openShiftModal')).show();
     <?php endif; ?>
+    // ── Auto-open Close Shift modal from dashboard link ────────────────────────
+    <?php if (($_GET['action'] ?? '') === 'close' && $can_close && count($allOpenForClose) > 0): ?>
+    new bootstrap.Modal(document.getElementById('closeAllShiftsModal')).show();
+    <?php endif; ?>
 
     // ── Open Shift Modal: auto-fetch expected float per till ───────────────────
     $('#openShiftModal').on('shown.bs.modal', function () {
