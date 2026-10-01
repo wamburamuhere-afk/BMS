@@ -124,12 +124,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View Compliance/KYC', 'Viewed MM KYC Re
                             <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td><code><?= safe_output($r['txn_code']) ?></code></td>
                             <td><?= safe_output($r['txn_date']) ?></td>
-                            <td><?= safe_output($r['customer_name'] ?? '—') ?></td>
+                            <td><?= caseFormat($r['customer_name'] ?? null) ?></td>
                             <td><?= safe_output($r['customer_phone']) ?></td>
                             <td><span class="badge bg-info"><?= safe_output($idTypes[$r['id_type']] ?? $r['id_type']) ?></span></td>
                             <td><code><?= safe_output($r['id_number']) ?></code></td>
-                            <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span></td>
-                            <td><?= safe_output($r['agent_name']) ?></td>
+                            <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
+                            <td><?= caseFormat($r['agent_name']) ?></td>
                             <td class="text-center"><?= number_format((float)$r['principal_amount']) ?></td>
                         </tr>
                         <?php endforeach; ?>
@@ -167,12 +167,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View Compliance/KYC', 'Viewed MM KYC Re
                             <td class="text-center text-muted small"><?= $sno2++ ?></td>
                             <td><code><?= safe_output($r['txn_code']) ?></code></td>
                             <td><?= safe_output($r['txn_date']) ?></td>
-                            <td><?= safe_output(ucwords(str_replace('_',' ',$r['txn_type']))) ?></td>
+                            <td><?= caseFormat(str_replace('_',' ',$r['txn_type'])) ?></td>
                             <td><?= safe_output($r['customer_phone'] ?? '—') ?></td>
-                            <td><?= safe_output($r['customer_name'] ?? '—') ?></td>
+                            <td><?= caseFormat($r['customer_name'] ?? null) ?></td>
                             <td class="text-center"><?= number_format((float)$r['principal_amount']) ?></td>
-                            <td><?= safe_output($r['agent_name']) ?></td>
-                            <td><?= safe_output($r['network_name']) ?></td>
+                            <td><?= caseFormat($r['agent_name']) ?></td>
+                            <td><?= caseFormat($r['network_name']) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

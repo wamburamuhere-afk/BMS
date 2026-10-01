@@ -104,12 +104,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                             <tr data-id="<?= (int)$a['agent_id'] ?>" data-name="<?= htmlspecialchars($a['agent_name']) ?>" data-code="<?= htmlspecialchars($a['agent_code'] ?: '') ?>" data-outlet-type="<?= htmlspecialchars($a['outlet_type'] ?: '') ?>" data-phone="<?= htmlspecialchars($a['phone_primary'] ?: '') ?>" data-region="<?= htmlspecialchars($a['region'] ?: '') ?>" data-district="<?= htmlspecialchars($a['district'] ?: '') ?>" data-street="<?= htmlspecialchars($a['street'] ?: '') ?>" data-bot-license="<?= htmlspecialchars($a['bot_license'] ?: '') ?>" data-status="<?= htmlspecialchars($a['status']) ?>" data-networks="<?= htmlspecialchars($a['networks_str'] ?: '—') ?>" data-can-edit="<?= $can_edit ? '1' : '0' ?>" data-can-delete="<?= $can_delete ? '1' : '0' ?>">
                                 <td class="text-center text-muted small"><?= $sno++ ?></td>
                                 <td><code><?= safe_output($a['agent_code']) ?></code></td>
-                                <td class="fw-semibold"><?= safe_output($a['agent_name']) ?></td>
+                                <td class="fw-semibold"><?= caseFormat($a['agent_name']) ?></td>
                                 <td><span class="badge bg-light text-dark"><?= ucfirst(str_replace('_', ' ', $a['outlet_type'])) ?></span></td>
-                                <td class="small text-muted"><?= safe_output($a['networks_str'] ?: '—') ?></td>
+                                <td class="small text-muted"><?= caseFormat($a['networks_str'] ?: null) ?></td>
                                 <td><?= safe_output($a['phone_primary'] ?: '—') ?></td>
-                                <td class="small text-muted"><?= safe_output(implode(', ', array_filter([$a['region'], $a['district']])) ?: '—') ?></td>
-                                <td class="text-muted small"><?= $a['parent_name'] ? safe_output($a['parent_name']) : '—' ?></td>
+                                <td class="small text-muted"><?= caseFormat(implode(', ', array_filter([$a['region'], $a['district']])) ?: null) ?></td>
+                                <td class="text-muted small"><?= $a['parent_name'] ? caseFormat($a['parent_name']) : '—' ?></td>
                                 <td class="text-center"><span class="badge bg-secondary"><?= (int)$a['till_count'] ?></span></td>
                                 <td>
                                     <span class="badge <?= $a['status']==='active'?'bg-success':($a['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>">
@@ -197,7 +197,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agents', 'Viewed Mobile Money a
                             <select class="form-select select2-static" name="parent_agent_id">
                                 <option value=""></option>
                                 <?php foreach ($parentAgents as $p): ?>
-                                <option value="<?= $p['agent_id'] ?>"><?= safe_output($p['agent_code'].' — '.$p['agent_name']) ?></option>
+                                <option value="<?= $p['agent_id'] ?>"><?= safe_output($p['agent_code']) ?> — <?= caseFormat($p['agent_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

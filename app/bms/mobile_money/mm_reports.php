@@ -208,7 +208,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <select class="form-select form-select-sm" name="network_id">
                     <option value=""><?= t('All Networks') ?></option>
                     <?php foreach ($networks as $n): ?>
-                    <option value="<?= $n['network_id'] ?>" <?= $networkId === (int)$n['network_id'] ? 'selected' : '' ?>><?= safe_output($n['network_name']) ?></option>
+                    <option value="<?= $n['network_id'] ?>" <?= $networkId === (int)$n['network_id'] ? 'selected' : '' ?>><?= caseFormat($n['network_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -217,7 +217,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <select class="form-select form-select-sm" name="agent_id">
                     <option value=""><?= t('All Agents') ?></option>
                     <?php foreach ($agents as $ag): ?>
-                    <option value="<?= $ag['agent_id'] ?>" <?= $agentId === (int)$ag['agent_id'] ? 'selected' : '' ?>><?= safe_output($ag['agent_name']) ?></option>
+                    <option value="<?= $ag['agent_id'] ?>" <?= $agentId === (int)$ag['agent_id'] ? 'selected' : '' ?>><?= caseFormat($ag['agent_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -249,7 +249,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <?php $totV=0; $totF=0; $totC=0; $totN=0;
                       foreach ($reportData as $r): $totV+=$r['volume']; $totF+=$r['fees']; $totC+=$r['commission']; $totN+=$r['cnt']; ?>
                 <tr>
-                    <td><?= safe_output(ucwords(str_replace('_',' ',$r['txn_type']))) ?></td>
+                    <td><?= caseFormat(str_replace('_',' ',$r['txn_type'])) ?></td>
                     <td class="text-end"><?= number_format((int)$r['cnt']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['volume']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['fees']) ?></td>
@@ -264,9 +264,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
-                    <td><?= safe_output($r['agent_name']) ?></td>
+                    <td><?= caseFormat($r['agent_name']) ?></td>
                     <td><?= safe_output($r['till_number']) ?></td>
-                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span></td>
+                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
                     <td class="text-end"><?= $r['float_balance'] !== null ? number_format((float)$r['float_balance']) : '—' ?></td>
                     <td class="text-end"><?= $r['cash_balance'] !== null ? number_format((float)$r['cash_balance']) : '—' ?></td>
                     <td><?= $r['snapshot_at'] ? safe_output($r['snapshot_at']) : '<span class="text-muted">No snapshot</span>' ?></td>
@@ -281,7 +281,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                       foreach ($reportData as $r): $totE+=$r['earned']; $totR+=$r['received'];
                           $outstanding = max(0, (float)$r['earned'] - (float)$r['received']); ?>
                 <tr>
-                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span></td>
+                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
                     <td class="text-end"><?= number_format((float)$r['earned']) ?></td>
                     <?php if ($showReceived): ?>
                     <td class="text-end"><?= number_format((float)$r['received']) ?></td>
@@ -298,8 +298,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <?php foreach ($reportData as $r): ?>
                 <tr>
                     <td><code><?= safe_output($r['agent_code']) ?></code></td>
-                    <td><?= safe_output($r['agent_name']) ?></td>
-                    <td><?= safe_output($r['region'] ?? '—') ?></td>
+                    <td><?= caseFormat($r['agent_name']) ?></td>
+                    <td><?= caseFormat($r['region'] ?? null) ?></td>
                     <td class="text-end"><?= number_format((int)$r['txn_count']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['volume']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['commission']) ?></td>
@@ -315,8 +315,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <tr>
                     <td><code><?= safe_output($r['shift_code']) ?></code></td>
                     <td><?= safe_output($r['till_number']) ?></td>
-                    <td><?= safe_output($r['agent_name']) ?></td>
-                    <td><?= safe_output($r['teller_name'] ?? '—') ?></td>
+                    <td><?= caseFormat($r['agent_name']) ?></td>
+                    <td><?= caseFormat($r['teller_name'] ?? null) ?></td>
                     <td><?= safe_output(substr($r['opened_at'],0,16)) ?></td>
                     <td><?= $r['closed_at'] ? safe_output(substr($r['closed_at'],0,16)) : '<span class="badge bg-warning">Open</span>' ?></td>
                     <td class="text-end <?= ($r['cash_variance'] ?? 0) != 0 ? 'text-danger' : '' ?>"><?= $r['cash_variance'] !== null ? number_format((float)$r['cash_variance']) : '—' ?></td>
@@ -333,15 +333,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <tr>
                     <td><code><?= safe_output($r['txn_code']) ?></code></td>
                     <td><?= safe_output($r['txn_date']) ?></td>
-                    <td><?= safe_output(ucwords(str_replace('_',' ',$r['txn_type']))) ?></td>
-                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span></td>
-                    <td><?= safe_output($r['agent_name']) ?></td>
+                    <td><?= caseFormat(str_replace('_',' ',$r['txn_type'])) ?></td>
+                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
+                    <td><?= caseFormat($r['agent_name']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['principal_amount']) ?></td>
                     <td>
                         <?php if ($r['suspicious_flag']): ?><span class="badge bg-warning me-1"><?= t('Suspicious') ?></span><?php endif; ?>
                         <?php if ($r['status']==='void'): ?><span class="badge bg-danger"><?= t('Void') ?></span><?php endif; ?>
                     </td>
-                    <td><?= safe_output($r['void_reason'] ?? '—', '—') ?></td>
+                    <td><?= caseFormat($r['void_reason'] ?? null) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -352,7 +352,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                 <?php $totV=0; $totC=0; $totN=0;
                       foreach ($reportData as $r): $totV+=$r['volume']; $totC+=$r['commission']; $totN+=$r['txn_count']; ?>
                 <tr>
-                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= safe_output($r['network_name']) ?></span></td>
+                    <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
                     <td class="text-end"><?= number_format((int)$r['txn_count']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['volume']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['commission']) ?></td>

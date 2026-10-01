@@ -71,7 +71,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transaction', 'Viewed: ' . $tx[
                         <dt class="col-sm-5 text-muted small"><?= t('Network') ?></dt>
                         <dd class="col-sm-7 small">
                             <span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($tx['color_hex'] ?: '#999') ?>"></span>
-                            <?= safe_output($tx['network_name']) ?>
+                            <?= caseFormat($tx['network_name']) ?>
                         </dd>
                         <dt class="col-sm-5 text-muted small"><?= t('Type') ?></dt>
                         <dd class="col-sm-7 small"><span class="badge bg-primary"><?= t($txnLabels[$tx['txn_type']] ?? $tx['txn_type']) ?></span></dd>
@@ -95,15 +95,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transaction', 'Viewed: ' . $tx[
                     <h6 class="fw-bold mb-3 text-primary"><?= t('Outlet & Customer') ?></h6>
                     <dl class="row mb-0">
                         <dt class="col-sm-5 text-muted small"><?= t('Agent Outlet') ?></dt>
-                        <dd class="col-sm-7 small"><?= safe_output($tx['agent_name']) ?></dd>
+                        <dd class="col-sm-7 small"><?= caseFormat($tx['agent_name']) ?></dd>
                         <dt class="col-sm-5 text-muted small"><?= t('Till') ?></dt>
                         <dd class="col-sm-7 small"><code><?= safe_output($tx['till_number']) ?></code></dd>
                         <dt class="col-sm-5 text-muted small"><?= t('Location') ?></dt>
-                        <dd class="col-sm-7 small"><?= safe_output(implode(', ', array_filter([$tx['region'], $tx['district']])) ?: '—') ?></dd>
+                        <dd class="col-sm-7 small"><?= caseFormat(implode(', ', array_filter([$tx['region'], $tx['district']])) ?: null) ?></dd>
                         <dt class="col-sm-5 text-muted small"><?= t('Teller') ?></dt>
-                        <dd class="col-sm-7 small"><?= safe_output($tx['teller_name'] ?: '—') ?></dd>
+                        <dd class="col-sm-7 small"><?= caseFormat($tx['teller_name'] ?: null) ?></dd>
                         <dt class="col-sm-5 text-muted small"><?= t('Customer Name') ?></dt>
-                        <dd class="col-sm-7 small"><?= safe_output($tx['customer_name'] ?: '—') ?></dd>
+                        <dd class="col-sm-7 small"><?= caseFormat($tx['customer_name'] ?: null) ?></dd>
                         <dt class="col-sm-5 text-muted small"><?= t('Customer Phone') ?></dt>
                         <dd class="col-sm-7 small"><?= safe_output($tx['customer_phone'] ?: '—') ?></dd>
                     </dl>
@@ -116,7 +116,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transaction', 'Viewed: ' . $tx[
     <div class="card border-0 shadow-sm mb-3">
         <div class="card-body">
             <h6 class="fw-bold text-primary mb-1"><?= t('Notes') ?></h6>
-            <p class="mb-0 small"><?= safe_output($tx['notes']) ?></p>
+            <p class="mb-0 small"><?= caseFormat($tx['notes']) ?></p>
         </div>
     </div>
     <?php endif; ?>

@@ -100,19 +100,19 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shift Report', 'Shift: ' . $shi
                 <div class="col-md-6">
                     <table class="table table-sm table-borderless mb-0">
                         <tr><td class="text-muted small"><?= t('Shift Code') ?></td><td class="fw-bold"><code><?= safe_output($shift['shift_code']) ?></code></td></tr>
-                        <tr><td class="text-muted small"><?= t('Network') ?></td><td><span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($shift['color_hex'] ?: '#999') ?>"></span><?= safe_output($shift['network_name']) ?></td></tr>
-                        <tr><td class="text-muted small"><?= t('Agent Outlet') ?></td><td><?= safe_output($shift['agent_name']) ?></td></tr>
+                        <tr><td class="text-muted small"><?= t('Network') ?></td><td><span class="d-inline-block me-1" style="width:10px;height:10px;border-radius:50%;background:<?= htmlspecialchars($shift['color_hex'] ?: '#999') ?>"></span><?= caseFormat($shift['network_name']) ?></td></tr>
+                        <tr><td class="text-muted small"><?= t('Agent Outlet') ?></td><td><?= caseFormat($shift['agent_name']) ?></td></tr>
                         <tr><td class="text-muted small"><?= t('Till No.') ?></td><td><code><?= safe_output($shift['till_number']) ?></code></td></tr>
-                        <tr><td class="text-muted small"><?= t('Location') ?></td><td><?= safe_output(implode(', ', array_filter([$shift['region'], $shift['district']])) ?: '—') ?></td></tr>
+                        <tr><td class="text-muted small"><?= t('Location') ?></td><td><?= caseFormat(implode(', ', array_filter([$shift['region'], $shift['district']])) ?: null) ?></td></tr>
                     </table>
                 </div>
                 <div class="col-md-6">
                     <table class="table table-sm table-borderless mb-0">
-                        <tr><td class="text-muted small"><?= t('Teller') ?></td><td><?= safe_output($shift['teller_name'] ?: '—') ?></td></tr>
+                        <tr><td class="text-muted small"><?= t('Teller') ?></td><td><?= caseFormat($shift['teller_name'] ?: null) ?></td></tr>
                         <tr><td class="text-muted small"><?= t('Opened') ?></td><td><?= date('d M Y H:i', strtotime($shift['opened_at'])) ?></td></tr>
                         <tr><td class="text-muted small"><?= t('Closed') ?></td><td><?= $shift['closed_at'] ? date('d M Y H:i', strtotime($shift['closed_at'])) : '<span class="badge bg-success">'.t('Still Open').'</span>' ?></td></tr>
                         <?php if ($shift['closed_by_name']): ?>
-                        <tr><td class="text-muted small"><?= t('Closed By') ?></td><td><?= safe_output($shift['closed_by_name']) ?></td></tr>
+                        <tr><td class="text-muted small"><?= t('Closed By') ?></td><td><?= caseFormat($shift['closed_by_name']) ?></td></tr>
                         <?php endif; ?>
                     </table>
                 </div>
@@ -146,7 +146,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Shift Report', 'Shift: ' . $shi
                 </table>
             </div>
             <?php if ($shift['close_notes']): ?>
-            <div class="mt-2 small text-muted"><?= t('Notes:') ?> <?= safe_output($shift['close_notes']) ?></div>
+            <div class="mt-2 small text-muted"><?= t('Notes:') ?> <?= caseFormat($shift['close_notes']) ?></div>
             <?php endif; ?>
         </div>
     </div>
