@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-01 — fix(pos-api): process_sale business-rule errors return 500 instead of 409/422; unit_price alias
+
+**Files:**
+- `api/pos/process_sale.php` — insufficient-stock throws now carry code 409; price-below-minimum throws carry code 422 (previously all had code 0 → fell through to HTTP 500); item price normaliser reads `unit_price` as alias for `price` so Flutter sending `unit_price` is no longer silently read as 0
+
+---
+
 ## 2026-10-01 — fix(mobile-api): create endpoints stored NULL status causing 500 / ghost 404
 
 **Files:**
