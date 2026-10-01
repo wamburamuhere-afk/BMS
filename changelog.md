@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-01 — fix(mm): remove active-shift banners; fix teller caseFormat in card view
+
+**Files:** `app/bms/mobile_money/mm_shifts.php`, `mm_transactions.php`, `mm_float.php`, `tests/test_mm_scope_dashboard_cli.php`
+
+**Changes:**
+- Removed green "Active Shift / Active Shifts" alert banners from the top of mm_shifts.php, mm_transactions.php, and mm_float.php — these appeared whenever a shift was open and added no information beyond what the stats/table already show
+- Kept yellow "No active shift" warning on mm_transactions and mm_float (explains why New Transaction is disabled + links to Open Shift)
+- Fixed `data-teller` and `data-outlet` attributes on the mm_shifts.php DataTable row: were using raw `htmlspecialchars()` instead of `caseFormat()`, so the JS card view showed teller names in stored all-caps rather than respecting the text display case mode
+- Updated scope dashboard test: removed stale "My Agents lists A and B" assertion (My Agents cards section removed in prior commit); changed agent name assertion to `stripos()` to be case-mode-agnostic; 38/38 pass; caseFormat test 63/63
+
 ## 2026-10-01 — feat(mm): apply caseFormat() across all 15 MM module pages
 
 **Purpose:** Roll out the Text Display Case system (`caseFormat()`, 2026-09-18) to the entire Mobile Money module so every human-readable string (names, locations, notes, labels) honours the admin-configured case mode (default: title case).
