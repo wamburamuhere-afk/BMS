@@ -2,6 +2,7 @@
 // scope-audit: skip — MM tables are agent-scoped via mm_user_agent_grants; no project/warehouse scope here.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/mm_posting.php';
+require_once __DIR__ . '/../../core/mm_nav.php';
 
 header('Content-Type: application/json');
 
@@ -20,7 +21,8 @@ $receiptDate  = trim($_POST['receipt_date'] ?? '');
 $referenceNo  = trim($_POST['reference_no'] ?? '');
 $notes        = trim($_POST['notes'] ?? '');
 
-if (!$networkId || !$periodFrom || !$periodTo || $amount <= 0 || !$bankAcctId || !$receiptDate) {
+$bankRequired = !mmSimpleModeEnabled();
+if (!$networkId || !$periodFrom || !$periodTo || $amount <= 0 || !$receiptDate || ($bankRequired && !$bankAcctId)) {
     echo json_encode(['success' => false, 'message' => 'All required fields must be filled.']); exit;
 }
 
@@ -38,19 +40,24 @@ try {
     $pdo->beginTransaction();
 
     $pdo->prepare("INSERT INTO mm_commissions_received (network_id, period_from, period_to, amount_received, bank_account_id, reference_no, notes, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,'draft',?,NOW())")
-        ->execute([$networkId, $periodFrom, $periodTo, $amount, $bankAcctId, $referenceNo ?: null, $notes ?: null, $_SESSION['user_id']]);
+        ->execute([$networkId, $periodFrom, $periodTo, $amount, $bankAcctId ?: null, $referenceNo ?: null, $notes ?: null, $_SESSION['user_id']]);
     $creditId = (int)$pdo->lastInsertId();
 
     $description = "Commission receipt: " . ($referenceNo ?: "CR-$creditId");
     $entryId = postMMCommissionReceived($pdo, $creditId, $networkId, $amount, $bankAcctId, $receiptDate, $_SESSION['user_id'], $description);
 
-    $pdo->prepare("UPDATE mm_commissions_received SET journal_entry_id=?, status='posted' WHERE credit_id=?")
-        ->execute([$entryId, $creditId]);
+    if ($entryId) {
+        $pdo->prepare("UPDATE mm_commissions_received SET journal_entry_id=?, status='posted' WHERE credit_id=?")
+            ->execute([$entryId, $creditId]);
+    } else {
+        $pdo->prepare("UPDATE mm_commissions_received SET status='posted' WHERE credit_id=?")
+            ->execute([$creditId]);
+    }
 
-    logActivity($pdo, $_SESSION['user_id'], "Posted MM commission receipt CR-$creditId TZS " . number_format($amount));
+    logActivity($pdo, $_SESSION['user_id'], "Recorded MM commission receipt CR-$creditId TZS " . number_format($amount));
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Commission receipt posted successfully.', 'credit_id' => $creditId]);
+    echo json_encode(['success' => true, 'message' => 'Commission receipt saved successfully.', 'credit_id' => $creditId]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
