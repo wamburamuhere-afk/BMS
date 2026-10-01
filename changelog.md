@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-10-01 — fix(mobile-api): schema fallback + offset + underpay + idempotency bugs
+
+**Files:**
+- `api/mobile/customers/create.php` — added `$doInsert(bool $full)` closure with `catch (PDOException 'Unknown column')` fallback to core-only INSERT for older tenant schemas
+- `api/mobile/suppliers/get.php` — wrapped full SELECT in `try/catch (PDOException $fullE)` with core-column fallback; confirmed live (suppliers missing `notes` column on demo tenant)
+- `api/mobile/products/get.php` — fixed fallback query: replaced `p.purchase_price, p.image_url, p.tax_rate_id` with `cost_price AS purchase_price, NULL AS image_url, NULL AS tax_rate_id` so older schema fallback doesn't fail on those columns
+- `api/pos/get_sales.php` — added `$offset` parameter; appended `OFFSET $offset` to the `LIMIT` clause
+- `api/pos/process_sale.php` — fixed `$amount_paid_now` default: when `amount_paid` absent and `amount_tendered > 0`, uses tendered value (Flutter pattern); non-credit guard now correctly catches underpayment
+- `api/pos/quick_restock.php` — removed silent `catch (PDOException $_) {}` from client_uuid UPDATE; DDL self-heal before the transaction guarantees column exists when `$restock_uuid !== ''`
+- `tests/test_flutter_mobile_api_cli.php` — 38-assertion test: A) static code checks, B) unit `amount_paid_now` logic (7 cases), C) customers/create full+fallback INSERT, D) suppliers/get fallback, E) products/get fallback, F) get_sales offset SQL + live pagination, G) quick_restock stamp+idempotency
+
+**Root causes:**
+- Bug 1 (customers/create 500): no `Unknown column` fallback; INSERT included `city, customer_type, credit_limit, notes` which may be absent on pre-migration schemas
+- Bug 2a (suppliers/get 500→"not found"): SELECT referenced `notes, contact_person, city, supplier_type, updated_at` absent on demo tenant (confirmed `notes` missing at test time)
+- Bug 2b (products/get 500→"not found"): fallback query still referenced `p.purchase_price, p.image_url, p.tax_rate_id` which may also be absent on very old schemas
+- Bug 3 (get_sales offset ignored): `$offset` never read from `$_GET`; LIMIT clause had no OFFSET
+- Bug 4 (process_sale underpay accepted): when Flutter sends `amount_tendered` but not `amount_paid`, server defaulted to `$total`, zeroing `balance_due` before the non-credit guard ran
+- Bug 5 (quick_restock double-batch): silent `catch (PDOException $_) {}` swallowed any UPDATE failure; if the column didn't exist (DDL self-heal failure), uuid was never stamped, so every retry bypassed the idempotency pre-check and created a new batch
+
+---
+
 ## 2026-10-01 — fix(pos): replace mt_rand receipt numbers with atomic daily sequence
 
 **Files:**

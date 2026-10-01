@@ -186,7 +186,11 @@ try {
     // authoritative payment_status / balance is finalised after the server
     // recomputes the total (see below).
     $is_credit = ($payment_method === 'credit');
-    $amount_paid_now = isset($input['amount_paid']) ? floatval($input['amount_paid']) : ($is_credit ? 0.0 : $total);
+    // When the client sends amount_tendered but omits amount_paid (Flutter pattern),
+    // use tendered — the non-credit guard below then fires on underpayment.
+    $amount_paid_now = isset($input['amount_paid'])
+        ? floatval($input['amount_paid'])
+        : ($is_credit ? 0.0 : ($amount_tendered > 0 ? $amount_tendered : $total));
     if ($amount_paid_now < 0) $amount_paid_now = 0.0;
     if ($is_credit && empty($customer_id)) {
         throw new Exception('Credit sales require a customer — you cannot sell on credit to a walk-in.', 422);
