@@ -1823,16 +1823,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body pt-0">
-            <?php if (isAdmin() || canView('mm_shifts') || canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance') || canView('mm_commission_rates')): ?>
+            <?php if (isAdmin() || canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance') || canView('mm_commission_rates')): ?>
             <div class="bn-group"><?= t('Settings') ?></div>
             <div class="list-group list-group-flush">
                 <?php if (isAdmin()): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>">
                     <i class="bi bi-gear"></i><?= t('Admin') ?></a>
-                <?php endif; ?>
-                <?php if (canView('mm_shifts')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_shifts') ?>">
-                    <i class="bi bi-clock-history"></i><?= t('Teller Shifts') ?></a>
                 <?php endif; ?>
                 <?php if (canView('mm_commissions')): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commissions') ?>">
