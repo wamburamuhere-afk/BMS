@@ -33,15 +33,17 @@ try {
     } catch (PDOException $fullE) {
         // Older tenant DB may be missing brands table or optional product columns.
         error_log('mobile/products/get.php full query failed (schema mismatch — run tenant migration 2026_09_30): ' . $fullE->getMessage());
+        // Guaranteed core-only fallback: exclude columns added by later migrations
+        // (purchase_price, image_url, tax_rate_id, updated_at may be absent on very old schemas).
         $stmt = $pdo->prepare("
             SELECT p.product_id, p.product_name, p.sku, p.barcode, p.unit,
-                   p.selling_price, p.cost_price, p.purchase_price, p.current_stock,
+                   p.selling_price, p.cost_price, p.cost_price AS purchase_price, p.current_stock,
                    p.reorder_level, p.is_service, p.category_id, c.category_name,
                    NULL AS brand_id, NULL AS brand_name,
-                   p.tax_rate_id, NULL AS tax_name,
-                   p.status, p.description, p.image_url,
+                   NULL AS tax_rate_id, NULL AS tax_name,
+                   p.status, p.description, NULL AS image_url,
                    NULL AS min_selling_price, NULL AS discount_rate,
-                   p.created_at, p.updated_at
+                   p.created_at, NULL AS updated_at
               FROM products p
               LEFT JOIN categories c ON c.category_id = p.category_id
              WHERE p.product_id = ? AND p.status != 'deleted'

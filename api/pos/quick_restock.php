@@ -212,11 +212,11 @@ try {
     ]);
 
     // Stamp the idempotency key onto the batch row so retries are detected above.
+    // DDL self-heal above guarantees client_uuid exists when $restock_uuid !== ''.
+    // No try/catch here: a failure must surface and roll the transaction back.
     if ($restock_uuid !== '' && !empty($intake['batch_id'])) {
-        try {
-            $pdo->prepare("UPDATE product_batches SET client_uuid = ? WHERE batch_id = ?")
-                ->execute([$restock_uuid, $intake['batch_id']]);
-        } catch (PDOException $_) {}
+        $pdo->prepare("UPDATE product_batches SET client_uuid = ? WHERE batch_id = ?")
+            ->execute([$restock_uuid, $intake['batch_id']]);
     }
 
     // Live prices: Retail -> products.selling_price (what every sale, report,
