@@ -51,7 +51,9 @@ if (!function_exists('mobileBearerAuth')) {
             return false;
         }
 
+        $GLOBALS['BMS_MOBILE_TOKEN_ID'] = (int)$row['token_id'];
         $_SESSION['user_id']    = (int)$row['user_id'];
+
         $_SESSION['role_id']    = (int)($row['role_id'] ?? 0);
         $_SESSION['role']       = $row['role']       ?? $row['user_role'] ?? 'user';
         $_SESSION['user_role']  = $row['user_role']  ?? $row['role']      ?? 'user';
@@ -61,6 +63,14 @@ if (!function_exists('mobileBearerAuth')) {
         if (function_exists('loadUserPermissions')) {
             loadUserPermissions($_SESSION['role_id']);
         }
+
+        // The web sets this in header.php; API messages wrapped in t() follow it.
+        if (empty($_SESSION['user_lang']) && function_exists('get_setting')) {
+            $lang = get_setting('user_language_' . (int)$row['user_id'], 'en');
+            $_SESSION['user_lang'] = in_array($lang, ['en', 'sw'], true) ? $lang : 'en';
+            if (function_exists('loadLanguage')) loadLanguage($_SESSION['user_lang']);
+        }
+
 
         // Best-effort last-used stamp; non-fatal
         try {
