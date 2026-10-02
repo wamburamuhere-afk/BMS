@@ -59,13 +59,13 @@ $unit          = trim($body['unit']          ?? '');
 $sku           = trim($body['sku']           ?? '');
 $barcode       = trim($body['barcode']       ?? '');
 $description   = trim($body['description']   ?? '');
-$category_id   = (int)($body['category_id']  ?? 0) ?: null;
 $_st           = $body['status'] ?? 'active';
 $status        = in_array($_st, ['active','inactive'], true) ? $_st : 'active';
 
 require_once __DIR__ . '/../../../core/stock_ledger.php';
 require_once __DIR__ . '/../../../core/stock_posting.php';
 require_once __DIR__ . '/../../../core/stock_intake.php';
+require_once __DIR__ . '/_fields.php';
 
 $fail = function (int $code, string $msg): void {
     http_response_code($code);
@@ -73,7 +73,28 @@ $fail = function (int $code, string $msg): void {
     exit;
 };
 
+$dateOrNull = function (string $k) use ($body, $fail): ?string {
+    $v = trim((string)($body[$k] ?? ''));
+    if ($v === '') return null;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) $fail(422, "$k must be YYYY-MM-DD");
+    return $v;
+};
+$mfg_date    = $dateOrNull('manufacturing_date');
+$expiry_date = $dateOrNull('expiry_date');
+$image_url   = null;
+
 try {
+    try {
+        $extra = mobileProductOptionalFields($pdo, $body);
+    } catch (InvalidArgumentException $ie) {
+        $fail(422, $ie->getMessage());
+    }
+    // Same rule as the web: min selling price defaults to selling price less the discount rate.
+    if (!isset($extra['min_selling_price'])) {
+        $extra['min_selling_price'] = round($selling_price - ($selling_price * ($extra['discount_rate'] ?? 0) / 100), 2);
+    }
+    if ($extra['min_selling_price'] > $selling_price) $fail(422, 'min_selling_price cannot exceed selling_price');
+
     // Same duplicate rules as the web (api/create_product.php).
     $chk = $pdo->prepare("SELECT 1 FROM products WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?)) LIMIT 1");
     $chk->execute([$product_name]);
@@ -104,28 +125,36 @@ try {
         }
     }
 
-    $user_id = (int)$_SESSION['user_id'];
-    $pdo->beginTransaction();
+    try {
+        $image_url = mobileProductImageUpload($pdo);
+    } catch (InvalidArgumentException $ie) {
+        $fail(422, $ie->getMessage());
+    }
 
-    $stmt = $pdo->prepare("
-        INSERT INTO products
-            (client_uuid, product_name, sku, product_code, barcode, unit, selling_price, cost_price, purchase_price,
-             current_stock, reorder_level, is_service, track_inventory, category_id,
-             description, status, created_at, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, NOW(), ?)
-    ");
-    $stmt->execute([
-        $client_uuid ?: null,
-        $product_name,
-        $sku, $sku,
-        $barcode  !== '' ? $barcode  : null,
-        $unit     !== '' ? $unit     : null,
-        $selling_price, $cost_price, $cost_price,
-        $reorder_level,
-        $is_service, $track_inventory, $category_id,
-        $description !== '' ? $description : null,
-        $status, $user_id,
-    ]);
+    $user_id = (int)$_SESSION['user_id'];
+    $cols = [
+        'client_uuid'     => $client_uuid ?: null,
+        'product_name'    => $product_name,
+        'sku'             => $sku,
+        'product_code'    => $sku,
+        'barcode'         => $barcode !== '' ? $barcode : null,
+        'unit'            => $unit !== '' ? $unit : null,
+        'selling_price'   => $selling_price,
+        'cost_price'      => $cost_price,
+        'purchase_price'  => $cost_price,
+        'current_stock'   => 0,
+        'reorder_level'   => $reorder_level,
+        'is_service'      => $is_service,
+        'track_inventory' => $track_inventory,
+        'description'     => $description !== '' ? $description : null,
+        'status'          => $status,
+        'created_by'      => $user_id,
+    ] + $extra;
+    if ($image_url !== null) $cols['image_url'] = $image_url;
+
+    $pdo->beginTransaction();
+    $pdo->prepare("INSERT INTO products (" . implode(', ', array_keys($cols)) . ", created_at) VALUES ("
+        . implode(', ', array_fill(0, count($cols), '?')) . ", NOW())")->execute(array_values($cols));
     $product_id = (int)$pdo->lastInsertId();
 
     // Opening stock = real batch + stock movement + GL (Dr Inventory / Cr Opening Balance), as on the web.
@@ -137,6 +166,9 @@ try {
             'unit_cost'        => $cost_price,
             'write_batch'      => true,
             'selling_price'    => $selling_price,
+            'wholesale_price'  => $extra['wholesale_price'] ?? null,
+            'manufacturing_date' => $mfg_date,
+            'expiry_date'      => $expiry_date,
             'movement_type'    => 'adjustment_in',
             'reference_type'   => 'manual',
             'reference_id'     => $product_id,
@@ -162,11 +194,14 @@ try {
         'is_service'      => (bool)$is_service,
         'track_inventory' => (bool)$track_inventory,
         'current_stock'   => $opening_qty,
+        'image_url'       => $image_url,
         'message'         => ucfirst($kind) . ' created successfully',
     ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    if ($image_url && is_file(__DIR__ . '/../../../' . $image_url)) @unlink(__DIR__ . '/../../../' . $image_url);
     error_log('mobile/products/create.php: ' . $e->getMessage());
+
     http_response_code(500);
     echo json_encode(['success'=>false,'message'=>'Server error']);
 }

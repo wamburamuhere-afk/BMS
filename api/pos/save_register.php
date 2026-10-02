@@ -14,6 +14,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth(); mobileJsonBody();
 // Respect the caller's saved language preference (set by header.php on their
 // last page load) so t()-wrapped messages below come back in the right
 // language, not always English.
@@ -26,7 +27,7 @@ if (!isAuthenticated())            { http_response_code(401); echo json_encode([
 if (!canView('pos_advanced'))      { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Multi-register management is not included in your plan.')]); exit; }
 if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
-csrf_check();
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 
 global $pdo;
 
@@ -49,8 +50,9 @@ $printer_ip_address = trim($_POST['printer_ip_address'] ?? '') ?: null;
 $printer_port = (int)($_POST['printer_port'] ?? 9100) ?: 9100;
 
 // Phase 22 (pos_upgrade_plan.md §8) — receipt layout variety.
-$receipt_template = in_array($_POST['receipt_template'] ?? 'classic', ['classic', 'detailed', 'slim'], true)
-    ? $_POST['receipt_template'] : 'classic';
+$_rt = $_POST['receipt_template'] ?? 'classic';
+$receipt_template = in_array($_rt, ['classic', 'detailed', 'slim'], true) ? $_rt : 'classic';
+
 
 if ($register_name === '' || $register_code === '') {
     echo json_encode(['success' => false, 'message' => t('Register name and code are required.')]);

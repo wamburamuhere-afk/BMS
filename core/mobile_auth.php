@@ -73,6 +73,98 @@ if (!function_exists('mobileBearerAuth')) {
 
 }
 
+if (!function_exists('mobileRun')) {
+    /**
+     * Run a shared (web) endpoint for a mobile caller. $fn echoes the JSON response
+     * and may exit() mid-way; the response is captured in a shutdown-safe way and:
+     *  - a 200 carrying success:false is re-coded (403 / 404 / 409 / 422) so the app
+     *    can rely on HTTP status, as the rest of the mobile API does;
+     *  - with a valid client_uuid the action runs at most once — a retry gets the
+     *    stored response back with "idempotent": true. Failed responses release
+     *    the key so the client can correct the input and retry with the same uuid.
+     * The bearer token is the authentication, so the shared endpoint's CSRF check
+     * is satisfied for this request.
+     */
+    function mobileRun(PDO $pdo, string $endpoint, ?string $uuid, callable $fn): void
+    {
+        if (function_exists('csrf_token') && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
+            $_POST['_csrf'] = csrf_token();
+        }
+
+        $uuid = strtolower(trim((string)$uuid));
+        $useKey = (bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $uuid);
+
+        if ($useKey) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `mobile_idempotency_keys` (
+                `client_uuid` CHAR(36) NOT NULL, `endpoint` VARCHAR(100) NOT NULL, `user_id` INT NOT NULL,
+                `http_code` SMALLINT NULL DEFAULT NULL, `response_body` MEDIUMTEXT NULL,
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`client_uuid`), KEY `idx_endpoint` (`endpoint`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            $ins = $pdo->prepare("INSERT IGNORE INTO mobile_idempotency_keys (client_uuid, endpoint, user_id) VALUES (?, ?, ?)");
+            $ins->execute([$uuid, $endpoint, (int)($_SESSION['user_id'] ?? 0)]);
+            if ($ins->rowCount() === 0) {
+                $row = $pdo->prepare("SELECT endpoint, http_code, response_body FROM mobile_idempotency_keys WHERE client_uuid = ?");
+                $row->execute([$uuid]);
+                $r = $row->fetch(PDO::FETCH_ASSOC);
+                if (!$r || $r['endpoint'] !== $endpoint) {
+                    http_response_code(409);
+                    echo json_encode(['success' => false, 'message' => 'client_uuid already used for a different action']);
+                } elseif ($r['response_body'] === null) {
+                    http_response_code(409);
+                    echo json_encode(['success' => false, 'message' => 'This request is still being processed — retry shortly']);
+                } else {
+                    $body = json_decode($r['response_body'], true);
+                    if (is_array($body)) $body['idempotent'] = true;
+                    http_response_code((int)$r['http_code'] ?: 200);
+                    echo json_encode($body ?? []);
+                }
+                return;
+            }
+        }
+
+        $level = ob_get_level();
+        ob_start();
+        $done = false;
+        $finalise = function () use (&$done, $pdo, $uuid, $useKey, $level): void {
+            if ($done) return;
+            $done = true;
+            $out = '';
+            while (ob_get_level() > $level) $out = (string)ob_get_clean() . $out;
+            $code = http_response_code() ?: 200;
+            $json = json_decode(trim($out), true);
+            $ok   = $code < 300 && is_array($json) && !empty($json['success']);
+            if (!$ok && $code < 300) {
+                $msg  = is_array($json) ? (string)($json['message'] ?? '') : '';
+                $code = !is_array($json) ? 500
+                      : (preg_match('/unauthori[sz]ed/i', $msg) ? 401
+                      : (preg_match('/denied|permission|not allowed|not in your/i', $msg) ? 403
+                      : (preg_match('/not found|does not exist/i', $msg) ? 404
+                      : (preg_match('/already|duplicate|in use|exists/i', $msg) ? 409 : 422))));
+                if (!is_array($json)) { error_log('mobileRun non-JSON output: ' . substr($out, 0, 300)); $out = json_encode(['success' => false, 'message' => 'Server error']); }
+                http_response_code($code);
+            }
+            try {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                if ($useKey) {
+                    if ($ok) {
+                        $pdo->prepare("UPDATE mobile_idempotency_keys SET http_code = ?, response_body = ? WHERE client_uuid = ?")
+                            ->execute([$code, $out, $uuid]);
+                    } else {
+                        $pdo->prepare("DELETE FROM mobile_idempotency_keys WHERE client_uuid = ?")->execute([$uuid]);
+                    }
+                }
+            } catch (Throwable $e) {
+                error_log('mobileRun finalise: ' . $e->getMessage());
+            }
+            echo $out;
+        };
+        register_shutdown_function($finalise);
+        $fn();
+        $finalise();
+    }
+}
+
 if (!function_exists('mobileJsonBody')) {
     /**
      * For $_POST-reading endpoints: when the request carried a JSON object body
