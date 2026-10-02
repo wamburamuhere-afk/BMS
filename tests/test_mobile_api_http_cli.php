@@ -612,6 +612,195 @@ if (section('parity')) {
 }
 
 // =========================================================================
+// v25 — user management + profile / company / POS settings.
+function loginAs(string $user, string $pass): array {
+    return api('POST', 'api/mobile/login.php', ['username' => $user, 'password' => $pass, 'device_name' => 'api-http-test'], true, false);
+}
+function asToken(string $tok, callable $fn) {
+    global $TOKEN; $keep = $TOKEN; $TOKEN = $tok;
+    try { return $fn(); } finally { $TOKEN = $keep; }
+}
+
+if (section('users')) {
+    $me = api('GET', 'api/mobile/me.php')[1]['user'] ?? [];
+    $myId = (int)($me['id'] ?? 0);
+    ok(!empty($me['is_admin']), 'me: user.is_admin present (admin token)', $me['is_admin'] ?? null);
+
+    [$c, $roles] = api('GET', 'api/mobile/users/roles.php');
+    ok($c === 200 && count($roles['data'] ?? []) > 0, 'users/roles → 200', [$c]);
+    $staffRole = 0; $adminRole = 1;
+    foreach ($roles['data'] ?? [] as $r) if (empty($r['is_admin']) && !$staffRole) $staffRole = (int)$r['role_id'];
+    if (!$staffRole) $staffRole = (int)($roles['data'][0]['role_id'] ?? 1);
+    $wh = (int)(api('GET', 'api/mobile/warehouses/list.php', ['status' => 'active', 'limit' => 1])[1]['data'][0]['warehouse_id'] ?? 0);
+
+    $uname = 'zzapi' . $RUN; $pw = 'ZzTest' . $RUN . '9';
+    $new = ['username' => $uname, 'email' => "$uname@example.com", 'first_name' => 'ZZ API', 'last_name' => "TEST $RUN",
+            'role_id' => $staffRole, 'password' => $pw, 'confirm_password' => $pw, 'phone' => '0700' . substr($RUN, 0, 6),
+            'warehouse_ids' => [$wh]];
+
+    [$c, $x] = api('POST', 'api/mobile/users/create.php', ['username' => 'ab']);
+    ok($c === 422 && isset($x['errors']['username'], $x['errors']['email'], $x['errors']['password']), 'users/create: invalid → 422 with per-field errors', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/users/create.php', ['confirm_password' => 'different'] + $new);
+    ok($c === 422 && isset($x['errors']['confirm_password']), 'users/create: password mismatch → 422', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/users/create.php', ['password' => 'short', 'confirm_password' => 'short'] + $new);
+    ok($c === 422 && isset($x['errors']['password']), 'users/create: password < 8 → 422', [$c, $x]);
+
+    $u = uuid4();
+    [$c, $cr] = api('POST', 'api/mobile/users/create.php', $new + ['client_uuid' => $u]);
+    $uid = (int)($cr['user']['user_id'] ?? 0);
+    ok($c === 200 && $uid > 0 && ($cr['user']['shops']['warehouse_ids'] ?? []) === [$wh], 'users/create → 200 with shop access', [$c, $cr]);
+    [$c, $cr2] = api('POST', 'api/mobile/users/create.php', $new + ['client_uuid' => $u], false);
+    ok($c === 200 && !empty($cr2['idempotent']) && (int)($cr2['user']['user_id'] ?? 0) === $uid, 'users/create: client_uuid replay is idempotent', [$c, $cr2]);
+    [$c, $x] = api('POST', 'api/mobile/users/create.php', $new);
+    ok($c === 422 && isset($x['errors']['username'], $x['errors']['email']), 'users/create: duplicate username/email → 422', [$c, $x]);
+
+    [$c, $l] = api('GET', 'api/mobile/users/list.php', ['search' => $uname]);
+    ok($c === 200 && (int)($l['total'] ?? 0) === 1 && ($l['data'][0]['username'] ?? '') === $uname, 'users/list: search finds new user', [$c, $l['total'] ?? null]);
+
+    // The new user can log in; a non-admin cannot manage users.
+    [$c, $lg] = loginAs($uname, $pw);
+    $utok = (string)($lg['token'] ?? '');
+    ok($utok !== '', 'login as new user → token', [$c, $lg['message'] ?? null]);
+    if ($utok && $staffRole !== $adminRole) {
+        [$c] = asToken($utok, fn() => api('GET', 'api/mobile/users/list.php'));
+        ok($c === 403, 'users/list as non-admin → 403', $c);
+        $meU = asToken($utok, fn() => api('GET', 'api/mobile/me.php'))[1] ?? [];
+        ok(empty($meU['user']['is_admin']) && empty($meU['permissions']['users_manage']), 'me (non-admin): is_admin=false, users_manage=false', $meU['permissions'] ?? null);
+        ok(count($meU['warehouses'] ?? []) === 1 && (int)($meU['warehouses'][0]['warehouse_id'] ?? 0) === $wh, 'me (non-admin): warehouses limited to granted shop', $meU['warehouses'] ?? null);
+        [$c, $x] = asToken($utok, fn() => api('POST', 'api/mobile/company/profile.php', ['website' => 'x']));
+        ok($c === 403, 'company/profile POST as non-admin → 403', [$c, $x]);
+    }
+
+    // Shops.
+    [$c, $s] = api('POST', 'api/mobile/users/shops.php', ['user_id' => $uid, 'all_shops' => true]);
+    ok($c === 200 && !empty($s['all_shops']), 'users/shops: grant all shops', [$c, $s]);
+    [$c, $s] = api('GET', 'api/mobile/users/shops.php', ['user_id' => $uid]);
+    ok($c === 200 && !empty($s['all_shops']), 'users/shops GET reflects all shops', [$c, $s]);
+    [$c, $s] = api('POST', 'api/mobile/users/shops.php', ['user_id' => $uid, 'all_shops' => false, 'warehouse_ids' => [999999999]]);
+    ok($c === 422, 'users/shops: unknown warehouse → 422', [$c, $s]);
+
+    // Partial update; admin password reset signs the user out of the app.
+    [$c, $up] = api('POST', 'api/mobile/users/update.php', ['user_id' => $uid, 'first_name' => 'ZZ API2']);
+    ok($c === 200 && ($up['user']['first_name'] ?? '') === 'ZZ API2' && ($up['user']['username'] ?? '') === $uname, 'users/update: partial (first_name only) → 200', [$c, $up]);
+    $pw2 = $pw . 'x';
+    [$c, $up] = api('POST', 'api/mobile/users/update.php', ['user_id' => $uid, 'password' => $pw2, 'confirm_password' => $pw2]);
+    ok($c === 200, 'users/update: admin sets new password', [$c, $up]);
+    if ($utok) {
+        [$c] = asToken($utok, fn() => api('GET', 'api/mobile/me.php'));
+        ok($c === 401, 'old app token rejected after admin password reset', $c);
+    }
+    [$c, $lg] = loginAs($uname, $pw2);
+    $utok = (string)($lg['token'] ?? '');
+    ok($utok !== '', 'login with new password → token', [$c, $lg['message'] ?? null]);
+
+    // Deactivate / activate.
+    [$c, $t] = api('POST', 'api/mobile/users/toggle.php', ['user_id' => $uid, 'action' => 'deactivate']);
+    ok($c === 200 && !empty($t['success']), 'users/toggle deactivate → 200', [$c, $t]);
+    [$c] = asToken($utok, fn() => api('GET', 'api/mobile/me.php'));
+    ok($c === 401, 'deactivated user token rejected', $c);
+    [$c, $lg] = loginAs($uname, $pw2);
+    ok(empty($lg['token']), 'deactivated user cannot log in', [$c, $lg['message'] ?? null]);
+    [$c, $t] = api('POST', 'api/mobile/users/toggle.php', ['user_id' => $uid, 'action' => 'activate']);
+    ok($c === 200 && !empty($t['success']), 'users/toggle activate → 200', [$c, $t]);
+    [$c, $lg] = loginAs($uname, $pw2);
+    $utok = (string)($lg['token'] ?? '');
+    ok($utok !== '', 'reactivated user can log in', [$c, $lg['message'] ?? null]);
+
+    // Self-protection.
+    [$c, $x] = api('POST', 'api/mobile/users/toggle.php', ['user_id' => $myId, 'action' => 'deactivate']);
+    ok($c === 409, 'users/toggle: cannot deactivate yourself → 409', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/users/delete.php', ['user_id' => $myId]);
+    ok($c === 409, 'users/delete: cannot delete yourself → 409', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/users/update.php', ['user_id' => $myId, 'role_id' => $staffRole]);
+    ok($staffRole === $adminRole || $c === 409, 'users/update: cannot change your own role → 409', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/users/toggle.php', ['user_id' => 999999999, 'action' => 'deactivate']);
+    ok($c === 404, 'users/toggle unknown → 404', [$c, $x]);
+
+    // Own profile + password + language + avatar, exercised on the TEST user.
+    if ($utok) {
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/update.php', ['first_name' => 'ZZ Self', 'phone' => '0711' . substr($RUN, 0, 6)]));
+        ok($c === 200 && ($p['user']['first_name'] ?? '') === 'ZZ Self', 'profile/update (own) → 200', [$c, $p]);
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/update.php', ['email' => 'not-an-email']));
+        ok($c === 422, 'profile/update: invalid email → 422', [$c, $p]);
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/change_password.php', ['current_password' => 'wrong', 'new_password' => 'Abcdefgh1', 'confirm_password' => 'Abcdefgh1']));
+        ok($c === 422, 'profile/change_password: wrong current → 422', [$c, $p]);
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/change_password.php', ['current_password' => $pw2, 'new_password' => $pw2, 'confirm_password' => $pw2]));
+        ok($c === 422, 'profile/change_password: same as current → 422', [$c, $p]);
+        $pw3 = $pw2 . 'y';
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/change_password.php', ['current_password' => $pw2, 'new_password' => $pw3, 'confirm_password' => $pw3]));
+        ok($c === 200, 'profile/change_password → 200', [$c, $p]);
+        [$c] = asToken($utok, fn() => api('GET', 'api/mobile/me.php'));
+        ok($c === 200, 'profile/change_password: the current device stays signed in', $c);
+        [$c, $lg] = loginAs($uname, $pw3);
+        ok(!empty($lg['token']), 'login with changed password works', [$c]);
+
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/language.php', ['language' => 'sw']));
+        ok($c === 200, 'profile/language sw → 200', [$c, $p]);
+        $lang = asToken($utok, fn() => api('GET', 'api/mobile/me.php'))[1]['user']['language'] ?? null;
+        ok($lang === 'sw', 'me.language = sw', $lang);
+        [$c, $p] = asToken($utok, fn() => api('POST', 'api/mobile/profile/language.php', ['language' => 'fr']));
+        ok($c === 422, 'profile/language invalid → 422', [$c, $p]);
+
+        $png = sys_get_temp_dir() . "/zz_av_$RUN.png";
+        file_put_contents($png, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+        [$c, $a] = asToken($utok, fn() => api('POST', 'api/mobile/profile/avatar.php', ['avatar' => new CURLFile($png, 'image/png', 'a.png')], 'multipart'));
+        ok($c === 200 && str_starts_with((string)($a['avatar_url'] ?? ''), 'uploads/avatars/'), 'profile/avatar upload → avatar_url', [$c, $a]);
+        $avm = asToken($utok, fn() => api('GET', 'api/mobile/me.php'))[1]['user']['avatar_url'] ?? '';
+        ok($avm === ($a['avatar_url'] ?? '-'), 'me.avatar_url matches upload', $avm);
+        $bad = sys_get_temp_dir() . "/zz_av_$RUN.txt"; file_put_contents($bad, 'not an image');
+        [$c, $a2] = asToken($utok, fn() => api('POST', 'api/mobile/profile/avatar.php', ['avatar' => new CURLFile($bad, 'image/png', 'b.png')], 'multipart'));
+        ok($c === 422, 'profile/avatar: non-image content → 422', [$c, $a2]);
+        [$c, $a3] = asToken($utok, fn() => api('POST', 'api/mobile/profile/avatar.php', ['remove' => true]));
+        ok($c === 200 && ($a3['avatar_url'] ?? 'x') === '', 'profile/avatar remove → 200', [$c, $a3]);
+        @unlink($png); @unlink($bad);
+    }
+
+    // Delete the test user.
+    [$c, $d] = api('POST', 'api/mobile/users/delete.php', ['user_id' => $uid]);
+    ok(in_array($c, [200, 409], true), "users/delete test user → $c", [$c, $d]);
+    if ($c === 409) api('POST', 'api/mobile/users/toggle.php', ['user_id' => $uid, 'action' => 'deactivate']);
+    [$c, $l] = api('GET', 'api/mobile/users/list.php', ['search' => $uname, 'status' => 'active']);
+    ok((int)($l['total'] ?? -1) === 0, 'test user no longer active', $l['total'] ?? null);
+}
+
+if (section('settings')) {
+    // Company profile: read, edit one field, restore it.
+    [$c, $co] = api('GET', 'api/mobile/company/profile.php');
+    ok($c === 200 && array_key_exists('tin', $co['data'] ?? []) && array_key_exists('code_prefix', $co['data'] ?? []), 'company/profile GET → all fields', [$c, $co]);
+    $origSite = (string)($co['data']['website'] ?? '');
+    [$c, $u] = api('POST', 'api/mobile/company/profile.php', ['website' => "https://zz-$RUN.example.com"]);
+    ok($c === 200 && ($u['data']['website'] ?? '') === "https://zz-$RUN.example.com", 'company/profile POST website → 200 and echoed', [$c, $u]);
+    $site = api('GET', 'api/mobile/company/profile.php')[1]['data']['website'] ?? null;
+    ok($site === "https://zz-$RUN.example.com", 'company/profile: change persisted', $site);
+    api('POST', 'api/mobile/company/profile.php', ['website' => $origSite]);
+    [$c, $x] = api('POST', 'api/mobile/company/profile.php', ['email' => 'bad']);
+    ok($c === 422, 'company/profile: invalid email → 422', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/company/profile.php', ['currency' => 'TZSX']);
+    ok($c === 422, 'company/profile: invalid currency → 422', [$c, $x]);
+    $bad = sys_get_temp_dir() . "/zz_logo_$RUN.png"; file_put_contents($bad, '<?php echo 1;');
+    [$c, $x] = api('POST', 'api/mobile/company/profile.php', ['company_logo' => new CURLFile($bad, 'image/png', 'logo.png')], 'multipart');
+    ok($c === 422, 'company/profile: non-image logo rejected → 422', [$c, $x]);
+    @unlink($bad);
+    $meC = api('GET', 'api/mobile/me.php')[1] ?? [];
+    ok(array_key_exists('email', $meC['company'] ?? []) && array_key_exists('tin', $meC['company'] ?? []), 'me.company includes email/tin/…', array_keys($meC['company'] ?? []));
+    ok(isset($meC['pos_settings']['loyalty'], $meC['pos_settings']['products_display_limit_mobile']), 'me.pos_settings includes loyalty + mobile display limit', array_keys($meC['pos_settings'] ?? []));
+
+    // POS settings: change, verify, restore.
+    $orig = (string)($meC['pos_settings']['products_display_limit_mobile'] ?? 10);
+    $target = $orig === '20' ? '30' : '20';
+    [$c, $s] = api('POST', 'api/pos/save_pos_setting.php', ['key' => 'pos_products_display_limit_mobile', 'value' => $target]);
+    ok($c === 200, "save_pos_setting display_limit_mobile=$target → 200", [$c, $s]);
+    $now = (string)(api('GET', 'api/mobile/me.php')[1]['pos_settings']['products_display_limit_mobile'] ?? '');
+    ok($now === $target, 'me reflects new display limit', $now);
+    api('POST', 'api/pos/save_pos_setting.php', ['key' => 'pos_products_display_limit_mobile', 'value' => $orig]);
+    [$c, $s] = api('POST', 'api/pos/save_pos_setting.php', ['key' => 'pos_products_display_limit', 'value' => '15']);
+    ok($c === 422, 'save_pos_setting: display limit 15 → 422', [$c, $s]);
+    [$c, $s] = api('POST', 'api/pos/save_pos_setting.php', ['key' => 'pos_loyalty_spend_per_point', 'value' => '1000']);
+    $avail = !empty($meC['pos_settings']['loyalty']['available']);
+    ok($avail ? $c === 200 : $c === 403, 'save_pos_setting loyalty → ' . ($avail ? '200' : '403 (not in plan)'), [$c, $s]);
+}
+
+// =========================================================================
 if (section('misc')) {
     [$c, $j] = api('POST', 'api/mobile/login.php', ['username' => 'nobody-' . $RUN, 'password' => 'wrong'], false, false);
     ok(empty($j['success']), 'login: wrong credentials rejected', [$c, $j]);

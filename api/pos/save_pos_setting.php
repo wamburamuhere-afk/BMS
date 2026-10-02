@@ -61,7 +61,32 @@ $allowed = [
             ? (in_array($v, ['1', 'true'], true) ? '1' : '0')
             : null;
     },
+    // Same choices as the web POS Settings page.
+    'pos_products_display_limit' => static function (string $v): ?string {
+        return in_array((int)$v, [10, 20, 30, 50, 100], true) && ctype_digit($v) ? $v : null;
+    },
+    'pos_products_display_limit_mobile' => static function (string $v): ?string {
+        return in_array((int)$v, [10, 20, 30, 50, 100], true) && ctype_digit($v) ? $v : null;
+    },
+    'pos_loyalty_enabled' => static function (string $v): ?string {
+        return in_array($v, ['0', '1', 'true', 'false'], true)
+            ? (in_array($v, ['1', 'true'], true) ? '1' : '0')
+            : null;
+    },
+    'pos_loyalty_spend_per_point' => static function (string $v): ?string {
+        return is_numeric($v) && (float)$v >= 1 ? (string)(float)$v : null;
+    },
+    'pos_loyalty_redeem_value' => static function (string $v): ?string {
+        return is_numeric($v) && (float)$v >= 0 ? (string)(float)$v : null;
+    },
 ];
+
+// The web only saves loyalty settings for tenants entitled to POS Advanced.
+if (str_starts_with($key, 'pos_loyalty_') && !canView('pos_advanced')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Loyalty is not included in your plan']);
+    exit;
+}
 
 if (!isset($allowed[$key])) {
     http_response_code(400);

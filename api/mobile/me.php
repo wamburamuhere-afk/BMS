@@ -10,6 +10,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
 require_once __DIR__ . '/../../core/pos_nav.php';
+require_once __DIR__ . '/../../core/permissions.php';
 
 if (!mobileBearerAuth()) {
     http_response_code(401);
@@ -42,8 +43,15 @@ try {
         'name'     => get_setting('company_name',     ''),
         'logo_url' => get_setting('company_logo',     ''),
         'currency' => $currency,
-        'address'  => get_setting('company_address',  ''),
+        'address'  => get_setting('company_address',  '') ?: get_setting('company_physical_address', ''),
         'phone'    => get_setting('company_phone',    ''),
+        'email'            => get_setting('company_email', ''),
+        'website'          => get_setting('company_website', ''),
+        'tin'              => get_setting('company_tin', ''),
+        'vrn'              => get_setting('company_vrn', ''),
+        'physical_address' => get_setting('company_physical_address', ''),
+        'postal_address'   => get_setting('company_postal_address', ''),
+        'code_prefix'      => get_setting('company_code_prefix', ''),
     ];
 
     // ── Warehouses the user's scope allows ────────────────────────────────────
@@ -55,7 +63,8 @@ try {
              WHERE status = 'active'
              ORDER BY warehouse_name
         ");
-        $warehouses = $wh->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $warehouses = array_values(array_filter($wh->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            fn($w) => userCan('warehouse', (int)$w['warehouse_id'])));
     } catch (Exception $e) { /* table may not exist yet */ }
 
     // ── Active shift ──────────────────────────────────────────────────────────
@@ -100,12 +109,21 @@ try {
 
         // How many products to render in the grid on open (before any search/filter)
         'products_display_limit' => (int)get_setting('pos_products_display_limit', '20'),
+        'products_display_limit_mobile' => (int)get_setting('pos_products_display_limit_mobile', '10'),
 
         // VAT selector is shown in all POS modes (v3 change — Simple POS included)
         'vat_enabled'          => true,
 
         // Shop mode: true = "Duka/Shop" wording; false = "Ghala/Warehouse" wording
         'shop_mode'            => get_setting('shop_mode', '0') === '1',
+    ];
+    // Loyalty (POS Advanced plans only — same entitlement gate as the web settings page).
+    $loyaltyEntitled = function_exists('canView') && canView('pos_advanced');
+    $pos_settings['loyalty'] = [
+        'available'       => $loyaltyEntitled,
+        'enabled'         => $loyaltyEntitled && get_setting('pos_loyalty_enabled', '0') === '1',
+        'spend_per_point' => (float)get_setting('pos_loyalty_spend_per_point', '1000'),
+        'redeem_value'    => (float)get_setting('pos_loyalty_redeem_value', '50'),
     ];
 
     // ── Tax rates ─────────────────────────────────────────────────────────────
@@ -128,6 +146,10 @@ try {
         'reports_view'     => function_exists('canView')   ? canView('reports')     : false,
         'customers_view'   => function_exists('canView')   ? canView('customers')   : false,
         'customers_create' => function_exists('canCreate') ? canCreate('customers') : false,
+        // Admin-only settings screens (same gates as the web pages).
+        'users_manage'      => isAdmin(),
+        'company_edit'      => isAdmin(),
+        'pos_settings_edit' => function_exists('canEdit') ? canEdit('pos_config_settings') : false,
     ];
 
     echo json_encode([
@@ -143,6 +165,8 @@ try {
             'email'      => $user['email']      ?? '',
             'language'   => $language,
             'currency'   => $currency,
+            'is_admin'   => isAdmin(),
+            'avatar_url' => !empty($user['avatar']) ? 'uploads/avatars/' . basename($user['avatar']) : '',
         ],
         'company'      => $company,
         'warehouses'   => $warehouses,

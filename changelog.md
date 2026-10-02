@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(mobile-api): user management, own profile, company profile, POS settings (v25)
+
+**Files:**
+- `api/mobile/users/{list,roles,create,update,toggle,delete,shops}.php` + `_common.php` (new) — admin-only user management with the web's rules (username ≥ 4 + unique, email required + unique, password ≥ 8 + confirm, role must exist, plan seat limit). `toggle` delegates to `ajax/toggle_user.php` (ends web sessions, reactivation email) and also signs the user out of the app; `update` is partial, blocks changing your own role, and an admin-set password signs that user out of the app; `delete` blocks self-delete and returns 409 instead of an SQL error when the user has records; `shops` reads/replaces shop access (user_scope_overrides) exactly like Settings > Project & Warehouse Access. `create` is replay-safe (client_uuid).
+- `api/mobile/profile/{update,change_password,avatar,language}.php` (new) — own profile with the web My Profile rules; password change keeps the current device signed in and signs out the others; avatar upload with extension + real MIME + 2 MB checks; language stored as `user_language_{id}` like the web switch.
+- `api/mobile/company/profile.php` (new) — GET for any user, POST admin-only: the web Company Profile fields + logo upload (adds a real-MIME check the web form lacks; tenant-scoped upload dir).
+- `api/pos/save_pos_setting.php` — adds products display limits (10/20/30/50/100) and loyalty settings (POS Advanced only → 403 otherwise), same rules as the web POS Settings page.
+- `api/mobile/me.php` — `warehouses` now filtered by the user's shop access (was every active shop for everyone); adds `user.is_admin`, `user.avatar_url`, full company fields, `pos_settings.loyalty`, `pos_settings.products_display_limit_mobile`, and `permissions.users_manage/company_edit/pos_settings_edit`.
+- `core/mobile_auth.php` — Bearer requests now load the user's saved language (API messages were always English); records the authenticating token id.
+- `tests/test_mobile_api_http_cli.php` — `users` and `settings` sections.
+
+---
+
 ## 2026-10-02 — security: ajax user/role endpoints readable without login
 
 **Files:**
