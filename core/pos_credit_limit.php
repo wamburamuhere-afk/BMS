@@ -13,10 +13,11 @@
  * Sum of every non-voided, non-fully-paid POS sale's remaining balance for
  * one customer — the same per-sale formula api/pos/receive_payment.php
  * already uses (grand_total - Σpayments), summed across all their open sales.
- * A completed sale currently being finalised (mid-transaction) is not yet
- * committed/visible to this query, so it must be added by the caller.
+ * $excludeSaleId: the sale being finalised in the caller's open transaction —
+ * its own uncommitted row IS visible on the same connection, so it must be
+ * excluded or it is counted twice (once here, once as the new balance due).
  */
-function customerOutstandingBalance(PDO $pdo, int $customerId): float
+function customerOutstandingBalance(PDO $pdo, int $customerId, int $excludeSaleId = 0): float
 {
     if ($customerId <= 0) return 0.0;
 
@@ -30,8 +31,9 @@ function customerOutstandingBalance(PDO $pdo, int $customerId): float
           AND s.is_return_sale = 0
           AND s.sale_status NOT IN ('voided')
           AND s.payment_status != 'paid'
+          AND s.sale_id <> ?
     ");
-    $stmt->execute([$customerId]);
+    $stmt->execute([$customerId, $excludeSaleId]);
     return round((float)$stmt->fetchColumn(), 2);
 }
 
@@ -53,7 +55,7 @@ class PosCreditLimitExceededException extends Exception {}
  *
  * @throws Exception
  */
-function assertPosCreditLimitPermitted(PDO $pdo, int $customerId, float $newBalanceDue, bool $overridePermitted, string $customerName): void
+function assertPosCreditLimitPermitted(PDO $pdo, int $customerId, float $newBalanceDue, bool $overridePermitted, string $customerName, int $excludeSaleId = 0): void
 {
     if ($newBalanceDue <= 0.01 || $customerId <= 0) return;
 
@@ -64,7 +66,8 @@ function assertPosCreditLimitPermitted(PDO $pdo, int $customerId, float $newBala
     // credit_limit = 0 means no limit has been set → allow unlimited credit
     if ($creditLimit <= 0) return;
 
-    $existingOutstanding = customerOutstandingBalance($pdo, $customerId);
+    $existingOutstanding = customerOutstandingBalance($pdo, $customerId, $excludeSaleId);
+
     $projected = round($existingOutstanding + $newBalanceDue, 2);
 
     if ($projected > $creditLimit + 0.01 && !$overridePermitted) {

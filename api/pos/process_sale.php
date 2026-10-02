@@ -790,7 +790,8 @@ try {
         $custNameStmt = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ?");
         $custNameStmt->execute([$customer_id]);
         $custName = $custNameStmt->fetchColumn() ?: ('#' . $customer_id);
-        assertPosCreditLimitPermitted($pdo, (int)$customer_id, $balance_due, $overridePermitted, $custName);
+        assertPosCreditLimitPermitted($pdo, (int)$customer_id, $balance_due, $overridePermitted, $custName, (int)$sale_id);
+
         if ($overridePermitted) {
             logAudit($pdo, $user_id, 'pos_credit_limit_override', [
                 'entity_type' => 'pos_sale', 'entity_id' => $sale_id,

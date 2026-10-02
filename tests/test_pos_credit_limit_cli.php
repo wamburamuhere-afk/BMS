@@ -54,6 +54,11 @@ has($sale, 'PosCreditLimitExceededException', 'process_sale.php catches the dedi
 has($sale, "'error_code' => 'credit_limit_exceeded'", 'process_sale.php returns a structured error_code, not a string-matched message');
 has($sale, "canEdit('pos')", 'process_sale.php re-checks the override permission fresh, server-side');
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'error_code', 'client detects the structured error_code, not translated text');
+// The 409 lands in jQuery's error: callback, so the override dialog must be offered there too.
+$js = src($root, 'app/bms/pos/pos_scripts_new.php');
+$errPart = substr($js, (int)strpos($js, 'error: function(xhr)', (int)strpos($js, "api/pos/process_sale.php")));
+has(substr($errPart, 0, 1500), "credit_limit_exceeded", 'process_sale error: handler offers the manager override (HTTP 409 path)');
+has($sale, 'assertPosCreditLimitPermitted($pdo, (int)$customer_id, $balance_due, $overridePermitted, $custName, (int)$sale_id)', 'process_sale excludes the in-flight sale from the outstanding balance');
 
 section('3. Runtime — customerOutstandingBalance() (rolled back)');
 $custRow = $pdo->query("SELECT customer_id FROM customers WHERE status='active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
