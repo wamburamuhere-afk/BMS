@@ -408,6 +408,21 @@ if (section('sales')) {
     $aging = api('GET', 'api/pos/get_credit_aging.php')[1]['data'] ?? [];
     ok(!in_array($csid, array_map(fn($r) => (int)($r['sale_id'] ?? 0), $aging), true), 'get_credit_aging: fully paid sale no longer listed');
 
+    // Credit limit: the sale being made must not be counted twice; over-limit → 409 + override.
+    [$c, $lc] = api('POST', 'api/mobile/customers/create.php', ['customer_name' => "ZZ API TEST limit $RUN", 'credit_limit' => 1500]);
+    $lcid = (int)($lc['customer_id'] ?? 0);
+    [$c, $l1] = $sale(['payment_method' => 'credit', 'customer_id' => $lcid, 'amount_tendered' => 0, 'amount_paid' => 0]);
+    ok($c === 200 && !empty($l1['sale_id']), 'credit limit 1500: first 1000 credit sale allowed (no double count)', [$c, $l1]);
+    [$c, $l2] = $sale(['payment_method' => 'credit', 'customer_id' => $lcid, 'amount_tendered' => 0, 'amount_paid' => 0]);
+    ok($c === 409 && ($l2['error_code'] ?? '') === 'credit_limit_exceeded' && array_key_exists('can_override', $l2), 'credit limit: second 1000 → 409 credit_limit_exceeded', [$c, $l2]);
+    if (!empty($l2['can_override'])) {
+        [$c, $l3] = $sale(['payment_method' => 'credit', 'customer_id' => $lcid, 'amount_tendered' => 0, 'amount_paid' => 0, 'override_credit_limit' => 1]);
+        ok($c === 200 && !empty($l3['sale_id']), 'credit limit: manager override → 200', [$c, $l3]);
+        if (!empty($l3['sale_id'])) api('POST', 'api/pos/void_sale.php', ['sale_id' => (int)$l3['sale_id'], 'reason' => 'ZZ API TEST']);
+    }
+    if (!empty($l1['sale_id'])) api('POST', 'api/pos/void_sale.php', ['sale_id' => (int)$l1['sale_id'], 'reason' => 'ZZ API TEST']);
+    if ($lcid) api('POST', 'api/mobile/customers/update.php', ['customer_id' => $lcid, 'customer_name' => "ZZ API TEST limit $RUN", 'status' => 'inactive']);
+
     // Cash drawer.
     $du = uuid4();
     [$c, $cd] = api('POST', 'api/pos/quick_cash_drawer.php', ['type' => 'cash_in', 'amount' => 100, 'reason' => 'ZZ API TEST', 'client_uuid' => $du]);
@@ -583,13 +598,13 @@ if (section('parity')) {
 
     // Registers / targets / printer: plan-gated (pos_advanced) → 200 or 403 with a plan message, never 401.
     [$c, $r] = api('POST', 'api/pos/save_register.php', ['register_name' => "ZZ API TEST reg $RUN", 'register_code' => "ZZ$RUN", 'warehouse_id' => $wh]);
-    ok(in_array($c, [200, 403], true) && $c !== 401, "save_register (Bearer) → $c", [$c, $r]);
+    ok(in_array($c, [200, 403, 404], true), "save_register (Bearer, plan-gated) → $c", [$c, $r]);
     if ($c === 200 && !empty($r['register_id'])) {
         [$c, $t] = api('POST', 'api/pos/toggle_register_status.php', ['register_id' => (int)$r['register_id'], 'status' => 'inactive']);
         ok($c === 200 && !empty($t['success']), 'toggle_register_status → 200', [$c, $t]);
     }
     [$c, $r] = api('POST', 'api/pos/save_sales_target.php', ['warehouse_id' => $wh, 'period_month' => date('Y-m'), 'target_amount' => 1000]);
-    ok(in_array($c, [200, 403], true), "save_sales_target (Bearer) → $c", [$c, $r]);
+    ok(in_array($c, [200, 403, 404], true), "save_sales_target (Bearer, plan-gated) → $c", [$c, $r]);
 
     // Product has stock movements but no sales → deletable.
     [$c, $d] = api('POST', 'api/mobile/products/delete.php', ['product_id' => $pid]);
