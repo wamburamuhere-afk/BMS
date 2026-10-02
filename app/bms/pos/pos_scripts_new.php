@@ -190,6 +190,10 @@ const PT = {
     // Mobile product-grid render cap.
     showingFirstNProducts: <?= json_encode(t('Showing %shown% of %total% products — search to find more.')) ?>,
     showAllProducts: <?= json_encode(t('Show all %total% products')) ?>,
+    prevPage: <?= json_encode(t('Previous')) ?>,
+    nextPage: <?= json_encode(t('Next')) ?>,
+    productPages: <?= json_encode(t('Product pages')) ?>,
+    pageOfTotal: <?= json_encode(t('%from%–%to% of %total% products')) ?>,
     addedToCart: <?= json_encode(t('Added to cart')) ?>,
     // "Add Product" shortcut — Restock Product modal.
     restockSaving: <?= json_encode(t('Saving...')) ?>,
@@ -239,17 +243,28 @@ function openRestockProductModal() {
     new bootstrap.Modal(document.getElementById('restockProductModal')).show();
 }
 
-$(document).ready(function() {
-    // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
-    // the old plain <select> hard-limited to 50 rows with no search at all.
-    $('#customerSelect').select2({
+// Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search. $parent is
+// set only while the field sits inside the phone cart sheet: the sheet's focus
+// trap would otherwise block typing in a dropdown attached to <body>.
+function initCustomerSelect($parent) {
+    const $s = $('#customerSelect');
+    if ($s.hasClass('select2-hidden-accessible')) $s.select2('destroy');
+    const opts = {
         theme: 'bootstrap-5', width: '100%', placeholder: <?= json_encode(t('Walk-in Customer')) ?>, allowClear: true,
         ajax: {
             url: '<?= buildUrl('/api/pos/search_customers.php') ?>',
             dataType: 'json', delay: 300, cache: true,
             data: p => ({ q: p.term })
         }
-    });
+    };
+    if ($parent) opts.dropdownParent = $parent;
+    $s.select2(opts);
+}
+
+$(document).ready(function() {
+    // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
+    // the old plain <select> hard-limited to 50 rows with no search at all.
+    initCustomerSelect();
 
     // "Add Product" shortcut — Restock Product modal (only rendered when the
     // cashier has adjust_stock permission; pos_modals_new.php's own PHP gate).
@@ -711,61 +726,22 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 const DEFAULT_DISPLAY_LIMIT = window.innerWidth < 768
                     ? <?= (int)get_setting('pos_products_display_limit_mobile', '10') ?>
                     : <?= (int)get_setting('pos_products_display_limit', '20') ?>;
+                // Simple Mode on phones: page through the current (filtered) list,
+                // DEFAULT_DISPLAY_LIMIT tiles per page, instead of capping it.
+                if (POS_SIMPLE_MODE && window.innerWidth < 768) {
+                    posPager.list = response.data;
+                    posPager.size = Math.max(1, DEFAULT_DISPLAY_LIMIT);
+                    posRenderPage(1, false);
+                    return;
+                }
+
                 const isDefaultView = !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined);
                 const capped = isDefaultView && !posShowAllProducts && response.data.length > DEFAULT_DISPLAY_LIMIT;
                 const renderList = capped ? response.data.slice(0, DEFAULT_DISPLAY_LIMIT) : response.data;
 
                 console.log('Rendering', renderList.length, 'of', products.length, 'products...');
 
-                renderList.forEach(product => {
-                    const isService = product.is_service == 1 || product.is_service == '1';
-                    const projectStock = parseFloat(product.project_stock) || 0;
-                    
-                    // Determine image content
-                    let imageContent;
-                    if (product.image_url) {
-                        let imgPath = product.image_url;
-                        if (!imgPath.startsWith('http') && !imgPath.startsWith('/')) {
-                             imgPath = '../../../' + product.image_url; 
-                        }
-                        imageContent = `<img src="${imgPath}" alt="${caseFormatJs(product.product_name)}" style="height: 100%; max-width: 100%; object-fit: contain;">`;
-                    } else {
-                        imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
-                    }
-
-                    // Phase 31 (pos_upgrade_plan.md §8) — a variant parent (variant_count > 0)
-                    // renders as ONE tile; tapping it opens the variant picker instead of
-                    // going straight to quick-view/add-to-cart. A plain, non-variant product
-                    // (variant_count is always 0 unless pos_advanced is entitled) behaves
-                    // byte-for-byte as before.
-                    const variantCount = parseInt(product.variant_count) || 0;
-                    const tileClickHandler = variantCount > 0
-                        ? `openVariantPicker(${product.product_id})`
-                        : (POS_SIMPLE_MODE ? `posTapProduct(${product.product_id})` : `showProductQuickView(${product.product_id})`);
-
-                    const card = `
-                        <div class="col-6 col-sm-6 col-md-6 col-lg-4 col-xl-3">
-                            <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="${tileClickHandler}">
-                                <div class="card-body text-center p-2">
-                                    <div class="mb-2" style="height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-                                        ${imageContent}
-                                        ${!isService && product.stock_quantity <= 10 ? '<span class="badge bg-danger position-absolute top-0 end-0" style="font-size: 8px;">' + PT.lowStock + '</span>' : ''}
-                                        ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
-                                        ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
-                                    </div>
-                                    ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
-                                    <h6 class="card-title mb-1 small text-truncate fw-bold" title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}</h6>
-                                    ${POS_SIMPLE_MODE ? '' : `<p class="card-text text-muted small mb-1">${product.sku || ''}</p>`}
-                                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
-                                    ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
-                                        ${PT.qtyLabel} ${product.stock_quantity}
-                                    </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    grid.append(card);
-                });
+                renderList.forEach(product => grid.append(posProductTileHtml(product)));
 
                 if (capped && POS_SIMPLE_MODE) {
                     grid.append(`
@@ -814,6 +790,96 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
         }
     });
 }
+
+// One product tile (shared by the full grid and the phone pager).
+function posProductTileHtml(product) {
+    const isService = product.is_service == 1 || product.is_service == '1';
+    const projectStock = parseFloat(product.project_stock) || 0;
+    
+    // Determine image content
+    let imageContent;
+    if (product.image_url) {
+        let imgPath = product.image_url;
+        if (!imgPath.startsWith('http') && !imgPath.startsWith('/')) {
+             imgPath = '../../../' + product.image_url; 
+        }
+        imageContent = `<img src="${imgPath}" alt="${caseFormatJs(product.product_name)}" style="height: 100%; max-width: 100%; object-fit: contain;">`;
+    } else {
+        imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
+    }
+
+    // Phase 31 (pos_upgrade_plan.md §8) — a variant parent (variant_count > 0)
+    // renders as ONE tile; tapping it opens the variant picker instead of
+    // going straight to quick-view/add-to-cart. A plain, non-variant product
+    // (variant_count is always 0 unless pos_advanced is entitled) behaves
+    // byte-for-byte as before.
+    const variantCount = parseInt(product.variant_count) || 0;
+    const tileClickHandler = variantCount > 0
+        ? `openVariantPicker(${product.product_id})`
+        : (POS_SIMPLE_MODE ? `posTapProduct(${product.product_id})` : `showProductQuickView(${product.product_id})`);
+
+    const card = `
+        <div class="col-6 col-sm-6 col-md-6 col-lg-4 col-xl-3">
+            <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="${tileClickHandler}">
+                <div class="card-body text-center p-2">
+                    <div class="mb-2" style="height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                        ${imageContent}
+                        ${!isService && product.stock_quantity <= 10 ? '<span class="badge bg-danger position-absolute top-0 end-0" style="font-size: 8px;">' + PT.lowStock + '</span>' : ''}
+                        ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
+                        ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
+                    </div>
+                    ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
+                    <h6 class="card-title mb-1 small text-truncate fw-bold" title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}</h6>
+                    ${POS_SIMPLE_MODE ? '' : `<p class="card-text text-muted small mb-1">${product.sku || ''}</p>`}
+                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
+                    ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
+                        ${PT.qtyLabel} ${product.stock_quantity}
+                    </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
+                </div>
+            </div>
+        </div>
+    `;
+    return card;
+}
+
+// Simple Mode phone pager: the loaded (already filtered) list, posPager.size per page.
+const posPager = { list: [], size: 10, page: 1 };
+
+function posRenderPage(page, scroll) {
+    const pages = Math.max(1, Math.ceil(posPager.list.length / posPager.size));
+    posPager.page = Math.min(Math.max(1, page), pages);
+    const start = (posPager.page - 1) * posPager.size;
+    const grid = $('#productGrid');
+    grid.empty();
+    posPager.list.slice(start, start + posPager.size).forEach(p => grid.append(posProductTileHtml(p)));
+
+    if (pages > 1) {
+        // First, last, current ±1, with "…" between gaps — fits a phone.
+        const nums = [...new Set([1, pages, posPager.page - 1, posPager.page, posPager.page + 1])]
+            .filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+        const item = (label, target, opts) => `<li class="page-item${opts.active ? ' active' : ''}${opts.disabled ? ' disabled' : ''}">`
+            + (opts.disabled || opts.active || target === null
+                ? `<span class="page-link">${label}</span>`
+                : `<a class="page-link" href="#" data-page="${target}">${label}</a>`) + '</li>';
+        let html = item('&lsaquo; ' + PT.prevPage, posPager.page - 1, { disabled: posPager.page === 1 });
+        nums.forEach((n, i) => {
+            if (i > 0 && n - nums[i - 1] > 1) html += item('&hellip;', null, { disabled: true });
+            html += item(n, n, { active: n === posPager.page });
+        });
+        html += item(PT.nextPage + ' &rsaquo;', posPager.page + 1, { disabled: posPager.page === pages });
+        grid.append(`<div class="col-12 py-2"><nav aria-label="${PT.productPages}"><ul class="pagination justify-content-center flex-wrap mb-0" id="posProductPager">${html}</ul></nav>`
+            + `<div class="text-center text-muted small mt-1">${PT.pageOfTotal.replace('%from%', start + 1).replace('%to%', Math.min(start + posPager.size, posPager.list.length)).replace('%total%', posPager.list.length)}</div></div>`);
+    }
+    if (scroll) {
+        const top = document.getElementById('productGrid').getBoundingClientRect().top + window.scrollY - 140;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
+}
+
+$(document).on('click', '#posProductPager a[data-page]', function (e) {
+    e.preventDefault();
+    posRenderPage(parseInt($(this).data('page'), 10), true);
+});
 
 function loadProductsByCategory(categoryId) {
     console.log('Loading category:', categoryId);
@@ -3113,6 +3179,9 @@ function updateMobileCartFab() {
     const count = cart.length;
     if (count === 0) {
         $('#mobileCartFab').hide();
+        // Last line removed from inside the open sheet: close it rather than leave a stale list.
+        const sheet = document.getElementById('mobileCartOffcanvas');
+        if (sheet && sheet.classList.contains('show')) bootstrap.Offcanvas.getOrCreateInstance(sheet).hide();
         return;
     }
 
@@ -3122,7 +3191,7 @@ function updateMobileCartFab() {
 
     // Build compact item rows for the offcanvas body
     let html = '';
-    cart.forEach(function(item) {
+    cart.forEach(function(item, index) {
         const lineTotal = (item.discounted_price * item.quantity)
             .toLocaleString('en-US', {minimumFractionDigits: 2});
         const hasDiscount = item.discounted_price < item.price;
@@ -3130,6 +3199,28 @@ function updateMobileCartFab() {
             ? '<span class="text-decoration-line-through text-muted me-1">' + item.price.toLocaleString() + '</span>'
               + '<span class="text-danger">' + item.discounted_price.toLocaleString() + '</span>'
             : item.discounted_price.toLocaleString();
+        if (POS_SIMPLE_MODE) {
+            // Same handlers as the desktop cart table; serial lines keep a read-only qty.
+            const qtyCtl = item.serial_numbers
+                ? '<span class="badge bg-secondary fs-6">' + item.quantity + '</span>'
+                : '<button type="button" class="btn btn-outline-secondary pos-sheet-btn" onclick="updateCartQuantity(' + index + ', -1)" aria-label="-">&minus;</button>'
+                  + '<span class="fw-bold px-2" style="min-width:2rem;text-align:center;">' + item.quantity + '</span>'
+                  + '<button type="button" class="btn btn-outline-secondary pos-sheet-btn" onclick="updateCartQuantity(' + index + ', 1)" aria-label="+">+</button>';
+            html += '<div class="py-2 border-bottom">'
+                + '<div class="d-flex justify-content-between align-items-start">'
+                +   '<div class="fw-semibold" style="min-width:0;flex:1;padding-right:8px;font-size:0.95rem;">' + safeOutput(caseFormatJs(item.product_name))
+                +     (item.unit_label ? ' <span class="badge bg-light text-dark border">' + safeOutput(item.unit_label) + '</span>' : '') + '</div>'
+                +   '<div class="fw-bold text-end" style="white-space:nowrap;font-size:0.95rem;">' + POS_CURRENCY + ' ' + lineTotal + '</div>'
+                + '</div>'
+                + '<div class="d-flex justify-content-between align-items-center mt-1">'
+                +   '<div class="text-muted" style="font-size:0.85rem;">' + priceStr + '</div>'
+                +   '<div class="d-flex align-items-center gap-1">' + qtyCtl
+                +     '<button type="button" class="btn btn-outline-danger pos-sheet-btn ms-2" onclick="removeFromCart(' + index + ')" aria-label="' + PT.remove + '"><i class="bi bi-trash"></i></button>'
+                +   '</div>'
+                + '</div>'
+                + '</div>';
+            return;
+        }
         html += '<div class="d-flex justify-content-between align-items-center py-2 border-bottom">'
             + '<div style="min-width:0;flex:1;padding-right:10px;">'
             +   '<div class="fw-semibold text-truncate" style="font-size:0.82rem;">' + safeOutput(item.product_name) + '</div>'
@@ -3145,4 +3236,69 @@ function updateMobileCartFab() {
     // Mirror the total already computed by calculateCartTotal() — always in sync
     $('#mobileCartOffcanvasTotal').text($('#cartTotal').text());
 }
+
+// ── Simple Mode: the phone cart sheet carries the real payment controls ─────
+// While the sheet is open, the VAT/total block, the customer/payment fields and
+// the Pay/Split block are MOVED (not copied) into it, then put back on close —
+// so every existing id, handler and validation keeps working unchanged.
+const posSheet = { moved: [], open: false };
+
+function posSheetMoveIn() {
+    if (!POS_SIMPLE_MODE || posSheet.moved.length || window.innerWidth >= 768) return;
+    const extra = document.getElementById('mobileSheetExtra');
+    const foot  = document.getElementById('mobileSheetFooterSlot');
+    [['.pos-cart-summary', extra], ['.pos-pay-fields', extra], ['.pos-pay-actions', foot]].forEach(function (pair) {
+        const el = document.querySelector('#pos-container ' + pair[0]);
+        if (!el) return;
+        const home = document.createComment('pos-sheet-home');
+        el.parentNode.insertBefore(home, el);
+        pair[1].appendChild(el);
+        posSheet.moved.push({ el: el, home: home });
+    });
+    if (!posSheet.moved.length) return;
+    $('#mobileSheetDefaultFooter').addClass('d-none');
+    initCustomerSelect($('#mobileCartOffcanvas'));
+}
+
+function posSheetMoveOut() {
+    if (!posSheet.moved.length) return;
+    posSheet.moved.forEach(function (m) {
+        m.home.parentNode.insertBefore(m.el, m.home);
+        m.home.remove();
+    });
+    posSheet.moved = [];
+    $('#mobileSheetDefaultFooter').removeClass('d-none');
+    initCustomerSelect();
+}
+
+// Lift the cart button above the phone bottom menu instead of covering it.
+function posPlaceCartFab() {
+    const fab = document.getElementById('mobileCartFab');
+    const nav = document.querySelector('.bms-bnav');
+    if (!fab) return;
+    const navOn = nav && window.getComputedStyle(nav).display !== 'none';
+    fab.style.bottom = (navOn ? nav.offsetHeight + 14 : 24) + 'px';
+}
+
+$(function () {
+    posPlaceCartFab();
+    $(window).on('resize', posPlaceCartFab);
+
+    const sheet = document.getElementById('mobileCartOffcanvas');
+    if (!sheet || !POS_SIMPLE_MODE) return;
+    sheet.addEventListener('show.bs.offcanvas', function () { posSheet.open = true; posSheetMoveIn(); });
+    sheet.addEventListener('hidden.bs.offcanvas', function () { posSheet.open = false; posSheetMoveOut(); });
+
+    // Pay, Split and Add-customer open a SweetAlert/modal. The sheet's focus trap
+    // would block typing in those, so close the sheet first, then re-run the click
+    // once everything is back in place.
+    sheet.addEventListener('click', function (e) {
+        const btn = e.target.closest('.pos-pay-actions button, #btnQuickAddCustomer');
+        if (!btn || !posSheet.moved.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        $(sheet).one('hidden.bs.offcanvas', function () { btn.click(); });
+        bootstrap.Offcanvas.getOrCreateInstance(sheet).hide();
+    }, true);
+});
 </script>

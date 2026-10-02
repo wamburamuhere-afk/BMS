@@ -41,6 +41,8 @@ $report  = str_replace("\r\n", "\n", file_get_contents("$root/app/constant/repor
 preg_match('/function posTapProduct\(.*?\n}\n/s', $scripts, $mTap);
 preg_match('/const fmtDate = .*?;\n/', $report, $mFmt);
 preg_match('/function salesPeriodRange\(.*?\n    }\n/s', $report, $mRange);
+preg_match('/function updateMobileCartFab\(\) \{.*?\n}\n/s', $scripts, $mFab);
+preg_match('/const posPager = .*?\nfunction posRenderPage\(.*?\n}\n/s', $scripts, $mPager);
 ok('extracted posTapProduct / fmtDate / salesPeriodRange from source', !empty($mTap) && !empty($mFmt) && !empty($mRange));
 
 $node = trim((string)shell_exec('node -v 2>&1'));
@@ -101,6 +103,77 @@ JS;
             '2026-10-02..2026-10-02', '2026-09-28..2026-10-04', '2026-09-28..2026-10-04', '2026-09-28..2026-10-04',
             '2026-02-01..2026-02-28', '2028-02-01..2028-02-29', '2026-01-01..2026-12-31', '2026-12-28..2027-01-03',
         ], json_encode($o['ranges']));
+    }
+
+    // Phone cart sheet rows (Simple Mode branch of updateMobileCartFab).
+    $js2 = <<<'JS'
+const nodes = {}; let hidden = 0;
+const $ = sel => ({ html: v => { nodes[sel] = v; }, text: v => { nodes[sel] = v; }, show: () => {}, hide: () => { hidden++; } });
+const document = { getElementById: () => null };
+const POS_CURRENCY = 'TZS', PT = { remove: 'Remove' };
+const safeOutput = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const caseFormatJs = s => s;
+let POS_SIMPLE_MODE = true, cart = [
+  { product_name: 'Soda <b>x</b>', price: 500, discounted_price: 500, quantity: 2 },
+  { product_name: 'Phone', price: 1000, discounted_price: 1000, quantity: 1, serial_numbers: ['A1'] },
+  { product_name: 'Rice', price: 3000, discounted_price: 3000, quantity: 1, unit_label: 'Bag' },
+];
+__FAB__
+updateMobileCartFab();
+const simple = nodes['#mobileCartOffcanvasItems'];
+POS_SIMPLE_MODE = false; updateMobileCartFab(); const plain = nodes['#mobileCartOffcanvasItems'];
+cart = []; updateMobileCartFab();
+console.log(JSON.stringify({ simple, plain, emptyHidden: hidden }));
+JS;
+    file_put_contents("$tmp/t2.js", str_replace('__FAB__', $mFab[0] ?? '', $js2));
+    $o2 = json_decode((string)shell_exec('node ' . escapeshellarg("$tmp/t2.js") . ' 2>&1'), true);
+    ok('sheet rows: node ran updateMobileCartFab', is_array($o2), (string)shell_exec('node ' . escapeshellarg("$tmp/t2.js") . ' 2>&1'));
+    if (is_array($o2)) {
+        $s = $o2['simple'];
+        ok('sheet rows: -/+ wired to updateCartQuantity with the right index', str_contains($s, 'updateCartQuantity(0, -1)') && str_contains($s, 'updateCartQuantity(0, 1)') && str_contains($s, 'updateCartQuantity(2, 1)'));
+        ok('sheet rows: every line has a remove button', substr_count($s, 'onclick="removeFromCart(') === 3 && str_contains($s, 'removeFromCart(1)'));
+        ok('sheet rows: serial line qty is read-only (no -/+ for index 1)', !str_contains($s, 'updateCartQuantity(1,'));
+        ok('sheet rows: unit label shown', str_contains($s, '>Bag</span>'));
+        ok('sheet rows: product names escaped', str_contains($s, 'Soda &lt;b&gt;x&lt;/b&gt;') && !str_contains($s, '<b>x</b>'));
+        ok('sheet rows: non-Simple output unchanged (no -/+ / remove)', !str_contains($o2['plain'], 'updateCartQuantity') && !str_contains($o2['plain'], 'removeFromCart'));
+        ok('empty cart hides the cart button', $o2['emptyHidden'] >= 1);
+    }
+
+    // Phone product pager.
+    $js3 = <<<'JS'
+let html = '';
+const $ = sel => ({ empty: () => { html = ''; }, append: h => { html += h; } });
+const document = { getElementById: () => ({ getBoundingClientRect: () => ({ top: 0 }) }) };
+const window = { scrollY: 0, scrollTo: () => {} };
+const PT = { prevPage: 'Prev', nextPage: 'Next', productPages: 'Pages', pageOfTotal: '%from%-%to% of %total%' };
+const posProductTileHtml = p => '[T' + p.product_id + ']';
+__PAGER__
+const tiles = () => (html.match(/\[T\d+\]/g) || []).map(t => +t.slice(2, -1));
+const links = () => [...html.matchAll(/data-page="(\d+)"/g)].map(m => +m[1]);
+const active = () => (html.match(/page-item active"><span class="page-link">(\d+)</) || [])[1];
+const info = () => (html.match(/small mt-1">([^<]*)</) || [])[1];
+const r = {};
+posPager.list = Array.from({ length: 43 }, (_, i) => ({ product_id: i + 1 })); posPager.size = 10;
+posRenderPage(1, false); r.p1 = { tiles: tiles(), links: links(), active: active(), info: info(), prevDisabled: /page-item disabled"><span class="page-link">&lsaquo; Prev/.test(html), ellipsis: html.includes('&hellip;') };
+posRenderPage(3, false); r.p3 = { first: tiles()[0], links: links(), active: active(), ellipsis: html.includes('&hellip;') };
+posRenderPage(5, false); r.p5 = { tiles: tiles(), info: info(), nextDisabled: /page-item disabled"><span class="page-link">Next &rsaquo;/.test(html) };
+posRenderPage(99, false); r.clamped = { page: posPager.page, tiles: tiles().length };
+posPager.list = Array.from({ length: 10 }, (_, i) => ({ product_id: i + 1 })); posRenderPage(1, false); r.ten = { tiles: tiles().length, pager: html.includes('posProductPager') };
+posPager.list = []; posRenderPage(1, false); r.empty = { tiles: tiles().length, pager: html.includes('posProductPager') };
+console.log(JSON.stringify(r));
+JS;
+    file_put_contents("$tmp/t3.js", str_replace('__PAGER__', $mPager[0] ?? '', $js3));
+    $o3 = json_decode((string)shell_exec('node ' . escapeshellarg("$tmp/t3.js") . ' 2>&1'), true);
+    ok('pager: node ran posRenderPage', is_array($o3), (string)shell_exec('node ' . escapeshellarg("$tmp/t3.js") . ' 2>&1'));
+    if (is_array($o3)) {
+        ok('pager p1: 10 tiles (1-10), Prev disabled, active 1, links 2 · 5 · Next, "…" gap, "1-10 of 43"',
+           $o3['p1']['tiles'] === range(1, 10) && $o3['p1']['prevDisabled'] && $o3['p1']['active'] === '1'
+           && $o3['p1']['links'] === [2, 5, 2] && $o3['p1']['ellipsis'] && $o3['p1']['info'] === '1-10 of 43', json_encode($o3['p1']));
+        ok('pager p3: starts at product 21, links Prev2 · 1 2 4 5 · Next4, no gap', $o3['p3']['first'] === 21 && $o3['p3']['active'] === '3'
+           && $o3['p3']['links'] === [2, 1, 2, 4, 5, 4] && !$o3['p3']['ellipsis'], json_encode($o3['p3']));
+        ok('pager p5: last 3 tiles (41-43), Next disabled, "41-43 of 43"', $o3['p5']['tiles'] === [41, 42, 43] && $o3['p5']['nextDisabled'] && $o3['p5']['info'] === '41-43 of 43');
+        ok('pager clamps an out-of-range page to the last page', $o3['clamped'] === ['page' => 5, 'tiles' => 3]);
+        ok('pager hidden when everything fits on one page (10 items) or list is empty', $o3['ten'] === ['tiles' => 10, 'pager' => false] && $o3['empty'] === ['tiles' => 0, 'pager' => false]);
     }
 }
 
@@ -169,7 +242,17 @@ try {
     ok('Pay bar sticks to the screen bottom (no fixed-height panel)', (bool)preg_match('/\.pos-simple-layout \.pos-pay-actions \{\s*position: sticky;\s*bottom: 0;/', $pos)
        && !str_contains($pos, 'height: calc(100vh - var(--pos-top'));
     ok('cart buttons have text labels', substr_count($pos, 'class="pos-btn-label"') >= 3);
-    ok('search box gets the wide column', (bool)preg_match('/<div class="col">\s*<div class="input-group">\s*<input type="text" class="form-control" id="productSearch"/', $pos));
+    ok('search box gets the wide column, one row on phones (nowrap)', (bool)preg_match('/<div class="col">\s*<div class="input-group flex-nowrap pos-search-group">\s*<input type="text" class="form-control" id="productSearch"/', $pos));
+    ok('desktop Receive Stock is blue and hidden on phones', (bool)preg_match('/<div class="col-auto d-none d-md-block">\s*<button type="button" class="btn btn-primary pos-restock-btn" id="posRestockBtn"/', $pos));
+    ok('phone Receive Stock is blue, on the shop row, phone-only', (bool)preg_match('/id="posWarehouseId".*?<\/select>\s*<\/div>\s*<\/div>\s*<!--[^>]*-->\s*<div class="col-auto d-md-none">\s*<button type="button" class="btn btn-primary btn-sm pos-restock-btn"/s', $pos)
+       && str_contains($pos, '<div class="col col-md-'));
+    ok('old-shift notice is dismissible with shift id + 24h period',
+       (bool)preg_match('/id="posOldShiftNotice"\s*data-shift-id="(\d+)"\s*data-period="(\d+)"/', $pos, $mN)
+       && (int)$mN[1] === $shiftId
+       && (int)$mN[2] === (int)floor((time() - strtotime(date('Y-m-d 08:00:00', strtotime('-1 day')))) / 86400)
+       && str_contains($pos, 'id="posOldShiftDismiss"') && str_contains($pos, "'pos_oldshift_dismissed_' + n.dataset.shiftId"));
+    ok('phone sheet has slots for the moved payment controls', str_contains($pos, 'id="mobileSheetExtra"') && str_contains($pos, 'id="mobileSheetFooterSlot"') && str_contains($pos, 'id="mobileSheetDefaultFooter"'));
+    ok('FAB/sheet buttons escape the global .btn min-width', str_contains($pos, '#mobileCartFab { min-width: 0; }') && str_contains($pos, '.pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }'));
     ok('old-shift reminder shown for a shift opened yesterday', str_contains($pos, 'id="posOldShiftNotice"') && str_contains($pos, date('d/m/Y', strtotime('-1 day'))));
     ok('JS flag POS_SIMPLE_MODE = true', str_contains($pos, 'const POS_SIMPLE_MODE = true'));
     ok('header: Shop menu offers Receive Stock', str_contains($pos, 'id="simpleShopDropdown"') && str_contains($pos, 'pos?restock=1'));
@@ -206,6 +289,8 @@ try {
         ok("OFF: no $label", !str_contains($pos, $needle));
     }
     ok('OFF: search keeps col-md-5', (bool)preg_match('/<div class="col-md-5">\s*<div class="input-group">\s*<input type="text" class="form-control" id="productSearch"/', $pos));
+    ok('OFF: no Receive Stock buttons / dismiss button', !str_contains($pos, 'class="btn btn-primary btn-sm pos-restock-btn"') && !str_contains($pos, 'id="posRestockBtn"') && !str_contains($pos, 'id="posOldShiftDismiss"'));
+    ok('OFF: shop column unchanged', !str_contains($pos, '<div class="col col-md-'));
     ok('OFF: Pay button still inside the payment section', (bool)preg_match('/pos-pay-fields">.*?id="processPaymentBtn"/s', $pos));
     ok('OFF: JS flag POS_SIMPLE_MODE = false', str_contains($pos, 'const POS_SIMPLE_MODE = false'));
     ok('OFF: header keeps "Core" (no My Business label)', !str_contains($pos, 'My Business') && !str_contains($pos, 'Biashara Yangu'));
