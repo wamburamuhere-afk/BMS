@@ -14,6 +14,14 @@ Everything below is gated on `posSimpleModeEnabled()` (on by default for every n
 - `lang/sw.php` — Swahili for the new strings.
 - `tests/test_pos_simple_ux_cli.php` (new) — 52 assertions: JS executed in Node (tap/merge/popup rules, XSS-safe toast, date + period ranges), API `unit_count` with a real fixture row, pages rendered with Simple Mode ON vs OFF, fixes for everyone.
 
+## 2026-10-02 — fix(pos): Pay visible on first load + quieter activity feed (follow-up, found testing on demo)
+
+**Files:**
+- `app/bms/pos/pos.php` — replaced the fixed-height pinned cart panel (only pinned after scrolling; Pay sat below the screen on first load, measured 615px on a 569px viewport) with a `position: sticky; bottom: 0` Total + Pay/Split bar; adds a TOTAL line to that bar.
+- `app/bms/pos/pos_scripts_new.php` — mirrors `#cartTotal` into `#posPayTotal`.
+- `app/dashboard.php` — Simple Mode activity feed also drops `Filtered…` / `Searched…` entries (real actions such as deletions still show).
+- `tests/test_pos_simple_ux_cli.php` — 56 assertions (pay bar total + sticky rule; noise vs real activity fixtures).
+
 ## 2026-10-02 — feat(settings): hide module-irrelevant settings items based on active modules (PR #2377)
 
 **Files:**

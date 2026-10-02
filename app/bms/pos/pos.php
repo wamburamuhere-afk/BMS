@@ -569,6 +569,10 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             </div>
             <!-- Simple Mode: Pay/Split in their own block, pinned to the bottom of the cart panel. -->
             <div class="px-3 pb-3 pt-2 bg-white pos-pay-actions">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold"><?= t('TOTAL:') ?></span>
+                    <span class="fs-5 fw-bold text-success" id="posPayTotal"><?= htmlspecialchars($currency) ?> 0.00</span>
+                </div>
                 <?php endif; ?>
                 <!-- Action Buttons -->
                 <div class="d-grid gap-2">
@@ -969,24 +973,18 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     }
 }
 
-/* Simple Mode, tablet/desktop: the cart panel stays pinned under the fixed site
-   header so Total + Pay are always on screen; only the item list scrolls.
+/* Simple Mode, tablet/desktop: Total + Pay/Split stick to the bottom of the
+   screen from the first moment, however long the cart or page gets.
    overflow:clip (not hidden) — hidden makes the container a scroll box, which
    silently disables position:sticky for everything inside it. */
 @media (min-width: 768px) {
     #pos-container.pos-simple { overflow: clip; }
-    .pos-simple-layout > .col-md-5 {
+    .pos-simple-layout .pos-pay-actions {
         position: sticky;
-        top: var(--pos-top, 80px);
-        height: calc(100vh - var(--pos-top, 80px));
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+        bottom: 0;
+        z-index: 5;
+        box-shadow: 0 -4px 10px rgba(0,0,0,.08);
     }
-    .pos-simple-layout > .col-md-5 > * { flex: 0 0 auto; }
-    .pos-simple-layout #cartItemsScrollArea { flex: 1 1 0; min-height: 110px; }
-    .pos-simple-layout .pos-pay-fields { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
-    .pos-simple-layout .pos-pay-actions { box-shadow: 0 -4px 10px rgba(0,0,0,.06); }
     .pos-simple-layout > .col-md-7 > .sticky-top { top: var(--pos-top, 80px) !important; }
 }
 .pos-btn-label { font-size: .75rem; }

@@ -164,6 +164,10 @@ try {
     ok('Receive Stock button', str_contains($pos, 'id="posRestockBtn"'));
     ok('pinned-pay layout classes', str_contains($pos, 'pos-simple-layout') && str_contains($pos, 'pos-pay-actions') && str_contains($pos, 'id="pos-container" style') && str_contains($pos, 'px-0 pos-simple"'));
     ok('Pay button still has its id/handler (inside pos-pay-actions)', (bool)preg_match('/pos-pay-actions">.*?id="processPaymentBtn"/s', $pos));
+    ok('pinned Pay bar shows the total', (bool)preg_match('/pos-pay-actions">.*?id="posPayTotal".*?id="processPaymentBtn"/s', $pos)
+       && str_contains($scripts, "\$('#posPayTotal').text(\$('#cartTotal').text())"));
+    ok('Pay bar sticks to the screen bottom (no fixed-height panel)', (bool)preg_match('/\.pos-simple-layout \.pos-pay-actions \{\s*position: sticky;\s*bottom: 0;/', $pos)
+       && !str_contains($pos, 'height: calc(100vh - var(--pos-top'));
     ok('cart buttons have text labels', substr_count($pos, 'class="pos-btn-label"') >= 3);
     ok('search box gets the wide column', (bool)preg_match('/<div class="col">\s*<div class="input-group">\s*<input type="text" class="form-control" id="productSearch"/', $pos));
     ok('old-shift reminder shown for a shift opened yesterday', str_contains($pos, 'id="posOldShiftNotice"') && str_contains($pos, date('d/m/Y', strtotime('-1 day'))));
@@ -179,11 +183,18 @@ try {
     $rep2 = $run('app/constant/reports/sales_report.php', 'date_from=2026-01-05&date_to=2026-01-09');
     ok('explicit dates in URL win, no chip active', str_contains($rep2, 'value="2026-01-05"') && !preg_match('/btn-primary active rounded-pill/', $rep2));
 
+    // Fresh entries so they're the newest 10: noise must vanish, a real action must stay.
+    logActivity($pdo, $admin['user_id'], 'Filtered ZZTEST List', 'User applied search filters ZZTEST-ACT');
+    logActivity($pdo, $admin['user_id'], 'Searched ZZTEST', 'User searched ZZTEST-ACT');
+    logActivity($pdo, $admin['user_id'], 'View Page', 'User viewed ZZTEST-ACT page');
+    logActivity($pdo, $admin['user_id'], 'Deleted ZZTEST Item', 'User deleted item ZZTEST-ACT-REAL');
     $dash = $run('app/dashboard.php');
     ok('dashboard rendered, no PHP warnings', str_contains($dash, '<!--END-->') && !$warn($dash));
     preg_match('/bi-clock-history"><\/i>.{0,200}?<\/h6>(.{0,8000})/s', $dash, $mAct);
     $acts = $mAct[1] ?? '';
     ok('Recent Activities hides page-view noise', $acts !== '' && stripos($acts, 'User viewed') === false && stripos($acts, '[VIEW]') === false);
+    ok('Recent Activities hides Filtered/Searched entries', !str_contains($acts, 'applied search filters ZZTEST-ACT') && !str_contains($acts, 'searched ZZTEST-ACT'));
+    ok('Recent Activities keeps real actions', str_contains($acts, 'ZZTEST-ACT-REAL'));
 
     // ─────────────────────────────────────────────────────────────────────────
     section('4. Simple Mode OFF — none of it renders');
@@ -216,6 +227,7 @@ try {
     else $setSimple((string)$origSimple);
     if ($unitRowId) $pdo->prepare("DELETE FROM product_unit_conversions WHERE id = ?")->execute([$unitRowId]);
     if ($shiftId)   $pdo->prepare("DELETE FROM cash_register_shifts WHERE shift_id = ?")->execute([$shiftId]);
+    $pdo->exec("DELETE FROM activity_logs WHERE description LIKE '%ZZTEST-ACT%'");
     array_map('unlink', glob("$tmp/*") ?: []); @rmdir($tmp);
 }
 
