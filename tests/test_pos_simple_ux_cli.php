@@ -154,9 +154,9 @@ const active = () => (html.match(/page-item active"><span class="page-link">(\d+
 const info = () => (html.match(/small mt-1">([^<]*)</) || [])[1];
 const r = {};
 posPager.list = Array.from({ length: 43 }, (_, i) => ({ product_id: i + 1 })); posPager.size = 10;
-posRenderPage(1, false); r.p1 = { tiles: tiles(), links: links(), active: active(), info: info(), prevDisabled: /page-item disabled"><span class="page-link">&lsaquo; Prev/.test(html), ellipsis: html.includes('&hellip;') };
+posRenderPage(1, false); r.p1 = { tiles: tiles(), links: links(), active: active(), info: info(), prevDisabled: /page-item disabled"><span class="page-link"[^>]*>&lsaquo; Prev/.test(html), ellipsis: html.includes('&hellip;') };
 posRenderPage(3, false); r.p3 = { first: tiles()[0], links: links(), active: active(), ellipsis: html.includes('&hellip;') };
-posRenderPage(5, false); r.p5 = { tiles: tiles(), info: info(), nextDisabled: /page-item disabled"><span class="page-link">Next &rsaquo;/.test(html) };
+posRenderPage(5, false); r.p5 = { tiles: tiles(), info: info(), nextDisabled: /page-item disabled"><span class="page-link"[^>]*>Next &rsaquo;/.test(html) };
 posRenderPage(99, false); r.clamped = { page: posPager.page, tiles: tiles().length };
 posPager.list = Array.from({ length: 10 }, (_, i) => ({ product_id: i + 1 })); posRenderPage(1, false); r.ten = { tiles: tiles().length, pager: html.includes('posProductPager') };
 posPager.list = []; posRenderPage(1, false); r.empty = { tiles: tiles().length, pager: html.includes('posProductPager') };
@@ -175,6 +175,77 @@ JS;
         ok('pager clamps an out-of-range page to the last page', $o3['clamped'] === ['page' => 5, 'tiles' => 3]);
         ok('pager hidden when everything fits on one page (10 items) or list is empty', $o3['ten'] === ['tiles' => 10, 'pager' => false] && $o3['empty'] === ['tiles' => 0, 'pager' => false]);
     }
+
+    // One-row pager: compact levels + the fit loop (fake <ul> whose width tracks its text).
+    $js4 = <<<'JS'
+let html = '', ulHtml = '', maxW = 999;
+const ul = { get innerHTML() { return ulHtml; }, set innerHTML(v) { ulHtml = v; },
+             get scrollWidth() { return ulHtml.replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, 'x').length * 10; }, get clientWidth() { return maxW; } };
+const $ = sel => ({ empty: () => { html = ''; }, append: h => { html += h; const m = h.match(/id="posProductPager">([\s\S]*?)<\/ul>/); if (m) ulHtml = m[1]; } });
+const document = { getElementById: id => id === 'posProductPager' ? ul : { getBoundingClientRect: () => ({ top: 0 }) } };
+const window = { scrollY: 0, scrollTo: () => {} };
+const PT = { prevPage: 'Iliyotangulia', nextPage: 'Ifuatayo', productPages: 'P', pageOfTotal: '%from%-%to% of %total%' };
+const posProductTileHtml = p => '[T' + p.product_id + ']';
+__PAGER__
+const labels = () => [...ulHtml.matchAll(/class="page-link"[^>]*>([^<]*)</g)].map(m => m[1].replace('&lsaquo;', '<').replace('&rsaquo;', '>').replace('&hellip;', '...').trim());
+const r = {};
+posPager.list = Array.from({ length: 43 }, (_, i) => ({ product_id: i + 1 })); posPager.size = 10; posPager.page = 4;
+ulHtml = posPagerItems(5, 0); r.l0 = labels();
+ulHtml = posPagerItems(5, 1); r.l1 = labels();
+ulHtml = posPagerItems(5, 2); r.l2 = labels();
+maxW = 999; posRenderPage(4, false); r.wide = labels();
+maxW = 290; posRenderPage(4, false); r.medium = labels();
+maxW = 150; posRenderPage(4, false); r.narrow = labels();
+r.nowrap = /pagination justify-content-center flex-nowrap/.test(html) && !/flex-wrap /.test(html);
+r.titles = /title="Iliyotangulia" aria-label="Iliyotangulia"/.test(ulHtml) && /title="Ifuatayo" aria-label="Ifuatayo"/.test(ulHtml);
+console.log(JSON.stringify(r));
+JS;
+    file_put_contents("$tmp/t4.js", str_replace('__PAGER__', $mPager[0] ?? '', $js4));
+    $o4 = json_decode((string)shell_exec('node ' . escapeshellarg("$tmp/t4.js") . ' 2>&1'), true);
+    ok('one-row pager: node ran', is_array($o4), (string)shell_exec('node ' . escapeshellarg("$tmp/t4.js") . ' 2>&1'));
+    if (is_array($o4)) {
+        ok('level 0: < Iliyotangulia · 1 · … · 3 4 5 · Ifuatayo >', $o4['l0'] === ['< Iliyotangulia', '1', '...', '3', '4', '5', 'Ifuatayo >'], json_encode($o4['l0']));
+        ok('level 1: drops first/last + "…", keeps words', $o4['l1'] === ['< Iliyotangulia', '3', '4', '5', 'Ifuatayo >'], json_encode($o4['l1']));
+        ok('level 2: arrows only', $o4['l2'] === ['<', '3', '4', '5', '>'], json_encode($o4['l2']));
+        ok('fit loop: wide screen keeps level 0', $o4['wide'] === $o4['l0']);
+        ok('fit loop: medium screen compacts to level 1 (words kept)', $o4['medium'] === $o4['l1'], json_encode($o4['medium']));
+        ok('fit loop: very narrow screen goes to arrows', $o4['narrow'] === $o4['l2'], json_encode($o4['narrow']));
+        ok('pager never wraps (flex-nowrap) and arrows keep accessible names', $o4['nowrap'] && $o4['titles']);
+    }
+
+    // Old-shift notice ✕: inline script from pos.php, run against a fake DOM.
+    $posSrc = str_replace("\r\n", "\n", file_get_contents("$root/app/bms/pos/pos.php"));
+    preg_match("/<script>\n    \(function \(\) \{\n        var n = document.getElementById\('posOldShiftNotice'\);.*?\n    \}\)\(\);\n/s", $posSrc, $mNote);
+    $mNote = isset($mNote[0]) ? preg_replace('/^<script>\n/', '', $mNote[0]) : '';
+    $js5 = <<<'JS'
+const store = {};
+const localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+function run(period) {
+  const n = { dataset: { shiftId: '77', period: String(period) }, removed: false, remove() { this.removed = true; } };
+  let click = null;
+  const btn = { addEventListener: (ev, fn) => { if (ev === 'click') click = fn; } };
+  const document = { getElementById: id => id === 'posOldShiftNotice' ? n : btn };
+  (new Function('document', 'localStorage', __NOTE__))(document, localStorage);
+  return { n, click };
+}
+const r = {};
+let a = run(0); r.firstLoadShown = !a.n.removed; a.click(); r.clickRemoves = a.n.removed; r.stored = store['pos_oldshift_dismissed_77'];
+r.sameDayHidden = run(0).n.removed;
+r.after24hShown = !run(1).n.removed;
+a = run(1); a.click(); r.after24hDismiss = run(1).n.removed;
+r.after48hShown = !run(2).n.removed;
+console.log(JSON.stringify(r));
+JS;
+    file_put_contents("$tmp/t5.js", str_replace('__NOTE__', json_encode($mNote), $js5));
+    $o5 = json_decode((string)shell_exec('node ' . escapeshellarg("$tmp/t5.js") . ' 2>&1'), true);
+    ok('notice ✕: extracted + node ran', $mNote !== '' && is_array($o5), (string)shell_exec('node ' . escapeshellarg("$tmp/t5.js") . ' 2>&1'));
+    if (is_array($o5)) {
+        ok('notice ✕: shown on first load', $o5['firstLoadShown'] === true);
+        ok('notice ✕: tapping ✕ removes it (not just display:none)', $o5['clickRemoves'] === true && $o5['stored'] === '0');
+        ok('notice ✕: stays hidden on reload within the same 24h', $o5['sameDayHidden'] === true);
+        ok('notice ✕: comes back after 24h, can be dismissed again, back again after 48h', $o5['after24hShown'] && $o5['after24hDismiss'] && $o5['after48hShown']);
+    }
+    ok('notice ✕: no style.display left (d-flex is !important)', !preg_match("/n\.style\.display\s*=\s*'none'/", $posSrc));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
