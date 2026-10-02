@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-02 — fix(pos): Pay / Split / Add-customer did nothing when tapped inside the phone cart sheet
+
+**Files:**
+- `app/bms/pos/pos_scripts_new.php` — the sheet closed but the tap was never carried out: the replay ran from a jQuery `.one('hidden.bs.offcanvas')` handler, which Bootstrap 5 fires BEFORE the native listener that moves the controls back, so the replayed click hit the still-moved button and was swallowed again. Now the tap is stored in `posSheet.pending` and run by the native hidden listener after `posSheetMoveOut()`. Cart button hidden while the sheet is open (it covered Pay).
+- `app/bms/pos/pos.php` — the pay bar's own TOTAL line is hidden inside the sheet (the VAT/total block already shows it).
+- `tests/js/test_pos_mobile_sheet.js` (new) — real jQuery 3.7.0 + Bootstrap 5.3.2 in jsdom; on the old code Pay/Split/Add-customer each ran 0 times, now once each.
+- `tests/test_pos_simple_ux_cli.php` — 95 assertions (static checks + runs the jsdom test when jsdom is installed, SKIP otherwise).
+
 ## 2026-10-02 — fix(pos+mobile-api): notice ✕, one-row pager, stale-shift alert for POS users
 
 **Files:**

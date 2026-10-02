@@ -246,6 +246,25 @@ JS;
         ok('notice ✕: comes back after 24h, can be dismissed again, back again after 48h', $o5['after24hShown'] && $o5['after24hDismiss'] && $o5['after48hShown']);
     }
     ok('notice ✕: no style.display left (d-flex is !important)', !preg_match("/n\.style\.display\s*=\s*'none'/", $posSrc));
+
+    // Phone cart sheet: Pay/Split/Add-customer replay must happen in the native
+    // hidden listener AFTER the controls are moved back (jQuery's copy of the
+    // event fires first — replaying there re-hit the still-moved button).
+    ok('sheet: no replay from a jQuery .one(hidden) handler', !str_contains($scripts, "\$(sheet).one('hidden.bs.offcanvas'"));
+    ok('sheet: native hidden listener moves controls back, then runs the pending tap',
+       (bool)preg_match("/addEventListener\('hidden\.bs\.offcanvas', function \(\) \{.*?posSheetMoveOut\(\);.*?const pending = posSheet\.pending;.*?if \(pending\) pending\.click\(\);/s", $scripts));
+    ok('sheet: cart button hidden while the sheet is open; duplicate total hidden in the sheet',
+       str_contains($scripts, "\$('#mobileCartFab').css('visibility', 'hidden')") && str_contains($posSrc, '#mobileCartOffcanvas .pos-pay-total { display: none !important; }'));
+    $jsdomOut = (string)shell_exec('node ' . escapeshellarg("$root/tests/js/test_pos_mobile_sheet.js") . ' 2>&1');
+    $j = json_decode(trim($jsdomOut), true);
+    if (!is_array($j) && str_contains($jsdomOut, "Cannot find module 'jsdom'")) {
+        echo "  SKIP  sheet under real jQuery+Bootstrap (jsdom not installed: npm install jsdom@24)\n";
+    } else {
+        ok('sheet under real jQuery+Bootstrap (jsdom): Pay, Split, Add-customer each run once; controls return home',
+           is_array($j) && $j['payRan'] === 1 && $j['splitRan'] === 1 && $j['addCustomerRan'] === 1 && $j['secondPayRanOnce'] === true
+           && $j['desktopPayRuns'] === true && $j['backHome'] === true && $j['fabHiddenWhileOpen'] === true && $j['fabVisibleAfter'] === true
+           && $j['customerDropdownInSheet'] === true && $j['customerDropdownBackToBody'] === true, $jsdomOut);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
