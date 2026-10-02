@@ -4801,6 +4801,8 @@ return [
     'Hold'                                  => 'Hifadhi',
     'Held'                                  => 'Zilizohifadhiwa',
     'Show all %total% products'             => 'Onyesha bidhaa zote %total%',
+    'Product pages'                         => 'Kurasa za bidhaa',
+    '%from%–%to% of %total% products'       => 'Bidhaa %from%–%to% kati ya %total%',
     'Added to cart'                         => 'Imeongezwa kwenye kikapu',
 
 ];

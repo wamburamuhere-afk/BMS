@@ -1027,6 +1027,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 #mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
 #mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
+#posProductPager { gap: 4px; }
+#posProductPager .page-link { min-height: 40px; min-width: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
 @media (max-width: 767.98px) {
     #cartHeaderActions .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pos-btn-label { font-size: .65rem; }

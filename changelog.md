@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(pos): phone product pager (Simple Mode)
+
+**Files:**
+- `app/bms/pos/pos_scripts_new.php` — tile markup extracted to `posProductTileHtml()` (desktop grid unchanged). On phones in Simple Mode the loaded (already filtered by category/search) list is paged `pos_products_display_limit_mobile` (default 10) per page with a Bootstrap pagination bar — ‹ Previous · 1 · … · n · Next › plus "X–Y of N products" — replacing the "Show all N products" button there. Paging is client-side (no refetch).
+- `app/bms/pos/pos.php` — 40px pager touch targets.
+- `lang/sw.php` — "Product pages", "%from%–%to% of %total% products".
+- `tests/test_pos_simple_ux_cli.php` — 77 assertions (+ Node-executed pager: slices, active/disabled, ellipsis, clamping, single-page/empty).
+
 ## 2026-10-02 — feat(pos): phone cart sheet you can actually check out from (Simple Mode)
 
 **Files:**
