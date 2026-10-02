@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-02 — fix(mobile-api): warehouses/create 500 when pos_mode/status omitted
+
+**Files:**
+- `api/mobile/warehouses/create.php` — same ternary-NULL bug as the other create endpoints: omitting `pos_mode`/`status` stored NULL into NOT NULL columns → HTTP 500. Defaults now captured before the whitelist check; `maintenance` accepted as a status (matches the web form). Auto shop code now uses `nextCode($pdo, 'WH')` (sequential `PREFIX-WH-NNNN`) instead of `rand(100,999)`; duplicate-code check no longer ignores soft-deleted rows (the UNIQUE key covers them).
+- `tests/test_mobile_api_http_cli.php` — new real-HTTP harness for the mobile API (Bearer token via env vars); warehouses section covers name-only, form-encoded, full payload, duplicate code 409, invalid enums, missing name 422, client_uuid replay, update/list, delete.
+- `migrations/tenant/2026_10_02_cleanup_test_warehouses.php` — removes `ZZ %` test shops with no sales/stock history (and their default location).
+
+---
+
 ## 2026-10-01 — fix(mobile-api): products/delete 500; get_sales param aliases + search; restore sale dates
 
 **Files:**
