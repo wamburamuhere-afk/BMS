@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(pos): Simple Mode usability pass (tap-to-add, pinned Pay, Receive Stock, quick report periods)
+
+Everything below is gated on `posSimpleModeEnabled()` (on by default for every newly provisioned tenant) unless marked **[all]**.
+
+**Files:**
+- `api/pos/simple_products.php` — additive `unit_count` per product (separate fail-safe query on `product_unit_conversions`; `null` on failure so the terminal falls back to the popup). Existing fields unchanged.
+- `app/bms/pos/pos.php` — pinned cart panel (Total + Pay/Split always visible on tablet/desktop; `overflow: clip` instead of `hidden` so sticky works); labelled cart buttons (Discount/Clear/Hold/Held); "Receive Stock" button beside a full-width search; reminder + "Close the Day" when the open shift started on an earlier day. **[all]** cashier name from first/last name (was "User"); "+" menu `data-bs-display="static"` (global dropdown fadeIn animation flung it to the screen corner); cash balance shows the tenant currency code.
+- `app/bms/pos/pos_scripts_new.php` — `posTapProduct()`: tap adds 1 base unit / +1 on repeat; serials, extra units, restaurant shops or unknown unit info still open the quick-view popup; toast via `titleText` (no HTML). Remembers the last shop for multi-shop users; "Show all N products" button instead of the static cap note; SKU hidden on tiles; `?restock=1` opens the Receive Stock modal (only rendered for `pos_restock` holders). **[all]** balance refresh uses `POS_CURRENCY` instead of hard-coded "TSh".
+- `header.php` — "Core" menu labelled "My Business"; Shop menu gains "Receive Stock" (desktop dropdown + phone More sheet), gated `canView('pos') && canView('pos_restock')`.
+- `app/dashboard.php` — Recent Activities drops page-view log entries (View*/VIEW/view_list/FILTER/"User viewed…").
+- `app/constant/reports/sales_report.php` — defaults to this month with Today / This Week / This Month / This Year chips; date inputs reload on change. **[all]** dates shown DD/MM/YYYY parsed from the string (`new Date('YYYY-MM-DD')` showed the previous day west of UTC).
+- `lang/sw.php` — Swahili for the new strings.
+- `tests/test_pos_simple_ux_cli.php` (new) — 52 assertions: JS executed in Node (tap/merge/popup rules, XSS-safe toast, date + period ranges), API `unit_count` with a real fixture row, pages rendered with Simple Mode ON vs OFF, fixes for everyone.
+
 ## 2026-10-02 — feat(settings): hide module-irrelevant settings items based on active modules (PR #2377)
 
 **Files:**
