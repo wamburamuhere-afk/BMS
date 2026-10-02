@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-02 — fix(pos+mobile-api): notice ✕, one-row pager, stale-shift alert for POS users
+
+**Files:**
+- `app/bms/pos/pos.php` — old-shift notice ✕ now removes the element (the notice's `.d-flex` is `display:flex !important`, so `style.display='none'` never hid it — tapping ✕ did nothing). Pager links compact (no wrap inside a link).
+- `app/bms/pos/pos_scripts_new.php` — phone pager is always one row (`flex-nowrap`); `posPagerItems(pages, level)` compacts until it fits: level 0 first/last/current±1 with "…", level 1 current±1, level 2 arrow-only Previous/Next (accessible names kept).
+- `api/mobile/notifications/list.php` — "Cash register shift not closed" alert was gated on `canView('cash_register')` (Finance module), so POS-only tenants never got it. Now: admins / cash-register viewers see every stale shift; POS users see their own.
+- `api/mobile/me.php` — active shift picks the newest (`ORDER BY start_time DESC`).
+- `tests/test_mobile_shift_followups_cli.php` (new) — 11 assertions over real HTTP with Bearer tokens (fixtures created/removed); fails 4/11 on the old code.
+- `tests/test_pos_simple_ux_cli.php` — 91 assertions (+ Node: pager levels + fit loop, ✕ lifecycle across 24h/48h).
+
 ## 2026-10-02 — feat(pos): phone product pager (Simple Mode)
 
 **Files:**

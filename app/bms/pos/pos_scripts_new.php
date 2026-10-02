@@ -845,6 +845,25 @@ function posProductTileHtml(product) {
 // Simple Mode phone pager: the loaded (already filtered) list, posPager.size per page.
 const posPager = { list: [], size: 10, page: 1 };
 
+// Pager items. level 0: first, last, current ±1 with "…" gaps;
+// level 1: current ±1 only; level 2: also arrow-only Previous/Next.
+function posPagerItems(pages, level) {
+    const p = posPager.page;
+    const nums = [...new Set(level === 0 ? [1, pages, p - 1, p, p + 1] : [p - 1, p, p + 1])]
+        .filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+    const item = (label, target, opts) => `<li class="page-item${opts.active ? ' active' : ''}${opts.disabled ? ' disabled' : ''}">`
+        + (opts.disabled || opts.active || target === null
+            ? `<span class="page-link"${opts.title ? ` title="${opts.title}"` : ''}>${label}</span>`
+            : `<a class="page-link" href="#" data-page="${target}"${opts.title ? ` title="${opts.title}" aria-label="${opts.title}"` : ''}>${label}</a>`) + '</li>';
+    let html = item(level < 2 ? '&lsaquo; ' + PT.prevPage : '&lsaquo;', p - 1, { disabled: p === 1, title: PT.prevPage });
+    nums.forEach((n, i) => {
+        if (i > 0 && n - nums[i - 1] > 1) html += item('&hellip;', null, { disabled: true });
+        html += item(n, n, { active: n === p });
+    });
+    html += item(level < 2 ? PT.nextPage + ' &rsaquo;' : '&rsaquo;', p + 1, { disabled: p === pages, title: PT.nextPage });
+    return html;
+}
+
 function posRenderPage(page, scroll) {
     const pages = Math.max(1, Math.ceil(posPager.list.length / posPager.size));
     posPager.page = Math.min(Math.max(1, page), pages);
@@ -854,21 +873,13 @@ function posRenderPage(page, scroll) {
     posPager.list.slice(start, start + posPager.size).forEach(p => grid.append(posProductTileHtml(p)));
 
     if (pages > 1) {
-        // First, last, current ±1, with "…" between gaps — fits a phone.
-        const nums = [...new Set([1, pages, posPager.page - 1, posPager.page, posPager.page + 1])]
-            .filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
-        const item = (label, target, opts) => `<li class="page-item${opts.active ? ' active' : ''}${opts.disabled ? ' disabled' : ''}">`
-            + (opts.disabled || opts.active || target === null
-                ? `<span class="page-link">${label}</span>`
-                : `<a class="page-link" href="#" data-page="${target}">${label}</a>`) + '</li>';
-        let html = item('&lsaquo; ' + PT.prevPage, posPager.page - 1, { disabled: posPager.page === 1 });
-        nums.forEach((n, i) => {
-            if (i > 0 && n - nums[i - 1] > 1) html += item('&hellip;', null, { disabled: true });
-            html += item(n, n, { active: n === posPager.page });
-        });
-        html += item(PT.nextPage + ' &rsaquo;', posPager.page + 1, { disabled: posPager.page === pages });
-        grid.append(`<div class="col-12 py-2"><nav aria-label="${PT.productPages}"><ul class="pagination justify-content-center flex-wrap mb-0" id="posProductPager">${html}</ul></nav>`
+        grid.append(`<div class="col-12 py-2"><nav aria-label="${PT.productPages}"><ul class="pagination justify-content-center flex-nowrap mb-0" id="posProductPager">${posPagerItems(pages, 0)}</ul></nav>`
             + `<div class="text-center text-muted small mt-1">${PT.pageOfTotal.replace('%from%', start + 1).replace('%to%', Math.min(start + posPager.size, posPager.list.length)).replace('%total%', posPager.list.length)}</div></div>`);
+        // Always one row: compact step by step until it fits the screen width.
+        const ul = document.getElementById('posProductPager');
+        for (let level = 1; level <= 2 && ul && ul.scrollWidth > ul.clientWidth + 1; level++) {
+            ul.innerHTML = posPagerItems(pages, level);
+        }
     }
     if (scroll) {
         const top = document.getElementById('productGrid').getBoundingClientRect().top + window.scrollY - 140;

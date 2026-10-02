@@ -75,6 +75,7 @@ try {
                    start_time, starting_cash, status
               FROM cash_register_shifts
              WHERE user_id = ? AND status = 'active'
+             ORDER BY start_time DESC
              LIMIT 1
         ");
         $sh->execute([$user_id]);
