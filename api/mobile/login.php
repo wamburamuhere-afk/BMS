@@ -21,6 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+require_once __DIR__ . '/../../core/mobile_auth.php';
+mobileJsonBody();
+
 // Accept "username" (preferred) or "phone" (legacy alias)
 $phone       = trim($_POST['username'] ?? $_POST['phone'] ?? '');
 $password    = $_POST['password'] ?? '';

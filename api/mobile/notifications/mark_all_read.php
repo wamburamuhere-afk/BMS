@@ -3,7 +3,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/mobile_auth.php';
-mobileBearerAuth();
+mobileBearerAuth(); mobileJsonBody();
 
 if (!isAuthenticated()) {
     http_response_code(401);
