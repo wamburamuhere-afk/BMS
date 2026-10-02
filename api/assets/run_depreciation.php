@@ -39,7 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 csrf_check();
 
 $fy_year     = isset($_POST['fy_year']) && $_POST['fy_year'] !== '' ? (int)$_POST['fy_year'] : (int)date('Y');
-$scope_type  = in_array($_POST['scope_type'] ?? 'all', ['all', 'category', 'asset'], true) ? $_POST['scope_type'] : 'all';
+$_scope      = $_POST['scope_type'] ?? 'all';
+$scope_type  = in_array($_scope, ['all', 'category', 'asset'], true) ? $_scope : 'all';
 $scope_value = isset($_POST['scope_value']) && $_POST['scope_value'] !== '' ? $_POST['scope_value'] : null;
 // Back-compat: a bare asset_id still scopes to that asset.
 if ($scope_type === 'all' && isset($_POST['asset_id']) && $_POST['asset_id'] !== '') {

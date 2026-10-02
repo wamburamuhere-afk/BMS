@@ -1687,10 +1687,31 @@ function submitPayment(paymentData) {
         },
         error: function(xhr) {
             let msg = PT.genericErrorRetry;
+            let resp = null;
             try {
-                const resp = JSON.parse(xhr.responseText);
+                resp = JSON.parse(xhr.responseText);
                 if (resp && resp.message) msg = resp.message;
             } catch (e) {}
+            // process_sale answers a blocked credit sale with HTTP 409, which lands
+            // here rather than in success: — offer the manager override from here too.
+            if (resp && resp.error_code === 'credit_limit_exceeded' && resp.can_override) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: PT.paymentFailed,
+                    text: resp.message,
+                    showCancelButton: true,
+                    confirmButtonText: PT.overrideAndProceed,
+                    cancelButtonText: PT.cancel
+                }).then(r => {
+                    if (r.isConfirmed) {
+                        paymentData.override_credit_limit = 1;
+                        submitPayment(paymentData);
+                    } else {
+                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                    }
+                });
+                return;
+            }
             Swal.fire({
                 icon: 'error',
                 title: PT.error,

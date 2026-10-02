@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-02 — fix(pos,assets): credit-limit double count + web override dialog; depreciation scope NULL
+
+**Files:**
+- `core/pos_credit_limit.php` — `customerOutstandingBalance()` / `assertPosCreditLimitPermitted()` take an optional `$excludeSaleId`. The sale being finalised is already inserted in the caller's transaction and visible on the same connection, so it was counted twice (outstanding + this sale): a customer with a 1,500 limit could not take a 1,000 credit sale.
+- `api/pos/process_sale.php` — passes the in-flight `$sale_id` to the credit check.
+- `app/bms/pos/pos_scripts_new.php` — a blocked credit sale returns HTTP 409, which jQuery routes to `error:`; the manager "Override and Proceed" dialog only existed in `success:`, so web managers never saw it. Now offered from `error:` as well.
+- `api/assets/run_depreciation.php` — ternary-NULL `scope_type` when omitted (also skipped the bare `asset_id` back-compat path).
+- `tests/test_pos_credit_limit_cli.php` — wiring checks for both fixes. `tests/test_mobile_api_http_cli.php` — live credit-limit test (no double count, 409 + override).
+
+---
+
 ## 2026-10-02 — feat(mobile-api): web-parity — expense void/delete, stock adjust, catalog, product fields, registers, receipt
 
 **Files:**

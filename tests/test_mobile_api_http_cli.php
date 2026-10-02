@@ -408,6 +408,21 @@ if (section('sales')) {
     $aging = api('GET', 'api/pos/get_credit_aging.php')[1]['data'] ?? [];
     ok(!in_array($csid, array_map(fn($r) => (int)($r['sale_id'] ?? 0), $aging), true), 'get_credit_aging: fully paid sale no longer listed');
 
+    // Credit limit: the sale being made must not be counted twice; over-limit → 409 + override.
+    [$c, $lc] = api('POST', 'api/mobile/customers/create.php', ['customer_name' => "ZZ API TEST limit $RUN", 'credit_limit' => 1500]);
+    $lcid = (int)($lc['customer_id'] ?? 0);
+    [$c, $l1] = $sale(['payment_method' => 'credit', 'customer_id' => $lcid, 'amount_tendered' => 0, 'amount_paid' => 0]);
+    ok($c === 200 && !empty($l1['sale_id']), 'credit limit 1500: first 1000 credit sale allowed (no double count)', [$c, $l1]);
+    [$c, $l2] = $sale(['payment_method' => 'credit', 'customer_id' => $lcid, 'amount_tendered' => 0, 'amount_paid' => 0]);
+    ok($c === 409 && ($l2['error_code'] ?? '') === 'credit_limit_exceeded' && array_key_exists('can_override', $l2), 'credit limit: second 1000 → 409 credit_limit_exceeded', [$c, $l2]);
+    if (!empty($l2['can_override'])) {
+        [$c, $l3] = $sale(['payment_method' => 'credit', 'customer_id' => $lcid, 'amount_tendered' => 0, 'amount_paid' => 0, 'override_credit_limit' => 1]);
+        ok($c === 200 && !empty($l3['sale_id']), 'credit limit: manager override → 200', [$c, $l3]);
+        if (!empty($l3['sale_id'])) api('POST', 'api/pos/void_sale.php', ['sale_id' => (int)$l3['sale_id'], 'reason' => 'ZZ API TEST']);
+    }
+    if (!empty($l1['sale_id'])) api('POST', 'api/pos/void_sale.php', ['sale_id' => (int)$l1['sale_id'], 'reason' => 'ZZ API TEST']);
+    if ($lcid) api('POST', 'api/mobile/customers/update.php', ['customer_id' => $lcid, 'customer_name' => "ZZ API TEST limit $RUN", 'status' => 'inactive']);
+
     // Cash drawer.
     $du = uuid4();
     [$c, $cd] = api('POST', 'api/pos/quick_cash_drawer.php', ['type' => 'cash_in', 'amount' => 100, 'reason' => 'ZZ API TEST', 'client_uuid' => $du]);
