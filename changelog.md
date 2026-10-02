@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-02 — fix(mobile-api): process_sale error codes; JSON login + notifications; full live HTTP suite
+
+**Files:**
+- `api/pos/process_sale.php` — remaining business-rule throws had no code → HTTP 500: table/shop mismatch (422/409), serial-number selection (422/409), product not found (404), loyalty redemption (422). `tax_rate`/`discount_percent` item fields default to 0. Catch now covers `Throwable` and only rolls back when a transaction is open.
+- `api/mobile/login.php` — accepts a JSON body (was form-only → "Username and password are required").
+- `api/mobile/notifications/{mark_read,mark_all_read}.php` — accept JSON bodies via `mobileJsonBody()`.
+- `tests/test_mobile_api_http_cli.php` — `sales` (cash/credit sale, replay, return, void, receive payment, cash drawer, Z-report), `expenses` and `misc` (auth, tenant_info, notifications, quick customer, units, settings) sections.
+
+---
+
 ## 2026-10-02 — fix(mobile-api): hold_sale wrong hold_id; quick_restock replay double-add; JSON bodies; product create stock
 
 **Files:**

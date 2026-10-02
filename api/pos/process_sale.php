@@ -215,7 +215,7 @@ try {
         $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
         $tblChk->execute([$table_id, $warehouse_id]);
         if (!$tblChk->fetchColumn()) {
-            throw new Exception(wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.', true));
+            throw new Exception(wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.', true), 422);
         }
     }
 
@@ -238,7 +238,7 @@ try {
     // the till they signed into, defeating the whole point of the lock. A
     // shift on a still-unassigned ("legacy") register has no such constraint.
     if (!empty($shift['warehouse_id']) && (int)$shift['warehouse_id'] !== (int)$warehouse_id) {
-        throw new Exception(wLabel('This sale\'s warehouse does not match the warehouse your current shift is locked to.', 'This sale\'s shop does not match the shop your current shift is locked to.', true));
+        throw new Exception(wLabel('This sale\'s warehouse does not match the warehouse your current shift is locked to.', 'This sale\'s shop does not match the shop your current shift is locked to.', true), 409);
     }
 
     // Phase 8 (pos_upgrade_plan.md §7) — denormalise the register onto the sale
@@ -446,16 +446,16 @@ try {
         $serials = array_values(array_filter(array_map('trim', (array)($item['serial_numbers'] ?? []))));
 
         if (count($serials) !== $qty) {
-            throw new Exception(sprintf(t('Select exactly %d serial number(s) for \'%s\'.'), $qty, $db_product['product_name']));
+            throw new Exception(sprintf(t('Select exactly %d serial number(s) for \'%s\'.'), $qty, $db_product['product_name']), 422);
         }
         if (count($serials) !== count(array_unique($serials))) {
-            throw new Exception(sprintf(t('Duplicate serial number selected for \'%s\'.'), $db_product['product_name']));
+            throw new Exception(sprintf(t('Duplicate serial number selected for \'%s\'.'), $db_product['product_name']), 422);
         }
         $placeholders2 = implode(',', array_fill(0, count($serials), '?'));
         $chk = $pdo->prepare("SELECT COUNT(*) FROM product_serials WHERE product_id = ? AND warehouse_id = ? AND status = 'in_stock' AND serial_number IN ($placeholders2)");
         $chk->execute(array_merge([$pid, (int)$warehouse_id], $serials));
         if ((int)$chk->fetchColumn() !== count($serials)) {
-            throw new Exception(sprintf(t('One or more selected serial numbers for \'%s\' are no longer available.'), $db_product['product_name']));
+            throw new Exception(sprintf(t('One or more selected serial numbers for \'%s\' are no longer available.'), $db_product['product_name']), 409);
         }
     }
 
@@ -487,7 +487,7 @@ try {
         $db_product = $products_map[$pid] ?? null;
 
         if (!$db_product) {
-            throw new Exception("Product ID $pid not found");
+            throw new Exception("Product ID $pid not found", 404);
         }
 
         // Phase 30 (pos_upgrade_plan.md §9) — modifier choices for this line,
@@ -608,8 +608,8 @@ try {
         if (empty($item['manual_price_override'])) {
             $original_price += $modifierAdjustmentTotal;
         }
-        $tax_rate = floatval($item['tax_rate']);
-        $discount_percent = floatval($item['discount_percent']);
+        $tax_rate = floatval($item['tax_rate'] ?? 0);
+        $discount_percent = floatval($item['discount_percent'] ?? 0);
 
         $item_original_total = $original_price * $qty;
         $item_discounted_total = $requested_price * $qty;
@@ -689,7 +689,7 @@ try {
                 $serials = array_values(array_filter(array_map('trim', (array)($item['serial_numbers'] ?? []))));
                 $consumedSerials = consumeSerials($pdo, $pid, (int)$warehouse_id, $serials, $sale_item_id);
                 if (count($consumedSerials) !== count($serials)) {
-                    throw new Exception(sprintf(t('A selected serial number for \'%s\' was just sold by another transaction. Please reselect.'), $db_product['product_name']));
+                    throw new Exception(sprintf(t('A selected serial number for \'%s\' was just sold by another transaction. Please reselect.'), $db_product['product_name']), 409);
                 }
             } else {
                 // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
@@ -751,7 +751,7 @@ try {
     if ($redeem_points_requested > 0) {
         $redeemResult = redeemLoyaltyPoints($pdo, $customer_id, $redeem_points_requested, $sale_id, $user_id);
         if ($redeemResult['error']) {
-            throw new Exception($redeemResult['error']);
+            throw new Exception($redeemResult['error'], 422);
         }
         $loyalty_points_redeemed = $redeemResult['points'];
         $loyalty_discount = min($redeemResult['discount'], $calculated_total);
@@ -933,7 +933,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     ]);
     
 } catch (PosCreditLimitExceededException $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(409);
     echo json_encode([
         'success' => false,
@@ -944,11 +944,12 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         // re-checked fresh server-side on the retry regardless.
         'can_override' => canEdit('pos'),
     ]);
-} catch (Exception $e) {
-    $pdo->rollBack();
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    if (!($e instanceof Exception)) error_log('process_sale: ' . $e->getMessage());
     // Use the exception code as HTTP status when it's a known business/validation code;
     // fall back to 500 for unexpected errors.
-    $httpCode = in_array((int)$e->getCode(), [403, 409, 422]) ? (int)$e->getCode() : 500;
+    $httpCode = in_array((int)$e->getCode(), [403, 404, 409, 422], true) ? (int)$e->getCode() : 500;
     http_response_code($httpCode);
     echo json_encode([
         'success' => false,
