@@ -169,6 +169,7 @@ if ($_POST) {
 }
 
 // Settings are handled by global helpers in helpers.php
+$projectsEnabled = function_exists('projectsModuleActive') ? projectsModuleActive() : true;
 ?>
 
 <div class="container-fluid mt-4">
@@ -355,6 +356,7 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
+                        <?php if (tenantFeatureEnabled('hr')): ?>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('zoom_settings') ?>">
                             <div class="d-flex align-items-center">
@@ -367,6 +369,8 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
+                        <?php endif; ?>
+                        <?php if (tenantFeatureEnabled('ai_assistant')): ?>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('ai_settings') ?>">
                             <div class="d-flex align-items-center">
@@ -379,7 +383,10 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Projects') ?></div>
+                        <?php endif; ?>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">
+                            <?= $projectsEnabled ? t('Projects') : wLabel('Warehouse Access', 'Shop Access') ?>
+                        </div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('user_projects') ?>">
                             <div class="d-flex align-items-center">
@@ -387,8 +394,12 @@ if ($_POST) {
                                     <i class="bi bi-diagram-3"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Project Assignments') ?></h6>
-                                    <small class="text-muted"><?= t("Who's assigned to which project") ?></small>
+                                    <h6 class="mb-0 fw-bold">
+                                        <?= $projectsEnabled ? t('Project Assignments') : wLabel('Warehouse Access', 'Shop Access') ?>
+                                    </h6>
+                                    <small class="text-muted">
+                                        <?= $projectsEnabled ? t("Who's assigned to which project") : wLabel('Grant users access to warehouses', 'Grant users access to shops') ?>
+                                    </small>
                                 </div>
                             </div>
                         </a>
