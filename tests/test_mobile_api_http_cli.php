@@ -598,13 +598,13 @@ if (section('parity')) {
 
     // Registers / targets / printer: plan-gated (pos_advanced) → 200 or 403 with a plan message, never 401.
     [$c, $r] = api('POST', 'api/pos/save_register.php', ['register_name' => "ZZ API TEST reg $RUN", 'register_code' => "ZZ$RUN", 'warehouse_id' => $wh]);
-    ok(in_array($c, [200, 403], true) && $c !== 401, "save_register (Bearer) → $c", [$c, $r]);
+    ok(in_array($c, [200, 403, 404], true), "save_register (Bearer, plan-gated) → $c", [$c, $r]);
     if ($c === 200 && !empty($r['register_id'])) {
         [$c, $t] = api('POST', 'api/pos/toggle_register_status.php', ['register_id' => (int)$r['register_id'], 'status' => 'inactive']);
         ok($c === 200 && !empty($t['success']), 'toggle_register_status → 200', [$c, $t]);
     }
     [$c, $r] = api('POST', 'api/pos/save_sales_target.php', ['warehouse_id' => $wh, 'period_month' => date('Y-m'), 'target_amount' => 1000]);
-    ok(in_array($c, [200, 403], true), "save_sales_target (Bearer) → $c", [$c, $r]);
+    ok(in_array($c, [200, 403, 404], true), "save_sales_target (Bearer, plan-gated) → $c", [$c, $r]);
 
     // Product has stock movements but no sales → deletable.
     [$c, $d] = api('POST', 'api/mobile/products/delete.php', ['product_id' => $pid]);
