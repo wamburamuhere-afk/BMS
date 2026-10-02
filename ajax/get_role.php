@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/permissions.php';
+if (!isAuthenticated()) { http_response_code(401); header('Content-Type: application/json'); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
+if (!isAdmin()) { http_response_code(403); header('Content-Type: application/json'); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 header('Content-Type: application/json');
 
 if (!isset($_GET['role_id'])) {
