@@ -233,7 +233,11 @@ if (canView('document_library') || isAdmin()) {
 }
 
 // ── 4. Cash register shifts not closed from a previous day ───────────────────
-if (canView('cash_register')) {
+// 'cash_register' belongs to the Finance module, so a POS-only tenant never held
+// it and never got this alert. A POS user now sees their own stale shift;
+// admins and cash-register viewers still see everyone's.
+$seeAllShifts = isAdmin() || canView('cash_register');
+if ($seeAllShifts || canView('pos')) {
     try {
         $stmt = $pdo->prepare("
             SELECT 'cash_shift_open' AS type,
@@ -246,10 +250,11 @@ if (canView('cash_register')) {
             LEFT JOIN users u ON crs.user_id = u.user_id
             WHERE crs.status = 'active'
               AND DATE(crs.start_time) < CURDATE()
+              " . ($seeAllShifts ? '' : 'AND crs.user_id = ?') . "
             ORDER BY crs.start_time ASC
             LIMIT 5
         ");
-        $stmt->execute();
+        $stmt->execute($seeAllShifts ? [] : [$user_id]);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $row['id']        = (int)$row['id'];
             $row['days_open'] = (int)$row['days_open'];

@@ -229,10 +229,11 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         var key = 'pos_oldshift_dismissed_' + n.dataset.shiftId, period = parseInt(n.dataset.period, 10);
         var seen = null;
         try { seen = localStorage.getItem(key); } catch (e) {}
-        if (seen !== null && parseInt(seen, 10) >= period) n.style.display = 'none';
+        // remove(), not style.display: the notice's .d-flex is display:flex !important.
+        if (seen !== null && parseInt(seen, 10) >= period) { n.remove(); return; }
         document.getElementById('posOldShiftDismiss').addEventListener('click', function () {
             try { localStorage.setItem(key, String(period)); } catch (e) {}
-            n.style.display = 'none';
+            n.remove();
         });
     })();
     </script>
@@ -1028,7 +1029,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 #mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
 #mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
 #posProductPager { gap: 4px; }
-#posProductPager .page-link { min-height: 40px; min-width: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+#posProductPager .page-link { min-height: 40px; min-width: 38px; padding: .35rem .55rem; display: flex; align-items: center; justify-content: center; border-radius: 8px; white-space: nowrap; font-size: .9rem; }
 @media (max-width: 767.98px) {
     #cartHeaderActions .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pos-btn-label { font-size: .65rem; }
