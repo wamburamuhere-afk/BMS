@@ -596,7 +596,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             </div>
             <!-- Simple Mode: Pay/Split in their own block, pinned to the bottom of the cart panel. -->
             <div class="px-3 pb-3 pt-2 bg-white pos-pay-actions">
-                <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-2 pos-pay-total">
                     <span class="fw-bold"><?= t('TOTAL:') ?></span>
                     <span class="fs-5 fw-bold text-success" id="posPayTotal"><?= htmlspecialchars($currency) ?> 0.00</span>
                 </div>
@@ -1028,6 +1028,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 #mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
 #mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
+/* The sheet already shows the total in the VAT/total block above. */
+#mobileCartOffcanvas .pos-pay-total { display: none !important; }
 #posProductPager { gap: 4px; }
 #posProductPager .page-link { min-height: 40px; min-width: 38px; padding: .35rem .55rem; display: flex; align-items: center; justify-content: center; border-radius: 8px; white-space: nowrap; font-size: .9rem; }
 @media (max-width: 767.98px) {

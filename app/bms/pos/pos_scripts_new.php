@@ -3252,7 +3252,7 @@ function updateMobileCartFab() {
 // While the sheet is open, the VAT/total block, the customer/payment fields and
 // the Pay/Split block are MOVED (not copied) into it, then put back on close —
 // so every existing id, handler and validation keeps working unchanged.
-const posSheet = { moved: [], open: false };
+const posSheet = { moved: [], open: false, pending: null };
 
 function posSheetMoveIn() {
     if (!POS_SIMPLE_MODE || posSheet.moved.length || window.innerWidth >= 768) return;
@@ -3297,18 +3297,31 @@ $(function () {
 
     const sheet = document.getElementById('mobileCartOffcanvas');
     if (!sheet || !POS_SIMPLE_MODE) return;
-    sheet.addEventListener('show.bs.offcanvas', function () { posSheet.open = true; posSheetMoveIn(); });
-    sheet.addEventListener('hidden.bs.offcanvas', function () { posSheet.open = false; posSheetMoveOut(); });
+    sheet.addEventListener('show.bs.offcanvas', function () {
+        posSheet.open = true;
+        posSheetMoveIn();
+        $('#mobileCartFab').css('visibility', 'hidden'); // it sat on top of the Pay button
+    });
+    sheet.addEventListener('hidden.bs.offcanvas', function () {
+        posSheet.open = false;
+        posSheetMoveOut();
+        $('#mobileCartFab').css('visibility', '');
+        // Replay a Pay/Split/Add-customer tap only now, with every control back in
+        // the page. (jQuery's copy of this event fires before this native listener,
+        // so replaying from a jQuery handler re-hit the still-moved button.)
+        const pending = posSheet.pending;
+        posSheet.pending = null;
+        if (pending) pending.click();
+    });
 
     // Pay, Split and Add-customer open a SweetAlert/modal. The sheet's focus trap
-    // would block typing in those, so close the sheet first, then re-run the click
-    // once everything is back in place.
+    // would block typing in those, so close the sheet first, then run the click.
     sheet.addEventListener('click', function (e) {
         const btn = e.target.closest('.pos-pay-actions button, #btnQuickAddCustomer');
-        if (!btn || !posSheet.moved.length) return;
+        if (!btn || !posSheet.moved.length || !sheet.contains(btn)) return;
         e.preventDefault();
         e.stopPropagation();
-        $(sheet).one('hidden.bs.offcanvas', function () { btn.click(); });
+        posSheet.pending = btn;
         bootstrap.Offcanvas.getOrCreateInstance(sheet).hide();
     }, true);
 });
