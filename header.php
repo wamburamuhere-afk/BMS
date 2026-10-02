@@ -1613,7 +1613,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                              too, so a non-admin granted that specific permission sees and can
                              reach it. -->
                         <?php
-                        $_set_sys_visible = isAdmin() || canView('pos_config_settings') || canView('color_settings');
+                        // Color Setting only styles sales/purchase documents.
+                        $_set_color_visible = canView('color_settings') && (tenantFeatureEnabled('sales') || tenantFeatureEnabled('procurement'));
+                        $_set_sys_visible = isAdmin() || canView('pos_config_settings') || $_set_color_visible;
                         // notification_settings dropped 2026-07-31: folded into notification_rules.php
                         // (Settings > Admin > Notification Rules) as an admin-only collapsible panel,
                         // no longer delegable via Roles & Permissions.
@@ -1631,7 +1633,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> <?= t('Admin') ?></a></li>
                                 <?php endif; ?>
                                 <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> <?= t('POS Settings') ?></a></li><?php endif; ?>
-                                <?php if (canView('color_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> <?= t('Color Setting') ?></a></li><?php endif; ?>
+                                <?php if ($_set_color_visible): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> <?= t('Color Setting') ?></a></li><?php endif; ?>
                                 <?php endif; ?>
                                 <?php if ($_set_biz_visible): ?>
                                 <li><h6 class="dropdown-header"><?= t('Business Settings') ?></h6></li>
@@ -1998,7 +2000,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <div class="list-group list-group-flush">
                 <?php if (isAdmin()): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i><?= t('Admin') ?></a><?php endif; ?>
                 <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= t('POS Settings') ?></a><?php endif; ?>
-                <?php if (canView('color_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>
+                <?php if ($_set_color_visible): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>
                 <?php if (canView('tax_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i><?= t('Tax') ?></a><?php endif; ?>
             </div>
             <?php endif; ?>

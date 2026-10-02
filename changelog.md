@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(settings): hide module-irrelevant settings items based on active modules (PR #2377)
+
+**Files:**
+- `app/constant/settings/system_settings.php` — Zoom Integration sidebar link gated on `hr` module; AI Assistant link gated on `ai_assistant` module; Projects section header and link label dynamically adapt to "Warehouse Access" / "Shop Access" when `projects` module is off (reuses `projectsModuleActive()` from `core/project_scope.php`, same as `user_projects.php`)
+- `app/constant/settings/color_settings.php` — Sales Side section (Sales Order, Quotation, Invoice, Delivery Note, Credit Note, Sales Return) gated on `sales` module; Purchase Side (PO, Purchase Return, Debit Note, RFQ, Delivery Order) gated on `procurement` module; info notice + no Save button shown when both are inactive
+- `header.php` — Settings → Color Setting link (desktop + mobile sheet) shown only when `sales` or `procurement` is active
+- `core/feature_registry.php` — `mm_shifts` now owned by `mobile_money`, `pos_restock` by `pos` (both were ungated; fixes failing `test_feature_registry_cli` reverse-coverage check)
+- `core/role_permission_ui.php` (new) — Roles matrix helpers: module relevance for always-on keys (color_settings, payment_create, attendance_settings, policy_management, zoom_settings, sms_templates), list of page_keys that actually use Review/Approve, POS tab grouping, and `saveRolePermissionGrants()` which keeps a role's grants on rows hidden because their module is off (previously wiped on every save)
+- `app/constant/settings/user_roles.php` — matrix shows only rows relevant to active modules; Review/Approve only on pages with an approval workflow (column hidden in tabs with none, "—" on other rows); all POS permissions in one "Point of Sale" tab; verb legend; Quotations hint pointing to Sales Orders; save uses `saveRolePermissionGrants()`
+- `lang/sw.php` — Swahili for the legend and hints
+- `tests/test_role_permission_ui_cli.php` (new) — 113 assertions: POS+Warehouse simulation, drift guard scanning every canReview/canApprove use and review/approve notification events, real save rolled back
+
 ## 2026-10-02 — feat(mobile-api): user management, own profile, company profile, POS settings (v25)
 
 **Files:**
