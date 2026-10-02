@@ -212,12 +212,30 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     </div>
 
     <?php if ($pos_simple && $shift_from_earlier_day): ?>
-    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 rounded-0 mb-0 py-2" id="posOldShiftNotice">
+    <!-- Dismissible; comes back every 24 hours counted from the shift's opening time.
+         data-period = completed 24h periods since opening (server clock). -->
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 rounded-0 mb-0 py-2 pe-5 position-relative" id="posOldShiftNotice"
+         data-shift-id="<?= (int)$shift_active['shift_id'] ?>"
+         data-period="<?= (int)floor(max(0, time() - strtotime($shift_active['start_time'])) / 86400) ?>">
         <span><i class="bi bi-exclamation-triangle-fill me-1"></i>
             <?= sprintf(htmlspecialchars(t('This shift was opened on %s. Close the day so your cash count stays correct.')), '<strong>' . date('d/m/Y', strtotime($shift_active['start_time'])) . '</strong>') ?>
         </span>
         <button type="button" class="btn btn-sm btn-dark" onclick="endShift()"><i class="bi bi-power me-1"></i><?= t('Close the Day') ?></button>
+        <button type="button" class="btn-close position-absolute top-0 end-0 m-2" id="posOldShiftDismiss" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
     </div>
+    <script>
+    (function () {
+        var n = document.getElementById('posOldShiftNotice');
+        var key = 'pos_oldshift_dismissed_' + n.dataset.shiftId, period = parseInt(n.dataset.period, 10);
+        var seen = null;
+        try { seen = localStorage.getItem(key); } catch (e) {}
+        if (seen !== null && parseInt(seen, 10) >= period) n.style.display = 'none';
+        document.getElementById('posOldShiftDismiss').addEventListener('click', function () {
+            try { localStorage.setItem(key, String(period)); } catch (e) {}
+            n.style.display = 'none';
+        });
+    })();
+    </script>
     <?php endif; ?>
 
     <!-- Main POS Layout -->
@@ -228,7 +246,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             <div class="bg-light p-3 border-bottom sticky-top" style="z-index: 1020; top: 0;">
                 <!-- Warehouse & Project Selection -->
                 <div class="row g-2 mb-3">
-                    <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
+                    <div class="<?= ($pos_simple && $can_restock_product) ? 'col ' : '' ?>col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-house-door text-primary"></i></span>
                             <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
@@ -288,6 +306,14 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                             </select>
                         </div>
                     </div>
+                    <?php if ($pos_simple && $can_restock_product): ?>
+                    <!-- Phone: Receive Stock sits on the shop row (desktop copy is beside the search). -->
+                    <div class="col-auto d-md-none">
+                        <button type="button" class="btn btn-primary btn-sm pos-restock-btn" onclick="openRestockProductModal()">
+                            <i class="bi bi-box-arrow-in-down me-1"></i><?= t('Receive Stock') ?>
+                        </button>
+                    </div>
+                    <?php endif; ?>
                     <?php if (projectsModuleActive()): ?>
                     <div class="col-md-6">
                         <div class="input-group input-group-sm">
@@ -308,7 +334,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 
                 <div class="row g-2">
                     <div class="<?= $pos_simple ? 'col' : 'col-md-5' ?>">
-                        <div class="input-group">
+                        <div class="input-group<?= $pos_simple ? ' flex-nowrap pos-search-group' : '' ?>">
                             <input type="text" class="form-control" id="productSearch"
                                    placeholder="<?= t('Search product by name, SKU or barcode') ?>" autofocus>
                             <button class="btn btn-outline-secondary" type="button" onclick="searchProducts()">
@@ -344,8 +370,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                         </div>
                     </div>
                     <?php if ($pos_simple && $can_restock_product): ?>
-                    <div class="col-auto">
-                        <button type="button" class="btn btn-success" id="posRestockBtn" onclick="openRestockProductModal()">
+                    <div class="col-auto d-none d-md-block">
+                        <button type="button" class="btn btn-primary pos-restock-btn" id="posRestockBtn" onclick="openRestockProductModal()">
                             <i class="bi bi-box-arrow-in-down me-1"></i><?= t('Receive Stock') ?>
                         </button>
                     </div>
@@ -625,10 +651,16 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="<?= t('Close') ?>"></button>
     </div>
-    <div class="offcanvas-body px-3 py-0" style="overflow-y:auto;" id="mobileCartOffcanvasItems">
-        <!-- Populated by updateMobileCartFab() whenever the cart changes -->
+    <div class="offcanvas-body px-3 py-0" style="overflow-y:auto;">
+        <div id="mobileCartOffcanvasItems">
+            <!-- Populated by updateMobileCartFab() whenever the cart changes -->
+        </div>
+        <!-- Simple Mode: the real VAT/total + customer/payment controls are moved here while the sheet is open. -->
+        <div id="mobileSheetExtra"></div>
     </div>
-    <div class="p-3 border-top bg-white" style="flex-shrink:0;">
+    <!-- Simple Mode: the real Pay/Split block is moved here while the sheet is open. -->
+    <div id="mobileSheetFooterSlot" style="flex-shrink:0;"></div>
+    <div class="p-3 border-top bg-white" style="flex-shrink:0;" id="mobileSheetDefaultFooter">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="fw-semibold text-muted small"><?= t('Total:') ?></span>
             <span class="fw-bold fs-6 text-success" id="mobileCartOffcanvasTotal"><?= htmlspecialchars($currency) ?> 0.00</span>
@@ -988,6 +1020,15 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     .pos-simple-layout > .col-md-7 > .sticky-top { top: var(--pos-top, 80px) !important; }
 }
 .pos-btn-label { font-size: .75rem; }
+/* style.css gives every .btn min-width:85px — it turned the round cart button
+   into an oval and pushed the search row's buttons onto a second line. */
+#mobileCartFab { min-width: 0; }
+.pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }
+.pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+#mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
+#mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
+#posProductPager { gap: 4px; }
+#posProductPager .page-link { min-height: 40px; min-width: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
 @media (max-width: 767.98px) {
     #cartHeaderActions .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pos-btn-label { font-size: .65rem; }

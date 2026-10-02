@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(pos): phone product pager (Simple Mode)
+
+**Files:**
+- `app/bms/pos/pos_scripts_new.php` — tile markup extracted to `posProductTileHtml()` (desktop grid unchanged). On phones in Simple Mode the loaded (already filtered by category/search) list is paged `pos_products_display_limit_mobile` (default 10) per page with a Bootstrap pagination bar — ‹ Previous · 1 · … · n · Next › plus "X–Y of N products" — replacing the "Show all N products" button there. Paging is client-side (no refetch).
+- `app/bms/pos/pos.php` — 40px pager touch targets.
+- `lang/sw.php` — "Product pages", "%from%–%to% of %total% products".
+- `tests/test_pos_simple_ux_cli.php` — 77 assertions (+ Node-executed pager: slices, active/disabled, ellipsis, clamping, single-page/empty).
+
+## 2026-10-02 — feat(pos): phone cart sheet you can actually check out from (Simple Mode)
+
+**Files:**
+- `app/bms/pos/pos.php` — old-shift notice gets a ✕; dismissal is stored per shift and the notice returns every 24h counted from the shift's opening (server-computed `data-period`). Receive Stock is blue; on phones it sits on the shop row (desktop copy stays beside the search). Search row stays one line on phones (`flex-nowrap`). Cart sheet gains `#mobileSheetExtra` / `#mobileSheetFooterSlot` slots. CSS escapes the global `.btn { min-width: 85px }` (style.css) for the round cart button, search-row buttons and 40px sheet buttons.
+- `app/bms/pos/pos_scripts_new.php` — while the phone sheet is open, the real VAT/total, customer/payment-method/cash-tendered/change fields and Pay/Split block are MOVED into it and moved back on close (all ids/handlers/validation unchanged); customer Select2 re-attached to the sheet while inside it (`initCustomerSelect()`). Sheet lines get −/+/remove (existing `updateCartQuantity`/`removeFromCart`; serial lines read-only). Pay/Split/Add-customer close the sheet first, then run. Emptying the cart closes the sheet. Cart button lifted above the phone bottom menu (`posPlaceCartFab()`).
+- `tests/test_pos_simple_ux_cli.php` — 71 assertions (+ Node-executed sheet rows: indexes, remove, serial read-only, escaping, non-Simple unchanged; notice period/dismiss; restock placement; OFF render unchanged).
+
 ## 2026-10-02 — feat(pos): Simple Mode usability pass (tap-to-add, pinned Pay, Receive Stock, quick report periods)
 
 Everything below is gated on `posSimpleModeEnabled()` (on by default for every newly provisioned tenant) unless marked **[all]**.
