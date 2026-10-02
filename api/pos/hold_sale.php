@@ -32,7 +32,10 @@ try {
     // The client sends this as a raw JSON body (contentType: 'application/json'),
     // which PHP never populates $_POST for — every field below was silently null/0
     // regardless of what was actually sent, not just 'items'.
-    $body = json_decode(file_get_contents('php://input'), true) ?: [];
+    $body = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    if (isset($body['items']) && is_string($body['items'])) {
+        $body['items'] = json_decode($body['items'], true) ?: [];
+    }
 
     $user_id = $_SESSION['user_id'];
     $customer_id = $body['customer_id'] ?? null;
@@ -96,6 +99,8 @@ try {
         $tax,
         $total
     ]);
+    // Capture now: logActivity() below inserts into activity_log and would change lastInsertId().
+    $hold_id = (int)$pdo->lastInsertId();
 
     // Phase 30 — opening/loading a table's order occupies it immediately, not
     // only once the bill is finally closed, so a floor-plan view reflects
@@ -112,7 +117,7 @@ try {
     echo json_encode([
         'success' => true,
         'message' => t('Sale held successfully'),
-        'hold_id' => $pdo->lastInsertId(),
+        'hold_id' => $hold_id,
         'reference' => $hold_reference
     ]);
     
