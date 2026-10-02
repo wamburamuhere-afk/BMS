@@ -50,28 +50,37 @@ $phone          = trim($body['phone']    ?? '');
 $email          = trim($body['email']    ?? '');
 $contact_person = trim($body['contact_person'] ?? '');
 $notes          = trim($body['notes']    ?? '');
-$pos_mode       = in_array($body['pos_mode'] ?? 'retail', ['retail','restaurant','hybrid'], true) ? $body['pos_mode'] : 'retail';
-$status         = in_array($body['status'] ?? 'active', ['active','inactive'], true) ? $body['status'] : 'active';
+$_pm            = $body['pos_mode'] ?? 'retail';
+$pos_mode       = in_array($_pm, ['retail','restaurant','hybrid'], true) ? $_pm : 'retail';
+$_st            = $body['status'] ?? 'active';
+$status         = in_array($_st, ['active','inactive','maintenance'], true) ? $_st : 'active';
+
+require_once __DIR__ . '/../../../core/code_generator.php';
 
 try {
-    // Auto-generate code if not provided
-    if ($warehouse_code === '') {
-        $prefix = strtoupper(preg_replace('/[^A-Z0-9]/i', '', substr($warehouse_name, 0, 4)));
-        $warehouse_code = $prefix . '-' . rand(100, 999);
-    }
-
-    // Unique code guard
-    $dup = $pdo->prepare("SELECT 1 FROM warehouses WHERE warehouse_code = ? AND status != 'deleted'");
-    $dup->execute([$warehouse_code]);
-    if ($dup->fetchColumn()) {
-        http_response_code(409);
-        echo json_encode(['success'=>false,'message'=>"Shop code '$warehouse_code' is already in use"]);
-        exit;
-    }
-
     $user_id = (int)$_SESSION['user_id'];
+    // warehouse_code has a UNIQUE key across all statuses (incl. deleted), so check without a status filter.
+    $dup = $pdo->prepare("SELECT 1 FROM warehouses WHERE warehouse_code = ?");
+
+    if ($warehouse_code !== '') {
+        $dup->execute([$warehouse_code]);
+        if ($dup->fetchColumn()) {
+            http_response_code(409);
+            echo json_encode(['success'=>false,'message'=>"Shop code '$warehouse_code' is already in use"]);
+            exit;
+        }
+    }
 
     $pdo->beginTransaction();
+
+    if ($warehouse_code === '') {
+        // Sequential company code; skip any number already taken by a manually-typed code.
+        for ($i = 0; $i < 50; $i++) {
+            $warehouse_code = nextCode($pdo, 'WH');
+            $dup->execute([$warehouse_code]);
+            if (!$dup->fetchColumn()) break;
+        }
+    }
 
     $stmt = $pdo->prepare("
         INSERT INTO warehouses
