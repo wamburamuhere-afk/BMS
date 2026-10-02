@@ -2,6 +2,7 @@
 $page_title = "User Roles & Permissions";
 require_once __DIR__ . '/../../../roots.php';
 require_once 'core/permissions.php';
+require_once 'core/role_permission_ui.php';
 
 // Role/permission management is strictly admin-only by design — it is NOT
 // delegable via itself no matter what is granted (the 'user_roles'
@@ -54,11 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Update existing role
                 $stmt = $pdo->prepare("UPDATE roles SET role_name = ?, description = ?, updated_at = NOW() WHERE role_id = ?");
                 $stmt->execute([$role_name, $role_description, $role_id]);
-                
-                // Delete existing permissions for this role to avoid duplicates
-                $stmt = $pdo->prepare("DELETE FROM role_permissions WHERE role_id = ?");
-                $stmt->execute([$role_id]);
-                
+
                 $message = t('Role updated successfully');
             } else {
                 // Create new role
@@ -69,23 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = t('Role created successfully');
             }
             
-            // Add granular permissions
-            $stmt = $pdo->prepare("INSERT INTO role_permissions
-                (role_id, permission_id, can_view, can_create, can_edit, can_delete, can_review, can_approve)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            foreach ($submitted_permissions as $perm_id => $actions) {
-                $can_view    = isset($actions['view'])    ? 1 : 0;
-                $can_create  = isset($actions['create'])  ? 1 : 0;
-                $can_edit    = isset($actions['edit'])    ? 1 : 0;
-                $can_delete  = isset($actions['delete'])  ? 1 : 0;
-                $can_review  = isset($actions['review'])  ? 1 : 0;
-                $can_approve = isset($actions['approve']) ? 1 : 0;
+            // Grants on rows hidden because their module is off are kept, so
+            // switching the module back on restores them.
+            saveRolePermissionGrants($pdo, (int)$role_id, is_array($submitted_permissions) ? $submitted_permissions : [], loadRolePermissionMatrix($pdo));
 
-                if ($can_view || $can_create || $can_edit || $can_delete || $can_review || $can_approve) {
-                    $stmt->execute([$role_id, $perm_id, $can_view, $can_create, $can_edit, $can_delete, $can_review, $can_approve]);
-                }
-            }
-            
             $pdo->commit();
             $success_messages[] = $message;
 
@@ -225,36 +209,19 @@ $roles_stmt = $pdo->query("
 ");
 $roles = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Load all permissions (exclude hidden/disabled keys such as unused modules)
-$permissions_stmt = $pdo->query("
-    SELECT permission_id, page_key, page_name, description, module_name
-    FROM permissions
-    WHERE COALESCE(is_hidden, 0) = 0
-    ORDER BY COALESCE(module_name, 'Other'), page_name
-");
-$permissions = $permissions_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Only rows for modules this company has active (core/role_permission_ui.php).
+$permissions = loadRolePermissionMatrix($pdo)['visible'];
 
-// Drop permissions for modules this company's subscription does not include
-// (ternant.md Phase 11). Without this, an administrator would still see — and be
-// able to tick — "Tenders: View/Create/Edit/Delete" for a module the platform has
-// not granted them, and the staff member they granted it to would then walk into
-// a 404. Not a security hole (canView() refuses either way), but a confusing one
-// that generates support tickets. tenantModuleAllowsPage() returns true for every
-// page when no tenant is resolved, so single-tenant installs see no change.
-$permissions = array_values(array_filter($permissions, static function (array $p): bool {
-    return !function_exists('tenantModuleAllowsPage')
-        || tenantModuleAllowsPage((string)$p['page_key']);
-}));
-
-// Group permissions by module
 $permissions_by_module = [];
 foreach ($permissions as $permission) {
-    $module_name = $permission['module_name'] ?? 'Other';
-    if (!isset($permissions_by_module[$module_name])) {
-        $permissions_by_module[$module_name] = [];
-    }
-    $permissions_by_module[$module_name][] = $permission;
+    $permission['has_workflow'] = rolePermissionHasWorkflow((string)$permission['page_key']);
+    $permissions_by_module[rolePermissionTabName((string)$permission['page_key'], $permission['module_name'])][] = $permission;
 }
+ksort($permissions_by_module, SORT_NATURAL | SORT_FLAG_CASE);
+foreach ($permissions_by_module as &$_tab_rows) {
+    usort($_tab_rows, static fn($a, $b) => strnatcasecmp((string)$a['page_name'], (string)$b['page_name']));
+}
+unset($_tab_rows);
 
 // Load all users with their roles
 $users_stmt = $pdo->query("
@@ -509,7 +476,15 @@ function getRoleBadgeColor($role_name) {
                                                 <input type="text" class="form-control" id="permSearch" placeholder="<?= t('Search permissions...') ?>">
                                             </div>
                                         </h6>
-                                        
+
+                                        <div class="small text-muted mb-2 d-flex flex-wrap gap-3">
+                                            <span><strong><?= t('View') ?></strong> — <?= t('open the page and see its records') ?></span>
+                                            <span><strong><?= t('Create') ?></strong> — <?= t('add new records') ?></span>
+                                            <span><strong><?= t('Edit') ?></strong> — <?= t('change existing records') ?></span>
+                                            <span><strong><?= t('Delete') ?></strong> — <?= t('remove records') ?></span>
+                                            <span><strong style="color:#0d6efd;"><?= t('Review') ?></strong> / <strong style="color:#198754;"><?= t('Approve') ?></strong> — <?= t('move a document through its approval steps; shown only where an approval workflow exists') ?></span>
+                                        </div>
+
                                         <div class="permissions-matrix-container border rounded overflow-hidden">
                                             <!-- Module Tabs -->
                                             <ul class="nav nav-tabs bg-light px-3 pt-2" id="moduleTabs" role="tablist">
@@ -540,6 +515,7 @@ function getRoleBadgeColor($role_name) {
                                                 $first = true;
                                                 foreach ($permissions_by_module as $module_name => $module_permissions): 
                                                     $tabId = 'tab-' . md5($module_name);
+                                                    $tabHasWorkflow = in_array(true, array_column($module_permissions, 'has_workflow'), true);
                                                 ?>
                                                     <div class="tab-pane fade <?= $first ? 'show active' : '' ?>" id="<?= $tabId ?>" role="tabpanel">
                                                         <div class="table-responsive">
@@ -571,6 +547,7 @@ function getRoleBadgeColor($role_name) {
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="delete">
                                                                             </div>
                                                                         </th>
+                                                                        <?php if ($tabHasWorkflow): ?>
                                                                         <th class="text-center" style="width: 13%;">
                                                                             <div class="d-flex flex-column align-items-center">
                                                                                 <span class="small mb-1" style="color:#0d6efd;font-weight:700;"><?= t('REVIEW') ?></span>
@@ -583,6 +560,7 @@ function getRoleBadgeColor($role_name) {
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="approve">
                                                                             </div>
                                                                         </th>
+                                                                        <?php endif; ?>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
@@ -591,6 +569,9 @@ function getRoleBadgeColor($role_name) {
                                                                             <td class="ps-3">
                                                                                 <div class="fw-bold small perm-name"><?= htmlspecialchars($permission['page_name'] ?? '') ?></div>
                                                                                 <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars($permission['description'] ?? '') ?></div>
+                                                                                <?php if ($_note = rolePermissionNote((string)$permission['page_key'])): ?>
+                                                                                <div class="text-primary" style="font-size: 0.7rem;"><i class="bi bi-info-circle me-1"></i><?= htmlspecialchars(t($_note)) ?></div>
+                                                                                <?php endif; ?>
                                                                             </td>
                                                                             <td class="text-center">
                                                                                 <input type="checkbox" class="form-check-input perm-check view"
@@ -616,6 +597,7 @@ function getRoleBadgeColor($role_name) {
                                                                                        data-perm-id="<?= $permission['permission_id'] ?>"
                                                                                        data-module="<?= $tabId ?>">
                                                                             </td>
+                                                                            <?php if ($tabHasWorkflow && $permission['has_workflow']): ?>
                                                                             <td class="text-center">
                                                                                 <input type="checkbox" class="form-check-input perm-check review"
                                                                                        name="perms[<?= $permission['permission_id'] ?>][review]"
@@ -630,6 +612,10 @@ function getRoleBadgeColor($role_name) {
                                                                                        data-module="<?= $tabId ?>"
                                                                                        style="accent-color:#198754;">
                                                                             </td>
+                                                                            <?php elseif ($tabHasWorkflow): ?>
+                                                                            <td class="text-center text-muted" title="<?= htmlspecialchars(t('No approval workflow on this page')) ?>">—</td>
+                                                                            <td class="text-center text-muted" title="<?= htmlspecialchars(t('No approval workflow on this page')) ?>">—</td>
+                                                                            <?php endif; ?>
                                                                         </tr>
                                                                     <?php endforeach; ?>
                                                                 </tbody>
