@@ -109,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="card border-0 shadow-sm rounded-4">
         <div class="card-body p-4">
             <form method="POST">
+                <?php if (tenantFeatureEnabled('sales')): ?>
                 <h6 class="fw-bold text-uppercase small text-muted mb-3"><i class="bi bi-cart-check me-1"></i> <?= t('Sales Side') ?></h6>
 
                 <!-- Sales Order Print Template Colors (own family, unrelated to Quotation) -->
@@ -231,8 +232,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <hr class="my-4">
+                <?php endif; ?>
 
+                <?php if (tenantFeatureEnabled('procurement')): ?>
                 <h6 class="fw-bold text-uppercase small text-muted mb-3"><i class="bi bi-truck me-1"></i> <?= t('Purchase Side') ?></h6>
 
                 <!-- Purchase Order Print Template Colors (own family, unrelated to Purchase Return / Debit Note) -->
@@ -338,11 +340,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
+                <?php endif; ?>
+
+                <?php if (!tenantFeatureEnabled('sales') && !tenantFeatureEnabled('procurement')): ?>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-1"></i>
+                    <?= t('Print template colors are only available when the Sales or Procurement module is active.') ?>
+                </div>
+                <?php else: ?>
                 <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                     <button type="submit" name="save_colors" class="btn btn-primary px-5">
                         <i class="bi bi-save me-2"></i> <?= t('Save Color Settings') ?>
                     </button>
                 </div>
+                <?php endif; ?>
             </form>
         </div>
     </div>
