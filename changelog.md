@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-02 — security: ajax user/role endpoints readable without login
+
+**Files:**
+- `ajax/get_users.php`, `ajax/get_role.php`, `ajax/get_role_permissions.php` — had no authentication at all: anyone could fetch every user's username, email and role, and every role's permission matrix, on any tenant (confirmed on live). Now require a logged-in admin (401 / 403), matching the admin-only Users and User Roles pages that call them.
+
+---
+
 ## 2026-10-02 — fix(pos,assets): credit-limit double count + web override dialog; depreciation scope NULL
 
 **Files:**
