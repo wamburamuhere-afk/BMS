@@ -262,7 +262,27 @@ try {
 
         return $p;
     }, $raw_products);
-    
+
+    // Extra selling units per product, so the terminal knows whether a tap can
+    // add the base unit directly. null = unknown (lookup failed) -> the terminal
+    // falls back to the quantity/unit popup, never guesses.
+    $unitCounts = null;
+    $ids = array_column($products, 'product_id');
+    if ($ids) {
+        try {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $uc = $pdo->prepare("SELECT product_id, COUNT(*) AS n FROM product_unit_conversions WHERE product_id IN ($ph) GROUP BY product_id");
+            $uc->execute($ids);
+            $unitCounts = array_map('intval', $uc->fetchAll(PDO::FETCH_KEY_PAIR));
+        } catch (PDOException $e) {
+            error_log('simple_products.php: unit_count lookup failed — terminal will use the popup: ' . $e->getMessage());
+        }
+    }
+    foreach ($products as &$p) {
+        $p['unit_count'] = $unitCounts === null ? null : ($unitCounts[$p['product_id']] ?? 0);
+    }
+    unset($p);
+
     echo json_encode([
         'success' => true,
         'data' => $products,

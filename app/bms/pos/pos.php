@@ -103,6 +103,12 @@ $restaurant_pos_enabled = canView('restaurant_pos');
 // stock/pricing action reachable from POS, not a sales action).
 $can_add_new_product = canCreate('products');
 $can_restock_product  = canView('pos_restock');
+
+$pos_simple = posSimpleModeEnabled();
+// A shift still open from an earlier day: cash totals keep accumulating into it.
+$shift_from_earlier_day = $shift_active && date('Y-m-d', strtotime($shift_active['start_time'])) < date('Y-m-d');
+$cashier_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))
+    ?: ($_SESSION['username'] ?? t('User'));
 ?>
 <script>
 // Phase 30 (pos_upgrade_plan.md §9) — populated once from PHP, never fetched
@@ -114,9 +120,10 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
 // cashier can never sell against a different shop mid-shift (see the lock
 // logic near the bottom of pos_scripts_new.php).
 const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_active['warehouse_id'])) ? (int)$shift_active['warehouse_id'] : null) ?>;
+const POS_USER_ID = <?= (int)$user_id ?>;
 </script>
 
-<div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
+<div class="container-fluid px-0<?= $pos_simple ? ' pos-simple' : '' ?>" id="pos-container" style="height: auto; min-height: 100vh;">
     <!-- Hidden input that captures barcode scanner keystrokes (scanner acts as keyboard) -->
     <input id="hiddenScanInput" type="text" autocomplete="off" aria-hidden="true"
            style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"
@@ -167,7 +174,7 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
             </h4>
             <small class="opacity-75" id="posShiftInfoLine">
                 <?php if ($shift_active): ?>
-                <span class="pos-shift-info-item"><?= t('Shift:') ?> <?= $shift_active['shift_code'] ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Cashier:') ?> <?= htmlspecialchars($_SESSION['username'] ?? t('User')) ?></span>
+                <span class="pos-shift-info-item"><?= t('Shift:') ?> <?= $shift_active['shift_code'] ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Cashier:') ?> <?= htmlspecialchars($cashier_name) ?></span>
                 <?php else: ?>
                 <?= t('No active shift') ?>
                 <?php endif; ?>
@@ -176,8 +183,8 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
         <div class="d-flex align-items-center gap-3">
             <div class="text-center">
                 <div class="fs-6"><?= t('Cash Balance') ?></div>
-                <div class="fs-4 fw-bold cash-balance-display"><?= format_currency($cash_balance, $currency) ?></div>
-                <small><?= t('Starting:') ?> <?= format_currency($starting_cash, $currency) ?></small>
+                <div class="fs-4 fw-bold cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></div>
+                <small><?= t('Starting:') ?> <?= htmlspecialchars($currency) ?> <?= number_format((float)$starting_cash, 2) ?></small>
             </div>
             <div class="vr text-white opacity-50"></div>
             <div id="posShiftButtons">
@@ -204,8 +211,17 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
         </div>
     </div>
 
+    <?php if ($pos_simple && $shift_from_earlier_day): ?>
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 rounded-0 mb-0 py-2" id="posOldShiftNotice">
+        <span><i class="bi bi-exclamation-triangle-fill me-1"></i>
+            <?= sprintf(htmlspecialchars(t('This shift was opened on %s. Close the day so your cash count stays correct.')), '<strong>' . date('d/m/Y', strtotime($shift_active['start_time'])) . '</strong>') ?>
+        </span>
+        <button type="button" class="btn btn-sm btn-dark" onclick="endShift()"><i class="bi bi-power me-1"></i><?= t('Close the Day') ?></button>
+    </div>
+    <?php endif; ?>
+
     <!-- Main POS Layout -->
-    <div class="row g-0">
+    <div class="row g-0<?= $pos_simple ? ' pos-simple-layout' : '' ?>">
         <!-- Left Column: Product Selection -->
         <div class="col-md-7" style="border-right: 1px solid #dee2e6;">
             <!-- Product Search & Categories -->
@@ -291,7 +307,7 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                 </div>
 
                 <div class="row g-2">
-                    <div class="col-md-5">
+                    <div class="<?= $pos_simple ? 'col' : 'col-md-5' ?>">
                         <div class="input-group">
                             <input type="text" class="form-control" id="productSearch"
                                    placeholder="<?= t('Search product by name, SKU or barcode') ?>" autofocus>
@@ -299,8 +315,11 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                                 <i class="bi bi-search"></i>
                             </button>
                             <?php if ($can_add_new_product || $can_restock_product): ?>
+                            <!-- data-bs-display="static": the global .dropdown-menu fadeIn
+                                 animation overrides Popper's transform, which flung this
+                                 menu to the screen's top-right corner. -->
                             <button class="btn btn-outline-success dropdown-toggle" type="button"
-                                    id="addProductDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                                    id="addProductDropdown" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
                                     title="<?= t('Add Product') ?>">
                                 <i class="bi bi-plus-circle"></i>
                             </button>
@@ -324,6 +343,13 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                             <?php endif; ?>
                         </div>
                     </div>
+                    <?php if ($pos_simple && $can_restock_product): ?>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-success" id="posRestockBtn" onclick="openRestockProductModal()">
+                            <i class="bi bi-box-arrow-in-down me-1"></i><?= t('Receive Stock') ?>
+                        </button>
+                    </div>
+                    <?php endif; ?>
                     <div class="col-12 mt-2">
                         <div class="category-scroll-strip" id="categoryButtons">
                             <button type="button" class="btn btn-sm btn-outline-primary active" onclick="loadProductsByCategory('all')">
@@ -357,17 +383,17 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                     <div id="cartHeaderActions" class="btn-group btn-group-sm">
                         <?php if (canEdit('pos_discount_override')): ?>
                         <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="<?= t('Apply Discount') ?>">
-                            <i class="bi bi-percent"></i>
+                            <i class="bi bi-percent"></i><?php if ($pos_simple): ?><span class="pos-btn-label"> <?= t('Discount') ?></span><?php endif; ?>
                         </button>
                         <?php endif; ?>
                         <button class="btn btn-outline-danger" onclick="clearCart()" title="<?= t('Clear Cart') ?>">
-                            <i class="bi bi-trash"></i>
+                            <i class="bi bi-trash"></i><?php if ($pos_simple): ?><span class="pos-btn-label"> <?= t('Clear') ?></span><?php endif; ?>
                         </button>
                         <button class="btn btn-outline-secondary" onclick="holdSale()" title="<?= t('Hold Sale') ?>">
-                            <i class="bi bi-pause"></i>
+                            <i class="bi bi-pause"></i><?php if ($pos_simple): ?><span class="pos-btn-label"> <?= t('Hold') ?></span><?php endif; ?>
                         </button>
                         <button class="btn btn-outline-info" onclick="showHeldSales()" title="<?= t('View Held Sales') ?>">
-                            <i class="bi bi-list"></i>
+                            <i class="bi bi-list"></i><?php if ($pos_simple): ?><span class="pos-btn-label"> <?= t('Held') ?></span><?php endif; ?>
                         </button>
                         <!-- Phase 30 (pos_upgrade_plan.md §9) — restaurant-only affordances,
                              hidden unless the selected warehouse's pos_mode !== 'retail' AND
@@ -421,7 +447,7 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
             </div>
 
             <!-- Cart Summary -->
-            <div class="p-3 border-top bg-white">
+            <div class="p-3 border-top bg-white pos-cart-summary">
                 <div class="mb-2">
                     <div class="d-flex justify-content-between mb-1">
                         <span class="text-muted"><?= t('Subtotal:') ?></span>
@@ -450,7 +476,7 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
             </div>
 
             <!-- Payment Section -->
-            <div class="p-3 border-top bg-white">
+            <div class="p-3 border-top bg-white pos-pay-fields">
                 <div class="mb-2">
                     <label class="form-label small fw-bold"><?= t('Customer') ?></label>
                     <div class="input-group input-group-sm">
@@ -539,6 +565,11 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
                     </div>
                 </div>
 
+                <?php if ($pos_simple): ?>
+            </div>
+            <!-- Simple Mode: Pay/Split in their own block, pinned to the bottom of the cart panel. -->
+            <div class="px-3 pb-3 pt-2 bg-white pos-pay-actions">
+                <?php endif; ?>
                 <!-- Action Buttons -->
                 <div class="d-grid gap-2">
                     <button class="btn btn-success btn-lg" onclick="processPayment()" id="processPaymentBtn">
@@ -936,6 +967,32 @@ const POS_SHIFT_WAREHOUSE_ID = <?= json_encode(($shift_active && !empty($shift_a
     #cartTable .btn-link {
         font-size: 9px !important;
     }
+}
+
+/* Simple Mode, tablet/desktop: the cart panel stays pinned under the fixed site
+   header so Total + Pay are always on screen; only the item list scrolls.
+   overflow:clip (not hidden) — hidden makes the container a scroll box, which
+   silently disables position:sticky for everything inside it. */
+@media (min-width: 768px) {
+    #pos-container.pos-simple { overflow: clip; }
+    .pos-simple-layout > .col-md-5 {
+        position: sticky;
+        top: var(--pos-top, 80px);
+        height: calc(100vh - var(--pos-top, 80px));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .pos-simple-layout > .col-md-5 > * { flex: 0 0 auto; }
+    .pos-simple-layout #cartItemsScrollArea { flex: 1 1 0; min-height: 110px; }
+    .pos-simple-layout .pos-pay-fields { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+    .pos-simple-layout .pos-pay-actions { box-shadow: 0 -4px 10px rgba(0,0,0,.06); }
+    .pos-simple-layout > .col-md-7 > .sticky-top { top: var(--pos-top, 80px) !important; }
+}
+.pos-btn-label { font-size: .75rem; }
+@media (max-width: 767.98px) {
+    #cartHeaderActions .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pos-btn-label { font-size: .65rem; }
 }
 </style>
 
