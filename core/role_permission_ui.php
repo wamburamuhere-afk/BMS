@@ -28,9 +28,20 @@ if (!function_exists('rolePermissionRelevantModules')) {
     }
 }
 
+if (!function_exists('rolePermissionRetiredKeys')) {
+    /** Pages with no effect anywhere; hidden from the matrix, existing grants kept. */
+    function rolePermissionRetiredKeys(): array
+    {
+        return ['tax_settings'];
+    }
+}
+
 if (!function_exists('rolePermissionVisible')) {
     function rolePermissionVisible(string $pageKey): bool
     {
+        if (in_array($pageKey, rolePermissionRetiredKeys(), true)) {
+            return false;
+        }
         if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
             return false;
         }

@@ -1619,9 +1619,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         // notification_settings dropped 2026-07-31: folded into notification_rules.php
                         // (Settings > Admin > Notification Rules) as an admin-only collapsible panel,
                         // no longer delegable via Roles & Permissions.
-                        $_set_biz_visible = canView('tax_settings');
+                        // Tax (tax_settings) removed from the menu 2026-10-02: no code reads its
+                        // values — VAT comes from each product's tax rate, TIN from company_tin.
                         ?>
-                        <?php if ($_set_sys_visible || $_set_biz_visible): ?>
+                        <?php if ($_set_sys_visible): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-sliders"></i> <?= t('Settings') ?>
@@ -1634,10 +1635,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php endif; ?>
                                 <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> <?= t('POS Settings') ?></a></li><?php endif; ?>
                                 <?php if ($_set_color_visible): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> <?= t('Color Setting') ?></a></li><?php endif; ?>
-                                <?php endif; ?>
-                                <?php if ($_set_biz_visible): ?>
-                                <li><h6 class="dropdown-header"><?= t('Business Settings') ?></h6></li>
-                                <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> <?= t('Tax') ?></a></li><?php endif; ?>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -1995,14 +1992,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body pt-0">
-            <?php if ($_set_sys_visible || $_set_biz_visible): ?>
+            <?php if ($_set_sys_visible): ?>
             <div class="bn-group"><?= t('Settings') ?></div>
             <div class="list-group list-group-flush">
                 <?php if (isAdmin()): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i><?= t('Admin') ?></a><?php endif; ?>
                 <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= t('POS Settings') ?></a><?php endif; ?>
-                <?php if ($_set_color_visible): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>
-                <?php if (canView('tax_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i><?= t('Tax') ?></a><?php endif; ?>
-            </div>
+                <?php if ($_set_color_visible): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>            </div>
             <?php endif; ?>
             <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
             <div class="list-group list-group-flush">

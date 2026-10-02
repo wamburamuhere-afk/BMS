@@ -4,6 +4,11 @@ require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 
+// Retired 2026-10-02 (no code reads these settings: VAT comes from each product's
+// tax rate, TIN from company_tin). Kept on disk so it can be re-enabled once wired up.
+header('Location: ' . getUrl('unauthorized'));
+exit();
+
 // Phase 2 of security_implementation_plan.md — page-level gate. Admin
 // can now grant 'tax_settings' to other roles via /user_roles.php.
 autoEnforcePermission('tax_settings');

@@ -111,8 +111,26 @@ ok('Attendance Settings returns when HR is on', rolePermissionVisible('attendanc
 section('4. No tenant resolved — everything shows');
 withFeatures(null);
 $m = loadRolePermissionMatrix($pdo);
-ok('nothing preserved/hidden when no tenant resolved', $m['preserved_ids'] === []);
-ok('all non-hidden rows shown', count($m['visible']) === count($allPerms) - count($hiddenRowIds));
+$retiredIds = array_values(array_filter(array_map(fn($k) => $idByKey[$k] ?? null, rolePermissionRetiredKeys())));
+sort($retiredIds); $pres = $m['preserved_ids']; sort($pres);
+ok('only retired rows hidden when no tenant resolved', $pres === $retiredIds);
+ok('all other non-hidden rows shown', count($m['visible']) === count($allPerms) - count($hiddenRowIds) - count($retiredIds));
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('4b. Retired Tax page (tax_settings)');
+ok('tax_settings permission row exists', isset($idByKey['tax_settings']));
+foreach ([null, ['pos', 'warehouses'], ['sales', 'procurement', 'pos', 'warehouses']] as $set) {
+    withFeatures($set);
+    ok('tax_settings hidden from Roles (' . ($set === null ? 'all on' : implode('+', $set)) . ')', !rolePermissionVisible('tax_settings'));
+}
+withFeatures(null);
+$hdr = file_get_contents(__DIR__ . '/../header.php');
+ok('header.php has no link to tax_settings', !str_contains($hdr, "getUrl('tax_settings')"));
+$tx = file_get_contents(__DIR__ . '/../app/constant/settings/tax_settings.php');
+$redirAt = strpos($tx, "header('Location: ' . getUrl('unauthorized'))");
+ok('tax_settings.php redirects to unauthorized before any output or save',
+   $redirAt !== false && $redirAt < strpos($tx, 'header.php') && $redirAt < strpos($tx, 'save_setting(')
+   && $redirAt < strpos($tx, "autoEnforcePermission('tax_settings')"));
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('5. Review/Approve list matches the code (drift guard)');
@@ -136,6 +154,17 @@ foreach ($files as $f) {
     }
 }
 ok('found canReview/canApprove uses to check (scan worked)', count($used) > 10);
+
+// Retired Tax page: if anything starts reading its settings, un-retire it.
+$taxSrcReaders = [];
+foreach ($files as $f) {
+    if (str_ends_with(str_replace('\\', '/', $f), 'app/constant/settings/tax_settings.php')) continue;
+    $src = file_get_contents($f);
+    if (preg_match("/(get_?[sS]etting\(\s*|setting_key\s*=\s*)['\"](enable_tax|tax_name|tax_rate|tax_number|tax_type)['\"]/", $src)) {
+        $taxSrcReaders[] = substr($f, strlen($root) + 1);
+    }
+}
+ok('no code reads the retired Tax page settings' . ($taxSrcReaders ? ' — read in: ' . implode(', ', $taxSrcReaders) : ''), $taxSrcReaders === []);
 $missing = array_diff(array_keys($used), rolePermissionWorkflowPageKeys());
 ok('every canReview/canApprove page_key is in the workflow list' . ($missing ? ' — missing: ' . implode(', ', $missing) : ''), $missing === []);
 ok('no dynamic canReview/canApprove($var) call the list cannot see' . ($dynamic ? ' — ' . implode(', ', $dynamic) : ''), $dynamic === []);
@@ -152,7 +181,7 @@ ok('no workflow key is stale (unused in code and events)' . ($stale ? ' — stal
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('6. Real save (rolled back)');
-$need = ['mm_shifts', 'pos', 'customers', 'tenders', 'purchase_orders', 'user_roles'];
+$need = ['mm_shifts', 'pos', 'customers', 'tenders', 'purchase_orders', 'user_roles', 'tax_settings'];
 $have = array_filter($need, fn($k) => isset($idByKey[$k]));
 ok('fixture permission rows exist: ' . implode(', ', $need), count($have) === count($need));
 
@@ -167,6 +196,7 @@ if (count($have) === count($need)) {
         $grant->execute([$rid, $idByKey['mm_shifts'], 1, 1, 1, 0, 0, 0]);   // module off -> must survive
         $grant->execute([$rid, $idByKey['pos'], 1, 0, 0, 0, 1, 1]);         // shown, stale review/approve
         $grant->execute([$rid, $idByKey['user_roles'], 1, 0, 0, 0, 0, 0]);  // locked row -> cleared as before
+        $grant->execute([$rid, $idByKey['tax_settings'], 1, 1, 1, 0, 0, 0]); // retired row -> kept
 
         $row = function (string $pk) use ($pdo, $rid, $idByKey) {
             $s = $pdo->prepare("SELECT * FROM role_permissions WHERE role_id = ? AND permission_id = ?");
@@ -192,12 +222,15 @@ if (count($have) === count($need)) {
         ok('row not on screen (Tenders) cannot be granted', $row('tenders') === []);
         ok('row not on screen (Purchase Orders) cannot be granted', $row('purchase_orders') === []);
         ok('locked is_hidden row cleared exactly as before', $row('user_roles') === []);
+        ok('retired Tax grant survives the save', count($row('tax_settings')) === 1);
 
-        // Unticking everything visible keeps only the hidden-module grant.
-        saveRolePermissionGrants($pdo, $rid, [], loadRolePermissionMatrix($pdo));
+        // Unticking everything visible keeps only the hidden grants.
+        saveRolePermissionGrants($pdo, $rid, [$idByKey['tax_settings'] => ['view' => 'on']], loadRolePermissionMatrix($pdo));
         $cnt = $pdo->prepare("SELECT COUNT(*) FROM role_permissions WHERE role_id = ?");
         $cnt->execute([$rid]);
-        ok('empty save leaves only the preserved grant', (int)$cnt->fetchColumn() === 1 && count($row('mm_shifts')) === 1);
+        ok('empty save leaves only the preserved grants (MM Shifts + Tax)', (int)$cnt->fetchColumn() === 2 && count($row('mm_shifts')) === 1);
+        $r = $row('tax_settings');
+        ok('crafted POST cannot change the retired Tax grant', count($r) === 1 && (int)$r[0]['can_edit'] === 1);
 
         // Module switched back on: grant is there and now editable.
         withFeatures(null);

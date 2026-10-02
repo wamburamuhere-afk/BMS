@@ -116,8 +116,9 @@ $LOCKED_NO_SIDEBAR_LINK = ['notification_settings'];
 $DELEGABLE = [
     'app/constant/settings/pos_config_settings.php'    => 'pos_config_settings',
     'app/constant/settings/color_settings.php'          => 'color_settings',
-    'app/constant/settings/tax_settings.php'            => 'tax_settings',
 ];
+// Retired 2026-10-02: no code reads its settings; no menu link, page redirects.
+$RETIRED = ['app/constant/settings/tax_settings.php' => 'tax_settings'];
 
 section('1. php -l — every touched file');
 foreach (array_merge(array_keys($LOCKED), array_keys($DELEGABLE), ['header.php', 'app/constant/settings/_notification_settings_panel.php', 'migrations/2026_07_29_lock_sensitive_settings.php', 'migrations/2026_07_30_lock_company_profile.php', 'migrations/2026_07_30_lock_notification_rules.php', 'migrations/2026_07_30_lock_project_assignments.php', 'migrations/2026_07_31_lock_notification_settings.php']) as $f) {
@@ -179,6 +180,10 @@ check(
 foreach ($DELEGABLE as $file => $key) {
     check(str_contains($hdr, "canView('$key')"), "header.php gates $key via canView()", "header.php is missing a canView('$key') gate for its menu item");
 }
+foreach ($RETIRED as $file => $key) {
+    check(!str_contains($hdr, "getUrl('$key')"), "header.php no longer links to retired '$key'", "header.php still links to retired '$key'");
+    check(str_contains(readSrc($root, $file), "header('Location: ' . getUrl('unauthorized'))"), "$file redirects to unauthorized", "$file is reachable again — retired page should redirect");
+}
 
 section('5b. system_settings.php now hosts plain nav links to every other locked page');
 $settingsPageSrc = readSrc($root, 'app/constant/settings/system_settings.php');
@@ -213,7 +218,9 @@ check(!str_contains($rulesPageSrc, 'save_notification_settings') && !str_contain
 
 section('6. The 11 of 12 locked permissions expected to be hidden are hidden from the Roles & Permissions management UI');
 $rolesSrc = readSrc($root, 'app/constant/settings/user_roles.php');
-check(str_contains($rolesSrc, 'COALESCE(is_hidden, 0) = 0'), 'user_roles.php filters out is_hidden=1 permissions from its management list', 'user_roles.php no longer filters by is_hidden — hidden permissions would leak back into the UI');
+// The matrix query moved to core/role_permission_ui.php (loadRolePermissionMatrix).
+$matrixSrc = readSrc($root, 'core/role_permission_ui.php');
+check(str_contains($rolesSrc, 'loadRolePermissionMatrix(') && str_contains($matrixSrc, 'COALESCE(is_hidden, 0) = 0'), 'user_roles.php filters out is_hidden=1 permissions from its management list', 'user_roles.php no longer filters by is_hidden — hidden permissions would leak back into the UI');
 
 if (!$isLive) {
     echo "\n  \033[33m⊘\033[0m  Skipping live section (no includes/config.php — not a live install)\n";
