@@ -36,6 +36,7 @@ try {
     $pdo->beginTransaction();
     $pdo->prepare("DELETE FROM stock_movements WHERE product_id = ?")->execute([$product_id]);
     $pdo->prepare("DELETE FROM product_stocks WHERE product_id = ?")->execute([$product_id]);
+    $pdo->prepare("DELETE FROM product_batches WHERE product_id = ?")->execute([$product_id]);
     $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$product_id]);
     $pdo->commit();
 

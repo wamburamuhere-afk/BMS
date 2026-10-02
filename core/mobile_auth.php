@@ -72,3 +72,20 @@ if (!function_exists('mobileBearerAuth')) {
     }
 
 }
+
+if (!function_exists('mobileJsonBody')) {
+    /**
+     * For $_POST-reading endpoints: when the request carried a JSON object body
+     * instead of form fields, copy it into $_POST. Nested arrays (items,
+     * denominations) are re-encoded as JSON strings, the shape form callers send.
+     */
+    function mobileJsonBody(): void
+    {
+        if (!empty($_POST) || ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
+        $data = json_decode((string)file_get_contents('php://input'), true);
+        if (!is_array($data)) return;
+        foreach ($data as $k => $v) {
+            $_POST[$k] = is_array($v) ? json_encode($v) : (is_bool($v) ? (int)$v : $v);
+        }
+    }
+}
