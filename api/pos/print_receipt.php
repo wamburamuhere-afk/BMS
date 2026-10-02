@@ -5,6 +5,7 @@
  * Generate printable receipt for completed sale
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth(); mobileJsonBody();
 // Respect the caller's saved language preference (set by header.php on their
 // last page load) so t()-wrapped strings below come back in the right
 // language, not always English — same pattern used across api/pos/*.php.
