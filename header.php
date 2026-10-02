@@ -1040,10 +1040,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="coreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-house"></i> <?= t('Core') ?>
+                                <i class="bi bi-house"></i> <?= posSimpleModeEnabled() ? t('My Business') : t('Core') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="coreDropdown">
-                                <li><h6 class="dropdown-header"><?= t('Business Core') ?></h6></li>
+                                <li><h6 class="dropdown-header"><?= posSimpleModeEnabled() ? t('My Business') : t('Business Core') ?></h6></li>
                                 <?php if(canView('dashboard')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></a></li>
                                 <?php endif; ?>
@@ -1276,11 +1276,29 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(posSimpleModeEnabled()): ?>
                         <!-- Simple POS: "Shop" links directly to warehouses — no dropdown,
                              no products/services/categories (those are accessible via core). -->
-                        <?php if(canView('warehouses')): ?>
+                        <?php
+                        $__simple_can_restock = canView('pos') && canView('pos_restock');
+                        $__restock_url = getUrl('pos') . '?restock=1'; // POS opens its Receive Stock window
+                        ?>
+                        <?php if(canView('warehouses') && $__simple_can_restock): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="simpleShopDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-house-door"></i> <?= wLabel('Inventory', 'Shop') ?>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="simpleShopDropdown">
+                                <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-shop"></i> <?= wLabel('Warehouses', 'Shops') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= $__restock_url ?>"><i class="bi bi-box-arrow-in-down"></i> <?= t('Receive Stock') ?></a></li>
+                            </ul>
+                        </li>
+                        <?php elseif(canView('warehouses')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('warehouses') ?>">
                                 <i class="bi bi-house-door"></i> <?= wLabel('Inventory', 'Shop') ?>
                             </a>
+                        </li>
+                        <?php elseif($__simple_can_restock): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= $__restock_url ?>"><i class="bi bi-box-arrow-in-down"></i> <?= t('Receive Stock') ?></a>
                         </li>
                         <?php endif; ?>
                         <?php else: ?>
@@ -2020,6 +2038,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
                 <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
+                <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? (getUrl('pos') . '?restock=1') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
             </div>
         </div>
     </div>

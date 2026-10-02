@@ -566,8 +566,19 @@ function get_recent_activities($pdo, $user_id, $permissions) {
 
     // Admins and any role with audit_logs access see all; others see only their own
     $see_all = $permissions['can_view_all'] || canView('audit_logs');
+    $where = [];
     if (!$see_all) {
-        $sql .= " WHERE activity_logs.user_id = :user_id ";
+        $where[] = "activity_logs.user_id = :user_id";
+    }
+    // Simple Mode: show what happened (sales, payments, edits), not page views.
+    if (function_exists('posSimpleModeEnabled') && posSimpleModeEnabled()) {
+        $where[] = "NOT (activity_logs.action LIKE 'View%' OR activity_logs.action IN ('VIEW', 'view_list', 'FILTER')
+                    OR COALESCE(activity_logs.description, '') LIKE 'User viewed%'
+                    OR COALESCE(activity_logs.description, '') LIKE '[LOG] User viewed%'
+                    OR COALESCE(activity_logs.description, '') LIKE '[VIEW]%')";
+    }
+    if ($where) {
+        $sql .= " WHERE " . implode(' AND ', $where) . " ";
     }
 
     $sql .= " ORDER BY activity_logs.created_at DESC LIMIT 10";

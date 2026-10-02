@@ -26,10 +26,11 @@ $warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
       WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
       ORDER BY warehouse_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC) : [];
-$date_from   = $_GET['date_from'] ?? date('Y-01-01');
-$date_to     = $_GET['date_to']   ?? date('Y-12-31');
 $currency    = get_setting('currency', 'TZS');
 $isSimplePOS = get_setting('pos_simple_mode', '0') === '1';
+// Simple Mode opens on this month (quick buttons switch to today/week/year).
+$date_from   = $_GET['date_from'] ?? ($isSimplePOS ? date('Y-m-01') : date('Y-01-01'));
+$date_to     = $_GET['date_to']   ?? ($isSimplePOS ? date('Y-m-t')  : date('Y-12-31'));
 ?>
 
 <div class="container-fluid py-4">
@@ -57,6 +58,15 @@ $isSimplePOS = get_setting('pos_simple_mode', '0') === '1';
     <!-- Filters (AJAX — no page reload) -->
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
+            <?php if ($isSimplePOS): ?>
+            <div class="d-flex flex-wrap gap-2 mb-3" id="periodChips" role="group" aria-label="<?= htmlspecialchars(t('Period')) ?>">
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-period="today"><?= t('Today') ?></button>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-period="week"><?= t('This Week') ?></button>
+                <?php $__month_default = !isset($_GET['date_from']) && !isset($_GET['date_to']); ?>
+                <button type="button" class="btn btn-sm <?= $__month_default ? 'btn-primary active' : 'btn-outline-primary' ?> rounded-pill px-3" data-period="month"><?= t('This Month') ?></button>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-period="year"><?= t('This Year') ?></button>
+            </div>
+            <?php endif; ?>
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('From') ?></label>
@@ -243,6 +253,19 @@ $(function () {
     const IS_SIMPLE_POS = <?= $isSimplePOS ? 'true' : 'false' ?>;
     const BLUE = '#0d6efd';
     const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // DD/MM/YYYY straight from the server's date string — new Date('YYYY-MM-DD')
+    // is read as UTC midnight and showed the previous day west of UTC.
+    const fmtDate = s => { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(s); };
+    // Quick-period range (weeks start Monday).
+    function salesPeriodRange(p, now) {
+        if (p === 'today') return { from: now, to: now };
+        if (p === 'week') {
+            const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+            return { from: from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6) };
+        }
+        if (p === 'year') return { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear(), 11, 31) };
+        return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 0) };
+    }
 
     // Blue-scale status badge (per ui-constants §UI-1)
     const STATUS_BG = { paid:'#052c65', partial:'#cfe2ff', unpaid:'#dc3545', overdue:'#dc3545', completed:'#052c65', draft:'#e9ecef', pending:'#e9ecef' };
@@ -331,8 +354,8 @@ $(function () {
                 res.rows.forEach((r, i) => table.row.add([
                     i + 1,
                     esc(r.ref_number || ''),
-                    r.sale_date ? new Date(r.sale_date).toLocaleDateString() : '',
-                    r.due_date  ? new Date(r.due_date).toLocaleDateString()  : '—',
+                    r.sale_date ? fmtDate(r.sale_date) : '',
+                    r.due_date  ? fmtDate(r.due_date)  : '—',
                     r.customer_name ? caseFormatJs(r.customer_name) : PT.walkIn,
                     fmt(r.grand_total),
                     fmt(r.paid_amount),
@@ -362,6 +385,24 @@ $(function () {
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
     const $filters = $('#f-project, #f-warehouse, #f-customer, #f-salesperson, #f-status' + (IS_SIMPLE_POS ? '' : ', #f-source'));
     $filters.on('change', loadReport);
+
+    if (IS_SIMPLE_POS) {
+        // Local-date YYYY-MM-DD (toISOString would shift by the UTC offset).
+        const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const setChip = p => $('#periodChips [data-period]').each(function () {
+            const on = $(this).data('period') === p;
+            $(this).toggleClass('btn-primary active', on).toggleClass('btn-outline-primary', !on);
+        });
+        $('#periodChips').on('click', '[data-period]', function () {
+            const p = $(this).data('period');
+            const r = salesPeriodRange(p, new Date());
+            $('#f-from').val(ymd(r.from)); $('#f-to').val(ymd(r.to));
+            setChip(p);
+            loadReport();
+        });
+        // A hand-picked date is a custom range: no chip active, reload straight away.
+        $('#f-from, #f-to').on('change', function () { setChip(null); loadReport(); });
+    }
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Sales Report', 'Loaded sales report');

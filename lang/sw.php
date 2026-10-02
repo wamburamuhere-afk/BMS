@@ -4793,4 +4793,14 @@ return [
     'No transactions in this shift.'        => 'Hakuna miamala katika zamu hii.',
     'Voided Transactions'                   => 'Miamala Iliyobatilishwa',
 
+    // POS Simple Mode usability (2026-10-02)
+    'This shift was opened on %s. Close the day so your cash count stays correct.' => 'Zamu hii ilifunguliwa tarehe %s. Funga siku ili hesabu ya fedha ibaki sahihi.',
+    'Close the Day'                         => 'Funga Siku',
+    'Receive Stock'                         => 'Pokea Mzigo',
+    'My Business'                           => 'Biashara Yangu',
+    'Hold'                                  => 'Hifadhi',
+    'Held'                                  => 'Zilizohifadhiwa',
+    'Show all %total% products'             => 'Onyesha bidhaa zote %total%',
+    'Added to cart'                         => 'Imeongezwa kwenye kikapu',
+
 ];
