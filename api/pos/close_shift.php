@@ -14,7 +14,7 @@ if (isset($_SESSION['user_lang'])) {
 require_once __DIR__ . '/../../core/pos_shift_reporting.php';
 require_once __DIR__ . '/../../core/pos_denominations.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
-mobileBearerAuth();
+mobileBearerAuth(); mobileJsonBody();
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);

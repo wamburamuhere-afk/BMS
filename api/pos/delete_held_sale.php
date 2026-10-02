@@ -29,7 +29,7 @@ try {
     global $pdo;
 
     // Get POST data
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
     $hold_id = isset($data['hold_id']) ? intval($data['hold_id']) : 0;
     $user_id = $_SESSION['user_id'];
     

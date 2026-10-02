@@ -47,6 +47,8 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 
 global $pdo;
 
+mobileJsonBody();
+
 $product_id            = (int)($_POST['product_id'] ?? 0);
 $warehouse_id           = (int)($_POST['warehouse_id'] ?? 0);
 $quantity               = (float)($_POST['quantity'] ?? 0);
@@ -151,21 +153,32 @@ if ($restock_uuid !== '') {
             $pdo->exec("ALTER TABLE product_batches ADD COLUMN client_uuid VARCHAR(36) NULL DEFAULT NULL");
             try { $pdo->exec("ALTER TABLE product_batches ADD UNIQUE KEY uq_product_batches_client_uuid (client_uuid)"); } catch (PDOException $_) {}
         }
-        // Idempotency pre-check.
-        $rDupChk = $pdo->prepare("SELECT batch_id, reference_number FROM product_batches WHERE client_uuid = ? LIMIT 1");
+        // Idempotency pre-check. product_batches has no reference_number column —
+        // the ADJ reference lives on the stock_movements row written in the same txn.
+        $rDupChk = $pdo->prepare("SELECT batch_id, product_id, created_at FROM product_batches WHERE client_uuid = ? LIMIT 1");
         $rDupChk->execute([$restock_uuid]);
         if ($rDup = $rDupChk->fetch(PDO::FETCH_ASSOC)) {
+            $refSt = $pdo->prepare("
+                SELECT reference_number FROM stock_movements
+                 WHERE product_id = ? AND reference_type = 'stock_adjustment'
+                   AND created_at BETWEEN DATE_SUB(?, INTERVAL 10 SECOND) AND DATE_ADD(?, INTERVAL 10 SECOND)
+                 ORDER BY ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) LIMIT 1");
+            $refSt->execute([$rDup['product_id'], $rDup['created_at'], $rDup['created_at'], $rDup['created_at']]);
             echo json_encode([
                 'success'          => true,
                 'idempotent'       => true,
                 'message'          => t('Restock already recorded.'),
                 'batch_id'         => (int)$rDup['batch_id'],
-                'reference_number' => $rDup['reference_number'] ?? '',
+                'reference_number' => (string)($refSt->fetchColumn() ?: ''),
             ]);
             exit;
         }
     } catch (PDOException $_rIdemp) {
-        $restock_uuid = ''; // column unavailable — skip idempotency, proceed normally
+        // Never fall through to a second stock intake when the duplicate check itself failed.
+        error_log('quick_restock idempotency check: ' . $_rIdemp->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => t('Database error.')]);
+        exit;
     }
 }
 

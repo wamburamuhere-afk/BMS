@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-02 — fix(mobile-api): hold_sale wrong hold_id; quick_restock replay double-add; JSON bodies; product create stock
+
+**Files:**
+- `api/pos/hold_sale.php` — `hold_id` was read via `lastInsertId()` after `logActivity()` inserted into activity_log, so the app got the activity_log id (and delete_held_sale then said "not found"). Captured right after the insert. Also accepts form-encoded bodies (items as JSON string).
+- `api/pos/delete_held_sale.php` — accepts form-encoded `hold_id` as well as JSON.
+- `api/pos/quick_restock.php` — idempotency pre-check selected `product_batches.reference_number`, a column that does not exist → PDOException → catch silently cleared the client_uuid → every replay restocked again. Pre-check now selects existing columns and recovers the ADJ reference from the matching stock_movements row; a failing pre-check now aborts (500) instead of double-adding. Accepts JSON bodies.
+- `core/mobile_auth.php` — new `mobileJsonBody()`: copies a JSON object body into `$_POST` (nested arrays re-encoded as JSON strings) for endpoints that read form fields.
+- `api/pos/{void_sale,email_receipt,update_credit_due_date,receive_payment,create_return,quick_cash_drawer,open_shift,close_shift}.php` — call `mobileJsonBody()` so JSON requests from the app are no longer read as empty. Web form posts unchanged.
+- `api/mobile/products/create.php` — `track_inventory` was never set (column default 0) so mobile products could not be restocked; now defaults to 1 for goods, as on the web. Opening stock (`initial_stock`, alias `current_stock`) now goes through `receiveProductBatch()` + `postStockAdjustmentGl()` like the web instead of a bare `current_stock` column write (no warehouse stock row, no movement, no GL). Duplicate name / SKU (incl. product_code) / barcode → 409, as on the web; `product_code` set to the SKU.
+- `api/mobile/products/delete.php` — also removes the product's `product_batches` rows.
+- `migrations/tenant/2026_10_02_restore_shift_start_from_code.php` — restores `cash_register_shifts.start_time` overwritten on 2026-09-28 ~11:49 from `shift_code` (SHIFT-YYYYMMDD-HHMMSS-uid).
+- `tests/test_mobile_api_http_cli.php` — customers/suppliers/products CRUD, held sales, quick_restock replay and opening-stock sections.
+
+---
+
 ## 2026-10-02 — fix(mobile-api): warehouses/create 500 when pos_mode/status omitted
 
 **Files:**
