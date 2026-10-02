@@ -1469,6 +1469,7 @@ function calculateCartTotal() {
     $('#cartSubtotal').text(POS_CURRENCY + ' ' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2}));
     $('#cartTax').text(POS_CURRENCY + ' ' + totalTax.toLocaleString('en-US', {minimumFractionDigits: 2}));
     $('#cartTotal').text(POS_CURRENCY + ' ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+    $('#posPayTotal').text($('#cartTotal').text()); // Simple Mode pinned Pay bar
 
     // Auto-fill amount tendered when cash is selected
     if ($('input[name="paymentMethod"]:checked').val() === 'cash' && total > 0) {

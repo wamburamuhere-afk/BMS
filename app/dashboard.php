@@ -573,6 +573,7 @@ function get_recent_activities($pdo, $user_id, $permissions) {
     // Simple Mode: show what happened (sales, payments, edits), not page views.
     if (function_exists('posSimpleModeEnabled') && posSimpleModeEnabled()) {
         $where[] = "NOT (activity_logs.action LIKE 'View%' OR activity_logs.action IN ('VIEW', 'view_list', 'FILTER')
+                    OR activity_logs.action LIKE 'Filter%' OR activity_logs.action LIKE 'Searched%'
                     OR COALESCE(activity_logs.description, '') LIKE 'User viewed%'
                     OR COALESCE(activity_logs.description, '') LIKE '[LOG] User viewed%'
                     OR COALESCE(activity_logs.description, '') LIKE '[VIEW]%')";
