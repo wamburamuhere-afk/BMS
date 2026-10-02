@@ -16,6 +16,7 @@ let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
+let posShowAllProducts = false; // Simple Mode "Show all" — lifts the default grid cap for this page view
 let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = no group chosen, plain selling_price
 const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
@@ -188,6 +189,8 @@ const PT = {
     noVariantsAvailable: <?= json_encode(t('No variants available.')) ?>,
     // Mobile product-grid render cap.
     showingFirstNProducts: <?= json_encode(t('Showing %shown% of %total% products — search to find more.')) ?>,
+    showAllProducts: <?= json_encode(t('Show all %total% products')) ?>,
+    addedToCart: <?= json_encode(t('Added to cart')) ?>,
     // "Add Product" shortcut — Restock Product modal.
     restockSaving: <?= json_encode(t('Saving...')) ?>,
     restockSaved: <?= json_encode(t('Product restocked successfully!')) ?>,
@@ -410,6 +413,17 @@ $(document).ready(function() {
         const $realOptions = $('#posWarehouseId option').filter(function () { return $(this).val() !== ''; });
         if ($realOptions.length === 1) {
             $('#posWarehouseId').val($realOptions.first().val()).prop('disabled', true);
+        } else if ($realOptions.length > 1 && POS_SIMPLE_MODE) {
+            // Simple Mode: reopen on the shop this user last sold from, if it's still theirs.
+            const key = 'pos_last_shop_' + POS_USER_ID;
+            let last = null;
+            try { last = localStorage.getItem(key); } catch (e) {}
+            if (last && $realOptions.filter(function () { return $(this).val() === last; }).length) {
+                $('#posWarehouseId').val(last);
+            }
+            $('#posWarehouseId').on('change', function () {
+                try { localStorage.setItem(key, $(this).val() || ''); } catch (e) {}
+            });
         } else if ($realOptions.length === 0) {
             $('#posWarehouseId').after(
                 '<div class="text-danger small mt-1" id="posNoWarehouseWarning">' +
@@ -468,6 +482,22 @@ $(document).ready(function() {
         updateCartDisplay();
         saveCartToStorage();
     });
+
+    if (POS_SIMPLE_MODE) {
+        // Pinned cart panel sits right under the fixed site header (.header-wrapper).
+        const syncPosTop = function () {
+            const h = document.querySelector('.header-wrapper');
+            document.documentElement.style.setProperty('--pos-top', (h ? h.offsetHeight : 0) + 'px');
+        };
+        syncPosTop();
+        $(window).on('resize', syncPosTop);
+    }
+
+    // "Receive Stock" menu link lands here as ?restock=1.
+    // The modal is only rendered for users holding pos_restock (pos_modals_new.php).
+    if (new URLSearchParams(location.search).get('restock') === '1' && document.getElementById('restockProductModal')) {
+        openRestockProductModal();
+    }
 
     // Load initial data
     loadCategories();
@@ -682,7 +712,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                     ? <?= (int)get_setting('pos_products_display_limit_mobile', '10') ?>
                     : <?= (int)get_setting('pos_products_display_limit', '20') ?>;
                 const isDefaultView = !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined);
-                const capped = isDefaultView && response.data.length > DEFAULT_DISPLAY_LIMIT;
+                const capped = isDefaultView && !posShowAllProducts && response.data.length > DEFAULT_DISPLAY_LIMIT;
                 const renderList = capped ? response.data.slice(0, DEFAULT_DISPLAY_LIMIT) : response.data;
 
                 console.log('Rendering', renderList.length, 'of', products.length, 'products...');
@@ -711,7 +741,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                     const variantCount = parseInt(product.variant_count) || 0;
                     const tileClickHandler = variantCount > 0
                         ? `openVariantPicker(${product.product_id})`
-                        : `showProductQuickView(${product.product_id})`;
+                        : (POS_SIMPLE_MODE ? `posTapProduct(${product.product_id})` : `showProductQuickView(${product.product_id})`);
 
                     const card = `
                         <div class="col-6 col-sm-6 col-md-6 col-lg-4 col-xl-3">
@@ -725,7 +755,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                                     </div>
                                     ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}</h6>
-                                    <p class="card-text text-muted small mb-1">${product.sku || ''}</p>
+                                    ${POS_SIMPLE_MODE ? '' : `<p class="card-text text-muted small mb-1">${product.sku || ''}</p>`}
                                     <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
                                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
                                         ${PT.qtyLabel} ${product.stock_quantity}
@@ -737,7 +767,15 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                     grid.append(card);
                 });
 
-                if (capped) {
+                if (capped && POS_SIMPLE_MODE) {
+                    grid.append(`
+                        <div class="col-12 text-center py-2">
+                            <button type="button" class="btn btn-outline-primary" onclick="posShowAllProducts = true; loadProducts();">
+                                <i class="bi bi-grid-3x3-gap me-1"></i>${PT.showAllProducts.replace('%total%', response.data.length)}
+                            </button>
+                        </div>
+                    `);
+                } else if (capped) {
                     grid.append(`
                         <div class="col-12 text-center py-2">
                             <small class="text-muted">${PT.showingFirstNProducts.replace('%shown%', renderList.length).replace('%total%', response.data.length)}</small>
@@ -817,6 +855,54 @@ let currentProductSerials = []; // Phase 26 (pos_upgrade_plan.md §9) — this p
 let selectedSerials = [];       // the cashier's checked subset for the line about to be added
 let currentProductModifierGroups = []; // Phase 30 (pos_upgrade_plan.md §9) — full group+option defs linked to this product
 let selectedModifierOptions = [];      // the cashier's checked options for the line about to be added
+
+// Simple Mode: a tap adds 1 of the base unit straight to the cart. Anything that
+// needs a choice — serials, extra selling units, restaurant modifiers — or whose
+// unit list is unknown (unit_count null) still opens the quick-view popup.
+function posTapProduct(productId) {
+    const product = products.find(p => p.product_id == productId);
+    if (!product) return;
+    const restaurantShop = POS_RESTAURANT_ENABLED
+        && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail';
+    const unitCount = (product.unit_count === null || product.unit_count === undefined) ? -1 : parseInt(product.unit_count, 10);
+    const needsPopup = product.track_serials == 1 || restaurantShop || unitCount !== 0;
+    if (needsPopup) {
+        showProductQuickView(productId);
+        return;
+    }
+
+    const price = parseFloat(product.effective_price ?? product.selling_price) || 0;
+    // Same merge rule as addToCart(): only a plain base-unit line, never one
+    // carrying a unit, serials or modifiers.
+    const existing = cart.find(item => item.product_id == product.product_id
+        && !item.unit_label && !item.serial_numbers && !item.modifiers);
+    if (existing) {
+        existing.quantity += 1;
+    } else {
+        cart.push({
+            product_id: product.product_id,
+            product_name: product.product_name,
+            sku: product.sku,
+            price: price,
+            quantity: 1,
+            tax_rate: saleVatRate,
+            min_selling_price: parseFloat(product.min_selling_price) || 0,
+            discount_type: 'percentage',
+            discount_value: 0,
+            discount_percent: 0,
+            discounted_price: price
+        });
+    }
+    updateCartDisplay();
+    saveCartToStorage();
+
+    const qty = existing ? existing.quantity : 1;
+    Swal.fire({
+        toast: true, position: 'top-end', icon: 'success', timer: 1200, showConfirmButton: false,
+        titleText: caseFormatJs(product.product_name) + ' × ' + qty, // titleText, not title: product names are user input
+        text: PT.addedToCart
+    });
+}
 
 function showProductQuickView(productId) {
     const product = products.find(p => p.product_id == productId);
@@ -2782,7 +2868,7 @@ function updateCashBalanceUI() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                $('.cash-balance-display').text('TSh ' + response.data.balance);
+                $('.cash-balance-display').text(POS_CURRENCY + ' ' + response.data.balance);
             }
         },
         error: function(err) {
