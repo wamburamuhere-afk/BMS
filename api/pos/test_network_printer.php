@@ -9,6 +9,7 @@
  * (same dual-gate the register CRUD endpoints already use).
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth(); mobileJsonBody();
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
@@ -20,7 +21,7 @@ if (!isAuthenticated())              { http_response_code(401); echo json_encode
 if (!canView('pos_advanced'))        { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Multi-register management is not included in your plan.')]); exit; }
 if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
-csrf_check();
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 
 $ip = trim($_POST['printer_ip_address'] ?? '');
 $port = (int)($_POST['printer_port'] ?? 9100) ?: 9100;

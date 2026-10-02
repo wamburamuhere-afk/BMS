@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(mobile-api): web-parity — expense void/delete, stock adjust, catalog, product fields, registers, receipt
+
+**Files:**
+- `core/mobile_auth.php` — `mobileIdempotent` replaced by `mobileRun()`: runs a shared web endpoint for a mobile caller, shutdown-safe (web files exit mid-way); re-codes 200+`success:false` to 401/403/404/409/422; optional `client_uuid` replay guard backed by `mobile_idempotency_keys`; satisfies the shared endpoint's CSRF check for Bearer requests.
+- `migrations/tenant/2026_10_02_mobile_idempotency_keys.php` — new table for the replay guard.
+- `api/mobile/expenses/void.php` (new) — void (→ rejected) via `api/account/update_expense_status.php` (reverses outflow + bank register). `api/mobile/expenses/delete.php` — now delegates to `api/account/delete_expense.php` (reverses accrual, archives to deleted_expenses, hard-deletes); the old soft delete wrote 'deleted', which the expenses status ENUM does not allow.
+- `api/mobile/stock/adjust.php` (new) — stock adjustment via `api/create_stock_adjustment.php` (movement + product_stocks + GL); validates movement type against the ENUM, blocks removing more than available (409), replay-safe.
+- `api/mobile/categories/create.php`, `api/mobile/brands/{list,save}.php`, `api/mobile/units/{list,create}.php`, `api/mobile/products/{unit_save,unit_delete}.php`, `api/mobile/tax_rates/list.php` (new) — catalog management via the web endpoints.
+- `api/mobile/products/_fields.php` (new) + `create.php` / `update.php` — web-parity optional fields: wholesale_price, discount_rate, min_selling_price (derived from discount rate as on the web), brand_id, tax_id (+tax_rate), is_taxable, min/max_stock_level, manufacturer, model, weight, expiry_days; multipart `product_image` upload (§19 checks); opening batch manufacturing/expiry dates. Update: product_name optional; SKU/barcode duplicate checks; a `current_stock` edit is now a stock adjustment in one shop (movement + GL, same as the web product edit) instead of a bare column write.
+- `api/mobile/products/get.php` — the "full" query referenced non-existent `products.tax_rate_id`, so it always failed and fell back to a core query (brand, tax, image, min price, discount always NULL). Now builds the column list from the live schema, joins tax_rates on `tax_id` (keeps a `tax_rate_id` alias), and returns `stock_by_shop`.
+- `api/pos/{save_register,toggle_register_status,save_sales_target,test_network_printer,print_receipt}.php` — accept the mobile Bearer token (+ JSON body); CSRF only for cookie sessions. `save_register.php` — fixed ternary-NULL `receipt_template` when omitted.
+- `tests/test_mobile_api_http_cli.php` — `parity` section (multipart image upload incl. non-image rejection). `tests/test_flutter_mobile_api_cli.php` — products/get static checks updated.
+
+---
+
 ## 2026-10-02 — fix(mobile-api): process_sale error codes; JSON login + notifications; full live HTTP suite
 
 **Files:**

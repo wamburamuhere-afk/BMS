@@ -33,7 +33,7 @@ function section(string $name): bool {
 }
 
 /** @return array{0:int,1:?array,2:string} [http_code, decoded_json, raw_body] */
-function api(string $method, string $path, array $data = [], bool $json = true, bool $auth = true): array {
+function api(string $method, string $path, array $data = [], bool|string $json = true, bool $auth = true): array {
     global $BASE, $TOKEN;
     $url = $BASE . '/' . ltrim($path, '/');
     $ch  = curl_init();
@@ -43,7 +43,9 @@ function api(string $method, string $path, array $data = [], bool $json = true, 
         if ($data) $url .= (str_contains($url, '?') ? '&' : '?') . http_build_query($data);
     } else {
         curl_setopt($ch, CURLOPT_POST, true);
-        if ($json) { $headers[] = 'Content-Type: application/json'; curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data)); }
+        if ($json === 'multipart') { curl_setopt($ch, CURLOPT_POSTFIELDS, $data); }
+        elseif ($json) { $headers[] = 'Content-Type: application/json'; curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data)); }
+
         else       { curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data)); }
     }
     curl_setopt_array($ch, [
@@ -453,6 +455,145 @@ if (section('expenses')) {
     echo "  INFO  expenses/update on a paid expense → HTTP $c " . json_encode($up) . "\n";
     [$c, $dl] = api('POST', 'api/mobile/expenses/delete.php', ['expense_id' => $eid]);
     echo "  INFO  expenses/delete on a paid expense → HTTP $c " . json_encode($dl) . "\n";
+}
+
+// =========================================================================
+// Web-parity features (v24): expense void/delete, stock adjust, catalog, product fields, registers, receipt.
+if (section('parity')) {
+    $wh = (int)(api('GET', 'api/mobile/warehouses/list.php', ['status' => 'active', 'limit' => 1])[1]['data'][0]['warehouse_id'] ?? 0);
+    $stockOf = fn(int $pid) => (float)(api('GET', 'api/mobile/products/get.php', ['id' => $pid])[1]['data']['current_stock'] ?? -1);
+
+    // Expenses: create (paid) → void → delete.
+    [$c, $e] = api('POST', 'api/mobile/expenses/create.php', ['description' => "ZZ API TEST void $RUN", 'amount' => 50, 'expense_date' => date('Y-m-d')]);
+    $eid = (int)($e['expense_id'] ?? 0);
+    ok($eid > 0, 'expenses/create for void test', [$c, $e]);
+    [$c, $d] = api('POST', 'api/mobile/expenses/delete.php', ['expense_id' => $eid]);
+    ok($c === 409, 'expenses/delete: paid expense → 409 (void first)', [$c, $d]);
+    [$c, $v] = api('POST', 'api/mobile/expenses/void.php', ['expense_id' => $eid]);
+    ok($c === 200 && !empty($v['success']), 'expenses/void → 200', [$c, $v]);
+    [$c, $g] = api('GET', 'api/mobile/expenses/get.php', ['id' => $eid]);
+    ok(($g['data']['status'] ?? '') === 'rejected', 'expenses/void: status = rejected', $g['data']['status'] ?? $g);
+    [$c, $v2] = api('POST', 'api/mobile/expenses/void.php', ['expense_id' => $eid], false);
+    ok($c === 200 && !empty($v2['idempotent']), 'expenses/void: second void is idempotent', [$c, $v2]);
+    [$c, $d] = api('POST', 'api/mobile/expenses/delete.php', ['expense_id' => $eid]);
+    ok($c === 200 && !empty($d['success']), 'expenses/delete after void → 200', [$c, $d]);
+    [$c] = api('GET', 'api/mobile/expenses/get.php', ['id' => $eid]);
+    ok($c === 404, 'expenses/get after delete → 404', $c);
+    [$c, $d] = api('POST', 'api/mobile/expenses/delete.php', ['expense_id' => 999999999]);
+    ok($c === 404, 'expenses/delete unknown → 404', [$c, $d]);
+
+    // Catalog: category, brand, unit, tax rates.
+    [$c, $cat] = api('POST', 'api/mobile/categories/create.php', ['category_name' => "ZZ API TEST cat $RUN"]);
+    ok($c === 200 && !empty($cat['category_id']), 'categories/create → 200', [$c, $cat]);
+    [$c, $cat2] = api('POST', 'api/mobile/categories/create.php', ['category_name' => "ZZ API TEST cat $RUN"]);
+    ok($c === 409, 'categories/create duplicate → 409', [$c, $cat2]);
+    [$c, $br] = api('POST', 'api/mobile/brands/save.php', ['brand_name' => "ZZ API TEST brand $RUN"]);
+    ok($c === 200 && !empty($br['success']), 'brands/save → 200', [$c, $br]);
+    $brands = api('GET', 'api/mobile/brands/list.php')[1]['data'] ?? [];
+    $brandId = 0; foreach ($brands as $b) if ($b['brand_name'] === "ZZ API TEST brand $RUN") $brandId = (int)$b['brand_id'];
+    ok($brandId > 0, 'brands/list includes new brand', count($brands));
+    $ucode = 'Z' . strtoupper(substr($RUN, 0, 5));
+    [$c, $un] = api('POST', 'api/mobile/units/create.php', ['unit_name' => "ZZ unit $RUN", 'unit_code' => $ucode]);
+    ok($c === 200 && !empty($un['success']), 'units/create → 200', [$c, $un]);
+    [$c, $un2] = api('POST', 'api/mobile/units/create.php', ['unit_name' => "ZZ unit $RUN", 'unit_code' => $ucode]);
+    ok($c === 409, 'units/create duplicate code → 409', [$c, $un2]);
+    [$c, $ul] = api('GET', 'api/mobile/units/list.php');
+    ok($c === 200 && in_array($ucode, array_column($ul['data'] ?? [], 'unit_code'), true), 'units/list includes new unit', [$c]);
+    [$c, $tx] = api('GET', 'api/mobile/tax_rates/list.php');
+    ok($c === 200 && isset($tx['data']), 'tax_rates/list → 200', [$c, $tx]);
+    $taxId = (int)($tx['data'][0]['rate_id'] ?? 0);
+
+    // Product with web-parity fields.
+    $body = ['product_name' => "ZZ API TEST parity $RUN", 'selling_price' => 1000, 'cost_price' => 0, 'discount_rate' => 10,
+             'wholesale_price' => 850, 'brand_id' => $brandId, 'category_id' => (int)($cat['category_id'] ?? 0),
+             'min_stock_level' => 2, 'max_stock_level' => 50, 'is_taxable' => 1, 'manufacturer' => 'ZZ Mfg', 'model' => 'M1',
+             'expiry_days' => 30, 'initial_stock' => 5, 'warehouse_id' => $wh, 'expiry_date' => date('Y-m-d', strtotime('+30 days'))];
+    if ($taxId) $body['tax_id'] = $taxId;
+    [$c, $p] = api('POST', 'api/mobile/products/create.php', $body);
+    $pid = (int)($p['product_id'] ?? 0);
+    ok($c === 200 && $pid > 0, 'products/create with parity fields → 200', [$c, $p]);
+    [$c, $g] = api('GET', 'api/mobile/products/get.php', ['id' => $pid]);
+    $d = $g['data'] ?? [];
+    ok((float)($d['min_selling_price'] ?? 0) == 900.0, 'products/get: min_selling_price derived from discount_rate (900)', $d['min_selling_price'] ?? null);
+    ok((float)($d['wholesale_price'] ?? 0) == 850.0 && (int)($d['brand_id'] ?? 0) === $brandId && ($d['brand_name'] ?? '') === "ZZ API TEST brand $RUN",
+       'products/get: wholesale_price + brand stored and joined', [$d['wholesale_price'] ?? null, $d['brand_id'] ?? null, $d['brand_name'] ?? null]);
+    ok(($d['manufacturer'] ?? '') === 'ZZ Mfg' && (int)($d['expiry_days'] ?? 0) === 30 && (float)($d['max_stock_level'] ?? 0) == 50.0, 'products/get: manufacturer/expiry_days/max_stock_level stored', $d);
+    if ($taxId) ok((int)($d['tax_id'] ?? 0) === $taxId && ($d['tax_name'] ?? '') !== '', 'products/get: tax_id + tax_name', [$d['tax_id'] ?? null, $d['tax_name'] ?? null]);
+    ok(count($d['stock_by_shop'] ?? []) === 1 && (float)($d['stock_by_shop'][0]['stock_quantity'] ?? 0) == 5.0, 'products/get: stock_by_shop shows 5', $d['stock_by_shop'] ?? null);
+    [$c, $x] = api('POST', 'api/mobile/products/create.php', ['product_name' => "ZZ API TEST bad $RUN", 'selling_price' => 100, 'discount_rate' => 150]);
+    ok($c === 422, 'products/create: discount_rate > 100 → 422', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/products/create.php', ['product_name' => "ZZ API TEST bad2 $RUN", 'selling_price' => 100, 'brand_id' => 999999999]);
+    ok($c === 422, 'products/create: unknown brand_id → 422', [$c, $x]);
+
+    // Update: price change recomputes the floor; stock edit goes through an adjustment.
+    [$c, $u] = api('POST', 'api/mobile/products/update.php', ['product_id' => $pid, 'selling_price' => 2000]);
+    ok($c === 200, 'products/update: partial update without product_name → 200', [$c, $u]);
+    $d = api('GET', 'api/mobile/products/get.php', ['id' => $pid])[1]['data'] ?? [];
+    ok((float)($d['min_selling_price'] ?? 0) == 1800.0, 'products/update: min_selling_price follows new price (1800)', $d['min_selling_price'] ?? null);
+    [$c, $u] = api('POST', 'api/mobile/products/update.php', ['product_id' => $pid, 'current_stock' => 7, 'warehouse_id' => $wh]);
+    ok($c === 200 && (float)($u['stock_adjustment']['after'] ?? -1) == 7.0 && !empty($u['stock_adjustment']['reference_number']),
+       'products/update: current_stock 5 → 7 recorded as an adjustment', [$c, $u]);
+    ok($stockOf($pid) == 7.0, 'products/update: current_stock now 7', $stockOf($pid));
+
+    // Image upload (multipart).
+    $png = sys_get_temp_dir() . "/zz_$RUN.png";
+    file_put_contents($png, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+    [$c, $u] = api('POST', 'api/mobile/products/update.php', ['product_id' => $pid, 'product_image' => new CURLFile($png, 'image/png', 'p.png')], 'multipart');
+    ok($c === 200 && str_starts_with((string)($u['image_url'] ?? ''), 'uploads/products/'), 'products/update: multipart image upload stored', [$c, $u]);
+    $fake = sys_get_temp_dir() . "/zz_$RUN.png.php";
+    file_put_contents($fake, '<?php echo 1;');
+    [$c, $u] = api('POST', 'api/mobile/products/update.php', ['product_id' => $pid, 'product_image' => new CURLFile($fake, 'image/png', 'x.png')], 'multipart');
+    ok($c === 422, 'products/update: non-image content rejected → 422', [$c, $u]);
+    @unlink($png); @unlink($fake);
+
+    // Per-product selling unit.
+    [$c, $pu] = api('POST', 'api/mobile/products/unit_save.php', ['product_id' => $pid, 'unit_label' => 'Box', 'base_unit_multiplier' => 6]);
+    ok($c === 200 && !empty($pu['id']), 'products/unit_save → 200', [$c, $pu]);
+    [$c, $pl] = api('GET', 'api/pos/get_product_units.php', ['product_id' => $pid]);
+    ok($c === 200 && str_contains(json_encode($pl), 'Box'), 'get_product_units lists Box', [$c]);
+    if (!empty($pu['id'])) {
+        [$c, $pd] = api('POST', 'api/mobile/products/unit_delete.php', ['id' => (int)$pu['id']]);
+        ok($c === 200 && !empty($pd['success']), 'products/unit_delete → 200', [$c, $pd]);
+    }
+
+    // Stock adjustment.
+    $u = uuid4();
+    $adj = ['product_id' => $pid, 'warehouse_id' => $wh, 'quantity' => 2, 'movement_type' => 'damaged', 'reason' => 'ZZ API TEST', 'client_uuid' => $u];
+    [$c, $a] = api('POST', 'api/mobile/stock/adjust.php', $adj);
+    ok($c === 200 && !empty($a['reference_number']), 'stock/adjust damaged 2 → 200', [$c, $a]);
+    [$c, $a2] = api('POST', 'api/mobile/stock/adjust.php', $adj, false);
+    ok($c === 200 && !empty($a2['idempotent']) && ($a2['reference_number'] ?? '') === ($a['reference_number'] ?? '-'), 'stock/adjust: replay is idempotent', [$c, $a2]);
+    ok($stockOf($pid) == 5.0, 'stock/adjust: stock 7 → 5 (once)', $stockOf($pid));
+    [$c, $x] = api('POST', 'api/mobile/stock/adjust.php', ['product_id' => $pid, 'warehouse_id' => $wh, 'quantity' => 99, 'movement_type' => 'adjustment_out', 'reason' => 'ZZ']);
+    ok($c === 409, 'stock/adjust: removing more than available → 409', [$c, $x]);
+    [$c, $x] = api('POST', 'api/mobile/stock/adjust.php', ['product_id' => $pid, 'warehouse_id' => $wh, 'quantity' => 1, 'movement_type' => 'set', 'reason' => 'ZZ']);
+    ok($c === 422, 'stock/adjust: invalid movement_type → 422', [$c, $x]);
+    [$c, $a] = api('POST', 'api/mobile/stock/adjust.php', ['product_id' => $pid, 'warehouse_id' => $wh, 'quantity' => 3, 'movement_type' => 'found', 'reason' => 'ZZ API TEST']);
+    ok($c === 200 && $stockOf($pid) == 8.0, 'stock/adjust found 3 → stock 8', [$c, $a, $stockOf($pid)]);
+
+    // Receipt HTML for a real sale.
+    $anySale = api('GET', 'api/pos/get_sales.php', ['limit' => 1])[1]['data'][0] ?? null;
+    if ($anySale) {
+        global $BASE, $TOKEN;
+        $ch = curl_init("$BASE/api/pos/print_receipt.php?id=" . (int)$anySale['sale_id']);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Authorization: Bearer $TOKEN"], CURLOPT_SSL_VERIFYPEER => false]);
+        $html = (string)curl_exec($ch); $hc = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        ok($hc === 200 && str_contains($html, (string)$anySale['receipt_number']), 'print_receipt (Bearer) → HTML with receipt number', [$hc, substr(strip_tags($html), 0, 120)]);
+    }
+
+    // Registers / targets / printer: plan-gated (pos_advanced) → 200 or 403 with a plan message, never 401.
+    [$c, $r] = api('POST', 'api/pos/save_register.php', ['register_name' => "ZZ API TEST reg $RUN", 'register_code' => "ZZ$RUN", 'warehouse_id' => $wh]);
+    ok(in_array($c, [200, 403], true) && $c !== 401, "save_register (Bearer) → $c", [$c, $r]);
+    if ($c === 200 && !empty($r['register_id'])) {
+        [$c, $t] = api('POST', 'api/pos/toggle_register_status.php', ['register_id' => (int)$r['register_id'], 'status' => 'inactive']);
+        ok($c === 200 && !empty($t['success']), 'toggle_register_status → 200', [$c, $t]);
+    }
+    [$c, $r] = api('POST', 'api/pos/save_sales_target.php', ['warehouse_id' => $wh, 'period_month' => date('Y-m'), 'target_amount' => 1000]);
+    ok(in_array($c, [200, 403], true), "save_sales_target (Bearer) → $c", [$c, $r]);
+
+    // Product has stock movements but no sales → deletable.
+    [$c, $d] = api('POST', 'api/mobile/products/delete.php', ['product_id' => $pid]);
+    ok($c === 200, 'products/delete parity product → 200', [$c, $d]);
 }
 
 // =========================================================================

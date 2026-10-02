@@ -40,12 +40,10 @@ ok(str_contains($suppGet, 'NULL AS contact_person'),           'suppliers/get: f
 ok(str_contains($suppGet, 'NULL AS updated_at'),               'suppliers/get: fallback NULL updated_at');
 
 $prodGet = file_get_contents(__DIR__ . '/../api/mobile/products/get.php');
-ok(str_contains($prodGet, 'NULL AS tax_rate_id'),              'products/get: fallback NULL tax_rate_id');
-ok(str_contains($prodGet, 'NULL AS image_url'),                'products/get: fallback NULL image_url');
-ok(str_contains($prodGet, 'cost_price AS purchase_price'),     'products/get: fallback uses cost_price for purchase_price');
-// Verify the FALLBACK section (after the inner catch) no longer reads p.purchase_price directly
-$fallbackSection = substr($prodGet, strpos($prodGet, 'catch (PDOException $fullE)'));
-ok(!str_contains($fallbackSection, 'p.purchase_price,'),        'products/get: fallback no longer reads p.purchase_price directly');
+// products/get now selects only columns present on the tenant (SHOW COLUMNS) and joins tax_rates on tax_id.
+ok(str_contains($prodGet, 'SHOW COLUMNS FROM products'),        'products/get: column list built from the live schema');
+ok(str_contains($prodGet, 't.rate_id = p.tax_id'),             'products/get: tax join uses products.tax_id');
+ok(!str_contains($prodGet, 'p.tax_rate_id'),                    'products/get: no reference to non-existent products.tax_rate_id');
 
 $getSales = file_get_contents(__DIR__ . '/../api/pos/get_sales.php');
 ok(str_contains($getSales, '$offset'),                         'get_sales: $offset variable declared');
