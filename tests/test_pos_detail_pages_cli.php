@@ -28,6 +28,7 @@ $POS['pos'] = $POS['warehouses'] = true;
 function render(string $file, array $get = [], ?array $features = null, int $uid = 0, bool $admin = true): array
 {
     global $ADMIN;
+    $get += ['__lang' => 'en'];   // assertions are written against English unless a test asks for sw
     $args = [PHP_BINARY, __DIR__ . '/helpers/page_request.php', $file, (string)($uid ?: $ADMIN), $admin ? '1' : '0', json_encode($get)];
     if ($features !== null) $args[] = json_encode($features);
     $p = proc_open($args, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, ROOT_DIR);
@@ -156,6 +157,75 @@ try {
     ok(($sw['Nobody owes you anything right now'] ?? '') === 'Hakuna mteja anayedaiwa kwa sasa', 'sw: credit list empty message corrected');
     ok(($sw['This customer owes nothing right now'] ?? '') === 'Mteja huyu hadaiwi chochote kwa sasa', 'sw: customer page message');
     ok(strpos($H['POS']['customer_details'][1], 'Nobody owes you anything right now') === false, 'customer page no longer uses the list wording');
+
+    // ═════════════════════════════════════════════════════════════════
+    section('B1. Suppliers — Simple mode: Activate/Deactivate only, nothing hidden');
+    $sup = $H['POS']['suppliers'][1];
+    ok(!preg_match("/updateStatus\(\d+, 'suspended'\)/", $sup) && !preg_match("/updateStatus\(\d+, 'blacklisted'\)/", $sup), 'POS: no Suspend / Blacklist actions');
+    $stuck = $pdo->query("SELECT supplier_id FROM suppliers WHERE status IN ('suspended','blacklisted') ORDER BY supplier_id")->fetchAll(PDO::FETCH_COLUMN);
+    foreach (array_slice($stuck, 0, 3) as $sid) ok(strpos($sup, "updateStatus($sid, 'active')") !== false, "POS: suspended/blacklisted supplier #$sid can be re-activated");
+    if ($stuck) ok(strpos($sup, 'id="stat-blacklisted-suppliers"') !== false, 'POS: Suspended/Blacklisted cards still shown while such suppliers exist (no data hidden)');
+    ok(preg_match("/updateStatus\(\d+, 'suspended'\)/", $H['FULL']['suppliers'][1]) === 1, 'FULL: Suspend still offered');
+    // Other branch: no supplier in those states → the cards/filter give way to "Inactive".
+    $risk = $pdo->query("SELECT supplier_id, status FROM suppliers WHERE status IN ('suspended','blacklisted')")->fetchAll(PDO::FETCH_KEY_PAIR);
+    try {
+        if ($risk) $pdo->exec("UPDATE suppliers SET status = 'inactive' WHERE supplier_id IN (" . implode(',', array_map('intval', array_keys($risk))) . ")");
+        [, $plain] = render('app/bms/Suppliers/suppliers.php', [], $POS);
+        ok(strpos($plain, 'id="stat-suspended-suppliers"') === false && strpos($plain, '<option value="blacklisted">') === false, 'POS, none suspended/blacklisted: those cards + filter options gone');
+        ok(substr_count($plain, '<div class="col-6 col-lg-3 mb-3">') === 3, 'POS: stat row = Suppliers, Active, Inactive');
+        ok(preg_match_all('#<div\b#', $plain) === preg_match_all('#</div>#', $plain), 'POS: page markup stays balanced');
+    } finally {
+        $u = $pdo->prepare("UPDATE suppliers SET status = ? WHERE supplier_id = ?");
+        foreach ($risk as $sid => $st) $u->execute([$st, $sid]);
+    }
+
+    section('B2. Supplier details');
+    $sd = $H['POS']['supplier_details'][1];
+    ok(strpos($sd, 'Projects Linked') === false && strpos($sd, 'id="pane-projects"') === false, 'POS: no Projects tab / "Projects Linked"');
+    [, $sdsw] = render('app/bms/Suppliers/supplier_details.php', ['id' => (string)$SUPPLIER, '__lang' => 'sw'], $POS);
+    foreach (['Taarifa za Msambazaji', 'Rudi kwa Wasambazaji', 'Taarifa za Rekodi', 'Kumbukumbu za Mabadiliko'] as $w) ok(strpos($sdsw, $w) !== false, "sw: supplier page shows '$w'");
+    ok(strpos($sdsw, '> Supplier View<') === false && strpos($sdsw, 'Record Information<') === false, 'sw: no English header/section titles left');
+
+    section('B3. Product details');
+    $pv = $H['POS']['product_view'][1];
+    $reserved = (float)$pdo->query("SELECT COALESCE(SUM(reserved_quantity),0) FROM product_stocks WHERE product_id = $PRODUCT")->fetchColumn();
+    ok(($reserved > 0) === (strpos($pv, "t('Reserved Stock')") !== false || preg_match('#Reserved Stock</small>#', $pv) === 1), 'POS: "Reserved Stock" shown only when stock is actually reserved (' . $reserved . ')');
+    $grn = (int)$pdo->query("SELECT COUNT(*) FROM product_batches pb JOIN purchase_receipts pr ON pr.receipt_id = pb.receipt_id WHERE pb.product_id = $PRODUCT")->fetchColumn();
+    $hasBatches = (int)$pdo->query("SELECT COUNT(*) FROM product_batches WHERE product_id = $PRODUCT")->fetchColumn() > 0;
+    if ($hasBatches) ok(($grn > 0) === (strpos($pv, '>Source GRN<') !== false), 'POS: "Source GRN" column only when a batch came from a GRN');
+    ok(strpos($pv, 'No reason provided') === false, 'POS: no "No reason provided" noise');
+    [, $pvsw] = render('app/bms/product/product_view.php', ['id' => (string)$PRODUCT, '__lang' => 'sw'], $POS);
+    foreach (['Taarifa za Bidhaa', 'Taarifa za Bei', 'Mienendo ya Stoku ya Karibuni', 'Takwimu za Mauzo'] as $w) ok(strpos($pvsw, $w) !== false, "sw: product page shows '$w'");
+    foreach (['Basic Information<', 'Pricing Information<', 'Recent Stock Movements<', 'No reason provided', ' units<'] as $w) ok(strpos($pvsw, $w) === false, "sw: no English '" . trim($w, '<') . "'");
+
+    section('B4. Services list');
+    $sl = $H['POS']['services'][1];
+    ok(strpos($sl, 'Services you sell at the POS') !== false && strpos($sl, 'used in Sales, Invoices') === false, 'POS: subtitle no longer mentions Sales/Invoices');
+    ok(strpos($H['FULL']['services'][1], 'used in Sales, Invoices') !== false, 'FULL: original subtitle kept');
+    ok(preg_match('#<hr class="dropdown-divider"></li>\s*</ul>#', $sl) === 0, 'no menu ends with a separator');
+    $shopWords = strpos($sl, 'Non-Inventory Products') === false;   // same wLabel() rule as the page title
+    ok($shopWords ? (strpos($sl, 'Total Services') !== false && strpos($sl, 'Service Name') !== false) : (strpos($sl, 'Total Products') !== false), 'stats/columns use the same word as the page title');
+    $usedCats = (int)$pdo->query("SELECT COUNT(DISTINCT category_id) FROM products WHERE is_service = 1 AND status <> 'deleted' AND category_id IS NOT NULL")->fetchColumn();
+    preg_match('#id="svcCategoryFilter".*?</select>#s', $sl, $cf);
+    ok(substr_count($cf[0] ?? '', '<option value="') - 1 <= $usedCats, 'category filter lists only categories services use');
+
+    section('B5. Service details');
+    $sv = $H['POS']['service_view'][1];
+    ok(strpos($sv, 'Assembly Information') === false && strpos($sv, 'Contract Item No') === false, 'POS: no Assembly / Contract Item No');
+    ok(strpos($sv, 'SKU:') === false, 'POS: no SKU');
+    ok(strpos($sv, 'Product Dashboard') === false && strpos($sv, '>SELLING<') === false, 'POS: no "Product Dashboard" / hard-coded SELLING label');
+    $svcCost = (float)$pdo->query("SELECT cost_price FROM products WHERE product_id = $SERVICE")->fetchColumn();
+    ok(($svcCost > 0) === (strpos($sv, "fw-bold text-danger\" style=\"white-space: nowrap;\">") !== false), 'POS: Cost/Margin shown only when the service has a cost (' . $svcCost . ')');
+    ok(strpos($H['FULL']['service_view'][1], 'Assembly Information') !== false, 'FULL: Assembly information kept');
+
+    section('B6. Customer details');
+    $cd = $H['POS']['customer_details'][1];
+    $limit = (float)$pdo->query("SELECT credit_limit FROM customers WHERE customer_id = $CUSTOMER")->fetchColumn();
+    ok(($limit > 0) === (strpos($cd, 'Available Credit') !== false), 'POS: "Available Credit" only with a credit limit (' . $limit . ')');
+    [, $cdsw] = render('app/bms/customer/customer_details.php', ['id' => (string)$CUSTOMER, '__lang' => 'sw'], $POS);
+    foreach (['Taarifa za Mteja', 'Taarifa kwa Ufupi', 'Amesajiliwa', 'Historia ya Madeni'] as $w) ok(strpos($cdsw, $w) !== false, "sw: customer page shows '$w'");
+    [, $cden] = render('app/bms/customer/customer_details.php', ['id' => (string)$CUSTOMER, '__lang' => 'en'], $POS);
+    ok(strpos($cden, 'Credit History') !== false && strpos($cden, 'Amekopa Mara') === false, 'en: Madeni labels are English for English users (were hard-coded Swahili)');
 } finally {
     foreach ($saved as $k => $v) setSetting($k, $v);
     $GLOBALS['__bms_features'] = null;

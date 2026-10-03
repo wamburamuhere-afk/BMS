@@ -15,7 +15,7 @@ if ($product_id <= 0) {
 }
 
 $back_url   = $from_project ? getUrl('project_view') . '?id=' . $from_project . '#proc-nip-products' : getUrl('services');
-$back_label = $from_project ? 'Back to Project' : 'Back to List';
+$back_label = $from_project ? t('Back to Project') : t('Back to List');
 
 // Fetch product details
 $stmt = $pdo->prepare("
@@ -39,7 +39,7 @@ $stmt->execute([$product_id]);
 $svc = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$svc) {
-    echo "<div class='container mt-5'><div class='alert alert-danger'>Service product not found.</div></div>";
+    echo "<div class='container mt-5'><div class='alert alert-danger'>" . htmlspecialchars(t('Service not found.')) . "</div></div>";
     require_once 'footer.php';
     exit();
 }
@@ -76,9 +76,14 @@ foreach ($components as $comp) {
     $assembly_cost += ($comp['component_cost'] * ($comp['qty_per_unit'] ?? 0));
 }
 
+// Simple POS services have no materials, so their cost is the service's own cost
+// price; Cost/Margin are shown only when a cost exists — a 0 cost made every
+// service read "100% margin" (pos_detail_pages_plan.md B5).
+$svc_cost = $hideMaterialComponents ? (float)($svc['cost_price'] ?? 0) : $assembly_cost;
+$show_cost = $svc_cost > 0;
 $margin = 0;
 if ($svc['selling_price'] > 0) {
-    $margin = (($svc['selling_price'] - $assembly_cost) / $svc['selling_price']) * 100;
+    $margin = (($svc['selling_price'] - $svc_cost) / $svc['selling_price']) * 100;
 }
 
 // Global company name for branding
@@ -269,11 +274,11 @@ $company_logo = getSetting('company_logo', '');
     <!-- Header Navigation -->
     <div class="d-flex justify-content-between align-items-center mb-4 d-print-none service-header-wrapper">
         <div>
-            <h2 class="fw-bold mb-0 text-primary service-header-title"><i class="bi bi-layout-text-window me-2"></i> Product Dashboard</h2>
+            <h2 class="fw-bold mb-0 text-primary service-header-title"><i class="bi bi-layout-text-window me-2"></i> <?= wLabel('Non-Inventory Product', 'Service') ?></h2>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0" style="font-size: 0.75rem;">
                     <li class="breadcrumb-item"><a href="<?= $back_url ?>">
-                        <?= $from_project ? 'Project' : 'Services' ?>
+                        <?= $from_project ? t('Project') : wLabel('Non-Inventory Products', 'Services') ?>
                     </a></li>
                     <li class="breadcrumb-item active text-truncate" style="max-width: 150px;" aria-current="page"><?= caseFormat($svc['product_name']) ?></li>
                 </ol>
@@ -281,7 +286,7 @@ $company_logo = getSetting('company_logo', '');
         </div>
         <div class="d-flex gap-2 service-header-buttons">
             <button class="btn btn-outline-primary fw-bold btn-mobile-sm" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> Print
+                <i class="bi bi-printer me-1"></i> <?= t('Print') ?>
             </button>
             <a href="<?= $back_url ?>" class="btn btn-secondary fw-bold btn-mobile-sm">
                 <i class="bi bi-arrow-left me-1"></i> <?= $back_label ?>
@@ -292,7 +297,7 @@ $company_logo = getSetting('company_logo', '');
     <!-- Print Only Branding -->
     <div class="text-center mb-4 report-header d-none d-print-block">
         
-        <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;">NON-INVENTORY PRODUCT DETAILS</h3>
+        <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;"><?= wLabel('Non-Inventory Product Details', 'Service Details') ?></h3>
         <h5 class="text-dark fw-bold mb-1" style="word-break:break-word;overflow-wrap:anywhere;max-width:100%;"><?= caseFormat($svc['product_name']) ?></h5>
         <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
     </div>
@@ -309,7 +314,9 @@ $company_logo = getSetting('company_logo', '');
                         </div>
                         <div style="min-width:0;">
                             <h3 class="fw-bold mb-0 text-dark" style="word-break:break-word;overflow-wrap:anywhere;"><?= caseFormat($svc['product_name']) ?></h3>
+                            <?php if (!$hideMaterialComponents): // Simple POS never shows SKUs ?>
                             <span class="badge bg-light text-primary border border-primary border-opacity-25 mt-1">SKU: <?= htmlspecialchars($svc['sku'] ?: 'N/A') ?></span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -318,27 +325,29 @@ $company_logo = getSetting('company_logo', '');
                         <div class="col-md-4 dashboard-stat-col">
                             <div class="p-2 bg-light rounded text-center border dashboard-stat-card">
                                 <div class="d-flex justify-content-between align-items-center px-2">
-                                    <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;">SELLING</small>
-                                    <div class="fw-bold text-success" style="white-space: nowrap;">TZS <?= number_format($svc['selling_price'], 2) ?></div>
+                                    <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;"><?= t('Selling Price') ?></small>
+                                    <div class="fw-bold text-success" style="white-space: nowrap;"><?= format_currency($svc['selling_price']) ?></div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php if ($show_cost): ?>
+                        <div class="col-md-4 dashboard-stat-col">
+                            <div class="p-2 bg-light rounded text-center border dashboard-stat-card">
+                                <div class="d-flex justify-content-between align-items-center px-2">
+                                    <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;"><?= t('Cost') ?></small>
+                                    <div class="fw-bold text-primary" style="white-space: nowrap;"><?= format_currency($svc_cost) ?></div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4 dashboard-stat-col">
                             <div class="p-2 bg-light rounded text-center border dashboard-stat-card">
                                 <div class="d-flex justify-content-between align-items-center px-2">
-                                    <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;">COST</small>
-                                    <div class="fw-bold text-primary" style="white-space: nowrap;">TZS <?= number_format($assembly_cost, 2) ?></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 dashboard-stat-col">
-                            <div class="p-2 bg-light rounded text-center border dashboard-stat-card">
-                                <div class="d-flex justify-content-between align-items-center px-2">
-                                    <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;">MARGIN</small>
+                                    <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;"><?= t('Margin') ?></small>
                                     <div class="fw-bold text-danger" style="white-space: nowrap;"><?= number_format($margin, 2) ?>%</div>
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -347,32 +356,33 @@ $company_logo = getSetting('company_logo', '');
         <div class="card-body p-4">
             <div class="row g-4">
                 <!-- Left Column: Specs -->
-                <div class="col-md-6">
+                <div class="<?= $hideMaterialComponents ? 'col-12' : 'col-md-6' ?>">
                     <div class="svc-info-box p-4 bg-light rounded-4 h-100 border">
                         <h6 class="fw-bold text-dark text-uppercase small mb-3 border-bottom pb-2">
-                            <i class="bi bi-info-circle me-2 text-primary"></i> Basic Specifications
+                            <i class="bi bi-info-circle me-2 text-primary"></i> <?= t('Basic Information') ?>
                         </h6>
                         <div class="d-flex flex-column gap-1">
                             <div class="spec-item">
-                                <span class="spec-label">Tax Rate</span>
+                                <span class="spec-label"><?= t('Tax Rate') ?></span>
                                 <span class="spec-value">
                                     <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="font-size: 0.65rem;">
-                                        <?= !empty($svc['tax_name']) ? caseFormat($svc['tax_name']) : 'No Tax' ?>
+                                        <?= !empty($svc['tax_name']) ? caseFormat($svc['tax_name']) : t('No Tax') ?>
                                         <?= $svc['tax_rate_percentage'] ? '('.$svc['tax_rate_percentage'].'%)' : '' ?>
                                     </span>
                                 </span>
                             </div>
                             <div class="mt-2">
-                                <label class="spec-label d-block mb-1">Description</label>
+                                <label class="spec-label d-block mb-1"><?= t('Description') ?></label>
                                 <div class="bg-white p-2 rounded border small text-dark" style="min-height: 50px;">
-                                    <?= !empty($svc['description']) ? nl2br(caseFormat($svc['description'])) : 'No description.' ?>
+                                    <?= !empty($svc['description']) ? nl2br(caseFormat($svc['description'])) : t('No description.') ?>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right Column: Assembly -->
+                <!-- Right Column: Assembly — a Projects/contracts concept, shown with the materials only -->
+                <?php if (!$hideMaterialComponents): ?>
                 <div class="col-md-6">
                     <div class="svc-info-box p-4 bg-light rounded-4 h-100 border">
                         <h6 class="fw-bold text-dark text-uppercase small mb-3 border-bottom pb-2">
@@ -390,6 +400,7 @@ $company_logo = getSetting('company_logo', '');
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Bottom: Material List -->
                 <?php if (!$hideMaterialComponents): ?>

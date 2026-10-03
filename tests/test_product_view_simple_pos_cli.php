@@ -55,6 +55,7 @@ function _pvs_render(string $root, int $uid, int $pid): string {
         require '$root/roots.php';
         \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
         \$_SESSION['first_name'] = 'Test'; \$_SESSION['last_name'] = 'Admin'; \$_SESSION['user_role'] = 'Admin';
+        \$_SESSION['user_lang'] = 'en'; // labels go through t() since pos_detail_pages_plan.md — assert in English
         ob_start();
         include '$root/app/bms/product/product_view.php';
         echo ob_get_clean();

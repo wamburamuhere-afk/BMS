@@ -38,6 +38,7 @@ $_SESSION = [
 ];
 if ($features !== '') $GLOBALS['__bms_features'] = json_decode($features, true);
 $_GET = json_decode($params, true) ?: [];
+if (isset($_GET['__lang'])) { $_SESSION['user_lang'] = $_GET['__lang']; unset($_GET['__lang']); }   // e.g. 'sw'
 
 // "--routes": print {route: bmsRouteAvailable(route)} for every mapped route,
 // evaluated in this fresh process (settings read now, not cached by the caller).

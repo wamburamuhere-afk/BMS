@@ -96,7 +96,10 @@ $stmt->execute();
 $all_nip_services = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Dropdown data
-$categories = $pdo->query("SELECT category_id, category_name FROM categories WHERE status='active' AND type='product' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+// Filter lists only categories some service actually uses (was every product category) — B4.
+$categories = $pdo->query("SELECT category_id, category_name FROM categories WHERE status='active' AND type='product'
+    AND category_id IN (SELECT DISTINCT category_id FROM products WHERE is_service = 1 AND status <> 'deleted' AND category_id IS NOT NULL)
+    ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $tax_rates  = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status='active' ORDER BY rate_name")->fetchAll(PDO::FETCH_ASSOC);
 $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $brands     = $pdo->query("SELECT brand_id, brand_name FROM brands WHERE status='active' ORDER BY brand_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -205,7 +208,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
                 <h4 class="fw-bold mb-1"><i class="bi bi-box-seam me-2"></i><?= wLabel('Non-Inventory Products', 'Services') ?></h4>
-                <p class="mb-0 opacity-75 small"><?= t('Virtual products & services — used in Sales, Invoices and POS only') ?></p>
+                <p class="mb-0 opacity-75 small"><?= tenantFeatureEnabled('sales') ? t('Virtual products & services — used in Sales, Invoices and POS only') : t('Services you sell at the POS') ?></p>
             </div>
             <div class="d-flex gap-2 flex-nowrap">
                 <?php if ($can_create): ?>
@@ -229,7 +232,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             <div class="card border-0 shadow-sm rounded-4 h-100">
                 <div class="card-body p-3 text-center">
                     <div class="text-primary fw-bold fs-4"><?= $total_count ?></div>
-                    <small class="text-muted"><?= t('Total Products') ?></small>
+                    <small class="text-muted"><?= wLabel('Total Products', 'Total Services') ?></small>
                 </div>
             </div>
         </div>
@@ -278,10 +281,10 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
                                 <input type="text" class="form-control border-0 bg-light" id="svcTableSearch"
-                                    placeholder="<?= t('Search products...') ?>" autocomplete="off">
+                                    placeholder="<?= wLabel('Search products...', 'Search services...') ?>" autocomplete="off">
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-3<?= $categories ? '' : ' d-none' ?>">
                             <select class="form-select border-0 bg-light select2-static" id="svcCategoryFilter" name="category">
                                 <option value=""><?= t('All Categories') ?></option>
                                 <?php foreach ($categories as $cat): ?>
@@ -434,7 +437,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                         <tr>
                             <th class="ps-3" style="width:50px;"><?= t('S/NO') ?></th>
                             <th style="width:110px;"><?= t('Item Code') ?></th>
-                            <th><?= t('Product Name') ?></th>
+                            <th><?= wLabel('Product Name', 'Service Name') ?></th>
                             <th style="width:120px;" class="<?= projectsModuleActive() ? '' : 'd-none' ?>"><?= t('Project') ?></th>
                             <th style="width:120px;"><?= t('Selling Price') ?></th>
                             <th style="width:90px;"><?= t('Tax') ?></th>
@@ -505,15 +508,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                             </a>
                                         </li>
                                         <?php endif; ?>
-                                        <li><hr class="dropdown-divider"></li>
                                         <?php if ($can_delete): ?>
+                                        <li><hr class="dropdown-divider"></li>
                                         <li>
                                             <a class="dropdown-item py-2 text-danger" href="javascript:void(0)"
                                                 onclick="deleteSvc(<?= $svc['product_id'] ?>, '<?= addslashes($svc['product_name']) ?>')">
                                                 <i class="bi bi-trash me-2"></i> <?= t('Delete Service') ?>
                                             </a>
                                         </li>
-                                        <li><hr class="dropdown-divider"></li>
                                         <?php endif; ?>
                                     </ul>
                                 </div>

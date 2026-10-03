@@ -208,7 +208,8 @@ if ($adminUid <= 0) {
 
         _scc_set_settings($root, '0');
         $normalDetail = _scc_render($root, $adminUid, 'app/bms/Suppliers/supplier_details.php', ['id' => $suppId]);
-        (str_contains($normalDetail, 'data-bs-target="#pane-payments"') && str_contains($normalDetail, 'data-bs-target="#pane-projects"') && str_contains($normalDetail, 'Total Orders'))
+        // The Projects tab follows projectsModuleActive() since pos_detail_pages_plan.md B2.
+        (str_contains($normalDetail, 'data-bs-target="#pane-payments"') && (str_contains($normalDetail, 'data-bs-target="#pane-projects"') === projectsModuleActive()) && str_contains($normalDetail, 'Total Orders'))
             ? pass('Normal tenant: everything present, unchanged — including the original Statistics Cards row') : fail('normal tenant lost tabs/cards — regression');
 
         section('5. Live — Delete is now always soft-delete');
