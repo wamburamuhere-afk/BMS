@@ -1877,7 +1877,7 @@ global $company_name, $company_logo;
                     <div id="madeniAgingCards" class="px-2 d-none"></div>
                     <div class="text-center py-4 d-none" id="madeniAgingEmpty">
                         <i class="bi bi-emoji-smile" style="font-size:2.5rem;color:#ccc;"></i>
-                        <p class="mt-2 mb-0 text-muted"><?= t('Nobody owes you anything right now') ?></p>
+                        <p class="mt-2 mb-0 text-muted"><?= t('This customer owes nothing right now') ?></p>
                     </div>
                 </div>
             </div>

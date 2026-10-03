@@ -4390,7 +4390,7 @@ return [
     'Total Owed' => 'Jumla Anayodaiwa',
     'Owed' => 'Anadaiwa',
     'Open Credit Sales' => 'Mauzo ya Mkopo Yaliyo Wazi',
-    'Nobody owes you anything right now' => 'Hakuna anayekudai chochote kwa sasa',
+    'Nobody owes you anything right now' => 'Hakuna mteja anayedaiwa kwa sasa',
     'Sale Date' => 'Tarehe ya Mauzo',
     'Sale Date:' => 'Tarehe ya Mauzo:',
     'Due Date:' => 'Tarehe ya Malipo:',
@@ -4804,5 +4804,10 @@ return [
     'Product pages'                         => 'Kurasa za bidhaa',
     '%from%–%to% of %total% products'       => 'Bidhaa %from%–%to% kati ya %total%',
     'Added to cart'                         => 'Imeongezwa kwenye kikapu',
+
+    // ------------------------------------------------------------------
+    // POS detail pages (pos_detail_pages_plan.md)
+    // ------------------------------------------------------------------
+    'This customer owes nothing right now' => 'Mteja huyu hadaiwi chochote kwa sasa',
 
 ];

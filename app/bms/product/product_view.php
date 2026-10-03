@@ -24,6 +24,10 @@ $can_adjust_stock = hasPermission('adjust_stock') || isAdmin();
 // Create/Edit is hidden here too, for the exact same reason — a Simple POS
 // shop owner never entered these values and shouldn't be shown them back.
 $simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
+require_once ROOT_DIR . '/core/stock_ledger.php';   // stockMovementIsInbound() for the movements sign
+// Links into other modules' pages only when they would open (pos_detail_pages_plan.md A4).
+$can_po_list_link       = bmsRouteAvailable('purchase_orders');
+$can_sales_report_link  = bmsRouteAvailable('product_analysis');
 
 // Get product details with comprehensive information
 try {
@@ -232,7 +236,7 @@ try {
         SELECT 
             sm.*,
             w.warehouse_name,
-            u.username as adjusted_by_name
+            COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.username) as adjusted_by_name
         FROM stock_movements sm
         LEFT JOIN warehouses w ON sm.warehouse_id = w.warehouse_id
         LEFT JOIN users u ON sm.created_by = u.user_id
@@ -778,11 +782,11 @@ global $company_logo, $company_name;
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="text-center mt-3">
+                                            <?php if ($can_po_list_link): ?><div class="text-center mt-3">
                                                 <a href="<?= getUrl('purchase_orders') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary">
                                                     <i class="bi bi-cart-plus"></i> View All Purchase Orders
                                                 </a>
-                                            </div>
+                                            </div><?php endif; ?>
                                         </div>
                                     </div>
                                     
@@ -1028,11 +1032,11 @@ global $company_logo, $company_name;
                                                     <?php endif; ?>
                                                 </p>
                                             </div>
-                                            <div class="text-center mt-2 px-3 pb-3">
+                                            <?php if ($can_po_list_link): ?><div class="text-center mt-2 px-3 pb-3">
                                                 <a href="<?= getUrl('purchase_orders') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary w-100">
                                                     <i class="bi bi-cart-plus"></i> View All Purchase Orders
                                                 </a>
-                                            </div>
+                                            </div><?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -1063,7 +1067,9 @@ global $company_logo, $company_name;
                                                 <tr>
                                                     <td><?= format_date($sale['sale_date']) ?></td>
                                                     <td>
-                                                        <a href="<?= getUrl('sales_order_view') ?>?id=<?= $sale['sale_id'] ?>" class="text-decoration-none">
+                                                        <!-- A POS sale: opens its receipt (was sales_order_view?id=<pos sale_id>,
+                                                             the wrong record — pos_detail_pages_plan.md A8). -->
+                                                        <a href="<?= buildUrl('api/pos/print_receipt.php') ?>?id=<?= (int)$sale['sale_id'] ?>" target="_blank" rel="noopener" class="text-decoration-none">
                                                             <?= caseFormat($sale['receipt_number']) ?>
                                                         </a>
                                                     </td>
@@ -1128,8 +1134,20 @@ global $company_logo, $company_name;
                                                         <span class="text-muted">N/A</span>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td class="<?= ($movement['quantity'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>">
-                                                        <?= ($movement['quantity'] ?? 0) >= 0 ? '+' : '' ?><?= format_number($movement['quantity'] ?? 0, 3) ?>
+                                                    <?php
+                                                    // Quantities are stored positive; the direction is the movement's
+                                                    // (pos_detail_pages_plan.md A5): stock_after vs stock_before when
+                                                    // both are recorded, else the canonical IN/OUT movement types.
+                                                    $mvQty = abs((float)($movement['quantity'] ?? 0));
+                                                    if ($movement['stock_before'] !== null && $movement['stock_after'] !== null
+                                                        && (float)$movement['stock_after'] != (float)$movement['stock_before']) {
+                                                        $mvIn = (float)$movement['stock_after'] > (float)$movement['stock_before'];
+                                                    } else {
+                                                        $mvIn = stockMovementIsInbound((string)$movement['movement_type']);
+                                                    }
+                                                    ?>
+                                                    <td class="<?= $mvIn ? 'text-success' : 'text-danger' ?>">
+                                                        <?= $mvIn ? '+' : '−' ?><?= format_number($mvQty, 3) ?>
                                                     </td>
                                                     <td><?= format_number($movement['stock_before'] ?? 0, 3) ?></td>
                                                     <td><?= format_number($movement['stock_after'] ?? 0, 3) ?></td>
@@ -1400,10 +1418,10 @@ global $company_logo, $company_name;
                                                     <i class="bi bi-file-earmark-text"></i> Generate Movement Report
                                                 </a>
 
-                                                <a href="<?= getUrl('product_analysis') ?>?product_id=<?= $product_id ?>" 
+                                                <?php if ($can_sales_report_link): ?><a href="<?= getUrl('product_analysis') ?>?product_id=<?= $product_id ?>" 
                                                    class="btn btn-outline-success">
                                                     <i class="bi bi-graph-up"></i> Generate Sales Report
-                                                </a>
+                                                </a><?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -1470,7 +1488,7 @@ global $company_logo, $company_name;
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4">
+                        <?php if ($can_po_list_link): ?><div class="col-md-4">
                             <h6><i class="bi bi-cart-plus"></i> Purchase Orders</h6>
                             <?php if (!empty($purchase_orders)): ?>
                             <div class="list-group">
@@ -1502,7 +1520,7 @@ global $company_logo, $company_name;
                             <?php else: ?>
                             <p class="text-muted">No purchase orders found for this product.</p>
                             <?php endif; ?>
-                        </div>
+                        </div><?php endif; ?>
 
                         <div class="col-md-4">
                             <h6><i class="bi bi-arrow-left-right"></i> Stock Transfers</h6>

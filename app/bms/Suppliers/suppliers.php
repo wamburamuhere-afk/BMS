@@ -158,6 +158,13 @@ if (projectsModuleActive()) {
 require_once __DIR__ . '/../../../core/pos_nav.php';
 $simpleSupplierForm = posSimpleModeEnabled() && !advancedSupplierEnabled();
 
+// Row-menu links into other modules' pages — drawn only when that page would
+// open (pos_detail_pages_plan.md A1): with Finance / Procurement off the router
+// 404s vendor_statement / purchase_order_create.
+$can_view_account_link = bmsRouteAvailable('vendor_statement');
+$can_new_order_link    = bmsRouteAvailable('purchase_order_create');
+$can_view_orders_link  = bmsRouteAvailable('purchase_orders');
+
 // Translated status label for badges (t() keys already exist from Customers).
 function supplier_status_label($status) {
     static $labels = null;
@@ -515,9 +522,13 @@ function supplier_status_label($status) {
                                                  tabs inside suppliers/view (Recent Purchase Orders, Recent Payments) —
                                                  reachable one click after "View Details" instead of duplicated here.
                                                  View Account is kept: it opens the full vendor statement, which is a
-                                                 separate report, not one of that page's tabs. -->
+                                                 separate report, not one of that page's tabs.
+                                                 Both links only when their page's module is on
+                                                 (bmsRouteAvailable — otherwise the router 404s them). -->
+                                            <?php if ($can_view_account_link): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> <?= t('View Account') ?></a></li>
-                                            <?php if (!$simpleSupplierForm && $company_type != 'microfinance' && $can_edit_suppliers): ?>
+                                            <?php endif; ?>
+                                            <?php if (!$simpleSupplierForm && $company_type != 'microfinance' && $can_edit_suppliers && $can_new_order_link): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> <?= t('New Order') ?></a></li>
                                             <?php endif; ?>
 
@@ -635,10 +646,12 @@ function supplier_status_label($status) {
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <?php endif; ?>
+                                    <?php if ($can_view_orders_link): ?>
                                     <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-success" title="<?= t('View Orders') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-cart"></i>
                                     </a>
-                                    <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
+                                    <?php endif; ?>
+                                    <?php if ($company_type != 'microfinance' && $can_edit_suppliers && $can_new_order_link): ?>
                                     <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-info" title="<?= t('New Order') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-plus-circle"></i>
                                     </a>
