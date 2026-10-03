@@ -252,7 +252,7 @@ try {
     section('6. Print report — Kiswahili & English, landscape & portrait');
     [$c, $sw] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'sw', 'orient' => 'portrait']);
     ok($c === 200, 'Kiswahili print renders (200)');
-    foreach (['RIPOTI YA ZIARA ZA WATEJA', 'Mahali alipotembelea', 'Jina la mteja', 'Kadi ya biashara', 'Amejiunga', 'Waliojiunga na mfumo wetu', 'Duka la rejareja', 'Ana nia', 'Ndiyo', 'Hapana', 'Chapisha / Hifadhi kama PDF', 'Ripoti hii imechapishwa na'] as $s)
+    foreach (['RIPOTI YA ZIARA ZA WATEJA', 'Mahali alipotembelea', 'Jina la mteja', '>Alichopewa<', 'Amejiunga', 'Waliojiunga na mfumo wetu', 'Duka la rejareja', 'Ana nia', 'Ndiyo', 'Hapana', 'Chapisha / Hifadhi kama PDF', 'Ripoti hii imechapishwa na'] as $s)
         ok(strpos($sw, $s) !== false, "sw contains '$s'");
     $swDate = frDateLabel($day1, 'sw');
     ok(strpos($sw, $swDate) !== false, "sw date written in Swahili ('$swDate')");
@@ -264,7 +264,7 @@ try {
 
     [$c, $en] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'en', 'orient' => 'landscape']);
     ok($c === 200, 'English print renders (200)');
-    foreach (['CUSTOMER VISITS REPORT', 'S/No', 'Place visited', 'Client name', 'Business card', 'Free trial link', 'Joined our system', 'Retail shop', 'Interested', 'This document was Printed by'] as $s)
+    foreach (['CUSTOMER VISITS REPORT', 'S/No', 'Place visited', 'Client name', '>Card<', '>Trial<', 'Joined our system', 'Retail shop', 'Interested', 'This document was Printed by'] as $s)
         ok(strpos($en, $s) !== false, "en contains '$s'");
     ok(strpos($en, 'RIPOTI YA MATEMBEZI') === false && strpos($en, 'Ripoti hii imechapishwa') === false, 'en has no Swahili headings/footer');
     ok(preg_match('/@page\s*\{\s*size:\s*A4\s+landscape/', $en) === 1, 'landscape → @page size A4 landscape');
@@ -466,6 +466,25 @@ try {
     ok(strpos($page, 'fr-follow-actions') !== false && strpos($page, 'white-space: nowrap') !== false, 'follow-up buttons stay on one compact row');
     [, $html] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'sw']);
     ok(strpos($html, '>Mwitikio<') !== false && strpos($html, '>Nia<') === false, 'report column says "Mwitikio" like the page (not "Nia")');
+
+    section('14. Print friendliness (second live test)');
+    [, $p] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'sw', 'orient' => 'landscape']);
+    ok(strpos($p, 'overflow-wrap: break-word') !== false && strpos($p, 'overflow-wrap: anywhere') === false && !preg_match('#th \{[^}]*text-transform: uppercase#', $p), 'headings wrap at spaces only (no uppercase squeeze, no mid-word breaks)');
+    ok(strpos($p, 'class="table-wrap"') !== false && strpos($p, 'min-width: 1000px') !== false && strpos($p, 'Telezesha pembeni') !== false, 'on a phone screen the table scrolls sideways (with a hint) instead of letters stacking');
+    ok(strpos($p, 'if (window.opener) { window.close(); }') !== false, 'Close works even when the report was not opened as a new tab');
+    [, $pp] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'sw', 'orient' => 'portrait']);
+    ok(strpos($pp, 'min-width: 720px') !== false, 'portrait screen width 720 px');
+    [, $csv] = call('api/field_reports/export.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'en']);
+    ok(strpos($csv, 'Business card') !== false && strpos($csv, 'Free trial link') !== false, 'Excel keeps the full column names');
+    $page = file_get_contents(ROOT_DIR . '/app/bms/field_reports/field_visits.php');
+    ok(strpos($page, 'id="rFrom"') !== false && strpos($page, 'data-rquick="week"') !== false && strpos($page, "$('#rFrom').val()") !== false, 'report dates can be chosen in the report dialog itself');
+    ok(strpos($page, "t('Preview & Print')") !== false, 'button says "Angalia na Uchapishe"');
+    // A4 portrait: card/trial/training merged into one "Alichopewa" column; <col> widths follow the column order
+    preg_match('#<colgroup>(.*?)</colgroup>#s', $pp, $cg); preg_match('#<thead><tr>(.*?)</tr></thead>#s', $pp, $th);
+    ok(strpos($th[1] ?? '', '>Alichopewa<') !== false && strpos($th[1] ?? '', '>Kadi<') === false, 'portrait: one "Alichopewa" column instead of three Yes/No columns');
+    ok(substr_count($cg[1] ?? '', '<col ') === substr_count($th[1] ?? '', '<th '), 'one <col> per heading');
+    ok(strpos($pp, 'Kadi, Majaribio') !== false || strpos($pp, 'Kadi') !== false, '"Alichopewa" lists what was given');
+    ok(strpos($p, '>Kadi<') !== false && strpos($p, '>Alichopewa<') === false, 'landscape keeps the three columns');
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")

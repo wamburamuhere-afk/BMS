@@ -5137,5 +5137,11 @@ return [
     'Follow-up re-opened.' => 'Ufuatiliaji umefunguliwa tena.',
     'The follow-up date cannot be before the visit.' => 'Tarehe ya kufuatilia haiwezi kuwa kabla ya ziara.',
     'Choose a follow-up date within a year.' => 'Chagua tarehe ya kufuatilia ndani ya mwaka mmoja.',
+    'Swipe sideways to see every column. The printout fits the page.' => 'Telezesha pembeni kuona safu zote. Ukichapisha, inatosha kwenye karatasi.',
+    'wide — recommended' => 'upana — inapendekezwa',
+    'upright' => 'wima wa kawaida',
+    'The report opens in a new tab. Press “Print / Save as PDF” there — on a phone choose “Save as PDF” to keep or share it.' => 'Ripoti itafunguka kwenye ukurasa mpya. Bonyeza “Chapisha / Hifadhi kama PDF” huko — kwenye simu chagua “Hifadhi kama PDF” ili kuitunza au kuituma.',
+    'Preview & Print' => 'Angalia na Uchapishe',
+    'Given' => 'Alichopewa',
 
 ];

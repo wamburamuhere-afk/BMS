@@ -7,8 +7,14 @@
 require_once __DIR__ . '/field_reports.php';
 
 if (!function_exists('frReportColumns')) {
-    /** [key => label]; Date only for multi-day ranges, Staff only for an all-staff report. */
-    function frReportColumns(bool $multiDay, bool $allStaff): array
+    /**
+     * [key => label]; Date only for multi-day ranges, Staff only for an all-staff report.
+     * $compact (print): short headings for the narrow Yes/No columns, so a heading never
+     * has to break inside a word on A4 ("Kadi" not "Kadi ya biasha|ra").
+     * $merged (A4 portrait): card / trial / training become ONE "Given" column
+     * ("Kadi, Majaribio") — 14 columns cannot fit upright without breaking words.
+     */
+    function frReportColumns(bool $multiDay, bool $allStaff, bool $compact = false, bool $merged = false): array
     {
         $c = ['sno' => t('S/No')];
         if ($multiDay) $c['date'] = t('Date');
@@ -19,9 +25,15 @@ if (!function_exists('frReportColumns')) {
             'client'   => t('Client name'),
             'phone'    => t('Phone'),
             'business' => t('Business'),
-            'card'     => t('Business card'),
-            'trial'    => t('Free trial link'),
-            'training' => t('Training'),
+        ];
+        if ($merged) {
+            $c['given'] = t('Given');
+        } else {
+            $c['card']     = $compact ? t('Card') : t('Business card');
+            $c['trial']    = $compact ? t('Trial') : t('Free trial link');
+            $c['training'] = t('Training');
+        }
+        $c += [
             'interest' => t('Response'),   // same word as the page ("Mwitikio")
             'joined'   => t('Joined'),
             'follow_up' => t('Follow-up'),
@@ -50,6 +62,11 @@ if (!function_exists('frReportColumns')) {
                 'card'     => (int)$v['gave_business_card'] ? $yes : $no,
                 'trial'    => (int)$v['gave_trial_link'] ? $yes : $no,
                 'training' => (int)$v['gave_training'] ? $yes : $no,
+                'given'    => implode(', ', array_filter([
+                                  (int)$v['gave_business_card'] ? t('Card') : null,
+                                  (int)$v['gave_trial_link'] ? t('Trial') : null,
+                                  (int)$v['gave_training'] ? t('Training') : null,
+                              ])) ?: '—',
                 'interest' => $v['interest'] ? t($interest[$v['interest']] ?? '') : '—',
                 'joined'   => (int)$v['joined'] ? $yes : $no,
                 'follow_up' => !empty($v['follow_up_date'])

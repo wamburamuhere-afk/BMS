@@ -18,15 +18,21 @@ $day = ($from === $to && $userId !== null) ? frDayStatus($pdo, $userId, $from) :
 logActivity($pdo, $me, 'Print field report', "Opened field report $from..$to (" . ($userId ?? 'all staff') . ", $lang, $orient)");
 
 loadLanguage($lang);   // everything below is in the report's language
-$columns = frReportColumns($from !== $to, $userId === null);
+$columns = frReportColumns($from !== $to, $userId === null, true, $orient === 'portrait');
 $rows    = frReportRows($visits, $columns);
 $summary = frReportSummary(frStats($visits));
 $subject = frReportSubject($pdo, $userId);
 
 // Relative column widths (normalised to 100% for whichever columns are shown).
-$weights = ['sno' => 4, 'date' => 8, 'time' => 6, 'staff' => 11, 'location' => 15, 'client' => 12, 'phone' => 11,
-            'business' => 11, 'card' => 6, 'trial' => 6, 'training' => 6, 'interest' => 8, 'joined' => 6, 'follow_up' => 8, 'notes' => 14];
-$w = array_intersect_key($weights, $columns);
+// Yes/No columns must fit "Hapana" on A4 portrait too (~6 %); the long-text columns give way.
+$weights = ['sno' => 3, 'date' => 7, 'time' => 5, 'staff' => 10, 'location' => 14, 'client' => 11, 'phone' => 10,
+            'business' => 10, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12, 'given' => 11];
+if ($orient === 'portrait') {   // fewer columns upright: give the tight ones room
+    $weights = array_merge($weights, ['sno' => 4, 'joined' => 10, 'follow_up' => 10, 'client' => 12]);
+}
+// In COLUMN order (array_intersect_key keeps $weights' order, which misaligns <col>s).
+$w = [];
+foreach (array_keys($columns) as $k) $w[$k] = $weights[$k] ?? 8;
 $sum = array_sum($w);
 $center = ['sno', 'time', 'card', 'trial', 'training', 'joined'];
 
@@ -74,9 +80,15 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         .summary span { font-size: 10px; color: #1a252f; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 14px; }
         thead { display: table-header-group; }   /* header repeats on every printed page */
-        th { background: #34495e; color: #fff; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; padding: 7px 5px; text-align: left; vertical-align: bottom; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        th { background: #34495e; color: #fff; font-weight: 600; font-size: 10px; padding: 7px 5px; text-align: left; vertical-align: bottom; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         td { padding: 5px; font-size: 11px; vertical-align: top; border-bottom: 1px solid #e4e8ec; }
-        th, td { white-space: normal; word-break: normal; overflow-wrap: anywhere; hyphens: auto; }   /* wrap, never cut */
+        /* Wrap at spaces only — a word is broken only when it alone is wider than its column. */
+        th, td { white-space: normal; word-break: normal; overflow-wrap: break-word; hyphens: none; }
+        /* On a phone SCREEN the A4 table scrolls sideways instead of being squeezed
+           letter-by-letter; printing always uses the A4 page width. */
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media screen and (max-width: 1000px) { .table-wrap table { min-width: <?= $orient === 'portrait' ? 720 : 1000 ?>px; } .scroll-hint { display: block !important; } }
+        .scroll-hint { display: none; font-size: 11px; color: #6c757d; margin: 0 0 6px; }
         tr { break-inside: avoid; page-break-inside: avoid; }
         tbody tr:nth-child(even) td { background: #f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .c { text-align: center; }
@@ -101,7 +113,8 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         <a class="<?= $lang === 'sw' ? 'on' : '' ?>" href="<?= $e($q(['lang' => 'sw'])) ?>">Kiswahili</a>
         <a class="<?= $lang === 'en' ? 'on' : '' ?>" href="<?= $e($q(['lang' => 'en'])) ?>">English</a></span>
     <a href="<?= $e(getUrl('api/field_reports/export.php') . $q([])) ?>">&#11015; <?= $e(t('Download Excel')) ?></a>
-    <button type="button" onclick="window.close()"><?= $e(t('Close')) ?></button>
+    <?php /* Opened in a new tab → close it; opened any other way → back to the visits page. */ ?>
+    <button type="button" onclick="if (window.opener) { window.close(); } else { location.href = '<?= $e(getUrl('field_reports')) ?>'; }"><?= $e(t('Close')) ?></button>
 </div>
 
 <div class="header">
@@ -140,6 +153,8 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     <?php endforeach; ?>
 </div>
 
+<p class="scroll-hint">&#8596; <?= $e(t('Swipe sideways to see every column. The printout fits the page.')) ?></p>
+<div class="table-wrap">
 <table>
     <colgroup><?php foreach ($w as $k => $v): ?><col style="width:<?= round($v * 100 / $sum, 2) ?>%"><?php endforeach; ?></colgroup>
     <thead><tr><?php foreach ($columns as $k => $label): ?><th class="<?= in_array($k, $center, true) ? 'c' : '' ?>"><?= $e($label) ?></th><?php endforeach; ?></tr></thead>
@@ -151,6 +166,7 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     <?php endforeach; endif; ?>
     </tbody>
 </table>
+</div>
 
 <div class="footer-spacer"></div>
 <div class="print-footer">
