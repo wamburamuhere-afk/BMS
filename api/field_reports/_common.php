@@ -52,6 +52,11 @@ function frRowOut(array $r): array
         'notes'              => $r['notes'] ?? '',
         'joined'             => (int)$r['joined'],
         'joined_at'          => $r['joined_at'],
+        'follow_up_date'     => $r['follow_up_date'] ?? null,
+        'follow_up_done'     => !empty($r['follow_up_done_at']) ? 1 : 0,
+        // GPS-confirmed: a position was captured with ±100 m or better (3.4).
+        'gps_verified'       => frGpsVerified($r) ? 1 : 0,
+        'gps_accuracy_m'     => $r['gps_accuracy_m'] !== null ? (int)$r['gps_accuracy_m'] : null,
         'can_edit'           => frCanTouch($r) && canEdit('field_visits'),
         'can_delete'         => frCanTouch($r) && canDelete('field_visits'),
     ];

@@ -17,6 +17,7 @@ $root = dirname(__DIR__, 2);
 
 $_SERVER['REQUEST_METHOD'] = $method;
 $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'localhost';   // buildUrl() reads it
+$_SERVER['SCRIPT_NAME'] = $_SERVER['PHP_SELF'] = '/index.php';   // links/assets render as "/path", like a root install
 require $root . '/roots.php';
 require_once $root . '/core/field_reports.php';
 

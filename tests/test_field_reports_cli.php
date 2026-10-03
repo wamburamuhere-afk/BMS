@@ -252,19 +252,19 @@ try {
     section('6. Print report — Kiswahili & English, landscape & portrait');
     [$c, $sw] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'sw', 'orient' => 'portrait']);
     ok($c === 200, 'Kiswahili print renders (200)');
-    foreach (['RIPOTI YA MATEMBEZI YA UWANDANI', 'Mahali alipotembelea', 'Jina la mteja', 'Kadi ya biashara', 'Amejiunga', 'Waliojiunga na mfumo wetu', 'Duka la rejareja', 'Ana nia', 'Ndiyo', 'Hapana', 'Chapisha / Hifadhi kama PDF', 'Ripoti hii imechapishwa na'] as $s)
+    foreach (['RIPOTI YA ZIARA ZA WATEJA', 'Mahali alipotembelea', 'Jina la mteja', 'Kadi ya biashara', 'Amejiunga', 'Waliojiunga na mfumo wetu', 'Duka la rejareja', 'Ana nia', 'Ndiyo', 'Hapana', 'Chapisha / Hifadhi kama PDF', 'Ripoti hii imechapishwa na'] as $s)
         ok(strpos($sw, $s) !== false, "sw contains '$s'");
     $swDate = frDateLabel($day1, 'sw');
     ok(strpos($sw, $swDate) !== false, "sw date written in Swahili ('$swDate')");
     ok(preg_match('/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|June|July|August|September|October|November|December)/', strip_tags($sw)) === 0, 'sw report has no English day/month names');
-    foreach (['FIELD VISITS REPORT', 'Place visited', 'This document was Printed by', 'Business card'] as $s)
+    foreach (['CUSTOMER VISITS REPORT', 'Place visited', 'This document was Printed by', 'Business card'] as $s)
         ok(strpos($sw, $s) === false, "sw does not fall back to English '$s'");
     ok(strpos($sw, '<html lang="sw">') !== false, 'sw page declares lang="sw"');
     ok(preg_match('/@page\s*\{\s*size:\s*A4\s+portrait/', $sw) === 1, 'portrait → @page size A4 portrait');
 
     [$c, $en] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'en', 'orient' => 'landscape']);
     ok($c === 200, 'English print renders (200)');
-    foreach (['FIELD VISITS REPORT', 'S/No', 'Place visited', 'Client name', 'Business card', 'Free trial link', 'Joined our system', 'Retail shop', 'Interested', 'This document was Printed by'] as $s)
+    foreach (['CUSTOMER VISITS REPORT', 'S/No', 'Place visited', 'Client name', 'Business card', 'Free trial link', 'Joined our system', 'Retail shop', 'Interested', 'This document was Printed by'] as $s)
         ok(strpos($en, $s) !== false, "en contains '$s'");
     ok(strpos($en, 'RIPOTI YA MATEMBEZI') === false && strpos($en, 'Ripoti hii imechapishwa') === false, 'en has no Swahili headings/footer');
     ok(preg_match('/@page\s*\{\s*size:\s*A4\s+landscape/', $en) === 1, 'landscape → @page size A4 landscape');
@@ -274,7 +274,7 @@ try {
     [$c, $multi] = call('app/bms/field_reports/field_report_print.php', $adminId, true, 'GET', ['date_from' => $day1, 'date_to' => $today, 'lang' => 'en']);
     ok($c === 200 && strpos($multi, '>Date<') !== false && strpos($multi, '>Staff<') !== false, 'multi-day all-staff print adds Date + Staff columns');
     [$c, $empty] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date_from' => $day2, 'date_to' => $day2, 'lang' => 'sw']);
-    ok($c === 200 && strpos($empty, 'Hakuna matembezi yaliyorekodiwa') !== false, 'empty day prints a clean "no visits" row (sw)');
+    ok($c === 200 && strpos($empty, 'Hakuna ziara zilizorekodiwa') !== false, 'empty day prints a clean "no visits" row (sw)');
     [, $bad] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'xx', 'orient' => 'sideways']);
     ok(preg_match('/@page\s*\{\s*size:\s*A4\s+landscape/', $bad) === 1, 'unknown orient falls back to landscape');
     // XSS: typed text is escaped
@@ -289,10 +289,10 @@ try {
     $created[] = (int)($j['visit_id'] ?? 0);
     [$c, $csv] = call('api/field_reports/export.php', $A, false, 'GET', $range + ['lang' => 'sw']);
     ok($c === 200 && substr($csv, 0, 3) === "\xEF\xBB\xBF", 'CSV starts with a UTF-8 BOM (Excel-safe)');
-    ok(strpos($csv, 'RIPOTI YA MATEMBEZI YA UWANDANI') !== false && strpos($csv, 'Mahali alipotembelea') !== false, 'sw export headings translated');
+    ok(strpos($csv, 'RIPOTI YA ZIARA ZA WATEJA') !== false && strpos($csv, 'Mahali alipotembelea') !== false, 'sw export headings translated');
     ok(strpos($csv, "'=HYPERLINK") !== false, 'formula-looking text is neutralised with a leading quote');
     [, $csvEn] = call('api/field_reports/export.php', $A, false, 'GET', $range + ['lang' => 'en']);
-    ok(strpos($csvEn, 'FIELD VISITS REPORT') !== false && strpos($csvEn, 'S/No') !== false, 'en export headings in English');
+    ok(strpos($csvEn, 'CUSTOMER VISITS REPORT') !== false && strpos($csvEn, 'S/No') !== false, 'en export headings in English');
 
     // ═════════════════════════════════════════════════════════════════
     section('8. Stats — a client counted once');
@@ -349,7 +349,116 @@ try {
     $created[] = (int)$pdo->query("SELECT MAX(visit_id) FROM field_visits WHERE client_name = " . $pdo->quote("Past $tag"))->fetchColumn();
     $page = file_get_contents(ROOT_DIR . '/app/bms/field_reports/field_visits.php');
     ok(strpos($page, 'ynL(L.cardShort, r.gave_business_card)') !== false && strpos($page, 'ynL(L.trialShort') !== false && strpos($page, 'ynL(L.trainingShort') !== false, 'phone card badges carry their names');
-    ok(strpos($page, "serverNow().time") !== false && strpos($page, 'new Date(); $(\'#vTime\')') === false, 'default time comes from the server clock, not the phone');
+    ok(strpos($page, 'const now = serverNow();') !== false && strpos($page, 'getHours()') === false, 'default time comes from the server clock, not the phone');
+
+    // ═════════════════════════════════════════════════════════════════
+    section('11. Phase 2 — "Ziara za Wateja", phone-first form, GPS place suggestion');
+    $reg = bmsFeatureRegistry()['field_reports'];
+    ok($reg['label'] === 'Customer Visits (Marketing)' && in_array('Field Reports (Marketing)', $reg['previous_labels'] ?? [], true), 'registry: new label, old one kept as previous_labels');
+    require_once ROOT_DIR . '/core/control_db.php';
+    if (controlDbReady()) {
+        $cp = getControlPdo();
+        $orig = $cp->query("SELECT label FROM features WHERE feature_key = 'field_reports'")->fetchColumn();
+        $cp->exec("UPDATE features SET label = 'Field Reports (Marketing)' WHERE feature_key = 'field_reports'");
+        syncFeatureCatalogue();
+        ok($cp->query("SELECT label FROM features WHERE feature_key = 'field_reports'")->fetchColumn() === 'Customer Visits (Marketing)', 'catalogue: the label we shipped is renamed on sync');
+        $cp->exec("UPDATE features SET label = 'Our Own Name' WHERE feature_key = 'field_reports'");
+        syncFeatureCatalogue();
+        ok($cp->query("SELECT label FROM features WHERE feature_key = 'field_reports'")->fetchColumn() === 'Our Own Name', "catalogue: an operator's own label is never overwritten");
+        $cp->prepare("UPDATE features SET label = ? WHERE feature_key = 'field_reports'")->execute([$orig === 'Our Own Name' ? 'Customer Visits (Marketing)' : ($orig ?: 'Customer Visits (Marketing)')]);
+    }
+    fieldReportsEnsureSchema($pdo);
+    ok($pdo->query("SELECT page_name FROM permissions WHERE page_key = 'field_visits'")->fetchColumn() === 'Customer Visits', 'roles screen: permission now "Customer Visits"');
+    $sw = include ROOT_DIR . '/lang/sw.php';
+    ok(($sw['Customer Visits'] ?? '') === 'Ziara za Wateja' && ($sw['Record a visit'] ?? '') === 'Rekodi Ziara', 'sw: "Ziara za Wateja" / "Rekodi Ziara"');
+    ok(substr_count(file_get_contents(ROOT_DIR . '/header.php'), "t('Customer Visits')") === 2, 'nav + phone More sheet use the new name');
+    [$c, $html] = call('app/bms/field_reports/field_visits.php', $A, false, 'GET', ['__lang' => 'sw']);
+    ok($c === 200 && strpos($html, 'Ziara za Wateja') !== false && strpos($html, 'Ripoti za Uwandani') === false, 'page renders as "Ziara za Wateja" (sw)');
+    $posPhone = strpos($html, 'id="vPhone"'); $posName = strpos($html, 'id="vName"'); $posDate = strpos($html, 'id="vDate"');
+    ok($posPhone !== false && $posPhone < $posName && $posName < $posDate, 'form order: Phone → Name → … → (hidden) Date/Time');
+    ok(strpos($html, 'modal-fullscreen-sm-down') !== false, 'form is full-screen on phones');
+    ok(substr_count($html, 'class="btn-check" name="gave_') === 3 && substr_count($html, 'class="btn-check fr-interest" name="interest"') === 3, 'big tap buttons for card/trial/training and the three responses');
+    ok(strpos($html, 'id="vWhenFields"') !== false && preg_match('#class="row g-2 d-none" id="vWhenFields"#', $html) === 1, 'date/time hidden behind "Change date / time"');
+    ok(strpos($html, 'id="mainStats"') !== false && strpos($html, 'id="moreStats"') !== false, 'three main numbers + "More statistics"');
+
+    // returning client
+    [$c, , $j] = save($A, false, visit(['client_name' => "Mama Rose $tag", 'client_phone' => '0744111222', 'business_type' => 'salon', 'location' => "Sinza $tag"]));
+    $created[] = (int)($j['visit_id'] ?? 0);
+    [$c, , $j] = save($A, false, visit(['client_name' => "Mama Rose $tag", 'client_phone' => '0744 111 222', 'business_type' => 'salon', 'location' => "Sinza $tag", 'visit_date' => $day2]));
+    $created[] = (int)($j['visit_id'] ?? 0);
+    [, , $j] = call('api/field_reports/check_phone.php', $A, false, 'GET', ['phone' => '+255744111222']);
+    $m = $j['match'] ?? [];
+    ok(($m['client_name'] ?? '') === "Mama Rose $tag" && ($m['business_type'] ?? '') === 'salon' && ($m['location'] ?? '') === "Sinza $tag" && (int)($m['visits'] ?? 0) === 2,
+       'known number returns name, business, place and visit count (2) for the form to fill');
+    [, , $j] = call('api/field_reports/check_phone.php', $B, false, 'GET', ['phone' => '0744111222']);
+    ok(array_key_exists('match', $j ?? []) && $j['match'] === null, "staff B learns nothing about A's client");
+
+    // GPS place suggestion
+    [$c, , $j] = save($A, false, visit(['client_name' => "Geo $tag", 'client_phone' => '0733444555', 'location' => "Mwenge Sokoni $tag", 'latitude' => '-6.771200', 'longitude' => '39.226500', 'gps_accuracy_m' => '15']));
+    $geoId = (int)($j['visit_id'] ?? 0); $created[] = $geoId;
+    [, , $j] = call('api/field_reports/nearby.php', $A, false, 'GET', ['lat' => '-6.771900', 'lng' => '39.226900']);   // ~90 m away
+    ok(($j['place']['location'] ?? '') === "Mwenge Sokoni $tag" && ($j['place']['distance_m'] ?? 999) < 150, 'GPS ~90 m away suggests "Mwenge Sokoni" (' . ($j['place']['distance_m'] ?? '?') . ' m)');
+    [, , $j] = call('api/field_reports/nearby.php', $A, false, 'GET', ['lat' => '-6.780000', 'lng' => '39.226500']);   // ~1 km
+    ok(($j['place']['location'] ?? null) !== "Mwenge Sokoni $tag", 'nothing suggested from 1 km away');
+    [, , $j] = call('api/field_reports/nearby.php', $B, false, 'GET', ['lat' => '-6.771200', 'lng' => '39.226500']);
+    ok(($j['place']['location'] ?? null) !== "Mwenge Sokoni $tag", "staff B is never shown A's places");
+    [, , $j] = call('api/field_reports/nearby.php', $adminId, true, 'GET', ['lat' => '-6.771200', 'lng' => '39.226500']);
+    ok(($j['place']['location'] ?? '') === "Mwenge Sokoni $tag", 'admin gets the suggestion from any staff member');
+    [$c] = call('api/field_reports/nearby.php', $A, false, 'GET', ['lat' => '999', 'lng' => 'x']);
+    ok($c === 422, 'invalid coordinates → 422');
+
+    // ═════════════════════════════════════════════════════════════════
+    section('12. Phase 3 — follow-up, joined button, own day, GPS ✓ in reports');
+    $cols = $pdo->query("SHOW COLUMNS FROM field_visits")->fetchAll(PDO::FETCH_COLUMN);
+    ok(in_array('follow_up_date', $cols, true) && in_array('follow_up_done_at', $cols, true) && in_array('follow_up_done_by', $cols, true), 'follow-up columns exist (migration ran)');
+    [$c, , $j] = save($A, false, visit(['follow_up_date' => date('Y-m-d', strtotime($day1 . ' -1 day'))]));
+    ok($c === 422 && isset($j['errors']['follow_up_date']), 'follow-up before the visit → 422');
+    [$c, , $j] = save($A, false, visit(['follow_up_date' => date('Y-m-d', strtotime($day1 . ' +400 days'))]));
+    ok($c === 422 && isset($j['errors']['follow_up_date']), 'follow-up more than a year ahead → 422');
+    $due = date('Y-m-d', strtotime($day1 . ' +1 day'));   // in the past → overdue
+    [$c, , $j] = save($A, false, visit(['client_name' => "Follow $tag", 'client_phone' => '0722555666', 'follow_up_date' => $due]));
+    $fuId = (int)($j['visit_id'] ?? 0); $created[] = $fuId;
+    ok($c === 200, 'visit with a follow-up date saved');
+    [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', ['date' => $today]);
+    $fu = array_values(array_filter($j['follow_ups'] ?? [], fn($f) => (int)$f['visit_id'] === $fuId))[0] ?? null;
+    ok($fu && $fu['days_overdue'] >= 1, 'A sees the follow-up in "To follow up" (overdue ' . ($fu['days_overdue'] ?? '?') . ' days), whatever date is filtered');
+    [, , $j] = call('api/field_reports/list.php', $B, false, 'GET', ['date' => $today]);
+    ok(!in_array($fuId, array_map('intval', array_column($j['follow_ups'] ?? [], 'visit_id')), true), "B does not see A's follow-ups");
+    [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', ['date' => $today]);
+    ok(in_array($fuId, array_map('intval', array_column($j['follow_ups'] ?? [], 'visit_id')), true), 'admin (all staff) sees it');
+    [$c] = call('api/field_reports/followup_done.php', $B, false, 'POST', ['visit_id' => $fuId, 'done' => 1]);
+    ok($c === 403, "B cannot mark A's follow-up done (got $c)");
+    [$c] = call('api/field_reports/followup_done.php', $A, false, 'POST', ['visit_id' => $aVisit, 'done' => 1]);
+    ok($c === 422, 'a visit without a follow-up date cannot be "followed up"');
+    [$c] = call('api/field_reports/followup_done.php', $A, false, 'POST', ['visit_id' => $fuId, 'done' => 1]);
+    $doneAt = $pdo->query("SELECT follow_up_done_at FROM field_visits WHERE visit_id = $fuId")->fetchColumn();
+    [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', ['date' => $today]);
+    ok($c === 200 && $doneAt && !in_array($fuId, array_map('intval', array_column($j['follow_ups'] ?? [], 'visit_id')), true), 'A marks it followed up → leaves the list, time recorded');
+    [$c] = save($A, false, visit(['visit_id' => $fuId, 'client_name' => "Follow $tag", 'client_phone' => '0722555666', 'follow_up_date' => date('Y-m-d', strtotime($due . ' +1 day'))]));
+    ok($c === 200 && $pdo->query("SELECT follow_up_done_at FROM field_visits WHERE visit_id = $fuId")->fetchColumn() === null, 'a NEW follow-up date re-opens it');
+    [$c] = save($A, false, visit(['visit_id' => $fuId, 'client_name' => "Follow $tag", 'client_phone' => '0722555666', 'follow_up_date' => date('Y-m-d', strtotime($due . ' +1 day')), 'notes' => "edit $tag"]));
+    call('api/field_reports/followup_done.php', $A, false, 'POST', ['visit_id' => $fuId, 'done' => 1]);
+    [$c] = save($A, false, visit(['visit_id' => $fuId, 'client_name' => "Follow $tag", 'client_phone' => '0722555666', 'follow_up_date' => date('Y-m-d', strtotime($due . ' +1 day')), 'notes' => "edit again $tag"]));
+    ok($pdo->query("SELECT follow_up_done_at FROM field_visits WHERE visit_id = $fuId")->fetchColumn() !== null, 'editing other fields keeps "followed up"');
+    call('api/field_reports/followup_done.php', $A, false, 'POST', ['visit_id' => $fuId, 'done' => 0]);
+    call('api/field_reports/toggle_joined.php', $A, false, 'POST', ['visit_id' => $fuId, 'joined' => 1]);
+    [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', ['date' => $today]);
+    ok(!in_array($fuId, array_map('intval', array_column($j['follow_ups'] ?? [], 'visit_id')), true), 'a client who joined is no longer in "To follow up"');
+    [, $html] = call('app/bms/field_reports/field_visits.php', $A, false, 'GET', []);
+    ok(strpos($html, 'data-act="joined"') !== false && strpos($html, 'function joinedBtn') !== false, 'a direct "Joined" button on every card/row');
+
+    // admin's own day while looking at all staff
+    [$c, , $j] = save($adminId, true, visit(['visit_date' => $day2, 'client_name' => "Boss $tag", 'client_phone' => '0700999888']));
+    $created[] = (int)($j['visit_id'] ?? 0);
+    call('api/field_reports/submit_day.php', $adminId, true, 'POST', ['date' => $day2]);
+    [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', ['date' => $day2, 'user_id' => '']);
+    ok(!empty($j['day_status']['submitted_time']) && (int)($j['own_visit_count'] ?? 0) >= 1, "admin viewing ALL staff still sees their own day's submission");
+
+    // reports
+    [, $html] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'sw']);
+    ok(strpos($html, 'Ufuatiliaji') !== false && strpos($html, 'Mwenge Sokoni ' . $tag . ' (GPS ✓)') !== false, 'print (sw): Follow-up column + "(GPS ✓)" on confirmed places');
+    [, $csv] = call('api/field_reports/export.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'en']);
+    ok(strpos($csv, 'Follow-up') !== false && strpos($csv, 'GPS ✓') !== false && strpos($csv, 'CUSTOMER VISITS REPORT') !== false, 'Excel (en): Follow-up column, GPS ✓, new title');
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")
