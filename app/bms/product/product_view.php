@@ -713,10 +713,10 @@ global $company_logo, $company_name;
                                         </div>
                                         <?php endif; ?>
                                         
-                                        <?php if ($product['wholesale_price'] > 0 && !$simpleProductForm): ?>
+                                        <?php if (($pos_wholesale ?? ((float)$product['wholesale_price'] > 0 ? (float)$product['wholesale_price'] : null)) !== null && !$simpleProductForm): // what POS charges: group price, else legacy ?>
                                         <div class="col-6 col-md-12 mb-1">
                                             <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Wholesale:') ?></small>
-                                            <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($product['wholesale_price']) ?></h5>
+                                            <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($pos_wholesale ?? $product['wholesale_price']) ?></h5>
                                         </div>
                                         <?php elseif ($simpleProductForm && $pos_wholesale !== null): // the Wholesale price-group price POS charges (C3) ?>
                                         <div class="col-6 col-md-12 mb-1">

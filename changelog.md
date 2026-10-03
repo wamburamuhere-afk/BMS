@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-03 — fix(products): the wholesale price a product is registered/edited with is the one POS charges
+
+POS charges wholesale customers the **Wholesale price-group** price (else the normal price) and never reads `products.wholesale_price`. Product create/edit (web + mobile) and variants wrote only that legacy column, so e.g. Alizeti Safi registered at 27,000 wholesale was sold to wholesale customers at 30,000. Only POS "Receive Stock" wrote the group.
+
+**Files:**
+- `core/pos_price_groups.php` — `syncWholesaleGroupPrice()` (upsert the Wholesale override, `<= 0` removes it, legacy column kept equal; skips the column on old schemas), `effectiveWholesalePrice()` (group price, else legacy), `backfillWholesaleGroupPrices()`.
+- `api/create_product.php`, `api/update_product.php` (only when the form sends the field), `api/mobile/products/create.php`, `api/mobile/products/update.php`, `api/generate_product_variants.php` (variants inherit the parent's effective price) — write the group inside their transaction.
+- `app/bms/product/product_edit.php`, `api/mobile/products/get.php`, `app/bms/product/product_view.php` — show/prefill the effective price, so saving other fields never writes a stale value back.
+- `migrations/tenant/2026_10_03_wholesale_price_group_backfill.php` + `migrations/2026_10_03_wholesale_price_group_backfill_legacy_db.php` — copy the legacy price into the group for products with none; never overwrites an existing override; idempotent.
+- `tests/test_wholesale_price_group_cli.php` (new, 25) — real create/update endpoints, POS product API prices it, 0 removes it, missing field leaves it, edit prefill, backfill rules, mobile get; fixtures removed.
+
 ## 2026-10-03 — fix/feat(pos-detail-pages): Customers · Suppliers · Products · Services make sense for a POS shop
 
 Plan: `pos_detail_pages_plan.md`. Found on shop.demo (POS + Warehouse only, Simple Mode). Code display (`Bsx-…`) deliberately unchanged.

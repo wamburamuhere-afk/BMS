@@ -211,6 +211,14 @@ try {
     $stmt = $pdo->prepare($update_query);
     $stmt->execute($product_data);
 
+    // Wholesale price → the Wholesale price group POS charges from. Only when the
+    // form actually sent the field (a form without it must not wipe the price);
+    // 0 removes the override so POS falls back to the normal price.
+    if (array_key_exists('wholesale_price', $_POST)) {
+        require_once __DIR__ . '/../core/pos_price_groups.php';
+        syncWholesaleGroupPrice($pdo, (int)$product_id, (float)($product_data['wholesale_price'] ?? 0));
+    }
+
     // Handle stock adjustments if provided
     if (isset($_POST['stock']) && is_array($_POST['stock'])) {
         foreach ($_POST['stock'] as $warehouse_id => $new_quantity) {

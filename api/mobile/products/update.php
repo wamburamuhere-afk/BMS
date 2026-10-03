@@ -121,6 +121,12 @@ try {
     $pdo->prepare("UPDATE products SET " . implode(', ', array_map(fn($k) => "$k = ?", array_keys($set))) . ", updated_at = NOW() WHERE product_id = ?")
         ->execute([...array_values($set), $product_id]);
 
+    // Wholesale sent → the Wholesale price group POS charges from (0 removes it).
+    if (array_key_exists('wholesale_price', $set)) {
+        require_once __DIR__ . '/../../../core/pos_price_groups.php';
+        syncWholesaleGroupPrice($pdo, $product_id, (float)$set['wholesale_price']);
+    }
+
     $stockResult = null;
     if ($stockChange) {
         [$wid, $newQty] = $stockChange;

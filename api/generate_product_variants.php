@@ -124,6 +124,10 @@ $insStmt = $pdo->prepare("INSERT INTO products (" . implode(', ', $insCols) . ")
 
 $nameCheckStmt = $pdo->prepare("SELECT COUNT(*) FROM products WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))");
 
+// Variants inherit the parent's wholesale price where POS reads it (Wholesale price group).
+require_once __DIR__ . '/../core/pos_price_groups.php';
+$parentWholesale = effectiveWholesalePrice($pdo, $parent_id, $parent['wholesale_price'] ?? null);
+
 $pdo->beginTransaction();
 try {
     $created = 0; $skippedExisting = 0; $skippedNameCollision = 0; $newIds = [];
@@ -170,6 +174,7 @@ try {
             'created_by'        => $_SESSION['user_id'],
         ]);
         $newIds[] = (int)$pdo->lastInsertId();
+        if ($parentWholesale !== null) syncWholesaleGroupPrice($pdo, end($newIds), $parentWholesale);
         $existingNormalized[$normalized] = true; // guards a duplicate combination within the SAME request
         $created++;
     }

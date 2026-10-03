@@ -31,6 +31,12 @@ try {
         exit();
     }
 
+    // The form shows (and re-posts) the wholesale price POS really charges — the
+    // Wholesale price-group override — so saving other fields never writes a
+    // stale legacy value back over it (api/update_product.php syncs the group).
+    require_once ROOT_DIR . '/core/pos_price_groups.php';
+    $product['wholesale_price'] = number_format(effectiveWholesalePrice($pdo, (int)$product_id, $product['wholesale_price']) ?? 0, 2, '.', '');
+
     // Phase D — project-scope gate
     $prod_project_id = $product['project_id'] ?? null;
     if (!empty($prod_project_id) && function_exists('userCan') && !userCan('project', (int)$prod_project_id)) {
