@@ -38,6 +38,7 @@ $_SESSION = [
 if ($features !== '') $GLOBALS['__bms_features'] = json_decode($features, true);
 
 $p = json_decode($params, true) ?: [];
+if (isset($p['__lang'])) { $_SESSION['user_lang'] = $p['__lang']; unset($p['__lang']); }   // e.g. 'sw'
 if ($method === 'POST') { $_POST = $p + ['_csrf' => 'test-csrf']; $_GET = []; }
 else                    { $_GET = $p; $_POST = []; }
 

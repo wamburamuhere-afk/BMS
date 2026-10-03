@@ -226,6 +226,15 @@ $(function () {
     const IS_ADMIN = <?= json_encode($is_admin) ?>, CAN_CREATE = <?= json_encode($can_create) ?>, TODAY = <?= json_encode($today) ?>;
     const API = '<?= buildUrl('api/field_reports/') ?>', PRINT_URL = '<?= getUrl('field_reports/print') ?>', EXPORT_URL = '<?= getUrl('api/field_reports/export.php') ?>';
     const CSRF = <?= json_encode(csrf_token()) ?>;
+    // One clock — the server's (EAT), whatever the phone's clock or time zone says
+    // (customer_visits_ux_plan 1.3): "now" = server time at page load + time elapsed since.
+    const SERVER_NOW = <?= json_encode(date('Y-m-d H:i:s')) ?>, LOADED_AT = Date.now();
+    function serverNow() {
+        const m = SERVER_NOW.match(/^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)$/);
+        const d = new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + (Date.now() - LOADED_AT));
+        const p = n => String(n).padStart(2, '0');
+        return { date: d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()), time: p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()), d };
+    }
     const L = <?= json_encode([
         'visits' => t('Visits'), 'people' => t('People visited'), 'places' => t('Places'), 'cards' => t('Business cards given'),
         'trials' => t('Trial links given'), 'trainings' => t('Trainings given'), 'joined' => t('Joined our system'),
@@ -242,12 +251,15 @@ $(function () {
         'dupOwn' => t('You already visited this number on %date% (%name%).'), 'dupAdmin' => t('Already visited on %date% by %staff% (%name%).'),
         'scopeAll' => t('All staff'), 'scopeMe' => t('Your visits'), 'staff' => t('Staff'), 'date' => t('Date'),
         'submitOneDay' => t('Choose a single day to submit its report.'),
+        'cardShort' => t('Business card'), 'trialShort' => t('Trial link'), 'trainingShort' => t('Training'),
     ]) ?>;
 
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const dmy = s => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
     const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const yn = v => v ? `<span class="fr-badge fr-yes">${L.yes}</span>` : `<span class="fr-badge fr-no">${L.no}</span>`;
+    // Phone cards have no column headers, so each badge carries its name (1.2).
+    const ynL = (label, v) => `<span class="fr-badge ${v ? 'fr-yes' : 'fr-no'}">${v ? '✓' : '✗'} ${label}</span>`;
     let rows = [];
 
     $('.select2-static').not('#visitModal .select2-static').select2({ theme: 'bootstrap-5', width: '100%' });
@@ -289,7 +301,7 @@ $(function () {
                     <div><i class="bi bi-geo-alt text-primary"></i> ${esc(r.location)}</div>
                     <div><i class="bi bi-telephone text-primary"></i> ${esc(r.client_phone)} · ${esc(r.business_label)}</div>
                     ${IS_ADMIN ? `<div class="text-muted">${L.staff}: ${esc(r.staff_name)}</div>` : ''}
-                    <div class="d-flex flex-wrap gap-1 mt-1">${yn(r.gave_business_card)} ${yn(r.gave_trial_link)} ${yn(r.gave_training)} ${r.joined ? `<span class="fr-badge fr-yes">${L.joined}</span>` : ''}</div>
+                    <div class="d-flex flex-wrap gap-1 mt-1">${ynL(L.cardShort, r.gave_business_card)} ${ynL(L.trialShort, r.gave_trial_link)} ${ynL(L.trainingShort, r.gave_training)} ${r.joined ? `<span class="fr-badge fr-yes">${L.joined}</span>` : ''}</div>
                 </div>
                 ${(r.can_edit || r.can_delete) ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
                     ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="edit" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:.72rem"><i class="bi bi-pencil"></i></button>
@@ -346,7 +358,7 @@ $(function () {
 
     $('#fFrom, #fTo, #fStaff').on('change', loadData);
     $('[data-quick]').on('click', function () {
-        const now = new Date(); let from = now, to = now;
+        const n = serverNow().d, now = new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); let from = now, to = now;
         if ($(this).data('quick') === 'yesterday') { from = to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1); }
         if ($(this).data('quick') === 'week') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)); }
         $('#fFrom').val(ymd(from)); $('#fTo').val(ymd(to)); loadData();
@@ -366,7 +378,7 @@ $(function () {
         $('#phoneWarn').addClass('d-none').empty(); $('#vOtherWrap').addClass('d-none');
         if (keep) { $('#vDate').val(keepDate); $('#vLocation').val(keepLoc); setGps(keepLat || null, keepLng || null, keepAcc || null); }
         else { setGps(null); }
-        const now = new Date(); $('#vTime').val(String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'));
+        $('#vTime').val(serverNow().time);
         if (!keep) $('#vDate').val(filters().date_to <= TODAY ? (filters().date_from === filters().date_to ? filters().date_from : TODAY) : TODAY);
         $('.is-invalid').removeClass('is-invalid');
     }

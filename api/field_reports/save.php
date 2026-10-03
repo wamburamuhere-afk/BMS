@@ -31,6 +31,10 @@ $errors = [];
 if (!frValidDate($date))                         $errors['visit_date'] = t('Choose a valid date.');
 elseif ($date > date('Y-m-d'))                   $errors['visit_date'] = t('The visit date cannot be in the future.');
 if ($time !== '' && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) $errors['visit_time'] = t('Enter the time as HH:MM.');
+// One clock — the server's (EAT). Today's visit cannot be later than now (5 min grace
+// for a slow phone); an empty time on today's visit means "now" (customer_visits_ux_plan 1.3).
+elseif ($time !== '' && $date === date('Y-m-d') && $time > date('H:i', time() + 300)) $errors['visit_time'] = t('The time cannot be later than now.');
+if ($time === '' && $date === date('Y-m-d') && !$existing) $time = date('H:i');
 if ($location === '')                            $errors['location'] = t('Enter the place you visited.');
 elseif (mb_strlen($location) > 255)              $errors['location'] = t('Place is too long.');
 if ($name === '')                                $errors['client_name'] = t('Enter the client\'s name.');

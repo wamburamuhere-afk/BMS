@@ -13,6 +13,11 @@ function frJson(array $body, int $code = 200): void
 }
 
 if (!isAuthenticated()) frJson(['success' => false, 'message' => t('Unauthorized')], 401);
+
+// APIs never include header.php, which is where the user's language is loaded —
+// without this every label and message went out in English (customer_visits_ux_plan 1.1).
+$_SESSION['user_lang'] = $_SESSION['user_lang'] ?? get_setting('user_language_' . (int)$_SESSION['user_id'], 'en');
+loadLanguage($_SESSION['user_lang']);
 if (!canView('field_visits')) frJson(['success' => false, 'message' => t('Permission denied')], 403);
 
 function frRequirePost(): void

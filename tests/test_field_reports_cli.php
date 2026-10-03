@@ -325,6 +325,31 @@ try {
     $missing = [];
     foreach (array_merge(array_values(frBusinessTypes()), array_values(frInterestLabels())) as $l) if (!isset($sw[$l])) $missing[] = $l;
     ok(!$missing, 'every business type + interest label has a Swahili translation' . ($missing ? ' (missing: ' . implode(', ', $missing) . ')' : ''));
+
+    // ═════════════════════════════════════════════════════════════════
+    section('10. Phase 1 — API language, labelled phone badges, one clock');
+    [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', $range + ['__lang' => 'sw']);
+    $lbl = array_column($j['rows'] ?? [], 'business_label');
+    ok(in_array('Duka la rejareja', $lbl, true) && !in_array('Retail shop', $lbl, true), 'API speaks the user\'s language: "Duka la rejareja", not "Retail shop"');
+    [$c, , $j] = call('api/field_reports/save.php', $A, false, 'POST', visit(['client_name' => '', '__lang' => 'sw']));
+    ok($c === 422 && ($j['errors']['client_name'] ?? '') === 'Andika jina la mteja.', 'validation messages in Swahili for a Swahili user');
+    [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', $range + ['__lang' => 'en']);
+    ok(in_array('Retail shop', array_column($j['rows'] ?? [], 'business_label'), true), 'English user still gets English');
+    $future = date('H:i', time() + 3600);
+    if ($future > date('H:i')) {   // not across midnight
+        [$c, , $j] = save($A, false, visit(['visit_date' => $today, 'visit_time' => $future, 'client_phone' => '0611222333']));
+        ok($c === 422 && isset($j['errors']['visit_time']), "today's visit at $future (an hour ahead) is rejected");
+    }
+    [$c, , $j] = save($A, false, visit(['visit_date' => $today, 'visit_time' => '', 'client_name' => "Now $tag", 'client_phone' => '0611222334']));
+    $t = $pdo->query("SELECT visit_time FROM field_visits WHERE visit_id = " . (int)($j['visit_id'] ?? 0))->fetchColumn();
+    $created[] = (int)($j['visit_id'] ?? 0);
+    ok($c === 200 && $t && abs(strtotime($today . ' ' . $t) - time()) < 120, "an empty time on today's visit is stored as the server's now ($t)");
+    [$c] = save($A, false, visit(['visit_date' => $day1, 'visit_time' => '23:30', 'client_name' => "Past $tag", 'client_phone' => '0611222335']));
+    ok($c === 200, 'a late time on an earlier day is fine');
+    $created[] = (int)$pdo->query("SELECT MAX(visit_id) FROM field_visits WHERE client_name = " . $pdo->quote("Past $tag"))->fetchColumn();
+    $page = file_get_contents(ROOT_DIR . '/app/bms/field_reports/field_visits.php');
+    ok(strpos($page, 'ynL(L.cardShort, r.gave_business_card)') !== false && strpos($page, 'ynL(L.trialShort') !== false && strpos($page, 'ynL(L.trainingShort') !== false, 'phone card badges carry their names');
+    ok(strpos($page, "serverNow().time") !== false && strpos($page, 'new Date(); $(\'#vTime\')') === false, 'default time comes from the server clock, not the phone');
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")

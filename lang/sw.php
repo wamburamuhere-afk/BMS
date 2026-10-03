@@ -5098,4 +5098,10 @@ return [
     'Fuel station' => 'Kituo cha mafuta',
     'Mobile money / Banking agent' => 'Wakala wa pesa za simu / benki',
 
+    // ------------------------------------------------------------------
+    // Customer Visits (customer_visits_ux_plan.md)
+    // ------------------------------------------------------------------
+    'Trial link' => 'Kiungo cha majaribio',
+    'The time cannot be later than now.' => 'Muda hauwezi kuwa baada ya sasa.',
+
 ];
