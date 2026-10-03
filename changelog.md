@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-02 — feat(field-reports): new module "Field Reports (Marketing)" — off by default, superadmin enables per tenant
+
+**Files:**
+- `core/feature_registry.php` — new feature `field_reports` (`default => false`, page key `field_visits`, paths `app/bms/field_reports/`, `api/field_reports/`). The deploy's catalogue sync seeds it with `default_enabled = 0`, so it stays OFF for every tenant until the superadmin switches it on in the tenant's Modules panel. When OFF, the pages and APIs 404 and the nav links are hidden, for the tenant's admin too.
+- `core/field_reports_schema.php`, `migrations/tenant/2026_10_03_field_reports_module.php`, `migrations/2026_10_03_field_reports_module_legacy_db.php` (new) — idempotent: tables `field_visits` (place + optional GPS, client name/phone/business, card/trial-link/training given, interest, notes, "joined" mark, soft delete) and `field_report_days` (daily submission + "changed after submit"); permission `field_visits`.
+- `core/field_reports.php`, `core/field_reports_report.php` (new) — helpers. **Access rule:** `frScopeUserId()` returns the user's own id for every non-admin (any role, any permission level), so a `user_id` sent in the request is ignored; only admins see all staff or pick one. Edit/delete/joined go through `frCanTouch()` (owner or admin). Stats count a client once by normalised phone (0712…/+255712… → 255712…) and a place once (case/space-insensitive).
+- `api/field_reports/` (new) — `list`, `save`, `delete` (soft), `toggle_joined`, `submit_day`, `check_phone` (warns about an earlier visit; staff only see their own, never another staff member's client), `export` (Excel CSV with UTF-8 BOM; formula-injection guard).
+- `app/bms/field_reports/field_visits.php` (new) — records visits (Save & add another keeps place/date/GPS), date filter (Today/Yesterday/This week), "Submit Today's Report" → banner "✓ Report for … submitted at …"; past days stay editable and show "updated after it was submitted". Admin only: staff picker + per-staff summary. DataTable + mobile cards, gear actions, SweetAlert.
+- `app/bms/field_reports/field_report_print.php` (new) — print/PDF report: company heading, date, S/No first, Kiswahili or English (dates too, e.g. "Ijumaa, 2 Oktoba 2026"), landscape or portrait (`@page` size), fixed table layout with wrapping (no cut words), headers repeat per page, footer "This document was Printed by …" in the General Ledger style (`.print-footer`), translated in Kiswahili.
+- `roots.php` — routes `field_reports`, `field_reports/print`.
+- `header.php` — "Field Reports" nav link + phone More-sheet link, both `canView('field_visits')`.
+- `lang/sw.php` — 95 Swahili strings for the module.
+- `tests/test_field_reports_cli.php`, `tests/helpers/field_reports_request.php` (new) — 138 assertions; every endpoint runs in its own PHP process as a forged user: module gate, ownership (two non-admin staff in different roles with FULL rights cannot list/print/export/edit/delete/mark-joined/phone-check each other's visits; admin sees all), validation, submit flow, print in sw + en and landscape + portrait, CSV export, stats. Fixtures removed afterwards.
+
 ## 2026-10-02 — fix(pos): Pay / Split / Add-customer did nothing when tapped inside the phone cart sheet
 
 **Files:**
