@@ -157,6 +157,12 @@ try {
         . implode(', ', array_fill(0, count($cols), '?')) . ", NOW())")->execute(array_values($cols));
     $product_id = (int)$pdo->lastInsertId();
 
+    // Wholesale → the Wholesale price group POS charges from (same as the web form).
+    if ((float)($extra['wholesale_price'] ?? 0) > 0) {
+        require_once __DIR__ . '/../../../core/pos_price_groups.php';
+        syncWholesaleGroupPrice($pdo, $product_id, (float)$extra['wholesale_price']);
+    }
+
     // Opening stock = real batch + stock movement + GL (Dr Inventory / Cr Opening Balance), as on the web.
     if ($opening_qty > 0) {
         $intake = receiveProductBatch($pdo, [

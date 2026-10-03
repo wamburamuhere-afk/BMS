@@ -118,3 +118,92 @@ function resolveActivePromoPrices(PDO $pdo, array $productIds): array
     }
     return $result;
 }
+
+if (!function_exists('effectiveWholesalePrice')) {
+    /**
+     * The wholesale price POS really charges for a product: its Wholesale
+     * price-group override when one exists, else the legacy
+     * products.wholesale_price (> 0) as entered on the product form, else null.
+     * Edit forms prefill from this so a save never writes a stale value back.
+     */
+    function effectiveWholesalePrice(PDO $pdo, int $productId, $legacyWholesale = null): ?float
+    {
+        $gid = wholesalePriceGroupId($pdo);
+        if ($gid) {
+            $st = $pdo->prepare("SELECT price FROM product_price_group_prices WHERE product_id = ? AND price_group_id = ?");
+            $st->execute([$productId, $gid]);
+            $v = $st->fetchColumn();
+            if ($v !== false) return (float)$v;
+        }
+        return ($legacyWholesale !== null && (float)$legacyWholesale > 0) ? (float)$legacyWholesale : null;
+    }
+}
+
+if (!function_exists('syncWholesaleGroupPrice')) {
+    /**
+     * Write a product's wholesale price where POS reads it — the Wholesale
+     * price group (the same upsert api/pos/quick_restock.php does) — and keep
+     * the legacy products.wholesale_price column equal to it.
+     *   $price > 0  → upsert the override;
+     *   $price <= 0 → remove the override (POS falls back to the normal price).
+     * A tenant without price groups only gets the legacy column. Runs inside the
+     * caller's transaction; throws on DB error so the caller rolls back.
+     */
+    function syncWholesaleGroupPrice(PDO $pdo, int $productId, float $price): void
+    {
+        $price = round(max(0.0, $price), 2);
+        $gid = wholesalePriceGroupId($pdo);
+        if ($gid) {
+            if ($price > 0) {
+                $pdo->prepare("
+                    INSERT INTO product_price_group_prices (product_id, price_group_id, price, created_at, updated_at)
+                    VALUES (?, ?, ?, NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE price = VALUES(price), updated_at = NOW()
+                ")->execute([$productId, $gid, $price]);
+            } else {
+                $pdo->prepare("DELETE FROM product_price_group_prices WHERE product_id = ? AND price_group_id = ?")
+                    ->execute([$productId, $gid]);
+            }
+        }
+        // Older schemas lack the legacy column (api/mobile/products/get.php checks the
+        // same) — never let its absence fail, and so roll back, the caller's save.
+        static $hasLegacyCol = null;
+        if ($hasLegacyCol === null) {
+            $hasLegacyCol = (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'wholesale_price'")->fetch();
+        }
+        if ($hasLegacyCol) {
+            $pdo->prepare("UPDATE products SET wholesale_price = ? WHERE product_id = ?")->execute([$price, $productId]);
+        }
+    }
+}
+
+if (!function_exists('backfillWholesaleGroupPrices')) {
+    /**
+     * One-off repair (migrations/*_wholesale_price_group_backfill*): products
+     * registered with a wholesale price got it only in the legacy
+     * products.wholesale_price column, which POS never reads, so wholesale
+     * customers paid the normal price. Copies that price into the Wholesale
+     * price group for every non-deleted product that has one (> 0) and no
+     * Wholesale override yet. Never overwrites an existing override. Idempotent.
+     * Returns the number of products fixed (0 when price groups or the legacy
+     * column do not exist on this database).
+     */
+    function backfillWholesaleGroupPrices(PDO $pdo): int
+    {
+        if (!(bool)$pdo->query("SHOW TABLES LIKE 'product_price_group_prices'")->fetch()) return 0;
+        if (!(bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'wholesale_price'")->fetch()) return 0;
+        $gid = wholesalePriceGroupId($pdo);
+        if (!$gid) return 0;
+        $st = $pdo->prepare("
+            INSERT IGNORE INTO product_price_group_prices (product_id, price_group_id, price, created_at, updated_at)
+            SELECT p.product_id, ?, ROUND(p.wholesale_price, 2), NOW(), NOW()
+              FROM products p
+             WHERE p.wholesale_price > 0
+               AND p.status <> 'deleted'
+               AND NOT EXISTS (SELECT 1 FROM product_price_group_prices x
+                                WHERE x.product_id = p.product_id AND x.price_group_id = ?)
+        ");
+        $st->execute([$gid, $gid]);
+        return $st->rowCount();
+    }
+}
