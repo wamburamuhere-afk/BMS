@@ -572,6 +572,22 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'core/mm_float_service.php',
                 ],
             ],
+            // 2026-10-03: Field Reports (marketing) — staff record client visits
+            // in the field and print/download a daily report. Every user sees
+            // only their own visits; admins see all staff. default: false —
+            // superadmin enables per tenant.
+            'field_reports' => [
+                'label'       => 'Field Reports (Marketing)',
+                'description' => 'Marketing staff record field visits (place, client, business, card/trial/training given) and produce a daily report; admins see every staff member\'s visits.',
+                'default'     => false,
+                'sort_order'  => 26,
+                'page_keys'   => ['field_visits'],
+                'depends_on'  => [],
+                'paths'       => [
+                    'app/bms/field_reports/',
+                    'api/field_reports/',
+                ],
+            ],
         ];
     }
 }
