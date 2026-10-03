@@ -5143,5 +5143,8 @@ return [
     'The report opens in a new tab. Press “Print / Save as PDF” there — on a phone choose “Save as PDF” to keep or share it.' => 'Ripoti itafunguka kwenye ukurasa mpya. Bonyeza “Chapisha / Hifadhi kama PDF” huko — kwenye simu chagua “Hifadhi kama PDF” ili kuitunza au kuituma.',
     'Preview & Print' => 'Angalia na Uchapishe',
     'Given' => 'Alichopewa',
+    'Print report' => 'Chapisha Ripoti',
+    'Opens the report for the dates and staff chosen below' => 'Inafungua ripoti ya tarehe na mfanyakazi uliowachagua hapa chini',
+    'Show' => 'Onyesha',
 
 ];

@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-03 — feat(customer-visits): one-click print; one table at a time; white heading; S/NO
+
+The user asked why language / orientation / dates were chosen three times (page filters → report dialog → report toolbar → the browser's own print dialog).
+
+**Files:**
+- `app/bms/field_reports/field_visits.php` — **no report options dialog**: "Chapisha Ripoti" opens the report straight away for the page's dates + staff, in the user's language. Admins get a **Visits ↔ Summary by staff switch** — one table visible at a time (summary re-measured when shown). Table heading white (`fr-thead`, was `table-dark`); first column **S/NO**.
+- `app/bms/field_reports/field_report_print.php` — **portrait / landscape is chosen only in the browser's print dialog ("Layout")**: `@page { size: A4 }` without an orientation, both column sets rendered with `k-*` classes, and `@media (orientation: portrait)` swaps card/trial/training for the one "Alichopewa" column with its own widths (also when a phone is held upright). Toolbar: Print / Save as PDF · Download Excel · (other language) · Close — the Page and Language button groups are gone. Old `orient=` links are simply ignored.
+- `lang/sw.php` — +3. `tests/test_field_reports_cli.php` — 198 assertions (orientation now CSS, one-click report, no dialog).
+
 ## 2026-10-03 — fix(customer-visits): printing is friendly — no broken words, phone-readable, dates in the dialog
 
 Found printing "Ziara za Wateja" live on shop.demo as a user.

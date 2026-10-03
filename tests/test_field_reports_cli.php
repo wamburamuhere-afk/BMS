@@ -260,14 +260,15 @@ try {
     foreach (['CUSTOMER VISITS REPORT', 'Place visited', 'This document was Printed by', 'Business card'] as $s)
         ok(strpos($sw, $s) === false, "sw does not fall back to English '$s'");
     ok(strpos($sw, '<html lang="sw">') !== false, 'sw page declares lang="sw"');
-    ok(preg_match('/@page\s*\{\s*size:\s*A4\s+portrait/', $sw) === 1, 'portrait → @page size A4 portrait');
+    ok(preg_match('/@page\s*\{\s*size:\s*A4;/', $sw) === 1, '@page is plain A4 — portrait/landscape is the print dialog\'s Layout');
+    ok(strpos($sw, '@media (orientation: portrait)') !== false && strpos($sw, '.k-card, .k-trial, .k-training { display: none; }') !== false, 'portrait (from the print dialog) merges card/trial/training into one column');
 
     [$c, $en] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'en', 'orient' => 'landscape']);
     ok($c === 200, 'English print renders (200)');
     foreach (['CUSTOMER VISITS REPORT', 'S/No', 'Place visited', 'Client name', '>Card<', '>Trial<', 'Joined our system', 'Retail shop', 'Interested', 'This document was Printed by'] as $s)
         ok(strpos($en, $s) !== false, "en contains '$s'");
     ok(strpos($en, 'RIPOTI YA MATEMBEZI') === false && strpos($en, 'Ripoti hii imechapishwa') === false, 'en has no Swahili headings/footer');
-    ok(preg_match('/@page\s*\{\s*size:\s*A4\s+landscape/', $en) === 1, 'landscape → @page size A4 landscape');
+    ok(strpos($en, 'class="k-card c"') !== false && strpos($en, 'class="k-given"') !== false, 'both column sets are in the page; CSS shows the right one');
     ok(strpos($en, 'print_footer') !== false || strpos($en, 'print-footer') !== false, 'footer uses the shared .print-footer (same as General Ledger)');
     ok(strpos($en, 'table-layout: fixed') !== false || strpos($en, 'table-layout:fixed') !== false, 'table uses fixed layout (no overflow off the page)');
     ok(strpos($en, 'overflow-wrap') !== false && strpos($en, 'table-header-group') !== false, 'words wrap (never cut) and headers repeat on every page');
@@ -276,7 +277,7 @@ try {
     [$c, $empty] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date_from' => $day2, 'date_to' => $day2, 'lang' => 'sw']);
     ok($c === 200 && strpos($empty, 'Hakuna ziara zilizorekodiwa') !== false, 'empty day prints a clean "no visits" row (sw)');
     [, $bad] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'xx', 'orient' => 'sideways']);
-    ok(preg_match('/@page\s*\{\s*size:\s*A4\s+landscape/', $bad) === 1, 'unknown orient falls back to landscape');
+    ok(strpos($bad, '<html lang="en">') !== false && strpos($bad, 'orient=') === false, 'unknown lang → user default; old orient param simply ignored');
     // XSS: typed text is escaped
     [$c, , $j] = save($A, false, visit(['client_name' => "<script>x</script> $tag", 'client_phone' => '0699888777']));
     $created[] = (int)($j['visit_id'] ?? 0);
@@ -473,18 +474,19 @@ try {
     ok(strpos($p, 'class="table-wrap"') !== false && strpos($p, 'min-width: 1000px') !== false && strpos($p, 'Telezesha pembeni') !== false, 'on a phone screen the table scrolls sideways (with a hint) instead of letters stacking');
     ok(strpos($p, 'if (window.opener) { window.close(); }') !== false, 'Close works even when the report was not opened as a new tab');
     [, $pp] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'sw', 'orient' => 'portrait']);
-    ok(strpos($pp, 'min-width: 720px') !== false, 'portrait screen width 720 px');
+    ok(strpos($pp, 'min-width: 720px') !== false && strpos($pp, 'min-width: 1000px') !== false, 'phone screen: 1000 px sideways, 720 px when held upright');
     [, $csv] = call('api/field_reports/export.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'en']);
     ok(strpos($csv, 'Business card') !== false && strpos($csv, 'Free trial link') !== false, 'Excel keeps the full column names');
     $page = file_get_contents(ROOT_DIR . '/app/bms/field_reports/field_visits.php');
-    ok(strpos($page, 'id="rFrom"') !== false && strpos($page, 'data-rquick="week"') !== false && strpos($page, "$('#rFrom').val()") !== false, 'report dates can be chosen in the report dialog itself');
-    ok(strpos($page, "t('Preview & Print')") !== false, 'button says "Angalia na Uchapishe"');
-    // A4 portrait: card/trial/training merged into one "Alichopewa" column; <col> widths follow the column order
-    preg_match('#<colgroup>(.*?)</colgroup>#s', $pp, $cg); preg_match('#<thead><tr>(.*?)</tr></thead>#s', $pp, $th);
-    ok(strpos($th[1] ?? '', '>Alichopewa<') !== false && strpos($th[1] ?? '', '>Kadi<') === false, 'portrait: one "Alichopewa" column instead of three Yes/No columns');
-    ok(substr_count($cg[1] ?? '', '<col ') === substr_count($th[1] ?? '', '<th '), 'one <col> per heading');
-    ok(strpos($pp, 'Kadi, Majaribio') !== false || strpos($pp, 'Kadi') !== false, '"Alichopewa" lists what was given');
-    ok(strpos($p, '>Kadi<') !== false && strpos($p, '>Alichopewa<') === false, 'landscape keeps the three columns');
+    ok(strpos($page, 'id="reportModal"') === false && strpos($page, "window.open(PRINT_URL + '?' + $.param(Object.assign(filters(), { lang: USER_LANG })), '_blank')") !== false, 'one click: the report opens straight away for the page filters, in the user\'s language (no options dialog)');
+    ok(strpos($page, "t('Print report')") !== false, 'button says "Chapisha Ripoti"');
+    // Both orientations from one page: every heading has a width class; widths per orientation
+    preg_match('#<thead><tr>(.*?)</tr></thead>#s', $p, $th);
+    preg_match_all('#class="k-([a-z_]+)#', $th[1] ?? '', $ks);
+    $cssOk = true; foreach ($ks[1] as $k) if (strpos($p, ".k-$k{width:") === false) $cssOk = false;
+    ok($ks[1] && $cssOk, 'every column has a width for landscape (and the portrait set its own)');
+    ok(strpos($th[1] ?? '', '>Alichopewa<') !== false && strpos($th[1] ?? '', '>Kadi<') !== false, 'headings: Kadi/Majaribio/Mafunzo (landscape) + Alichopewa (portrait)');
+    ok(strpos($p, 'class="lang-alt"') !== false && strpos($p, 'Ukurasa:') === false, 'toolbar: Print · Excel · other language · Close (no page/orientation buttons)');
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")
