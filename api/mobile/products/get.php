@@ -36,6 +36,10 @@ try {
 
     // Backwards-compatible alias for older app builds.
     $row['tax_rate_id'] = $row['tax_id'];
+    // The wholesale price POS really charges (Wholesale price group, else the legacy column).
+    require_once __DIR__ . '/../../../core/pos_price_groups.php';
+    $ew = effectiveWholesalePrice($pdo, $id, $row['wholesale_price']);
+    $row['wholesale_price'] = $ew !== null ? number_format($ew, 2, '.', '') : $row['wholesale_price'];
 
     require_once __DIR__ . '/../../../core/project_scope.php';
     $st = $pdo->prepare("SELECT ps.warehouse_id, w.warehouse_name, COALESCE(ps.stock_quantity,0) AS stock_quantity,

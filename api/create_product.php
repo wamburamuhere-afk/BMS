@@ -219,7 +219,14 @@ try {
     $stmt->execute($product_data);
     
     $product_id = $pdo->lastInsertId();
-    
+
+    // Wholesale price → the Wholesale price group POS charges from (it never reads
+    // products.wholesale_price), same as Receive Stock does. Inside the transaction.
+    if ((float)($product_data['wholesale_price'] ?? 0) > 0) {
+        require_once __DIR__ . '/../core/pos_price_groups.php';
+        syncWholesaleGroupPrice($pdo, (int)$product_id, (float)$product_data['wholesale_price']);
+    }
+
     // Handle initial stock if provided
     $initial_stock = null;
     if (isset($_POST['initial_stock_data'])) {
