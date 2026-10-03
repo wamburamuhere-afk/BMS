@@ -35,7 +35,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
             <button class="btn btn-primary fw-bold" id="btnAddVisit"><i class="bi bi-plus-circle me-1"></i><?= t('Record a visit') ?></button>
             <button class="btn btn-outline-primary" id="btnSubmitDay"><i class="bi bi-send-check me-1"></i><?= t("Submit Today's Report") ?></button>
             <?php endif; ?>
-            <button class="btn btn-outline-primary" id="btnReport"><i class="bi bi-printer me-1"></i><?= t('Report') ?></button>
+            <button class="btn btn-outline-primary" id="btnReport" title="<?= t('Opens the report for the dates and staff chosen below') ?>"><i class="bi bi-printer me-1"></i><?= t('Print report') ?></button>
         </div>
     </div>
 
@@ -89,12 +89,18 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
     </div></div>
 
     <?php if ($is_admin): ?>
+    <!-- One table at a time: switch between the visits and the per-staff summary -->
+    <div class="btn-group mb-2 w-100 fr-view-switch" role="group" aria-label="<?= t('Show') ?>">
+        <input type="radio" class="btn-check" name="frView" id="viewVisits" value="visits" autocomplete="off" checked>
+        <label class="btn btn-outline-primary" for="viewVisits"><i class="bi bi-list-ul me-1"></i><?= t('Visits') ?> <span class="badge bg-primary ms-1" id="visitsCount">0</span></label>
+        <input type="radio" class="btn-check" name="frView" id="viewStaff" value="staff" autocomplete="off">
+        <label class="btn btn-outline-primary" for="viewStaff"><i class="bi bi-people me-1"></i><?= t('Summary by staff') ?></label>
+    </div>
     <!-- Admin: per-staff summary — table on desktop, list on phones -->
     <div class="card border-0 shadow-sm mb-3 d-none" id="staffSummaryCard"><div class="card-body p-3">
-        <h6 class="fw-bold mb-2"><i class="bi bi-people text-primary me-1"></i><?= t('Summary by staff') ?></h6>
         <div id="staffTableWrap">
         <table class="table table-sm align-middle w-100" id="staffTable">
-            <thead class="table-light"><tr>
+            <thead class="fr-thead"><tr>
                 <th><?= t('Staff') ?></th><th class="text-center"><?= t('Visits') ?></th><th class="text-center"><?= t('People visited') ?></th>
                 <th class="text-center"><?= t('Places') ?></th><th class="text-center"><?= t('Business cards given') ?></th>
                 <th class="text-center"><?= t('Trial links given') ?></th><th class="text-center"><?= t('Trainings given') ?></th>
@@ -103,14 +109,15 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
         </table>
         </div>
         <ul class="list-group list-group-flush d-none" id="staffList"></ul>
+        <p class="text-muted text-center py-3 mb-0 d-none" id="staffEmpty"><?= t('No visits recorded for this period.') ?></p>
     </div></div>
     <?php endif; ?>
 
     <!-- Visits -->
     <div id="tableView" class="card border-0 shadow-sm"><div class="card-body p-2">
         <table id="visitsTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark"><tr>
-                <th>#</th><th><?= t('Date') ?></th><th><?= t('Time') ?></th>
+            <thead class="fr-thead"><tr>
+                <th>S/NO</th><th><?= t('Date') ?></th><th><?= t('Time') ?></th>
                 <?php if ($is_admin): ?><th><?= t('Staff') ?></th><?php endif; ?>
                 <th><?= t('Place visited') ?></th><th><?= t('Client name') ?></th><th><?= t('Phone') ?></th><th><?= t('Business') ?></th>
                 <th class="text-center"><?= t('Card') ?></th><th class="text-center"><?= t('Trial') ?></th><th class="text-center"><?= t('Training') ?></th>
@@ -234,45 +241,6 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
     </div></div>
 </div>
 
-<!-- Report options -->
-<div class="modal fade" id="reportModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title"><i class="bi bi-printer me-1"></i><?= t('Report') ?></h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <p class="small text-muted mb-2" id="reportScope"></p>
-            <!-- The report's own dates (start from the page filter) — no need to change the filter first. -->
-            <div class="row g-2 mb-2">
-                <div class="col-6"><label class="form-label fw-bold small mb-1" for="rFrom"><?= t('From') ?></label><input type="date" class="form-control" id="rFrom" max="<?= $today ?>"></div>
-                <div class="col-6"><label class="form-label fw-bold small mb-1" for="rTo"><?= t('To') ?></label><input type="date" class="form-control" id="rTo" max="<?= $today ?>"></div>
-            </div>
-            <div class="d-flex gap-2 mb-3 flex-nowrap fr-quick">
-                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-rquick="today"><?= t('Today') ?></button>
-                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-rquick="yesterday"><?= t('Yesterday') ?></button>
-                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-rquick="week"><?= t('This Week') ?></button>
-            </div>
-            <label class="form-label fw-bold"><?= t('Language') ?></label>
-            <div class="mb-3 d-flex gap-3">
-                <div class="form-check"><input class="form-check-input" type="radio" name="rLang" id="rLangSw" value="sw" <?= $userLang === 'sw' ? 'checked' : '' ?>><label class="form-check-label" for="rLangSw">Kiswahili</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="rLang" id="rLangEn" value="en" <?= $userLang === 'en' ? 'checked' : '' ?>><label class="form-check-label" for="rLangEn">English</label></div>
-            </div>
-            <label class="form-label fw-bold"><?= t('Page') ?></label>
-            <div class="d-flex gap-3">
-                <div class="form-check"><input class="form-check-input" type="radio" name="rOrient" id="rLand" value="landscape" checked><label class="form-check-label" for="rLand"><?= t('Landscape') ?> <small class="text-muted">(<?= t('wide — recommended') ?>)</small></label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="rOrient" id="rPort" value="portrait"><label class="form-check-label" for="rPort"><?= t('Portrait') ?> <small class="text-muted">(<?= t('upright') ?>)</small></label></div>
-            </div>
-            <p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle me-1"></i><?= t('The report opens in a new tab. Press “Print / Save as PDF” there — on a phone choose “Save as PDF” to keep or share it.') ?></p>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-            <button type="button" class="btn btn-outline-primary" id="btnExcel"><i class="bi bi-download me-1"></i><?= t('Download Excel') ?></button>
-            <button type="button" class="btn btn-primary" id="btnOpenReport"><i class="bi bi-printer me-1"></i><?= t('Preview & Print') ?></button>
-        </div>
-    </div></div>
-</div>
-
 <style>
 @media (max-width: 767.98px) {
     .fr-sticky { position: sticky; top: 0; z-index: 1020; background: #fff; padding: 6px 0; }
@@ -286,6 +254,8 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 .fr-main-stat { background:#0d6efd; color:#fff; }
 .fr-toggle { min-width: 0 !important; white-space: normal; }   /* global .btn{min-width:85px} */
 .fr-quick .btn { min-width: 0; }
+.fr-thead th { background: #fff !important; color: #212529; border-bottom: 2px solid #dee2e6; font-weight: 600; }
+.fr-view-switch .btn { min-width: 0; }
 .fr-follow-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; padding: .55rem .25rem; }   /* ~38 px: a finger-sized target */
 @media (max-width: 767.98px) { .fr-head-actions .btn:not(#btnAddVisit) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; } }
 </style>
@@ -293,8 +263,8 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 <script>
 $(function () {
     const IS_ADMIN = <?= json_encode($is_admin) ?>, CAN_CREATE = <?= json_encode($can_create) ?>, CAN_EDIT = <?= json_encode($can_edit) ?>, ME = <?= $me ?>, TODAY = <?= json_encode($today) ?>;
-    const API = '<?= buildUrl('api/field_reports/') ?>', PRINT_URL = '<?= getUrl('field_reports/print') ?>', EXPORT_URL = '<?= getUrl('api/field_reports/export.php') ?>';
-    const CSRF = <?= json_encode(csrf_token()) ?>;
+    const API = '<?= buildUrl('api/field_reports/') ?>', PRINT_URL = '<?= getUrl('field_reports/print') ?>';
+    const CSRF = <?= json_encode(csrf_token()) ?>, USER_LANG = <?= json_encode($userLang) ?>;
     // One clock — the server's (EAT), whatever the phone's clock or time zone says
     // (customer_visits_ux_plan 1.3): "now" = server time at page load + time elapsed since.
     const SERVER_NOW = <?= json_encode(date('Y-m-d H:i:s')) ?>, LOADED_AT = Date.now();
@@ -448,7 +418,7 @@ $(function () {
 
     function renderStaff(list) {
         if (!staffTable) return;
-        $('#staffSummaryCard').toggleClass('d-none', !list.length);
+        $('#staffEmpty').toggleClass('d-none', !!list.length);
         staffTable.clear().rows.add(list.map(s => [esc(s.staff_name), s.visits, s.people, s.places, s.cards, s.trials, s.trainings, s.joined])).draw();
         $('#staffList').html(list.map(s => `<li class="list-group-item px-0">
             <div class="fw-bold">${esc(s.staff_name)}</div>
@@ -460,6 +430,7 @@ $(function () {
         $.getJSON(API + 'list.php', filters()).done(function (res) {
             if (!res.success) { Swal.fire({ icon: 'error', title: L.error, text: res.message }); return; }
             rows = res.rows;
+            $('#visitsCount').text(rows.length);
             renderFollowUps(res.follow_ups);
             table.clear().rows.add(rows.map((r, i) => {
                 const cells = [i + 1, dmy(r.visit_date), esc(r.visit_time || '—')];
@@ -477,12 +448,18 @@ $(function () {
         }).fail(() => Swal.fire({ icon: 'error', title: L.error, text: L.serverError }));
     }
 
+    // Which table is showing (admins switch between visits and the per-staff summary).
+    const showingStaff = () => IS_ADMIN && $('#viewStaff').is(':checked');
     function applyView() {
-        const m = window.innerWidth < 768;
-        $('#tableView').toggleClass('d-none', m); $('#cardView').toggleClass('d-none', !m);
+        const m = window.innerWidth < 768, staff = showingStaff();
+        $('#tableView').toggleClass('d-none', m || staff); $('#cardView').toggleClass('d-none', !m || staff);
+        $('#staffSummaryCard').toggleClass('d-none', !staff);
         $('#staffTableWrap').toggleClass('d-none', m); $('#staffList').toggleClass('d-none', !m);
+        // the summary table is built while hidden (zero width) — re-measure it once shown
+        if (staff && staffTable && !m) staffTable.columns.adjust();
     }
     applyView(); $(window).on('resize', applyView);
+    $('input[name=frView]').on('change', applyView);
     if (window.innerWidth >= 768) $('#moreStats').addClass('show');   // open on desktop, closed on phones
 
     $('#fFrom, #fTo, #fStaff').on('change', loadData);
@@ -664,28 +641,11 @@ $(function () {
             .then(x => { if (x.isConfirmed) post('submit_day.php', { date: f.date_from }); });
     });
 
-    // ── Report ─────────────────────────────────────────────────────
+    // ── Report: one click — the page's dates + staff, in the user's language. Portrait /
+    // landscape is the browser print dialog's "Layout"; the report adapts to it.
     $('#btnReport').on('click', function () {
-        const f = filters();
-        const who = IS_ADMIN ? (f.user_id ? $('#fStaff option:selected').text() : L.scopeAll) : L.scopeMe;
-        $('#reportScope').text(`${L.staff}: ${who}`);
-        $('#rFrom').val(f.date_from); $('#rTo').val(f.date_to);
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('reportModal')).show();
+        window.open(PRINT_URL + '?' + $.param(Object.assign(filters(), { lang: USER_LANG })), '_blank');
     });
-    $('[data-rquick]').on('click', function () {
-        const n = serverNow().d, now = new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); let from = now, to = now;
-        if ($(this).data('rquick') === 'yesterday') { from = to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1); }
-        if ($(this).data('rquick') === 'week') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)); }
-        $('#rFrom').val(ymd(from)); $('#rTo').val(ymd(to));
-    });
-    const reportQuery = () => {
-        let from = $('#rFrom').val() || filters().date_from, to = $('#rTo').val() || from;
-        if (to < from) [from, to] = [to, from];
-        return '?' + $.param({ date_from: from, date_to: to, user_id: filters().user_id, lang: $('input[name=rLang]:checked').val(), orient: $('input[name=rOrient]:checked').val() });
-    };
-    $('#btnOpenReport').on('click', () => window.open(PRINT_URL + reportQuery(), '_blank'));
-    $('#btnExcel').on('click', () => { window.location.href = EXPORT_URL + reportQuery(); });
-
     loadData();
 });
 </script>

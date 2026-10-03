@@ -1,6 +1,9 @@
 <?php
-// Field Reports — printable daily/period report. GET: date_from, date_to (or date),
-// user_id (admins only; others always get their own), lang (sw|en), orient (landscape|portrait).
+// Customer Visits — printable daily/period report. GET: date_from, date_to (or date),
+// user_id (admins only; others always get their own), lang (sw|en; default = the user's).
+// One click from the visits page: no options dialog. Portrait/landscape is chosen ONLY in
+// the browser's own print dialog (Layout) — the table re-arranges itself for it with
+// @media (orientation: portrait) (card/trial/training → one "Given" column).
 require_once __DIR__ . '/../../../roots.php';
 require_once ROOT_DIR . '/core/field_reports_report.php';
 
@@ -11,29 +14,36 @@ if (!canView('field_visits')) { http_response_code(403); die(t('Access Denied'))
 $userId = frScopeUserId($_GET['user_id'] ?? null);   // non-admin => always self
 $me     = (int)$_SESSION['user_id'];
 $lang   = frReportLang($_GET['lang'] ?? null);
-$orient = ($_GET['orient'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
 
 $visits = frFetchVisits($pdo, $from, $to, $userId);
 $day = ($from === $to && $userId !== null) ? frDayStatus($pdo, $userId, $from) : null;
-logActivity($pdo, $me, 'Print field report', "Opened field report $from..$to (" . ($userId ?? 'all staff') . ", $lang, $orient)");
+logActivity($pdo, $me, 'Print field report', "Opened field report $from..$to (" . ($userId ?? 'all staff') . ", $lang)");
 
 loadLanguage($lang);   // everything below is in the report's language
-$columns = frReportColumns($from !== $to, $userId === null, true, $orient === 'portrait');
+// Every column for BOTH orientations; CSS shows the right set (see the <style> below).
+$columns = [];
+foreach (frReportColumns($from !== $to, $userId === null, true) as $k => $label) {
+    $columns[$k] = $label;
+    if ($k === 'training') $columns['given'] = t('Given');
+}
 $rows    = frReportRows($visits, $columns);
 $summary = frReportSummary(frStats($visits));
 $subject = frReportSubject($pdo, $userId);
 
-// Relative column widths (normalised to 100% for whichever columns are shown).
-// Yes/No columns must fit "Hapana" on A4 portrait too (~6 %); the long-text columns give way.
-$weights = ['sno' => 3, 'date' => 7, 'time' => 5, 'staff' => 10, 'location' => 14, 'client' => 11, 'phone' => 10,
-            'business' => 10, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12, 'given' => 11];
-if ($orient === 'portrait') {   // fewer columns upright: give the tight ones room
-    $weights = array_merge($weights, ['sno' => 4, 'joined' => 10, 'follow_up' => 10, 'client' => 12]);
-}
-// In COLUMN order (array_intersect_key keeps $weights' order, which misaligns <col>s).
-$w = [];
-foreach (array_keys($columns) as $k) $w[$k] = $weights[$k] ?? 8;
-$sum = array_sum($w);
+// Relative column widths per orientation, normalised to 100% of the columns shown in it.
+// Yes/No columns must fit "Hapana"; the long-text columns give way.
+$wLand = ['sno' => 3, 'date' => 7, 'time' => 5, 'staff' => 10, 'location' => 14, 'client' => 11, 'phone' => 10,
+          'business' => 10, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12];
+$wPort = array_merge(array_diff_key($wLand, ['card' => 1, 'trial' => 1, 'training' => 1]),
+                     ['sno' => 4, 'joined' => 10, 'follow_up' => 10, 'client' => 12, 'given' => 11]);
+$pct = function (array $weights) use ($columns): array {
+    $w = array_intersect_key($weights, $columns);
+    $sum = array_sum($w) ?: 1;
+    return array_map(fn($v) => round($v * 100 / $sum, 2), $w);
+};
+$widthCss = function (array $p): string {
+    return implode(' ', array_map(fn($k, $v) => ".k-$k{width:$v%}", array_keys($p), $p));
+};
 $center = ['sno', 'time', 'card', 'trial', 'training', 'joined'];
 
 $comp = [
@@ -47,7 +57,7 @@ $printedBy   = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_nam
 $printedRole = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'User';
 $printedAt   = frDateLabel(date('Y-m-d'), $lang) . ' ' . ($lang === 'sw' ? 'saa' : 'at') . ' ' . date('H:i');
 $q = fn(array $over) => '?' . http_build_query(array_merge(
-    ['date_from' => $from, 'date_to' => $to, 'user_id' => $userId ?? '', 'lang' => $lang, 'orient' => $orient], $over));
+    ['date_from' => $from, 'date_to' => $to, 'user_id' => $userId ?? '', 'lang' => $lang], $over));
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
@@ -65,6 +75,7 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         .toolbar .primary { background: #0d6efd; color: #fff; border-color: #0d6efd; }
         .toolbar .grp { display: inline-flex; gap: 4px; align-items: center; }
         .toolbar .lbl { font-size: 12px; color: #495057; margin-right: 2px; }
+        .toolbar .lang-alt { margin-left: auto; font-weight: 500; font-size: 12px; border-color: #dee2e6; color: #495057; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 3px solid #3498db; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .company h1 { color: #0d6efd; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .company .row { display: flex; gap: 12px; align-items: flex-start; }
@@ -87,32 +98,40 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         /* On a phone SCREEN the A4 table scrolls sideways instead of being squeezed
            letter-by-letter; printing always uses the A4 page width. */
         .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        @media screen and (max-width: 1000px) { .table-wrap table { min-width: <?= $orient === 'portrait' ? 720 : 1000 ?>px; } .scroll-hint { display: block !important; } }
+        @media screen and (max-width: 1000px) { .table-wrap table { min-width: 1000px; } .scroll-hint { display: block !important; } }
+        @media screen and (max-width: 1000px) and (orientation: portrait) { .table-wrap table { min-width: 720px; } }
         .scroll-hint { display: none; font-size: 11px; color: #6c757d; margin: 0 0 6px; }
         tr { break-inside: avoid; page-break-inside: avoid; }
         tbody tr:nth-child(even) td { background: #f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .c { text-align: center; }
         .empty { text-align: center; padding: 18px; color: #6c757d; }
-        body.portrait td { font-size: 9.5px; padding: 4px 3px; }
-        body.portrait th { font-size: 8.5px; padding: 6px 3px; letter-spacing: 0; }
-        body.portrait .summary { grid-template-columns: repeat(4, 1fr); }
-        @page { size: A4 <?= $orient ?>; margin: 10mm 8mm 14mm 8mm; }
+        /* Landscape (default): all columns. Portrait — the page chosen in the browser's print
+           dialog, or a phone held upright — card/trial/training become one "Given" column. */
+        <?= $widthCss($pct($wLand)) ?>
+        .k-given { display: none; }
+        @media (orientation: portrait) {
+            .k-card, .k-trial, .k-training { display: none; }
+            .k-given { display: table-cell; }
+            <?= $widthCss($pct($wPort)) ?>
+            .summary { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media print and (orientation: portrait) {
+            td { font-size: 9.5px; padding: 4px 3px; }
+            th { font-size: 8.5px; padding: 6px 3px; letter-spacing: 0; }
+        }
+        @page { size: A4; margin: 10mm 8mm 14mm 8mm; }   /* orientation: the print dialog's Layout */
         @media print { .toolbar { display: none !important; } body { padding: 0; } }
         @media (max-width: 700px) { .header { flex-direction: column; } .title-box { text-align: left; width: 100%; } .summary { grid-template-columns: repeat(2, 1fr); } }
     </style>
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </head>
-<body class="<?= $orient ?>">
+<body>
 
 <div class="toolbar">
     <button type="button" class="primary" onclick="window.print()">&#128424; <?= $e(t('Print / Save as PDF')) ?></button>
-    <span class="grp"><span class="lbl"><?= $e(t('Page')) ?>:</span>
-        <a class="<?= $orient === 'landscape' ? 'on' : '' ?>" href="<?= $e($q(['orient' => 'landscape'])) ?>"><?= $e(t('Landscape')) ?></a>
-        <a class="<?= $orient === 'portrait' ? 'on' : '' ?>" href="<?= $e($q(['orient' => 'portrait'])) ?>"><?= $e(t('Portrait')) ?></a></span>
-    <span class="grp"><span class="lbl"><?= $e(t('Language')) ?>:</span>
-        <a class="<?= $lang === 'sw' ? 'on' : '' ?>" href="<?= $e($q(['lang' => 'sw'])) ?>">Kiswahili</a>
-        <a class="<?= $lang === 'en' ? 'on' : '' ?>" href="<?= $e($q(['lang' => 'en'])) ?>">English</a></span>
     <a href="<?= $e(getUrl('api/field_reports/export.php') . $q([])) ?>">&#11015; <?= $e(t('Download Excel')) ?></a>
+    <?php /* Already in the user's language; this is only for a client who needs the other one. */ ?>
+    <a class="lang-alt" href="<?= $e($q(['lang' => $lang === 'sw' ? 'en' : 'sw'])) ?>"><?= $lang === 'sw' ? 'English' : 'Kiswahili' ?></a>
     <?php /* Opened in a new tab → close it; opened any other way → back to the visits page. */ ?>
     <button type="button" onclick="if (window.opener) { window.close(); } else { location.href = '<?= $e(getUrl('field_reports')) ?>'; }"><?= $e(t('Close')) ?></button>
 </div>
@@ -156,13 +175,12 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 <p class="scroll-hint">&#8596; <?= $e(t('Swipe sideways to see every column. The printout fits the page.')) ?></p>
 <div class="table-wrap">
 <table>
-    <colgroup><?php foreach ($w as $k => $v): ?><col style="width:<?= round($v * 100 / $sum, 2) ?>%"><?php endforeach; ?></colgroup>
-    <thead><tr><?php foreach ($columns as $k => $label): ?><th class="<?= in_array($k, $center, true) ? 'c' : '' ?>"><?= $e($label) ?></th><?php endforeach; ?></tr></thead>
+    <thead><tr><?php foreach ($columns as $k => $label): ?><th class="k-<?= $k ?><?= in_array($k, $center, true) ? ' c' : '' ?>"><?= $e($label) ?></th><?php endforeach; ?></tr></thead>
     <tbody>
     <?php if (!$rows): ?>
-        <tr><td class="empty" colspan="<?= count($columns) ?>"><?= $e(t('No visits recorded for this period.')) ?></td></tr>
+        <tr><td class="empty" colspan="<?= count($columns) - 1 ?>"><?= $e(t('No visits recorded for this period.')) ?></td></tr>
     <?php else: foreach ($rows as $r): ?>
-        <tr><?php foreach ($columns as $k => $label): ?><td class="<?= in_array($k, $center, true) ? 'c' : '' ?>"><?= nl2br($e($r[$k])) ?></td><?php endforeach; ?></tr>
+        <tr><?php foreach ($columns as $k => $label): ?><td class="k-<?= $k ?><?= in_array($k, $center, true) ? ' c' : '' ?>"><?= nl2br($e($r[$k])) ?></td><?php endforeach; ?></tr>
     <?php endforeach; endif; ?>
     </tbody>
 </table>
