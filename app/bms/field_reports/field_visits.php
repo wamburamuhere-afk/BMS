@@ -123,7 +123,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 </div>
 
 <!-- Record / edit a visit — full screen on phones -->
-<div class="modal fade" id="visitModal" tabindex="-1">
+<div class="modal fade" id="visitModal" tabindex="-1" data-no-autoclose="true"><!-- footer.php ajaxSuccess would close it after "Save & Add Another" -->
     <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down"><div class="modal-content">
         <div class="modal-header bg-primary text-white">
             <h5 class="modal-title" id="visitModalTitle"><i class="bi bi-geo-alt me-1"></i><?= t('Record a visit') ?></h5>
@@ -275,6 +275,8 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 .fr-main-stat { background:#0d6efd; color:#fff; }
 .fr-toggle { min-width: 0 !important; white-space: normal; }   /* global .btn{min-width:85px} */
 .fr-quick .btn { min-width: 0; }
+.fr-follow-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .8rem; padding: .35rem .25rem; }
+@media (max-width: 767.98px) { .fr-head-actions .btn:not(#btnAddVisit) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; } }
 </style>
 
 <script>
@@ -409,10 +411,10 @@ $(function () {
                         <small class="text-muted">${esc(f.location)} · ${esc(f.business_label)}${IS_ADMIN ? ' · ' + esc(f.staff_name) : ''}</small></div>
                     <span class="badge ${f.days_overdue > 0 ? 'bg-danger' : 'bg-primary'} align-self-start text-nowrap">${f.days_overdue > 0 ? esc(L.daysLate.replace('%d', f.days_overdue)) : esc(L.dueToday)}</span>
                 </div>
-                <div class="d-flex gap-2 mt-2">
-                    <a class="btn btn-sm btn-primary flex-fill" href="tel:${esc(f.client_phone)}" style="min-width:0"><i class="bi bi-telephone me-1"></i>${L.call}</a>
-                    ${CAN_CREATE ? `<button class="btn btn-sm btn-outline-primary flex-fill" data-fact="visit" data-id="${f.visit_id}" style="min-width:0"><i class="bi bi-plus-circle me-1"></i>${L.newVisit}</button>` : ''}
-                    ${f.can_edit ? `<button class="btn btn-sm btn-outline-success flex-fill" data-fact="done" data-id="${f.visit_id}" style="min-width:0"><i class="bi bi-check2 me-1"></i>${L.followedUp}</button>` : ''}
+                <div class="d-flex gap-1 mt-2 fr-follow-actions">
+                    <a class="btn btn-sm btn-primary" href="tel:${esc(f.client_phone)}"><i class="bi bi-telephone me-1"></i>${L.call}</a>
+                    ${CAN_CREATE ? `<button class="btn btn-sm btn-outline-primary" data-fact="visit" data-id="${f.visit_id}"><i class="bi bi-plus-circle me-1"></i>${L.newVisit}</button>` : ''}
+                    ${f.can_edit ? `<button class="btn btn-sm btn-outline-success" data-fact="done" data-id="${f.visit_id}"><i class="bi bi-check2 me-1"></i>${L.followedUp}</button>` : ''}
                 </div>
             </li>`).join(''));
     }

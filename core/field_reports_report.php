@@ -22,7 +22,7 @@ if (!function_exists('frReportColumns')) {
             'card'     => t('Business card'),
             'trial'    => t('Free trial link'),
             'training' => t('Training'),
-            'interest' => t('Interest'),
+            'interest' => t('Response'),   // same word as the page ("Mwitikio")
             'joined'   => t('Joined'),
             'follow_up' => t('Follow-up'),
             'notes'    => t('Notes'),
