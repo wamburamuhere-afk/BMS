@@ -242,7 +242,17 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-            <p class="small text-muted mb-3" id="reportScope"></p>
+            <p class="small text-muted mb-2" id="reportScope"></p>
+            <!-- The report's own dates (start from the page filter) — no need to change the filter first. -->
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="form-label fw-bold small mb-1" for="rFrom"><?= t('From') ?></label><input type="date" class="form-control" id="rFrom" max="<?= $today ?>"></div>
+                <div class="col-6"><label class="form-label fw-bold small mb-1" for="rTo"><?= t('To') ?></label><input type="date" class="form-control" id="rTo" max="<?= $today ?>"></div>
+            </div>
+            <div class="d-flex gap-2 mb-3 flex-nowrap fr-quick">
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-rquick="today"><?= t('Today') ?></button>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-rquick="yesterday"><?= t('Yesterday') ?></button>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-rquick="week"><?= t('This Week') ?></button>
+            </div>
             <label class="form-label fw-bold"><?= t('Language') ?></label>
             <div class="mb-3 d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="rLang" id="rLangSw" value="sw" <?= $userLang === 'sw' ? 'checked' : '' ?>><label class="form-check-label" for="rLangSw">Kiswahili</label></div>
@@ -250,14 +260,15 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
             </div>
             <label class="form-label fw-bold"><?= t('Page') ?></label>
             <div class="d-flex gap-3">
-                <div class="form-check"><input class="form-check-input" type="radio" name="rOrient" id="rLand" value="landscape" checked><label class="form-check-label" for="rLand"><?= t('Landscape') ?></label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="rOrient" id="rPort" value="portrait"><label class="form-check-label" for="rPort"><?= t('Portrait') ?></label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="rOrient" id="rLand" value="landscape" checked><label class="form-check-label" for="rLand"><?= t('Landscape') ?> <small class="text-muted">(<?= t('wide — recommended') ?>)</small></label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="rOrient" id="rPort" value="portrait"><label class="form-check-label" for="rPort"><?= t('Portrait') ?> <small class="text-muted">(<?= t('upright') ?>)</small></label></div>
             </div>
+            <p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle me-1"></i><?= t('The report opens in a new tab. Press “Print / Save as PDF” there — on a phone choose “Save as PDF” to keep or share it.') ?></p>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
             <button type="button" class="btn btn-outline-primary" id="btnExcel"><i class="bi bi-download me-1"></i><?= t('Download Excel') ?></button>
-            <button type="button" class="btn btn-primary" id="btnOpenReport"><i class="bi bi-printer me-1"></i><?= t('Open Report') ?></button>
+            <button type="button" class="btn btn-primary" id="btnOpenReport"><i class="bi bi-printer me-1"></i><?= t('Preview & Print') ?></button>
         </div>
     </div></div>
 </div>
@@ -275,7 +286,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 .fr-main-stat { background:#0d6efd; color:#fff; }
 .fr-toggle { min-width: 0 !important; white-space: normal; }   /* global .btn{min-width:85px} */
 .fr-quick .btn { min-width: 0; }
-.fr-follow-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .8rem; padding: .35rem .25rem; }
+.fr-follow-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; padding: .55rem .25rem; }   /* ~38 px: a finger-sized target */
 @media (max-width: 767.98px) { .fr-head-actions .btn:not(#btnAddVisit) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; } }
 </style>
 
@@ -595,7 +606,9 @@ $(function () {
                     if (again) { resetForm(true); $('#vPhone').trigger('focus'); }
                     else bootstrap.Modal.getOrCreateInstance(document.getElementById('visitModal')).hide();
                     loadData();
-                    Swal.fire({ icon: 'success', title: res.message, timer: 1400, showConfirmButton: false });
+                    // After "Save & Add Another" the cursor goes back to Phone once the toast closes (it takes focus).
+                    Swal.fire({ icon: 'success', title: res.message, timer: 1400, showConfirmButton: false })
+                        .then(() => { if (again && $('#visitModal').hasClass('show')) $('#vPhone').trigger('focus'); });
                 } else showErrors(res);
             })
             .fail(x => showErrors(x.responseJSON || {}))
@@ -655,10 +668,21 @@ $(function () {
     $('#btnReport').on('click', function () {
         const f = filters();
         const who = IS_ADMIN ? (f.user_id ? $('#fStaff option:selected').text() : L.scopeAll) : L.scopeMe;
-        $('#reportScope').text(`${L.staff}: ${who} · ${L.date}: ${dmy(f.date_from)}${f.date_to !== f.date_from ? ' – ' + dmy(f.date_to) : ''}`);
+        $('#reportScope').text(`${L.staff}: ${who}`);
+        $('#rFrom').val(f.date_from); $('#rTo').val(f.date_to);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('reportModal')).show();
     });
-    const reportQuery = () => '?' + $.param(Object.assign(filters(), { lang: $('input[name=rLang]:checked').val(), orient: $('input[name=rOrient]:checked').val() }));
+    $('[data-rquick]').on('click', function () {
+        const n = serverNow().d, now = new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); let from = now, to = now;
+        if ($(this).data('rquick') === 'yesterday') { from = to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1); }
+        if ($(this).data('rquick') === 'week') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)); }
+        $('#rFrom').val(ymd(from)); $('#rTo').val(ymd(to));
+    });
+    const reportQuery = () => {
+        let from = $('#rFrom').val() || filters().date_from, to = $('#rTo').val() || from;
+        if (to < from) [from, to] = [to, from];
+        return '?' + $.param({ date_from: from, date_to: to, user_id: filters().user_id, lang: $('input[name=rLang]:checked').val(), orient: $('input[name=rOrient]:checked').val() });
+    };
     $('#btnOpenReport').on('click', () => window.open(PRINT_URL + reportQuery(), '_blank'));
     $('#btnExcel').on('click', () => { window.location.href = EXPORT_URL + reportQuery(); });
 

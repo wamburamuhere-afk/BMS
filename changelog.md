@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-03 — fix(customer-visits): printing is friendly — no broken words, phone-readable, dates in the dialog
+
+Found printing "Ziara za Wateja" live on shop.demo as a user.
+
+**Files:**
+- `app/bms/field_reports/field_report_print.php` — headings wrap at spaces only (no uppercase, `overflow-wrap: break-word`, was `anywhere` → "MAFUN|ZO", "AMEJIU|NGA"); on a phone screen the table scrolls sideways (with a hint) instead of stacking one letter per line — print still uses the A4 width; column widths rebalanced so "Hapana" fits; **`<col>` widths now follow the column order** (`array_intersect_key()` kept the weights' order and misaligned them); "Close" goes back to the visits page when the report wasn't opened as a new tab.
+- `core/field_reports_report.php` — print uses short Yes/No headings (Kadi · Majaribio); **A4 portrait merges card / trial / training into one "Alichopewa" column** ("Kadi, Majaribio") — 14 columns can't stand upright without breaking words. Excel keeps the full names.
+- `app/bms/field_reports/field_visits.php` — report dialog has its own From/To + Leo/Jana/Wiki hii (no need to change the page filter first), explains Mlalo/Wima, and how to save as PDF on a phone; button "Angalia na Uchapishe"; follow-up buttons ~38 px (finger-sized); after "Save & Add Another" the cursor returns to Phone.
+- `lang/sw.php` — +6. `tests/test_field_reports_cli.php` — 198 assertions.
+
 ## 2026-10-03 — fix(customer-visits): found filling it in live on shop.demo
 
 **Files:**
