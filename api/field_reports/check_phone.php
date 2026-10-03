@@ -11,6 +11,7 @@ $where = "v.status = 'active' AND v.phone_normalized = ? AND v.visit_id <> ?";
 $params = [$norm, (int)($_GET['exclude_id'] ?? 0)];
 $scope = frScopeUserId(null);
 if ($scope !== null) { $where .= " AND v.user_id = ?"; $params[] = $scope; }
+$where .= frSubmittedOnlySql('v', $params);   // admin: another staff member's day only once submitted
 
 try {
     $s = $pdo->prepare("SELECT v.visit_date, v.client_name, v.location, v.business_type, v.business_other,

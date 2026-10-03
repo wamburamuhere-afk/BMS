@@ -24,6 +24,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../roots.php';
 require_once ROOT_DIR . '/core/field_reports.php';
 require_once ROOT_DIR . '/core/field_reports_schema.php';
+require_once ROOT_DIR . '/core/field_reports_report.php';
 
 $pass = 0; $fail = 0;
 function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  ✓ $m\n"; } else { $fail++; echo "  ✗ $m\n"; } }
@@ -144,9 +145,24 @@ try {
     $names = array_column($j['rows'] ?? [], 'client_name');
     ok(in_array("Baraka B $tag", $names, true) && !in_array("Asha A $tag", $names, true), "B sees own only, not A's");
 
+    // Admin sees another staff member's day only once it is submitted (2026-10-03).
     [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', $range);
     $names = array_column($j['rows'] ?? [], 'client_name');
-    ok(in_array("Asha A $tag", $names, true) && in_array("Baraka B $tag", $names, true), 'admin sees both A and B');
+    ok(!in_array("Asha A $tag", $names, true) && !in_array("Baraka B $tag", $names, true), 'admin does NOT see A or B before they submit the day');
+    ok(!in_array($A, array_map('intval', array_column($j['staff_summary'] ?? [], 'user_id')), true), 'admin summary leaves out an unsubmitted day');
+    [, , $j] = call('api/field_reports/check_phone.php', $adminId, true, 'GET', ['phone' => '0755000222']);
+    ok(is_array($j) && array_key_exists('match', $j) && $j['match'] === null, "admin phone check does not reveal B's unsubmitted visit");
+    [, $html] = call('app/bms/field_reports/field_report_print.php', $adminId, true, 'GET', $range + ['lang' => 'en']);
+    ok(strpos($html, "Asha A $tag") === false && strpos($html, "Baraka B $tag") === false, 'admin print leaves out unsubmitted days');
+    [, , $j] = call('api/field_reports/report_data.php', $adminId, true, 'GET', $range + ['lang' => 'en']);
+    ok(!in_array("Baraka B $tag", array_column($j['rows'] ?? [], 3), true) && strpos(json_encode($j['rows'] ?? []), "Baraka B $tag") === false, 'admin PDF data leaves out unsubmitted days');
+    [$c] = call('api/field_reports/submit_day.php', $A, false, 'POST', ['date' => $day1]);
+    [$c2] = call('api/field_reports/submit_day.php', $B, false, 'POST', ['date' => $day1]);
+    ok($c === 200 && $c2 === 200, 'A and B submit the day');
+
+    [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', $range);
+    $names = array_column($j['rows'] ?? [], 'client_name');
+    ok(in_array("Asha A $tag", $names, true) && in_array("Baraka B $tag", $names, true), 'admin sees both A and B once submitted');
     $sumIds = array_column($j['staff_summary'] ?? [], 'user_id');
     ok(in_array($A, array_map('intval', $sumIds), true) && in_array($B, array_map('intval', $sumIds), true), 'admin gets the per-staff summary for both');
     [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', $range + ['user_id' => (string)$B]);
@@ -186,6 +202,16 @@ try {
     [$c] = save($adminId, true, visit(['visit_id' => $bVisit, 'client_name' => "Baraka B $tag", 'notes' => "Admin fixed $tag", 'location' => "Mbezi $tag", 'client_phone' => '0755000222']));
     $owner = (int)$pdo->query("SELECT user_id FROM field_visits WHERE visit_id = $bVisit")->fetchColumn();
     ok($c === 200 && $owner === $B, 'admin can edit B\'s visit and B stays the owner');
+    // B's submission removed again → hidden from the admin again (section 5 needs B unsubmitted).
+    $pdo->prepare("DELETE FROM field_report_days WHERE user_id = ? AND report_date = ?")->execute([$B, $day1]);
+    [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', $range);
+    $names = array_column($j['rows'] ?? [], 'client_name');
+    ok(in_array("Asha A $tag", $names, true) && !in_array("Baraka B $tag", $names, true), "without B's submission the admin sees A's day only");
+    // The admin's OWN visits need no submission.
+    [$c, , $j] = save($adminId, true, visit(['client_name' => "Own admin $tag", 'client_phone' => '0700123456']));
+    $created[] = (int)($j['visit_id'] ?? 0);
+    [, , $j] = call('api/field_reports/list.php', $adminId, true, 'GET', $range);
+    ok(in_array("Own admin $tag", array_column($j['rows'] ?? [], 'client_name'), true), "admin always sees their own visits (not submitted)");
 
     // ═════════════════════════════════════════════════════════════════
     section('4. Validation');
@@ -446,7 +472,7 @@ try {
     [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', ['date' => $today]);
     ok(!in_array($fuId, array_map('intval', array_column($j['follow_ups'] ?? [], 'visit_id')), true), 'a client who joined is no longer in "To follow up"');
     [, $html] = call('app/bms/field_reports/field_visits.php', $A, false, 'GET', []);
-    ok(strpos($html, 'data-act="joined"') !== false && strpos($html, 'function joinedBtn') !== false, 'a direct "Joined" button on every card/row');
+    ok(strpos($html, 'data-act="joined"') !== false && strpos($html, 'L.markJoined') !== false && strpos($html, 'function joinedBtn') === false, '"Mark as joined" lives in the Actions menu (and the phone card buttons)');
 
     // admin's own day while looking at all staff
     [$c, , $j] = save($adminId, true, visit(['visit_date' => $day2, 'client_name' => "Boss $tag", 'client_phone' => '0700999888']));
@@ -487,6 +513,84 @@ try {
     ok($ks[1] && $cssOk, 'every column has a width for landscape (and the portrait set its own)');
     ok(strpos($th[1] ?? '', '>Alichopewa<') !== false && strpos($th[1] ?? '', '>Kadi<') !== false, 'headings: Kadi/Majaribio/Mafunzo (landscape) + Alichopewa (portrait)');
     ok(strpos($p, 'class="lang-alt"') !== false && strpos($p, 'Ukurasa:') === false, 'toolbar: Print · Excel · other language · Close (no page/orientation buttons)');
+
+    // ═════════════════════════════════════════════════════════════════
+    section('15. Third live test — phone optional, Na./S/No, joined in Actions, form fits the screen');
+    [$c, , $j] = save($A, false, visit(['client_name' => "NoPhone $tag", 'client_phone' => '']));
+    $np = (int)($j['visit_id'] ?? 0); $created[] = $np;
+    $r = $pdo->query("SELECT client_phone, phone_normalized FROM field_visits WHERE visit_id = $np")->fetch(PDO::FETCH_ASSOC);
+    ok($c === 200 && $r && $r['client_phone'] === '' && $r['phone_normalized'] === '', 'a visit WITHOUT a phone number saves');
+    [$c, , $j] = save($A, false, visit(['client_phone' => '12345']));
+    ok($c === 422 && isset($j['errors']['client_phone']), 'a phone that IS typed must still be valid');
+    [, $html] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'en']);
+    ok(preg_match('#NoPhone ' . preg_quote($tag, '#') . '</td><td class="k-phone">—</td>#u', $html) === 1, 'report shows "—" for a missing phone');
+    $s = frStats([
+        ['phone_normalized' => '', 'client_name' => 'Juma', 'location' => 'A', 'gave_business_card' => 0, 'gave_trial_link' => 0, 'gave_training' => 0, 'joined' => 0],
+        ['phone_normalized' => '', 'client_name' => 'Neema', 'location' => 'A', 'gave_business_card' => 0, 'gave_trial_link' => 0, 'gave_training' => 0, 'joined' => 0],
+    ]);
+    ok($s['people'] === 2, 'clients without a phone are told apart by name (2 people)');
+
+    [$c, $swPage] = call('app/bms/field_reports/field_visits.php', $A, false, 'GET', ['__lang' => 'sw']);
+    preg_match('#<table id="visitsTable".*?</thead>#s', $swPage, $th);
+    ok($c === 200 && strpos($th[0] ?? '', '<th>Na.</th>') !== false && strpos($th[0] ?? '', 'S/NO') === false, 'page table (sw) starts with "Na."');
+    [, $enPage] = call('app/bms/field_reports/field_visits.php', $A, false, 'GET', ['__lang' => 'en']);
+    preg_match('#<table id="visitsTable".*?</thead>#s', $enPage, $th);
+    ok(strpos($th[0] ?? '', '<th>S/No</th>') !== false, 'page table (en) starts with "S/No"');
+    ok(strpos($th[0] ?? '', '>Joined<') === false && strpos($th[0] ?? '', '>Actions<') !== false, 'no "Joined" column — it is in the Actions menu');
+    ok(preg_match('#<input type="tel"[^>]*id="vPhone"[^>]*>#', $enPage, $ph) && strpos($ph[0], 'required') === false && strpos($enPage, '(optional)') !== false, 'phone field is optional');
+    ok(strpos($enPage, '#visitForm { display: flex; flex-direction: column;') !== false && strpos($enPage, '#visitForm > .modal-body { overflow-y: auto;') !== false, 'form is the flex column the scrollable modal needs (Save stays on screen)');
+    ok(strpos($enPage, '.fr-form-foot .btn { flex: 1 1 0; min-width: 0; min-height: 40px;') !== false && preg_match('#@media \(max-width: 575\.98px\) \{\s*\#visitModal \.modal-dialog \{ margin: 0; \}#', $enPage) === 1
+       && strpos($enPage, '#visitModal .form-control, #visitModal .form-select { font-size: 16px;') !== false, 'phone: compact form, inputs 16px, finger-sized buttons, full-screen with no gap');
+    ok(substr_count($enPage, 'class="col-4"><input type="checkbox" class="btn-check" name="gave_') === 3, 'card / trial / training sit side by side');
+
+    section('16. Report as PDF — download, WhatsApp, email');
+    ok(strpos($enPage, 'data-frs="download"') !== false && strpos($enPage, 'data-frs="whatsapp"') !== false && strpos($enPage, 'data-frs="email"') !== false, 'visits page: Report menu has PDF / WhatsApp / Email');
+    ok(strpos($enPage, 'id="frsEmail"') !== false && strpos($enPage, 'window.FrShare') !== false, 'visits page carries the share kit (email dialog + FrShare)');
+    [, $pp] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', $range + ['lang' => 'sw']);
+    ok(strpos($pp, 'data-frs="whatsapp"') !== false && strpos($pp, 'Shiriki kwa WhatsApp') !== false && strpos($pp, 'Tuma kwa Email') !== false && strpos($pp, 'Pakua PDF') !== false, 'print page toolbar (sw): Pakua PDF · Shiriki kwa WhatsApp · Tuma kwa Email');
+    ok(strpos($pp, '.k-sno{width:') !== false && strpos($pp, 'table-layout: fixed') !== false, 'print layout untouched (fixed widths, same columns)');
+    $kit = file_get_contents(ROOT_DIR . '/includes/field_reports/report_share.php');
+    ok(strpos($kit, "rowPageBreak: 'avoid'") !== false && strpos($kit, "showHead: 'everyPage'") !== false && strpos($kit, 'getTextWidth') !== false, 'PDF: rows never split, headings on every page, widths measured so words are not cut');
+    ok(strpos($kit, 'navigator.canShare') !== false && strpos($kit, 'https://wa.me/?text=') !== false, 'WhatsApp: phone share sheet with the PDF; computer falls back to wa.me (choose a contact)');
+
+    [$c, , $j] = call('api/field_reports/report_data.php', $A, false, 'GET', $range + ['lang' => 'sw', 'user_id' => (string)$B]);
+    ok($c === 200 && !empty($j['success']), 'report data (sw) answers');
+    ok(($j['columns'][0]['label'] ?? '') === 'Na.' && ($j['labels']['title'] ?? '') === 'RIPOTI YA ZIARA ZA WATEJA', 'PDF columns/labels in Swahili ("Na.")');
+    $flat = json_encode($j['rows'] ?? [], JSON_UNESCAPED_UNICODE);
+    ok(strpos($flat, "Asha A $tag") !== false && strpos($flat, "Baraka B $tag") === false, "A asking ?user_id=B gets only A's rows in the PDF");
+    ok(preg_match('/^Ripoti_ya_Ziara_.+_' . $day1 . '\.pdf$/', $j['filename'] ?? '') === 1 && strpos($j['share_text'] ?? '', '*RIPOTI YA ZIARA ZA WATEJA*') === 0, 'PDF file name + WhatsApp text');
+    ok(($j['status'] ?? '') !== '' && count($j['summary'] ?? []) === 7 && count($j['columns'] ?? []) === count($j['rows'][0] ?? []), 'status line, 7 summary boxes, a cell per column');
+    ok(array_sum(array_column($j['columns'] ?? [], 'weight')) > 0 && ($j['columns'][0]['weight'] ?? 0) === frReportLandscapeWeights()['sno'], 'PDF uses the print page widths');
+
+    $pdf = base64_encode("%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF\n");
+    $mail = sys_get_temp_dir() . '/fr_fake_mail_' . $tag . '.json';
+    $send = fn(array $over, int $uid = 0, bool $adm = false) => call('api/field_reports/email_report.php', $uid ?: $A, $adm, 'POST',
+        $over + ['to' => 'boss@example.com', 'message' => "Habari $tag", 'pdf' => $pdf, 'date_from' => $day1, 'date_to' => $day1, 'lang' => 'sw', '__fake_mail' => $mail]);
+    [$c] = call('api/field_reports/email_report.php', $A, false, 'GET', []);
+    ok($c === 405, "email via GET → 405 (got $c)");
+    [$c] = $send(['_csrf' => 'wrong']);
+    ok($c === 419 || $c === 403, "email with a bad CSRF token is refused (got $c)");
+    foreach ([[['to' => ''], 'no address'], [['to' => 'not-an-email'], 'a bad address'],
+              [['to' => 'a@x.co,b@x.co,c@x.co,d@x.co,e@x.co,f@x.co'], 'six addresses'],
+              [['pdf' => base64_encode('<html>not a pdf</html>')], 'a file that is not a PDF'], [['pdf' => '%%%'], 'broken base64'],
+              [['message' => str_repeat('x', 1001)], 'a message over 1000 characters']] as [$over, $label]) {
+        @unlink($mail);
+        [$c] = $send($over);
+        ok($c === 422 && !is_file($mail), "email rejects $label → 422, nothing sent");
+    }
+    @unlink($mail);
+    [$c, , $j] = $send(['to' => 'boss@example.com, deputy@example.com', 'user_id' => (string)$B]);
+    $m = json_decode((string)@file_get_contents($mail), true) ?: [];
+    ok($c === 200 && !empty($j['success']), 'email with a valid PDF → 200');
+    ok(($m['to'] ?? []) === ['boss@example.com', 'deputy@example.com'], 'sent to both addresses');
+    ok(!empty($m['attachment_exists']) && ($m['attachment_head'] ?? '') === '%PDF-' && preg_match('/^Ripoti_ya_Ziara_.+\.pdf$/', $m['attachment_name'] ?? '') === 1, 'the PDF is attached under a readable name');
+    ok(!empty($m['attachment']) && !file_exists($m['attachment']) && !is_dir(dirname($m['attachment'])), 'the temporary copy is removed after sending');
+    ok(strpos($m['subject'] ?? '', 'RIPOTI YA ZIARA ZA WATEJA') === 0 && strpos($m['body'] ?? '', 'Ziara') !== false && strpos($m['body'] ?? '', "Habari $tag") !== false, 'subject + summary in Swahili, with the typed message');
+    ok(strpos($m['subject'] ?? '', 'Baraka') === false, "A's email with ?user_id=B is still about A");
+    [$c, , $j] = $send(['message' => "<script>alert(1)</script> $tag"]);
+    $m = json_decode((string)@file_get_contents($mail), true) ?: [];
+    ok(strpos($m['body'] ?? '', '<script>') === false && strpos($m['body'] ?? '', '&lt;script&gt;') !== false, 'the typed message is escaped in the email');
+    @unlink($mail);
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")
@@ -497,6 +601,10 @@ try {
         $pdo->prepare("DELETE FROM activity_log WHERE user_id IN (?, ?, ?) AND created_at >= ? AND (description LIKE '%field visit%' OR description LIKE '%field report%')")
             ->execute([$A, $B, $adminId, $logStart]);
     } catch (PDOException $e) { /* activity log layout differs — leave it */ }
+    try {   // logActivity() writes to activity_logs; the email rate limit counts these rows
+        $pdo->prepare("DELETE FROM activity_logs WHERE user_id IN (?, ?, ?) AND created_at >= ? AND (description LIKE '%field visit%' OR description LIKE '%field report%')")
+            ->execute([$A, $B, $adminId, $logStart]);
+    } catch (PDOException $e) { /* no activity_logs table */ }
     $left = (int)$pdo->query("SELECT COUNT(*) FROM field_visits WHERE client_name LIKE " . $pdo->quote("%$tag%"))->fetchColumn();
     echo "\nCleanup: " . ($left === 0 ? 'all test rows removed' : "$left rows LEFT BEHIND") . "\n";
 }

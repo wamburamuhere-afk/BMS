@@ -32,8 +32,7 @@ $subject = frReportSubject($pdo, $userId);
 
 // Relative column widths per orientation, normalised to 100% of the columns shown in it.
 // Yes/No columns must fit "Hapana"; the long-text columns give way.
-$wLand = ['sno' => 3, 'date' => 7, 'time' => 5, 'staff' => 10, 'location' => 14, 'client' => 11, 'phone' => 10,
-          'business' => 10, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12];
+$wLand = frReportLandscapeWeights();
 $wPort = array_merge(array_diff_key($wLand, ['card' => 1, 'trial' => 1, 'training' => 1]),
                      ['sno' => 4, 'joined' => 10, 'follow_up' => 10, 'client' => 12, 'given' => 11]);
 $pct = function (array $weights) use ($columns): array {
@@ -129,6 +128,10 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
 <div class="toolbar">
     <button type="button" class="primary" onclick="window.print()">&#128424; <?= $e(t('Print / Save as PDF')) ?></button>
+    <?php /* One tap on a phone: a ready PDF, or straight into WhatsApp / email (includes/field_reports/report_share.php). */ ?>
+    <button type="button" data-frs="download">&#11015; <?= $e(t('Download PDF')) ?></button>
+    <button type="button" data-frs="whatsapp">&#128172; <?= $e(t('Share on WhatsApp')) ?></button>
+    <button type="button" data-frs="email">&#9993; <?= $e(t('Send by email')) ?></button>
     <a href="<?= $e(getUrl('api/field_reports/export.php') . $q([])) ?>">&#11015; <?= $e(t('Download Excel')) ?></a>
     <?php /* Already in the user's language; this is only for a client who needs the other one. */ ?>
     <a class="lang-alt" href="<?= $e($q(['lang' => $lang === 'sw' ? 'en' : 'sw'])) ?>"><?= $lang === 'sw' ? 'English' : 'Kiswahili' ?></a>
@@ -195,5 +198,14 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     <?php endif; ?>
     <p class="brand">Powered By BJP Technologies &copy; <?= date('Y') ?>, All Rights Reserved</p>
 </div>
+<?php require_once ROOT_DIR . '/includes/field_reports/report_share.php'; frRenderShareKit(); ?>
+<script>
+(function () {
+    const params = <?= json_encode(['date_from' => $from, 'date_to' => $to, 'user_id' => $userId ?? '', 'lang' => $lang]) ?>;
+    document.querySelectorAll('[data-frs]').forEach(b => b.addEventListener('click', () => FrShare[b.dataset.frs](params, b)));
+    // Build the PDF while the page is being read, so a WhatsApp tap can share it at once.
+    setTimeout(() => FrShare.prepare(params), 600);
+})();
+</script>
 </body>
 </html>
