@@ -55,6 +55,7 @@ function _pvs_render(string $root, int $uid, int $pid): string {
         require '$root/roots.php';
         \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true;
         \$_SESSION['first_name'] = 'Test'; \$_SESSION['last_name'] = 'Admin'; \$_SESSION['user_role'] = 'Admin';
+        \$_SESSION['user_lang'] = 'en'; // labels go through t() since pos_detail_pages_plan.md — assert in English
         ob_start();
         include '$root/app/bms/product/product_view.php';
         echo ob_get_clean();
@@ -113,7 +114,9 @@ if (!$uid || !$wh) {
         $simple = _pvs_render($root, $uid, $pid);
 
         lacks($simple, 'SKU:</small>', 'Simple POS render: SKU label absent from Basic Information');
-        lacks($simple, 'Barcode:</small>', 'Simple POS render: Barcode label absent');
+        // pos_detail_pages_plan.md C3: the barcode is shown read-only in Simple mode
+        // (it is what "Print Barcode" prints); SKU stays hidden.
+        has($simple, 'Barcode:</small>', 'Simple POS render: Barcode shown read-only (C3)');
         lacks($simple, '>Description:<', 'Simple POS render: Description block absent');
         lacks($simple, '>Wholesale:<', 'Simple POS render: Wholesale price absent');
         lacks($simple, 'id="details-tab"', 'Simple POS render: Additional Details tab button absent');

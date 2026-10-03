@@ -281,6 +281,45 @@ $can_delete_credit = $show_credit_tab && canDelete('pos');
 // the profile card already displays and the same currently_owed the Madeni
 // counters above already computed, never a third parallel calculation.
 $credit_available = max(0, (float)($customer['credit_limit'] ?? 0) - (float)$credit_counters['currently_owed']);
+// "Available Credit" only means something when the customer has a credit line (B6).
+$has_credit_line = (float)($customer['credit_limit'] ?? 0) > 0;
+
+// ── Purchase summary (pos_detail_pages_plan.md C2) ──────────────────────────
+// What this customer has bought at the POS, net of returns. Recognition rules are
+// core/pos_dashboard_metrics.php's ($recOrig/$recRet) so the figure agrees with
+// the POS dashboard; scope is api/pos/get_sales.php's (the Sales History tab).
+$purchase_summary = ['net' => 0.0, 'count' => 0, 'last' => null, 'avg' => 0.0];
+$top_products = [];
+try {
+    $psScope = scopeFilterSqlNullable('project', 'ps') . scopeFilterSqlNullable('warehouse', 'ps');
+    $recOrig = "ps.sale_status IN ('completed','partially_refunded','refunded') AND ps.is_return_sale = 0 AND ps.invoice_id IS NULL";
+    $recRet  = "ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled') AND ps.invoice_id IS NULL";
+    $q = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN $recOrig THEN ps.grand_total WHEN $recRet THEN -ps.grand_total ELSE 0 END), 0) AS net,
+                               COALESCE(SUM(CASE WHEN $recOrig THEN 1 ELSE 0 END), 0) AS cnt,
+                               MAX(CASE WHEN $recOrig THEN ps.sale_date END) AS last
+                          FROM pos_sales ps WHERE ps.customer_id = ?" . $psScope);
+    $q->execute([(int)$customer_id]);
+    $row = $q->fetch(PDO::FETCH_ASSOC) ?: [];
+    $purchase_summary['net']   = (float)($row['net'] ?? 0);
+    $purchase_summary['count'] = (int)($row['cnt'] ?? 0);
+    $purchase_summary['last']  = $row['last'] ?? null;
+    $purchase_summary['avg']   = $purchase_summary['count'] > 0 ? $purchase_summary['net'] / $purchase_summary['count'] : 0.0;
+    $tq = $pdo->prepare("SELECT p.product_id, p.product_name, p.is_service,
+                                SUM(CASE WHEN $recOrig THEN psi.quantity ELSE -psi.quantity END) AS qty,
+                                SUM(CASE WHEN $recOrig THEN psi.line_total ELSE -psi.line_total END) AS amount
+                           FROM pos_sale_items psi
+                           JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                           JOIN products p ON p.product_id = psi.product_id
+                          WHERE ps.customer_id = ? AND (($recOrig) OR ($recRet))" . $psScope . "
+                          GROUP BY p.product_id, p.product_name, p.is_service
+                         HAVING qty > 0
+                          ORDER BY amount DESC
+                          LIMIT 5");
+    $tq->execute([(int)$customer_id]);
+    $top_products = $tq->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('customer_details purchase summary: ' . $e->getMessage());
+}
 
 // Simple POS / module-closed decluttering (2026-09-17 request) — the 7
 // formal B2B sales-cycle tabs (Sales Orders, Quotations, Invoices, Payments,
@@ -326,8 +365,8 @@ global $company_name, $company_logo;
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('customers') ?>">Customers</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('customers') ?>"><?= t('Customers') ?></a></li>
             <li class="breadcrumb-item active"><?= caseFormat($customer_name) ?></li>
         </ol>
     </nav>
@@ -336,22 +375,22 @@ global $company_name, $company_logo;
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-start flex-nowrap gap-2">
                 <div>
-                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-<?= $isCompany ? 'building' : 'person-badge' ?>"></i> <?= $isCompany ? 'Company' : 'Customer' ?> View</h2>
+                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-<?= $isCompany ? 'building' : 'person-badge' ?>"></i> <?= $isCompany ? t('Company View') : t('Customer View') ?></h2>
                     <p class="text-muted mb-0 small mt-1 header-desc">
-                        Detailed information for <?= caseFormat($customer_name) ?> • Code: <code><?= caseFormat($customer['customer_code'] ?? 'N/A') ?></code>
+                        <?= t('Detailed information for') ?> <?= caseFormat($customer_name) ?> • <?= t('Code') ?>: <code><?= caseFormat($customer['customer_code'] ?? 'N/A') ?></code>
                     </p>
                 </div>
                 <!-- Desktop Actions (Hidden on mobile) -->
                 <div class="d-none d-sm-flex gap-2 ms-auto pt-2 flex-shrink-0">
-                    <a href="<?= getUrl('customers') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="Back to Customers">
-                        <i class="bi bi-arrow-left"></i> Back
+                    <a href="<?= getUrl('customers') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="<?= t('Back to Customers') ?>">
+                        <i class="bi bi-arrow-left"></i> <?= t('Back') ?>
                     </a>
-                    <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print Details">
-                        <i class="bi bi-printer"></i> Print
+                    <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="<?= t('Print Details') ?>">
+                        <i class="bi bi-printer"></i> <?= t('Print') ?>
                     </button>
                     <?php if ($can_edit_customers): ?>
-                    <button type="button" class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editCustomer(<?= $customer_id ?>)" title="Edit Customer">
-                        <i class="bi bi-pencil"></i> Edit
+                    <button type="button" class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editCustomer(<?= $customer_id ?>)" title="<?= t('Edit Customer') ?>">
+                        <i class="bi bi-pencil"></i> <?= t('Edit') ?>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -360,28 +399,28 @@ global $company_name, $company_logo;
                 <div class="d-flex d-sm-none ms-auto pt-1 flex-shrink-0">
                     <div class="dropdown">
                         <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear-fill me-1"></i> Actions
+                            <i class="bi bi-gear-fill me-1"></i> <?= t('Actions') ?>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                             <li>
                                 <a class="dropdown-item py-2" href="<?= getUrl('customers') ?>">
-                                    <i class="bi bi-arrow-left text-secondary"></i> Back to Customers
+                                    <i class="bi bi-arrow-left text-secondary"></i> <?= t('Back to Customers') ?>
                                 </a>
                             </li>
                             <li>
-                                <div class="dropdown-header small text-uppercase fw-bold text-muted pb-1">Print Options</div>
+                                <div class="dropdown-header small text-uppercase fw-bold text-muted pb-1"><?= t('Print Options') ?></div>
                                 <button class="dropdown-item py-2" onclick="printDetails('portrait')">
-                                    <i class="bi bi-file-earmark-person text-info"></i> Print Portrait
+                                    <i class="bi bi-file-earmark-person text-info"></i> <?= t('Print Portrait') ?>
                                 </button>
                                 <button class="dropdown-item py-2" onclick="printDetails('landscape')">
-                                    <i class="bi bi-file-earmark-person text-success" style="transform: rotate(90deg); display: inline-block;"></i> Print Landscape
+                                    <i class="bi bi-file-earmark-person text-success" style="transform: rotate(90deg); display: inline-block;"></i> <?= t('Print Landscape') ?>
                                 </button>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <?php if ($can_edit_customers): ?>
                                 <a class="dropdown-item py-2" href="#" onclick="editCustomer(<?= $customer_id ?>)">
-                                    <i class="bi bi-pencil text-primary"></i> Edit Customer
+                                    <i class="bi bi-pencil text-primary"></i> <?= t('Edit Customer') ?>
                                 </a>
                                 <?php endif; ?>
                             </li>
@@ -464,7 +503,7 @@ global $company_name, $company_logo;
             <!-- Customer/Company Photo Card -->
             <div class="card mb-4">
                 <div class="card-header bg-light border-bottom">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-camera"></i> <?= $isCompany ? 'Company' : 'Customer' ?> Photo</h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-camera"></i> <?= $isCompany ? t('Company Photo') : t('Customer Photo') ?></h6>
                 </div>
                 <div class="card-body text-center">
                     <?php if (!empty($customer['photo_path']) && file_exists($customer['photo_path'])): ?>
@@ -475,7 +514,7 @@ global $company_name, $company_logo;
                     <?php else: ?>
                         <div class="text-muted py-4">
                             <i class="bi bi-<?= $isCompany ? 'building' : 'person-circle' ?>" style="font-size: 4rem;"></i>
-                            <p class="mt-2 mb-0">No Photo Available</p>
+                            <p class="mt-2 mb-0"><?= t('No Photo Available') ?></p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -484,21 +523,21 @@ global $company_name, $company_logo;
             <!-- Quick Information Card -->
             <div class="card">
                 <div class="card-header bg-light border-bottom">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-info-circle"></i> Quick Information</h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-info-circle"></i> <?= t('Quick Information') ?></h6>
                 </div>
                 <div class="card-body">
                     <table class="table table-sm table-borderless">
                         <tr>
-                            <td><strong>Customer ID:</strong></td>
+                            <td><strong><?= t('Customer ID') ?>:</strong></td>
                             <td>#<?= caseFormat($customer['customer_id']) ?></td>
                         </tr>
                         <tr>
-                            <td><strong><?= $isCompany ? 'Company Name' : 'Name' ?>:</strong></td>
+                            <td><strong><?= $isCompany ? t('Company Name') : t('Name') ?>:</strong></td>
                             <td><?= caseFormat($customer_name) ?></td>
                         </tr>
                         <?php if ($isCompany): ?>
                         <tr>
-                            <td><strong>Representative:</strong></td>
+                            <td><strong><?= t('Representative') ?>:</strong></td>
                             <td><?= caseFormat($representative_name) ?></td>
                         </tr>
                         <?php endif; ?>
@@ -513,7 +552,7 @@ global $company_name, $company_logo;
                         </tr>
                         <?php endif; ?>
                         <tr>
-                            <td><strong>Phone:</strong></td>
+                            <td><strong><?= t('Phone') ?>:</strong></td>
                             <td><?= caseFormat($customer['phone']) ?></td>
                         </tr>
                         <?php if (!$simpleCustomerForm): ?>
@@ -531,7 +570,7 @@ global $company_name, $company_logo;
                         </tr>
                         <?php endif; ?>
                         <tr>
-                            <td><strong>Status:</strong></td>
+                            <td><strong><?= t('Status') ?>:</strong></td>
                             <td>
                                 <?php
                                 $status_class = 'secondary';
@@ -543,7 +582,7 @@ global $company_name, $company_logo;
                                 }
                                 ?>
                                 <span class="badge bg-<?= $status_class ?>">
-                                    <?= ucfirst($customer['status'] ?? 'active') ?>
+                                    <?= t(ucfirst($customer['status'] ?? 'active')) ?>
                                 </span>
                             </td>
                         </tr>
@@ -554,8 +593,8 @@ global $company_name, $company_logo;
                         </tr>
                         <?php endif; ?>
                         <tr>
-                            <td><strong>Registered:</strong></td>
-                            <td><?= date('M d, Y', strtotime($customer['created_at'])) ?></td>
+                            <td><strong><?= t('Registered') ?>:</strong></td>
+                            <td><?= format_date($customer['created_at']) ?></td>
                         </tr>
                     </table>
                 </div>
@@ -588,6 +627,7 @@ global $company_name, $company_logo;
                             </div>
                         </div>
                     </div>
+                    <?php if ($has_credit_line): ?>
                     <div class="col-6 col-md-6">
                         <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #0d6efd !important;">
                             <div class="card-body py-3">
@@ -602,7 +642,51 @@ global $company_name, $company_logo;
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
+
+                <!-- What this customer buys (pos_detail_pages_plan.md C2) -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= format_currency($purchase_summary['net']) ?></div>
+                            <div class="small text-muted"><?= t('Total Purchases') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= (int)$purchase_summary['count'] ?></div>
+                            <div class="small text-muted"><?= t('Number of Purchases') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= $purchase_summary['last'] ? format_date($purchase_summary['last']) : '—' ?></div>
+                            <div class="small text-muted"><?= t('Last Purchase') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= format_currency($purchase_summary['avg']) ?></div>
+                            <div class="small text-muted"><?= t('Average per Purchase') ?></div>
+                        </div>
+                    </div>
+                </div>
+                <?php if ($top_products): ?>
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-2">
+                        <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-star me-2"></i><?= t('Most Bought') ?></h6>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($top_products as $tp): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                            <a href="<?= getUrl($tp['is_service'] ? 'service_view' : 'products/view') ?>?id=<?= (int)$tp['product_id'] ?>" class="text-decoration-none text-break"><?= caseFormat($tp['product_name']) ?></a>
+                            <span class="text-nowrap small"><?= format_number($tp['qty'], 3) ?> · <strong><?= format_currency($tp['amount']) ?></strong></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
                 <?php else: ?>
                 <!-- Financial Summary Cards -->
                 <div class="row g-3 mb-4">
@@ -692,7 +776,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
-                            <p class="mb-0 fw-semibold fs-7"><span class="badge bg-<?= get_status_badge($customer['status']) ?>"><?= ucfirst($customer['status']) ?></span></p>
+                            <p class="mb-0 fw-semibold fs-7"><span class="badge bg-<?= get_status_badge($customer['status']) ?>"><?= t(ucfirst($customer['status'])) ?></span></p>
                         </div>
                         <?php if (!empty($customer['notes'])): ?>
                         <div class="col-12 mb-0">
@@ -1110,7 +1194,7 @@ global $company_name, $company_logo;
                 </li>
                 <?php endif; ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
-                    <button class="nav-link <?= $default_tab_id === 'pane-sysinfo' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> System Info</button>
+                    <button class="nav-link <?= $default_tab_id === 'pane-sysinfo' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> <?= t('System Info') ?></button>
                 </li>
             </ul>
             <div class="tab-content" id="customerDetailTabContent">
@@ -1810,47 +1894,49 @@ global $company_name, $company_logo;
             <!-- Madeni (POS Credit Sales) — pos_credit_receivables_plan.md Phase 2b -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-coin me-2"></i> Historia ya Madeni (Credit History)</h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-coin me-2"></i> <?= t('Credit History') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col-6 col-md-3">
                             <div class="card border-0 bg-light text-center p-2">
                                 <div class="fs-5 fw-bold text-primary"><?= (int)$credit_counters['times_borrowed'] ?></div>
-                                <div class="small text-muted">Amekopa Mara</div>
+                                <div class="small text-muted"><?= t('Times Borrowed') ?></div>
                             </div>
                         </div>
                         <div class="col-6 col-md-3">
                             <div class="card border-0 bg-light text-center p-2">
                                 <div class="fs-5 fw-bold text-success"><?= (int)$credit_counters['times_repaid_on_time'] ?></div>
-                                <div class="small text-muted">Amerejesha kwa Wakati</div>
+                                <div class="small text-muted"><?= t('Repaid On Time') ?></div>
                             </div>
                         </div>
                         <div class="col-6 col-md-3">
                             <div class="card border-0 bg-light text-center p-2">
                                 <div class="fs-5 fw-bold text-warning"><?= (int)$credit_counters['times_repaid_late'] ?></div>
-                                <div class="small text-muted">Amerejesha Kuchelewa</div>
+                                <div class="small text-muted"><?= t('Repaid Late') ?></div>
                             </div>
                         </div>
                         <div class="col-6 col-md-3">
                             <div class="card border-0 bg-light text-center p-2">
                                 <div class="fs-5 fw-bold text-danger"><?= number_format($credit_counters['currently_owed'], 2) ?></div>
-                                <div class="small text-muted">Anadaiwa Sasa</div>
+                                <div class="small text-muted"><?= t('Currently Owed') ?></div>
                             </div>
                         </div>
+                        <?php if ($has_credit_line): ?>
                         <div class="col-6 col-md-3">
                             <div class="card border-0 bg-light text-center p-2">
                                 <div class="fs-5 fw-bold text-primary"><?= number_format($credit_available, 2) ?></div>
                                 <div class="small text-muted"><?= t('Available Credit') ?></div>
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
 
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i> Mauzo ya Mkopo Yaliyo Wazi (Open Credit Sales)</h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i> <?= t('Open Credit Sales') ?></h6>
                 </div>
                 <div class="card-body p-0">
                     <div id="madeniAgingLoading" class="text-center py-4">
@@ -1877,7 +1963,7 @@ global $company_name, $company_logo;
                     <div id="madeniAgingCards" class="px-2 d-none"></div>
                     <div class="text-center py-4 d-none" id="madeniAgingEmpty">
                         <i class="bi bi-emoji-smile" style="font-size:2.5rem;color:#ccc;"></i>
-                        <p class="mt-2 mb-0 text-muted"><?= t('Nobody owes you anything right now') ?></p>
+                        <p class="mt-2 mb-0 text-muted"><?= t('This customer owes nothing right now') ?></p>
                     </div>
                 </div>
             </div>
@@ -2163,7 +2249,7 @@ global $company_name, $company_logo;
             <!-- System Information -->
             <div class="card">
                 <div class="card-header bg-light border-bottom">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-clock-history"></i> System Information</h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-clock-history"></i> <?= t('System Information') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="row">

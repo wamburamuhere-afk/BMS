@@ -158,6 +158,16 @@ if (projectsModuleActive()) {
 require_once __DIR__ . '/../../../core/pos_nav.php';
 $simpleSupplierForm = posSimpleModeEnabled() && !advancedSupplierEnabled();
 
+// Row-menu links into other modules' pages — drawn only when that page would
+// open (pos_detail_pages_plan.md A1): with Finance / Procurement off the router
+// 404s vendor_statement / purchase_order_create.
+$can_view_account_link = bmsRouteAvailable('vendor_statement');
+$can_new_order_link    = bmsRouteAvailable('purchase_order_create');
+$can_view_orders_link  = bmsRouteAvailable('purchase_orders');
+// Suspend/Blacklist are Procurement vendor-management states: Simple mode shows them
+// (cards, filter) only when some supplier is already in one, so no data is hidden (B1).
+$showRiskStatuses = !$simpleSupplierForm || count($suspended_suppliers) > 0 || count($blacklisted_suppliers) > 0;
+
 // Translated status label for badges (t() keys already exist from Customers).
 function supplier_status_label($status) {
     static $labels = null;
@@ -254,6 +264,7 @@ function supplier_status_label($status) {
                 </div>
             </div>
         </div>
+        <?php if ($showRiskStatuses): ?>
         <div class="col-6 col-lg-3 mb-3">
             <div class="card custom-stat-card shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
@@ -284,6 +295,23 @@ function supplier_status_label($status) {
                 </div>
             </div>
         </div>
+        <?php else: ?>
+        <div class="col-6 col-lg-3 mb-3">
+            <div class="card custom-stat-card shadow-sm border-0 h-100">
+                <div class="card-body py-2 px-2 px-sm-3">
+                    <div class="d-flex align-items-center h-100">
+                        <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
+                            <i class="bi bi-pause-circle"></i>
+                        </div>
+                        <div class="overflow-hidden flex-grow-1">
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Inactive') ?></p>
+                            <h4 class="mb-0 fw-bold auto-resize text-nowrap" style="font-size: 1.1rem;"><?= count($inactive_suppliers) ?></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Filters Section -->
@@ -305,8 +333,10 @@ function supplier_status_label($status) {
                                     <option value=""><?= t('All Status') ?></option>
                                     <option value="active"><?= t('Active') ?></option>
                                     <option value="inactive"><?= t('Inactive') ?></option>
+                                    <?php if ($showRiskStatuses): ?>
                                     <option value="suspended"><?= t('Suspended') ?></option>
                                     <option value="blacklisted"><?= t('Blacklisted') ?></option>
+                                    <?php endif; ?>
                                 </select>
                             </div>
                             <?php if (!$simpleSupplierForm): ?>
@@ -515,9 +545,13 @@ function supplier_status_label($status) {
                                                  tabs inside suppliers/view (Recent Purchase Orders, Recent Payments) —
                                                  reachable one click after "View Details" instead of duplicated here.
                                                  View Account is kept: it opens the full vendor statement, which is a
-                                                 separate report, not one of that page's tabs. -->
+                                                 separate report, not one of that page's tabs.
+                                                 Both links only when their page's module is on
+                                                 (bmsRouteAvailable — otherwise the router 404s them). -->
+                                            <?php if ($can_view_account_link): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> <?= t('View Account') ?></a></li>
-                                            <?php if (!$simpleSupplierForm && $company_type != 'microfinance' && $can_edit_suppliers): ?>
+                                            <?php endif; ?>
+                                            <?php if (!$simpleSupplierForm && $company_type != 'microfinance' && $can_edit_suppliers && $can_new_order_link): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> <?= t('New Order') ?></a></li>
                                             <?php endif; ?>
 
@@ -525,15 +559,19 @@ function supplier_status_label($status) {
                                             <li><hr class="dropdown-divider"></li>
                                             <?php if ($supplier['status'] == 'active'): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> <?= t('Deactivate') ?></a></li>
-                                            <?php elseif ($supplier['status'] == 'inactive'): ?>
+                                            <?php elseif ($supplier['status'] == 'inactive' || $simpleSupplierForm): ?>
+                                            <!-- Simple mode has no Suspend/Blacklist, so a supplier already in one of
+                                                 those states must still be re-activatable (pos_detail_pages_plan.md B1). -->
                                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> <?= t('Activate') ?></a></li>
                                             <?php endif; ?>
+                                            <?php if (!$simpleSupplierForm): ?>
                                             <?php if ($supplier['status'] !== 'suspended'): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i> <?= t('Suspend') ?></a></li>
                                             <?php endif; ?>
                                             <?php if ($supplier['status'] !== 'blacklisted'): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'blacklisted')"><i class="bi bi-ban text-danger me-2"></i> <?= t('Blacklist') ?></a></li>
                                             <?php endif; ?>
+                                            <?php endif; // !$simpleSupplierForm ?>
                                             <?php endif; ?>
 
                                             <?php if ($can_delete_suppliers): ?>
@@ -635,10 +673,12 @@ function supplier_status_label($status) {
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <?php endif; ?>
+                                    <?php if ($can_view_orders_link): ?>
                                     <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-success" title="<?= t('View Orders') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-cart"></i>
                                     </a>
-                                    <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
+                                    <?php endif; ?>
+                                    <?php if ($company_type != 'microfinance' && $can_edit_suppliers && $can_new_order_link): ?>
                                     <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-info" title="<?= t('New Order') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-plus-circle"></i>
                                     </a>
