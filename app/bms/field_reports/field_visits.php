@@ -35,7 +35,18 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
             <button class="btn btn-primary fw-bold" id="btnAddVisit"><i class="bi bi-plus-circle me-1"></i><?= t('Record a visit') ?></button>
             <button class="btn btn-outline-primary" id="btnSubmitDay"><i class="bi bi-send-check me-1"></i><?= t("Submit Today's Report") ?></button>
             <?php endif; ?>
-            <button class="btn btn-outline-primary" id="btnReport" title="<?= t('Opens the report for the dates and staff chosen below') ?>"><i class="bi bi-printer me-1"></i><?= t('Print report') ?></button>
+            <!-- Report: PDF / WhatsApp / email / print — for the dates and staff chosen below -->
+            <div class="dropdown fr-report-menu">
+                <button class="btn btn-outline-primary dropdown-toggle w-100" type="button" id="btnReportMenu" data-bs-toggle="dropdown" aria-expanded="false" title="<?= t('Opens the report for the dates and staff chosen below') ?>"><i class="bi bi-file-earmark-text me-1"></i><?= t('Report') ?></button>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" aria-labelledby="btnReportMenu">
+                    <li><button class="dropdown-item py-2 rounded" type="button" data-frs="download"><i class="bi bi-file-earmark-pdf text-primary me-2"></i><?= t('Download PDF') ?></button></li>
+                    <li><button class="dropdown-item py-2 rounded" type="button" data-frs="whatsapp"><i class="bi bi-whatsapp text-primary me-2"></i><?= t('Share on WhatsApp') ?></button></li>
+                    <li><button class="dropdown-item py-2 rounded" type="button" data-frs="email"><i class="bi bi-envelope text-primary me-2"></i><?= t('Send by email') ?></button></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="dropdown-item py-2 rounded" type="button" id="btnReport"><i class="bi bi-printer text-primary me-2"></i><?= t('Print report') ?></button></li>
+                    <li><button class="dropdown-item py-2 rounded" type="button" id="btnExcel"><i class="bi bi-file-earmark-spreadsheet text-primary me-2"></i><?= t('Download Excel') ?></button></li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -117,12 +128,12 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
     <div id="tableView" class="card border-0 shadow-sm"><div class="card-body p-2">
         <table id="visitsTable" class="table table-hover align-middle w-100">
             <thead class="fr-thead"><tr>
-                <th>S/NO</th><th><?= t('Date') ?></th><th><?= t('Time') ?></th>
+                <th><?= t('S/No') ?></th><th><?= t('Date') ?></th><th><?= t('Time') ?></th>
                 <?php if ($is_admin): ?><th><?= t('Staff') ?></th><?php endif; ?>
                 <th><?= t('Place visited') ?></th><th><?= t('Client name') ?></th><th><?= t('Phone') ?></th><th><?= t('Business') ?></th>
                 <th class="text-center"><?= t('Card') ?></th><th class="text-center"><?= t('Trial') ?></th><th class="text-center"><?= t('Training') ?></th>
                 <th><?= t('Response') ?></th><th><?= t('Follow-up') ?></th>
-                <th class="text-center"><?= t('Joined') ?></th><th class="text-end"><?= t('Actions') ?></th>
+                <th class="text-end"><?= t('Actions') ?></th>
             </tr></thead><tbody></tbody>
         </table>
     </div></div>
@@ -144,8 +155,8 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
                 <div class="row g-3">
                     <!-- 1. Phone first: a known number fills the rest -->
                     <div class="col-12 col-md-6">
-                        <label class="form-label fw-bold" for="vPhone"><?= t('Phone') ?> <span class="text-danger">*</span></label>
-                        <input type="tel" inputmode="tel" class="form-control form-control-lg" name="client_phone" id="vPhone" maxlength="30" placeholder="07XX XXX XXX" required>
+                        <label class="form-label fw-bold" for="vPhone"><?= t('Phone') ?> <small class="text-muted fw-normal">(<?= t('optional') ?>)</small></label>
+                        <input type="tel" inputmode="tel" class="form-control form-control-lg" name="client_phone" id="vPhone" maxlength="30" placeholder="07XX XXX XXX">
                         <div class="small mt-1 d-none" id="phoneWarn"></div>
                     </div>
                     <div class="col-12 col-md-6">
@@ -182,9 +193,9 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
                     <div class="col-12">
                         <label class="form-label fw-bold d-block"><?= t('Given to the client') ?></label>
                         <div class="row g-2">
-                            <div class="col-12 col-md-4"><input type="checkbox" class="btn-check" name="gave_business_card" value="1" id="vCard" autocomplete="off"><label class="btn btn-outline-primary w-100 py-2 fr-toggle" for="vCard"><i class="bi bi-person-vcard me-1"></i><?= t('Business card') ?></label></div>
-                            <div class="col-12 col-md-4"><input type="checkbox" class="btn-check" name="gave_trial_link" value="1" id="vTrial" autocomplete="off"><label class="btn btn-outline-primary w-100 py-2 fr-toggle" for="vTrial"><i class="bi bi-link-45deg me-1"></i><?= t('Free trial link (14 days)') ?></label></div>
-                            <div class="col-12 col-md-4"><input type="checkbox" class="btn-check" name="gave_training" value="1" id="vTraining" autocomplete="off"><label class="btn btn-outline-primary w-100 py-2 fr-toggle" for="vTraining"><i class="bi bi-easel me-1"></i><?= t('Training about our system') ?></label></div>
+                            <div class="col-4"><input type="checkbox" class="btn-check" name="gave_business_card" value="1" id="vCard" autocomplete="off"><label class="btn btn-outline-primary w-100 h-100 py-2 fr-toggle" for="vCard"><i class="bi bi-person-vcard d-block fs-5"></i><?= t('Business card') ?></label></div>
+                            <div class="col-4"><input type="checkbox" class="btn-check" name="gave_trial_link" value="1" id="vTrial" autocomplete="off"><label class="btn btn-outline-primary w-100 h-100 py-2 fr-toggle" for="vTrial"><i class="bi bi-link-45deg d-block fs-5"></i><?= t('Free trial link (14 days)') ?></label></div>
+                            <div class="col-4"><input type="checkbox" class="btn-check" name="gave_training" value="1" id="vTraining" autocomplete="off"><label class="btn btn-outline-primary w-100 h-100 py-2 fr-toggle" for="vTraining"><i class="bi bi-easel d-block fs-5"></i><?= t('Training about our system') ?></label></div>
                         </div>
                     </div>
 
@@ -193,7 +204,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
                         <label class="form-label fw-bold d-block"><?= t('How did the client respond?') ?></label>
                         <div class="row g-2">
                             <?php foreach (frInterestLabels() as $code => $label): [$color, $icon] = $interestStyles[$code]; ?>
-                            <div class="col-4"><input type="radio" class="btn-check fr-interest" name="interest" value="<?= $code ?>" id="vInt_<?= $code ?>" autocomplete="off"><label class="btn btn-outline-<?= $color ?> w-100 py-2 fr-toggle" for="vInt_<?= $code ?>"><i class="bi <?= $icon ?> d-block fs-5"></i><?= t($label) ?></label></div>
+                            <div class="col-4"><input type="radio" class="btn-check fr-interest" name="interest" value="<?= $code ?>" id="vInt_<?= $code ?>" autocomplete="off"><label class="btn btn-outline-<?= $color ?> w-100 h-100 py-2 fr-toggle" for="vInt_<?= $code ?>"><i class="bi <?= $icon ?> d-block fs-5"></i><?= t($label) ?></label></div>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -232,7 +243,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer fr-form-foot">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                 <button type="submit" class="btn btn-outline-primary" data-again="1" id="btnSaveAgain"><i class="bi bi-plus-circle me-1"></i><?= t('Save & Add Another') ?></button>
                 <button type="submit" class="btn btn-primary" data-again="0"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
@@ -246,7 +257,30 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
     .fr-sticky { position: sticky; top: 0; z-index: 1020; background: #fff; padding: 6px 0; }
     .fr-head-actions { width: 100%; }
     .fr-head-actions #btnAddVisit { flex: 1 1 100%; padding: .7rem; font-size: 1.05rem; }
-    .fr-head-actions .btn:not(#btnAddVisit) { flex: 1 1 0; min-width: 0; }
+    .fr-head-actions > .btn:not(#btnAddVisit), .fr-head-actions > .fr-report-menu { flex: 1 1 0; min-width: 0; }
+}
+.fr-report-menu .dropdown-toggle { min-width: 0; }
+/* The <form> sits between .modal-content and the body/footer: make it the flex column
+   .modal-dialog-scrollable expects, so the body scrolls and Save always stays on screen
+   (on a short screen, or a phone with the keyboard open, it fell off the bottom). */
+#visitForm { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+#visitForm > .modal-body { overflow-y: auto; min-height: 0; }
+/* Phone: compact but readable — sizes in px because this app's root font is 12px.
+   Inputs stay 16px (iOS zooms into anything smaller); buttons stay finger-sized (38px+). */
+@media (max-width: 575.98px) {
+    #visitModal .modal-dialog { margin: 0; }   /* a global rule pushed the full-screen form 5px off the bottom */
+    #visitModal .modal-header { padding: 10px 14px; }
+    #visitModal .modal-title { font-size: 16px; }
+    #visitModal .modal-body { padding: 12px; }
+    #visitModal .modal-body > .row { --bs-gutter-y: 10px; }
+    #visitModal .form-label { font-size: 13px; margin-bottom: 3px; }
+    #visitModal .form-control, #visitModal .form-select { font-size: 16px; padding: 6px 10px; }
+    #visitModal .fr-toggle { font-size: 12px; line-height: 1.25; padding: 6px 3px !important; }
+    #visitModal .fr-toggle .fs-5 { font-size: 16px !important; }
+    #visitModal [data-fu] { font-size: 12px; padding: 4px 10px; }
+    .fr-form-foot { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
+    .fr-form-foot .btn { flex: 1 1 0; min-width: 0; min-height: 40px; margin: 0; font-size: 13px; line-height: 1.2; padding: 6px 4px; white-space: normal; }
+    .fr-form-foot .btn-secondary { flex: 0 0 auto; padding: 6px 10px; }
 }
 .fr-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:600; }
 .fr-yes { background:#0d6efd; color:#fff; } .fr-no { background:#e9ecef; color:#495057; }
@@ -338,14 +372,12 @@ $(function () {
         return { date_from: from, date_to: to, user_id: IS_ADMIN ? ($('#fStaff').val() || '') : '' };
     }
 
-    function joinedBtn(r, small) {
-        if (!r.can_edit) return r.joined ? `<span class="fr-badge fr-yes">✓ ${L.joinedBtn}</span>` : '';
-        return `<button type="button" class="btn btn-sm ${r.joined ? 'btn-success' : 'btn-outline-success'} ${small ? '' : 'w-100'}" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}" title="${esc(r.joined ? L.unmarkJoined : L.markJoined)}" style="min-width:0">
-            <i class="bi ${r.joined ? 'bi-check-circle-fill' : 'bi-person-check'}"></i> ${L.joinedBtn}</button>`;
-    }
+    // "Joined" is a status (a badge) — marking it is an action, inside the Actions menu.
+    const joinedBadge = r => r.joined ? ` <span class="fr-badge fr-yes text-nowrap">✓ ${L.joinedBtn}</span>` : '';
 
     function actions(r) {
         let items = '';
+        if (r.can_edit) items += `<li><button class="dropdown-item py-2 rounded" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}"><i class="bi ${r.joined ? 'bi-person-x' : 'bi-person-check'} text-primary me-2"></i>${r.joined ? L.unmarkJoined : L.markJoined}</button></li>`;
         if (r.can_edit) items += `<li><button class="dropdown-item py-2 rounded" data-act="edit" data-id="${r.visit_id}"><i class="bi bi-pencil text-primary me-2"></i>${L.edit}</button></li>`;
         if (r.can_delete) items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" data-act="delete" data-id="${r.visit_id}"><i class="bi bi-trash text-danger me-2"></i>${L.delete}</button></li>`;
         if (!items) return '';
@@ -359,16 +391,16 @@ $(function () {
                 <div class="card-body p-3" style="font-size:.85rem">
                     <div class="d-flex justify-content-between gap-2"><div class="fw-bold text-break">${esc(r.client_name)}</div><small class="text-muted text-nowrap">${dmy(r.visit_date)} ${esc(r.visit_time)}</small></div>
                     <div><i class="bi bi-geo-alt text-primary"></i> ${esc(r.location)}${gpsMark(r)}</div>
-                    <div><a href="tel:${esc(r.client_phone)}" class="text-decoration-none"><i class="bi bi-telephone text-primary"></i> ${esc(r.client_phone)}</a> · ${esc(r.business_label)}</div>
+                    <div>${r.client_phone ? `<a href="tel:${esc(r.client_phone)}" class="text-decoration-none"><i class="bi bi-telephone text-primary"></i> ${esc(r.client_phone)}</a> · ` : ''}${esc(r.business_label)}</div>
                     ${IS_ADMIN ? `<div class="text-muted">${L.staff}: ${esc(r.staff_name)}</div>` : ''}
-                    <div class="d-flex flex-wrap gap-1 mt-1">${ynL(L.cardShort, r.gave_business_card)} ${ynL(L.trialShort, r.gave_trial_link)} ${ynL(L.trainingShort, r.gave_training)} ${r.interest ? interestBadge(r) : ''}</div>
+                    <div class="d-flex flex-wrap gap-1 mt-1">${ynL(L.cardShort, r.gave_business_card)} ${ynL(L.trialShort, r.gave_trial_link)} ${ynL(L.trainingShort, r.gave_training)} ${r.interest ? interestBadge(r) : ''}${joinedBadge(r)}</div>
                     ${r.follow_up_date ? `<div class="mt-1 small"><i class="bi bi-calendar-event text-primary"></i> ${L.followUp}: ${followTxt(r)}</div>` : ''}
                 </div>
-                <div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                    <div style="flex:2;min-width:0">${joinedBtn(r, false)}</div>
-                    ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="edit" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.edit)}"><i class="bi bi-pencil"></i></button>` : ''}
-                    ${r.can_delete ? `<button class="btn btn-sm btn-outline-danger" data-act="delete" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.delete)}"><i class="bi bi-trash"></i></button>` : ''}
-                </div></div>
+                ${r.can_edit || r.can_delete ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                    ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(r.joined ? L.unmarkJoined : L.markJoined)}" aria-label="${esc(r.joined ? L.unmarkJoined : L.markJoined)}"><i class="bi ${r.joined ? 'bi-person-x' : 'bi-person-check'}"></i></button>` : ''}
+                    ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="edit" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.edit)}" aria-label="${esc(L.edit)}"><i class="bi bi-pencil"></i></button>` : ''}
+                    ${r.can_delete ? `<button class="btn btn-sm btn-outline-danger" data-act="delete" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.delete)}" aria-label="${esc(L.delete)}"><i class="bi bi-trash"></i></button>` : ''}
+                </div></div>` : ''}
             </div></div>`).join(''));
     }
 
@@ -393,7 +425,7 @@ $(function () {
                     <span class="badge ${f.days_overdue > 0 ? 'bg-danger' : 'bg-primary'} align-self-start text-nowrap">${f.days_overdue > 0 ? esc(L.daysLate.replace('%d', f.days_overdue)) : esc(L.dueToday)}</span>
                 </div>
                 <div class="d-flex gap-1 mt-2 fr-follow-actions">
-                    <a class="btn btn-sm btn-primary" href="tel:${esc(f.client_phone)}"><i class="bi bi-telephone me-1"></i>${L.call}</a>
+                    ${f.client_phone ? `<a class="btn btn-sm btn-primary" href="tel:${esc(f.client_phone)}"><i class="bi bi-telephone me-1"></i>${L.call}</a>` : ''}
                     ${CAN_CREATE ? `<button class="btn btn-sm btn-outline-primary" data-fact="visit" data-id="${f.visit_id}"><i class="bi bi-plus-circle me-1"></i>${L.newVisit}</button>` : ''}
                     ${f.can_edit ? `<button class="btn btn-sm btn-outline-success" data-fact="done" data-id="${f.visit_id}"><i class="bi bi-check2 me-1"></i>${L.followedUp}</button>` : ''}
                 </div>
@@ -429,16 +461,16 @@ $(function () {
     function loadData() {
         $.getJSON(API + 'list.php', filters()).done(function (res) {
             if (!res.success) { Swal.fire({ icon: 'error', title: L.error, text: res.message }); return; }
+            FrShare.invalidate();   // visits changed — the next PDF is built fresh
             rows = res.rows;
             $('#visitsCount').text(rows.length);
             renderFollowUps(res.follow_ups);
             table.clear().rows.add(rows.map((r, i) => {
                 const cells = [i + 1, dmy(r.visit_date), esc(r.visit_time || '—')];
                 if (IS_ADMIN) cells.push(esc(r.staff_name));
-                cells.push(esc(r.location) + gpsMark(r), esc(r.client_name), esc(r.client_phone), esc(r.business_label),
+                cells.push(esc(r.location) + gpsMark(r), esc(r.client_name) + joinedBadge(r), r.client_phone ? esc(r.client_phone) : '<span class="text-muted">—</span>', esc(r.business_label),
                     `<div class="text-center">${yn(r.gave_business_card)}</div>`, `<div class="text-center">${yn(r.gave_trial_link)}</div>`,
-                    `<div class="text-center">${yn(r.gave_training)}</div>`, interestBadge(r), followTxt(r),
-                    `<div class="text-center">${joinedBtn(r, true)}</div>`, actions(r));
+                    `<div class="text-center">${yn(r.gave_training)}</div>`, interestBadge(r), followTxt(r), actions(r));
                 cells._row = r;
                 return cells;
             })).draw();
@@ -646,8 +678,15 @@ $(function () {
     $('#btnReport').on('click', function () {
         window.open(PRINT_URL + '?' + $.param(Object.assign(filters(), { lang: USER_LANG })), '_blank');
     });
+    const reportParams = () => Object.assign(filters(), { lang: USER_LANG });
+    $('#btnExcel').on('click', () => { window.location.href = API + 'export.php?' + $.param(reportParams()); });
+    // PDF / WhatsApp / email (includes/field_reports/report_share.php). The PDF starts building
+    // as soon as the menu opens, so a WhatsApp tap can hand it to the share sheet at once.
+    document.getElementById('btnReportMenu').addEventListener('show.bs.dropdown', () => FrShare.prepare(reportParams()));
+    $('[data-frs]').on('click', function () { FrShare[$(this).data('frs')](reportParams(), this); });
     loadData();
 });
 </script>
 
+<?php require_once ROOT_DIR . '/includes/field_reports/report_share.php'; frRenderShareKit(); ?>
 <?php includeFooter(); ?>

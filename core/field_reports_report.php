@@ -57,7 +57,7 @@ if (!function_exists('frReportColumns')) {
                 // "(GPS)" = position captured with ±100 m or better (customer_visits_ux_plan 3.4)
                 'location' => $v['location'] . (frGpsVerified($v) ? ' (GPS ✓)' : ''),
                 'client'   => $v['client_name'],
-                'phone'    => $v['client_phone'],
+                'phone'    => trim((string)$v['client_phone']) !== '' ? $v['client_phone'] : '—',   // optional
                 'business' => frBusinessLabel($v),
                 'card'     => (int)$v['gave_business_card'] ? $yes : $no,
                 'trial'    => (int)$v['gave_trial_link'] ? $yes : $no,
@@ -77,6 +77,25 @@ if (!function_exists('frReportColumns')) {
             $out[] = array_intersect_key($cells, $columns);
         }
         return $out;
+    }
+
+    /**
+     * Relative column widths for A4 landscape (all columns) — shared by the print page
+     * and the downloadable PDF so both lay the table out the same way. Yes/No columns
+     * must fit "Hapana"; the long-text columns give way.
+     */
+    function frReportLandscapeWeights(): array
+    {
+        return ['sno' => 3, 'date' => 7, 'time' => 5, 'staff' => 10, 'location' => 14, 'client' => 11, 'phone' => 10,
+                'business' => 10, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12];
+    }
+
+    /** "Report submitted at 15:20 — updated after it was submitted" / "not submitted yet"; null when not one person's day. */
+    function frReportStatusText(?array $day): string
+    {
+        if (!$day) return t('This report has not been submitted yet.');
+        $s = sprintf(t('Report submitted at %s'), date('H:i', strtotime($day['submitted_at'])));
+        return (int)$day['changed_after_submit'] ? $s . ' — ' . t('updated after it was submitted') : $s;
     }
 
     /** Summary line items [label => value] in report order. */

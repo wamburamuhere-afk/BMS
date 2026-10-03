@@ -40,6 +40,21 @@ if ($features !== '') $GLOBALS['__bms_features'] = json_decode($features, true);
 
 $p = json_decode($params, true) ?: [];
 if (isset($p['__lang'])) { $_SESSION['user_lang'] = $p['__lang']; unset($p['__lang']); }   // e.g. 'sw'
+// '__fake_mail' => file: sendEmail() records what it was given there instead of sending
+// (core/mailer.php only defines sendEmail when it does not exist yet).
+if (isset($p['__fake_mail'])) {
+    $GLOBALS['__fake_mail_file'] = $p['__fake_mail']; unset($p['__fake_mail']);
+    function sendEmail($to, string $subject, string $htmlBody, array $opts = []): bool
+    {
+        $att = $opts['attachments'][0] ?? '';
+        file_put_contents($GLOBALS['__fake_mail_file'], json_encode([
+            'to' => (array)$to, 'subject' => $subject, 'body' => $htmlBody, 'reply_to' => $opts['reply_to'] ?? null,
+            'attachment' => $att, 'attachment_name' => basename($att), 'attachment_exists' => is_file($att),
+            'attachment_head' => is_file($att) ? substr(file_get_contents($att), 0, 5) : '',
+        ]));
+        return true;
+    }
+}
 if ($method === 'POST') { $_POST = $p + ['_csrf' => 'test-csrf']; $_GET = []; }
 else                    { $_GET = $p; $_POST = []; }
 
