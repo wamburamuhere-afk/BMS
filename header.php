@@ -1549,10 +1549,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
 
-                        <!-- Field Reports (marketing) — module 'field_reports', off by default -->
+                        <!-- Customer Visits (marketing) — module 'field_reports', off by default -->
                         <?php if(canView('field_visits')): ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i> <?= t('Field Reports') ?></a>
+                            <a class="nav-link" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i> <?= t('Customer Visits') ?></a>
                         </li>
                         <?php endif; ?>
 
@@ -2046,7 +2046,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? (getUrl('pos') . '?restock=1') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
-                <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Field Reports') ?></a><?php endif; ?>
+                <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Customer Visits') ?></a><?php endif; ?>
             </div>
         </div>
     </div>

@@ -182,6 +182,47 @@ if (!function_exists('frBusinessTypes')) {
         return t($types[$r['business_type']] ?? 'Other');
     }
 
+    /** A position captured with ±100 m or better (or with no accuracy reported). */
+    function frGpsVerified(array $r): bool
+    {
+        return $r['latitude'] !== null && $r['longitude'] !== null
+            && ($r['gps_accuracy_m'] === null || (int)$r['gps_accuracy_m'] <= 100);
+    }
+
+    /**
+     * Follow-ups due by $asOf (today or overdue), not done, client not joined — for
+     * $userId (null = every staff member; callers pass frScopeUserId()).
+     */
+    function frDueFollowUps(PDO $pdo, ?int $userId, string $asOf): array
+    {
+        $sql = "SELECT v.visit_id, v.user_id, v.client_name, v.client_phone, v.location, v.visit_date, v.follow_up_date,
+                       v.business_type, v.business_other, u.first_name, u.last_name, u.username
+                  FROM field_visits v LEFT JOIN users u ON u.user_id = v.user_id
+                 WHERE v.status = 'active' AND v.follow_up_date IS NOT NULL AND v.follow_up_date <= ?
+                   AND v.follow_up_done_at IS NULL AND v.joined = 0";
+        $params = [$asOf];
+        if ($userId !== null) { $sql .= " AND v.user_id = ?"; $params[] = $userId; }
+        $sql .= " ORDER BY v.follow_up_date ASC, v.visit_id ASC LIMIT 200";
+        $s = $pdo->prepare($sql);
+        $s->execute($params);
+        $out = [];
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[] = [
+                'visit_id'       => (int)$r['visit_id'],
+                'client_name'    => $r['client_name'],
+                'client_phone'   => $r['client_phone'],
+                'location'       => $r['location'],
+                'business_label' => frBusinessLabel($r),
+                'visit_date'     => $r['visit_date'],
+                'follow_up_date' => $r['follow_up_date'],
+                'days_overdue'   => (int)floor((strtotime($asOf) - strtotime($r['follow_up_date'])) / 86400),
+                'staff_name'     => frStaffName($r),
+                'can_edit'       => frCanTouch($r) && canEdit('field_visits'),
+            ];
+        }
+        return $out;
+    }
+
     /** Reads the date range from a request; defaults to today, swaps if reversed. */
     function frRequestRange(array $src): array
     {

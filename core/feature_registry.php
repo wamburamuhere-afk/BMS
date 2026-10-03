@@ -577,8 +577,11 @@ if (!function_exists('bmsFeatureRegistry')) {
             // only their own visits; admins see all staff. default: false —
             // superadmin enables per tenant.
             'field_reports' => [
-                'label'       => 'Field Reports (Marketing)',
-                'description' => 'Marketing staff record field visits (place, client, business, card/trial/training given) and produce a daily report; admins see every staff member\'s visits.',
+                'label'       => 'Customer Visits (Marketing)',
+                // Shipped as this before (2026-10-03): syncFeatureCatalogue() renames a
+                // catalogue row only while it still carries one of these.
+                'previous_labels' => ['Field Reports (Marketing)'],
+                'description' => 'Marketing staff record their customer visits (place, client, business, card/trial/training given, follow-up) and produce a daily report; admins see every staff member\'s visits.',
                 'default'     => false,
                 'sort_order'  => 26,
                 'page_keys'   => ['field_visits'],
@@ -1171,6 +1174,13 @@ if (!function_exists('syncFeatureCatalogue')) {
                     (int)($def['sort_order'] ?? 0),
                 ]);
                 $added += $seed->rowCount();
+            }
+            // A renamed module: refresh the catalogue label ONLY while the row still
+            // carries a label this code shipped earlier ('previous_labels'), so an
+            // operator's own wording is never overwritten.
+            $rename = $pdo->prepare("UPDATE features SET label = ? WHERE feature_key = ? AND label = ?");
+            foreach (bmsFeatureRegistry() as $key => $def) {
+                foreach ($def['previous_labels'] ?? [] as $old) $rename->execute([$def['label'], $key, $old]);
             }
             return ['ran' => true, 'reason' => null, 'added' => $added];
         } catch (Throwable $e) {

@@ -24,6 +24,7 @@ if (!function_exists('frReportColumns')) {
             'training' => t('Training'),
             'interest' => t('Interest'),
             'joined'   => t('Joined'),
+            'follow_up' => t('Follow-up'),
             'notes'    => t('Notes'),
         ];
         return $c;
@@ -41,7 +42,8 @@ if (!function_exists('frReportColumns')) {
                 'date'     => date('d/m/Y', strtotime($v['visit_date'])),
                 'time'     => $v['visit_time'] ? substr($v['visit_time'], 0, 5) : '—',
                 'staff'    => $v['staff_name'] ?? '',
-                'location' => $v['location'],
+                // "(GPS)" = position captured with ±100 m or better (customer_visits_ux_plan 3.4)
+                'location' => $v['location'] . (frGpsVerified($v) ? ' (GPS ✓)' : ''),
                 'client'   => $v['client_name'],
                 'phone'    => $v['client_phone'],
                 'business' => frBusinessLabel($v),
@@ -50,6 +52,9 @@ if (!function_exists('frReportColumns')) {
                 'training' => (int)$v['gave_training'] ? $yes : $no,
                 'interest' => $v['interest'] ? t($interest[$v['interest']] ?? '') : '—',
                 'joined'   => (int)$v['joined'] ? $yes : $no,
+                'follow_up' => !empty($v['follow_up_date'])
+                    ? date('d/m/Y', strtotime($v['follow_up_date'])) . (!empty($v['follow_up_done_at']) ? ' ✓' : '')
+                    : '—',
                 'notes'    => trim((string)($v['notes'] ?? '')) !== '' ? trim($v['notes']) : '—',
             ];
             $out[] = array_intersect_key($cells, $columns);
