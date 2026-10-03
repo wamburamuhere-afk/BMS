@@ -114,7 +114,9 @@ if (!$uid || !$wh) {
         $simple = _pvs_render($root, $uid, $pid);
 
         lacks($simple, 'SKU:</small>', 'Simple POS render: SKU label absent from Basic Information');
-        lacks($simple, 'Barcode:</small>', 'Simple POS render: Barcode label absent');
+        // pos_detail_pages_plan.md C3: the barcode is shown read-only in Simple mode
+        // (it is what "Print Barcode" prints); SKU stays hidden.
+        has($simple, 'Barcode:</small>', 'Simple POS render: Barcode shown read-only (C3)');
         lacks($simple, '>Description:<', 'Simple POS render: Description block absent');
         lacks($simple, '>Wholesale:<', 'Simple POS render: Wholesale price absent');
         lacks($simple, 'id="details-tab"', 'Simple POS render: Additional Details tab button absent');

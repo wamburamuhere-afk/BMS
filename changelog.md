@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-10-03 — fix/feat(pos-detail-pages): Customers · Suppliers · Products · Services make sense for a POS shop
+
+Plan: `pos_detail_pages_plan.md`. Found on shop.demo (POS + Warehouse only, Simple Mode). Code display (`Bsx-…`) deliberately unchanged.
+
+**Files:**
+- `core/feature_registry.php` — `bmsRouteAvailable($route)`: the router's own 404 rule (mapped + file exists + `tenantModuleAllowsPage` + `bmsFeatureBlockingPath`), used before drawing a link into another module's page.
+- `app/bms/Suppliers/suppliers.php` — View Account / New Order / View Orders only when their module is on (View Account 404'd). Simple mode: only Activate/Deactivate (suspended/blacklisted suppliers can still be re-activated); Suspended/Blacklisted cards + filter only while such suppliers exist.
+- `app/bms/Suppliers/supplier_details.php` — new **Stock Received** tab (POS Receive Stock batches by `product_batches.supplier_id`: total bought, deliveries, last delivery; warehouse-scoped; default in Simple mode). Projects tab / "Projects Linked" only with `projectsModuleActive()`; created/updated by show names (were e-mails); labels via `t()`.
+- `app/bms/product/products.php` — Create Purchase Order only with Procurement (404'd); new **Receive Stock** → `pos?restock=1&product_id=N`.
+- `app/bms/pos/pos_scripts_new.php` — `&product_id=N` pre-selects that product in the Receive Stock modal (server-side lookup, same filter as the restock search; service/unknown id ignored).
+- `app/bms/product/product_view.php` — PO / Sales Report links gated (404'd); **stock movements now signed by direction** (a sale showed `+3` while stock fell 16→13); Adjusted By = names; Recent Sales receipt opened `sales_order_view?id=<POS sale id>` (wrong record) → now the POS receipt; Reserved (Projects) / Source GRN hidden unless relevant (never hiding data); Simple mode adds barcode, last delivery, days of stock left, wholesale from the Wholesale price group; batch Supplier column; all labels + badges via `t()`.
+- `app/bms/product/services.php` — subtitle per modules, Services wording, category filter = categories services use, no trailing separator, `?edit=N` deep link; guarded margin-badge writes (threw on every Add/Edit open).
+- `app/bms/product/service_view.php` — no Assembly / Contract Item No / SKU in Simple mode; Service title; `format_currency`; Cost/Margin only when a cost exists (was always "100%"); **Edit** button; sales summary + last 10 sales.
+- `app/bms/customer/customer_details.php` — purchase summary (net of returns, count, last, average) + Most Bought; Available Credit only with a credit limit; labels via `t()` (Madeni labels were hard-coded Swahili).
+- `lang/sw.php` — +~265 strings; "Nobody owes you anything right now" → "Hakuna mteja anayedaiwa kwa sasa" (was "Hakuna anayekudai…", the opposite meaning).
+- `tests/test_pos_detail_pages_cli.php` (new, 119 assertions) + `tests/helpers/page_request.php` (new) — every page rendered as a forged admin in POS-only/Simple and all-modules shapes: no link to a page that 404s, sign, receipt link, Swahili/English renders, every B/C rule; fixtures removed. `tests/test_product_view_simple_pos_cli.php`, `tests/test_supplier_crud_simple_pos_cli.php` — render in English; Projects tab follows `projectsModuleActive()`.
+
 ## 2026-10-02 — fix(pos): Pay / Split / Add-customer did nothing when tapped inside the phone cart sheet
 
 **Files:**
