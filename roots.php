@@ -524,6 +524,10 @@ $routes = [
     'mm_reports'          => MOBILE_MONEY_DIR . '/mm_reports.php',
     'mm_compliance'       => MOBILE_MONEY_DIR . '/mm_compliance.php',
 
+    // Field Reports (marketing) module — 2026-10-03
+    'field_reports'       => BMS_DIR . '/field_reports/field_visits.php',
+    'field_reports/print' => BMS_DIR . '/field_reports/field_report_print.php',
+
     // ========================================================================
     // SALES MODULE
     // ========================================================================
