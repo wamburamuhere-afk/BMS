@@ -459,6 +459,13 @@ try {
     ok(strpos($html, 'Ufuatiliaji') !== false && strpos($html, 'Mwenge Sokoni ' . $tag . ' (GPS ✓)') !== false, 'print (sw): Follow-up column + "(GPS ✓)" on confirmed places');
     [, $csv] = call('api/field_reports/export.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'en']);
     ok(strpos($csv, 'Follow-up') !== false && strpos($csv, 'GPS ✓') !== false && strpos($csv, 'CUSTOMER VISITS REPORT') !== false, 'Excel (en): Follow-up column, GPS ✓, new title');
+
+    section('13. Live-test fixes (shop.demo, 2026-10-03)');
+    $page = file_get_contents(ROOT_DIR . '/app/bms/field_reports/field_visits.php');
+    ok(preg_match('#id="visitModal"[^>]*data-no-autoclose="true"#', $page) === 1, 'visit form opts out of footer.php\x27s "close any modal after a successful POST" (Save & Add Another kept closing it)');
+    ok(strpos($page, 'fr-follow-actions') !== false && strpos($page, 'white-space: nowrap') !== false, 'follow-up buttons stay on one compact row');
+    [, $html] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date' => $day1, 'lang' => 'sw']);
+    ok(strpos($html, '>Mwitikio<') !== false && strpos($html, '>Nia<') === false, 'report column says "Mwitikio" like the page (not "Nia")');
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")

@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-03 — fix(customer-visits): found filling it in live on shop.demo
+
+**Files:**
+- `app/bms/field_reports/field_visits.php` — **"Save & Add Another" closed the form**: `footer.php`'s global `ajaxSuccess` closes any open modal after a successful POST; the visit form now opts out (`data-no-autoclose="true"`, the existing opt-out) since the page closes/keeps it itself. Follow-up buttons (Call · New visit · Followed up) were 93 px tall (text wrapping) → one compact row; phone header buttons no longer wrap.
+- `core/field_reports_report.php` — report column "Nia" → "Mwitikio" (`t('Response')`), the page's word.
+- `tests/test_field_reports_cli.php` — 187 assertions; the jsdom check now fires jQuery's global `ajaxSuccess` like the real library (its mock hid this bug) and asserts the form stays open.
+
 ## 2026-10-03 — feat(customer-visits): "Ripoti za Uwandani" → "Ziara za Wateja", phone-first, follow-ups
 
 Plan: `customer_visits_ux_plan.md`. Found by filling the module in on shop.demo as a marketer on a phone. Module key `field_reports`, page key `field_visits` and routes unchanged.
