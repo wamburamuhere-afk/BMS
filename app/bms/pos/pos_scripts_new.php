@@ -510,8 +510,30 @@ $(document).ready(function() {
 
     // "Receive Stock" menu link lands here as ?restock=1.
     // The modal is only rendered for users holding pos_restock (pos_modals_new.php).
+    // &product_id=N (Products list "Receive Stock", pos_detail_pages_plan.md A3)
+    // pre-selects that product — looked up below with the same filter and label
+    // as api/pos/search_products_for_restock.php; an unknown id / service just
+    // opens the modal empty, as before.
     if (new URLSearchParams(location.search).get('restock') === '1' && document.getElementById('restockProductModal')) {
         openRestockProductModal();
+        <?php
+        $__restockPre = null;
+        if (!empty($_GET['restock']) && ctype_digit((string)($_GET['product_id'] ?? ''))) {
+            try {
+                $__rp = $pdo->prepare("SELECT product_id, product_name, sku FROM products WHERE product_id = ? AND status != 'deleted' AND is_service != 1");
+                $__rp->execute([(int)$_GET['product_id']]);
+                if ($__r = $__rp->fetch(PDO::FETCH_ASSOC)) {
+                    $__n = applyCaseMode($__r['product_name']);
+                    $__restockPre = ['id' => (int)$__r['product_id'], 'text' => $__r['sku'] ? ($__r['sku'] . ' — ' . $__n) : $__n];
+                }
+            } catch (Throwable $e) { $__restockPre = null; }
+        }
+        ?>
+        const restockPre = <?= json_encode($__restockPre) ?>;
+        if (restockPre) {
+            $('#restock_product_id').append(new Option(restockPre.text, restockPre.id, true, true)).trigger('change')
+                .trigger({ type: 'select2:select', params: { data: restockPre } });   // loads its last prices
+        }
     }
 
     // Load initial data

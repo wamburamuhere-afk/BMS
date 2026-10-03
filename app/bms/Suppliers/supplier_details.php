@@ -47,6 +47,7 @@ if ($hideProcurementTabs) {
     $default_supplier_tab = canView('expenses') ? 'pane-expenses' : 'pane-sysinfo';
 }
 
+
 // ── Project context (clean deep-link from Project Details) ───────────────────
 // Arriving as ?project=<id>&back=<tab> shows a "Back to Project" banner and
 // rebuilds the return URL server-side, so the address bar stays clean.
@@ -95,8 +96,8 @@ if (empty($_SESSION['scope']['is_admin'])) {
 $stmt = $pdo->prepare("
     SELECT s.*,
            sc.category_name,
-           u1.username as created_by_name,
-           u2.username as updated_by_name
+           COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u1.first_name, ''), ' ', COALESCE(u1.last_name, ''))), ''), u1.username) as created_by_name,
+           COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u2.first_name, ''), ' ', COALESCE(u2.last_name, ''))), ''), u2.username) as updated_by_name
     FROM suppliers s
     LEFT JOIN supplier_categories sc ON s.category_id = sc.category_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
@@ -110,6 +111,42 @@ if (!$supplier) {
     echo "<div class='alert alert-danger'>Supplier not found</div>";
     include("footer.php");
     exit();
+}
+
+// ── Stock Received (pos_detail_pages_plan.md C1) ─────────────────────────────
+// POS "Receive Stock" (api/pos/quick_restock.php) records the supplier on each
+// batch it creates (product_batches.supplier_id) — this is what a shop actually
+// bought from this supplier. Warehouse-scoped for non-admins (strict: a batch
+// always belongs to one shop). The newest 200 rows are listed; the summary
+// covers all of them.
+$received_rows = [];
+$received_summary = ['total' => 0.0, 'deliveries' => 0, 'last' => null];
+$show_received_tab = false;
+if (canView('products')) {
+    try {
+        $rcvScope = scopeFilterSql('warehouse', 'pb');
+        $rs = $pdo->prepare("SELECT COUNT(*) AS deliveries, COALESCE(SUM(pb.quantity_received * pb.unit_cost), 0) AS total, MAX(pb.created_at) AS last
+                               FROM product_batches pb WHERE pb.supplier_id = ?" . $rcvScope);
+        $rs->execute([(int)$supplier['supplier_id']]);
+        $agg = $rs->fetch(PDO::FETCH_ASSOC) ?: [];
+        $received_summary = ['total' => (float)($agg['total'] ?? 0), 'deliveries' => (int)($agg['deliveries'] ?? 0), 'last' => $agg['last'] ?? null];
+        $rl = $pdo->prepare("SELECT pb.batch_id, pb.created_at, pb.quantity_received, pb.unit_cost, p.product_id, p.product_name, p.unit, w.warehouse_name
+                               FROM product_batches pb
+                               JOIN products p ON p.product_id = pb.product_id
+                               LEFT JOIN warehouses w ON w.warehouse_id = pb.warehouse_id
+                              WHERE pb.supplier_id = ?" . $rcvScope . "
+                              ORDER BY pb.created_at DESC, pb.batch_id DESC
+                              LIMIT 200");
+        $rl->execute([(int)$supplier['supplier_id']]);
+        $received_rows = $rl->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('supplier_details stock received: ' . $e->getMessage());
+    }
+    // Shown for POS shops (where Receive Stock lives) and wherever such deliveries exist.
+    $show_received_tab = tenantFeatureEnabled('pos') || $received_summary['deliveries'] > 0;
+}
+if ($show_received_tab && $hideProcurementTabs) {
+    $default_supplier_tab = 'pane-received';
 }
 
 // Get purchase orders
@@ -237,8 +274,8 @@ global $company_name, $company_logo;
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('suppliers') ?>">Suppliers</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('suppliers') ?>"><?= t('Suppliers') ?></a></li>
             <li class="breadcrumb-item active"><?= caseFormat($supplier['supplier_name']) ?></li>
         </ol>
     </nav>
@@ -248,31 +285,31 @@ global $company_name, $company_logo;
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-start flex-nowrap gap-2">
                 <div>
-                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-truck"></i> Supplier View</h2>
+                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-truck"></i> <?= t('Supplier View') ?></h2>
                     <p class="text-muted mb-0 small mt-1 header-desc">
-                        Detailed information about <?= caseFormat($supplier['supplier_name']) ?> 
+                        <?= t('Detailed information about') ?> <?= caseFormat($supplier['supplier_name']) ?> 
                         <?php if (!empty($supplier['company_name'])): ?>
-                        • Company: <?= caseFormat($supplier['company_name']) ?>
+                        • <?= t('Company') ?>: <?= caseFormat($supplier['company_name']) ?>
                         <?php endif; ?>
-                        • Code: <code><?= htmlspecialchars($supplier['supplier_code']) ?></code>
+                        • <?= t('Code') ?>: <code><?= htmlspecialchars($supplier['supplier_code']) ?></code>
                     </p>
                 </div>
                 <!-- Desktop Actions (Hidden on mobile) -->
                 <div class="d-none d-sm-flex gap-2 ms-auto pt-2 flex-shrink-0">
-                    <a href="<?= getUrl('suppliers') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="Back to Suppliers">
-                        <i class="bi bi-arrow-left"></i> Back
+                    <a href="<?= getUrl('suppliers') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="<?= t('Back to Suppliers') ?>">
+                        <i class="bi bi-arrow-left"></i> <?= t('Back') ?>
                     </a>
-                    <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print Details">
-                        <i class="bi bi-printer"></i> Print
+                    <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="<?= t('Print Details') ?>">
+                        <i class="bi bi-printer"></i> <?= t('Print') ?>
                     </button>
                     <?php if (canCreate('received_invoices')): ?>
-                    <button onclick="openRiModal()" class="btn btn-outline-success btn-sm px-2 shadow-sm" title="Record Bill">
-                        <i class="bi bi-inbox me-1"></i> Record Invoice
+                    <button onclick="openRiModal()" class="btn btn-outline-success btn-sm px-2 shadow-sm" title="<?= t('Record Invoice') ?>">
+                        <i class="bi bi-inbox me-1"></i> <?= t('Record Invoice') ?>
                     </button>
                     <?php endif; ?>
                     <?php if ($can_edit): ?>
-                    <button class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit Supplier">
-                        <i class="bi bi-pencil"></i> Edit
+                    <button class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="<?= t('Edit Supplier') ?>">
+                        <i class="bi bi-pencil"></i> <?= t('Edit') ?>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -281,23 +318,23 @@ global $company_name, $company_logo;
                 <div class="d-flex d-sm-none ms-auto pt-1 flex-shrink-0">
                     <div class="dropdown">
                         <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear-fill me-1"></i> Actions
+                            <i class="bi bi-gear-fill me-1"></i> <?= t('Actions') ?>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                             <li>
                                 <a class="dropdown-item py-2" href="<?= getUrl('suppliers') ?>">
-                                    <i class="bi bi-arrow-left text-secondary"></i> Back to Suppliers
+                                    <i class="bi bi-arrow-left text-secondary"></i> <?= t('Back to Suppliers') ?>
                                 </a>
                             </li>
                             <li>
                                 <button class="dropdown-item py-2" onclick="printDetails()">
-                                    <i class="bi bi-printer text-info"></i> Print Details
+                                    <i class="bi bi-printer text-info"></i> <?= t('Print Details') ?>
                                 </button>
                             </li>
                             <?php if (canCreate('received_invoices')): ?>
                             <li>
                                 <button class="dropdown-item py-2" onclick="openRiModal()">
-                                    <i class="bi bi-inbox text-success"></i> Record Invoice
+                                    <i class="bi bi-inbox text-success"></i> <?= t('Record Invoice') ?>
                                 </button>
                             </li>
                             <?php endif; ?>
@@ -305,7 +342,7 @@ global $company_name, $company_logo;
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <button class="dropdown-item py-2" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)">
-                                    <i class="bi bi-pencil text-primary"></i> Edit Supplier
+                                    <i class="bi bi-pencil text-primary"></i> <?= t('Edit Supplier') ?>
                                 </button>
                             </li>
                             <?php endif; ?>
@@ -382,7 +419,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
-                            <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= ucfirst($supplier['status']) ?></span></p>
+                            <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= t(ucfirst($supplier['status'])) ?></span></p>
                         </div>
                         <?php if (!empty($supplier['bank_name']) || !empty($supplier['bank_account'])): ?>
                         <div class="col-6 col-md-4 mb-3">
@@ -454,7 +491,7 @@ global $company_name, $company_logo;
                             <td><strong>Status:</strong></td>
                             <td>
                                 <span class="badge bg-<?= get_status_badge($supplier['status']) ?>">
-                                    <?= ucfirst($supplier['status']) ?>
+                                    <?= t(ucfirst($supplier['status'])) ?>
                                 </span>
                             </td>
                         </tr>
@@ -729,75 +766,82 @@ global $company_name, $company_logo;
             <!-- flex-nowrap + overflow-auto: eleven tabs scroll sideways on a phone
                  instead of wrapping into three stacked rows. Same as customer details. -->
             <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="supplierSectionTabs" role="tablist">
+                <?php if ($show_received_tab): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link <?= $default_supplier_tab === 'pane-received' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-received" type="button" role="tab">
+                        <i class="bi bi-box-arrow-in-down me-1"></i> <?= t('Stock Received') ?> <span class="badge bg-primary ms-1"><?= (int)$received_summary['deliveries'] ?></span>
+                    </button>
+                </li>
+                <?php endif; ?>
                 <?php if (!$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link <?= $default_supplier_tab === 'pane-payments' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
-                        <i class="bi bi-cash-coin me-1"></i> Recent Payments
+                        <i class="bi bi-cash-coin me-1"></i> <?= t('Recent Payments') ?>
                     </button>
                 </li>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab">
-                        <i class="bi bi-receipt me-1"></i> Bills
+                        <i class="bi bi-receipt me-1"></i> <?= t('Bills') ?>
                     </button>
                 </li>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pos" type="button" role="tab">
-                        <i class="bi bi-cart me-1"></i> Recent Purchase Orders
+                        <i class="bi bi-cart me-1"></i> <?= t('Recent Purchase Orders') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('grn') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-grn" type="button" role="tab">
-                        <i class="bi bi-box-seam me-1"></i> Goods Received
+                        <i class="bi bi-box-seam me-1"></i> <?= t('Goods Received') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (hasPermission('purchase_returns') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-returns" type="button" role="tab">
-                        <i class="bi bi-arrow-return-left me-1"></i> Purchase Returns
+                        <i class="bi bi-arrow-return-left me-1"></i> <?= t('Purchase Returns') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if ((canView('dn') || canView('grn')) && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-dn" type="button" role="tab">
-                        <i class="bi bi-truck me-1"></i> Delivery Notes
+                        <i class="bi bi-truck me-1"></i> <?= t('Delivery Notes') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('rfq') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-rfq" type="button" role="tab">
-                        <i class="bi bi-file-earmark-text me-1"></i> RFQs
+                        <i class="bi bi-file-earmark-text me-1"></i> <?= t('RFQs') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('debit_notes') && !$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-debitnotes" type="button" role="tab">
-                        <i class="bi bi-receipt-cutoff me-1"></i> Debit Notes
+                        <i class="bi bi-receipt-cutoff me-1"></i> <?= t('Debit Notes') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('expenses')): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link <?= $default_supplier_tab === 'pane-expenses' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-expenses" type="button" role="tab">
-                        <i class="bi bi-wallet2 me-1"></i> Expenses
+                        <i class="bi bi-wallet2 me-1"></i> <?= t('Expenses') ?>
                     </button>
                 </li>
                 <?php endif; ?>
-                <?php if (!$hideProcurementTabs): ?>
+                <?php if (!$hideProcurementTabs && projectsModuleActive()): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
-                        <i class="bi bi-diagram-3 me-1"></i> Projects Involved
+                        <i class="bi bi-diagram-3 me-1"></i> <?= t('Projects Involved') ?>
                     </button>
                 </li>
                 <?php endif; ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link <?= $default_supplier_tab === 'pane-sysinfo' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab">
-                        <i class="bi bi-clock-history me-1"></i> System Info
+                        <i class="bi bi-clock-history me-1"></i> <?= t('System Info') ?>
                     </button>
                 </li>
             </ul>
@@ -805,6 +849,77 @@ global $company_name, $company_logo;
     </div>
 
     <div class="tab-content" id="supplierSectionTabContent">
+
+        <?php if ($show_received_tab): ?>
+        <!-- Stock Received — every POS "Receive Stock" batch from this supplier (pos_detail_pages_plan.md C1) -->
+        <div class="tab-pane fade <?= $default_supplier_tab === 'pane-received' ? 'show active' : '' ?>" id="pane-received" role="tabpanel">
+            <div class="row g-2 mb-3">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm text-center p-3">
+                        <div class="fs-5 fw-bold text-primary"><?= format_currency($received_summary['total']) ?></div>
+                        <div class="small text-muted"><?= t('Total bought from this supplier') ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card border-0 shadow-sm text-center p-3">
+                        <div class="fs-5 fw-bold text-primary"><?= (int)$received_summary['deliveries'] ?></div>
+                        <div class="small text-muted"><?= t('Deliveries') ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card border-0 shadow-sm text-center p-3">
+                        <div class="fs-5 fw-bold text-primary"><?= $received_summary['last'] ? format_date($received_summary['last']) : '—' ?></div>
+                        <div class="small text-muted"><?= t('Last delivery') ?></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-box-arrow-in-down me-2"></i><?= t('Stock Received') ?></h6>
+                </div>
+                <div class="card-body p-0">
+                    <?php if ($received_rows): ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="supplierReceivedTable">
+                            <thead class="bg-light text-muted small text-uppercase">
+                                <tr>
+                                    <th style="width:50px;"><?= t('S/NO') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= wLabel('Warehouse', 'Shop') ?></th>
+                                    <th class="text-end"><?= t('Quantity') ?></th>
+                                    <th class="text-end"><?= t('Unit Cost') ?></th>
+                                    <th class="text-end"><?= t('Total') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($received_rows as $i => $r): ?>
+                                <tr>
+                                    <td><?= $i + 1 ?></td>
+                                    <td class="text-nowrap"><?= format_date($r['created_at']) ?></td>
+                                    <td><a href="<?= getUrl('products/view') ?>?id=<?= (int)$r['product_id'] ?>" class="text-decoration-none"><?= caseFormat($r['product_name']) ?></a></td>
+                                    <td><?= caseFormat($r['warehouse_name'] ?? '—') ?></td>
+                                    <td class="text-end text-nowrap"><?= format_number($r['quantity_received'], 3) ?> <?= htmlspecialchars((string)($r['unit'] ?? '')) ?></td>
+                                    <td class="text-end text-nowrap"><?= format_currency($r['unit_cost']) ?></td>
+                                    <td class="text-end text-nowrap fw-bold"><?= format_currency((float)$r['quantity_received'] * (float)$r['unit_cost']) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php if ($received_summary['deliveries'] > count($received_rows)): ?>
+                    <p class="small text-muted px-3 py-2 mb-0"><?= sprintf(t('Showing the latest %d of %d deliveries.'), count($received_rows), $received_summary['deliveries']) ?></p>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-box-seam" style="font-size:2.5rem;color:#ccc;"></i>
+                        <p class="mt-2 mb-0"><?= t('No stock received from this supplier yet. Use "Receive Stock" in the POS and choose this supplier.') ?></p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Goods Received (GRN) — same table code as app/bms/grn/grn.php, locked
              to this supplier and with the (redundant) Supplier column hidden. -->
@@ -825,7 +940,7 @@ global $company_name, $company_logo;
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?= getUrl('grn') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
+                                    <?= t('View All') ?>
                                 </a>
                             </div>
                         </div>
@@ -866,7 +981,7 @@ global $company_name, $company_logo;
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?= getUrl('purchase_returns') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
+                                    <?= t('View All') ?>
                                 </a>
                             </div>
                         </div>
@@ -908,7 +1023,7 @@ global $company_name, $company_logo;
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?= getUrl('delivery_notes') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
+                                    <?= t('View All') ?>
                                 </a>
                             </div>
                         </div>
@@ -950,7 +1065,7 @@ global $company_name, $company_logo;
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?= getUrl('rfq') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
+                                    <?= t('View All') ?>
                                 </a>
                             </div>
                         </div>
@@ -991,7 +1106,7 @@ global $company_name, $company_logo;
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?= getUrl('debit_notes') ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
+                                    <?= t('View All') ?>
                                 </a>
                             </div>
                         </div>
@@ -1023,17 +1138,17 @@ global $company_name, $company_logo;
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
                             <h6 class="mb-0 fw-bold text-dark">
-                                <i class="bi bi-wallet2 text-primary me-2"></i> Expenses
+                                <i class="bi bi-wallet2 text-primary me-2"></i> <?= t('Expenses') ?>
                                 <span class="badge bg-primary ms-1" id="sup-expenses-count">0</span>
                             </h6>
                             <div class="d-flex gap-2 ms-auto">
                                 <?php if (canCreate('expenses')): ?>
                                 <a href="<?= getUrl('expenses') ?>?paid_to_type=supplier&paid_to_id=<?= $supplier_id ?>&add=1" class="btn btn-primary btn-sm shadow-sm">
-                                    <i class="bi bi-plus-circle me-1"></i> New Expense
+                                    <i class="bi bi-plus-circle me-1"></i> <?= t('New Expense') ?>
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?= getUrl('expenses') ?>?paid_to_type=supplier&paid_to_id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
+                                    <?= t('View All') ?>
                                 </a>
                             </div>
                         </div>
@@ -1058,7 +1173,7 @@ global $company_name, $company_logo;
         <?php endif; ?>
 
         <!-- Projects Involved -->
-        <?php if (!$hideProcurementTabs): ?>
+        <?php if (!$hideProcurementTabs && projectsModuleActive()): ?>
         <div class="tab-pane fade" id="pane-projects" role="tabpanel">
             <div class="row mt-2 mb-4">
                 <div class="col-12">
@@ -1203,11 +1318,11 @@ global $company_name, $company_logo;
                                     <?php endif; ?>
                                     <?php if (canCreate('received_invoices')): ?>
                                     <button type="button" class="btn btn-success btn-sm shadow-sm" onclick="openRiModal()">
-                                        <i class="bi bi-inbox me-1"></i> Record Invoice
+                                        <i class="bi bi-inbox me-1"></i> <?= t('Record Invoice') ?>
                                     </button>
                                     <?php endif; ?>
                                     <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                        View All
+                                        <?= t('View All') ?>
                                     </a>
                                 </div>
                             </div>
@@ -1295,7 +1410,7 @@ global $company_name, $company_logo;
                                         <i class="bi bi-plus-circle me-1"></i> Add Payment
                                     </a>
                                     <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                        View All
+                                        <?= t('View All') ?>
                                     </a>
                                 </div>
                             </div>
@@ -1364,7 +1479,7 @@ global $company_name, $company_logo;
                 <div class="col-12">
                     <div class="card border-0 shadow-sm mb-3">
                         <div class="card-header bg-white py-3">
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i> Record Information</h6>
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i> <?= t('Record Information') ?></h6>
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
@@ -1374,7 +1489,7 @@ global $company_name, $company_logo;
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
-                                    <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= ucfirst($supplier['status']) ?></span></p>
+                                    <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= t(ucfirst($supplier['status'])) ?></span></p>
                                 </div>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1"><?= t('Created By') ?></label>
@@ -1392,14 +1507,18 @@ global $company_name, $company_logo;
                                     <label class="form-label text-muted small mb-1"><?= t('Last Updated') ?></label>
                                     <p class="mb-0 fw-semibold"><?= !empty($supplier['updated_at']) ? format_date($supplier['updated_at']) : '—' ?></p>
                                 </div>
+                                <?php if (!$simpleSupplierForm || !empty($supplier['category_name'])): // the Simple form has no Category ?>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1"><?= t('Category') ?></label>
                                     <p class="mb-0 fw-semibold"><?= caseFormat($supplier['category_name'], '—') ?></p>
                                 </div>
+                                <?php endif; ?>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-6 col-md-3">
                                     <label class="form-label text-muted small mb-1"><?= t('Projects Linked') ?></label>
                                     <p class="mb-0 fw-semibold"><?= (int) $total_supplier_projects ?></p>
                                 </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -1407,7 +1526,7 @@ global $company_name, $company_logo;
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-white py-3 d-flex align-items-center">
                             <h6 class="mb-0 fw-bold text-dark">
-                                <i class="bi bi-clock-history text-primary me-2"></i> Audit Trail
+                                <i class="bi bi-clock-history text-primary me-2"></i> <?= t('Audit Trail') ?>
                                 <span class="badge bg-primary ms-1"><?= count($supplier_audit) ?></span>
                             </h6>
                         </div>

@@ -24,6 +24,10 @@ $can_adjust_stock = hasPermission('adjust_stock') || isAdmin();
 // Create/Edit is hidden here too, for the exact same reason — a Simple POS
 // shop owner never entered these values and shouldn't be shown them back.
 $simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
+require_once ROOT_DIR . '/core/stock_ledger.php';   // stockMovementIsInbound() for the movements sign
+// Links into other modules' pages only when they would open (pos_detail_pages_plan.md A4).
+$can_po_list_link       = bmsRouteAvailable('purchase_orders');
+$can_sales_report_link  = bmsRouteAvailable('product_analysis');
 
 // Get product details with comprehensive information
 try {
@@ -152,7 +156,12 @@ try {
 } catch (PDOException $e) {
     header("Location: products.php?error=Database error");
     exit();
-} 
+}
+
+// Reserved stock is set aside for Projects (stock_intake / project sales): hidden when
+// Projects is off AND nothing is reserved, so real data is never hidden (B3).
+$showReserved = projectsModuleActive() || (float)($product['total_reserved'] ?? 0) > 0;
+
 
 // Get stock by warehouse
 $warehouse_stock = [];
@@ -185,11 +194,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT pb.batch_id, pb.batch_number, pb.expiry_date, pb.manufacturing_date, pb.quantity_received,
                pb.quantity_remaining, pb.unit_cost, pb.created_at,
-               w.warehouse_name, pr.receipt_number,
+               w.warehouse_name, pr.receipt_number, sup.supplier_name,
                DATEDIFF(pb.expiry_date, CURDATE()) AS days_remaining
         FROM product_batches pb
         LEFT JOIN warehouses w ON w.warehouse_id = pb.warehouse_id
         LEFT JOIN purchase_receipts pr ON pr.receipt_id = pb.receipt_id
+        LEFT JOIN suppliers sup ON sup.supplier_id = pb.supplier_id
         WHERE pb.product_id = ?
         ORDER BY (pb.expiry_date IS NULL), pb.expiry_date ASC, pb.batch_id DESC
     ");
@@ -197,6 +207,39 @@ try {
     $product_batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $product_batches = [];
+}
+// "Source GRN" only means something with Procurement (or when a batch really came from a GRN) — B3.
+$showGrnCol = bmsRouteAvailable('grn') || count(array_filter($product_batches, fn($b) => !empty($b['receipt_number']))) > 0;
+// Without GRNs the batch's supplier (from POS "Receive Stock") is the useful column (C3).
+$showBatchSupplierCol = !$showGrnCol;
+
+// ── POS facts for Basic Information (pos_detail_pages_plan.md C3) ──────────────
+// Last delivery = newest batch; wholesale = the Wholesale price-group price POS
+// really charges (products.wholesale_price is legacy/unread — quick_restock.php);
+// days of stock left = available ÷ average daily units sold over the last 30 days.
+$last_delivery = null; $pos_wholesale = null; $days_of_stock = null;
+try {
+    $ld = $pdo->prepare("SELECT pb.created_at, pb.unit_cost, pb.quantity_received, s.supplier_id, s.supplier_name
+                           FROM product_batches pb LEFT JOIN suppliers s ON s.supplier_id = pb.supplier_id
+                          WHERE pb.product_id = ? ORDER BY pb.created_at DESC, pb.batch_id DESC LIMIT 1");
+    $ld->execute([$product_id]);
+    $last_delivery = $ld->fetch(PDO::FETCH_ASSOC) ?: null;
+    require_once ROOT_DIR . '/core/pos_price_groups.php';
+    $wgId = wholesalePriceGroupId($pdo);
+    if ($wgId) {
+        $wp = $pdo->prepare("SELECT price FROM product_price_group_prices WHERE product_id = ? AND price_group_id = ?");
+        $wp->execute([$product_id, $wgId]);
+        $v = $wp->fetchColumn();
+        $pos_wholesale = ($v !== false && (float)$v > 0) ? (float)$v : null;
+    }
+    $sold30 = $pdo->prepare("SELECT COALESCE(SUM(psi.quantity), 0) FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                               WHERE psi.product_id = ? AND ps.is_return_sale = 0 AND ps.sale_status IN ('completed','partially_refunded','refunded')
+                                 AND ps.sale_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+    $sold30->execute([$product_id]);
+    $perDay = (float)$sold30->fetchColumn() / 30;
+    if ($perDay > 0) $days_of_stock = max(0, (int)floor((float)$product['available_stock'] / $perDay));
+} catch (PDOException $e) {
+    error_log('product_view POS facts: ' . $e->getMessage());
 }
 
 // Get recent sales (last 10)
@@ -232,7 +275,7 @@ try {
         SELECT 
             sm.*,
             w.warehouse_name,
-            u.username as adjusted_by_name
+            COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.username) as adjusted_by_name
         FROM stock_movements sm
         LEFT JOIN warehouses w ON sm.warehouse_id = w.warehouse_id
         LEFT JOIN users u ON sm.created_by = u.user_id
@@ -339,43 +382,53 @@ function get_movement_type_badge($type) {
         'damaged' => 'dark',
         'expired' => 'secondary',
         'found' => 'info',
-        'theft' => 'danger'
+        'theft' => 'danger',
+        'transfer_in' => 'info',
+        'transfer_out' => 'secondary',
+        'return_in' => 'success',
+        'return_out' => 'danger',
+        'issue_out' => 'warning'
     ];
     
     $labels = [
-        'purchase_in' => 'Purchase',
-        'sale_out' => 'Sale',
-        'adjustment_in' => 'Stock In',
-        'adjustment_out' => 'Stock Out',
-        'correction' => 'Correction',
-        'damaged' => 'Damaged',
-        'expired' => 'Expired',
-        'found' => 'Found',
-        'theft' => 'Theft'
+        'purchase_in' => t('Purchase'),
+        'sale_out' => t('Sale'),
+        'adjustment_in' => t('Stock In'),
+        'adjustment_out' => t('Stock Out'),
+        'correction' => t('Correction'),
+        'damaged' => t('Damaged'),
+        'expired' => t('Expired'),
+        'found' => t('Found'),
+        'theft' => t('Theft'),
+        'transfer_in' => t('Transfer In'),
+        'transfer_out' => t('Transfer Out'),
+        'return_in' => t('Return In'),
+        'return_out' => t('Return Out'),
+        'issue_out' => t('Issued Out')
     ];
     
     $color = $badges[$type] ?? 'secondary';
-    $label = $labels[$type] ?? $type;
+    $label = $labels[$type] ?? ucwords(str_replace('_', ' ', (string)$type));
     
-    return '<span class="badge bg-' . $color . '">' . $label . '</span>';
+    return '<span class="badge bg-' . $color . '">' . htmlspecialchars($label) . '</span>';
 }
 
 function get_stock_badge($stock_status, $available_stock) {
     $color = 'secondary';
-    $label = 'Unknown';
+    $label = t('Unknown');
     
     switch ($stock_status) {
         case 'out_of_stock':
             $color = 'danger';
-            $label = 'Out of Stock';
+            $label = t('Out of Stock');
             break;
         case 'low_stock':
             $color = 'warning';
-            $label = 'Low Stock';
+            $label = t('Low Stock');
             break;
         case 'in_stock':
             $color = 'success';
-            $label = 'In Stock (' . $available_stock . ')';
+            $label = t('In Stock') . ' (' . $available_stock . ')';
             break;
     }
     return '<span class="badge bg-' . $color . '">' . $label . '</span>';
@@ -445,8 +498,8 @@ global $company_logo, $company_name;
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-start flex-nowrap gap-2">
                 <div>
-                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> Product View</h2>
-                    <p class="text-muted mb-0 small mt-1 d-none d-md-block">View comprehensive information about this product</p>
+                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> <?= t('Product View') ?></h2>
+                    <p class="text-muted mb-0 small mt-1 d-none d-md-block"><?= t('View comprehensive information about this product') ?></p>
                     <?php if (!$simpleProductForm): ?>
                     <p class="text-muted mb-0 small mt-1 d-md-none">Product: <?= caseFormat($product['sku']) ?></p>
                     <?php endif; ?>
@@ -455,20 +508,20 @@ global $company_logo, $company_name;
                 <!-- Desktop Actions -->
                 <div class="d-none d-md-flex gap-2 ms-auto pt-1 flex-shrink-0">
                     <a href="<?= $product['is_service'] == 1 ? getUrl('services') : getUrl('products') ?>" class="btn btn-outline-secondary btn-sm shadow-sm">
-                        <i class="bi bi-arrow-left"></i> Back
+                        <i class="bi bi-arrow-left"></i> <?= t('Back') ?>
                     </a>
                     <button type="button" class="btn btn-outline-primary btn-sm shadow-sm" onclick="printProductDetails()">
-                        <i class="bi bi-printer"></i> Print
+                        <i class="bi bi-printer"></i> <?= t('Print') ?>
                     </button>
                    
                     <?php if ($can_edit_products): ?>
                     <a href="<?= getUrl('product_edit') ?>?id=<?= $product_id ?>&type=<?= $product['is_service'] == 1 ? 'service' : 'inventory' ?>" class="btn btn-primary btn-sm shadow-sm">
-                        <i class="bi bi-pencil"></i> Edit <?= $product['is_service'] == 1 ? 'Service' : 'Product' ?>
+                        <i class="bi bi-pencil"></i> <?= $product['is_service'] == 1 ? t('Edit Service') : t('Edit Product') ?>
                     </a>
                     <?php endif; ?>
                     <?php if ($can_adjust_stock): ?>
                     <button type="button" class="btn btn-outline-primary btn-sm shadow-sm" onclick="adjustStock(<?= $product_id ?>)">
-                        <i class="bi bi-arrow-left-right"></i> Adjust Stock
+                        <i class="bi bi-arrow-left-right"></i> <?= t('Adjust Stock') ?>
                     </button>
                     <?php endif; ?>
                     <?php if ($can_delete_products && $product['status'] == 'inactive'): ?>
@@ -482,31 +535,31 @@ global $company_logo, $company_name;
                 <div class="d-flex d-md-none ms-auto pt-1 flex-shrink-0">
                     <div class="dropdown">
                         <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear-fill me-1"></i> Actions
+                            <i class="bi bi-gear-fill me-1"></i> <?= t('Actions') ?>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="z-index: 1060;">
                             <li>
                                 <a class="dropdown-item py-2" href="<?= $product['is_service'] == 1 ? getUrl('services') : getUrl('products') ?>">
-                                    <i class="bi bi-arrow-left text-secondary me-2"></i> Back to <?= $product['is_service'] == 1 ? 'Services' : 'Products' ?>
+                                    <i class="bi bi-arrow-left text-secondary me-2"></i> <?= $product['is_service'] == 1 ? t('Back to Services') : t('Back to Products') ?>
                                 </a>
                             </li>
                             <li>
                                 <button class="dropdown-item py-2" onclick="printProductDetails()">
-                                    <i class="bi bi-printer text-info me-2"></i> Print Details
+                                    <i class="bi bi-printer text-info me-2"></i> <?= t('Print Details') ?>
                                 </button>
                             </li>
                             <?php if ($can_edit_products): ?>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item py-2 text-primary" href="<?= getUrl('product_edit') ?>?id=<?= $product_id ?>">
-                                    <i class="bi bi-pencil me-2"></i> Edit Product
+                                    <i class="bi bi-pencil me-2"></i> <?= t('Edit Product') ?>
                                 </a>
                             </li>
                             <?php endif; ?>
                             <?php if ($can_adjust_stock): ?>
                             <li>
                                 <button class="dropdown-item py-2 text-info" onclick="adjustStock(<?= $product_id ?>)">
-                                    <i class="bi bi-arrow-left-right me-2"></i> Adjust Stock
+                                    <i class="bi bi-arrow-left-right me-2"></i> <?= t('Adjust Stock') ?>
                                 </button>
                             </li>
                             <?php endif; ?>
@@ -531,7 +584,7 @@ global $company_logo, $company_name;
         <div class="col-md-4">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-header bg-light border-bottom">
-                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-image"></i> Product Image</h5>
+                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-image"></i> <?= t('Product Image') ?></h5>
                 </div>
                 <div class="card-body text-center">
                     <?php if (!empty($product['image_url'])): ?>
@@ -561,7 +614,7 @@ global $company_logo, $company_name;
         <div class="col-md-8">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-header bg-light border-bottom">
-                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-info-circle"></i> Basic Information</h5>
+                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-info-circle"></i> <?= t('Basic Information') ?></h5>
                 </div>
                 <div class="card-body">
                     <div class="row g-2">
@@ -571,84 +624,117 @@ global $company_logo, $company_name;
                             <div class="row g-2">
                                 <?php if (!$simpleProductForm): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">SKU:</small>
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('SKU:') ?></small>
                                     <span class="custom-badge mt-1"><?= caseFormat($product['sku']) ?></span>
                                 </div>
 
                                 <?php if (!empty($product['barcode'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Barcode:</small>
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Barcode:') ?></small>
                                     <span class="custom-badge mt-1"><?= caseFormat($product['barcode']) ?></span>
                                 </div>
                                 <?php endif; ?>
                                 <?php endif; ?>
                                 
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Category:</small> 
-                                    <span class="custom-badge mt-1"><?= !empty($product['category_name']) ? caseFormat($product['category_name']) : 'Uncategorized' ?></span>
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Category:') ?></small> 
+                                    <span class="custom-badge mt-1"><?= !empty($product['category_name']) ? caseFormat($product['category_name']) : t('Uncategorized') ?></span>
                                 </div>
                                 
                                 <?php if (!empty($product['brand_name'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Brand:</small> 
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Brand:') ?></small> 
                                     <span class="custom-badge mt-1"><?= caseFormat($product['brand_name']) ?></span>
                                 </div>
                                 <?php endif; ?>
                                 
                                 <?php if (!empty($product['supplier_name'])): ?>
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Supplier:</small> 
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Supplier:') ?></small> 
                                     <span class="custom-badge mt-1"><?= caseFormat($product['supplier_name']) ?></span>
                                 </div>
                                 <?php endif; ?>
                                 
                                 <div class="col-6 col-md-12 mb-2 mb-md-3">
-                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;">Unit:</small> 
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Unit:') ?></small> 
                                     <span class="custom-badge mt-1"><?= caseFormat($product['unit']) ?></span>
                                 </div>
+                                <?php if ($simpleProductForm): // POS facts (pos_detail_pages_plan.md C3) ?>
+                                <?php if (!empty($product['barcode'])): ?>
+                                <div class="col-6 col-md-12 mb-2 mb-md-3">
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Barcode:') ?></small>
+                                    <span class="custom-badge mt-1"><?= htmlspecialchars($product['barcode']) ?></span>
+                                </div>
+                                <?php endif; ?>
+                                <div class="col-6 col-md-12 mb-2 mb-md-3">
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Last delivery:') ?></small>
+                                    <?php if ($last_delivery): ?>
+                                    <span class="d-block mt-1"><?= format_date($last_delivery['created_at']) ?> · <?= format_number($last_delivery['quantity_received'], 3) ?> @ <?= format_currency($last_delivery['unit_cost']) ?></span>
+                                    <?php if (!empty($last_delivery['supplier_name'])): ?>
+                                    <a class="small text-decoration-none" href="<?= getUrl('suppliers/view') ?>?id=<?= (int)$last_delivery['supplier_id'] ?>"><?= caseFormat($last_delivery['supplier_name']) ?></a>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <span class="d-block mt-1 text-muted">—</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($product['is_service'] == 0): ?>
+                                <div class="col-6 col-md-12 mb-2 mb-md-3">
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Days of stock left:') ?></small>
+                                    <span class="d-block mt-1 fw-bold <?= ($days_of_stock !== null && $days_of_stock <= 7) ? 'text-danger' : '' ?>">
+                                        <?= $days_of_stock === null ? '—' : sprintf(t('about %d days'), $days_of_stock) ?>
+                                    </span>
+                                    <?php if ($days_of_stock === null): ?><small class="text-muted"><?= t('No sales in the last 30 days') ?></small><?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+                                <?php endif; ?>
                             </div>
                         </div>
                         
                         <div class="col-md-6">
                             <div class="card bg-light h-100 mb-0 shadow-none border-0">
                                 <div class="card-body p-2 p-md-3">
-                                    <h6 class="card-title fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-tag"></i> Pricing Information</h6>
+                                    <h6 class="card-title fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-tag"></i> <?= t('Pricing Information') ?></h6>
                                     
                                     <div class="row g-3">
                                         <div class="col-6 col-md-12 mb-1">
-                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;">Cost Price:</small>
+                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Cost Price:') ?></small>
                                             <h4 class="text-danger fw-bold mb-0 mt-1 fs-5 fs-md-4"><?= format_currency($product['cost_price']) ?></h4>
                                         </div>
                                         
                                         <div class="col-6 col-md-12 mb-1">
-                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;">Selling Price:</small>
+                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Selling Price:') ?></small>
                                             <h4 class="text-success fw-bold mb-0 mt-1 fs-5 fs-md-4"><?= format_currency($product['selling_price']) ?></h4>
                                         </div>
                                         
                                         <?php if ($product['min_selling_price'] > 0): ?>
                                         <div class="col-6 col-md-12 mb-1">
-                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;">Min Price:</small>
+                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Min Price:') ?></small>
                                             <h5 class="text-warning fw-bold mb-0 mt-1"><?= format_currency($product['min_selling_price']) ?></h5>
                                         </div>
                                         <?php endif; ?>
                                         
                                         <?php if ($product['wholesale_price'] > 0 && !$simpleProductForm): ?>
                                         <div class="col-6 col-md-12 mb-1">
-                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;">Wholesale:</small>
+                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Wholesale:') ?></small>
                                             <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($product['wholesale_price']) ?></h5>
+                                        </div>
+                                        <?php elseif ($simpleProductForm && $pos_wholesale !== null): // the Wholesale price-group price POS charges (C3) ?>
+                                        <div class="col-6 col-md-12 mb-1">
+                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Wholesale:') ?></small>
+                                            <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($pos_wholesale) ?></h5>
                                         </div>
                                         <?php endif; ?>
                                         
                                         <div class="col-12 col-md-12 mb-1 border-top pt-2">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem;">Margin:</small>
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem;"><?= t('Margin:') ?></small>
                                                     <h5 class="text-<?= get_progress_color($product['profit_margin_percentage']) ?> fw-bold mb-0">
                                                         <?= format_number($product['profit_margin_percentage'], 1) ?>%
                                                     </h5>
                                                 </div>
                                                 <div class="text-end">
-                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem;">Profit:</small>
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem;"><?= t('Profit:') ?></small>
                                                     <h6 class="mb-0 text-dark"><?= format_currency($product['selling_price'] - $product['cost_price']) ?></h6>
                                                 </div>
                                             </div>
@@ -661,19 +747,19 @@ global $company_logo, $company_name;
                     
                     <?php if (!empty($product['description']) && !$simpleProductForm): ?>
                     <div class="mt-3">
-                        <strong>Description:</strong>
+                        <strong><?= t('Description:') ?></strong>
                         <p class="mt-1"><?= nl2br(caseFormat($product['description'])) ?></p>
                     </div>
                     <?php endif; ?>
                     
                     <div class="row mt-3">
                         <div class="col-md-6">
-                            <small class="text-muted">Created:</small>
-                            <p><?= format_date($product['created_at'], 'd M Y, h:i A') ?> by <?= caseFormat($product['created_by_name']) ?></p>
+                            <small class="text-muted"><?= t('Created:') ?></small>
+                            <p><?= format_date($product['created_at'], 'd M Y, h:i A') ?> <?= t('by') ?> <?= caseFormat($product['created_by_name']) ?></p>
                         </div>
                         <div class="col-md-6">
-                            <small class="text-muted">Last Updated:</small>
-                            <p><?= format_date($product['updated_at'], 'd M Y, h:i A') ?> by <?= caseFormat($product['updated_by_name']) ?></p>
+                            <small class="text-muted"><?= t('Last Updated:') ?></small>
+                            <p><?= format_date($product['updated_at'], 'd M Y, h:i A') ?> <?= t('by') ?> <?= caseFormat($product['updated_by_name']) ?></p>
                         </div>
                     </div>
                 </div>
@@ -691,21 +777,21 @@ global $company_logo, $company_name;
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="stock-tab" data-bs-toggle="tab" 
                                     data-bs-target="#stock" type="button" role="tab">
-                                <i class="bi bi-boxes"></i> Stock Information
+                                <i class="bi bi-boxes"></i> <?= t('Stock Information') ?>
                             </button>
                         </li>
                         <?php endif; ?>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link <?= $product['is_service'] == 1 ? 'active' : '' ?>" id="sales-tab" data-bs-toggle="tab" 
                                     data-bs-target="#sales" type="button" role="tab">
-                                <i class="bi bi-graph-up"></i> Sales Performance
+                                <i class="bi bi-graph-up"></i> <?= t('Sales Performance') ?>
                             </button>
                         </li>
                         <?php if ($product['is_service'] == 0): ?>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="movements-tab" data-bs-toggle="tab" 
                                     data-bs-target="#movements" type="button" role="tab">
-                                <i class="bi bi-arrow-left-right"></i> Stock Movements
+                                <i class="bi bi-arrow-left-right"></i> <?= t('Stock Movements') ?>
                             </button>
                         </li>
                         <?php endif; ?>
@@ -713,7 +799,7 @@ global $company_logo, $company_name;
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="details-tab" data-bs-toggle="tab"
                                     data-bs-target="#details" type="button" role="tab">
-                                <i class="bi bi-list-check"></i> Additional Details
+                                <i class="bi bi-list-check"></i> <?= t('Additional Details') ?>
                             </button>
                         </li>
                         <?php endif; ?>
@@ -721,7 +807,7 @@ global $company_logo, $company_name;
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="actions-tab" data-bs-toggle="tab" 
                                     data-bs-target="#actions" type="button" role="tab">
-                                <i class="bi bi-gear"></i> Quick Actions
+                                <i class="bi bi-gear"></i> <?= t('Quick Actions') ?>
                             </button>
                         </li>
                         <?php endif; ?>
@@ -737,28 +823,30 @@ global $company_logo, $company_name;
                                 <div class="col-md-6">
                                     <div class="card mb-4">
                                         <div class="card-header bg-light border-bottom">
-                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-pie-chart"></i> Stock Summary</h6>
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-pie-chart"></i> <?= t('Stock Summary') ?></h6>
                                         </div>
                                         <div class="card-body" style="background-color: #d1e7dd;">
                                             <div class="row text-center">
                                                 <div class="col-6">
                                                     <h2 class="text-primary"><?= format_number($product['total_stock'], 3) ?></h2>
-                                                    <small class="text-muted">Total Stock</small>
+                                                    <small class="text-muted"><?= t('Total Stock') ?></small>
                                                 </div>
                                                 <div class="col-6">
                                                     <h2 class="text-success"><?= format_number($product['available_stock'], 3) ?></h2>
-                                                    <small class="text-muted">Available Stock</small>
+                                                    <small class="text-muted"><?= t('Available Stock') ?></small>
                                                 </div>
                                             </div>
                                             
                                             <div class="row text-center mt-3">
+                                                <?php if ($showReserved): ?>
                                                 <div class="col-6">
                                                     <h4 class="text-danger"><?= format_number($product['total_reserved'], 3) ?></h4>
-                                                    <small class="text-muted">Reserved Stock</small>
+                                                    <small class="text-muted"><?= t('Reserved Stock') ?></small>
                                                 </div>
-                                                <div class="col-6">
+                                                <?php endif; ?>
+                                                <div class="<?= $showReserved ? 'col-6' : 'col-12' ?>">
                                                     <h4 class="text-warning"><?= format_currency($product['stock_value']) ?></h4>
-                                                    <small class="text-muted">Stock Value</small>
+                                                    <small class="text-muted"><?= t('Stock Value') ?></small>
                                                 </div>
                                             </div>
                                             
@@ -771,56 +859,58 @@ global $company_logo, $company_name;
                                                         ($product['total_reserved'] / $product['total_stock']) * 100 : 0;
                                                     ?>
                                                     <div class="progress-bar bg-success" style="width: <?= $available_percentage ?>%">
-                                                        Available: <?= format_number($available_percentage, 1) ?>%
+                                                        <?= t('Available') ?>: <?= format_number($available_percentage, 1) ?>%
                                                     </div>
+                                                    <?php if ($showReserved): ?>
                                                     <div class="progress-bar bg-danger" style="width: <?= $reserved_percentage ?>%">
-                                                        Reserved: <?= format_number($reserved_percentage, 1) ?>%
+                                                        <?= t('Reserved') ?>: <?= format_number($reserved_percentage, 1) ?>%
                                                     </div>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
-                                            <div class="text-center mt-3">
+                                            <?php if ($can_po_list_link): ?><div class="text-center mt-3">
                                                 <a href="<?= getUrl('purchase_orders') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary">
-                                                    <i class="bi bi-cart-plus"></i> View All Purchase Orders
+                                                    <i class="bi bi-cart-plus"></i> <?= t('View All Purchase Orders') ?>
                                                 </a>
-                                            </div>
+                                            </div><?php endif; ?>
                                         </div>
                                     </div>
                                     
                                     <div class="card">
                                         <div class="card-header bg-light border-bottom">
-                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-exclamation-triangle"></i> Stock Alerts</h6>
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-exclamation-triangle"></i> <?= t('Stock Alerts') ?></h6>
                                         </div>
                                         <div class="card-body">
                                             <?php if ($product['stock_status'] == 'out_of_stock'): ?>
                                             <div class="alert alert-danger">
                                                 <i class="bi bi-x-circle"></i>
-                                                <strong>Out of Stock!</strong> This product has no available stock.
+                                                <strong><?= t('Out of Stock!') ?></strong> <?= t('This product has no available stock.') ?>
                                             </div>
                                             <?php elseif ($product['stock_status'] == 'low_stock'): ?>
                                             <div class="alert alert-warning">
                                                 <i class="bi bi-exclamation-triangle"></i>
-                                                <strong>Low Stock Alert!</strong> 
+                                                <strong><?= t('Low Stock Alert!') ?></strong> 
                                                 Stock (<?= $product['available_stock'] ?>) is below reorder level (<?= $product['min_stock_level'] ?>).
                                             </div>
                                             <?php else: ?>
                                             <div class="alert alert-success">
                                                 <i class="bi bi-check-circle"></i>
-                                                <strong>Stock Level OK</strong> 
-                                                Current stock is above reorder level.
+                                                <strong><?= t('Stock Level OK') ?></strong> 
+                                                <?= t('Current stock is above reorder level.') ?>
                                             </div>
                                             <?php endif; ?>
                                             
                                             <div class="row">
                                                 <div class="col-6">
-                                                    <small class="text-muted">Reorder Level:</small>
+                                                    <small class="text-muted"><?= t('Reorder Level:') ?></small>
                                                     <p><strong><?= format_number($product['min_stock_level'], 3) ?></strong></p>
                                                 </div>
                                                 <div class="col-6">
-                                                    <small class="text-muted">Min Stock Level:</small>
+                                                    <small class="text-muted"><?= t('Min Stock Level:') ?></small>
                                                     <p><strong><?= format_number($product['min_stock_level'], 3) ?></strong></p>
                                                 </div>
                                                 <div class="col-6">
-                                                    <small class="text-muted">Max Stock Level:</small>
+                                                    <small class="text-muted"><?= t('Max Stock Level:') ?></small>
                                                     <p><strong><?= format_number($product['max_stock_level'], 3) ?></strong></p>
                                                 </div>
                                             </div>
@@ -844,7 +934,7 @@ global $company_logo, $company_name;
                                                             <th><?= t('Location') ?></th>
                                                             <th><?= t('Total Stock') ?></th>
                                                             <th><?= t('Available') ?></th>
-                                                            <th><?= t('Reserved') ?></th>
+                                                            <?php if ($showReserved): ?><th><?= t('Reserved') ?></th><?php endif; ?>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -859,7 +949,7 @@ global $company_logo, $company_name;
                                                             <td>
                                                                 <?= format_number($stock['stock_quantity'] - $stock['reserved_quantity'], 3) ?>
                                                             </td>
-                                                            <td><?= format_number($stock['reserved_quantity'], 3) ?></td>
+                                                            <?php if ($showReserved): ?><td><?= format_number($stock['reserved_quantity'], 3) ?></td><?php endif; ?>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
@@ -868,7 +958,7 @@ global $company_logo, $company_name;
                                             <?php else: ?>
                                             <div class="text-center py-4">
                                                 <i class="bi bi-box" style="font-size: 3rem; color: #6c757d;"></i>
-                                                <p class="text-muted mt-2">No stock information available</p>
+                                                <p class="text-muted mt-2"><?= t('No stock information available') ?></p>
                                             </div>
                                             <?php endif; ?>
                                         </div>
@@ -880,7 +970,7 @@ global $company_logo, $company_name;
                                 <div class="col-12 mt-3">
                                     <div class="card">
                                         <div class="card-header bg-light border-bottom">
-                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-upc-scan"></i> Batches / Lots</h6>
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-upc-scan"></i> <?= t('Batches / Lots') ?></h6>
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
@@ -896,7 +986,8 @@ global $company_logo, $company_name;
                                                             <th><?= t('Remaining') ?></th>
                                                             <th><?= t('Status') ?></th>
                                                             <th><?= t('Unit Cost') ?></th>
-                                                            <th><?= t('Source GRN') ?></th>
+                                                            <?php if ($showGrnCol): ?><th><?= t('Source GRN') ?></th><?php endif; ?>
+                                                            <?php if ($showBatchSupplierCol): ?><th><?= t('Supplier') ?></th><?php endif; ?>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -908,11 +999,11 @@ global $company_logo, $company_name;
                                                             $isExhausted = (float)$b['quantity_remaining'] <= 0.0001;
                                                             $isExpired   = ($days !== null && $days <= 0);
                                                             if ($isExhausted) {
-                                                                $statusBadge = '<span class="badge bg-secondary">Exhausted</span>';
+                                                                $statusBadge = '<span class="badge bg-secondary">' . t('Exhausted') . '</span>';
                                                             } elseif ($isExpired) {
-                                                                $statusBadge = '<span class="badge bg-danger">Expired</span>';
+                                                                $statusBadge = '<span class="badge bg-danger">' . t('Expired') . '</span>';
                                                             } else {
-                                                                $statusBadge = '<span class="badge bg-success">Active</span>';
+                                                                $statusBadge = '<span class="badge bg-success">' . t('Active') . '</span>';
                                                             }
                                                         ?>
                                                         <tr>
@@ -923,14 +1014,15 @@ global $company_logo, $company_name;
                                                             <td class="<?= $expiredClass ?>">
                                                                 <?= $b['expiry_date'] ? date('d M Y', strtotime($b['expiry_date'])) : '—' ?>
                                                                 <?php if ($days !== null && $days <= 30): ?>
-                                                                    (<?= $days <= 0 ? 'expired' : $days . 'd left' ?>)
+                                                                    (<?= $days <= 0 ? t('expired') : sprintf(t('%d days left'), $days) ?>)
                                                                 <?php endif; ?>
                                                             </td>
                                                             <td><?= format_number($b['quantity_received'], 3) ?></td>
                                                             <td><?= format_number($b['quantity_remaining'], 3) ?></td>
                                                             <td><?= $statusBadge ?></td>
                                                             <td><?= format_currency($b['unit_cost']) ?></td>
-                                                            <td><?= caseFormat($b['receipt_number'] ?? '—') ?></td>
+                                                            <?php if ($showGrnCol): ?><td><?= caseFormat($b['receipt_number'] ?? '—') ?></td><?php endif; ?>
+                                                            <?php if ($showBatchSupplierCol): ?><td><?= !empty($b['supplier_name']) ? caseFormat($b['supplier_name']) : '—' ?></td><?php endif; ?>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
@@ -950,7 +1042,7 @@ global $company_logo, $company_name;
                                 <div class="col-md-8">
                                     <div class="card mb-4">
                                         <div class="card-header bg-light border-bottom">
-                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-bar-chart"></i> Sales Trend (Last 6 Months)</h6>
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-bar-chart"></i> <?= t('Sales Trend (Last 6 Months)') ?></h6>
                                         </div>
                                         <div class="card-body">
                                             <?php if (!empty($sales_trend)): ?>
@@ -993,46 +1085,46 @@ global $company_logo, $company_name;
                                 <div class="col-md-4">
                                     <div class="card mb-4">
                                         <div class="card-header bg-light border-bottom">
-                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-stack"></i> Sales Statistics</h6>
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-stack"></i> <?= t('Sales Statistics') ?></h6>
                                         </div>
                                         <div class="card-body" style="background-color: #d1e7dd;">
                                             <div class="mb-3">
-                                                <small class="text-muted">Total Sold (All Time):</small>
-                                                <h4><?= format_number($product['total_sales_quantity'], 3) ?> units</h4>
+                                                <small class="text-muted"><?= t('Total Sold (All Time):') ?></small>
+                                                <h4><?= format_number($product['total_sales_quantity'], 3) ?> <?= t('units') ?></h4>
                                             </div>
                                             
                                             <div class="mb-3">
-                                                <small class="text-muted">Total Revenue:</small>
+                                                <small class="text-muted"><?= t('Total Revenue:') ?></small>
                                                 <h4><?= format_currency($product['total_revenue']) ?></h4>
                                             </div>
                                             
                                             <div class="mb-3">
-                                                <small class="text-muted">Last 90 Days:</small>
-                                                <h5><?= format_number($product['sales_last_90_days'], 3) ?> units</h5>
+                                                <small class="text-muted"><?= t('Last 90 Days:') ?></small>
+                                                <h5><?= format_number($product['sales_last_90_days'], 3) ?> <?= t('units') ?></h5>
                                             </div>
                                             
                                             <div class="mb-3">
-                                                <small class="text-muted">Average Monthly Sales:</small>
-                                                <h5><?= format_number($product['avg_monthly_sales'], 3) ?> units</h5>
+                                                <small class="text-muted"><?= t('Average Monthly Sales:') ?></small>
+                                                <h5><?= format_number($product['avg_monthly_sales'], 3) ?> <?= t('units') ?></h5>
                                             </div>
                                             
                                             <div class="mb-3">
-                                                <small class="text-muted">Last Sale:</small>
+                                                <small class="text-muted"><?= t('Last Sale:') ?></small>
                                                 <p>
                                                     <?= !empty($product['last_sale_date']) ? 
-                                                        format_date($product['last_sale_date']) : 'No sales yet' ?>
+                                                        format_date($product['last_sale_date']) : t('No sales yet') ?>
                                                     <?php if (is_numeric($days_since_last_sale)): ?>
                                                     <br><small class="text-muted">
-                                                        <?= $days_since_last_sale ?> days ago
+                                                        <?= sprintf(t('%d days ago'), $days_since_last_sale) ?>
                                                     </small>
                                                     <?php endif; ?>
                                                 </p>
                                             </div>
-                                            <div class="text-center mt-2 px-3 pb-3">
+                                            <?php if ($can_po_list_link): ?><div class="text-center mt-2 px-3 pb-3">
                                                 <a href="<?= getUrl('purchase_orders') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary w-100">
-                                                    <i class="bi bi-cart-plus"></i> View All Purchase Orders
+                                                    <i class="bi bi-cart-plus"></i> <?= t('View All Purchase Orders') ?>
                                                 </a>
-                                            </div>
+                                            </div><?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -1041,7 +1133,7 @@ global $company_logo, $company_name;
                             <!-- Recent Sales -->
                             <div class="card">
                                 <div class="card-header bg-info text-white">
-                                    <h6 class="mb-0"><i class="bi bi-receipt"></i> Recent Sales (Last 10)</h6>
+                                    <h6 class="mb-0"><i class="bi bi-receipt"></i> <?= t('Recent Sales (Last 10)') ?></h6>
                                 </div>
                                 <div class="card-body">
                                     <?php if (!empty($recent_sales)): ?>
@@ -1063,7 +1155,9 @@ global $company_logo, $company_name;
                                                 <tr>
                                                     <td><?= format_date($sale['sale_date']) ?></td>
                                                     <td>
-                                                        <a href="<?= getUrl('sales_order_view') ?>?id=<?= $sale['sale_id'] ?>" class="text-decoration-none">
+                                                        <?php /* A POS sale: opens its receipt (was sales_order_view?id=<pos sale_id>,
+                                                                 the wrong record — pos_detail_pages_plan.md A8). */ ?>
+                                                        <a href="<?= buildUrl('api/pos/print_receipt.php') ?>?id=<?= (int)$sale['sale_id'] ?>" target="_blank" rel="noopener" class="text-decoration-none">
                                                             <?= caseFormat($sale['receipt_number']) ?>
                                                         </a>
                                                     </td>
@@ -1084,7 +1178,7 @@ global $company_logo, $company_name;
                                     <?php else: ?>
                                     <div class="text-center py-4">
                                         <i class="bi bi-cart" style="font-size: 3rem; color: #6c757d;"></i>
-                                        <p class="text-muted mt-2">No recent sales found</p>
+                                        <p class="text-muted mt-2"><?= t('No recent sales found') ?></p>
                                     </div>
                                     <?php endif; ?>
                                 </div>
@@ -1096,7 +1190,7 @@ global $company_logo, $company_name;
                         <div class="tab-pane fade" id="movements" role="tabpanel">
                             <div class="card">
                                 <div class="card-header bg-warning text-dark">
-                                    <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> Recent Stock Movements</h6>
+                                    <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> <?= t('Recent Stock Movements') ?></h6>
                                 </div>
                                 <div class="card-body">
                                     <?php if (!empty($recent_movements)): ?>
@@ -1128,8 +1222,20 @@ global $company_logo, $company_name;
                                                         <span class="text-muted">N/A</span>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td class="<?= ($movement['quantity'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>">
-                                                        <?= ($movement['quantity'] ?? 0) >= 0 ? '+' : '' ?><?= format_number($movement['quantity'] ?? 0, 3) ?>
+                                                    <?php
+                                                    // Quantities are stored positive; the direction is the movement's
+                                                    // (pos_detail_pages_plan.md A5): stock_after vs stock_before when
+                                                    // both are recorded, else the canonical IN/OUT movement types.
+                                                    $mvQty = abs((float)($movement['quantity'] ?? 0));
+                                                    if ($movement['stock_before'] !== null && $movement['stock_after'] !== null
+                                                        && (float)$movement['stock_after'] != (float)$movement['stock_before']) {
+                                                        $mvIn = (float)$movement['stock_after'] > (float)$movement['stock_before'];
+                                                    } else {
+                                                        $mvIn = stockMovementIsInbound((string)$movement['movement_type']);
+                                                    }
+                                                    ?>
+                                                    <td class="<?= $mvIn ? 'text-success' : 'text-danger' ?>">
+                                                        <?= $mvIn ? '+' : '−' ?><?= format_number($mvQty, 3) ?>
                                                     </td>
                                                     <td><?= format_number($movement['stock_before'] ?? 0, 3) ?></td>
                                                     <td><?= format_number($movement['stock_after'] ?? 0, 3) ?></td>
@@ -1138,7 +1244,7 @@ global $company_logo, $company_name;
                                                         <?php if (!empty($movement['reason'])): ?>
                                                         <small><?= caseFormat($movement['reason']) ?></small>
                                                         <?php else: ?>
-                                                        <span class="text-muted">No reason provided</span>
+                                                        <span class="text-muted">—</span>
                                                         <?php endif; ?>
                                                     </td>
                                                 </tr>
@@ -1148,13 +1254,13 @@ global $company_logo, $company_name;
                                     </div>
                                     <div class="text-center mt-2">
                                         <a href="<?= getUrl('stock_movements') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary">
-                                            View All Movements
+                                            <?= t('View All Movements') ?>
                                         </a>
                                     </div>
                                     <?php else: ?>
                                     <div class="text-center py-4">
                                         <i class="bi bi-arrow-left-right" style="font-size: 3rem; color: #6c757d;"></i>
-                                        <p class="text-muted mt-2">No stock movements recorded</p>
+                                        <p class="text-muted mt-2"><?= t('No stock movements recorded') ?></p>
                                     </div>
                                     <?php endif; ?>
                                 </div>
@@ -1198,11 +1304,11 @@ global $company_logo, $company_name;
                                         <div class="card-body">
                                             <div class="row">
                                                 <div class="col-6">
-                                                    <small class="text-muted">Created:</small>
+                                                    <small class="text-muted"><?= t('Created:') ?></small>
                                                     <p><?= format_date($product['created_at'], 'd M Y, h:i A') ?></p>
                                                 </div>
                                                 <div class="col-6">
-                                                    <small class="text-muted">Last Updated:</small>
+                                                    <small class="text-muted"><?= t('Last Updated:') ?></small>
                                                     <p><?= format_date($product['updated_at'], 'd M Y, h:i A') ?></p>
                                                 </div>
                                             </div>
@@ -1311,7 +1417,7 @@ global $company_logo, $company_name;
                                 <div class="col-md-6">
                                     <div class="card mb-4">
                                         <div class="card-header bg-danger text-white">
-                                            <h6 class="mb-0"><i class="bi bi-plus-slash-minus"></i> Stock Adjustment</h6>
+                                            <h6 class="mb-0"><i class="bi bi-plus-slash-minus"></i> <?= t('Stock Adjustment') ?></h6>
                                         </div>
                                         <div class="card-body">
                                             <form id="adjustStockForm">
@@ -1320,13 +1426,13 @@ global $company_logo, $company_name;
                                                 <div class="mb-3">
                                                     <label for="adjustment_type" class="form-label"><?= t('Adjustment Type') ?></label>
                                                     <select class="form-select" id="adjustment_type" name="movement_type" required>
-                                                        <option value="adjustment_in">Stock In (Increase)</option>
-                                                        <option value="adjustment_out">Stock Out (Decrease)</option>
-                                                        <option value="correction">Correction</option>
-                                                        <option value="damaged">Damaged</option>
-                                                        <option value="expired">Expired</option>
-                                                        <option value="found">Found Stock</option>
-                                                        <option value="theft">Theft/Loss</option>
+                                                        <option value="adjustment_in"><?= t('Stock In (Increase)') ?></option>
+                                                        <option value="adjustment_out"><?= t('Stock Out (Decrease)') ?></option>
+                                                        <option value="correction"><?= t('Correction') ?></option>
+                                                        <option value="damaged"><?= t('Damaged') ?></option>
+                                                        <option value="expired"><?= t('Expired') ?></option>
+                                                        <option value="found"><?= t('Found Stock') ?></option>
+                                                        <option value="theft"><?= t('Theft/Loss') ?></option>
                                                     </select>
                                                 </div>
 
@@ -1356,7 +1462,7 @@ global $company_logo, $company_name;
 
                                                 <div class="d-grid gap-2">
                                                     <button type="submit" class="btn btn-primary">
-                                                        <i class="bi bi-check-circle"></i> Submit Adjustment
+                                                        <i class="bi bi-check-circle"></i> <?= t('Submit Adjustment') ?>
                                                     </button>
                                                 </div>
                                             </form>
@@ -1367,50 +1473,50 @@ global $company_logo, $company_name;
                                 <div class="col-md-6">
                                     <div class="card mb-4">
                                         <div class="card-header bg-warning text-dark">
-                                            <h6 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h6>
+                                            <h6 class="mb-0"><i class="bi bi-lightning"></i> <?= t('Quick Actions') ?></h6>
                                         </div>
                                         <div class="card-body">
                                             <div class="d-grid gap-2">
                                                 <?php if ($product['status'] == 'active'): ?>
                                                 <button type="button" class="btn btn-outline-secondary" onclick="toggleProductStatus(<?= $product_id ?>, 'inactive')">
-                                                    <i class="bi bi-pause"></i> Deactivate Product
+                                                    <i class="bi bi-pause"></i> <?= t('Deactivate Product') ?>
                                                 </button>
                                                 <?php else: ?>
                                                 <button type="button" class="btn btn-outline-success" onclick="toggleProductStatus(<?= $product_id ?>, 'active')">
-                                                    <i class="bi bi-play"></i> Activate Product
+                                                    <i class="bi bi-play"></i> <?= t('Activate Product') ?>
                                                 </button>
                                                 <?php endif; ?>
 
                                                 <button type="button" class="btn btn-outline-info" onclick="printBarcode(<?= $product_id ?>)">
-                                                    <i class="bi bi-upc-scan"></i> Print Barcode
+                                                    <i class="bi bi-upc-scan"></i> <?= t('Print Barcode') ?>
                                                 </button>
 
                                                 <button type="button" class="btn btn-outline-primary" onclick="duplicateProduct(<?= $product_id ?>)">
-                                                    <i class="bi bi-copy"></i> Duplicate Product
+                                                    <i class="bi bi-copy"></i> <?= t('Duplicate Product') ?>
                                                 </button>
 
                                                 <?php if ($product['track_inventory']): ?>
                                                 <button type="button" class="btn btn-outline-dark" onclick="transferStock(<?= $product_id ?>)">
-                                                    <i class="bi bi-truck"></i> Transfer Stock
+                                                    <i class="bi bi-truck"></i> <?= t('Transfer Stock') ?>
                                                 </button>
                                                 <?php endif; ?>
 
                                                 <a href="<?= getUrl('stock_movements') ?>?product_id=<?= $product_id ?>" 
                                                    class="btn btn-outline-info">
-                                                    <i class="bi bi-file-earmark-text"></i> Generate Movement Report
+                                                    <i class="bi bi-file-earmark-text"></i> <?= t('Generate Movement Report') ?>
                                                 </a>
 
-                                                <a href="<?= getUrl('product_analysis') ?>?product_id=<?= $product_id ?>" 
+                                                <?php if ($can_sales_report_link): ?><a href="<?= getUrl('product_analysis') ?>?product_id=<?= $product_id ?>" 
                                                    class="btn btn-outline-success">
-                                                    <i class="bi bi-graph-up"></i> Generate Sales Report
-                                                </a>
+                                                    <i class="bi bi-graph-up"></i> <?= t('Generate Sales Report') ?>
+                                                </a><?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
 
                                         <div class="card">
                                             <div class="card-header bg-info text-white">
-                                                <h6 class="mb-0"><i class="bi bi-bell"></i> Stock Alerts Setup</h6>
+                                                <h6 class="mb-0"><i class="bi bi-bell"></i> <?= t('Stock Alerts Setup') ?></h6>
                                             </div>
                                             <div class="card-body">
                                                 <form id="alertSettingsForm">
@@ -1438,13 +1544,13 @@ global $company_logo, $company_name;
                                                     <input class="form-check-input" type="checkbox" id="email_alerts" name="email_alerts"
                                                            <?= $product['email_alerts'] ? 'checked' : '' ?>>
                                                     <label class="form-check-label" for="email_alerts">
-                                                        Send email alerts for stock issues
+                                                        <?= t('Send email alerts for stock issues') ?>
                                                     </label>
                                                 </div>
 
                                                 <div class="d-grid">
                                                     <button type="submit" class="btn btn-primary">
-                                                        <i class="bi bi-save"></i> Update Alert Settings
+                                                        <i class="bi bi-save"></i> <?= t('Update Alert Settings') ?>
                                                     </button>
                                                 </div>
                                             </form>
@@ -1466,12 +1572,12 @@ global $company_logo, $company_name;
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-secondary text-white">
-                    <h6 class="mb-0"><i class="bi bi-link"></i> Related Information</h6>
+                    <h6 class="mb-0"><i class="bi bi-link"></i> <?= t('Related Information') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4">
-                            <h6><i class="bi bi-cart-plus"></i> Purchase Orders</h6>
+                        <?php if ($can_po_list_link): ?><div class="col-md-4">
+                            <h6><i class="bi bi-cart-plus"></i> <?= t('Purchase Orders') ?></h6>
                             <?php if (!empty($purchase_orders)): ?>
                             <div class="list-group">
                                 <?php foreach ($purchase_orders as $order): ?>
@@ -1496,16 +1602,16 @@ global $company_logo, $company_name;
                             </div>
                             <div class="mt-2">
                                 <a href="<?= getUrl('purchase_orders') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-cart-plus"></i> View All Purchase Orders
+                                    <i class="bi bi-cart-plus"></i> <?= t('View All Purchase Orders') ?>
                                 </a>
                             </div>
                             <?php else: ?>
-                            <p class="text-muted">No purchase orders found for this product.</p>
+                            <p class="text-muted"><?= t('No purchase orders found for this product.') ?></p>
                             <?php endif; ?>
-                        </div>
+                        </div><?php endif; ?>
 
                         <div class="col-md-4">
-                            <h6><i class="bi bi-arrow-left-right"></i> Stock Transfers</h6>
+                            <h6><i class="bi bi-arrow-left-right"></i> <?= t('Stock Transfers') ?></h6>
                             <?php if (!empty($stock_transfers)): ?>
                             <div class="list-group">
                                 <?php foreach ($stock_transfers as $transfer): ?>
@@ -1541,7 +1647,7 @@ global $company_logo, $company_name;
                             </div>
                             <div class="mt-3 d-print-none text-end">
                                 <a href="<?= getUrl('stock_transfers') ?>?product_id=<?= $product_id ?>" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-gear"></i> View All Transfers <i class="bi bi-caret-right-fill"></i>
+                                    <i class="bi bi-gear"></i> <?= t('View All Transfers') ?> <i class="bi bi-caret-right-fill"></i>
                                 </a>
                             </div>
                             <?php else: ?>
@@ -1550,11 +1656,11 @@ global $company_logo, $company_name;
                         </div>
 
                         <div class="col-md-4">
-                            <h6><i class="bi bi-graph-up"></i> Performance Metrics</h6>
+                            <h6><i class="bi bi-graph-up"></i> <?= t('Performance Metrics') ?></h6>
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <small class="text-muted">Stock Turnover Ratio:</small>
+                                        <small class="text-muted"><?= t('Stock Turnover Ratio:') ?></small>
                                         <div class="d-flex align-items-center">
                                             <div class="progress flex-grow-1 me-2" style="height: 20px;">
                                                 <div class="progress-bar bg-<?= get_progress_color(min($turnover_ratio * 10, 100)) ?>" 
@@ -1567,7 +1673,7 @@ global $company_logo, $company_name;
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <small class="text-muted">Stock Coverage (months):</small>
+                                        <small class="text-muted"><?= t('Stock Coverage (months):') ?></small>
                                         <div class="d-flex align-items-center">
                                             <div class="progress flex-grow-1 me-2" style="height: 20px;">
                                                 <div class="progress-bar bg-<?= 
@@ -1583,17 +1689,17 @@ global $company_logo, $company_name;
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <small class="text-muted">Gross Profit Contribution:</small>
+                                        <small class="text-muted"><?= t('Gross Profit Contribution:') ?></small>
                                         <h4 class="text-success">
                                             <?= format_currency($product['total_revenue'] - ($product['total_sales_quantity'] * $product['cost_price'])) ?>
                                         </h4>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <small class="text-muted">Sales Velocity (units/day):</small>
+                                        <small class="text-muted"><?= t('Sales Velocity (units/day):') ?></small>
                                         <h5 class="text-primary">
                                             <?= format_number($sales_velocity, 3) ?>
-                                            <small class="text-muted">units/day</small>
+                                            <small class="text-muted"><?= t('units/day') ?></small>
                                         </h5>
                                     </div>
                                 </div>
@@ -1619,7 +1725,7 @@ global $company_logo, $company_name;
                 <!-- Content loaded via AJAX -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Close') ?></button>
             </div>
         </div>
     </div>

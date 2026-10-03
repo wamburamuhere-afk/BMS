@@ -943,6 +943,25 @@ if (!function_exists('bmsFeatureGuardPath')) {
     }
 }
 
+if (!function_exists('bmsRouteAvailable')) {
+    /**
+     * Would a link to this clean route open, or would the router 404 it?
+     * Same checks as roots.php handleRoute(): the route is mapped to a file
+     * that exists, the route key's module is on (tenantModuleAllowsPage, only
+     * once a feature map is primed), and the file's path is not owned by a
+     * switched-off feature. Use it before drawing a link into another module's
+     * page (pos_detail_pages_plan.md) — with every module on it is always true.
+     */
+    function bmsRouteAvailable(string $route): bool
+    {
+        $routes = $GLOBALS['routes'] ?? null;
+        if (!is_array($routes) || !isset($routes[$route]) || !is_file($routes[$route])) return false;
+        if (!is_array($GLOBALS['__bms_features'] ?? null)) return true;   // no tenant → everything on
+        if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($route)) return false;
+        return bmsFeatureBlockingPath($routes[$route]) === null;
+    }
+}
+
 if (!function_exists('tenantModuleAllowsPage')) {
     /**
      * The question the permission layer asks: may this request's tenant reach

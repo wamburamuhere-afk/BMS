@@ -18,6 +18,11 @@ $can_adjust_stock = hasPermission('adjust_stock') || isAdmin(); // Assuming adju
 // Create/Edit/View are hidden here too — the list's SKU column and the
 // Quick Add modal's SKU/Barcode fields.
 $simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
+// Row-menu links (pos_detail_pages_plan.md A2): "Create Purchase Order" only when
+// the Procurement page would open; "Receive Stock" = the POS restock modal, for
+// the same users the header's "Receive Stock" link is shown to.
+$can_po_link       = bmsRouteAvailable('purchase_order_create');
+$can_receive_stock = canView('pos') && canView('pos_restock');
 
 // Use global company name
 $display_company_name = $GLOBALS['DISPLAY_COMPANY_NAME'] ?? 'BUSINESS MANAGEMENT SYSTEM';
@@ -889,6 +894,16 @@ function get_quick_actions($product) {
                                             <li><a class="dropdown-item" href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-pencil text-warning"></i> <?= t('Edit Product') ?></a></li>
                                             <?php endif; ?>
 
+                                            <?php if ($can_receive_stock && !empty($product['track_inventory'])): ?>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <!-- POS "Receive Stock" with this product pre-selected (pos_detail_pages_plan.md A2) -->
+                                                <a class="dropdown-item" href="<?= getUrl('pos') ?>?restock=1&amp;product_id=<?= (int)$product['product_id'] ?>">
+                                                    <i class="bi bi-box-arrow-in-down text-primary"></i> <?= t('Receive Stock') ?>
+                                                </a>
+                                            </li>
+                                            <?php endif; ?>
+
                                             <?php if ($can_adjust_stock): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
@@ -910,11 +925,13 @@ function get_quick_actions($product) {
                                                     <i class="bi bi-copy"></i> <?= t('Duplicate Product') ?>
                                                 </a>
                                             </li>
+                                            <?php if ($can_po_link): ?>
                                             <li>
                                                 <a class="dropdown-item" href="<?= getUrl('purchase_order_create') ?>?product=<?= $product['product_id'] ?>">
                                                     <i class="bi bi-truck"></i> <?= t('Create Purchase Order') ?>
                                                 </a>
                                             </li>
+                                            <?php endif; ?>
                                             <!-- <li>
                                                 <a class="dropdown-item" href="#" onclick="printBarcode(<?= $product['product_id'] ?>); return false;">
                                                     <i class="bi bi-upc-scan"></i> Print Barcode
