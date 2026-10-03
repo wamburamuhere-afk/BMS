@@ -19,7 +19,7 @@ $columns = frReportColumns($from !== $to, $userId === null);
 $rows = frReportRows($visits, $columns);
 $subject = frReportSubject($pdo, $userId);
 
-$file = 'field_report_' . preg_replace('/[^a-z0-9]+/i', '_', $subject) . '_' . $from . ($from !== $to ? '_to_' . $to : '') . '.csv';
+$file = 'customer_visits_' . preg_replace('/[^a-z0-9]+/i', '_', $subject) . '_' . $from . ($from !== $to ? '_to_' . $to : '') . '.csv';
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $file . '"');
 logActivity($pdo, (int)$_SESSION['user_id'], 'Export field report', "Exported field report $from..$to ($subject)");
@@ -27,7 +27,7 @@ logActivity($pdo, (int)$_SESSION['user_id'], 'Export field report', "Exported fi
 $out = fopen('php://output', 'w');
 fwrite($out, "\xEF\xBB\xBF"); // BOM so Excel reads UTF-8
 fputcsv($out, [getSetting('company_name', 'BMS')]);
-fputcsv($out, [t('FIELD VISITS REPORT')]);
+fputcsv($out, [t('CUSTOMER VISITS REPORT')]);
 fputcsv($out, [t('Staff') . ': ' . $subject]);
 fputcsv($out, [t('Date') . ': ' . frRangeLabel($from, $to, $lang)]);
 fputcsv($out, []);

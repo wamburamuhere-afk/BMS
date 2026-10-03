@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-10-03 — feat(customer-visits): "Ripoti za Uwandani" → "Ziara za Wateja", phone-first, follow-ups
+
+Plan: `customer_visits_ux_plan.md`. Found by filling the module in on shop.demo as a marketer on a phone. Module key `field_reports`, page key `field_visits` and routes unchanged.
+
+**Files:**
+- `api/field_reports/_common.php` — loads the user's language (APIs never include header.php): business types, interest, errors and messages were English for Swahili users. Rows also carry `follow_up_*`, `gps_verified`, `gps_accuracy_m`.
+- `api/field_reports/save.php` — one clock (server, EAT): today's visit can't be later than now (+5 min), empty time = now; optional `follow_up_date` (≥ visit, ≤ 1 year); a new follow-up date re-opens a done one.
+- `api/field_reports/check_phone.php` — a known number returns name, business, place and visit count to fill the form (same scope: staff only their own).
+- `api/field_reports/nearby.php` (new) — nearest own earlier visit within 300 m suggests the place name; no external map service.
+- `api/field_reports/followup_done.php` (new) — mark a follow-up done / re-open (owner or admin).
+- `api/field_reports/list.php` — `follow_ups` due today/overdue (not done, not joined, same scope); the caller's own day status also for an admin viewing all staff.
+- `core/field_reports.php` — `frGpsVerified()`, `frDueFollowUps()`. `core/field_reports_report.php`, `field_report_print.php`, `export.php` — Follow-up column, "(GPS ✓)" on confirmed places, new title.
+- `core/field_reports_schema.php` + `migrations/tenant/2026_10_03_customer_visits_follow_up.php` + `migrations/2026_10_03_customer_visits_follow_up_legacy_db.php` — `follow_up_date`, `follow_up_done_at`, `follow_up_done_by` (+ index), added only when missing; permission renamed "Customer Visits" only while it still has the shipped name.
+- `core/feature_registry.php` — label "Customer Visits (Marketing)" + `previous_labels`; `syncFeatureCatalogue()` renames a catalogue label only while it still equals a label we shipped (operator wording never overwritten).
+- `app/bms/field_reports/field_visits.php` — rewritten phone-first: full-screen form starting with Phone (known client fills itself), GPS confirmation + place suggestion, big tap buttons for card/trial/training, three coloured response buttons, follow-up date with Tomorrow / In a week, date/time "now" unless changed; "To follow up" list (Call, New visit, Followed up); 3 main numbers + "More statistics"; labelled badges and a direct "Joined" button on cards/rows; admin summary as a list on phones.
+- `header.php` — nav + phone More sheet say "Ziara za Wateja".
+- `lang/sw.php` — +36 strings; this module's "tembeleo/matembezi" wording → "ziara".
+- `tests/test_field_reports_cli.php` — 184 assertions (+46); `tests/helpers/field_reports_request.php` — `__lang`, root base path.
+
 ## 2026-10-03 — fix(products): the wholesale price a product is registered/edited with is the one POS charges
 
 POS charges wholesale customers the **Wholesale price-group** price (else the normal price) and never reads `products.wholesale_price`. Product create/edit (web + mobile) and variants wrote only that legacy column, so e.g. Alizeti Safi registered at 27,000 wholesale was sold to wholesale customers at 30,000. Only POS "Receive Stock" wrote the group.

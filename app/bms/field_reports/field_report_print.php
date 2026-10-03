@@ -25,7 +25,7 @@ $subject = frReportSubject($pdo, $userId);
 
 // Relative column widths (normalised to 100% for whichever columns are shown).
 $weights = ['sno' => 4, 'date' => 8, 'time' => 6, 'staff' => 11, 'location' => 15, 'client' => 12, 'phone' => 11,
-            'business' => 11, 'card' => 6, 'trial' => 6, 'training' => 6, 'interest' => 8, 'joined' => 6, 'notes' => 15];
+            'business' => 11, 'card' => 6, 'trial' => 6, 'training' => 6, 'interest' => 8, 'joined' => 6, 'follow_up' => 8, 'notes' => 14];
 $w = array_intersect_key($weights, $columns);
 $sum = array_sum($w);
 $center = ['sno', 'time', 'card', 'trial', 'training', 'joined'];
@@ -49,7 +49,7 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= $e(t('FIELD VISITS REPORT') . ' — ' . $subject . ' — ' . $from) ?></title>
+    <title><?= $e(t('CUSTOMER VISITS REPORT') . ' — ' . $subject . ' — ' . $from) ?></title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; color: #1a252f; line-height: 1.45; padding: 20px 20px 0; background: #fff; }
@@ -117,7 +117,7 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         </div>
     </div>
     <div class="title-box">
-        <h2><?= $e(t('FIELD VISITS REPORT')) ?></h2>
+        <h2><?= $e(t('CUSTOMER VISITS REPORT')) ?></h2>
         <p><strong><?= $e(t('Staff')) ?>:</strong> <?= $e($subject) ?></p>
         <p><strong><?= $e(t('Date')) ?>:</strong> <?= $e(frRangeLabel($from, $to, $lang)) ?></p>
     </div>

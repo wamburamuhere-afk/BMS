@@ -25,12 +25,17 @@ $btype    = trim((string)($_POST['business_type'] ?? ''));
 $bother   = trim((string)($_POST['business_other'] ?? ''));
 $interest = trim((string)($_POST['interest'] ?? ''));
 $notes    = trim((string)($_POST['notes'] ?? ''));
+$followUp = trim((string)($_POST['follow_up_date'] ?? ''));   // optional (customer_visits_ux_plan 3.1)
 $flag     = fn($k) => in_array((string)($_POST[$k] ?? '0'), ['1', 'on', 'true'], true) ? 1 : 0;
 
 $errors = [];
 if (!frValidDate($date))                         $errors['visit_date'] = t('Choose a valid date.');
 elseif ($date > date('Y-m-d'))                   $errors['visit_date'] = t('The visit date cannot be in the future.');
 if ($time !== '' && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) $errors['visit_time'] = t('Enter the time as HH:MM.');
+// One clock — the server's (EAT). Today's visit cannot be later than now (5 min grace
+// for a slow phone); an empty time on today's visit means "now" (customer_visits_ux_plan 1.3).
+elseif ($time !== '' && $date === date('Y-m-d') && $time > date('H:i', time() + 300)) $errors['visit_time'] = t('The time cannot be later than now.');
+if ($time === '' && $date === date('Y-m-d') && !$existing) $time = date('H:i');
 if ($location === '')                            $errors['location'] = t('Enter the place you visited.');
 elseif (mb_strlen($location) > 255)              $errors['location'] = t('Place is too long.');
 if ($name === '')                                $errors['client_name'] = t('Enter the client\'s name.');
@@ -43,6 +48,11 @@ if ($btype === 'other' && $bother === '')        $errors['business_other'] = t('
 if (mb_strlen($bother) > 150)                    $errors['business_other'] = t('Business description is too long.');
 if ($interest !== '' && !array_key_exists($interest, frInterestLabels())) $errors['interest'] = t('Choose a valid option.');
 if (mb_strlen($notes) > 2000)                    $errors['notes'] = t('Notes are too long.');
+if ($followUp !== '') {
+    if (!frValidDate($followUp))                  $errors['follow_up_date'] = t('Choose a valid date.');
+    elseif (frValidDate($date) && $followUp < $date) $errors['follow_up_date'] = t('The follow-up date cannot be before the visit.');
+    elseif (frValidDate($date) && $followUp > date('Y-m-d', strtotime($date . ' +1 year'))) $errors['follow_up_date'] = t('Choose a follow-up date within a year.');
+}
 
 $lat = $_POST['latitude'] ?? ''; $lng = $_POST['longitude'] ?? ''; $acc = $_POST['gps_accuracy_m'] ?? '';
 $lat = ($lat === '' || $lat === null) ? null : (is_numeric($lat) && $lat >= -90 && $lat <= 90 ? (float)$lat : false);
@@ -56,15 +66,18 @@ $vals = [
     $date, $time !== '' ? $time . ':00' : null, $location, $lat, $lng, $lat === null ? null : $acc,
     $name, $phone, frNormalizePhone($phone), $btype, $btype === 'other' ? $bother : null,
     $flag('gave_business_card'), $flag('gave_trial_link'), $flag('gave_training'),
-    $interest !== '' ? $interest : null, $notes !== '' ? $notes : null,
+    $interest !== '' ? $interest : null, $notes !== '' ? $notes : null, $followUp !== '' ? $followUp : null,
 ];
 
 try {
     if ($existing) {
         $pdo->prepare("UPDATE field_visits SET visit_date = ?, visit_time = ?, location = ?, latitude = ?, longitude = ?, gps_accuracy_m = ?,
                 client_name = ?, client_phone = ?, phone_normalized = ?, business_type = ?, business_other = ?,
-                gave_business_card = ?, gave_trial_link = ?, gave_training = ?, interest = ?, notes = ?, updated_by = ?
-            WHERE visit_id = ?")->execute(array_merge($vals, [$me, $id]));
+                gave_business_card = ?, gave_trial_link = ?, gave_training = ?, interest = ?, notes = ?, follow_up_date = ?, follow_up_done_at = ?, updated_by = ?
+            WHERE visit_id = ?")->execute(array_merge($vals, [
+            // A changed follow-up date is a new follow-up: its "done" mark is cleared.
+            ($existing['follow_up_date'] ?? null) === ($followUp !== '' ? $followUp : null) ? ($existing['follow_up_done_at'] ?? null) : null,
+            $me, $id]));
         $owner = (int)$existing['user_id'];
         frMarkChanged($pdo, $owner, $date);
         if ($existing['visit_date'] !== $date) frMarkChanged($pdo, $owner, $existing['visit_date']);
@@ -73,8 +86,8 @@ try {
     }
     $pdo->prepare("INSERT INTO field_visits (visit_date, visit_time, location, latitude, longitude, gps_accuracy_m,
             client_name, client_phone, phone_normalized, business_type, business_other,
-            gave_business_card, gave_trial_link, gave_training, interest, notes, user_id, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")->execute(array_merge($vals, [$me, $me]));
+            gave_business_card, gave_trial_link, gave_training, interest, notes, follow_up_date, user_id, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")->execute(array_merge($vals, [$me, $me]));
     $newId = (int)$pdo->lastInsertId();
     frMarkChanged($pdo, $me, $date);
     logActivity($pdo, $me, 'Add field visit', "Recorded field visit #$newId ($name, $location)");

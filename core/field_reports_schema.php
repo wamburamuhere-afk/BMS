@@ -30,6 +30,9 @@ if (!function_exists('fieldReportsEnsureSchema')) {
                 `gave_training`     TINYINT(1) NOT NULL DEFAULT 0,
                 `interest`          ENUM('interested','thinking','not_interested') NULL DEFAULT NULL,
                 `notes`             TEXT NULL DEFAULT NULL,
+                `follow_up_date`    DATE NULL DEFAULT NULL,
+                `follow_up_done_at` DATETIME NULL DEFAULT NULL,
+                `follow_up_done_by` INT UNSIGNED NULL DEFAULT NULL,
                 `joined`            TINYINT(1) NOT NULL DEFAULT 0,
                 `joined_at`         DATE NULL DEFAULT NULL,
                 `joined_marked_by`  INT UNSIGNED NULL DEFAULT NULL,
@@ -41,9 +44,23 @@ if (!function_exists('fieldReportsEnsureSchema')) {
                 PRIMARY KEY (`visit_id`),
                 KEY `idx_fv_user_date` (`user_id`, `visit_date`),
                 KEY `idx_fv_date` (`visit_date`),
-                KEY `idx_fv_phone` (`phone_normalized`)
+                KEY `idx_fv_phone` (`phone_normalized`),
+                KEY `idx_fv_follow_up` (`user_id`, `follow_up_date`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
+
+        // Follow-up columns (customer_visits_ux_plan 3.1) for tables created before them.
+        // Plain ALTERs, each only when missing — no DDL inside a transaction, re-runnable.
+        $have = array_flip($pdo->query("SHOW COLUMNS FROM `field_visits`")->fetchAll(PDO::FETCH_COLUMN));
+        foreach ([
+            'follow_up_date'    => "ADD COLUMN `follow_up_date` DATE NULL DEFAULT NULL AFTER `notes`",
+            'follow_up_done_at' => "ADD COLUMN `follow_up_done_at` DATETIME NULL DEFAULT NULL AFTER `follow_up_date`",
+            'follow_up_done_by' => "ADD COLUMN `follow_up_done_by` INT UNSIGNED NULL DEFAULT NULL AFTER `follow_up_done_at`",
+        ] as $col => $ddl) {
+            if (!isset($have[$col])) $pdo->exec("ALTER TABLE `field_visits` $ddl");
+        }
+        $idx = $pdo->query("SHOW INDEX FROM `field_visits` WHERE Key_name = 'idx_fv_follow_up'")->fetch();
+        if (!$idx) $pdo->exec("ALTER TABLE `field_visits` ADD KEY `idx_fv_follow_up` (`user_id`, `follow_up_date`)");
 
         // One row per staff member per day once they press "Submit today's report".
         $pdo->exec("
@@ -65,9 +82,13 @@ if (!function_exists('fieldReportsEnsureSchema')) {
             VALUES (?, ?, ?, ?)
         ")->execute([
             'field_visits',
-            'Field Visits',
-            'Record own marketing field visits and print/download own daily report (admins see all staff)',
-            'Field Reports',
+            'Customer Visits',
+            'Record own customer visits (marketing) and print/download own daily report (admins see all staff)',
+            'Customer Visits',
         ]);
+        // Renamed 2026-10-03 (customer_visits_ux_plan 2.1) — only rows still carrying
+        // the name this module first shipped with; a custom name is left alone.
+        $pdo->exec("UPDATE permissions SET page_name = 'Customer Visits' WHERE page_key = 'field_visits' AND page_name = 'Field Visits'");
+        $pdo->exec("UPDATE permissions SET module_name = 'Customer Visits' WHERE page_key = 'field_visits' AND module_name = 'Field Reports'");
     }
 }
