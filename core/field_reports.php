@@ -3,7 +3,8 @@
  * core/field_reports.php — Field Reports (marketing) module helpers.
  *
  * Access rule (product owner, 2026-10-03): every user sees and changes ONLY
- * their own visits; admins (isAdmin()) see and change everyone's. No role,
+ * their own visits; admins (isAdmin()) see and change everyone's — but another
+ * staff member's day only after it was submitted (frSubmittedOnlySql). No role,
  * whatever it is granted, can see another staff member's visits — so every
  * query goes through frScopeUserId().
  */
@@ -65,6 +66,20 @@ if (!function_exists('frBusinessTypes')) {
         return $requested > 0 ? $requested : null;
     }
 
+    /**
+     * Admins see another staff member's visits only once that day's report has been
+     * submitted (product owner, 2026-10-03); their own visits always. Appends the
+     * condition for visits aliased $a and pushes its parameter. '' for non-admins —
+     * they are already limited to their own visits by frScopeUserId().
+     */
+    function frSubmittedOnlySql(string $a, array &$params): string
+    {
+        if (!isAdmin()) return '';
+        $params[] = (int)($_SESSION['user_id'] ?? 0);
+        return " AND ($a.user_id = ? OR EXISTS (SELECT 1 FROM field_report_days frd
+                                                  WHERE frd.user_id = $a.user_id AND frd.report_date = $a.visit_date))";
+    }
+
     /** Owner or admin. */
     function frCanTouch(array $visit): bool
     {
@@ -94,6 +109,7 @@ if (!function_exists('frBusinessTypes')) {
                 WHERE v.status = 'active' AND v.visit_date BETWEEN ? AND ?";
         $params = [$from, $to];
         if ($userId !== null) { $sql .= " AND v.user_id = ?"; $params[] = $userId; }
+        $sql .= frSubmittedOnlySql('v', $params);
         $sql .= " ORDER BY v.visit_date ASC, v.visit_time ASC, v.visit_id ASC";
         $s = $pdo->prepare($sql);
         $s->execute($params);
@@ -202,6 +218,7 @@ if (!function_exists('frBusinessTypes')) {
                    AND v.follow_up_done_at IS NULL AND v.joined = 0";
         $params = [$asOf];
         if ($userId !== null) { $sql .= " AND v.user_id = ?"; $params[] = $userId; }
+        $sql .= frSubmittedOnlySql('v', $params);
         $sql .= " ORDER BY v.follow_up_date ASC, v.visit_id ASC LIMIT 200";
         $s = $pdo->prepare($sql);
         $s->execute($params);

@@ -41,8 +41,8 @@ elseif (mb_strlen($location) > 255)              $errors['location'] = t('Place 
 if ($name === '')                                $errors['client_name'] = t('Enter the client\'s name.');
 elseif (mb_strlen($name) > 150)                  $errors['client_name'] = t('Name is too long.');
 $digits = preg_replace('/\D+/', '', $phone);
-if ($phone === '')                               $errors['client_phone'] = t('Enter the client\'s phone number.');
-elseif (strlen($digits) < 9 || strlen($digits) > 15 || mb_strlen($phone) > 30) $errors['client_phone'] = t('Enter a valid phone number.');
+// Optional (product owner, 2026-10-03): many shop owners will not give a number.
+if ($phone !== '' && (strlen($digits) < 9 || strlen($digits) > 15 || mb_strlen($phone) > 30)) $errors['client_phone'] = t('Enter a valid phone number.');
 if (!array_key_exists($btype, frBusinessTypes())) $errors['business_type'] = t('Choose the type of business.');
 if ($btype === 'other' && $bother === '')        $errors['business_other'] = t('Describe the business.');
 if (mb_strlen($bother) > 150)                    $errors['business_other'] = t('Business description is too long.');

@@ -14,14 +14,15 @@ $radius = 300.0;                                   // metres
 $dLat = $radius / 111320.0;                        // bounding box first (index-friendly)
 $dLng = $radius / (111320.0 * max(0.01, cos(deg2rad($lat))));
 
-$where = "status = 'active' AND latitude IS NOT NULL AND longitude IS NOT NULL
-          AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?";
+$where = "v.status = 'active' AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
+          AND v.latitude BETWEEN ? AND ? AND v.longitude BETWEEN ? AND ?";
 $params = [$lat - $dLat, $lat + $dLat, $lng - $dLng, $lng + $dLng];
 $scope = frScopeUserId(null);
-if ($scope !== null) { $where .= " AND user_id = ?"; $params[] = $scope; }
+if ($scope !== null) { $where .= " AND v.user_id = ?"; $params[] = $scope; }
+$where .= frSubmittedOnlySql('v', $params);   // admin: another staff member's day only once submitted
 
 try {
-    $s = $pdo->prepare("SELECT location, latitude, longitude FROM field_visits WHERE $where ORDER BY visit_id DESC LIMIT 200");
+    $s = $pdo->prepare("SELECT v.location, v.latitude, v.longitude FROM field_visits v WHERE $where ORDER BY v.visit_id DESC LIMIT 200");
     $s->execute($params);
     $best = null;
     foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {
