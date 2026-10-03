@@ -44,6 +44,7 @@ $query = "
     LEFT JOIN projects proj ON proj.project_id = COALESCE(p.project_id, wh.project_id)
     WHERE p.is_service = 1
 ";
+$svc_base_query = $query;   // reused for the ?edit=N deep link below
 
 $params     = [];
 $conditions = [];
@@ -94,6 +95,15 @@ $stmt->bindValue(':limit',  $per_page, PDO::PARAM_INT);
 $stmt->bindValue(':offset', $offset,   PDO::PARAM_INT);
 $stmt->execute();
 $all_nip_services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ?edit=N (the service page's Edit button, pos_detail_pages_plan.md C4): open that
+// service's Edit form on load — same row shape as the list, same scope.
+$edit_svc = null;
+if ($can_edit && ctype_digit((string)($_GET['edit'] ?? ''))) {
+    $es = $pdo->prepare($svc_base_query . " AND p.product_id = :id AND p.status <> 'deleted'" . $scope_sql);
+    $es->execute([':id' => (int)$_GET['edit']]);
+    $edit_svc = $es->fetch(PDO::FETCH_ASSOC) ?: null;
+}
 
 // Dropdown data
 // Filter lists only categories some service actually uses (was every product category) — B4.
@@ -1597,8 +1607,11 @@ function calcSvcMargin() {
     const sell = parseFloat(document.getElementById('svc_sell').value) || 0;
     const profit = sell - cost;
     const margin = cost > 0 ? ((profit / cost) * 100).toFixed(2) : (sell > 0 ? '100.00' : '0.00');
-    document.getElementById('svc_margin_badge').textContent = margin + '%';
-    document.getElementById('svc_profit_badge').textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
+    // The badges are not on every form variant (removed from the modal markup) — writing to a missing
+    // element threw on every Add/Edit open (pos_detail_pages_plan.md C4).
+    const mBadge = document.getElementById('svc_margin_badge'), pBadge = document.getElementById('svc_profit_badge');
+    if (mBadge) mBadge.textContent = margin + '%';
+    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
 }
 
 function calcSvcMarginEdit() {
@@ -1606,8 +1619,11 @@ function calcSvcMarginEdit() {
     const sell = parseFloat(document.getElementById('edit_svc_sell').value) || 0;
     const profit = sell - cost;
     const margin = cost > 0 ? ((profit / cost) * 100).toFixed(2) : (sell > 0 ? '100.00' : '0.00');
-    document.getElementById('edit_svc_margin_badge').textContent = margin + '%';
-    document.getElementById('edit_svc_profit_badge').textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
+    // The badges are not on every form variant (removed from the modal markup) — writing to a missing
+    // element threw on every Add/Edit open (pos_detail_pages_plan.md C4).
+    const mBadge = document.getElementById('edit_svc_margin_badge'), pBadge = document.getElementById('edit_svc_profit_badge');
+    if (mBadge) mBadge.textContent = margin + '%';
+    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
 }
 
 function submitSvcForm(addAnother) {
@@ -1814,6 +1830,10 @@ $(function () {
             });
         });
     });
+
+    // ?edit=N deep link (C4) — after the handlers above are wired.
+    const editSvcOnLoad = <?= json_encode($edit_svc) ?>;
+    if (editSvcOnLoad) setTimeout(function () { openEditSvcModal(editSvcOnLoad); }, 0);
 });
 </script>
 

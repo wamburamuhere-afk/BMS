@@ -284,6 +284,43 @@ $credit_available = max(0, (float)($customer['credit_limit'] ?? 0) - (float)$cre
 // "Available Credit" only means something when the customer has a credit line (B6).
 $has_credit_line = (float)($customer['credit_limit'] ?? 0) > 0;
 
+// ── Purchase summary (pos_detail_pages_plan.md C2) ──────────────────────────
+// What this customer has bought at the POS, net of returns. Recognition rules are
+// core/pos_dashboard_metrics.php's ($recOrig/$recRet) so the figure agrees with
+// the POS dashboard; scope is api/pos/get_sales.php's (the Sales History tab).
+$purchase_summary = ['net' => 0.0, 'count' => 0, 'last' => null, 'avg' => 0.0];
+$top_products = [];
+try {
+    $psScope = scopeFilterSqlNullable('project', 'ps') . scopeFilterSqlNullable('warehouse', 'ps');
+    $recOrig = "ps.sale_status IN ('completed','partially_refunded','refunded') AND ps.is_return_sale = 0 AND ps.invoice_id IS NULL";
+    $recRet  = "ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled') AND ps.invoice_id IS NULL";
+    $q = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN $recOrig THEN ps.grand_total WHEN $recRet THEN -ps.grand_total ELSE 0 END), 0) AS net,
+                               COALESCE(SUM(CASE WHEN $recOrig THEN 1 ELSE 0 END), 0) AS cnt,
+                               MAX(CASE WHEN $recOrig THEN ps.sale_date END) AS last
+                          FROM pos_sales ps WHERE ps.customer_id = ?" . $psScope);
+    $q->execute([(int)$customer_id]);
+    $row = $q->fetch(PDO::FETCH_ASSOC) ?: [];
+    $purchase_summary['net']   = (float)($row['net'] ?? 0);
+    $purchase_summary['count'] = (int)($row['cnt'] ?? 0);
+    $purchase_summary['last']  = $row['last'] ?? null;
+    $purchase_summary['avg']   = $purchase_summary['count'] > 0 ? $purchase_summary['net'] / $purchase_summary['count'] : 0.0;
+    $tq = $pdo->prepare("SELECT p.product_id, p.product_name, p.is_service,
+                                SUM(CASE WHEN $recOrig THEN psi.quantity ELSE -psi.quantity END) AS qty,
+                                SUM(CASE WHEN $recOrig THEN psi.line_total ELSE -psi.line_total END) AS amount
+                           FROM pos_sale_items psi
+                           JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                           JOIN products p ON p.product_id = psi.product_id
+                          WHERE ps.customer_id = ? AND (($recOrig) OR ($recRet))" . $psScope . "
+                          GROUP BY p.product_id, p.product_name, p.is_service
+                         HAVING qty > 0
+                          ORDER BY amount DESC
+                          LIMIT 5");
+    $tq->execute([(int)$customer_id]);
+    $top_products = $tq->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('customer_details purchase summary: ' . $e->getMessage());
+}
+
 // Simple POS / module-closed decluttering (2026-09-17 request) — the 7
 // formal B2B sales-cycle tabs (Sales Orders, Quotations, Invoices, Payments,
 // Deliveries, LPOs, Credit Notes & Advances) all belong to ONE tenant
@@ -607,6 +644,49 @@ global $company_name, $company_logo;
                     </div>
                     <?php endif; ?>
                 </div>
+
+                <!-- What this customer buys (pos_detail_pages_plan.md C2) -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= format_currency($purchase_summary['net']) ?></div>
+                            <div class="small text-muted"><?= t('Total Purchases') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= (int)$purchase_summary['count'] ?></div>
+                            <div class="small text-muted"><?= t('Number of Purchases') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= $purchase_summary['last'] ? format_date($purchase_summary['last']) : '—' ?></div>
+                            <div class="small text-muted"><?= t('Last Purchase') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm text-center p-2 h-100">
+                            <div class="fs-6 fw-bold text-primary"><?= format_currency($purchase_summary['avg']) ?></div>
+                            <div class="small text-muted"><?= t('Average per Purchase') ?></div>
+                        </div>
+                    </div>
+                </div>
+                <?php if ($top_products): ?>
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-2">
+                        <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-star me-2"></i><?= t('Most Bought') ?></h6>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($top_products as $tp): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                            <a href="<?= getUrl($tp['is_service'] ? 'service_view' : 'products/view') ?>?id=<?= (int)$tp['product_id'] ?>" class="text-decoration-none text-break"><?= caseFormat($tp['product_name']) ?></a>
+                            <span class="text-nowrap small"><?= format_number($tp['qty'], 3) ?> · <strong><?= format_currency($tp['amount']) ?></strong></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
                 <?php else: ?>
                 <!-- Financial Summary Cards -->
                 <div class="row g-3 mb-4">

@@ -47,6 +47,7 @@ if ($hideProcurementTabs) {
     $default_supplier_tab = canView('expenses') ? 'pane-expenses' : 'pane-sysinfo';
 }
 
+
 // ── Project context (clean deep-link from Project Details) ───────────────────
 // Arriving as ?project=<id>&back=<tab> shows a "Back to Project" banner and
 // rebuilds the return URL server-side, so the address bar stays clean.
@@ -110,6 +111,42 @@ if (!$supplier) {
     echo "<div class='alert alert-danger'>Supplier not found</div>";
     include("footer.php");
     exit();
+}
+
+// ── Stock Received (pos_detail_pages_plan.md C1) ─────────────────────────────
+// POS "Receive Stock" (api/pos/quick_restock.php) records the supplier on each
+// batch it creates (product_batches.supplier_id) — this is what a shop actually
+// bought from this supplier. Warehouse-scoped for non-admins (strict: a batch
+// always belongs to one shop). The newest 200 rows are listed; the summary
+// covers all of them.
+$received_rows = [];
+$received_summary = ['total' => 0.0, 'deliveries' => 0, 'last' => null];
+$show_received_tab = false;
+if (canView('products')) {
+    try {
+        $rcvScope = scopeFilterSql('warehouse', 'pb');
+        $rs = $pdo->prepare("SELECT COUNT(*) AS deliveries, COALESCE(SUM(pb.quantity_received * pb.unit_cost), 0) AS total, MAX(pb.created_at) AS last
+                               FROM product_batches pb WHERE pb.supplier_id = ?" . $rcvScope);
+        $rs->execute([(int)$supplier['supplier_id']]);
+        $agg = $rs->fetch(PDO::FETCH_ASSOC) ?: [];
+        $received_summary = ['total' => (float)($agg['total'] ?? 0), 'deliveries' => (int)($agg['deliveries'] ?? 0), 'last' => $agg['last'] ?? null];
+        $rl = $pdo->prepare("SELECT pb.batch_id, pb.created_at, pb.quantity_received, pb.unit_cost, p.product_id, p.product_name, p.unit, w.warehouse_name
+                               FROM product_batches pb
+                               JOIN products p ON p.product_id = pb.product_id
+                               LEFT JOIN warehouses w ON w.warehouse_id = pb.warehouse_id
+                              WHERE pb.supplier_id = ?" . $rcvScope . "
+                              ORDER BY pb.created_at DESC, pb.batch_id DESC
+                              LIMIT 200");
+        $rl->execute([(int)$supplier['supplier_id']]);
+        $received_rows = $rl->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('supplier_details stock received: ' . $e->getMessage());
+    }
+    // Shown for POS shops (where Receive Stock lives) and wherever such deliveries exist.
+    $show_received_tab = tenantFeatureEnabled('pos') || $received_summary['deliveries'] > 0;
+}
+if ($show_received_tab && $hideProcurementTabs) {
+    $default_supplier_tab = 'pane-received';
 }
 
 // Get purchase orders
@@ -729,6 +766,13 @@ global $company_name, $company_logo;
             <!-- flex-nowrap + overflow-auto: eleven tabs scroll sideways on a phone
                  instead of wrapping into three stacked rows. Same as customer details. -->
             <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="supplierSectionTabs" role="tablist">
+                <?php if ($show_received_tab): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link <?= $default_supplier_tab === 'pane-received' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-received" type="button" role="tab">
+                        <i class="bi bi-box-arrow-in-down me-1"></i> <?= t('Stock Received') ?> <span class="badge bg-primary ms-1"><?= (int)$received_summary['deliveries'] ?></span>
+                    </button>
+                </li>
+                <?php endif; ?>
                 <?php if (!$hideProcurementTabs): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link <?= $default_supplier_tab === 'pane-payments' ? 'active' : '' ?>" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
@@ -805,6 +849,77 @@ global $company_name, $company_logo;
     </div>
 
     <div class="tab-content" id="supplierSectionTabContent">
+
+        <?php if ($show_received_tab): ?>
+        <!-- Stock Received — every POS "Receive Stock" batch from this supplier (pos_detail_pages_plan.md C1) -->
+        <div class="tab-pane fade <?= $default_supplier_tab === 'pane-received' ? 'show active' : '' ?>" id="pane-received" role="tabpanel">
+            <div class="row g-2 mb-3">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm text-center p-3">
+                        <div class="fs-5 fw-bold text-primary"><?= format_currency($received_summary['total']) ?></div>
+                        <div class="small text-muted"><?= t('Total bought from this supplier') ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card border-0 shadow-sm text-center p-3">
+                        <div class="fs-5 fw-bold text-primary"><?= (int)$received_summary['deliveries'] ?></div>
+                        <div class="small text-muted"><?= t('Deliveries') ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card border-0 shadow-sm text-center p-3">
+                        <div class="fs-5 fw-bold text-primary"><?= $received_summary['last'] ? format_date($received_summary['last']) : '—' ?></div>
+                        <div class="small text-muted"><?= t('Last delivery') ?></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-box-arrow-in-down me-2"></i><?= t('Stock Received') ?></h6>
+                </div>
+                <div class="card-body p-0">
+                    <?php if ($received_rows): ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="supplierReceivedTable">
+                            <thead class="bg-light text-muted small text-uppercase">
+                                <tr>
+                                    <th style="width:50px;"><?= t('S/NO') ?></th>
+                                    <th><?= t('Date') ?></th>
+                                    <th><?= t('Product') ?></th>
+                                    <th><?= wLabel('Warehouse', 'Shop') ?></th>
+                                    <th class="text-end"><?= t('Quantity') ?></th>
+                                    <th class="text-end"><?= t('Unit Cost') ?></th>
+                                    <th class="text-end"><?= t('Total') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($received_rows as $i => $r): ?>
+                                <tr>
+                                    <td><?= $i + 1 ?></td>
+                                    <td class="text-nowrap"><?= format_date($r['created_at']) ?></td>
+                                    <td><a href="<?= getUrl('products/view') ?>?id=<?= (int)$r['product_id'] ?>" class="text-decoration-none"><?= caseFormat($r['product_name']) ?></a></td>
+                                    <td><?= caseFormat($r['warehouse_name'] ?? '—') ?></td>
+                                    <td class="text-end text-nowrap"><?= format_number($r['quantity_received'], 3) ?> <?= htmlspecialchars((string)($r['unit'] ?? '')) ?></td>
+                                    <td class="text-end text-nowrap"><?= format_currency($r['unit_cost']) ?></td>
+                                    <td class="text-end text-nowrap fw-bold"><?= format_currency((float)$r['quantity_received'] * (float)$r['unit_cost']) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php if ($received_summary['deliveries'] > count($received_rows)): ?>
+                    <p class="small text-muted px-3 py-2 mb-0"><?= sprintf(t('Showing the latest %d of %d deliveries.'), count($received_rows), $received_summary['deliveries']) ?></p>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-box-seam" style="font-size:2.5rem;color:#ccc;"></i>
+                        <p class="mt-2 mb-0"><?= t('No stock received from this supplier yet. Use "Receive Stock" in the POS and choose this supplier.') ?></p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Goods Received (GRN) — same table code as app/bms/grn/grn.php, locked
              to this supplier and with the (redundant) Supplier column hidden. -->

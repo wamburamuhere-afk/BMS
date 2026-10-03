@@ -226,6 +226,61 @@ try {
     foreach (['Taarifa za Mteja', 'Taarifa kwa Ufupi', 'Amesajiliwa', 'Historia ya Madeni'] as $w) ok(strpos($cdsw, $w) !== false, "sw: customer page shows '$w'");
     [, $cden] = render('app/bms/customer/customer_details.php', ['id' => (string)$CUSTOMER, '__lang' => 'en'], $POS);
     ok(strpos($cden, 'Credit History') !== false && strpos($cden, 'Amekopa Mara') === false, 'en: Madeni labels are English for English users (were hard-coded Swahili)');
+
+    // ═════════════════════════════════════════════════════════════════
+    section('C1. Supplier — Stock Received (from POS "Receive Stock")');
+    $WH = (int)$pdo->query("SELECT warehouse_id FROM warehouses ORDER BY warehouse_id LIMIT 1")->fetchColumn();
+    $batchId = 0;
+    try {
+        $pdo->prepare("INSERT INTO product_batches (product_id, warehouse_id, supplier_id, batch_number, quantity_received, quantity_remaining, unit_cost, created_at)
+                       VALUES (?, ?, ?, 'PDP-TEST', 7, 7, 1234.50, NOW())")->execute([$PRODUCT, $WH, $SUPPLIER]);
+        $batchId = (int)$pdo->lastInsertId();
+        $agg = $pdo->query("SELECT COUNT(*) n, COALESCE(SUM(quantity_received * unit_cost),0) t FROM product_batches WHERE supplier_id = $SUPPLIER")->fetch(PDO::FETCH_ASSOC);
+        [, $sd] = render('app/bms/Suppliers/supplier_details.php', ['id' => (string)$SUPPLIER], $POS);
+        ok(strpos($sd, 'id="pane-received"') !== false && preg_match('#class="tab-pane fade show active" id="pane-received"#', $sd) === 1, 'POS: "Stock Received" tab present and opened by default');
+        ok(strpos($sd, format_currency((float)$agg['t'])) !== false, 'total bought = Σ qty × unit cost (' . format_currency((float)$agg['t']) . ')');
+        ok(preg_match('#Deliveries.*?#s', $sd) && strpos($sd, '>' . (int)$agg['n'] . '</span>') !== false, 'tab badge shows the number of deliveries (' . (int)$agg['n'] . ')');
+        ok(strpos($sd, format_currency(7 * 1234.50)) !== false && strpos($sd, 'products/view?id=' . $PRODUCT) !== false, 'the delivery row shows the line total and links to the product');
+        ok(substr_count($sd, 'show active') === 1 || preg_match_all('#tab-pane fade show active#', $sd) === 1, 'exactly one tab pane is open');
+        setSetting('pos_simple_mode', '0');
+        [, $sdF] = render('app/bms/Suppliers/supplier_details.php', ['id' => (string)$SUPPLIER], null);
+        setSetting('pos_simple_mode', '1');
+        ok(strpos($sdF, 'id="pane-received"') !== false && preg_match('#class="tab-pane fade show active" id="pane-received"#', $sdF) === 0, 'FULL: tab present but Recent Payments stays the default');
+
+        section('C3. Product — barcode, last delivery, wholesale, days of stock left');
+        [, $pv] = render('app/bms/product/product_view.php', ['id' => (string)$PRODUCT], $POS);
+        $p = $pdo->query("SELECT barcode FROM products WHERE product_id = $PRODUCT")->fetch(PDO::FETCH_ASSOC);
+        if (!empty($p['barcode'])) ok(strpos($pv, htmlspecialchars($p['barcode'])) !== false, 'Simple mode shows the barcode (what "Print Barcode" prints)');
+        ok(strpos($pv, 'Last delivery:') !== false && strpos($pv, '@ ' . format_currency(1234.50)) !== false, 'Last delivery = the newest batch (qty @ unit cost)');
+        ok(strpos($pv, 'suppliers/view?id=' . $SUPPLIER) !== false, 'Last delivery links to its supplier');
+        ok(strpos($pv, 'Days of stock left:') !== false, 'Days of stock left shown');
+        ok(strpos($pv, '<th><?= t(\'Supplier\') ?>') === false && (strpos($pv, '>Source GRN<') !== false || strpos($pv, '>Supplier<') !== false), 'Batches table shows Supplier where Source GRN is hidden');
+        ok(strpos($pv, 'PDP-TEST') !== false, 'the new batch appears in Batches / Lots');
+    } finally {
+        if ($batchId) $pdo->prepare("DELETE FROM product_batches WHERE batch_id = ?")->execute([$batchId]);
+    }
+
+    section('C2. Customer — purchase summary');
+    $recOrig = "sale_status IN ('completed','partially_refunded','refunded') AND is_return_sale = 0 AND invoice_id IS NULL";
+    $recRet  = "is_return_sale = 1 AND sale_status NOT IN ('voided','cancelled') AND invoice_id IS NULL";
+    $orig = $pdo->query("SELECT COUNT(*) n, COALESCE(SUM(grand_total),0) t FROM pos_sales WHERE customer_id = $CUSTOMER AND $recOrig")->fetch(PDO::FETCH_ASSOC);
+    $ret  = (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM pos_sales WHERE customer_id = $CUSTOMER AND $recRet")->fetchColumn();
+    $cd = $H['POS']['customer_details'][1];
+    ok(strpos($cd, 'Total Purchases') !== false && strpos($cd, format_currency((float)$orig['t'] - $ret)) !== false, 'Total Purchases = sales − returns (' . format_currency((float)$orig['t'] - $ret) . ')');
+    ok(preg_match('#>' . (int)$orig['n'] . '</div>\s*<div class="small text-muted">Number of Purchases#', $cd) === 1, 'Number of Purchases = ' . (int)$orig['n']);
+    if ((int)$orig['n'] > 0) ok(strpos($cd, 'Most Bought') !== false, '"Most Bought" list shown when there are purchases');
+    ok(strpos($H['FULL']['customer_details'][1], 'Number of Purchases') === false, 'FULL (Sales on): the Sales module\'s own cards stay, no duplicate summary');
+
+    section('C4. Service — Edit button + sales');
+    $sv = $H['POS']['service_view'][1];
+    ok(strpos($sv, 'href="/services?edit=' . $SERVICE . '"') !== false, 'service page has an Edit button → services?edit=N');
+    [, $sl] = render('app/bms/product/services.php', ['edit' => (string)$SERVICE], $POS);
+    ok(preg_match('/const editSvcOnLoad = \{"product_id":' . $SERVICE . ',/', $sl) === 1, 'services?edit=N opens that service\'s Edit form on load');
+    [, $sl] = render('app/bms/product/services.php', ['edit' => '99999999'], $POS);
+    ok(strpos($sl, 'const editSvcOnLoad = null') !== false, 'an unknown id opens nothing');
+    $times = (int)$pdo->query("SELECT COUNT(DISTINCT ps.sale_id) FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id WHERE psi.product_id = $SERVICE AND ps.$recOrig")->fetchColumn();
+    ok(preg_match('#>' . $times . '</div><div class="small text-muted">Times Sold#', $sv) === 1, "Times Sold = $times");
+    ok(strpos($sv, 'Recent Sales (Last 10)') !== false, 'recent sales list shown');
 } finally {
     foreach ($saved as $k => $v) setSetting($k, $v);
     $GLOBALS['__bms_features'] = null;

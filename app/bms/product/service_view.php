@@ -86,6 +86,35 @@ if ($svc['selling_price'] > 0) {
     $margin = (($svc['selling_price'] - $svc_cost) / $svc['selling_price']) * 100;
 }
 
+// ── Sales of this service at the POS (pos_detail_pages_plan.md C4) ───────────
+// Net of returns, with core/pos_dashboard_metrics.php's recognition rules and
+// api/pos/get_sales.php's project/warehouse scope.
+$svc_sales = ['times' => 0, 'qty' => 0.0, 'revenue' => 0.0, 'last' => null];
+$svc_recent = [];
+try {
+    $svScope = scopeFilterSqlNullable('project', 'ps') . scopeFilterSqlNullable('warehouse', 'ps');
+    $recOrig = "ps.sale_status IN ('completed','partially_refunded','refunded') AND ps.is_return_sale = 0 AND ps.invoice_id IS NULL";
+    $recRet  = "ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled') AND ps.invoice_id IS NULL";
+    $sq = $pdo->prepare("SELECT COUNT(DISTINCT CASE WHEN $recOrig THEN ps.sale_id END) AS times,
+                                COALESCE(SUM(CASE WHEN $recOrig THEN psi.quantity WHEN $recRet THEN -psi.quantity ELSE 0 END), 0) AS qty,
+                                COALESCE(SUM(CASE WHEN $recOrig THEN psi.line_total WHEN $recRet THEN -psi.line_total ELSE 0 END), 0) AS revenue,
+                                MAX(CASE WHEN $recOrig THEN ps.sale_date END) AS last
+                           FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                          WHERE psi.product_id = ?" . $svScope);
+    $sq->execute([$product_id]);
+    $r = $sq->fetch(PDO::FETCH_ASSOC) ?: [];
+    $svc_sales = ['times' => (int)($r['times'] ?? 0), 'qty' => (float)($r['qty'] ?? 0), 'revenue' => (float)($r['revenue'] ?? 0), 'last' => $r['last'] ?? null];
+    $rq = $pdo->prepare("SELECT ps.sale_id, ps.receipt_number, ps.sale_date, psi.quantity, psi.unit_price, psi.line_total, c.customer_name
+                           FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                           LEFT JOIN customers c ON c.customer_id = ps.customer_id
+                          WHERE psi.product_id = ? AND $recOrig" . $svScope . "
+                          ORDER BY ps.sale_date DESC, ps.sale_id DESC LIMIT 10");
+    $rq->execute([$product_id]);
+    $svc_recent = $rq->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('service_view sales: ' . $e->getMessage());
+}
+
 // Global company name for branding
 $display_company_name = $GLOBALS['DISPLAY_COMPANY_NAME'] ?? 'BUSINESS MANAGEMENT SYSTEM';
 $company_logo = getSetting('company_logo', '');
@@ -288,6 +317,11 @@ $company_logo = getSetting('company_logo', '');
             <button class="btn btn-outline-primary fw-bold btn-mobile-sm" onclick="window.print()">
                 <i class="bi bi-printer me-1"></i> <?= t('Print') ?>
             </button>
+            <?php if (canEdit('products')): // opens this service's Edit form on the Services list (C4) ?>
+            <a href="<?= getUrl('services') ?>?edit=<?= (int)$product_id ?>" class="btn btn-primary fw-bold btn-mobile-sm">
+                <i class="bi bi-pencil me-1"></i> <?= t('Edit Service') ?>
+            </a>
+            <?php endif; ?>
             <a href="<?= $back_url ?>" class="btn btn-secondary fw-bold btn-mobile-sm">
                 <i class="bi bi-arrow-left me-1"></i> <?= $back_label ?>
             </a>
@@ -454,6 +488,46 @@ $company_logo = getSetting('company_logo', '');
                 </div>
                 <?php endif; ?>
             </div>
+        </div>
+    </div>
+
+    <!-- Sales of this service (pos_detail_pages_plan.md C4) -->
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= (int)$svc_sales['times'] ?></div><div class="small text-muted"><?= t('Times Sold') ?></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= format_number($svc_sales['qty'], 2) ?></div><div class="small text-muted"><?= t('Quantity Sold') ?></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= format_currency($svc_sales['revenue']) ?></div><div class="small text-muted"><?= t('Revenue') ?></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= $svc_sales['last'] ? format_date($svc_sales['last']) : '—' ?></div><div class="small text-muted"><?= t('Last Sold') ?></div></div></div>
+    </div>
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i><?= t('Recent Sales (Last 10)') ?></h6></div>
+        <div class="card-body p-0">
+            <?php if ($svc_recent): ?>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="svcRecentSales">
+                    <thead class="bg-light small text-uppercase"><tr>
+                        <th style="width:50px;"><?= t('S/NO') ?></th><th><?= t('Date') ?></th><th><?= t('Receipt') ?></th><th><?= t('Customer') ?></th>
+                        <th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Total') ?></th></tr></thead>
+                    <tbody>
+                        <?php foreach ($svc_recent as $i => $sr): ?>
+                        <tr>
+                            <td><?= $i + 1 ?></td>
+                            <td class="text-nowrap"><?= format_date($sr['sale_date']) ?></td>
+                            <td><a href="<?= buildUrl('api/pos/print_receipt.php') ?>?id=<?= (int)$sr['sale_id'] ?>" target="_blank" rel="noopener" class="text-decoration-none"><?= caseFormat($sr['receipt_number']) ?></a></td>
+                            <td><?= !empty($sr['customer_name']) ? caseFormat($sr['customer_name']) : t('Walk-in Customer') ?></td>
+                            <td class="text-end"><?= format_number($sr['quantity'], 2) ?></td>
+                            <td class="text-end fw-bold text-nowrap"><?= format_currency($sr['line_total']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <p class="text-center text-muted py-4 mb-0"><?= t('No sales yet') ?></p>
+            <?php endif; ?>
         </div>
     </div>
 </div>

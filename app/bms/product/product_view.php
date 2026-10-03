@@ -194,11 +194,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT pb.batch_id, pb.batch_number, pb.expiry_date, pb.manufacturing_date, pb.quantity_received,
                pb.quantity_remaining, pb.unit_cost, pb.created_at,
-               w.warehouse_name, pr.receipt_number,
+               w.warehouse_name, pr.receipt_number, sup.supplier_name,
                DATEDIFF(pb.expiry_date, CURDATE()) AS days_remaining
         FROM product_batches pb
         LEFT JOIN warehouses w ON w.warehouse_id = pb.warehouse_id
         LEFT JOIN purchase_receipts pr ON pr.receipt_id = pb.receipt_id
+        LEFT JOIN suppliers sup ON sup.supplier_id = pb.supplier_id
         WHERE pb.product_id = ?
         ORDER BY (pb.expiry_date IS NULL), pb.expiry_date ASC, pb.batch_id DESC
     ");
@@ -209,6 +210,37 @@ try {
 }
 // "Source GRN" only means something with Procurement (or when a batch really came from a GRN) — B3.
 $showGrnCol = bmsRouteAvailable('grn') || count(array_filter($product_batches, fn($b) => !empty($b['receipt_number']))) > 0;
+// Without GRNs the batch's supplier (from POS "Receive Stock") is the useful column (C3).
+$showBatchSupplierCol = !$showGrnCol;
+
+// ── POS facts for Basic Information (pos_detail_pages_plan.md C3) ──────────────
+// Last delivery = newest batch; wholesale = the Wholesale price-group price POS
+// really charges (products.wholesale_price is legacy/unread — quick_restock.php);
+// days of stock left = available ÷ average daily units sold over the last 30 days.
+$last_delivery = null; $pos_wholesale = null; $days_of_stock = null;
+try {
+    $ld = $pdo->prepare("SELECT pb.created_at, pb.unit_cost, pb.quantity_received, s.supplier_id, s.supplier_name
+                           FROM product_batches pb LEFT JOIN suppliers s ON s.supplier_id = pb.supplier_id
+                          WHERE pb.product_id = ? ORDER BY pb.created_at DESC, pb.batch_id DESC LIMIT 1");
+    $ld->execute([$product_id]);
+    $last_delivery = $ld->fetch(PDO::FETCH_ASSOC) ?: null;
+    require_once ROOT_DIR . '/core/pos_price_groups.php';
+    $wgId = wholesalePriceGroupId($pdo);
+    if ($wgId) {
+        $wp = $pdo->prepare("SELECT price FROM product_price_group_prices WHERE product_id = ? AND price_group_id = ?");
+        $wp->execute([$product_id, $wgId]);
+        $v = $wp->fetchColumn();
+        $pos_wholesale = ($v !== false && (float)$v > 0) ? (float)$v : null;
+    }
+    $sold30 = $pdo->prepare("SELECT COALESCE(SUM(psi.quantity), 0) FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                               WHERE psi.product_id = ? AND ps.is_return_sale = 0 AND ps.sale_status IN ('completed','partially_refunded','refunded')
+                                 AND ps.sale_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+    $sold30->execute([$product_id]);
+    $perDay = (float)$sold30->fetchColumn() / 30;
+    if ($perDay > 0) $days_of_stock = max(0, (int)floor((float)$product['available_stock'] / $perDay));
+} catch (PDOException $e) {
+    error_log('product_view POS facts: ' . $e->getMessage());
+}
 
 // Get recent sales (last 10)
 $recent_sales = [];
@@ -627,6 +659,34 @@ global $company_logo, $company_name;
                                     <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Unit:') ?></small> 
                                     <span class="custom-badge mt-1"><?= caseFormat($product['unit']) ?></span>
                                 </div>
+                                <?php if ($simpleProductForm): // POS facts (pos_detail_pages_plan.md C3) ?>
+                                <?php if (!empty($product['barcode'])): ?>
+                                <div class="col-6 col-md-12 mb-2 mb-md-3">
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Barcode:') ?></small>
+                                    <span class="custom-badge mt-1"><?= htmlspecialchars($product['barcode']) ?></span>
+                                </div>
+                                <?php endif; ?>
+                                <div class="col-6 col-md-12 mb-2 mb-md-3">
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Last delivery:') ?></small>
+                                    <?php if ($last_delivery): ?>
+                                    <span class="d-block mt-1"><?= format_date($last_delivery['created_at']) ?> · <?= format_number($last_delivery['quantity_received'], 3) ?> @ <?= format_currency($last_delivery['unit_cost']) ?></span>
+                                    <?php if (!empty($last_delivery['supplier_name'])): ?>
+                                    <a class="small text-decoration-none" href="<?= getUrl('suppliers/view') ?>?id=<?= (int)$last_delivery['supplier_id'] ?>"><?= caseFormat($last_delivery['supplier_name']) ?></a>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <span class="d-block mt-1 text-muted">—</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($product['is_service'] == 0): ?>
+                                <div class="col-6 col-md-12 mb-2 mb-md-3">
+                                    <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem;"><?= t('Days of stock left:') ?></small>
+                                    <span class="d-block mt-1 fw-bold <?= ($days_of_stock !== null && $days_of_stock <= 7) ? 'text-danger' : '' ?>">
+                                        <?= $days_of_stock === null ? '—' : sprintf(t('about %d days'), $days_of_stock) ?>
+                                    </span>
+                                    <?php if ($days_of_stock === null): ?><small class="text-muted"><?= t('No sales in the last 30 days') ?></small><?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+                                <?php endif; ?>
                             </div>
                         </div>
                         
@@ -657,6 +717,11 @@ global $company_logo, $company_name;
                                         <div class="col-6 col-md-12 mb-1">
                                             <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Wholesale:') ?></small>
                                             <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($product['wholesale_price']) ?></h5>
+                                        </div>
+                                        <?php elseif ($simpleProductForm && $pos_wholesale !== null): // the Wholesale price-group price POS charges (C3) ?>
+                                        <div class="col-6 col-md-12 mb-1">
+                                            <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.65rem;"><?= t('Wholesale:') ?></small>
+                                            <h5 class="text-info fw-bold mb-0 mt-1"><?= format_currency($pos_wholesale) ?></h5>
                                         </div>
                                         <?php endif; ?>
                                         
@@ -922,6 +987,7 @@ global $company_logo, $company_name;
                                                             <th><?= t('Status') ?></th>
                                                             <th><?= t('Unit Cost') ?></th>
                                                             <?php if ($showGrnCol): ?><th><?= t('Source GRN') ?></th><?php endif; ?>
+                                                            <?php if ($showBatchSupplierCol): ?><th><?= t('Supplier') ?></th><?php endif; ?>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -956,6 +1022,7 @@ global $company_logo, $company_name;
                                                             <td><?= $statusBadge ?></td>
                                                             <td><?= format_currency($b['unit_cost']) ?></td>
                                                             <?php if ($showGrnCol): ?><td><?= caseFormat($b['receipt_number'] ?? '—') ?></td><?php endif; ?>
+                                                            <?php if ($showBatchSupplierCol): ?><td><?= !empty($b['supplier_name']) ? caseFormat($b['supplier_name']) : '—' ?></td><?php endif; ?>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
