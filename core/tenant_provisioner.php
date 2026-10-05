@@ -409,13 +409,14 @@ if (!function_exists('provisionTenant')) {
 
         // ── 2. Reserve the registry row to obtain the tenant id ──────────────
         // Placeholder db_name/username; filled in at step 8 once real.
-        // trial_ends_at defaults to NOW() + 14 days; caller may override.
-        $trialEndsAt = null;
-        if (!empty($opts['trial_ends_at'])) {
-            $trialEndsAt = $opts['trial_ends_at'];
-        } else {
-            $trialEndsAt = date('Y-m-d H:i:s', strtotime('+14 days'));
-        }
+        // Trial length. Was hard-coded '+14 days' here, so changing how long a
+        // trial runs meant a deploy; it is now a platform setting the operator
+        // edits in the panel. An explicit trial_ends_at from the caller still
+        // wins, which is how the New Company form offers a custom date.
+        require_once __DIR__ . '/tenant_lifecycle_policy.php';
+        $trialEndsAt = !empty($opts['trial_ends_at'])
+            ? $opts['trial_ends_at']
+            : date('Y-m-d H:i:s', strtotime('+' . tenantDefaultTrialDays() . ' days'));
         $ownerFirstName = trim((string)($opts['owner_first_name'] ?? ''));
         $ownerLastName  = trim((string)($opts['owner_last_name']  ?? ''));
         $ownerPhone     = trim((string)($opts['owner_phone']      ?? ''));

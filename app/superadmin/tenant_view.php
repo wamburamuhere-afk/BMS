@@ -8,6 +8,7 @@
  * tenant's database password is never even selected (see getTenant()).
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../core/plans.php';
 require_once __DIR__ . '/../../helpers.php';
@@ -461,9 +462,39 @@ if ($hasContext ?? false):
                             <i class="bi bi-pause-circle me-1"></i> Suspend
                         </button>
                     <?php endif; ?>
-                    <?php if (in_array($tenant['status'], ['trial', 'suspended'], true)): ?>
-                    <button class="btn btn-outline-success w-100 mb-2" onclick="doExtendTrial()">
-                        <i class="bi bi-calendar-plus me-1"></i> Extend Trial
+                    <?php
+                    // Access clock. Shown for every running state, not just
+                    // trials: on the live platform every ACTIVE tenant had no
+                    // subscription_ends_at at all, so the list said "Expires —"
+                    // for all of them and nothing ever asked about it.
+                    if (in_array($tenant['status'], ['trial', 'active', 'suspended'], true)):
+                        $exp   = tenantExpiryLabel($tenant);
+                        $ends  = tenantAccessEndsAt($tenant);
+                        $tone  = ['ok' => 'secondary', 'warn' => 'warning', 'danger' => 'danger', 'none' => 'warning'][$exp['tone']];
+                    ?>
+                    <div class="alert alert-<?= $tone ?> py-2 mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-<?= $ends === null ? 'infinity' : 'calendar-event' ?> fs-5"></i>
+                        <div>
+                            <?php if ($ends === null): ?>
+                                <strong>No expiry date set</strong>
+                                <br><small>This company can use the system indefinitely, free. Set one with
+                                Extend access or on the Billing tab.</small>
+                            <?php else: ?>
+                                <strong><?= $tenant['status'] === 'trial' ? 'Trial' : 'Subscription' ?>
+                                    <?= ((int)($exp['tone'] === 'danger')) ? 'expired' : 'ends' ?></strong>
+                                <?= safe_output($exp['text'], '') ?>
+                                <br><small class="text-muted"><?= date('d M Y', strtotime($ends)) ?>
+                                    · grace <?= (int)tenantGraceDaysFor($tenant) ?> day<?= tenantGraceDaysFor($tenant) === 1 ? '' : 's' ?>
+                                    <?= ($tenant['grace_days'] ?? null) !== null ? '(set for this tenant)' : '(platform default)' ?>
+                                </small>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-primary w-100 mb-2" onclick="doExtendAccess()">
+                        <i class="bi bi-calendar-plus me-1"></i> Extend access
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm w-100 mb-2" onclick="doSetGraceDays()">
+                        <i class="bi bi-hourglass me-1"></i> Grace period for this tenant
                     </button>
                     <?php endif; ?>
                     <hr>
@@ -1166,6 +1197,21 @@ const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSO
 // Shown in the release-address and purge confirmations, where the operator
 // needs to see exactly which address is about to become claimable again.
 const TENANT_SUBDOMAIN = <?= json_encode((string)($tenant['subdomain'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+<?php
+$__ends   = tenantAccessEndsAt($tenant);
+$__left   = tenantDaysRemaining($tenant);
+$__clock  = ($tenant['status'] ?? '') === 'trial' ? 'trial' : 'subscription';
+$__hint   = $__ends === null
+    ? 'This tenant has no expiry date set, so extending starts the clock from today.'
+    : 'Their ' . $__clock . ' runs to ' . date('d M Y', strtotime($__ends))
+      . ($__left !== null && $__left < 0
+            ? ' (' . abs($__left) . ' day' . (abs($__left) === 1 ? '' : 's') . ' ago). Days are added from today.'
+            : '. Days are added to that date.');
+?>
+const EXPIRY_HINT        = <?= json_encode($__hint, JSON_UNESCAPED_UNICODE) ?>;
+const PLATFORM_GRACE_DAYS = <?= (int)tenantDefaultGraceDays() ?>;
+const TENANT_GRACE_DAYS   = <?= isset($tenant['grace_days']) && $tenant['grace_days'] !== null
+                                ? (int)$tenant['grace_days'] : 'null' ?>;
 const TENANT_DELETED = <?= json_encode(($tenant['status'] ?? '') === 'deleted') ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
@@ -1442,33 +1488,94 @@ function postAction(data, title, redirect) {
     }
 })();
 
-function doExtendTrial() {
+// One button for both clocks. It used to be "Extend Trial" and moved
+// trial_ends_at only, so for an active paying customer asking for a few more
+// days it did nothing they would notice. The server decides which date
+// governs — see extendTenantAccess().
+function doExtendAccess() {
     Swal.fire({
-        title: 'Extend Trial',
-        html: '<select id="swalExtendDays" class="form-select mt-2">'
+        title: 'Extend access',
+        html: '<p class="small text-muted mb-2">' + EXPIRY_HINT + '</p>'
+            + '<select id="swalExtendDays" class="form-select">'
             + '<option value="7">+ 7 days</option>'
             + '<option value="14" selected>+ 14 days</option>'
             + '<option value="30">+ 30 days</option>'
-            + '</select>',
+            + '<option value="60">+ 60 days</option>'
+            + '<option value="90">+ 90 days</option>'
+            + '<option value="custom">Custom…</option>'
+            + '</select>'
+            + '<input id="swalExtendCustom" type="number" min="1" max="365" class="form-control mt-2 d-none" placeholder="Number of days (1–365)">',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Extend',
-        confirmButtonColor: '#198754',
+        didOpen: function () {
+            const sel = document.getElementById('swalExtendDays');
+            const box = document.getElementById('swalExtendCustom');
+            sel.addEventListener('change', function () {
+                box.classList.toggle('d-none', sel.value !== 'custom');
+                if (sel.value === 'custom') box.focus();
+            });
+        },
         preConfirm: function () {
-            return document.getElementById('swalExtendDays').value;
+            const sel = document.getElementById('swalExtendDays').value;
+            const days = sel === 'custom'
+                ? parseInt(document.getElementById('swalExtendCustom').value, 10)
+                : parseInt(sel, 10);
+            if (!days || days < 1 || days > 365) {
+                Swal.showValidationMessage('Enter a number of days between 1 and 365.');
+                return false;
+            }
+            return days;
         }
     }).then(function (result) {
         if (!result.isConfirmed) return;
         $.ajax({
-            url: '/actions/superadmin_extend_trial.php',
+            url: '/actions/superadmin_tenant_access.php',
             method: 'POST', dataType: 'json',
-            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, days: result.value }
+            data: { _csrf: SA_CSRF_TOKEN, action: 'extend', tenant_id: TENANT_ID, days: result.value }
         }).done(function (res) {
             if (res && res.success) {
-                Swal.fire({ icon: 'success', title: 'Trial Extended', text: res.message, timer: 1800, showConfirmButton: false });
-                setTimeout(function () { window.location.reload(); }, 1800);
+                Swal.fire({ icon: 'success', title: 'Access extended', text: res.message, timer: 2400, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 2400);
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not extend trial.' });
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not extend access.' });
+            }
+        }).fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Request failed.' });
+        });
+    });
+}
+
+function doSetGraceDays() {
+    Swal.fire({
+        title: 'Grace period for this tenant',
+        html: 'Days they keep working after their date passes, before they are cut off.'
+            + '<br><br><span class="small text-muted">Leave blank to follow the platform default ('
+            + PLATFORM_GRACE_DAYS + ' days). <strong>0</strong> means cut off the moment it expires.</span>',
+        input: 'number',
+        inputValue: TENANT_GRACE_DAYS === null ? '' : TENANT_GRACE_DAYS,
+        inputAttributes: { min: 0, max: 90, placeholder: 'Blank = default' },
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function (v) {
+            if (v === '' || v === null) return undefined;          // blank is valid
+            const n = parseInt(v, 10);
+            if (isNaN(n) || n < 0 || n > 90) return 'Enter 0–90, or leave blank for the default.';
+            return undefined;
+        }
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '/actions/superadmin_tenant_access.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, action: 'set_grace_days', tenant_id: TENANT_ID,
+                    grace_days: (r.value === null ? '' : String(r.value)) }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2200, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 2200);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not save.' });
             }
         }).fail(function () {
             Swal.fire({ icon: 'error', title: 'Error', text: 'Request failed.' });

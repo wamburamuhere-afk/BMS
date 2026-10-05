@@ -59,7 +59,10 @@ function expiresBadge(
     }
 
     if ($status === 'trial') {
-        if ($trialEndsAt === null) return '<span class="text-muted">—</span>';
+        // Was a plain em-dash, which read as "nothing to see". A running
+        // tenant with no end date is the opposite: it never expires, and on
+        // the live platform that was EVERY active tenant.
+        if ($trialEndsAt === null) return '<span class="badge bg-warning text-dark"><i class="bi bi-infinity me-1"></i>No expiry</span>';
         $daysLeft = (int)floor((strtotime($trialEndsAt) - time()) / 86400);
         $date = date('d M Y', strtotime($trialEndsAt));
         if ($daysLeft < 0)   return '<span class="badge bg-danger">Trial expired</span>';
@@ -73,7 +76,7 @@ function expiresBadge(
     }
     if ($status === 'active') {
         // subscription_ends_at is set from the last recorded payment's ends_at
-        if ($subscriptionEndsAt === null) return '<span class="text-muted small">—</span>';
+        if ($subscriptionEndsAt === null) return '<span class="badge bg-warning text-dark"><i class="bi bi-infinity me-1"></i>No expiry</span>';
         $daysLeft = (int)floor((strtotime($subscriptionEndsAt) - time()) / 86400);
         $date = date('d M Y', strtotime($subscriptionEndsAt));
         if ($daysLeft < 0)   return '<span class="badge bg-danger">Expired ' . $date . '</span>';

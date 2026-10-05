@@ -228,7 +228,14 @@ if (!function_exists('bmsConnectPdo')) {
         // the grace_until IS NULL check prevents double-setting, and
         // insertSaNotification deduplicates per (tenant_id, type) per day.
 
-        define('BMS_GRACE_PERIOD_DAYS', 7);
+        // Was define('BMS_GRACE_PERIOD_DAYS', 7) here, and a second
+        // define('GRACE_PERIOD_DAYS', 7) in api/cron/trial_enforcement.php:
+        // two independent copies of one policy, read by the two code paths
+        // that enforce it, agreeing only because nobody had edited one yet.
+        // Both now come from core/tenant_lifecycle_policy.php, which also
+        // honours this tenant's own grace_days override.
+        require_once __DIR__ . '/tenant_lifecycle_policy.php';
+        $graceDays = tenantGraceDaysFor($tenant);
 
         $trialExpired = ($status === 'trial')
             && !empty($tenant['trial_ends_at'])
@@ -246,7 +253,7 @@ if (!function_exists('bmsConnectPdo')) {
                 $expiryDate = $trialExpired
                     ? (string)$tenant['trial_ends_at']
                     : (string)$tenant['subscription_ends_at'];
-                $graceDate = date('Y-m-d', strtotime($expiryDate . ' +' . BMS_GRACE_PERIOD_DAYS . ' days'));
+                $graceDate = date('Y-m-d', strtotime($expiryDate . ' +' . $graceDays . ' days'));
                 $notifType  = $trialExpired ? 'trial_grace_started' : 'subscription_grace_started';
 
                 try {
@@ -319,6 +326,22 @@ if (!function_exists('bmsConnectPdo')) {
             // Clear stale grace warning if tenant is now fully active/paid
             if (session_status() === PHP_SESSION_ACTIVE) {
                 unset($_SESSION['_bms_grace_warning']);
+
+                // Warn BEFORE the date, not only after it. The grace banner
+                // above is the first thing a customer ever saw about their
+                // expiry — by which point they had already run out and had to
+                // be told their trial "has ended". A week's notice lets them
+                // do something about it instead.
+                $daysLeft = tenantDaysRemaining($tenant);
+                if ($daysLeft !== null && $daysLeft >= 0 && $daysLeft <= 7) {
+                    $_SESSION['_bms_expiry_warning'] = [
+                        'type'      => $status === 'trial' ? 'trial' : 'subscription',
+                        'days_left' => $daysLeft,
+                        'ends_at'   => tenantAccessEndsAt($tenant),
+                    ];
+                } else {
+                    unset($_SESSION['_bms_expiry_warning']);
+                }
             }
         }
 

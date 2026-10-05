@@ -1,13 +1,24 @@
 <?php
 /**
- * actions/superadmin_extend_trial.php — extend a tenant's trial period.
+ * actions/superadmin_extend_trial.php — DEPRECATED shim.
  *
- * Accepts: tenant_id (int), days (7|14|30|custom int).
- * Sets trial_ends_at = MAX(NOW(), trial_ends_at) + :days INTERVAL.
- * If the tenant was suspended solely due to trial expiry, restores status to
- * 'trial' automatically.
+ * This endpoint used to hold the extension logic, and it only half worked: it
+ * moved `trial_ends_at` and restored a suspended tenant to 'trial', so for an
+ * ACTIVE paying customer who asked for a few more days it changed nothing they
+ * would ever notice.
+ *
+ * The real thing is now extendTenantAccess() in
+ * core/tenant_lifecycle_policy.php, behind actions/superadmin_tenant_access.php,
+ * and it moves whichever date actually governs the tenant in front of you.
+ *
+ * Kept as a thin forward rather than deleted: the URL may be in a bookmark, an
+ * old tab, or a script, and a 404 there would look like the panel is broken.
+ * It takes the same parameters and answers in the same shape as before, so an
+ * old caller cannot tell the difference — except that it now works for
+ * subscriptions too.
  */
 require_once __DIR__ . '/../core/tenant_admin.php';
+require_once __DIR__ . '/../core/tenant_lifecycle_policy.php';
 require_once __DIR__ . '/../helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -39,63 +50,24 @@ if ($tenantId <= 0) {
     exit;
 }
 
-if ($days < 1 || $days > 365) {
+$r = extendTenantAccess($tenantId, $days);
+
+if (!$r['ok']) {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Days must be between 1 and 365.']);
+    echo json_encode(['success' => false, 'message' => $r['error']]);
     exit;
 }
 
-try {
-    $ctrl = getControlPdo();
+$what = $r['field'] === 'trial_ends_at' ? 'Trial' : 'Subscription';
 
-    $row = $ctrl->prepare("SELECT id, subdomain, status, trial_ends_at FROM tenants WHERE id = ?");
-    $row->execute([$tenantId]);
-    $tenant = $row->fetch(\PDO::FETCH_ASSOC);
-
-    if (!$tenant) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Tenant not found.']);
-        exit;
-    }
-
-    // Base: extend from the later of NOW() or the current trial end (avoid shrinking)
-    // If no trial_ends_at yet, start from now.
-    $base       = (!empty($tenant['trial_ends_at'])
-                   ? "GREATEST(NOW(), trial_ends_at)"
-                   : "NOW()");
-    $newEndsAt  = $ctrl->query(
-        "SELECT DATE_ADD({$base}, INTERVAL {$days} DAY) FROM tenants WHERE id = {$tenantId}"
-    )->fetchColumn();
-
-    // Build the UPDATE — also restore 'suspended' → 'trial' if appropriate
-    $sa = currentSuperadmin();
-
-    $ctrl->prepare(
-        "UPDATE tenants
-            SET trial_ends_at     = ?,
-                trial_extended_by = ?,
-                status            = CASE
-                                        WHEN status = 'suspended' THEN 'trial'
-                                        ELSE status
-                                    END
-          WHERE id = ?"
-    )->execute([$newEndsAt, $sa['id'], $tenantId]);
-
-    logTenantAdminAction(
-        $tenantId,
-        (string)$tenant['subdomain'],
-        'extend_trial',
-        "Extended by {$days} days — new trial_ends_at: {$newEndsAt}"
-    );
-
-    echo json_encode([
-        'success'       => true,
-        'message'       => "Trial extended by {$days} day" . ($days > 1 ? 's' : '') . '. New expiry: ' . date('d M Y', strtotime($newEndsAt)) . '.',
-        'trial_ends_at' => $newEndsAt,
-    ]);
-
-} catch (\Throwable $e) {
-    error_log('superadmin_extend_trial.php: ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error. Please try again.']);
-}
+echo json_encode([
+    'success'       => true,
+    'message'       => $what . ' extended by ' . $days . ' day' . ($days === 1 ? '' : 's')
+                     . '. New expiry: ' . date('d M Y', strtotime((string)$r['ends_at'])) . '.'
+                     . ($r['resumed'] ? ' Service has been restored.' : ''),
+    // The old response key, kept for any caller that reads it. It now carries
+    // whichever date was actually moved.
+    'trial_ends_at' => $r['ends_at'],
+    'ends_at'       => $r['ends_at'],
+    'field'         => $r['field'],
+]);

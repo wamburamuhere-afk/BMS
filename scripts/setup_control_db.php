@@ -587,6 +587,10 @@ try {
         'suspension_reason'    => "ADD COLUMN `suspension_reason` ENUM('trial_expired','subscription_expired','manual') NULL AFTER `subscription_ends_at`",
         // Grace period end date — set when trial/subscription expires; tenant stays accessible until this date
         'grace_until'          => "ADD COLUMN `grace_until` DATE NULL AFTER `suspension_reason`",
+        // Per-tenant grace override. NULL = follow the platform default, which
+        // is NOT the same as 0 (cut off the moment it expires). "They asked for
+        // more time" should not mean giving every other customer more time too.
+        'grace_days'           => "ADD COLUMN `grace_days` TINYINT UNSIGNED NULL AFTER `grace_until`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
