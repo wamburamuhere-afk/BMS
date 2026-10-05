@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-10-05 — fix(documents): correct visibility policy — managers see all, others see public+own+assigned
+
+Non-admins were seeing 0 documents for two reasons: (1) `canView('documents')` was the gate but only two roles had that key; (2) management roles (Director, CFO, Credit Manager) who do have `document_library` view permission still got the same filtered view as Staff, rather than seeing everything.
+
+**Policy now:**
+- Admin → all (unchanged)
+- Managing Director, Director, CFO, Credit Manager → all (new `see_all_documents` flag)
+- Other roles with `document_library` view permission → public + own uploads + assigned + blank access_level
+- Roles without `document_library` permission → blocked entirely (unchanged)
+
+**Files:**
+- `migrations/tenant/2026_10_05_document_visibility_policy.php` — adds `see_all_documents tinyint(1) DEFAULT 0` to `roles`; sets it to 1 for Admin, Managing Director, Director, CFO, Credit Manager (matched by name so it works across tenants regardless of role_id).
+- `core/document_access.php` — adds `canSeeAllDocuments()`: checks `isAdmin()` first, then `see_all_documents` from the user's role (cached in `$_SESSION['_see_all_docs']` to avoid repeated DB queries). Fails safe (returns false) if column is pre-migration. `userCanAccessDocument()` delegates to it as the first check; also now allows blank `access_level` rows (same visibility as `public`).
+- `api/document/get_documents.php` — gate key changed `canView('documents')` → `canView('document_library')` (the key all roles actually have); visibility filter switches `!isAdmin()` → `!canSeeAllDocuments()`; blank `access_level` added to the public-visible clause.
+- `api/get_documents.php` (signing-wizard picker) — same three changes as above.
+- `app/constant/document/document_library.php` — download/view gate and `autoEnforcePermission` both changed from `'documents'` → `'document_library'`.
+- `tests/test_document_visibility_policy_cli.php` — 19 static assertions verifying: php -l on all 5 files; canView key correct in all 3 endpoints; `canSeeAllDocuments()` present and wired; blank access_level in filters; live DB checks (migration applied, per-role flag, `userCanAccessDocument` allows/denies correctly).
+
 ## 2026-10-05 — fix(e-signature): the signing wizard offers only documents the user may actually sign
 
 A non-admin could walk the Document Signing Wizard through steps 1-3 and only be refused at the final step with **"Signing failed — Could not fetch original PDF (HTTP 403)"**, on the very same document an admin signed without trouble. Three layers disagreed about who may see a document: the picker listed every row, the preview read the file straight off disk, and only the final fetch consulted the access gate.

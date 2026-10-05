@@ -12,7 +12,7 @@ try {
     if (!isset($_SESSION['user_id'])) {
         throw new Exception('Unauthorized');
     }
-    if (!canView('documents')) {
+    if (!canView('document_library')) {
         http_response_code(403);
         throw new Exception('Access Denied');
     }
@@ -31,8 +31,9 @@ try {
     // the same rule core/document_access.php enforces on download/view. Without
     // it the picker listed every document, and a non-admin only discovered the
     // refusal at the final step as "Could not fetch original PDF (HTTP 403)".
-    if (!isAdmin()) {
+    if (!canSeeAllDocuments()) {
         $where .= " AND (d.access_level = 'public'
+                      OR d.access_level = ''
                       OR d.uploaded_by = :vis_user1
                       OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2))";
         $params[':vis_user1'] = $_SESSION['user_id'];
@@ -55,12 +56,13 @@ try {
     $countStmt->execute();
     $totalFiltered = (int)$countStmt->fetchColumn();
 
-    if (isAdmin()) {
+    if (canSeeAllDocuments()) {
         $totalRecords = (int)$pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
     } else {
         $totalStmt = $pdo->prepare("
             SELECT COUNT(*) FROM documents d
             WHERE d.access_level = 'public'
+               OR d.access_level = ''
                OR d.uploaded_by = :vis_user1
                OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2)
         ");
