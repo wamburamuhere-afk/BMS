@@ -55,6 +55,35 @@ if (isSuperadminLoggedIn()) {
 
     <div id="loginError" class="alert alert-danger d-none" role="alert"></div>
 
+    <!-- Second step, revealed only when the account has two-step sign-in on.
+         Until the code is accepted there is no operator session at all. -->
+    <div id="step-2fa" class="d-none">
+        <p class="text-muted" style="font-size:.9rem;">
+            Enter the 6-digit code from your authenticator app. You can also use one of
+            your recovery codes.
+        </p>
+        <form id="twoFactorForm" autocomplete="off" novalidate>
+            <div class="mb-3">
+                <label for="totpCode" class="form-label">Code</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-shield-lock text-primary"></i></span>
+                    <input type="text" class="form-control" id="totpCode" name="code"
+                           inputmode="text" autocomplete="one-time-code" spellcheck="false"
+                           maxlength="12" placeholder="123456" style="letter-spacing:2px;">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="btn2fa">
+                <i class="bi bi-shield-check me-1"></i> Verify
+            </button>
+        </form>
+        <div class="text-center mt-3">
+            <a href="<?= saUrl('login') ?>" class="text-decoration-none" style="font-size:.85rem;">
+                <i class="bi bi-arrow-left me-1"></i>Start again
+            </a>
+        </div>
+    </div>
+
+    <div id="step-password">
     <form id="superadminLoginForm" autocomplete="off" novalidate>
         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
 
@@ -90,6 +119,7 @@ if (isSuperadminLoggedIn()) {
             Forgot your password?
         </a>
     </div>
+    </div><!-- /#step-password -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
@@ -115,6 +145,13 @@ $('#superadminLoginForm').on('submit', function (e) {
         dataType: 'json',
         data: $(this).serialize(),
         success: function (res) {
+            if (res && res.success && res.needs_2fa) {
+                // Password accepted, but no session exists yet — the server
+                // holds only a short-lived pending marker until the code is
+                // verified. See attemptSuperadminLogin().
+                showTwoFactorStep();
+                return;
+            }
             if (res && res.success) {
                 window.location.href = '<?= saUrl('') ?>';
             } else {
@@ -127,6 +164,41 @@ $('#superadminLoginForm').on('submit', function (e) {
         },
         complete: function () {
             $btn.prop('disabled', false).html('<i class="bi bi-box-arrow-in-right me-1"></i> Sign In');
+        }
+    });
+});
+
+function showTwoFactorStep() {
+    $('#step-password').addClass('d-none');
+    $('#step-2fa').removeClass('d-none');
+    $('#loginError').addClass('d-none').text('');
+    $('#totpCode').val('').focus();
+}
+
+$('#twoFactorForm').on('submit', function (e) {
+    e.preventDefault();
+    $('#loginError').addClass('d-none').text('');
+    const $btn = $('#btn2fa').prop('disabled', true)
+        .html('<span class="spinner-border spinner-border-sm me-1"></span> Checking...');
+
+    $.ajax({
+        url: '/actions/superadmin_login.php',
+        method: 'POST',
+        dataType: 'json',
+        data: { _csrf: $('input[name="_csrf"]').first().val(), step: '2fa', code: $('#totpCode').val() },
+        success: function (res) {
+            if (res && res.success) {
+                window.location.href = '<?= saUrl('') ?>';
+            } else {
+                $('#loginError').removeClass('d-none').text((res && res.message) || 'That code is not right.');
+                $('#totpCode').val('').focus();
+            }
+        },
+        error: function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Could not reach the server. Please try again.' });
+        },
+        complete: function () {
+            $btn.prop('disabled', false).html('<i class="bi bi-shield-check me-1"></i> Verify');
         }
     });
 });

@@ -696,6 +696,15 @@ try {
         'failed_attempts' => "ADD COLUMN `failed_attempts` INT NOT NULL DEFAULT 0 AFTER `password_hash`",
         'locked_until'    => "ADD COLUMN `locked_until` DATETIME NULL AFTER `failed_attempts`",
         'last_login'      => "ADD COLUMN `last_login` DATETIME NULL AFTER `locked_until`",
+        // Two-step sign-in (core/superadmin_2fa.php). This account reaches
+        // every company on the platform and had one password protecting it.
+        // The secret is stored encrypted, never raw; totp_last_counter is the
+        // replay guard (a code stays valid ~90s, so without it the same six
+        // digits work twice); recovery codes are kept only as SHA-256.
+        'totp_secret_enc'      => "ADD COLUMN `totp_secret_enc` VARCHAR(255) NULL AFTER `last_login`",
+        'totp_confirmed_at'    => "ADD COLUMN `totp_confirmed_at` DATETIME NULL AFTER `totp_secret_enc`",
+        'totp_last_counter'    => "ADD COLUMN `totp_last_counter` BIGINT NULL AFTER `totp_confirmed_at`",
+        'totp_recovery_hashes' => "ADD COLUMN `totp_recovery_hashes` TEXT NULL AFTER `totp_last_counter`",
     ] as $col => $clause) {
         if (!in_array($col, $saCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`superadmins` {$clause}");
