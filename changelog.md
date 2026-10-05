@@ -7,7 +7,7 @@ Adds Progressive Web App support so users can install the system from the browse
 - `manifest.json` — name "Smart BMS", standalone display, theme `#0d6efd`; `start_url`/`scope` are relative (`./`), so routing stays with `roots.php` and it works on both bms. and demo. hosts.
 - `sw.js` — never caches pages (per-user financial data + CSRF tokens); only shows `offline.html` when a page load fails with no network.
 - `header.php`, `login.php` — manifest link, theme-color, iOS meta tags, apple-touch-icon, service-worker registration.
-- Icons are a generic blue "BMS" placeholder — replace files in `assets/images/pwa/` to rebrand.
+- Icons use the Smart BMS logo (navy `#161B6E` dots + grey `#A9A9AE` grid), redrawn at full resolution from the supplied 99×102 PNG so they stay sharp at 512 px; the offline page shows the same logo as inline SVG.
 
 ---
 
