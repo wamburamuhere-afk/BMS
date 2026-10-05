@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-05 — fix(e-signature): the signing wizard offers only documents the user may actually sign
+
+A non-admin could walk the Document Signing Wizard through steps 1-3 and only be refused at the final step with **"Signing failed — Could not fetch original PDF (HTTP 403)"**, on the very same document an admin signed without trouble. Three layers disagreed about who may see a document: the picker listed every row, the preview read the file straight off disk, and only the final fetch consulted the access gate.
+
+**Files:**
+- `api/get_documents.php` — the wizard's picker list ran `WHERE 1=1`, so **every user was offered every document**, including ones the signing step would refuse. It now applies the same visibility rule the access gate enforces (`core/document_access.php`: admin, `access_level = 'public'`, own upload, or listed in `document_assignees`), on the page query, the filtered count and the unfiltered total alike, and requires `canView('documents')` like its sibling `api/document/get_documents.php` already did. The refusal can no longer arrive four steps late, because the document is never offered.
+- `app/constant/document/select_document_add_esignature.php` — **the preview no longer bypasses PHP.** It fetched `<?= getUrl("") ?>/' + selectedDocPath`, i.e. the raw `/uploads/document_library/...` path served statically by Apache, so a restricted document's full contents were readable by anyone who reached this page (and by anyone holding the URL). It now renders through `document_library?action=view&document_id=`, which runs the gate; that action sends `Content-Disposition: inline` (what pdf.js needs — the original reason the raw path was used) and does not touch the download counter. The **preselect** path (arriving via "Save & Sign") hand-rolled its own `uploaded_by === user_id || isAdmin()` check, which both missed public documents and missed documents shared through `document_assignees`; it now calls the shared `userCanAccessDocument()`. A refused fetch finally reports *"You do not have access to this document… Ask the document owner to share it with you"* instead of a bare `HTTP 403`.
+- `tests/test_document_access_gate_cli.php` — extended from 17 to **31 assertions**. New static guards for the picker filter, the permission check, the gated preview URL, the shared preselect helper and the readable 403; plus a live section that **executes `api/get_documents.php` itself** under faked sessions (stranger / assignee / owner / admin) and asserts the contract that was broken: *every row the picker offers passes the gate the signing step enforces*. Verified to fail (6 failures) against the pre-fix code.
+
+Verified end-to-end over HTTP through the production route as a real non-admin user: picker returns only permitted rows; preview of a permitted PDF returns `200 application/pdf` `Content-Disposition: inline`; preview and download of a restricted document both return `403`; the wizard page renders with no preselect for a document the user may not sign.
+
 ## 2026-10-03 — feat(customer-visits): PDF + WhatsApp + email; form fits the phone; admin sees submitted days only; phone optional
 
 Third live test on shop.demo as a field marketer (the "Save" buttons could not be reached on a short screen; sending the day's report to the boss meant print → save PDF → WhatsApp by hand).
