@@ -142,6 +142,21 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($tr['page_title']) ?></title>
+
+    <link rel="manifest" href="<?= getUrl('manifest.json') ?>">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Smart BMS">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAMAAAAKE/YAAAAALVBMVEX+/v7U1NiMj7dcX5k9QYY1OoEpLXqwsczV1uQVGm0cIXGdn8KoqK1+ga6/wNfXo1VqAAAFCUlEQVR42u2c23akIBBFG1FETOb/P3da++Id6hSW4ArnJZNMQu2QCrSy4+NRUlJSUlJSUlJSUlLyJ6MqXTfGNLWuWpsahpRWm24Wp/vURGHkeiR1L2A3/sNUqam8UfUXeJrq5/umTU12nOqJ2O3k+UF9IYZd5Pvu/ifrA+YRu7HhCrN32MTq5zB7i0J9iDxSOxVdgTDJP95sELzMI7WNrEDITyArBO1nHqiNjaoQ1xvvLD69CjEP1DqmwhkTvZwIFSJ+Uff8CgLQNQW6W7Z1uALa1RYasg03x7ZBUkMTJ3o51YmhWzJzV2UDranQXddkA23o0J3KBJq03m37Iy00YWPZWz/SQgd38P2mTgtdI9DTopcaGkgu0MjiMVs+CrRse3SWUSE1tMsEGlryzLdEWuhbbi7kF3k5beOW3h2uazOBRl6aTi2dGpp4tbW63koMTd5eFtfjqaGB9UOyp8EhgZ28TQo9v4dB7uoZNVaBlDY45OLTkV3xTS1wWyzY1KufHXIl0LIqUKKwEa2BqcEK8XO9HZFBDVYgYlu1n93fENvgfY1VEAmwnXf5nHf1buesyLnMqa12x5jZUj9stbr6Mr/9wVFdRtSv83wzNIozuvr3GK8S8qcesjjCPLq2yY56kUJNytCjtTF1lHPi7et3hdOslo1zwp2bQ2p1VoVvpblz0r2dE6Yq47vT8LFaXt9XlNWy55yMg/Lm4oj6VKvldOek7YgvqfhWi/YNWnuck+WbwT2BqT1WizcB58TsjBl2ThBqh7+iDjonhuWc0O/77Vgt4d4IOifN6ktCl3wWpjYYtaBzgnQI9Nso6pwg1MiWQDyQMDznBLmfTW8QjnMichceaRCOcyIjiNCnmuWcQNBkb2FhtXgD3JerOT3NtVq8kXdOeBV8+UcfkHlYxbRafOEdCyI93fMOHk9q6VlTX3DE6wvknBgeNBDaotewhpTXFrzB9A0ONDQttOWDB42sHgLQ2JAcaIH2kJe/mBV84S1IiZc8YHPpeJsLVKEmQSOnr9Mmi72ePn1H5DknF1gtgaYmZ2q4C6wWb3r6NPzyoHlWiz/yzgl9AyPfZuI4J5jVQnxxCt35kHdOqEfSwP08oOeYzgmpAniLibxnTdTnWy2OfFUL/vgmagmrBbzZa520c0LwQ+AzDIVTn2q1PP+LcSBFN2Wmvj5STnCrxXHPRTVwrnNuhecHG64OJO+c7Ffoov5ke+OceGaeR72u8Dpf1dxpfg9arS4Zje5Ppd6rEIc8RlW6Gb9/Z/TvQLZ7K5jd16sK0Sfjs+l4rgsB5ySGelNBIsU5SUz96RDVa103zWi1pAYNU3db58Sc+JslRz2ttp83XKvlaupV0zT5zDZwdHfpk1Q+GVbQ7SqKGAW1BcaPWK9JzgmZmme1oJNLuRCJok72JBWEmme1nNQb7zxg6nyepIJQ5/MkFcA5YVot1FzgnKSFZjoniaF5zkliaHmrRQCafmfY3fxJKon/Qp938FiepIJD3/KhJLeEvuVDSW4JLW+1iPT0DR9pJG+1CEDLK5MC0EznJC30XZ+kQsZmWi0C0Lk8SeUC5yTxTFPXD+kLW6EnqajU0LHOCVaBFHnnBKxACeqcUKwWFVWBEtQ5CfshbVyF+Lnejui3WnadE5knqWDOicGdE6yCRKyEcyIfCedEPiLOyQXYIs6JfFSlzeuY2dRZnYyHIu+clJSUlJSUlJSUlJT8nfwHEXIZVeHdeokAAAAASUVORK5CYII=">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('<?= getUrl('sw.js') ?>').catch(function () {});
+            });
+        }
+    </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
