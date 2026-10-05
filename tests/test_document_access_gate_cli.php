@@ -36,6 +36,8 @@ foreach ([
     'core/document_access.php',
     'app/constant/document/document_library.php',
     'api/document/get_document_activity.php',
+    'api/get_documents.php',
+    'app/constant/document/select_document_add_esignature.php',
 ] as $rel) {
     $out = []; $rc = 0;
     exec('php -l ' . escapeshellarg("$root/$rel") . ' 2>&1', $out, $rc);
@@ -50,7 +52,26 @@ check(strpos($libSrc, "action === 'download' || \$action === 'view'") !== false 
 check(strpos($libSrc, 'document_library?action=view&document_id=') !== false, '"View Online" links route through the PHP gate instead of a raw file path', 'View Online still links directly to the raw file path');
 check(!preg_match('/href="\$\{APP_URL\}\/\$\{row\.file_path\}"/', $libSrc), 'no remaining raw-file-path link in document_library.php', 'a raw file-path link still exists in document_library.php');
 
-section('3. Live — userCanAccessDocument() actually allows/denies correctly');
+section('3. Static — the signing wizard offers only documents the user may fetch');
+
+// The wizard's picker is fed by api/get_documents.php while the final signing
+// step fetches through document_library's gate. When the two disagreed, a
+// non-admin could select a restricted document and only hit the refusal four
+// steps later as "Could not fetch original PDF (HTTP 403)".
+$listSrc = file_get_contents("$root/api/get_documents.php");
+check(strpos($listSrc, "canView('documents')") !== false, 'api/get_documents.php requires the documents view permission', "api/get_documents.php does not check canView('documents')");
+check(strpos($listSrc, 'document_assignees') !== false && strpos($listSrc, "access_level = 'public'") !== false, 'api/get_documents.php filters the list by the same visibility rule as the access gate', 'api/get_documents.php still lists every document regardless of access_level');
+check(strpos($listSrc, 'isAdmin()') !== false, 'api/get_documents.php keeps the admin bypass explicit', 'api/get_documents.php has no admin bypass');
+check(!preg_match('/\$where\s*=\s*"WHERE 1=1";\s*
+\s*if \(!empty\(\$search\)\)/', $listSrc), 'the unfiltered WHERE 1=1 list query is gone', 'api/get_documents.php still goes straight from WHERE 1=1 to the search filter with no visibility clause');
+
+$wizSrc = file_get_contents("$root/app/constant/document/select_document_add_esignature.php");
+check(strpos($wizSrc, "?action=view&document_id=' + selectedDocId") !== false, 'the wizard preview renders through the PHP permission gate', 'the wizard preview does not use the gated action=view endpoint');
+check(strpos($wizSrc, "?>/' + selectedDocPath") === false, 'the wizard no longer loads the raw /uploads/... file path for preview', 'SECURITY REGRESSION: the wizard preview still fetches the raw file path, bypassing PHP entirely');
+check(strpos($wizSrc, 'userCanAccessDocument(') !== false, 'the wizard preselect uses the shared access-gate helper', 'the wizard preselect still hand-rolls its own ownership check');
+check(strpos($wizSrc, 'pdfResp.status === 403') !== false, 'a refused document reports a readable reason instead of a bare HTTP code', 'the wizard still surfaces only "HTTP 403" to the user');
+
+section('4. Live — userCanAccessDocument() actually allows/denies correctly');
 
 if (!$isLive) {
     echo "  \033[33m⊘\033[0m  Skipped (no includes/config.php — not a live install)\n";
@@ -96,6 +117,67 @@ if (!$isLive) {
         unset($_SESSION['is_admin']);
 
         check(userCanAccessDocument($pdo, 999999999) === false, 'a non-existent document_id resolves to false (no crash, no silent allow)', 'a non-existent document_id did not resolve to false');
+
+        section('5. Live — the real picker endpoint is executed and returns only permitted rows');
+
+        // Runtime, not static: api/get_documents.php is actually included and
+        // run under a faked session, exactly as the wizard's DataTable calls
+        // it. This is the list that must agree with the gate above.
+        $runPicker = function (int $uid, bool $admin) use ($root) {
+            global $pdo;  // the included endpoint resolves $pdo from this scope
+            $_SESSION['user_id'] = $uid;
+            $_SESSION['permissions'] = ['documents' => ['view' => true]];
+            if ($admin) { $_SESSION['is_admin'] = 1; } else { unset($_SESSION['is_admin']); }
+            $_GET = [
+                'draw'   => 1,
+                'start'  => 0,
+                'length' => 50,
+                'search' => ['value' => 'TEST access-gate'],
+            ];
+            ob_start();
+            include "$root/api/get_documents.php";
+            $raw = ob_get_clean();
+            return json_decode($raw, true);
+        };
+
+        $names = function (?array $res): array {
+            return array_column($res['data'] ?? [], 'document_name');
+        };
+
+        $strangerRes = $runPicker($strangerId, false);
+        if (isset($strangerRes['error'])) {
+            echo "  [33m⊘[0m  Skipped (picker returned: {$strangerRes['error']})
+";
+        } else {
+            $strangerNames = $names($strangerRes);
+            check(in_array('TEST access-gate public', $strangerNames, true), 'picker offers the public document to an unrelated user', 'picker hid a public document from a user who may fetch it');
+            check(!in_array('TEST access-gate restricted', $strangerNames, true), 'picker does NOT offer the restricted document to an unrelated user — the wizard can no longer reach the 4-step-late HTTP 403', 'REGRESSION: picker still offers a restricted document the user cannot fetch');
+
+            $assigneeNames = $names($runPicker($assigneeId, false));
+            check(in_array('TEST access-gate restricted', $assigneeNames, true), 'picker offers the restricted document to the explicitly assigned user', 'picker hid the restricted document from an assigned user who may sign it');
+
+            $ownerNames = $names($runPicker($ownerId, false));
+            check(in_array('TEST access-gate restricted', $ownerNames, true), 'picker offers the owner their own restricted document', 'picker hid the restricted document from its own uploader');
+
+            $adminNames = $names($runPicker($strangerId, true));
+            check(in_array('TEST access-gate restricted', $adminNames, true), 'picker offers every document to an admin', 'picker hid a restricted document from an admin');
+
+            // The contract that was broken: every row the picker offers must
+            // pass the gate that the final signing step enforces.
+            $_SESSION['user_id'] = $strangerId;
+            unset($_SESSION['is_admin']);
+            $mismatch = [];
+            foreach (($strangerRes['data'] ?? []) as $row) {
+                if (!userCanAccessDocument($pdo, (int)$row['id'])) {
+                    $mismatch[] = $row['document_name'];
+                }
+            }
+            check(empty($mismatch), 'every row the picker offers passes the signing gate (list and gate agree)', 'picker offered rows the gate refuses: ' . implode(', ', $mismatch));
+        }
+
+        unset($_GET);
+        $_SESSION['user_id'] = $strangerId;
+        unset($_SESSION['is_admin']);
 
         // Cleanup — self-contained.
         $pdo->prepare("DELETE FROM document_assignees WHERE document_id = ?")->execute([$privId]);

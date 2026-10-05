@@ -4,6 +4,7 @@ ob_start();
 
 // Include roots which sets up paths and authentication
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/document_access.php';
 
 // Paths are relative to root directory
 includeHeader();
@@ -33,7 +34,10 @@ if ($preselect_document_id > 0) {
     $preStmt = $pdo->prepare("SELECT id, document_name, file_path, uploaded_by FROM documents WHERE id = ?");
     $preStmt->execute([$preselect_document_id]);
     $preRow = $preStmt->fetch(PDO::FETCH_ASSOC);
-    if ($preRow && ((int)$preRow['uploaded_by'] === (int)$_SESSION['user_id'] || isAdmin())) {
+    // Same rule the download/view endpoint enforces (admin, public, own upload,
+    // or explicitly assigned) — a narrower check here would silently drop the
+    // preselect for a document the user genuinely may sign.
+    if ($preRow && userCanAccessDocument($pdo, $preselect_document_id)) {
         $preselect_document = [
             'id'   => (int)$preRow['id'],
             'name' => $preRow['document_name'],
@@ -731,10 +735,13 @@ function initPlacement() {
         $('#preview-loading').show().html('<div class="spinner-border" role="status"></div><p class="mt-2">Rendering PDF Preview...</p>');
         $('#sign-placement-area').css('visibility', 'hidden');
         
-        // Use the direct file URL for pdf.js rendering.
-        // The download endpoint sends Content-Disposition:attachment which some
-        // pdf.js versions reject; the direct path avoids that entirely.
-        const url = '<?= rtrim(getUrl(""), "/") ?>/' + selectedDocPath;
+        // Render through the permission-checked endpoint, never the raw
+        // /uploads/... path: serving the file statically bypassed PHP entirely,
+        // so the preview showed restricted documents to anyone who could reach
+        // this page. `action=view` sends Content-Disposition:inline (which
+        // pdf.js accepts, unlike the download action's attachment) and does not
+        // inflate the document's download counter.
+        const url = '<?= buildUrl("document_library") ?>?action=view&document_id=' + selectedDocId;
 
         const loadingTask = pdfjsLib.getDocument({ url: url, withCredentials: true });
 
@@ -884,7 +891,13 @@ async function embedSignatureIntoPdf() {
     // 1. Fetch the original PDF bytes
     const pdfUrl = '<?= buildUrl("document_library") ?>?action=download&document_id=' + selectedDocId;
     const pdfResp = await fetch(pdfUrl, { credentials: 'include' });
-    if (!pdfResp.ok) throw new Error('Could not fetch original PDF (HTTP ' + pdfResp.status + ')');
+    if (!pdfResp.ok) {
+        if (pdfResp.status === 403) {
+            throw new Error('You do not have access to this document, so it cannot be signed. '
+                          + 'Ask the document owner to share it with you, then try again.');
+        }
+        throw new Error('Could not fetch original PDF (HTTP ' + pdfResp.status + ')');
+    }
     const contentType = pdfResp.headers.get('Content-Type') || '';
     if (!contentType.includes('application/pdf') && !contentType.includes('octet-stream')) {
         throw new Error('The selected document file was not found on the server. Please re-upload the document and try again.');
