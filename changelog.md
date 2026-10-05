@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-05 — fix(documents): quick-upload always saved as private — added access_level field to wizard
+
+**Files:** `app/constant/document/select_document_add_esignature.php`, `api/document/quick_upload_document.php`
+The signing-wizard quick-upload form had no Access Level field; the handler hardcoded `access_level = 'private'`.
+Documents uploaded this way were never visible to other users regardless of intent.
+Fix: added Access Level select (Private / Restricted / Public) to the form; handler now reads and whitelists `$_POST['access_level']`, falling back to `'private'`.
+
+---
+
 ## 2026-10-05 — fix(documents): add missing require_once for document_access.php — hotfix for Sentry fatal error
 
 **Files:** `api/get_documents.php`, `api/document/get_documents.php`
