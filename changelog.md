@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-05 — fix(documents): add missing require_once for document_access.php — hotfix for Sentry fatal error
+
+**Files:** `api/get_documents.php`, `api/document/get_documents.php`
+Both API endpoints called `canSeeAllDocuments()` (defined in `core/document_access.php`) but
+never included that file. `roots.php` does not auto-include it, so every request produced
+`Call to undefined function canSeeAllDocuments()` — confirmed via Sentry production alert.
+Fix: added `require_once __DIR__ . '/../core/document_access.php'` to both files.
+
+---
+
+---
+
 ## 2026-10-05 — feat(superadmin) Phase 5: two-step sign-in for the platform operator
 
 This account reaches every company on the platform and had **one password** protecting it, with no second factor anywhere in the codebase. A single reused or phished credential was the whole of the defence.
