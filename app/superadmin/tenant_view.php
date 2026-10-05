@@ -373,12 +373,58 @@ if ($hasContext ?? false):
                 <div class="card-header"><i class="bi bi-sliders text-primary me-1"></i> Lifecycle</div>
                 <div class="card-body">
                 <?php if ($tenant['status'] === 'deleted'): ?>
-                    <p class="text-muted mb-0">
+                    <p class="text-muted">
                         <i class="bi bi-slash-circle me-1"></i>
                         This tenant has been deleted. Its database and database user were removed, so it
                         cannot be reactivated. The record is kept so the subdomain stays claimed and the
                         history below remains meaningful.
                     </p>
+                    <?php if (strpos((string)$tenant['subdomain'], '~released~') === false): ?>
+                    <hr>
+                    <p class="small text-muted mb-2">
+                        <i class="bi bi-link-45deg me-1"></i>
+                        <strong>Release the address.</strong> <code><?= safe_output($tenant['subdomain'], '') ?></code>
+                        stays claimed so old links and emails cannot hand this company's traffic to a
+                        different business. Release it only if you are sure nothing still points here.
+                        The history below is kept.
+                    </p>
+                    <button class="btn btn-outline-secondary w-100 mb-2" onclick="doReleaseSubdomain()">
+                        <i class="bi bi-link-45deg me-1"></i> Release this address
+                    </button>
+                    <?php endif; ?>
+                    <hr>
+                    <p class="small text-danger mb-2">
+                        <i class="bi bi-eraser me-1"></i>
+                        <strong>Remove from the registry.</strong> The database is already gone; this
+                        removes the row itself so the tenant list shows only real business. The audit log
+                        keeps what happened. The address becomes available again.
+                    </p>
+                    <button class="btn btn-outline-danger w-100" onclick="doPurge()">
+                        <i class="bi bi-eraser me-1"></i> Remove from registry
+                    </button>
+                <?php elseif ($tenant['status'] === 'archived'): ?>
+                    <div class="alert alert-secondary py-2 mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-archive fs-5"></i>
+                        <div><strong>Archived</strong>
+                            <?= !empty($tenant['suspended_at']) ? '<br><small class="text-muted">On ' . date('d M Y', strtotime($tenant['suspended_at'])) . '</small>' : '' ?>
+                        </div>
+                    </div>
+                    <p class="small text-muted">
+                        Locked out and hidden from the tenant list, but <strong>nothing has been
+                        deleted</strong> — every byte of their data is still here. Reactivate brings
+                        them straight back.
+                    </p>
+                    <button class="btn btn-primary w-100 mb-2" onclick="doActivate()">
+                        <i class="bi bi-play-circle me-1"></i> Reactivate
+                    </button>
+                    <hr>
+                    <p class="small text-danger mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Deleting destroys this company's entire database permanently. There is no undo.
+                    </p>
+                    <button class="btn btn-outline-danger w-100" onclick="doDelete()">
+                        <i class="bi bi-trash me-1"></i> Delete permanently
+                    </button>
                 <?php else: ?>
                     <?php if ($tenant['status'] === 'suspended'): ?>
                         <p class="small text-muted">Suspended tenants are locked out of their system, but no data has been deleted.</p>
@@ -420,6 +466,19 @@ if ($hasContext ?? false):
                         <i class="bi bi-calendar-plus me-1"></i> Extend Trial
                     </button>
                     <?php endif; ?>
+                    <hr>
+                    <!-- The middle option that was missing: 'suspended' reads as
+                         "we are chasing you" and stays in the working list;
+                         'deleted' destroys everything. A customer who has simply
+                         left needs neither. -->
+                    <p class="small text-muted mb-2">
+                        <i class="bi bi-archive me-1"></i>
+                        <strong>Archiving</strong> closes the account and hides it from the tenant list,
+                        but keeps every byte of their data. Reversible at any time.
+                    </p>
+                    <button class="btn btn-outline-secondary w-100 mb-2" onclick="doArchive()">
+                        <i class="bi bi-archive me-1"></i> Archive
+                    </button>
                     <hr>
                     <p class="small text-danger mb-2">
                         <i class="bi bi-exclamation-triangle me-1"></i>
@@ -1104,6 +1163,9 @@ if ($hasContext ?? false):
 const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+// Shown in the release-address and purge confirmations, where the operator
+// needs to see exactly which address is about to become claimable again.
+const TENANT_SUBDOMAIN = <?= json_encode((string)($tenant['subdomain'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 const TENANT_DELETED = <?= json_encode(($tenant['status'] ?? '') === 'deleted') ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
@@ -2146,6 +2208,62 @@ function doDelete() {
             return v;
         }
     }).then(r => { if (r.isConfirmed) postAction({ action: 'delete', confirm_name: r.value }, 'Deleted', 'tenants.php'); });
+}
+
+// Typed confirmation on all three below as well. Archiving destroys nothing,
+// but it does cut a real company off today — and purging and releasing an
+// address are both one-way.
+function confirmByName(opts, payload, okTitle, go) {
+    Swal.fire(Object.assign({
+        input: 'text', inputPlaceholder: 'Company name', showCancelButton: true,
+        preConfirm: function (v) {
+            if ((v || '').trim() !== TENANT_NAME.trim()) {
+                Swal.showValidationMessage('The name does not match.');
+                return false;
+            }
+            return v;
+        }
+    }, opts)).then(r => {
+        if (r.isConfirmed) postAction(Object.assign({ confirm_name: r.value }, payload), okTitle, go);
+    });
+}
+
+function doArchive() {
+    confirmByName({
+        title: 'Archive this tenant?',
+        html: 'They are locked out immediately and disappear from the tenant list.<br><br>'
+            + '<strong>No data is deleted</strong> — their database stays exactly as it is, and '
+            + 'Reactivate brings them back at any time.<br><br>'
+            + 'Type <code>' + $('<div>').text(TENANT_NAME).html() + '</code> to confirm:',
+        icon: 'question', confirmButtonText: 'Archive'
+    }, { action: 'archive' }, 'Archived', 'tenants.php');
+}
+
+function doReleaseSubdomain() {
+    confirmByName({
+        title: 'Release this address?',
+        html: '<code>' + $('<div>').text(TENANT_SUBDOMAIN).html() + '</code> becomes available for a '
+            + 'new company to claim.<br><br>'
+            + '<span style="color:#b02a37;">Old emails, bookmarks and printed documents that still '
+            + 'point at this address would then reach <strong>a different business</strong>.</span><br><br>'
+            + 'This company\'s record and history are kept.<br><br>'
+            + 'Type <code>' + $('<div>').text(TENANT_NAME).html() + '</code> to confirm:',
+        icon: 'warning', confirmButtonColor: '#dc3545', confirmButtonText: 'Release the address'
+    }, { action: 'release_subdomain' }, 'Address released');
+}
+
+function doPurge() {
+    confirmByName({
+        title: 'Remove from the registry?',
+        html: 'The database is already gone. This removes the row itself, so this company no longer '
+            + 'appears anywhere in the panel.<br><br>'
+            + 'The <strong>audit log keeps the record</strong> of what was done.<br>'
+            + 'The address <code>' + $('<div>').text(TENANT_SUBDOMAIN).html() + '</code> becomes '
+            + 'available again.<br><br>'
+            + '<strong>This cannot be undone.</strong><br><br>'
+            + 'Type <code>' + $('<div>').text(TENANT_NAME).html() + '</code> to confirm:',
+        icon: 'warning', confirmButtonColor: '#dc3545', confirmButtonText: 'Remove permanently'
+    }, { action: 'purge' }, 'Removed', 'tenants.php');
 }
 
 // Context-aware tab auto-open — open Billing tab for payment/subscription events

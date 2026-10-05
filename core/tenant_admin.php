@@ -135,7 +135,7 @@ if (!function_exists('tenantStats')) {
     /** Counts by status plus trial-expiry urgency buckets. */
     function tenantStats(): array
     {
-        $out = ['active' => 0, 'trial' => 0, 'suspended' => 0, 'deleted' => 0];
+        $out = ['active' => 0, 'trial' => 0, 'suspended' => 0, 'archived' => 0, 'deleted' => 0];
         foreach (getControlPdo()->query("SELECT status, COUNT(*) AS n FROM tenants GROUP BY status") as $r) {
             $out[$r['status']] = (int)$r['n'];
         }
@@ -280,6 +280,168 @@ if (!function_exists('deleteTenant')) {
 
         logTenantAdminAction($id, $t['subdomain'], 'delete',
             'dropped database ' . $t['db_name'] . ' and user ' . $t['db_username']);
+
+        return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('archiveTenant')) {
+    /**
+     * Close a company's account without destroying anything.
+     *
+     * The state that was missing. 'suspended' says "we are chasing you" and
+     * stays in the operator's working list; 'deleted' destroys the database.
+     * A customer who has simply stopped trading, or moved on, needed a third
+     * option: locked out, every byte intact, reversible by activateTenant(),
+     * and out of the default view so the list shows the business that is
+     * actually running.
+     *
+     * Typed confirmation, like deleteTenant(): this ends service for a real
+     * company today, even though nothing is destroyed.
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function archiveTenant(int $id, string $typedName, string $reason = ''): array
+    {
+        $t = getTenant($id);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.'];
+        if ($t['status'] === 'deleted') {
+            return ['ok' => false, 'error' => 'This tenant has been deleted. There is nothing left to archive.'];
+        }
+        if ($t['status'] === 'archived') {
+            return ['ok' => true, 'error' => null];   // already there; not an error
+        }
+        if (trim($typedName) !== trim((string)$t['company_name'])) {
+            logTenantAdminAction($id, $t['subdomain'], 'archive_refused', 'confirmation text did not match');
+            return ['ok' => false, 'error' => 'The company name you typed does not match. Nothing was changed.'];
+        }
+
+        getControlPdo()->prepare("
+            UPDATE tenants
+               SET status = 'archived',
+                   suspended_at = IFNULL(suspended_at, NOW()),
+                   suspension_reason = 'manual'
+             WHERE id = ?
+        ")->execute([$id]);
+        logTenantAdminAction($id, $t['subdomain'], 'archive', $reason !== '' ? $reason : null);
+
+        return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('releaseTenantSubdomain')) {
+    /**
+     * Give a closed company's web address back, without losing its history.
+     *
+     * The registry deliberately keeps `subdomain` UNIQUE even for deleted
+     * tenants, "so a new signup cannot inherit a dead company's address" —
+     * which is right by default: old emails, bookmarks and printed documents
+     * keep pointing there, and handing that traffic to a different business is
+     * a data leak waiting to happen. But it also means a name is burned
+     * forever, including names lost to a typo or a test account.
+     *
+     * So it stays reserved unless an operator explicitly asks, and the original
+     * is freed by renaming the tombstone rather than removing it: the row, its
+     * audit trail and its history all survive under `name~released~<id>`.
+     *
+     * Only for a tenant that is already closed — releasing a live company's
+     * address would let someone else claim the name it is still being served on.
+     *
+     * @return array{ok:bool, error:?string, released:?string}
+     */
+    function releaseTenantSubdomain(int $id, string $typedName): array
+    {
+        $t = getTenant($id);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.', 'released' => null];
+
+        if (!in_array($t['status'], ['deleted', 'archived'], true)) {
+            return ['ok' => false, 'released' => null, 'error' =>
+                'Only a closed or archived company\'s address can be released. '
+              . 'Delete or archive this tenant first.'];
+        }
+        if (strpos((string)$t['subdomain'], '~released~') !== false) {
+            return ['ok' => false, 'error' => 'This address has already been released.', 'released' => null];
+        }
+        if (trim($typedName) !== trim((string)$t['company_name'])) {
+            logTenantAdminAction($id, $t['subdomain'], 'release_subdomain_refused', 'confirmation text did not match');
+            return ['ok' => false, 'released' => null,
+                    'error' => 'The company name you typed does not match. Nothing was changed.'];
+        }
+
+        $original = (string)$t['subdomain'];
+        // Longer than the 63-character column would allow for a maximal
+        // subdomain, so truncate the original part rather than the marker.
+        $tomb = substr($original, 0, 40) . '~released~' . $id;
+
+        try {
+            getControlPdo()->prepare("UPDATE tenants SET subdomain = ? WHERE id = ?")->execute([$tomb, $id]);
+        } catch (Throwable $e) {
+            error_log('releaseTenantSubdomain(' . $id . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The address could not be released.', 'released' => null];
+        }
+
+        logTenantAdminAction($id, $original, 'release_subdomain',
+            $original . ' is now available again; this row kept as ' . $tomb);
+
+        return ['ok' => true, 'error' => null, 'released' => $original];
+    }
+}
+
+if (!function_exists('purgeTenant')) {
+    /**
+     * Remove a closed company's registry row for good.
+     *
+     * deleteTenant() destroys the database but keeps the row as a tombstone,
+     * which is correct right after a deletion — an operator needs to see that
+     * it happened. It is wrong forever: the live panel reached 8 closed rows
+     * out of 11, so the list stopped being a picture of the business.
+     *
+     * Only a tenant whose database is already gone may be purged. There is no
+     * path here that destroys data: destroyTenantResources() has to have run
+     * first, through deleteTenant(), which has its own typed confirmation.
+     * Purge is strictly about the registry.
+     *
+     * What survives: `tenant_admin_log` and `tenant_provisioning_log`. Both
+     * hold tenant_id with NO foreign key — deliberately, per the control-DB
+     * schema's own note — so the record of what was done, and why, outlives
+     * the row. A final entry is written BEFORE the delete so the purge itself
+     * is in that history.
+     *
+     * Side effect the caller must warn about: with the row gone the subdomain
+     * becomes available again. See releaseTenantSubdomain() for why that is
+     * not free.
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function purgeTenant(int $id, string $typedName): array
+    {
+        $t = getTenant($id);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.'];
+
+        if ($t['status'] !== 'deleted') {
+            return ['ok' => false, 'error' =>
+                'Only a deleted tenant can be purged. Delete this tenant first — that is the step '
+              . 'that destroys its database, and it cannot be skipped.'];
+        }
+        if (trim($typedName) !== trim((string)$t['company_name'])) {
+            logTenantAdminAction($id, $t['subdomain'], 'purge_refused', 'confirmation text did not match');
+            return ['ok' => false, 'error' => 'The company name you typed does not match. Nothing was removed.'];
+        }
+
+        // Written first: after the next statement there is no row to hang a
+        // log entry off, and this is the entry that explains where it went.
+        logTenantAdminAction($id, $t['subdomain'], 'purge',
+            'registry row removed for ' . $t['company_name']
+          . ' (database ' . ($t['db_name'] ?: '?') . ' was already destroyed); '
+          . 'subdomain ' . $t['subdomain'] . ' is available again');
+
+        try {
+            getControlPdo()->prepare("DELETE FROM tenants WHERE id = ? AND status = 'deleted'")
+                ->execute([$id]);
+        } catch (Throwable $e) {
+            error_log('purgeTenant(' . $id . '): ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The registry row could not be removed.'];
+        }
 
         return ['ok' => true, 'error' => null];
     }

@@ -615,6 +615,25 @@ try {
         say('  · superadmin_notifications.type ENUM expanded (grace types added)');
     }
 
+    // Add 'archived' to the tenant status ENUM (idempotent check).
+    //
+    // Before this there were only two ways to stop serving a company:
+    // 'suspended', which reads as "we are chasing you for payment" and stays
+    // in the operator's working list, and 'deleted', which destroys the
+    // database. A company that has simply LEFT needed a third: locked out,
+    // data intact, reversible, and out of the default view.
+    $stType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'tenants' AND COLUMN_NAME = 'status'
+    ")->fetchColumn();
+    if ($stType !== false && strpos((string)$stType, 'archived') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants`
+            MODIFY COLUMN `status` ENUM('trial','active','suspended','archived','deleted')
+            NOT NULL DEFAULT 'trial'");
+        say("  · tenants.status ENUM expanded (archived added)");
+    }
+
     // Expand billing_cycle ENUM to include quarterly and biannual (idempotent check).
     $bcType = $admin->query("
         SELECT COLUMN_TYPE FROM information_schema.COLUMNS

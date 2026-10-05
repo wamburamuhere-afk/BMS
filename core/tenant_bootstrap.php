@@ -195,6 +195,15 @@ if (!function_exists('bmsConnectPdo')) {
             bmsTenantHalt(403, 'Account suspended',
                 'This account is currently suspended. Please contact your administrator.');
         }
+        if ($status === 'archived') {
+            // Locked out like 'suspended', but this is the state for a company
+            // that has LEFT rather than one being chased for payment — so the
+            // message does not imply something they can fix by paying, and the
+            // panel hides it from the default list. The database is intact and
+            // activateTenant() brings them back if they return.
+            bmsTenantHalt(403, 'Account closed',
+                'This account has been closed. Its data is safe — contact your provider to reopen it.');
+        }
         if ($status === 'deleted') {
             bmsTenantHalt(410, 'Account closed',
                 'This account has been closed and its data is no longer available.');

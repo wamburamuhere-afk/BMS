@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../helpers.php';
 requireSuperadmin();
 
 $me      = currentSuperadmin();
-$stats   = ['active' => 0, 'trial' => 0, 'suspended' => 0, 'deleted' => 0, 'total' => 0];
+$stats   = ['active' => 0, 'trial' => 0, 'suspended' => 0, 'archived' => 0, 'deleted' => 0, 'total' => 0];
 $tenants = [];
 $dbError = null;
 
@@ -112,6 +112,8 @@ function saBadge(string $status): string
         'active'    => ['#0d6efd', '#fff'],
         'trial'     => ['#cfe2ff', '#084298'],
         'suspended' => ['#6c757d', '#fff'],
+        // Grey like suspended, not red like deleted: nothing was destroyed.
+        'archived'  => ['#495057', '#fff'],
         'deleted'   => ['#dc3545', '#fff'],
     ];
     [$bg, $fg] = $map[$status] ?? ['#e9ecef', '#495057'];
@@ -152,9 +154,10 @@ function saBadge(string $status): string
             'active'    => ['Active', 'bi-check-circle'],
             'trial'     => ['Trial', 'bi-hourglass-split'],
             'suspended' => ['Suspended', 'bi-pause-circle'],
+            'archived'  => ['Archived', 'bi-archive'],
             'deleted'   => ['Closed', 'bi-x-circle'],
         ] as $key => [$label, $icon]): ?>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2 col-lg">
             <div class="stat-card p-3">
                 <div class="text-muted small"><i class="bi <?= $icon ?> text-primary me-1"></i><?= $label ?></div>
                 <div class="value"><?= (int)($stats[$key] ?? 0) ?></div>
@@ -166,11 +169,17 @@ function saBadge(string $status): string
     <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
         <h6 class="mb-0"><i class="bi bi-building text-primary me-1"></i> Tenants (<span id="visibleCount"><?= count($tenants) ?></span>)</h6>
         <div class="d-flex gap-2 flex-wrap align-items-center">
+            <!-- Defaults to "Open accounts". The live panel reached 8 closed
+                 rows out of 11, so "All statuses" made the list a graveyard
+                 rather than a picture of the business. Closed rows are one
+                 click away, never hidden for good. -->
             <select id="filterStatus" class="form-select form-select-sm w-auto">
+                <option value="live" selected>Open accounts</option>
                 <option value="">All statuses</option>
                 <option value="active">Active</option>
                 <option value="trial">Trial</option>
                 <option value="suspended">Suspended</option>
+                <option value="archived">Archived</option>
                 <option value="deleted">Closed</option>
             </select>
             <?php if ($allIndustries): ?>
@@ -334,7 +343,9 @@ function tenantActionMenu(array $t): string
         $items .= '<li><span class="dropdown-item py-2 text-muted disabled">'
                 . '<i class="bi bi-slash-circle me-2"></i> Closed</span></li>';
     } else {
-        if ($t['status'] === 'suspended') {
+        // Archived behaves like suspended here: nothing was destroyed, so the
+        // one useful action is bringing them back.
+        if ($t['status'] === 'suspended' || $t['status'] === 'archived') {
             $items .= '<li><button class="dropdown-item py-2 rounded" onclick="doActivate(' . $id . ')">'
                     . '<i class="bi bi-play-circle text-primary me-2"></i> Activate</button></li>';
         } else {
@@ -393,7 +404,12 @@ if (document.getElementById('tenantTable')) {
             const industry= (node.data('industry') || '').toLowerCase();
             const country = node.data('country')  || '';
             const size    = node.data('size')      || '';
-            const show = (!fStatus   || status   === fStatus)
+            // 'live' is the default view: everything that is not closed or
+            // archived. Any other value is an exact status match as before.
+            const statusOk = fStatus === ''      ? true
+                           : fStatus === 'live'  ? (status !== 'deleted' && status !== 'archived')
+                           : status === fStatus;
+            const show = statusOk
                       && (!fIndustry || industry === fIndustry)
                       && (!fCountry  || country  === fCountry)
                       && (!fSize     || size      === fSize);
