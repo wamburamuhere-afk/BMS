@@ -21,7 +21,7 @@ $attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
 // URL, forever, even after access was revoked. Gate both actions the same
 // way get_document_activity.php already does for the same table.
 if (($action === 'download' || $action === 'view') && $document_id > 0) {
-    if (!isAuthenticated() || !canView('documents')) {
+    if (!isAuthenticated() || !canView('document_library')) {
         http_response_code(403);
         die('Access Denied');
     }
@@ -41,7 +41,7 @@ includeHeader();
 
 // Enforce permission
 if (function_exists('autoEnforcePermission')) {
-    autoEnforcePermission('documents');
+    autoEnforcePermission('document_library');
 }
 
 // Helper functions (kept from original but renamed to avoid conflicts if needed)
