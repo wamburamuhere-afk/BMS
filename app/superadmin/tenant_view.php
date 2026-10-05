@@ -8,6 +8,7 @@
  * tenant's database password is never even selected (see getTenant()).
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../core/plans.php';
 require_once __DIR__ . '/../../helpers.php';
@@ -373,12 +374,58 @@ if ($hasContext ?? false):
                 <div class="card-header"><i class="bi bi-sliders text-primary me-1"></i> Lifecycle</div>
                 <div class="card-body">
                 <?php if ($tenant['status'] === 'deleted'): ?>
-                    <p class="text-muted mb-0">
+                    <p class="text-muted">
                         <i class="bi bi-slash-circle me-1"></i>
                         This tenant has been deleted. Its database and database user were removed, so it
                         cannot be reactivated. The record is kept so the subdomain stays claimed and the
                         history below remains meaningful.
                     </p>
+                    <?php if (strpos((string)$tenant['subdomain'], '~released~') === false): ?>
+                    <hr>
+                    <p class="small text-muted mb-2">
+                        <i class="bi bi-link-45deg me-1"></i>
+                        <strong>Release the address.</strong> <code><?= safe_output($tenant['subdomain'], '') ?></code>
+                        stays claimed so old links and emails cannot hand this company's traffic to a
+                        different business. Release it only if you are sure nothing still points here.
+                        The history below is kept.
+                    </p>
+                    <button class="btn btn-outline-secondary w-100 mb-2" onclick="doReleaseSubdomain()">
+                        <i class="bi bi-link-45deg me-1"></i> Release this address
+                    </button>
+                    <?php endif; ?>
+                    <hr>
+                    <p class="small text-danger mb-2">
+                        <i class="bi bi-eraser me-1"></i>
+                        <strong>Remove from the registry.</strong> The database is already gone; this
+                        removes the row itself so the tenant list shows only real business. The audit log
+                        keeps what happened. The address becomes available again.
+                    </p>
+                    <button class="btn btn-outline-danger w-100" onclick="doPurge()">
+                        <i class="bi bi-eraser me-1"></i> Remove from registry
+                    </button>
+                <?php elseif ($tenant['status'] === 'archived'): ?>
+                    <div class="alert alert-secondary py-2 mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-archive fs-5"></i>
+                        <div><strong>Archived</strong>
+                            <?= !empty($tenant['suspended_at']) ? '<br><small class="text-muted">On ' . date('d M Y', strtotime($tenant['suspended_at'])) . '</small>' : '' ?>
+                        </div>
+                    </div>
+                    <p class="small text-muted">
+                        Locked out and hidden from the tenant list, but <strong>nothing has been
+                        deleted</strong> — every byte of their data is still here. Reactivate brings
+                        them straight back.
+                    </p>
+                    <button class="btn btn-primary w-100 mb-2" onclick="doActivate()">
+                        <i class="bi bi-play-circle me-1"></i> Reactivate
+                    </button>
+                    <hr>
+                    <p class="small text-danger mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Deleting destroys this company's entire database permanently. There is no undo.
+                    </p>
+                    <button class="btn btn-outline-danger w-100" onclick="doDelete()">
+                        <i class="bi bi-trash me-1"></i> Delete permanently
+                    </button>
                 <?php else: ?>
                     <?php if ($tenant['status'] === 'suspended'): ?>
                         <p class="small text-muted">Suspended tenants are locked out of their system, but no data has been deleted.</p>
@@ -415,11 +462,54 @@ if ($hasContext ?? false):
                             <i class="bi bi-pause-circle me-1"></i> Suspend
                         </button>
                     <?php endif; ?>
-                    <?php if (in_array($tenant['status'], ['trial', 'suspended'], true)): ?>
-                    <button class="btn btn-outline-success w-100 mb-2" onclick="doExtendTrial()">
-                        <i class="bi bi-calendar-plus me-1"></i> Extend Trial
+                    <?php
+                    // Access clock. Shown for every running state, not just
+                    // trials: on the live platform every ACTIVE tenant had no
+                    // subscription_ends_at at all, so the list said "Expires —"
+                    // for all of them and nothing ever asked about it.
+                    if (in_array($tenant['status'], ['trial', 'active', 'suspended'], true)):
+                        $exp   = tenantExpiryLabel($tenant);
+                        $ends  = tenantAccessEndsAt($tenant);
+                        $tone  = ['ok' => 'secondary', 'warn' => 'warning', 'danger' => 'danger', 'none' => 'warning'][$exp['tone']];
+                    ?>
+                    <div class="alert alert-<?= $tone ?> py-2 mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-<?= $ends === null ? 'infinity' : 'calendar-event' ?> fs-5"></i>
+                        <div>
+                            <?php if ($ends === null): ?>
+                                <strong>No expiry date set</strong>
+                                <br><small>This company can use the system indefinitely, free. Set one with
+                                Extend access or on the Billing tab.</small>
+                            <?php else: ?>
+                                <strong><?= $tenant['status'] === 'trial' ? 'Trial' : 'Subscription' ?>
+                                    <?= ((int)($exp['tone'] === 'danger')) ? 'expired' : 'ends' ?></strong>
+                                <?= safe_output($exp['text'], '') ?>
+                                <br><small class="text-muted"><?= date('d M Y', strtotime($ends)) ?>
+                                    · grace <?= (int)tenantGraceDaysFor($tenant) ?> day<?= tenantGraceDaysFor($tenant) === 1 ? '' : 's' ?>
+                                    <?= ($tenant['grace_days'] ?? null) !== null ? '(set for this tenant)' : '(platform default)' ?>
+                                </small>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-primary w-100 mb-2" onclick="doExtendAccess()">
+                        <i class="bi bi-calendar-plus me-1"></i> Extend access
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm w-100 mb-2" onclick="doSetGraceDays()">
+                        <i class="bi bi-hourglass me-1"></i> Grace period for this tenant
                     </button>
                     <?php endif; ?>
+                    <hr>
+                    <!-- The middle option that was missing: 'suspended' reads as
+                         "we are chasing you" and stays in the working list;
+                         'deleted' destroys everything. A customer who has simply
+                         left needs neither. -->
+                    <p class="small text-muted mb-2">
+                        <i class="bi bi-archive me-1"></i>
+                        <strong>Archiving</strong> closes the account and hides it from the tenant list,
+                        but keeps every byte of their data. Reversible at any time.
+                    </p>
+                    <button class="btn btn-outline-secondary w-100 mb-2" onclick="doArchive()">
+                        <i class="bi bi-archive me-1"></i> Archive
+                    </button>
                     <hr>
                     <p class="small text-danger mb-2">
                         <i class="bi bi-exclamation-triangle me-1"></i>
@@ -803,19 +893,22 @@ if ($hasContext ?? false):
                 </div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
-                        Read-only — who has an account in this company, whether they're active, and when
-                        they last signed in. Loaded on demand, same as Current usage above; nothing here
-                        is kept automatically. For support triage only — not a way to manage this
-                        tenant's staff.
+                        Read-only — who has an account in this company, their sign-in name and contact,
+                        whether they're active, and when they last signed in. Loaded on demand, same as
+                        Current usage above; nothing here is kept automatically. For support triage only
+                        — not a way to manage this tenant's staff.
                     </p>
                     <div id="usersSummary" class="d-none mb-3">
                         <div class="d-flex flex-wrap gap-2 mb-2" id="usersRoleBadges"></div>
                         <div class="small text-muted" id="usersLastActivity"></div>
                     </div>
+                    <!-- Raised BEFORE a lockout, not during one: an active admin with no
+                         address on file cannot use "Forgot password?" at all. -->
+                    <div id="usersNoRecovery" class="alert alert-warning py-2 px-3 small d-none mb-3"></div>
                     <div id="usersEmpty" class="text-muted small">Not loaded yet.</div>
                     <div id="usersTableWrap" class="table-responsive d-none">
                         <table class="table table-sm align-middle mb-0">
-                            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th></tr></thead>
+                            <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last login</th><th class="text-end">Actions</th></tr></thead>
                             <tbody id="usersTableBody"></tbody>
                         </table>
                     </div>
@@ -1101,6 +1194,24 @@ if ($hasContext ?? false):
 const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+// Shown in the release-address and purge confirmations, where the operator
+// needs to see exactly which address is about to become claimable again.
+const TENANT_SUBDOMAIN = <?= json_encode((string)($tenant['subdomain'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+<?php
+$__ends   = tenantAccessEndsAt($tenant);
+$__left   = tenantDaysRemaining($tenant);
+$__clock  = ($tenant['status'] ?? '') === 'trial' ? 'trial' : 'subscription';
+$__hint   = $__ends === null
+    ? 'This tenant has no expiry date set, so extending starts the clock from today.'
+    : 'Their ' . $__clock . ' runs to ' . date('d M Y', strtotime($__ends))
+      . ($__left !== null && $__left < 0
+            ? ' (' . abs($__left) . ' day' . (abs($__left) === 1 ? '' : 's') . ' ago). Days are added from today.'
+            : '. Days are added to that date.');
+?>
+const EXPIRY_HINT        = <?= json_encode($__hint, JSON_UNESCAPED_UNICODE) ?>;
+const PLATFORM_GRACE_DAYS = <?= (int)tenantDefaultGraceDays() ?>;
+const TENANT_GRACE_DAYS   = <?= isset($tenant['grace_days']) && $tenant['grace_days'] !== null
+                                ? (int)$tenant['grace_days'] : 'null' ?>;
 const TENANT_DELETED = <?= json_encode(($tenant['status'] ?? '') === 'deleted') ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
@@ -1377,33 +1488,94 @@ function postAction(data, title, redirect) {
     }
 })();
 
-function doExtendTrial() {
+// One button for both clocks. It used to be "Extend Trial" and moved
+// trial_ends_at only, so for an active paying customer asking for a few more
+// days it did nothing they would notice. The server decides which date
+// governs — see extendTenantAccess().
+function doExtendAccess() {
     Swal.fire({
-        title: 'Extend Trial',
-        html: '<select id="swalExtendDays" class="form-select mt-2">'
+        title: 'Extend access',
+        html: '<p class="small text-muted mb-2">' + EXPIRY_HINT + '</p>'
+            + '<select id="swalExtendDays" class="form-select">'
             + '<option value="7">+ 7 days</option>'
             + '<option value="14" selected>+ 14 days</option>'
             + '<option value="30">+ 30 days</option>'
-            + '</select>',
+            + '<option value="60">+ 60 days</option>'
+            + '<option value="90">+ 90 days</option>'
+            + '<option value="custom">Custom…</option>'
+            + '</select>'
+            + '<input id="swalExtendCustom" type="number" min="1" max="365" class="form-control mt-2 d-none" placeholder="Number of days (1–365)">',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Extend',
-        confirmButtonColor: '#198754',
+        didOpen: function () {
+            const sel = document.getElementById('swalExtendDays');
+            const box = document.getElementById('swalExtendCustom');
+            sel.addEventListener('change', function () {
+                box.classList.toggle('d-none', sel.value !== 'custom');
+                if (sel.value === 'custom') box.focus();
+            });
+        },
         preConfirm: function () {
-            return document.getElementById('swalExtendDays').value;
+            const sel = document.getElementById('swalExtendDays').value;
+            const days = sel === 'custom'
+                ? parseInt(document.getElementById('swalExtendCustom').value, 10)
+                : parseInt(sel, 10);
+            if (!days || days < 1 || days > 365) {
+                Swal.showValidationMessage('Enter a number of days between 1 and 365.');
+                return false;
+            }
+            return days;
         }
     }).then(function (result) {
         if (!result.isConfirmed) return;
         $.ajax({
-            url: '/actions/superadmin_extend_trial.php',
+            url: '/actions/superadmin_tenant_access.php',
             method: 'POST', dataType: 'json',
-            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, days: result.value }
+            data: { _csrf: SA_CSRF_TOKEN, action: 'extend', tenant_id: TENANT_ID, days: result.value }
         }).done(function (res) {
             if (res && res.success) {
-                Swal.fire({ icon: 'success', title: 'Trial Extended', text: res.message, timer: 1800, showConfirmButton: false });
-                setTimeout(function () { window.location.reload(); }, 1800);
+                Swal.fire({ icon: 'success', title: 'Access extended', text: res.message, timer: 2400, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 2400);
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not extend trial.' });
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not extend access.' });
+            }
+        }).fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Request failed.' });
+        });
+    });
+}
+
+function doSetGraceDays() {
+    Swal.fire({
+        title: 'Grace period for this tenant',
+        html: 'Days they keep working after their date passes, before they are cut off.'
+            + '<br><br><span class="small text-muted">Leave blank to follow the platform default ('
+            + PLATFORM_GRACE_DAYS + ' days). <strong>0</strong> means cut off the moment it expires.</span>',
+        input: 'number',
+        inputValue: TENANT_GRACE_DAYS === null ? '' : TENANT_GRACE_DAYS,
+        inputAttributes: { min: 0, max: 90, placeholder: 'Blank = default' },
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function (v) {
+            if (v === '' || v === null) return undefined;          // blank is valid
+            const n = parseInt(v, 10);
+            if (isNaN(n) || n < 0 || n > 90) return 'Enter 0–90, or leave blank for the default.';
+            return undefined;
+        }
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '/actions/superadmin_tenant_access.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, action: 'set_grace_days', tenant_id: TENANT_ID,
+                    grace_days: (r.value === null ? '' : String(r.value)) }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2200, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 2200);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not save.' });
             }
         }).fail(function () {
             Swal.fire({ icon: 'error', title: 'Error', text: 'Request failed.' });
@@ -1591,18 +1763,53 @@ function loadUsers() {
                 + (lastActivity ? '<strong>' + safeOutput(lastActivity) + '</strong>' : '<span class="text-muted">no one has signed in yet</span>'));
             $('#usersSummary').removeClass('d-none');
 
+            // Admins who cannot be sent a reset link, because there is no
+            // address to send it to. Named explicitly — "2 admins" would leave
+            // the operator hunting down the table for which ones.
+            const stranded = res.users.filter(function (u) {
+                return u.is_admin && u.is_active && !u.has_recovery_email;
+            });
+            if (stranded.length) {
+                $('#usersNoRecovery').html(
+                    '<i class="bi bi-exclamation-triangle-fill me-1"></i>'
+                    + '<strong>' + stranded.length + ' admin account'
+                    + (stranded.length === 1 ? ' has' : 's have') + ' no email address.</strong> '
+                    + (stranded.length === 1 ? 'It' : 'They') + ' cannot use "Forgot password?" — if '
+                    + (stranded.length === 1 ? 'that password is' : 'those passwords are')
+                    + ' forgotten there is no self-service way back in. Set an address now: '
+                    + stranded.map(function (u) {
+                        return '<code>' + safeOutput(u.username || ('#' + u.user_id)) + '</code>';
+                    }).join(', ')
+                ).removeClass('d-none');
+            } else {
+                $('#usersNoRecovery').addClass('d-none').html('');
+            }
+
             let rows = '';
             res.users.forEach(function (u) {
                 const statusBadge = u.is_active
                     ? '<span class="badge" style="background:#0d6efd;color:#fff">Active</span>'
                     : '<span class="badge" style="background:#6c757d;color:#fff">Inactive</span>';
                 const adminTag = u.is_admin ? ' <span class="text-muted" style="font-size:.72rem;">(admin)</span>' : '';
+                // The one field the support call actually turns on.
+                const uname = u.username
+                    ? '<code style="font-size:.8rem;">' + safeOutput(u.username) + '</code>'
+                    : '<span class="text-muted">—</span>';
+                const mail = u.email
+                    ? safeOutput(u.email)
+                    : (u.is_admin && u.is_active
+                        ? '<span class="text-danger" title="Cannot receive a password reset">'
+                          + '<i class="bi bi-exclamation-triangle-fill me-1"></i>none</span>'
+                        : '<span class="text-muted">—</span>');
                 rows += '<tr>'
                     + '<td>' + safeOutput(u.name) + adminTag + '</td>'
-                    + '<td>' + safeOutput(u.email) + '</td>'
+                    + '<td>' + uname + '</td>'
+                    + '<td>' + mail + '</td>'
+                    + '<td>' + (u.phone ? safeOutput(u.phone) : '<span class="text-muted">—</span>') + '</td>'
                     + '<td>' + safeOutput(u.role) + '</td>'
                     + '<td>' + statusBadge + '</td>'
                     + '<td>' + (u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>') + '</td>'
+                    + '<td class="text-end">' + userActions(u) + '</td>'
                     + '</tr>';
             });
             $('#usersTableBody').html(rows);
@@ -1617,6 +1824,120 @@ function loadUsers() {
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     }).always(function () {
         btn.prop('disabled', false).html(orig);
+    });
+}
+
+// ── Account recovery for one tenant user (§UI-5 gear dropdown) ──────────────
+// There is deliberately no "set password" and no "sign in as" here. The owner
+// always chooses their own password through their own forgot-password page;
+// the operator's part is to get a one-time code to the right inbox. See
+// core/tenant_account_recovery.php.
+function userActions(u) {
+    let items = '';
+
+    if (u.is_admin && u.is_active) {
+        items += u.has_recovery_email
+            ? `<li><button class="dropdown-item py-2 rounded" onclick="userIssueOtp(${u.user_id}, '${jsAttr(u.username)}', '${jsAttr(u.email)}')"><i class="bi bi-key text-primary me-2"></i> Send one-time code</button></li>`
+            : `<li><button class="dropdown-item py-2 rounded text-muted" disabled title="No email on file to send it to"><i class="bi bi-key me-2"></i> Send one-time code</button></li>`;
+    }
+    items += `<li><button class="dropdown-item py-2 rounded" onclick="userSetEmail(${u.user_id}, '${jsAttr(u.username)}', '${jsAttr(u.email)}')"><i class="bi bi-envelope text-primary me-2"></i> ${u.email ? 'Change' : 'Set'} recovery email</button></li>`;
+    items += `<li><button class="dropdown-item py-2 rounded" onclick="userSetUsername(${u.user_id}, '${jsAttr(u.username)}')"><i class="bi bi-person-badge text-primary me-2"></i> Change username</button></li>`;
+    if (!u.is_active) {
+        items += `<li><hr class="dropdown-divider"></li>`;
+        items += `<li><button class="dropdown-item py-2 rounded" onclick="userReactivate(${u.user_id}, '${jsAttr(u.username)}')"><i class="bi bi-check-circle text-primary me-2"></i> Re-enable account</button></li>`;
+    }
+
+    return `<div class="dropdown d-flex justify-content-end">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-gear-fill me-1"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
+    </div>`;
+}
+
+// Escape for a value going inside a single-quoted JS string in an onclick
+// attribute — safeOutput() escapes for HTML text, which is not the same job.
+function jsAttr(v) {
+    return String(v == null ? '' : v)
+        .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;').replace(/</g, '\\x3C');
+}
+
+function userAction(payload, successTitle, successText) {
+    Swal.fire({ title: 'Working...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    $.ajax({
+        url: '/actions/superadmin_tenant_user_action.php',
+        method: 'POST', dataType: 'json',
+        data: Object.assign({ _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }, payload)
+    }).done(function (res) {
+        if (res && res.success) {
+            loadUsers();   // reflect the change before the dialog, per §UI-4
+            Swal.fire({ icon: 'success', title: successTitle, text: successText || res.message });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Not done', text: (res && res.message) || 'Something went wrong.' });
+        }
+    }).fail(function (xhr) {
+        let msg = 'Something went wrong.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Not done', text: msg });
+    });
+}
+
+function userIssueOtp(userId, username, email) {
+    Swal.fire({
+        title: 'Send a one-time code?',
+        html: 'A code will be emailed to <strong>' + safeOutput(email) + '</strong> for <strong>'
+            + safeOutput(username) + '</strong>.<br><br>'
+            + '<span style="font-size:.85rem;color:#6c757d;">They choose their own new password — '
+            + 'you will never see the code or the password. Verify who you are speaking to before sending.</span>',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Send code'
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'issue_otp', user_id: userId }, 'Code sent');
+    });
+}
+
+function userSetEmail(userId, username, current) {
+    Swal.fire({
+        title: 'Recovery email',
+        html: 'Password resets for <strong>' + safeOutput(username) + '</strong> will go to this address.'
+            + '<br><br><span style="font-size:.85rem;color:#b02a37;">Whoever controls it can take over the '
+            + 'account. Verify the caller\'s identity first — the old address is told that it changed.</span>',
+        input: 'email',
+        inputValue: current || '',
+        inputPlaceholder: 'name@example.com',
+        showCancelButton: true,
+        confirmButtonText: 'Save address',
+        inputValidator: v => (!v || !/^\S+@\S+\.\S+$/.test(v)) ? 'Enter a valid email address' : undefined
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'set_email', user_id: userId, email: r.value }, 'Address updated');
+    });
+}
+
+function userSetUsername(userId, current) {
+    Swal.fire({
+        title: 'Change username',
+        html: 'This is the name they type to sign in.',
+        input: 'text',
+        inputValue: current || '',
+        showCancelButton: true,
+        confirmButtonText: 'Save username',
+        inputValidator: v => (!v || v.trim().length < 3) ? 'At least 3 characters' : undefined
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'set_username', user_id: userId, username: r.value.trim() }, 'Username updated');
+    });
+}
+
+function userReactivate(userId, username) {
+    Swal.fire({
+        title: 'Re-enable this account?',
+        html: '<strong>' + safeOutput(username) + '</strong> will be able to sign in again.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Re-enable'
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'reactivate', user_id: userId }, 'Account re-enabled');
     });
 }
 
@@ -1994,6 +2315,62 @@ function doDelete() {
             return v;
         }
     }).then(r => { if (r.isConfirmed) postAction({ action: 'delete', confirm_name: r.value }, 'Deleted', 'tenants.php'); });
+}
+
+// Typed confirmation on all three below as well. Archiving destroys nothing,
+// but it does cut a real company off today — and purging and releasing an
+// address are both one-way.
+function confirmByName(opts, payload, okTitle, go) {
+    Swal.fire(Object.assign({
+        input: 'text', inputPlaceholder: 'Company name', showCancelButton: true,
+        preConfirm: function (v) {
+            if ((v || '').trim() !== TENANT_NAME.trim()) {
+                Swal.showValidationMessage('The name does not match.');
+                return false;
+            }
+            return v;
+        }
+    }, opts)).then(r => {
+        if (r.isConfirmed) postAction(Object.assign({ confirm_name: r.value }, payload), okTitle, go);
+    });
+}
+
+function doArchive() {
+    confirmByName({
+        title: 'Archive this tenant?',
+        html: 'They are locked out immediately and disappear from the tenant list.<br><br>'
+            + '<strong>No data is deleted</strong> — their database stays exactly as it is, and '
+            + 'Reactivate brings them back at any time.<br><br>'
+            + 'Type <code>' + $('<div>').text(TENANT_NAME).html() + '</code> to confirm:',
+        icon: 'question', confirmButtonText: 'Archive'
+    }, { action: 'archive' }, 'Archived', 'tenants.php');
+}
+
+function doReleaseSubdomain() {
+    confirmByName({
+        title: 'Release this address?',
+        html: '<code>' + $('<div>').text(TENANT_SUBDOMAIN).html() + '</code> becomes available for a '
+            + 'new company to claim.<br><br>'
+            + '<span style="color:#b02a37;">Old emails, bookmarks and printed documents that still '
+            + 'point at this address would then reach <strong>a different business</strong>.</span><br><br>'
+            + 'This company\'s record and history are kept.<br><br>'
+            + 'Type <code>' + $('<div>').text(TENANT_NAME).html() + '</code> to confirm:',
+        icon: 'warning', confirmButtonColor: '#dc3545', confirmButtonText: 'Release the address'
+    }, { action: 'release_subdomain' }, 'Address released');
+}
+
+function doPurge() {
+    confirmByName({
+        title: 'Remove from the registry?',
+        html: 'The database is already gone. This removes the row itself, so this company no longer '
+            + 'appears anywhere in the panel.<br><br>'
+            + 'The <strong>audit log keeps the record</strong> of what was done.<br>'
+            + 'The address <code>' + $('<div>').text(TENANT_SUBDOMAIN).html() + '</code> becomes '
+            + 'available again.<br><br>'
+            + '<strong>This cannot be undone.</strong><br><br>'
+            + 'Type <code>' + $('<div>').text(TENANT_NAME).html() + '</code> to confirm:',
+        icon: 'warning', confirmButtonColor: '#dc3545', confirmButtonText: 'Remove permanently'
+    }, { action: 'purge' }, 'Removed', 'tenants.php');
 }
 
 // Context-aware tab auto-open — open Billing tab for payment/subscription events

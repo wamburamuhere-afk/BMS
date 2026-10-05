@@ -93,6 +93,9 @@ try {
             'owner_first_name' => $job['owner_first_name'],
             'owner_last_name'  => $job['owner_last_name'],
             'owner_phone'      => $job['owner_phone'],
+            // Owner's own address → users.email, so they can recover their
+            // password. 'email' below is the company profile field.
+            'owner_contact_email' => $job['owner_email'],
             'email'            => $job['owner_email'],
             'physical_address' => $job['phys_address'],
             'postal_address'   => $job['post_address'],

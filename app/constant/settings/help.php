@@ -115,7 +115,8 @@ $company_name = get_setting('company_name', 'Business Management System');
                             </h2>
                             <div id="gs1" class="accordion-collapse collapse" data-bs-parent="#accordionGettingStarted">
                                 <div class="accordion-body text-muted">
-                                    <?= t('<p>Enter your <strong>username</strong> and <strong>password</strong> on the login page. If you forgot your password, contact the system administrator to reset it.</p>
+                                    <?= t('<p>Enter your <strong>username</strong> and <strong>password</strong> on the login page.</p>
+                                    <p>Forgotten your password? If you are an <strong>administrator</strong>, use <strong>Forgot password?</strong> on the login page — a reset link is emailed to the address on your account. If you are a <strong>staff member</strong>, ask your company administrator to set a new password for you in <strong>Settings &rsaquo; Users</strong>.</p>
                                     <p>After logging in, you\'ll be taken to the <strong>Dashboard</strong> which shows an overview of your business metrics.</p>') ?>
                                 </div>
                             </div>

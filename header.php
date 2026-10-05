@@ -2138,6 +2138,35 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </div>
     <?php endif; ?>
 
+    <!-- Advance warning — shown in the last week BEFORE expiry, so the first
+         thing a customer hears about it is not "your trial has ended". Set by
+         core/tenant_bootstrap.php; never shown at the same time as the grace
+         banner above, because by then it is no longer advance notice. -->
+    <?php if (empty($_SESSION['_bms_grace_warning']) && !empty($_SESSION['_bms_expiry_warning'])): ?>
+    <?php
+    $__ew   = $_SESSION['_bms_expiry_warning'];
+    $__days = (int)($__ew['days_left'] ?? 0);
+    $__when = $__days === 0 ? 'today' : ($__days === 1 ? 'tomorrow' : 'in ' . $__days . ' days');
+    ?>
+    <div id="bmsExpiryBanner" class="alert alert-info alert-dismissible fade show mb-0 rounded-0 border-0 border-bottom" role="alert" style="font-size:.88rem">
+        <div class="container-fluid d-flex align-items-center gap-2 px-4">
+            <i class="bi bi-<?= ($__ew['type'] ?? '') === 'trial' ? 'hourglass-split' : 'calendar-event' ?> flex-shrink-0"></i>
+            <span>
+                <?php if (($__ew['type'] ?? '') === 'trial'): ?>
+                    <strong>Your free trial ends <?= $__when ?>.</strong>
+                <?php else: ?>
+                    <strong>Your subscription ends <?= $__when ?>.</strong>
+                <?php endif; ?>
+                <?php if (!empty($__ew['ends_at'])): ?>
+                    <span class="text-muted">(<?= date('d M Y', strtotime((string)$__ew['ends_at'])) ?>)</span>
+                <?php endif; ?>
+                Contact your service provider to continue without interruption.
+            </span>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Content Area -->
     <div class="container-fluid mt-4">
 
