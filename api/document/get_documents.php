@@ -15,7 +15,7 @@ try {
     if (!isset($_SESSION['user_id'])) {
         throw new Exception('Unauthorized');
     }
-    if (!canView('documents')) {
+    if (!canView('document_library')) {
         http_response_code(403);
         throw new Exception('Access Denied');
     }
@@ -69,11 +69,12 @@ $countQuery = "SELECT COUNT(*) FROM documents d
 
 $params = [];
 
-// Visibility gap-fix: a non-admin only sees public documents, their own
-// uploads, and private/restricted documents they've been explicitly
-// assigned. Admins are unrestricted.
-if (!isAdmin()) {
+// Visibility: Admin and management roles (see_all_documents=1) bypass the
+// filter and see every document. Other roles see only public documents,
+// their own uploads, and documents explicitly shared with them.
+if (!canSeeAllDocuments()) {
     $visibilitySql = " AND (d.access_level = 'public'
+                         OR d.access_level = ''
                          OR d.uploaded_by = :vis_user1
                          OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2))";
     $query .= $visibilitySql;
@@ -178,12 +179,13 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt->closeCursor();
 
 // Get total records without filters (still respects visibility for non-admins)
-if (isAdmin()) {
+if (canSeeAllDocuments()) {
     $totalRecords = $pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
 } else {
     $totalStmt = $pdo->prepare("
         SELECT COUNT(*) FROM documents d
         WHERE d.access_level = 'public'
+           OR d.access_level = ''
            OR d.uploaded_by = :vis_user1
            OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2)
     ");

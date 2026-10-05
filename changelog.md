@@ -87,6 +87,34 @@ The reason a reset could not simply be bolted on: `provisionTenant()` wrote the 
 - `tests/test_account_recovery_foundation_cli.php` (new) — 37 assertions: schema + shape, idempotency on re-run, the backfill's sorting and its refusal to overwrite or invent an address, stranded-admin reporting (active admins only), UNIQUE added when data allows and **withheld + reported** when it does not, with neither login name rewritten.
 - `tests/test_tenant_provisioning_cli.php` — one stale assertion fixed: it expected `provisionTenant()` to reject `'not-an-email'`, which has been wrong since `44be7a84` made the phone the sign-in credential. Blank is the real invalid case. Suite now **72/72** (was 70/72, both failures pre-existing).
 
+## 2026-10-05 — fix(documents): correct visibility policy — managers see all, others see public+own+assigned
+
+Non-admins were seeing 0 documents for two reasons: (1) `canView('documents')` was the gate but only two roles had that key; (2) management roles (Director, CFO, Credit Manager) who do have `document_library` view permission still got the same filtered view as Staff, rather than seeing everything.
+
+**Policy now:**
+- Admin → all (unchanged)
+- Managing Director, Director, CFO, Credit Manager → all (new `see_all_documents` flag)
+- Other roles with `document_library` view permission → public + own uploads + assigned + blank access_level
+- Roles without `document_library` permission → blocked entirely (unchanged)
+
+**Files:**
+- `migrations/tenant/2026_10_05_document_visibility_policy.php` — adds `see_all_documents tinyint(1) DEFAULT 0` to `roles`; sets it to 1 for Admin, Managing Director, Director, CFO, Credit Manager (matched by name so it works across tenants regardless of role_id).
+- `core/document_access.php` — adds `canSeeAllDocuments()`: checks `isAdmin()` first, then `see_all_documents` from the user's role (cached in `$_SESSION['_see_all_docs']` to avoid repeated DB queries). Fails safe (returns false) if column is pre-migration. `userCanAccessDocument()` delegates to it as the first check; also now allows blank `access_level` rows (same visibility as `public`).
+- `api/document/get_documents.php` — gate key changed `canView('documents')` → `canView('document_library')` (the key all roles actually have); visibility filter switches `!isAdmin()` → `!canSeeAllDocuments()`; blank `access_level` added to the public-visible clause.
+- `api/get_documents.php` (signing-wizard picker) — same three changes as above.
+- `app/constant/document/document_library.php` — download/view gate and `autoEnforcePermission` both changed from `'documents'` → `'document_library'`.
+- `tests/test_document_visibility_policy_cli.php` — 19 static assertions verifying: php -l on all 5 files; canView key correct in all 3 endpoints; `canSeeAllDocuments()` present and wired; blank access_level in filters; live DB checks (migration applied, per-role flag, `userCanAccessDocument` allows/denies correctly).
+
+## 2026-10-05 — fix(e-signature): the signing wizard offers only documents the user may actually sign
+
+A non-admin could walk the Document Signing Wizard through steps 1-3 and only be refused at the final step with **"Signing failed — Could not fetch original PDF (HTTP 403)"**, on the very same document an admin signed without trouble. Three layers disagreed about who may see a document: the picker listed every row, the preview read the file straight off disk, and only the final fetch consulted the access gate.
+
+**Files:**
+- `api/get_documents.php` — the wizard's picker list ran `WHERE 1=1`, so **every user was offered every document**, including ones the signing step would refuse. It now applies the same visibility rule the access gate enforces (`core/document_access.php`: admin, `access_level = 'public'`, own upload, or listed in `document_assignees`), on the page query, the filtered count and the unfiltered total alike, and requires `canView('documents')` like its sibling `api/document/get_documents.php` already did. The refusal can no longer arrive four steps late, because the document is never offered.
+- `app/constant/document/select_document_add_esignature.php` — **the preview no longer bypasses PHP.** It fetched `<?= getUrl("") ?>/' + selectedDocPath`, i.e. the raw `/uploads/document_library/...` path served statically by Apache, so a restricted document's full contents were readable by anyone who reached this page (and by anyone holding the URL). It now renders through `document_library?action=view&document_id=`, which runs the gate; that action sends `Content-Disposition: inline` (what pdf.js needs — the original reason the raw path was used) and does not touch the download counter. The **preselect** path (arriving via "Save & Sign") hand-rolled its own `uploaded_by === user_id || isAdmin()` check, which both missed public documents and missed documents shared through `document_assignees`; it now calls the shared `userCanAccessDocument()`. A refused fetch finally reports *"You do not have access to this document… Ask the document owner to share it with you"* instead of a bare `HTTP 403`.
+- `tests/test_document_access_gate_cli.php` — extended from 17 to **31 assertions**. New static guards for the picker filter, the permission check, the gated preview URL, the shared preselect helper and the readable 403; plus a live section that **executes `api/get_documents.php` itself** under faked sessions (stranger / assignee / owner / admin) and asserts the contract that was broken: *every row the picker offers passes the gate the signing step enforces*. Verified to fail (6 failures) against the pre-fix code.
+
+Verified end-to-end over HTTP through the production route as a real non-admin user: picker returns only permitted rows; preview of a permitted PDF returns `200 application/pdf` `Content-Disposition: inline`; preview and download of a restricted document both return `403`; the wizard page renders with no preselect for a document the user may not sign.
 
 ## 2026-10-03 — feat(customer-visits): PDF + WhatsApp + email; form fits the phone; admin sees submitted days only; phone optional
 
