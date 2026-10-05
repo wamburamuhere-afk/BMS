@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-05 — fix(pwa): keep browser address bar / tabs white (theme-color)
+
+**Files:** `header.php`, `login.php`, `offline.html`, `manifest.json`
+The PWA change set `theme-color` / `theme_color` to `#0d6efd`, which tinted the mobile browser's address bar, tab strip and new-tab button blue. Set back to `#ffffff` so the browser chrome stays white as before; the app's own blue page header (CSS in `header.php`) is unchanged.
+
+---
+
 ## 2026-10-05 — feat(pwa): make BMS installable on phone/desktop as "Smart BMS"
 
 **Files:** `manifest.json` (new), `sw.js` (new), `offline.html` (new), `header.php`, `login.php`
