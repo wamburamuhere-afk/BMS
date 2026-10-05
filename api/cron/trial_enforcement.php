@@ -53,7 +53,13 @@ if (!hash_equals('Bearer ' . $expectedSecret, trim($authHeader))) {
 ignore_user_abort(true);
 set_time_limit(120);
 
-define('GRACE_PERIOD_DAYS', 7);
+// Was define('GRACE_PERIOD_DAYS', 7), with an independent second copy in
+// core/tenant_bootstrap.php. One policy, two hard-coded constants, read by the
+// two paths that enforce it — the nightly sweep and the live request — and
+// neither changeable without a deploy. Both now come from
+// core/tenant_lifecycle_policy.php, which also honours a per-tenant override.
+require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php';
+$defaultGraceDays = tenantDefaultGraceDays();
 
 try {
     $ctrl   = getControlPdo();
@@ -61,7 +67,7 @@ try {
 
     // ── Phase A: Trial expired, no grace period set yet ──────────────────
     $stmtA = $ctrl->prepare(
-        "SELECT id, subdomain, company_name, trial_ends_at
+        "SELECT id, subdomain, company_name, trial_ends_at, grace_days
            FROM tenants
           WHERE status = 'trial'
             AND trial_ends_at < NOW()
@@ -73,7 +79,7 @@ try {
     $trialGraceStarted = 0;
     foreach ($newTrialGrace as $t) {
         try {
-            $graceDate = date('Y-m-d', strtotime($t['trial_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+            $graceDate = date('Y-m-d', strtotime($t['trial_ends_at'] . ' +' . tenantGraceDaysFor($t) . ' days'));
             $ctrl->prepare(
                 "UPDATE tenants SET grace_until = ? WHERE id = ? AND status = 'trial' AND grace_until IS NULL"
             )->execute([$graceDate, $t['id']]);
@@ -131,7 +137,7 @@ try {
 
     // ── Phase C: Subscription expired, no grace period set yet ───────────
     $stmtC = $ctrl->prepare(
-        "SELECT id, subdomain, company_name, subscription_ends_at
+        "SELECT id, subdomain, company_name, subscription_ends_at, grace_days
            FROM tenants
           WHERE status = 'active'
             AND subscription_ends_at IS NOT NULL
@@ -144,7 +150,7 @@ try {
     $subGraceStarted = 0;
     foreach ($newSubGrace as $t) {
         try {
-            $graceDate = date('Y-m-d', strtotime($t['subscription_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+            $graceDate = date('Y-m-d', strtotime($t['subscription_ends_at'] . ' +' . tenantGraceDaysFor($t) . ' days'));
             $ctrl->prepare(
                 "UPDATE tenants SET grace_until = ? WHERE id = ? AND status = 'active' AND grace_until IS NULL"
             )->execute([$graceDate, $t['id']]);
@@ -214,7 +220,7 @@ try {
 
                 $trialGraceRows = '';
                 foreach ($newTrialGrace as $t) {
-                    $graceEnd = date('d M Y', strtotime($t['trial_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+                    $graceEnd = date('d M Y', strtotime($t['trial_ends_at'] . ' +' . tenantGraceDaysFor($t) . ' days'));
                     $trialGraceRows .= '<tr>'
                         . '<td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
                         . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
@@ -224,7 +230,7 @@ try {
                 }
                 $subGraceRows = '';
                 foreach ($newSubGrace as $t) {
-                    $graceEnd = date('d M Y', strtotime($t['subscription_ends_at'] . ' +' . GRACE_PERIOD_DAYS . ' days'));
+                    $graceEnd = date('d M Y', strtotime($t['subscription_ends_at'] . ' +' . tenantGraceDaysFor($t) . ' days'));
                     $subGraceRows .= '<tr>'
                         . '<td style="padding:6px 10px">' . htmlspecialchars((string)$t['company_name'], ENT_QUOTES) . '</td>'
                         . '<td style="padding:6px 10px;color:#6c757d">' . htmlspecialchars((string)$t['subdomain'], ENT_QUOTES) . '</td>'
@@ -238,7 +244,7 @@ try {
 
                 $graceBody = '
                 <p>This is a BMS grace-period notification for <strong>' . $todayLabel . '</strong>.</p>
-                <p>The following tenants have entered their <strong>' . GRACE_PERIOD_DAYS . '-day grace period</strong> — they can still log in, but will be automatically suspended when the grace period ends unless a payment is recorded.</p>
+                <p>The following tenants have entered their grace period (the platform default is <strong>' . $defaultGraceDays . ' days</strong>; a tenant may have its own). They can still log in, but will be automatically suspended on the date shown unless a payment is recorded.</p>
                 <table style="' . $tableStyle . '">
                     <thead><tr>
                         <th style="' . $thStyle . '">Company</th>
@@ -299,7 +305,7 @@ try {
 
                 $body = '
                 <p>This is your daily BMS enforcement summary for <strong>' . $todayLabel . '</strong>.</p>
-                <p>The following tenants completed their ' . GRACE_PERIOD_DAYS . '-day grace period and were automatically suspended.</p>
+                <p>The following tenants reached the end of their grace period and were automatically suspended.</p>
                 <table style="' . $tableStyle . '">
                     <thead><tr>
                         <th style="' . $thStyle . '">Company</th>

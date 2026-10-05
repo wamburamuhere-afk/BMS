@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../../core/tenant_admin.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../core/platform_settings.php';
+require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
@@ -273,6 +274,51 @@ $isAutoUser   = ($emailProvider === 'sendgrid');   // auto-fill username = "apik
             </div>
         </div>
 
+        <!-- Trial & grace defaults -->
+        <div class="col-12 col-lg-6">
+            <div class="card panel-card h-100">
+                <div class="card-header"><i class="bi bi-hourglass-split text-primary me-1"></i> Trial &amp; Grace Period</div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        Both numbers used to be written into the code — the trial length in
+                        <code>tenant_provisioner.php</code> and the grace period in <em>two</em> separate
+                        places — so changing either meant a deploy. A single tenant can still be given
+                        their own grace period on that tenant's page.
+                    </p>
+                    <form id="lifecycleForm" autocomplete="off">
+                        <input type="hidden" name="action" value="save_lifecycle">
+                        <div class="mb-3">
+                            <label class="form-label" for="default_trial_days">Default trial length</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="default_trial_days"
+                                       name="default_trial_days" min="1" max="365" required
+                                       value="<?= (int)tenantDefaultTrialDays() ?>">
+                                <span class="input-group-text">days</span>
+                            </div>
+                            <div class="form-text">How long a new company's trial runs when no explicit date is given.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="default_grace_days">Default grace period</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="default_grace_days"
+                                       name="default_grace_days" min="0" max="90" required
+                                       value="<?= (int)tenantDefaultGraceDays() ?>">
+                                <span class="input-group-text">days</span>
+                            </div>
+                            <div class="form-text">
+                                Extra days a company keeps working after their trial or subscription
+                                date passes, before they are suspended automatically.
+                                <strong>0</strong> cuts them off the moment it expires.
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i> Save
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Self-registration starting modules -->
         <div class="col-12 col-lg-6">
             <div class="card panel-card h-100">
@@ -451,6 +497,11 @@ $('#emailForm').on('submit', function (e) {
 $('#provisioningForm').on('submit', function (e) {
     e.preventDefault();
     submitSettingsForm(this, '/actions/superadmin_platform_settings.php', 'Self-registration setting updated');
+});
+
+$('#lifecycleForm').on('submit', function (e) {
+    e.preventDefault();
+    submitSettingsForm(this, '/actions/superadmin_platform_settings.php', 'Trial and grace defaults updated');
 });
 
 $('#btnTestEmail').on('click', function () {

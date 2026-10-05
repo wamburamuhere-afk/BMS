@@ -156,5 +156,36 @@ if ($action === 'save_provisioning') {
     exit;
 }
 
+if ($action === 'save_lifecycle') {
+    // Replaces two numbers that were previously written into the code: the
+    // trial length in core/tenant_provisioner.php, and the grace period in
+    // BOTH core/tenant_bootstrap.php and api/cron/trial_enforcement.php as
+    // two independent constants. Neither could be changed without a deploy.
+    $trial = (int)($_POST['default_trial_days'] ?? 0);
+    if ($trial < 1 || $trial > 365) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Trial length must be between 1 and 365 days.']);
+        exit;
+    }
+
+    // 0 is meaningful here — "cut them off the moment it expires" — so the
+    // range starts at 0 and a blank field is rejected rather than silently
+    // becoming zero.
+    $graceRaw = trim((string)($_POST['default_grace_days'] ?? ''));
+    $grace    = (int)$graceRaw;
+    if ($graceRaw === '' || $grace < 0 || $grace > 90) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Grace period must be between 0 and 90 days.']);
+        exit;
+    }
+
+    setPlatformSetting('default_trial_days', (string)$trial, (int)$me['id']);
+    setPlatformSetting('default_grace_days', (string)$grace, (int)$me['id']);
+    logTenantAdminAction(null, null, 'platform_settings',
+        "Default trial {$trial} day(s), default grace {$grace} day(s)");
+    echo json_encode(['success' => true, 'message' => 'Trial and grace defaults updated.']);
+    exit;
+}
+
 http_response_code(422);
 echo json_encode(['success' => false, 'message' => 'Unknown action.']);

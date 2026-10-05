@@ -153,6 +153,46 @@ try {
     ");
     say('  · table superadmins ready');
 
+    // Break-glass for the platform operator themselves.
+    //
+    // Until this existed, an operator who forgot their password — or who
+    // tripped their own 5-attempt lockout — had exactly one way back:
+    // scripts/create_superadmin.php or raw SQL, over SSH. That is not a
+    // recovery path, it is an outage with a shell prompt.
+    //
+    // Same shape as the tenant-side password_resets: SHA-256 of the token so a
+    // leaked dump is worthless, UNIQUE so single-use is enforceable, short
+    // expiry, and an attempt ledger because throttling cannot live in a
+    // session belonging to someone who is not signed in.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`superadmin_password_resets` (
+            `reset_id`      INT AUTO_INCREMENT PRIMARY KEY,
+            `superadmin_id` INT          NOT NULL,
+            `token_hash`    CHAR(64)     NOT NULL,
+            `destination`   VARCHAR(191) NOT NULL DEFAULT '',
+            `expires_at`    DATETIME     NOT NULL,
+            `used_at`       DATETIME     NULL,
+            `request_ip`    VARCHAR(45)  NOT NULL DEFAULT '',
+            `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `uq_sapr_token` (`token_hash`),
+            KEY `idx_sapr_owner` (`superadmin_id`, `created_at`),
+            KEY `idx_sapr_expires` (`expires_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table superadmin_password_resets ready');
+
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`superadmin_reset_attempts` (
+            `attempt_id` INT AUTO_INCREMENT PRIMARY KEY,
+            `identifier` VARCHAR(191) NOT NULL DEFAULT '',
+            `request_ip` VARCHAR(45)  NOT NULL DEFAULT '',
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_sara_identifier` (`identifier`, `created_at`),
+            KEY `idx_sara_ip` (`request_ip`, `created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table superadmin_reset_attempts ready');
+
     // tenant_id is NULLable with NO foreign key on purpose: provisioning logs
     // steps before the tenants row exists, and its rollback deletes that row
     // while the record of WHY it failed has to survive.
@@ -547,6 +587,10 @@ try {
         'suspension_reason'    => "ADD COLUMN `suspension_reason` ENUM('trial_expired','subscription_expired','manual') NULL AFTER `subscription_ends_at`",
         // Grace period end date — set when trial/subscription expires; tenant stays accessible until this date
         'grace_until'          => "ADD COLUMN `grace_until` DATE NULL AFTER `suspension_reason`",
+        // Per-tenant grace override. NULL = follow the platform default, which
+        // is NOT the same as 0 (cut off the moment it expires). "They asked for
+        // more time" should not mean giving every other customer more time too.
+        'grace_days'           => "ADD COLUMN `grace_days` TINYINT UNSIGNED NULL AFTER `grace_until`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
@@ -573,6 +617,25 @@ try {
         $admin->exec("ALTER TABLE `{$controlDb}`.`superadmin_notifications`
             MODIFY COLUMN `type` ENUM('trial_expired','subscription_expired','trial_grace_started','subscription_grace_started') NOT NULL");
         say('  · superadmin_notifications.type ENUM expanded (grace types added)');
+    }
+
+    // Add 'archived' to the tenant status ENUM (idempotent check).
+    //
+    // Before this there were only two ways to stop serving a company:
+    // 'suspended', which reads as "we are chasing you for payment" and stays
+    // in the operator's working list, and 'deleted', which destroys the
+    // database. A company that has simply LEFT needed a third: locked out,
+    // data intact, reversible, and out of the default view.
+    $stType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'tenants' AND COLUMN_NAME = 'status'
+    ")->fetchColumn();
+    if ($stType !== false && strpos((string)$stType, 'archived') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants`
+            MODIFY COLUMN `status` ENUM('trial','active','suspended','archived','deleted')
+            NOT NULL DEFAULT 'trial'");
+        say("  · tenants.status ENUM expanded (archived added)");
     }
 
     // Expand billing_cycle ENUM to include quarterly and biannual (idempotent check).
@@ -633,6 +696,15 @@ try {
         'failed_attempts' => "ADD COLUMN `failed_attempts` INT NOT NULL DEFAULT 0 AFTER `password_hash`",
         'locked_until'    => "ADD COLUMN `locked_until` DATETIME NULL AFTER `failed_attempts`",
         'last_login'      => "ADD COLUMN `last_login` DATETIME NULL AFTER `locked_until`",
+        // Two-step sign-in (core/superadmin_2fa.php). This account reaches
+        // every company on the platform and had one password protecting it.
+        // The secret is stored encrypted, never raw; totp_last_counter is the
+        // replay guard (a code stays valid ~90s, so without it the same six
+        // digits work twice); recovery codes are kept only as SHA-256.
+        'totp_secret_enc'      => "ADD COLUMN `totp_secret_enc` VARCHAR(255) NULL AFTER `last_login`",
+        'totp_confirmed_at'    => "ADD COLUMN `totp_confirmed_at` DATETIME NULL AFTER `totp_secret_enc`",
+        'totp_last_counter'    => "ADD COLUMN `totp_last_counter` BIGINT NULL AFTER `totp_confirmed_at`",
+        'totp_recovery_hashes' => "ADD COLUMN `totp_recovery_hashes` TEXT NULL AFTER `totp_last_counter`",
     ] as $col => $clause) {
         if (!in_array($col, $saCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`superadmins` {$clause}");
