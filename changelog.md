@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-05 — feat(pwa): make BMS installable on phone/desktop as "Smart BMS"
+
+**Files:** `manifest.json` (new), `sw.js` (new), `offline.html` (new), `assets/images/pwa/*` (new icons), `header.php`, `login.php`
+Adds Progressive Web App support so users can install the system from the browser ("Add to Home screen" / "Install app") on Android, iOS, Windows and macOS.
+- `manifest.json` — name "Smart BMS", standalone display, theme `#0d6efd`; `start_url`/`scope` are relative (`./`), so routing stays with `roots.php` and it works on both bms. and demo. hosts.
+- `sw.js` — never caches pages (per-user financial data + CSRF tokens); only shows `offline.html` when a page load fails with no network.
+- `header.php`, `login.php` — manifest link, theme-color, iOS meta tags, apple-touch-icon, service-worker registration.
+- Icons are a generic blue "BMS" placeholder — replace files in `assets/images/pwa/` to rebrand.
+
+---
+
 ## 2026-10-05 — fix(documents): quick-upload always saved as private — added access_level field to wizard
 
 **Files:** `app/constant/document/select_document_add_esignature.php`, `api/document/quick_upload_document.php`

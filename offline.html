@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d6efd">
+    <title>Offline | Smart BMS</title>
+    <style>
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+               background: #f8f9fa; color: #212529; text-align: center; padding: 16px; box-sizing: border-box; }
+        .box { max-width: 380px; }
+        .badge { width: 96px; height: 96px; border-radius: 20px; margin: 0 auto; background: #0d6efd; color: #fff;
+                 display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.6rem; }
+        h1 { font-size: 1.4rem; margin: 20px 0 8px; }
+        p { color: #6c757d; margin: 0 0 24px; line-height: 1.5; }
+        button { background: #0d6efd; color: #fff; border: 0; border-radius: 6px; padding: 10px 24px; font-size: 1rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="badge">BMS</div>
+        <h1>You are offline</h1>
+        <p>Smart BMS needs an internet connection. Check your connection and try again.<br>
+           <small>Hauna mtandao. Tafadhali angalia muunganisho wako kisha ujaribu tena.</small></p>
+        <button onclick="location.reload()">Try again</button>
+    </div>
+</body>
+</html>

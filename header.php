@@ -200,6 +200,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title : 'Business Management System'; ?></title>
 
+    <link rel="manifest" href="<?= getUrl('manifest.json') ?>">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Smart BMS">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="<?= getUrl('assets/images/pwa/apple-touch-icon.png') ?>">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('<?= getUrl('sw.js') ?>').catch(function () {});
+            });
+        }
+    </script>
+
     <!-- Open the DNS + TCP + TLS connection to each CDN in parallel, immediately.
          Every page pulls scripts, stylesheets and webfonts from these four hosts,
          and the browser would otherwise pay a fresh handshake for each one only
