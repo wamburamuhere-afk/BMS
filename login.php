@@ -330,7 +330,11 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
             <div class="mb-3 form-check">
                 <input type="checkbox" class="form-check-input" id="rememberMe">
                 <label class="form-check-label" for="rememberMe"><?= htmlspecialchars($tr['remember_me']) ?></label>
-                <a href="forgot-password.php" class="float-end"><?= htmlspecialchars($tr['forgot_pw']) ?></a>
+                <!-- Clean-URL form, and the page now actually exists. This
+                     link pointed at forgot-password.php for a long time while
+                     no such file was ever written: every tenant who clicked it
+                     got a bare 404. Carries the chosen language through. -->
+                <a href="forgot-password?lang=<?= urlencode($pageLang) ?>" class="float-end"><?= htmlspecialchars($tr['forgot_pw']) ?></a>
             </div>
 
             <button type="submit" class="btn btn-primary w-100 btn-login"><?= htmlspecialchars($tr['login_btn']) ?></button>

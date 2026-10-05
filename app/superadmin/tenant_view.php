@@ -803,19 +803,22 @@ if ($hasContext ?? false):
                 </div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
-                        Read-only — who has an account in this company, whether they're active, and when
-                        they last signed in. Loaded on demand, same as Current usage above; nothing here
-                        is kept automatically. For support triage only — not a way to manage this
-                        tenant's staff.
+                        Read-only — who has an account in this company, their sign-in name and contact,
+                        whether they're active, and when they last signed in. Loaded on demand, same as
+                        Current usage above; nothing here is kept automatically. For support triage only
+                        — not a way to manage this tenant's staff.
                     </p>
                     <div id="usersSummary" class="d-none mb-3">
                         <div class="d-flex flex-wrap gap-2 mb-2" id="usersRoleBadges"></div>
                         <div class="small text-muted" id="usersLastActivity"></div>
                     </div>
+                    <!-- Raised BEFORE a lockout, not during one: an active admin with no
+                         address on file cannot use "Forgot password?" at all. -->
+                    <div id="usersNoRecovery" class="alert alert-warning py-2 px-3 small d-none mb-3"></div>
                     <div id="usersEmpty" class="text-muted small">Not loaded yet.</div>
                     <div id="usersTableWrap" class="table-responsive d-none">
                         <table class="table table-sm align-middle mb-0">
-                            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th></tr></thead>
+                            <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last login</th></tr></thead>
                             <tbody id="usersTableBody"></tbody>
                         </table>
                     </div>
@@ -1591,15 +1594,49 @@ function loadUsers() {
                 + (lastActivity ? '<strong>' + safeOutput(lastActivity) + '</strong>' : '<span class="text-muted">no one has signed in yet</span>'));
             $('#usersSummary').removeClass('d-none');
 
+            // Admins who cannot be sent a reset link, because there is no
+            // address to send it to. Named explicitly — "2 admins" would leave
+            // the operator hunting down the table for which ones.
+            const stranded = res.users.filter(function (u) {
+                return u.is_admin && u.is_active && !u.has_recovery_email;
+            });
+            if (stranded.length) {
+                $('#usersNoRecovery').html(
+                    '<i class="bi bi-exclamation-triangle-fill me-1"></i>'
+                    + '<strong>' + stranded.length + ' admin account'
+                    + (stranded.length === 1 ? ' has' : 's have') + ' no email address.</strong> '
+                    + (stranded.length === 1 ? 'It' : 'They') + ' cannot use "Forgot password?" — if '
+                    + (stranded.length === 1 ? 'that password is' : 'those passwords are')
+                    + ' forgotten there is no self-service way back in. Set an address now: '
+                    + stranded.map(function (u) {
+                        return '<code>' + safeOutput(u.username || ('#' + u.user_id)) + '</code>';
+                    }).join(', ')
+                ).removeClass('d-none');
+            } else {
+                $('#usersNoRecovery').addClass('d-none').html('');
+            }
+
             let rows = '';
             res.users.forEach(function (u) {
                 const statusBadge = u.is_active
                     ? '<span class="badge" style="background:#0d6efd;color:#fff">Active</span>'
                     : '<span class="badge" style="background:#6c757d;color:#fff">Inactive</span>';
                 const adminTag = u.is_admin ? ' <span class="text-muted" style="font-size:.72rem;">(admin)</span>' : '';
+                // The one field the support call actually turns on.
+                const uname = u.username
+                    ? '<code style="font-size:.8rem;">' + safeOutput(u.username) + '</code>'
+                    : '<span class="text-muted">—</span>';
+                const mail = u.email
+                    ? safeOutput(u.email)
+                    : (u.is_admin && u.is_active
+                        ? '<span class="text-danger" title="Cannot receive a password reset">'
+                          + '<i class="bi bi-exclamation-triangle-fill me-1"></i>none</span>'
+                        : '<span class="text-muted">—</span>');
                 rows += '<tr>'
                     + '<td>' + safeOutput(u.name) + adminTag + '</td>'
-                    + '<td>' + safeOutput(u.email) + '</td>'
+                    + '<td>' + uname + '</td>'
+                    + '<td>' + mail + '</td>'
+                    + '<td>' + (u.phone ? safeOutput(u.phone) : '<span class="text-muted">—</span>') + '</td>'
                     + '<td>' + safeOutput(u.role) + '</td>'
                     + '<td>' + statusBadge + '</td>'
                     + '<td>' + (u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>') + '</td>'

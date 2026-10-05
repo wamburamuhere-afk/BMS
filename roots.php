@@ -178,6 +178,11 @@ $routes = [
     'activity_log'   => ROOT_DIR . '/app/activity_log.php',
     'profile'        => PROFILE_DIR . '/profile.php',
     'unauthorized'   => ROOT_DIR . '/unauthorized.php',
+    // Public, unauthenticated — the only way back in for an admin who has
+    // forgotten their password. Both spellings, because login.php has linked
+    // to the .php form since long before this page existed.
+    'forgot-password' => ROOT_DIR . '/forgot-password.php',
+    'forgot_password' => ROOT_DIR . '/forgot-password.php',
     // Public, unauthenticated — reached only via the single-use signing
     // token emailed by api/document/request_external_signature.php.
     'sign-document'  => ROOT_DIR . '/sign_document.php',

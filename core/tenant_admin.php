@@ -798,12 +798,26 @@ if (!function_exists('tenantUserDirectory')) {
      * (actions/superadmin_tenant_users.php), never automatically on
      * tenant_view.php's normal page load — same discipline as usage snapshots.
      *
-     * Returns ONLY: id, name, email, role, admin flag, active flag, last
-     * login, created date. Never a password hash, phone number, avatar, or
+     * Returns ONLY: id, name, USERNAME, email, phone, role, admin flag, active
+     * flag, last login, created date. Never a password hash, avatar, or
      * anything from any other table — this is an account directory, not a
      * window into the tenant's business data.
      *
-     * @return array<int,array{user_id:int,name:string,email:string,role:string,is_admin:bool,is_active:bool,last_login:?string,created_at:?string}>|null
+     * WHY username AND phone ARE HERE. They were selected and then dropped on
+     * the way out, which made the single most common support call unanswerable:
+     * an admin rings up saying "I cannot remember my username", and the panel —
+     * the one place that can see their account — could not tell them. phone is
+     * the number the operator calls to verify who they are speaking to before
+     * doing anything about it. Both are contact/identity fields the operator
+     * already holds in the control database for the owner; showing them for the
+     * tenant's other accounts does not widen what the panel can see into the
+     * business itself.
+     *
+     * has_recovery_email is computed here rather than left to the caller so the
+     * panel can warn that an admin is one forgotten password away from being
+     * locked out for good, BEFORE it happens — see accountsWithoutRecoveryContact().
+     *
+     * @return array<int,array{user_id:int,name:string,username:string,email:string,phone:string,role:string,is_admin:bool,is_active:bool,has_recovery_email:bool,last_login:?string,created_at:?string}>|null
      */
     function tenantUserDirectory(int $tenantId): ?array
     {
@@ -823,24 +837,30 @@ if (!function_exists('tenantUserDirectory')) {
             );
 
             $rows = $tPdo->query("
-                SELECT user_id, first_name, last_name, username, email,
+                SELECT user_id, first_name, last_name, username, email, phone,
                        COALESCE(NULLIF(role, ''), user_role) AS role,
                        is_admin, is_active, last_login, created_at
                 FROM users
-                ORDER BY is_active DESC, first_name, last_name
+                ORDER BY is_admin DESC, is_active DESC, first_name, last_name
                 LIMIT 500
             ")->fetchAll(PDO::FETCH_ASSOC);
 
             $out = [];
             foreach ($rows as $r) {
-                $name = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                $name  = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                $email = trim((string)($r['email'] ?? ''));
                 $out[] = [
                     'user_id'    => (int)$r['user_id'],
                     'name'       => $name !== '' ? $name : (string)$r['username'],
-                    'email'      => (string)($r['email'] ?? ''),
+                    'username'   => (string)($r['username'] ?? ''),
+                    'email'      => $email,
+                    'phone'      => (string)($r['phone'] ?? ''),
                     'role'       => (string)($r['role'] ?? ''),
                     'is_admin'   => (bool)$r['is_admin'],
                     'is_active'  => (bool)$r['is_active'],
+                    // An active admin with no address cannot use "Forgot
+                    // password?" at all. The panel turns this into a warning.
+                    'has_recovery_email' => $email !== '',
                     'last_login' => $r['last_login'] !== null ? (string)$r['last_login'] : null,
                     'created_at' => $r['created_at'] !== null ? (string)$r['created_at'] : null,
                 ];
