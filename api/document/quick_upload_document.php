@@ -76,7 +76,9 @@ try {
         !empty($_POST['category_id']) ? $_POST['category_id'] : null,
         '1.0',
         $_SESSION['user_id'],
-        'private'
+        in_array($_POST['access_level'] ?? '', ['public', 'restricted', 'private'], true)
+            ? $_POST['access_level']
+            : 'private'
     ]);
 
     echo json_encode([
