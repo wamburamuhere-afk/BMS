@@ -1,11 +1,14 @@
 {
-  "name": "Smart BMS — Business Management System",
+  "name": "Smart BMS",
   "short_name": "Smart BMS",
   "description": "BJP Technologies Business Management System",
   "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay"
+  ],
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",

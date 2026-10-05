@@ -157,6 +157,16 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
             });
         }
     </script>
+    <style>
+        /* Installed desktop app without a title bar: invisible strip so the window can still be dragged. */
+        @media (display-mode: window-controls-overlay) {
+            body::before {
+                content: ""; position: fixed; z-index: 2000;
+                top: 0; left: env(titlebar-area-x, 0); width: env(titlebar-area-width, 100%); height: env(titlebar-area-height, 32px);
+                app-region: drag; -webkit-app-region: drag;
+            }
+        }
+    </style>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
