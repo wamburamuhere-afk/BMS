@@ -52,6 +52,28 @@ switch ($action) {
         $okMsg = 'Tenant reactivated.';
         break;
 
+    case 'archive':
+        // Nothing is destroyed — but it does end service for a real company
+        // today, so it carries the same typed confirmation as delete.
+        $r = archiveTenant($tenantId, (string)($_POST['confirm_name'] ?? ''),
+                           trim((string)($_POST['reason'] ?? '')));
+        $okMsg = 'Tenant archived. Its data is untouched and Reactivate brings it straight back.';
+        break;
+
+    case 'release_subdomain':
+        $r = releaseTenantSubdomain($tenantId, (string)($_POST['confirm_name'] ?? ''));
+        $okMsg = $r['ok']
+            ? 'The address "' . $r['released'] . '" is available again. This company\'s history is kept.'
+            : '';
+        break;
+
+    case 'purge':
+        // Registry only. The database must already be gone — purgeTenant()
+        // refuses anything that is not already 'deleted'.
+        $r = purgeTenant($tenantId, (string)($_POST['confirm_name'] ?? ''));
+        $okMsg = 'Registry row removed. The audit log keeps the record of what happened.';
+        break;
+
     case 'delete':
         // The typed company name is verified inside deleteTenant() against the
         // stored value, not here — so the check cannot be bypassed by calling

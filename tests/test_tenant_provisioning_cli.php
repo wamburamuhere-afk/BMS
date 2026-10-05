@@ -247,7 +247,12 @@ try {
     foreach ([
         ['', 'ptestx' . $sfx, 'a@b.test', 'Password!123', 'empty company name'],
         ['Co', 'admin', 'a@b.test', 'Password!123', 'reserved subdomain'],
-        ['Co', 'ptesty' . $sfx, 'not-an-email', 'Password!123', 'invalid email'],
+        // Was 'not-an-email' expecting a rejection, which has been wrong since
+        // 44be7a84 made the phone number the sign-in credential: this argument
+        // is the account's USERNAME and is legitimately a phone number on the
+        // self-registration path, so provisionTenant() deliberately does not
+        // require an email shape here. Blank is the real invalid case.
+        ['Co', 'ptesty' . $sfx, '', 'Password!123', 'blank contact'],
         ['Co', 'ptestz' . $sfx, 'a@b.test', 'short', 'weak password'],
     ] as [$c, $s, $e, $p, $label]) {
         $r = provisionTenant($c, $s, $e, $p);

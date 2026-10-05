@@ -153,7 +153,14 @@ ok('the inactive user shows last_login as null, not a stale value',
 ok('names are composed from first+last, not raw username',
    isset($byEmail['second.admin@userdirtest.example']) && $byEmail['second.admin@userdirtest.example']['name'] === 'Second Admin');
 
-$allowedKeys = ['user_id','name','email','role','is_admin','is_active','last_login','created_at'];
+// username, phone and has_recovery_email were added deliberately (account
+// recovery Phase 1). The panel could previously see an admin's account but
+// not tell them their own sign-in name — the single most common support call —
+// and had no way to show that an admin has no address to send a reset to.
+// They are identity/contact fields, not a window into the tenant's business
+// data, which is what this allow-list exists to keep out.
+$allowedKeys = ['user_id','name','username','email','phone','role','is_admin','is_active',
+                'has_recovery_email','last_login','created_at'];
 $leaked = false; $extraKeys = [];
 foreach ($dir as $u) {
     foreach (array_keys($u) as $k) {
@@ -161,6 +168,13 @@ foreach ($dir as $u) {
     }
 }
 ok('every returned row has ONLY the declared safe keys — nothing else', !$leaked, implode(',', array_unique($extraKeys)));
+
+// The new fields must actually carry data, or the support call is no better off.
+$second = $byEmail['second.admin@userdirtest.example'] ?? null;
+ok('the username is returned, so an operator can answer "what is my username?"',
+   $second !== null && isset($second['username']) && $second['username'] !== '');
+ok('has_recovery_email is true when an address is on file',
+   $second !== null && ($second['has_recovery_email'] ?? null) === true);
 
 $asJson = json_encode($dir);
 ok('no password hash anywhere in the serialised output', strpos($asJson, '$2y$') === false);

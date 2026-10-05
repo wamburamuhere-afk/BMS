@@ -361,6 +361,10 @@ function endedBadge(r) {
         case 'revoked':     return { badge: '<span class="badge bg-danger">Revoked</span>',                   detail: 'at ' + at(r.logout_at) + by };
         case 'admin_ended': return { badge: '<span class="badge bg-dark">Ended by admin</span>',              detail: 'at ' + at(r.logout_at) + by };
         case 'blocked':     return { badge: '<span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Account Blocked</span>', detail: 'at ' + at(r.logout_at) + by };
+        // core/account_recovery.php ends every open session when a password is
+        // reset — otherwise whoever already had the old password stays signed
+        // in and the reset achieves nothing.
+        case 'password_reset': return { badge: '<span class="badge bg-dark"><i class="bi bi-key me-1"></i>Password Reset</span>', detail: 'at ' + at(r.logout_at) };
         default:            return { badge: '<span class="badge bg-secondary-subtle text-secondary border">Signed out</span>', detail: 'at ' + at(r.logout_at) };
     }
 }

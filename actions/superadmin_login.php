@@ -23,12 +23,39 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 csrf_check();   // §21 — exits 419 on mismatch
 
+// Second step of a two-step sign-in. Handled here rather than in its own
+// endpoint so there is one door into an operator session, and one place that
+// can set superadmin_id.
+if (($_POST['step'] ?? '') === '2fa') {
+    $r = completeSuperadminTwoFactor((string)($_POST['code'] ?? ''));
+    if (!$r['ok']) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => $r['error']]);
+        exit;
+    }
+    echo json_encode([
+        'success'  => true,
+        'redirect' => '/app/superadmin/index.php',
+        'notice'   => $r['used_recovery']
+            ? 'You signed in with a recovery code. ' . (int)$r['remaining'] . ' left.'
+            : null,
+    ]);
+    exit;
+}
+
 $result = attemptSuperadminLogin($_POST['email'] ?? '', $_POST['password'] ?? '');
 
 if (!$result['ok']) {
     // 401 rather than 200 so the failure is visible to logs and monitoring.
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => $result['error']]);
+    exit;
+}
+
+// The password was right but it is not enough on its own. No session exists
+// yet — attemptSuperadminLogin() deliberately leaves only a pending marker.
+if (!empty($result['needs_2fa'])) {
+    echo json_encode(['success' => true, 'needs_2fa' => true]);
     exit;
 }
 

@@ -249,8 +249,26 @@ if (!function_exists('registerTenant')) {
         // ── Provision ────────────────────────────────────────────────────────
         // provisionTenant() guarantees all-or-nothing: on failure there is no
         // orphaned database, MySQL user or registry row to clean up here.
+        // Email is REQUIRED here, where it used to be optional.
+        //
+        // It is the only channel this platform can actually send a password
+        // reset on — there is no SMS gateway (api/test_sms_config.php makes no
+        // HTTP call). An owner who signs up without one has no way back into
+        // their own company if they forget their password, and no way for the
+        // platform to help them that does not amount to an operator taking
+        // their word for it over the phone. Collecting it once at signup is the
+        // difference between a self-service reset and a lost business.
+        //
+        // The mobile path (api/mobile/register.php) still accepts a blank
+        // address: rejecting there would break app versions already installed
+        // on people's phones. Those tenants are surfaced in the superadmin panel
+        // by accountsWithoutRecoveryContact() instead.
         $ownerEmail = trim((string)($in['owner_email'] ?? ''));
-        if ($ownerEmail !== '' && !filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+        if ($ownerEmail === '') {
+            return $fail('Please enter your email address — it is the only way to reset your password if you forget it.',
+                'rejected', $phone, $sub);
+        }
+        if (!filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
             return $fail('Please enter a valid email address.', 'rejected', $phone, $sub);
         }
 
@@ -259,6 +277,9 @@ if (!function_exists('registerTenant')) {
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
             'owner_phone'       => $phone,
+            // Owner's own address → users.email, so a password reset has
+            // somewhere to go. Distinct from 'email' below (company profile).
+            'owner_contact_email' => $ownerEmail,
             'country'           => trim((string)($in['country']       ?? '')),
             'industry'          => trim((string)($in['industry']      ?? '')),
             'company_size'      => trim((string)($in['company_size']  ?? '')),

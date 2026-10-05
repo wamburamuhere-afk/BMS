@@ -202,6 +202,26 @@ if (!function_exists('attemptSuperadminLogin')) {
 
         superadminSessionReady();
 
+        // Second factor, when the operator has switched it on. The password is
+        // correct, but it is not enough on its own — so NO superadmin_id is
+        // set here. A pending marker is stored instead, and only
+        // completeSuperadminTwoFactor() promotes it to a real session. Writing
+        // the session first and "checking 2FA later" is how a half-authenticated
+        // request ends up being treated as signed in.
+        require_once __DIR__ . '/superadmin_2fa.php';
+        if (saTotpEnabled($sa)) {
+            unset($_SESSION['superadmin_id']);
+            if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+                session_regenerate_id(true);
+            }
+            $_SESSION['superadmin_2fa_pending'] = [
+                'id'         => (int)$sa['id'],
+                'expires_at' => time() + 300,    // five minutes to find the phone
+            ];
+            return ['ok' => true, 'error' => null, 'needs_2fa' => true];
+        }
+        unset($_SESSION['superadmin_2fa_pending']);
+
         // A superadmin session and a tenant-user session must never coexist in
         // one browser session: whichever is established last wins outright.
         // Otherwise a page could read one identity while a guard checked the other.
@@ -213,7 +233,72 @@ if (!function_exists('attemptSuperadminLogin')) {
         }
         $_SESSION['superadmin_id'] = (int)$sa['id'];
 
-        return ['ok' => true, 'error' => null];
+        return ['ok' => true, 'error' => null, 'needs_2fa' => false];
+    }
+}
+
+if (!function_exists('completeSuperadminTwoFactor')) {
+    /**
+     * Second half of a two-step sign-in: turn the pending marker left by
+     * attemptSuperadminLogin() into a real session, once the code checks out.
+     *
+     * The marker expires on its own after five minutes, so a browser left on
+     * the code screen cannot be finished off hours later by somebody else.
+     *
+     * A wrong code counts against the SAME lockout counter the password uses.
+     * Otherwise the second factor would be the one part of sign-in an attacker
+     * could brute-force freely — a million tries at six digits, unthrottled.
+     *
+     * @return array{ok:bool, error:?string, used_recovery:bool, remaining:?int}
+     */
+    function completeSuperadminTwoFactor(string $code): array
+    {
+        require_once __DIR__ . '/superadmin_2fa.php';
+        superadminSessionReady();
+
+        $pending = $_SESSION['superadmin_2fa_pending'] ?? null;
+        if (!is_array($pending) || empty($pending['id'])) {
+            return ['ok' => false, 'error' => 'Please sign in again.', 'used_recovery' => false, 'remaining' => null];
+        }
+        if ((int)($pending['expires_at'] ?? 0) < time()) {
+            unset($_SESSION['superadmin_2fa_pending']);
+            return ['ok' => false, 'error' => 'That took too long. Please sign in again.',
+                    'used_recovery' => false, 'remaining' => null];
+        }
+
+        $id = (int)$pending['id'];
+        $r  = saTotpCheck($id, $code);
+
+        if (!$r['ok']) {
+            try {
+                getControlPdo()->prepare("
+                    UPDATE superadmins
+                       SET locked_until = IF(failed_attempts + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until),
+                           failed_attempts = failed_attempts + 1
+                     WHERE id = ?
+                ")->execute([SUPERADMIN_MAX_ATTEMPTS, SUPERADMIN_LOCKOUT_MINUTES, $id]);
+            } catch (Throwable $e) {
+                error_log('completeSuperadminTwoFactor lockout: ' . $e->getMessage());
+            }
+            return $r;
+        }
+
+        try {
+            getControlPdo()->prepare("UPDATE superadmins SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
+                ->execute([$id]);
+        } catch (Throwable $e) {
+            error_log('completeSuperadminTwoFactor reset: ' . $e->getMessage());
+        }
+
+        unset($_SESSION['superadmin_2fa_pending']);
+        unset($_SESSION['user_id'], $_SESSION['role_id'], $_SESSION['role'],
+              $_SESSION['user_role'], $_SESSION['first_name'], $_SESSION['last_name']);
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
+        }
+        $_SESSION['superadmin_id'] = $id;
+
+        return $r;
     }
 }
 
@@ -340,6 +425,10 @@ if (!function_exists('superadminRouteMap')) {
             'profile'      => $d . 'profile.php',
             'login'        => $d . 'login.php',
             'logout'       => $d . 'logout.php',
+            // Public, unauthenticated — an operator who forgot their password
+            // or tripped their own lockout. Before this, the only way back was
+            // scripts/create_superadmin.php or raw SQL over SSH.
+            'forgot'       => $d . 'forgot.php',
         ];
     }
 }

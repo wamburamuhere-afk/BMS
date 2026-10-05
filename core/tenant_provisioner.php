@@ -409,13 +409,14 @@ if (!function_exists('provisionTenant')) {
 
         // ── 2. Reserve the registry row to obtain the tenant id ──────────────
         // Placeholder db_name/username; filled in at step 8 once real.
-        // trial_ends_at defaults to NOW() + 14 days; caller may override.
-        $trialEndsAt = null;
-        if (!empty($opts['trial_ends_at'])) {
-            $trialEndsAt = $opts['trial_ends_at'];
-        } else {
-            $trialEndsAt = date('Y-m-d H:i:s', strtotime('+14 days'));
-        }
+        // Trial length. Was hard-coded '+14 days' here, so changing how long a
+        // trial runs meant a deploy; it is now a platform setting the operator
+        // edits in the panel. An explicit trial_ends_at from the caller still
+        // wins, which is how the New Company form offers a custom date.
+        require_once __DIR__ . '/tenant_lifecycle_policy.php';
+        $trialEndsAt = !empty($opts['trial_ends_at'])
+            ? $opts['trial_ends_at']
+            : date('Y-m-d H:i:s', strtotime('+' . tenantDefaultTrialDays() . ' days'));
         $ownerFirstName = trim((string)($opts['owner_first_name'] ?? ''));
         $ownerLastName  = trim((string)($opts['owner_last_name']  ?? ''));
         $ownerPhone     = trim((string)($opts['owner_phone']      ?? ''));
@@ -533,6 +534,20 @@ if (!function_exists('provisionTenant')) {
                 throw new RuntimeException("Schema looks incomplete — only {$tableCount} objects created.");
             }
 
+            // Account-recovery schema. A new tenant is built from
+            // schema/tenant_schema_template.sql — a dump that predates these
+            // tables — so without this call a company created today would be
+            // the only one on the platform unable to reset a password, until
+            // the next deploy's tenant migration happened to reach it. Ensuring
+            // it here instead of regenerating the template keeps one definition
+            // (core/account_recovery_schema.php) authoritative for both paths.
+            // Run BEFORE the owner row exists so the UNIQUE username index is
+            // in place from the very first account.
+            require_once __DIR__ . '/account_recovery_schema.php';
+            accountRecoveryEnsureSchema($tpdo);
+            $step('ensure_recovery_schema', 'ok');
+            logProvisioningStep($tenantId, $subdomain, 'ensure_recovery_schema', 'ok');
+
             // ── 7. The owner's account ───────────────────────────────────────
             // Look the Admin role up by name rather than hardcoding id 1: the
             // seed file's ids are whatever the source database happened to use.
@@ -544,18 +559,54 @@ if (!function_exists('provisionTenant')) {
                 throw new RuntimeException('No roles were seeded — the owner would have no permissions.');
             }
 
+            // The owner's REAL contact details, kept apart from their login name.
+            //
+            // $ownerEmail is this function's third argument, and it is the
+            // account's USERNAME — but it is not always an email: the public
+            // signup path (core/tenant_registration.php) passes the phone
+            // number there, while the superadmin panel passes an address. This
+            // used to write `email = ''` for everyone, which left account
+            // recovery with nowhere to send a reset and locked out any admin
+            // who forgot their password. Sort the value by what it actually is,
+            // and fall back to the caller's explicit owner_contact_email.
+            //
+            // owner_contact_email is deliberately its own option and NOT
+            // $opts['email'] — that one is the COMPANY profile address
+            // (seedTenantCompanyProfile), which on an operator-created tenant is
+            // routinely a different person, e.g. the company's accountant.
+            // Sending password resets there would hand over account recovery.
+            $isEmailLogin  = (bool)filter_var($ownerEmail, FILTER_VALIDATE_EMAIL);
+            $contactEmail  = trim((string)($opts['owner_contact_email'] ?? ''));
+            $ownerUserMail = $isEmailLogin
+                ? $ownerEmail
+                : (filter_var($contactEmail, FILTER_VALIDATE_EMAIL) ? $contactEmail : '');
+            $ownerUserPhone = $ownerPhone !== ''
+                ? $ownerPhone
+                : (preg_match('/^\+?[0-9]{7,15}$/', $ownerEmail) ? $ownerEmail : '');
+
+            // When the OPERATOR typed this password, somebody outside the
+            // company knows how to sign in as its administrator until the owner
+            // replaces it. Flag the account so roots.php lets them reach
+            // nothing but change-password.php on first sign-in. Self-registration
+            // passes false: that owner chose their own password already, and
+            // making them change it immediately would be noise.
+            $forceChange = !empty($opts['force_password_change']) ? 1 : 0;
+
             $tpdo->prepare("
-                INSERT INTO users (username, password, email, role, user_role, is_admin,
-                                   role_id, is_active, first_name, last_name, password_changed_at)
-                VALUES (?,?,?,?,?,1,?,1,?,?,NOW())
+                INSERT INTO users (username, password, email, phone, role, user_role, is_admin,
+                                   role_id, is_active, first_name, last_name, password_changed_at,
+                                   must_change_password)
+                VALUES (?,?,?,?,?,?,1,?,1,?,?,NOW(),?)
             ")->execute([
                 $ownerEmail,
                 password_hash($ownerPassword, PASSWORD_DEFAULT),
-                '',
+                $ownerUserMail,
+                $ownerUserPhone,
                 'Admin', 'Admin',
                 (int)$roleId,
                 trim((string)($opts['owner_first_name'] ?? '')) ?: $companyName,
                 trim((string)($opts['owner_last_name'] ?? '')) ?: 'Owner',
+                $forceChange,
             ]);
             $step('create_owner_user', 'ok', $ownerEmail);
             logProvisioningStep($tenantId, $subdomain, 'create_owner_user', 'ok', $ownerEmail);

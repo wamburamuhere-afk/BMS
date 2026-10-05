@@ -179,8 +179,9 @@ $baseDom = tenantBaseDomain();
         </div>
 
         <div class="mb-3">
-            <label for="owner_email" class="form-label">Email address <span class="text-muted">(optional)</span></label>
-            <input type="email" class="form-control" id="owner_email" name="owner_email" maxlength="191" placeholder="e.g. info@yourcompany.com">
+            <label for="owner_email" class="form-label">Email address <span class="text-danger">*</span></label>
+            <input type="email" class="form-control" id="owner_email" name="owner_email" maxlength="191" required placeholder="e.g. info@yourcompany.com">
+            <div class="form-text">Used to reset your password if you forget it — without it we cannot get you back in.</div>
         </div>
 
         <div class="row g-2 mb-3">
