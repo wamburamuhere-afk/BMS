@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-05 — fix(documents): add missing require_once for document_access.php — hotfix for Sentry fatal error
+
+**Files:** `api/get_documents.php`, `api/document/get_documents.php`
+Both API endpoints called `canSeeAllDocuments()` (defined in `core/document_access.php`) but
+never included that file. `roots.php` does not auto-include it, so every request produced
+`Call to undefined function canSeeAllDocuments()` — confirmed via Sentry production alert.
+Fix: added `require_once __DIR__ . '/../core/document_access.php'` to both files.
+
+---
+
 ## 2026-10-05 — fix(documents): correct visibility policy — managers see all, others see public+own+assigned
 
 Non-admins were seeing 0 documents for two reasons: (1) `canView('documents')` was the gate but only two roles had that key; (2) management roles (Director, CFO, Credit Manager) who do have `document_library` view permission still got the same filtered view as Staff, rather than seeing everything.
