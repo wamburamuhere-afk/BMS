@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-05 — feat(pwa): hide the desktop app title bar (window controls overlay)
+
+**Files:** `manifest.json`, `header.php`, `login.php`
+On desktop, the installed app showed a Windows/Chrome title bar with the Smart BMS icon and "Smart BMS — Business Management System - Business Management System". Now:
+- `manifest.json` — `display_override: ["window-controls-overlay"]` removes that title bar in the installed desktop app (Chrome/Edge), so the company's own header sits at the top; `name` shortened to "Smart BMS" so the text is not doubled if a user switches the title bar back on.
+- `header.php` — rules that apply **only** in that mode: the top branding bar is draggable (to move the window), the date/location keep clear of the minimise/maximise/close buttons, and those buttons are tinted to the header blue. Company name, logo, colours and layout are unchanged; browser tabs and phones are unaffected.
+- `login.php` — invisible drag strip at the top in that mode so the window can still be moved from the login screen.
+
+---
+
 ## 2026-10-05 — fix(pwa): keep browser address bar / tabs white (theme-color)
 
 **Files:** `header.php`, `login.php`, `offline.html`, `manifest.json`

@@ -213,7 +213,27 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 navigator.serviceWorker.register('<?= getUrl('sw.js') ?>').catch(function () {});
             });
         }
+        // Installed desktop app without a title bar: tint the window buttons to the header blue.
+        (function () {
+            if (!window.matchMedia) return;
+            var mq = window.matchMedia('(display-mode: window-controls-overlay)');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            function sync() { meta.setAttribute('content', mq.matches ? '#0b5ed7' : '#ffffff'); }
+            sync();
+            if (mq.addEventListener) mq.addEventListener('change', sync);
+        })();
     </script>
+    <style>
+        @media (display-mode: window-controls-overlay) {
+            .top-header {
+                app-region: drag;
+                -webkit-app-region: drag;
+                padding-left: env(titlebar-area-x, 0);
+                padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+            }
+            .top-header a, .top-header button { app-region: no-drag; -webkit-app-region: no-drag; }
+        }
+    </style>
 
     <!-- Open the DNS + TCP + TLS connection to each CDN in parallel, immediately.
          Every page pulls scripts, stylesheets and webfonts from these four hosts,
