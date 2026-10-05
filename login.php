@@ -144,7 +144,7 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
     <title><?= htmlspecialchars($tr['page_title']) ?></title>
 
     <link rel="manifest" href="<?= getUrl('manifest.json') ?>">
-    <meta name="theme-color" content="#0d6efd">
+    <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Smart BMS">
