@@ -533,6 +533,20 @@ if (!function_exists('provisionTenant')) {
                 throw new RuntimeException("Schema looks incomplete — only {$tableCount} objects created.");
             }
 
+            // Account-recovery schema. A new tenant is built from
+            // schema/tenant_schema_template.sql — a dump that predates these
+            // tables — so without this call a company created today would be
+            // the only one on the platform unable to reset a password, until
+            // the next deploy's tenant migration happened to reach it. Ensuring
+            // it here instead of regenerating the template keeps one definition
+            // (core/account_recovery_schema.php) authoritative for both paths.
+            // Run BEFORE the owner row exists so the UNIQUE username index is
+            // in place from the very first account.
+            require_once __DIR__ . '/account_recovery_schema.php';
+            accountRecoveryEnsureSchema($tpdo);
+            $step('ensure_recovery_schema', 'ok');
+            logProvisioningStep($tenantId, $subdomain, 'ensure_recovery_schema', 'ok');
+
             // ── 7. The owner's account ───────────────────────────────────────
             // Look the Admin role up by name rather than hardcoding id 1: the
             // seed file's ids are whatever the source database happened to use.
@@ -544,14 +558,40 @@ if (!function_exists('provisionTenant')) {
                 throw new RuntimeException('No roles were seeded — the owner would have no permissions.');
             }
 
+            // The owner's REAL contact details, kept apart from their login name.
+            //
+            // $ownerEmail is this function's third argument, and it is the
+            // account's USERNAME — but it is not always an email: the public
+            // signup path (core/tenant_registration.php) passes the phone
+            // number there, while the superadmin panel passes an address. This
+            // used to write `email = ''` for everyone, which left account
+            // recovery with nowhere to send a reset and locked out any admin
+            // who forgot their password. Sort the value by what it actually is,
+            // and fall back to the caller's explicit owner_contact_email.
+            //
+            // owner_contact_email is deliberately its own option and NOT
+            // $opts['email'] — that one is the COMPANY profile address
+            // (seedTenantCompanyProfile), which on an operator-created tenant is
+            // routinely a different person, e.g. the company's accountant.
+            // Sending password resets there would hand over account recovery.
+            $isEmailLogin  = (bool)filter_var($ownerEmail, FILTER_VALIDATE_EMAIL);
+            $contactEmail  = trim((string)($opts['owner_contact_email'] ?? ''));
+            $ownerUserMail = $isEmailLogin
+                ? $ownerEmail
+                : (filter_var($contactEmail, FILTER_VALIDATE_EMAIL) ? $contactEmail : '');
+            $ownerUserPhone = $ownerPhone !== ''
+                ? $ownerPhone
+                : (preg_match('/^\+?[0-9]{7,15}$/', $ownerEmail) ? $ownerEmail : '');
+
             $tpdo->prepare("
-                INSERT INTO users (username, password, email, role, user_role, is_admin,
+                INSERT INTO users (username, password, email, phone, role, user_role, is_admin,
                                    role_id, is_active, first_name, last_name, password_changed_at)
-                VALUES (?,?,?,?,?,1,?,1,?,?,NOW())
+                VALUES (?,?,?,?,?,?,1,?,1,?,?,NOW())
             ")->execute([
                 $ownerEmail,
                 password_hash($ownerPassword, PASSWORD_DEFAULT),
-                '',
+                $ownerUserMail,
+                $ownerUserPhone,
                 'Admin', 'Admin',
                 (int)$roleId,
                 trim((string)($opts['owner_first_name'] ?? '')) ?: $companyName,

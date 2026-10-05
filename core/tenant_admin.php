@@ -703,6 +703,10 @@ if (!function_exists('createTenantAsOperator')) {
             'owner_first_name' => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'  => trim((string)($in['owner_last_name'] ?? '')),
             'owner_phone'      => trim((string)($in['owner_phone']      ?? '')),
+            // The owner's own address, for password recovery. Distinct from the
+            // 'email' option further down, which is the COMPANY profile address
+            // and is often a different person entirely.
+            'owner_contact_email' => $email,
             'country'          => trim((string)($in['country']          ?? '')),
             'industry'         => trim((string)($in['industry']         ?? '')),
             'company_size'     => trim((string)($in['company_size']     ?? '')),
