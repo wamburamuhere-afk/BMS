@@ -43,6 +43,9 @@ if (!defined('RECOVERY_TOKEN_TTL_MIN'))      define('RECOVERY_TOKEN_TTL_MIN', 30
 if (!defined('RECOVERY_MAX_PER_IDENTIFIER')) define('RECOVERY_MAX_PER_IDENTIFIER', 3);
 if (!defined('RECOVERY_MAX_PER_IP'))         define('RECOVERY_MAX_PER_IP', 10);
 if (!defined('RECOVERY_WINDOW_MIN'))         define('RECOVERY_WINDOW_MIN', 60);
+if (!defined('RECOVERY_OTP_TTL_MIN'))        define('RECOVERY_OTP_TTL_MIN', 60);
+if (!defined('RECOVERY_CODE_LENGTH'))        define('RECOVERY_CODE_LENGTH', 10);
+if (!defined('RECOVERY_CODE_ALPHABET'))      define('RECOVERY_CODE_ALPHABET', 'A-HJ-NP-Z2-9');
 
 if (!function_exists('recoveryClientIp')) {
     function recoveryClientIp(): string
@@ -180,6 +183,60 @@ if (!function_exists('recoveryFindAdminByEmail')) {
     }
 }
 
+if (!function_exists('recoveryNormalizeToken')) {
+    /**
+     * Accept either credential format and return its canonical form, or null.
+     *
+     * TWO FORMATS, ONE TABLE. A self-service reset travels as a 64-hex token
+     * inside a link nobody ever reads. An operator-issued OTP has to survive
+     * being read down a phone line and typed by hand, so it is 10 characters
+     * from an alphabet with no O/0 and no I/1 to confuse. Both are hashed into
+     * the same token_hash column, so single-use, expiry and the claim-then-act
+     * race guard are written once and cannot drift between the two flows.
+     *
+     * Normalising before hashing is what lets the owner type "k7m2 9qx4pl" or
+     * "K7M2-9QX4-PL" and still match. The link in the OTP email carries the
+     * very same value, so one credential works both ways.
+     */
+    function recoveryNormalizeToken(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if (preg_match('/^[a-f0-9]{64}$/', $raw)) return $raw;
+
+        $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $raw) ?? '');
+        if (preg_match('/^[' . RECOVERY_CODE_ALPHABET . ']{' . RECOVERY_CODE_LENGTH . '}$/', $code)) {
+            return $code;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('recoveryGenerateCode')) {
+    /**
+     * A typeable one-time code. 10 characters from a 32-symbol alphabet is
+     * about 2^50 — far beyond guessing for a credential that lives one hour,
+     * works once, and sits behind the same per-account and per-IP throttle as
+     * everything else here.
+     */
+    function recoveryGenerateCode(): string
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no O/0, no I/1
+        $out = '';
+        for ($i = 0; $i < RECOVERY_CODE_LENGTH; $i++) {
+            $out .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('recoveryFormatCode')) {
+    /** Group a code for reading aloud: K7M29QX4PL → K7M2-9QX4-PL */
+    function recoveryFormatCode(string $code): string
+    {
+        return trim(implode('-', str_split($code, 4)), '-');
+    }
+}
+
 if (!function_exists('recoveryIssueToken')) {
     /**
      * Mint a single-use token for one account and return the RAW value.
@@ -198,9 +255,12 @@ if (!function_exists('recoveryIssueToken')) {
         string $kind = 'self_service',
         ?int $issuedBy = null,
         string $channel = 'email',
-        ?int $ttlMinutes = null
+        ?int $ttlMinutes = null,
+        string $format = 'link'
     ): string {
-        $raw  = bin2hex(random_bytes(32));
+        // 'link' → 64-hex, never read by a human. 'code' → typeable, for an
+        // OTP an operator may have to read down the phone.
+        $raw  = $format === 'code' ? recoveryGenerateCode() : bin2hex(random_bytes(32));
         $hash = hash('sha256', $raw);
         $ttl  = max(5, (int)($ttlMinutes ?? RECOVERY_TOKEN_TTL_MIN));
         $now  = recoveryNow();
@@ -235,8 +295,8 @@ if (!function_exists('recoveryVerifyToken')) {
      */
     function recoveryVerifyToken(PDO $pdo, string $rawToken): ?array
     {
-        $rawToken = trim($rawToken);
-        if (!preg_match('/^[a-f0-9]{64}$/', $rawToken)) return null;
+        $rawToken = recoveryNormalizeToken($rawToken);
+        if ($rawToken === null) return null;
 
         try {
             $st = $pdo->prepare("

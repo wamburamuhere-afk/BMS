@@ -707,6 +707,9 @@ if (!function_exists('createTenantAsOperator')) {
             // 'email' option further down, which is the COMPANY profile address
             // and is often a different person entirely.
             'owner_contact_email' => $email,
+            // The operator just typed this owner's password, so they know it.
+            // The owner is made to replace it before they can use anything.
+            'force_password_change' => true,
             'country'          => trim((string)($in['country']          ?? '')),
             'industry'         => trim((string)($in['industry']         ?? '')),
             'company_size'     => trim((string)($in['company_size']     ?? '')),

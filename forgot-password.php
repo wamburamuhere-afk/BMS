@@ -72,6 +72,10 @@ $T = [
         'go_login'      => 'Ingia sasa',
         'csrf'          => 'Muda wa fomu umeisha. Tafadhali jaribu tena.',
         'no_email'      => 'Tafadhali andika barua pepe yako.',
+        'have_code'     => 'Una msimbo kutoka kwa mtoa huduma?',
+        'code_ph'       => 'Mfano: K7M2-9QX4-PL',
+        'use_code'      => 'Tumia msimbo',
+        'bad_code'      => 'Msimbo huo hautumiki. Angalia umeuandika sawa, au omba mpya kwa mtoa huduma.',
         'admin_only'    => 'Njia hii ni kwa wasimamizi pekee. Kama wewe ni mfanyakazi, muulize msimamizi wa kampuni yako akubadilishie nenosiri.',
     ],
     'en' => [
@@ -99,6 +103,10 @@ $T = [
         'go_login'      => 'Sign in now',
         'csrf'          => 'This form expired. Please try again.',
         'no_email'      => 'Please enter your email address.',
+        'have_code'     => 'Have a code from your provider?',
+        'code_ph'       => 'e.g. K7M2-9QX4-PL',
+        'use_code'      => 'Use code',
+        'bad_code'      => 'That code is not valid. Check it was typed correctly, or ask your provider for a new one.',
         'admin_only'    => 'This route is for administrators. If you are a staff member, ask your company administrator to set a new password for you.',
     ],
 ];
@@ -143,6 +151,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $screen = 'reset';
                 $notice = ['type' => 'danger', 'text' => $r['error']];
+            }
+        } elseif ($action === 'use_code') {
+            // The OTP email carries a clickable link AND the code in print, so
+            // an owner reading it on a phone and working on a laptop can type
+            // it instead. Same credential either way; the page only has to
+            // move it from a form field into the reset screen.
+            $typed = (string)($_POST['code'] ?? '');
+            if (recoveryVerifyToken($pdo, $typed) !== null) {
+                $token  = recoveryNormalizeToken($typed) ?? '';
+                $screen = 'reset';
+            } else {
+                $screen = 'request';
+                $notice = ['type' => 'danger', 'text' => $tr['bad_code']];
             }
         } elseif ($action === 'request_reset' || $action === 'request_username') {
             $email = trim((string)($_POST['email'] ?? ''));
@@ -286,6 +307,25 @@ if ($screen === 'reset' && $_SERVER['REQUEST_METHOD'] !== 'POST' && recoveryVeri
                 <button type="submit" name="action" value="request_username" class="btn btn-outline-secondary w-100">
                     <i class="fas fa-id-badge me-1"></i> <?= htmlspecialchars($tr['send_username']) ?>
                 </button>
+            </form>
+
+            <hr class="my-4">
+
+            <form method="post" action="">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+                <input type="hidden" name="action" value="use_code">
+                <label for="code" class="form-label" style="font-size:.9rem;">
+                    <i class="fas fa-hashtag me-1 text-muted"></i><?= htmlspecialchars($tr['have_code']) ?>
+                </label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="code" name="code"
+                           maxlength="20" autocomplete="one-time-code" spellcheck="false"
+                           style="text-transform:uppercase;letter-spacing:1px;"
+                           placeholder="<?= htmlspecialchars($tr['code_ph']) ?>">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <?= htmlspecialchars($tr['use_code']) ?>
+                    </button>
+                </div>
             </form>
 
             <p class="text-muted mt-3 mb-0" style="font-size:.78rem;">

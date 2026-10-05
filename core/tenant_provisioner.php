@@ -583,10 +583,19 @@ if (!function_exists('provisionTenant')) {
                 ? $ownerPhone
                 : (preg_match('/^\+?[0-9]{7,15}$/', $ownerEmail) ? $ownerEmail : '');
 
+            // When the OPERATOR typed this password, somebody outside the
+            // company knows how to sign in as its administrator until the owner
+            // replaces it. Flag the account so roots.php lets them reach
+            // nothing but change-password.php on first sign-in. Self-registration
+            // passes false: that owner chose their own password already, and
+            // making them change it immediately would be noise.
+            $forceChange = !empty($opts['force_password_change']) ? 1 : 0;
+
             $tpdo->prepare("
                 INSERT INTO users (username, password, email, phone, role, user_role, is_admin,
-                                   role_id, is_active, first_name, last_name, password_changed_at)
-                VALUES (?,?,?,?,?,?,1,?,1,?,?,NOW())
+                                   role_id, is_active, first_name, last_name, password_changed_at,
+                                   must_change_password)
+                VALUES (?,?,?,?,?,?,1,?,1,?,?,NOW(),?)
             ")->execute([
                 $ownerEmail,
                 password_hash($ownerPassword, PASSWORD_DEFAULT),
@@ -596,6 +605,7 @@ if (!function_exists('provisionTenant')) {
                 (int)$roleId,
                 trim((string)($opts['owner_first_name'] ?? '')) ?: $companyName,
                 trim((string)($opts['owner_last_name'] ?? '')) ?: 'Owner',
+                $forceChange,
             ]);
             $step('create_owner_user', 'ok', $ownerEmail);
             logProvisioningStep($tenantId, $subdomain, 'create_owner_user', 'ok', $ownerEmail);

@@ -81,6 +81,15 @@ if (isSuperadminLoggedIn()) {
             <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
         </button>
     </form>
+
+    <!-- Until this existed, an operator who forgot this password — or who
+         tripped the 5-attempt lockout below — could only get back in through
+         scripts/create_superadmin.php or raw SQL over SSH. -->
+    <div class="text-center mt-3">
+        <a href="<?= saUrl('forgot') ?>" class="text-decoration-none" style="font-size:.85rem;">
+            Forgot your password?
+        </a>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>

@@ -131,6 +131,33 @@ if (function_exists('bmsEnforceSessionLifecycle')) {
     bmsEnforceSessionLifecycle($pdo);
 }
 
+// 1b. Forced password change. createTenantAsOperator() lets a platform operator
+//     choose the first password for a new company's administrator, so until the
+//     owner replaces it somebody outside the company can sign in as its admin.
+//     The flag is set at provisioning and cleared by change-password.php; while
+//     it is set, that page and signing out are the only things this session may
+//     do. Guarded on $_SESSION['user_id'], which a superadmin session never
+//     sets, so the platform panel is untouched. Fails silently like its
+//     neighbours — a missing column on an un-migrated tenant must not lock
+//     anybody out of their own system.
+if (!empty($_SESSION['user_id'])) {
+    try {
+        $__fp = $pdo->prepare("SELECT COALESCE(must_change_password, 0) FROM users WHERE user_id = ?");
+        $__fp->execute([(int)$_SESSION['user_id']]);
+        if ((int)$__fp->fetchColumn() === 1) {
+            $__path = strtolower(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
+            $__open = (strpos($__path, 'change-password') !== false)
+                   || (strpos($__path, 'logout') !== false);
+            if (!$__open) {
+                header('Location: ' . (function_exists('getUrl') ? getUrl('change-password') : '/change-password'));
+                exit;
+            }
+        }
+    } catch (Throwable $__e) {
+        // Column absent (tenant not migrated yet) — nothing to enforce.
+    }
+}
+
 // 2. Heartbeat — bump last_seen_at (throttled to 60s server-side inside the
 //    function itself) so an idle timeout has a real last-active moment.
 if (function_exists('touchUserSession') && !empty($_SESSION['session_row_id'])) {
@@ -183,6 +210,10 @@ $routes = [
     // to the .php form since long before this page existed.
     'forgot-password' => ROOT_DIR . '/forgot-password.php',
     'forgot_password' => ROOT_DIR . '/forgot-password.php',
+    // Signed in, but holding a password their provider chose for them — the
+    // only page they may reach until they replace it.
+    'change-password' => ROOT_DIR . '/change-password.php',
+    'change_password' => ROOT_DIR . '/change-password.php',
     // Public, unauthenticated — reached only via the single-use signing
     // token emailed by api/document/request_external_signature.php.
     'sign-document'  => ROOT_DIR . '/sign_document.php',

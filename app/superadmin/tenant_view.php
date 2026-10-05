@@ -818,7 +818,7 @@ if ($hasContext ?? false):
                     <div id="usersEmpty" class="text-muted small">Not loaded yet.</div>
                     <div id="usersTableWrap" class="table-responsive d-none">
                         <table class="table table-sm align-middle mb-0">
-                            <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last login</th></tr></thead>
+                            <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last login</th><th class="text-end">Actions</th></tr></thead>
                             <tbody id="usersTableBody"></tbody>
                         </table>
                     </div>
@@ -1640,6 +1640,7 @@ function loadUsers() {
                     + '<td>' + safeOutput(u.role) + '</td>'
                     + '<td>' + statusBadge + '</td>'
                     + '<td>' + (u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>') + '</td>'
+                    + '<td class="text-end">' + userActions(u) + '</td>'
                     + '</tr>';
             });
             $('#usersTableBody').html(rows);
@@ -1654,6 +1655,120 @@ function loadUsers() {
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     }).always(function () {
         btn.prop('disabled', false).html(orig);
+    });
+}
+
+// ── Account recovery for one tenant user (§UI-5 gear dropdown) ──────────────
+// There is deliberately no "set password" and no "sign in as" here. The owner
+// always chooses their own password through their own forgot-password page;
+// the operator's part is to get a one-time code to the right inbox. See
+// core/tenant_account_recovery.php.
+function userActions(u) {
+    let items = '';
+
+    if (u.is_admin && u.is_active) {
+        items += u.has_recovery_email
+            ? `<li><button class="dropdown-item py-2 rounded" onclick="userIssueOtp(${u.user_id}, '${jsAttr(u.username)}', '${jsAttr(u.email)}')"><i class="bi bi-key text-primary me-2"></i> Send one-time code</button></li>`
+            : `<li><button class="dropdown-item py-2 rounded text-muted" disabled title="No email on file to send it to"><i class="bi bi-key me-2"></i> Send one-time code</button></li>`;
+    }
+    items += `<li><button class="dropdown-item py-2 rounded" onclick="userSetEmail(${u.user_id}, '${jsAttr(u.username)}', '${jsAttr(u.email)}')"><i class="bi bi-envelope text-primary me-2"></i> ${u.email ? 'Change' : 'Set'} recovery email</button></li>`;
+    items += `<li><button class="dropdown-item py-2 rounded" onclick="userSetUsername(${u.user_id}, '${jsAttr(u.username)}')"><i class="bi bi-person-badge text-primary me-2"></i> Change username</button></li>`;
+    if (!u.is_active) {
+        items += `<li><hr class="dropdown-divider"></li>`;
+        items += `<li><button class="dropdown-item py-2 rounded" onclick="userReactivate(${u.user_id}, '${jsAttr(u.username)}')"><i class="bi bi-check-circle text-primary me-2"></i> Re-enable account</button></li>`;
+    }
+
+    return `<div class="dropdown d-flex justify-content-end">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-gear-fill me-1"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
+    </div>`;
+}
+
+// Escape for a value going inside a single-quoted JS string in an onclick
+// attribute — safeOutput() escapes for HTML text, which is not the same job.
+function jsAttr(v) {
+    return String(v == null ? '' : v)
+        .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;').replace(/</g, '\\x3C');
+}
+
+function userAction(payload, successTitle, successText) {
+    Swal.fire({ title: 'Working...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    $.ajax({
+        url: '/actions/superadmin_tenant_user_action.php',
+        method: 'POST', dataType: 'json',
+        data: Object.assign({ _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }, payload)
+    }).done(function (res) {
+        if (res && res.success) {
+            loadUsers();   // reflect the change before the dialog, per §UI-4
+            Swal.fire({ icon: 'success', title: successTitle, text: successText || res.message });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Not done', text: (res && res.message) || 'Something went wrong.' });
+        }
+    }).fail(function (xhr) {
+        let msg = 'Something went wrong.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Not done', text: msg });
+    });
+}
+
+function userIssueOtp(userId, username, email) {
+    Swal.fire({
+        title: 'Send a one-time code?',
+        html: 'A code will be emailed to <strong>' + safeOutput(email) + '</strong> for <strong>'
+            + safeOutput(username) + '</strong>.<br><br>'
+            + '<span style="font-size:.85rem;color:#6c757d;">They choose their own new password — '
+            + 'you will never see the code or the password. Verify who you are speaking to before sending.</span>',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Send code'
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'issue_otp', user_id: userId }, 'Code sent');
+    });
+}
+
+function userSetEmail(userId, username, current) {
+    Swal.fire({
+        title: 'Recovery email',
+        html: 'Password resets for <strong>' + safeOutput(username) + '</strong> will go to this address.'
+            + '<br><br><span style="font-size:.85rem;color:#b02a37;">Whoever controls it can take over the '
+            + 'account. Verify the caller\'s identity first — the old address is told that it changed.</span>',
+        input: 'email',
+        inputValue: current || '',
+        inputPlaceholder: 'name@example.com',
+        showCancelButton: true,
+        confirmButtonText: 'Save address',
+        inputValidator: v => (!v || !/^\S+@\S+\.\S+$/.test(v)) ? 'Enter a valid email address' : undefined
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'set_email', user_id: userId, email: r.value }, 'Address updated');
+    });
+}
+
+function userSetUsername(userId, current) {
+    Swal.fire({
+        title: 'Change username',
+        html: 'This is the name they type to sign in.',
+        input: 'text',
+        inputValue: current || '',
+        showCancelButton: true,
+        confirmButtonText: 'Save username',
+        inputValidator: v => (!v || v.trim().length < 3) ? 'At least 3 characters' : undefined
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'set_username', user_id: userId, username: r.value.trim() }, 'Username updated');
+    });
+}
+
+function userReactivate(userId, username) {
+    Swal.fire({
+        title: 'Re-enable this account?',
+        html: '<strong>' + safeOutput(username) + '</strong> will be able to sign in again.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Re-enable'
+    }).then(r => {
+        if (r.isConfirmed) userAction({ action: 'reactivate', user_id: userId }, 'Account re-enabled');
     });
 }
 

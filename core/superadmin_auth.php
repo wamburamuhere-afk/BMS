@@ -340,6 +340,10 @@ if (!function_exists('superadminRouteMap')) {
             'profile'      => $d . 'profile.php',
             'login'        => $d . 'login.php',
             'logout'       => $d . 'logout.php',
+            // Public, unauthenticated — an operator who forgot their password
+            // or tripped their own lockout. Before this, the only way back was
+            // scripts/create_superadmin.php or raw SQL over SSH.
+            'forgot'       => $d . 'forgot.php',
         ];
     }
 }

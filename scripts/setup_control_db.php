@@ -153,6 +153,46 @@ try {
     ");
     say('  · table superadmins ready');
 
+    // Break-glass for the platform operator themselves.
+    //
+    // Until this existed, an operator who forgot their password — or who
+    // tripped their own 5-attempt lockout — had exactly one way back:
+    // scripts/create_superadmin.php or raw SQL, over SSH. That is not a
+    // recovery path, it is an outage with a shell prompt.
+    //
+    // Same shape as the tenant-side password_resets: SHA-256 of the token so a
+    // leaked dump is worthless, UNIQUE so single-use is enforceable, short
+    // expiry, and an attempt ledger because throttling cannot live in a
+    // session belonging to someone who is not signed in.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`superadmin_password_resets` (
+            `reset_id`      INT AUTO_INCREMENT PRIMARY KEY,
+            `superadmin_id` INT          NOT NULL,
+            `token_hash`    CHAR(64)     NOT NULL,
+            `destination`   VARCHAR(191) NOT NULL DEFAULT '',
+            `expires_at`    DATETIME     NOT NULL,
+            `used_at`       DATETIME     NULL,
+            `request_ip`    VARCHAR(45)  NOT NULL DEFAULT '',
+            `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `uq_sapr_token` (`token_hash`),
+            KEY `idx_sapr_owner` (`superadmin_id`, `created_at`),
+            KEY `idx_sapr_expires` (`expires_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table superadmin_password_resets ready');
+
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`superadmin_reset_attempts` (
+            `attempt_id` INT AUTO_INCREMENT PRIMARY KEY,
+            `identifier` VARCHAR(191) NOT NULL DEFAULT '',
+            `request_ip` VARCHAR(45)  NOT NULL DEFAULT '',
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_sara_identifier` (`identifier`, `created_at`),
+            KEY `idx_sara_ip` (`request_ip`, `created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table superadmin_reset_attempts ready');
+
     // tenant_id is NULLable with NO foreign key on purpose: provisioning logs
     // steps before the tenants row exists, and its rollback deletes that row
     // while the record of WHY it failed has to survive.
