@@ -92,8 +92,13 @@ has($createSrc, "expiry_date", 'Expiry Date field present in the simple branch')
 has($createSrc, "<?php if (\$simpleProductForm): ?>", 'the simple branch is a real PHP conditional, not just hidden by CSS');
 
 $footerSrc = src($root, 'app/bms/product/product_create_footer.php');
-has($footerSrc, "#simple_shop_id", 'footer JS wires the Simple POS shop picker into initial_stock_data');
-has($footerSrc, "#simple_opening_stock", 'footer JS wires the Simple POS opening-stock field');
+has($createSrc, 'name="initial_stock[<?= (int)$warehouse[\'warehouse_id\'] ?>]"', 'Simple POS: one Opening Stock input per shop');
+(strpos($createSrc, 'simple_shop_id') === false) ? pass('old single Shop dropdown is gone') : fail('single Shop dropdown still present');
+has($footerSrc, '[name^="initial_stock"]', 'footer JS collects every per-shop quantity into initial_stock_data');
+(strpos($footerSrc, '#simple_shop_id') === false) ? pass('footer no longer reads a single shop') : fail('footer still reads #simple_shop_id');
+foreach (['api/create_product.php', 'api/update_product.php'] as $apiFile) {
+    has(src($root, $apiFile), 'warehousesForSelect($pdo)', "$apiFile checks shop access against the same list the form shows");
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. Rendered HTML — three states, the real page');
@@ -129,6 +134,12 @@ if (!$uid) {
     (strpos($simple, 'id="brand_id"') === false) ? pass('Simple POS render: Advanced Details tab (Brand) absent') : fail('Advanced Details tab still present');
     (strpos($simple, 'id="weight"') === false) ? pass('Simple POS render: Weight/Dimensions absent') : fail('Weight field still present');
     (strpos($simple, 'id="productTabs"') === false) ? pass('Simple POS render: no tab navigation (collapsed to one section)') : fail('Tab navigation still present');
+    $activeShops = (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status='active'")->fetchColumn();
+    $renderedRows = preg_match_all('/name="initial_stock\[\d+\]"/', $simple);
+    ($renderedRows === $activeShops)
+        ? pass("Simple POS render (admin): one Opening Stock input for each of the $activeShops active shops")
+        : fail("expected $activeShops per-shop inputs, rendered $renderedRows");
+    (strpos($simple, 'Select Shop') === false) ? pass('Simple POS render: no "Select Shop" dropdown') : fail('"Select Shop" dropdown still rendered');
 
     // State B: normal mode — fully unchanged.
     _pcs_set_settings($root, '0', '0');
@@ -150,12 +161,12 @@ if (!$uid) {
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Runtime — the real Simple POS payload, end to end');
 
-$wh = $pdo->query("SELECT warehouse_id FROM warehouses WHERE status='active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$shopIds = array_map('intval', $pdo->query("SELECT warehouse_id FROM warehouses WHERE status='active' ORDER BY warehouse_id LIMIT 2")->fetchAll(PDO::FETCH_COLUMN));
 
-if (!$uid || !$wh) {
-    pass('no admin user / warehouse fixture available — section 4 skipped (n/a)');
+if (!$uid || count($shopIds) < 2) {
+    pass('no admin user / two-shop fixture available — section 4 skipped (n/a)');
 } else {
-    $wid = (int)$wh['warehouse_id'];
+    [$wid, $wid2] = $shopIds;
     $uniqueName = 'CLI Simple Create Test ' . time() . '-' . rand(1000, 9999);
 
     // This mirrors EXACTLY what the Simple POS form submits: no sku typed by
@@ -180,7 +191,7 @@ if (!$uid || !$wh) {
             'manufacturing_date' => '2026-02-01',
             'expiry_date'        => '2027-02-01',
             'status'             => 'active',
-            'initial_stock_data' => json_encode([$wid => 25]),
+            'initial_stock_data' => json_encode([$wid => 25, $wid2 => 10]),
         ];
         ob_start();
         include '$root/api/create_product.php';
@@ -208,17 +219,28 @@ if (!$uid || !$wh) {
         ((int)$prod['track_inventory'] === 1) ? pass('track_inventory still defaults to 1 even though the checkbox is not rendered') : fail('track_inventory not defaulting correctly');
         ((int)$prod['is_taxable'] === 0) ? pass('is_taxable defaults to 0 (consistent with no tax configured)') : fail('is_taxable unexpectedly 1 with no tax_id');
 
-        $batch = $pdo->prepare("SELECT * FROM product_batches WHERE product_id = ?");
+        $batch = $pdo->prepare("SELECT warehouse_id, quantity_received, manufacturing_date, expiry_date FROM product_batches WHERE product_id = ?");
         $batch->execute([$pid]);
-        $b = $batch->fetch(PDO::FETCH_ASSOC);
-        if (!$b) {
-            fail('no product_batches row created for the opening stock');
+        $byShop = [];
+        foreach ($batch->fetchAll(PDO::FETCH_ASSOC) as $row) $byShop[(int)$row['warehouse_id']] = $row;
+        if (count($byShop) !== 2) {
+            fail('expected one opening-stock batch per shop (2), got ' . count($byShop));
         } else {
-            pass('a real batch was created for the opening stock (same Phase 1 wiring)');
-            ($b['manufacturing_date'] === '2026-02-01') ? pass('manufacturing_date flowed through to the batch') : fail('manufacturing_date mismatch: ' . var_export($b['manufacturing_date'], true));
-            ($b['expiry_date'] === '2027-02-01') ? pass('expiry_date flowed through to the batch') : fail('expiry_date mismatch: ' . var_export($b['expiry_date'], true));
-            ((float)$b['quantity_received'] === 25.0) ? pass('opening stock quantity correct') : fail('quantity mismatch: ' . $b['quantity_received']);
+            pass('one real batch created for EACH shop that was given opening stock');
+            ((float)$byShop[$wid]['quantity_received'] === 25.0) ? pass('shop 1 opening stock = 25') : fail('shop 1 quantity mismatch: ' . $byShop[$wid]['quantity_received']);
+            ((float)$byShop[$wid2]['quantity_received'] === 10.0) ? pass('shop 2 opening stock = 10') : fail('shop 2 quantity mismatch: ' . $byShop[$wid2]['quantity_received']);
+            foreach ($byShop as $b) {
+                ($b['manufacturing_date'] === '2026-02-01' && $b['expiry_date'] === '2027-02-01')
+                    ? pass("mfg/expiry dates flowed through to shop {$b['warehouse_id']}'s batch")
+                    : fail("dates mismatch on shop {$b['warehouse_id']}: " . json_encode($b));
+            }
         }
+        $stk = $pdo->prepare("SELECT warehouse_id, stock_quantity FROM product_stocks WHERE product_id = ?");
+        $stk->execute([$pid]);
+        $stockByShop = array_map('floatval', $stk->fetchAll(PDO::FETCH_KEY_PAIR));
+        (($stockByShop[$wid] ?? 0) == 25 && ($stockByShop[$wid2] ?? 0) == 10)
+            ? pass('product_stocks shows 25 in shop 1 and 10 in shop 2')
+            : fail('product_stocks per shop wrong: ' . json_encode($stockByShop));
 
         // Cleanup — GL entry first (needs the movement id before that row is gone)
         $mvStmt = $pdo->prepare("SELECT movement_id FROM stock_movements WHERE product_id = ?");
@@ -238,4 +260,102 @@ if (!$uid || !$wh) {
         $left = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE product_id = $pid")->fetchColumn();
         ($left === 0) ? pass('test product fully cleaned up') : fail('test product not cleaned up');
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+section('5. Runtime — staff are limited to their assigned shops (create + edit)');
+
+$staffId = (int)$pdo->query("SELECT user_id FROM users WHERE is_admin = 0 AND is_active = 1 ORDER BY user_id LIMIT 1")->fetchColumn();
+
+if (!$staffId || count($shopIds) < 2) {
+    pass('no staff user / two-shop fixture available — section 5 skipped (n/a)');
+} else {
+    [$grantedShop, $otherShop] = $shopIds;
+
+    // Real grant via the same table the Assign Shop screen writes; the staff
+    // user's previous grants are restored afterwards.
+    $prevGrants = $pdo->prepare("SELECT resource_id, granted_by FROM user_scope_overrides WHERE user_id = ? AND resource_type = 'warehouse'");
+    $prevGrants->execute([$staffId]);
+    $prevGrants = $prevGrants->fetchAll(PDO::FETCH_ASSOC);
+    $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ? AND resource_type = 'warehouse'")->execute([$staffId]);
+    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, ?)")
+        ->execute([$staffId, $grantedShop, $uid ?: $staffId]);
+
+    // Runs a real endpoint as the staff user. Only the page permission is
+    // granted in-session; the shop scope is loaded by the real loadUserScope().
+    $asStaff = function (string $endpoint, array $post) use ($root, $staffId): array {
+        $out = _pcs_run_php("
+            \$_SESSION = [];
+            \$_SERVER['REQUEST_METHOD'] = 'POST';
+            require '$root/roots.php';
+            \$_SESSION['user_id'] = $staffId; \$_SESSION['role_id'] = 99; \$_SESSION['is_admin'] = false;
+            \$_SESSION['permissions']['products'] = ['view' => true, 'create' => true, 'edit' => true, 'delete' => false];
+            \$_POST = " . var_export($post, true) . ";
+            ob_start();
+            include '$root/api/$endpoint';
+            \$out = ob_get_clean();
+            \$pos = strpos(\$out, '{');
+            echo \$pos === false ? \$out : substr(\$out, \$pos);
+        ");
+        return json_decode($out, true) ?: ['success' => false, 'message' => $out];
+    };
+
+    $base = [
+        'sku' => '', 'barcode' => '', 'category_id' => '', 'cost_price' => '100', 'selling_price' => '150',
+        'min_selling_price' => '150', 'unit' => 'pcs', 'status' => 'active',
+    ];
+    $deniedName  = 'CLI Staff Denied ' . time() . rand(100, 999);
+    $allowedName = 'CLI Staff Allowed ' . time() . rand(100, 999);
+
+    $r = $asStaff('create_product.php', $base + ['product_name' => $deniedName, 'sku' => 'STFD' . time(), 'initial_stock_data' => json_encode([$otherShop => 5])]);
+    (empty($r['success']) && stripos($r['message'] ?? '', 'access') !== false)
+        ? pass('CREATE: staff refused when putting stock into a shop they were NOT assigned')
+        : fail('CREATE: staff was not refused for an unassigned shop: ' . json_encode($r));
+    $leak = $pdo->prepare("SELECT COUNT(*) FROM products WHERE product_name = ?");
+    $leak->execute([$deniedName]);
+    ((int)$leak->fetchColumn() === 0) ? pass('CREATE: refused request rolled back — no product row left behind') : fail('CREATE: refused request still created a product');
+
+    $r = $asStaff('create_product.php', $base + ['product_name' => $allowedName, 'sku' => 'STFA' . time(), 'initial_stock_data' => json_encode([$grantedShop => 5])]);
+    $staffPid = (int)($r['product_id'] ?? 0);
+    (!empty($r['success']) && $staffPid)
+        ? pass('CREATE: staff CAN stock their own assigned shop (positive control)')
+        : fail('CREATE: staff refused for their own shop: ' . json_encode($r));
+
+    if ($staffPid) {
+        $editBase = $base + ['product_id' => $staffPid, 'product_name' => $allowedName, 'sku' => 'STFA' . $staffPid];
+
+        $r = $asStaff('update_product.php', $editBase + ['stock' => [$otherShop => 3]]);
+        (empty($r['success']) && stripos($r['message'] ?? '', 'access') !== false)
+            ? pass('EDIT: staff refused when adjusting stock in a shop they were NOT assigned')
+            : fail('EDIT: staff was not refused for an unassigned shop: ' . json_encode($r));
+        $os = $pdo->prepare("SELECT COUNT(*) FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
+        $os->execute([$staffPid, $otherShop]);
+        ((int)$os->fetchColumn() === 0) ? pass('EDIT: no stock written to the unassigned shop') : fail('EDIT: stock leaked into the unassigned shop');
+
+        $r = $asStaff('update_product.php', $editBase + ['stock' => [$grantedShop => 8]]);
+        $gs = $pdo->prepare("SELECT stock_quantity FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
+        $gs->execute([$staffPid, $grantedShop]);
+        (!empty($r['success']) && (float)$gs->fetchColumn() === 8.0)
+            ? pass('EDIT: staff CAN adjust stock in their own shop (5 → 8)')
+            : fail('EDIT: own-shop adjustment failed: ' . json_encode($r));
+
+        $mv = $pdo->prepare("SELECT movement_id FROM stock_movements WHERE product_id = ?");
+        $mv->execute([$staffPid]);
+        foreach ($mv->fetchAll(PDO::FETCH_COLUMN) as $movementId) {
+            $je = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'stock_adjustment' AND entity_id = ?");
+            $je->execute([(int)$movementId]);
+            foreach ($je->fetchAll(PDO::FETCH_COLUMN) as $entryId) {
+                $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id = ?")->execute([$entryId]);
+                $pdo->prepare("DELETE FROM journal_entries WHERE entry_id = ?")->execute([$entryId]);
+            }
+        }
+        foreach (['product_batches', 'stock_movements', 'product_stocks', 'products'] as $t) {
+            $pdo->prepare("DELETE FROM $t WHERE product_id = ?")->execute([$staffPid]);
+        }
+    }
+
+    $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ? AND resource_type = 'warehouse'")->execute([$staffId]);
+    $restore = $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, ?)");
+    foreach ($prevGrants as $g) $restore->execute([$staffId, $g['resource_id'], $g['granted_by']]);
+    pass('staff user\'s original shop grants restored');
 }

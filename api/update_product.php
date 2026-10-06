@@ -221,6 +221,15 @@ try {
 
     // Handle stock adjustments if provided
     if (isset($_POST['stock']) && is_array($_POST['stock'])) {
+        // Same list the edit form renders — a hand-crafted request can't
+        // adjust stock in a shop the user was never offered.
+        require_once __DIR__ . '/../core/warehouse_scope.php';
+        $allowedShopIds = array_map('intval', array_column(warehousesForSelect($pdo), 'warehouse_id'));
+        foreach (array_keys($_POST['stock']) as $requestedShopId) {
+            if (!in_array((int)$requestedShopId, $allowedShopIds, true)) {
+                throw new Exception('You do not have access to one of the selected shops.');
+            }
+        }
         foreach ($_POST['stock'] as $warehouse_id => $new_quantity) {
             $warehouse_id  = intval($warehouse_id);
             $new_quantity  = floatval($new_quantity);
