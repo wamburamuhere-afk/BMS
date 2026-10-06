@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-06 — feat(mobile-api): product opening stock / stock edits for several shops
+
+**Files:** `api/mobile/products/_fields.php`, `api/mobile/products/create.php`, `api/mobile/products/update.php`, `tests/test_mobile_product_per_shop_stock_cli.php`
+Brings the mobile app in line with the web "Opening Stock per Shop" change.
+- `_fields.php` — new `mobileShopQuantities()`: reads a list of `{warehouse_id, quantity}` (or a map, or either as a JSON string for multipart), rejecting missing ids, negative quantities and duplicate shops with 422.
+- `create.php` — new `initial_stocks`: one batch + movement + ledger entry per shop with quantity > 0. Response adds `opening_stock_by_shop[]`; `current_stock` is the total. Old `warehouse_id` + `initial_stock` still work.
+- `update.php` — new `stocks`: new level per shop, each change posted as its own adjustment. Response adds `stock_adjustments[]` and keeps `stock_adjustment` (first entry). Old `warehouse_id` + `current_stock` still work.
+- Both refuse the whole request (403, nothing saved) if any listed shop is outside the user's scope.
+- API doc artifact bumped to v27.
+- Tests: 28 checks — multi-shop create/update, JSON-string form, legacy single-shop fields, validation, and staff refused for an unassigned shop on create and update.
+
+---
+
 ## 2026-10-06 — fix(products): opening stock per shop + shop-access check on create/edit
 
 **Files:** `app/bms/product/product_create.php`, `app/bms/product/product_create_footer.php`, `api/create_product.php`, `api/update_product.php`, `tests/test_product_create_simple_pos_cli.php`

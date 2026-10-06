@@ -113,8 +113,20 @@ try {
         if ($chk->fetchColumn()) $fail(409, "Barcode '$barcode' is already in use");
     }
 
-    // Opening stock needs a shop; resolve it the way quick_restock does.
-    if ($opening_qty > 0) {
+    // Opening stock per shop. `initial_stocks` (many shops) wins; the older
+    // single warehouse_id + initial_stock pair still works for existing app builds.
+    try {
+        $openingByShop = mobileShopQuantities($body, 'initial_stocks');
+    } catch (InvalidArgumentException $ie) {
+        $fail(422, $ie->getMessage());
+    }
+    if ($openingByShop !== null) {
+        $openingByShop = ($is_service || !$track_inventory) ? [] : array_filter($openingByShop, fn($q) => $q > 0);
+        foreach (array_keys($openingByShop) as $wid) {
+            if (!userCan('warehouse', $wid)) $fail(403, "Access denied: shop $wid is not in your scope");
+        }
+    } elseif ($opening_qty > 0) {
+        // Opening stock needs a shop; resolve it the way quick_restock does.
         require_once __DIR__ . '/../../../core/warehouse_scope.php';
         if ($warehouse_id <= 0) {
             $scoped = array_values(array_filter(warehousesForSelect($pdo), fn($w) => userCan('warehouse', (int)$w['warehouse_id'])));
@@ -123,6 +135,9 @@ try {
         } elseif (!userCan('warehouse', $warehouse_id)) {
             $fail(403, 'Access denied: this shop is not in your scope');
         }
+        $openingByShop = [$warehouse_id => $opening_qty];
+    } else {
+        $openingByShop = [];
     }
 
     try {
@@ -164,11 +179,11 @@ try {
     }
 
     // Opening stock = real batch + stock movement + GL (Dr Inventory / Cr Opening Balance), as on the web.
-    if ($opening_qty > 0) {
+    foreach ($openingByShop as $shopId => $shopQty) {
         $intake = receiveProductBatch($pdo, [
             'product_id'       => $product_id,
-            'warehouse_id'     => $warehouse_id,
-            'quantity'         => $opening_qty,
+            'warehouse_id'     => $shopId,
+            'quantity'         => $shopQty,
             'unit_cost'        => $cost_price,
             'write_batch'      => true,
             'selling_price'    => $selling_price,
@@ -183,7 +198,7 @@ try {
             'created_by'       => $user_id,
             'notes'            => 'Initial product stock',
         ]);
-        postStockAdjustmentGl($pdo, (int)$intake['movement_id'], $opening_qty, 'adjustment_in',
+        postStockAdjustmentGl($pdo, (int)$intake['movement_id'], $shopQty, 'adjustment_in',
             $cost_price, null, $user_id, date('Y-m-d'), $sku);
     }
 
@@ -199,7 +214,9 @@ try {
         'sku'             => $sku,
         'is_service'      => (bool)$is_service,
         'track_inventory' => (bool)$track_inventory,
-        'current_stock'   => $opening_qty,
+        'current_stock'   => array_sum($openingByShop),
+        'opening_stock_by_shop' => array_map(fn($w, $q) => ['warehouse_id' => $w, 'quantity' => $q],
+                                             array_keys($openingByShop), array_values($openingByShop)),
         'image_url'       => $image_url,
         'message'         => ucfirst($kind) . ' created successfully',
     ]);
