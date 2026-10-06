@@ -92,9 +92,21 @@ try {
         $set['track_inventory'] = !empty($body['track_inventory']) && $body['track_inventory'] !== 'false' ? 1 : 0;
     }
 
-    // Stock edit → adjustment in one shop, same as the web product edit (movement + GL).
-    $stockChange = null;
-    if (array_key_exists('current_stock', $body) && !$existing['is_service']) {
+    // Stock edit → an adjustment per shop, same as the web product edit (movement + GL).
+    // `stocks` (many shops, absolute new quantity each) wins over the older
+    // single current_stock + warehouse_id pair, which still works for old builds.
+    $stockChanges = [];
+    try {
+        $stocksByShop = mobileShopQuantities($body, 'stocks');
+    } catch (InvalidArgumentException $ie) {
+        $fail(422, $ie->getMessage());
+    }
+    if ($stocksByShop !== null && !$existing['is_service']) {
+        foreach ($stocksByShop as $wid => $qty) {
+            if (!userCan('warehouse', $wid)) $fail(403, "Access denied: shop $wid is not in your scope");
+            $stockChanges[] = [$wid, $qty];
+        }
+    } elseif (array_key_exists('current_stock', $body) && !$existing['is_service']) {
         if (!is_numeric($body['current_stock']) || (float)$body['current_stock'] < 0) $fail(422, 'current_stock must be a non-negative number');
         $warehouse_id = (int)($body['warehouse_id'] ?? 0);
         if ($warehouse_id <= 0) {
@@ -104,7 +116,7 @@ try {
             $warehouse_id = (int)$scoped[0]['warehouse_id'];
         }
         if (!userCan('warehouse', $warehouse_id)) $fail(403, 'Access denied: this shop is not in your scope');
-        $stockChange = [$warehouse_id, (float)$body['current_stock']];
+        $stockChanges[] = [$warehouse_id, (float)$body['current_stock']];
     }
 
     try {
@@ -127,9 +139,8 @@ try {
         syncWholesaleGroupPrice($pdo, $product_id, (float)$set['wholesale_price']);
     }
 
-    $stockResult = null;
-    if ($stockChange) {
-        [$wid, $newQty] = $stockChange;
+    $stockResults = [];
+    foreach ($stockChanges as [$wid, $newQty]) {
         $cur = $pdo->prepare("SELECT COALESCE(stock_quantity,0) FROM product_stocks WHERE product_id = ? AND warehouse_id = ? FOR UPDATE");
         $cur->execute([$product_id, $wid]);
         $curQty = (float)($cur->fetchColumn() ?: 0);
@@ -151,7 +162,7 @@ try {
                 'reason' => 'Stock adjustment via product edit', 'notes' => 'Mobile stock edit', 'created_by' => $user_id,
             ]);
             postStockAdjustmentGl($pdo, $mid, $diff, $type, $cost, null, $user_id, date('Y-m-d'), $ref);
-            $stockResult = ['warehouse_id' => $wid, 'before' => $curQty, 'after' => $newQty, 'reference_number' => $ref];
+            $stockResults[] = ['warehouse_id' => $wid, 'before' => $curQty, 'after' => $newQty, 'reference_number' => $ref];
         }
     }
 
@@ -161,7 +172,13 @@ try {
         @unlink(__DIR__ . '/../../../' . $existing['image_url']);
     }
     logActivity($pdo, $user_id, "Mobile: updated product #$product_id ($product_name)");
-    echo json_encode(['success' => true, 'message' => 'Product updated successfully', 'stock_adjustment' => $stockResult, 'image_url' => $image_url]);
+    echo json_encode([
+        'success'           => true,
+        'message'           => 'Product updated successfully',
+        'stock_adjustment'  => $stockResults[0] ?? null,
+        'stock_adjustments' => $stockResults,
+        'image_url'         => $image_url,
+    ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     if ($image_url && is_file(__DIR__ . '/../../../' . $image_url)) @unlink(__DIR__ . '/../../../' . $image_url);
