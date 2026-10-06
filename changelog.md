@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-06 — fix(products): opening stock per shop + shop-access check on create/edit
+
+**Files:** `app/bms/product/product_create.php`, `app/bms/product/product_create_footer.php`, `api/create_product.php`, `api/update_product.php`, `tests/test_product_create_simple_pos_cli.php`
+The Simple POS Add Product form had one Shop dropdown and one Opening Stock box, so a new product could only start stocked in a single shop.
+- `product_create.php` — the dropdown is replaced by an **Opening Stock per Shop** list: one quantity row for every shop the user can access (admin: all shops; staff: their assigned shops only). With exactly one shop it stays a single Opening Stock box.
+- `product_create_footer.php` — removed the single-shop reader; the existing `initial_stock[...]` collector sends every shop with a quantity above 0.
+- `api/create_product.php` / `api/update_product.php` — stock can only be written to shops in the user's own list (`warehousesForSelect()`, the same list the form shows). A request naming any other shop is refused and fully rolled back. Admins are unaffected.
+- Edit page already listed one stock row per shop; it now gets the same server-side shop check.
+- Tests: 58 checks — per-shop inputs render for every active shop, a two-shop save creates one batch + stock row per shop, and a staff user is refused for an unassigned shop on both create and edit (with positive controls).
+
+---
+
 ## 2026-10-05 — feat(pwa): hide the desktop app title bar (window controls overlay)
 
 **Files:** `manifest.json`, `header.php`, `login.php`
