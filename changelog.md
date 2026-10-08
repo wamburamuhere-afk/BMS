@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-08 — fix(tenants): new self-registered companies were left without their migrations (product create failed: Unknown column 'supplier_id')
+
+**Files:** `core/tenant_migration_runner.php`, `core/tenant_provisioner.php`
+A company created through public registration got only the schema snapshot; none of the `migrations/tenant/` scripts ran. Creating a product then failed with `SQLSTATE[42S22]: Unknown column 'supplier_id'` (`product_batches` also lacked `manufacturing_date`, `wholesale_price`, `selling_price`).
+Cause: registration runs the migration runner inside a web request, and the runner started each migration with `exec(PHP_BINARY ...)`. Under a web server `PHP_BINARY` is empty (mod_php) or the php-fpm binary, so the very first migration failed ("Permission denied") and the runner stopped for that company. The provisioner then logged the step as `ok`, so nothing flagged it.
+- `core/tenant_migration_runner.php` — new `tenantMigrationPhpBinary()` returns the real PHP CLI binary (`PHP_BINARY` when already on the CLI, otherwise `PHP_BINDIR/php`, `/usr/bin/php`, `/usr/local/bin/php`); used to start each migration. Deploy/cron runs are unchanged.
+- `core/tenant_provisioner.php` — the `apply_tenant_migrations` step is now logged `failed` (not `ok`) when a migration fails, so it shows in `tenant_provisioning_log`.
+Existing companies stuck in this state are repaired by the next deploy, whose CLI run applies every pending migration to every company.
+Verified on Apache mod_php with a fresh snapshot database: before the fix 0 migrations applied (failed at `2026_09_04_backfill_file_size_columns.php`); after the fix all 71 applied and the product-batch INSERT succeeds.
+
+---
+
 ## 2026-10-06 — feat(mobile-api): product opening stock / stock edits for several shops
 
 **Files:** `api/mobile/products/_fields.php`, `api/mobile/products/create.php`, `api/mobile/products/update.php`, `tests/test_mobile_product_per_shop_stock_cli.php`
