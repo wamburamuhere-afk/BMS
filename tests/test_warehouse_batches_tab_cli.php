@@ -129,13 +129,12 @@ $wv = src($root, 'app/bms/stock/warehouse_view.php');
 has($wv, '$pos_simple_mode      = posSimpleModeEnabled();', 'page computes Simple POS state');
 has($wv, 'if ($pos_simple_mode):', 'tab UI gated on Simple POS');
 has($wv, "<?php include __DIR__ . '/warehouse_batches_tab.php'; ?>", 'Batches pane included only in the Simple-POS branch');
-// The non-Simple-POS branch must be the exact original markup — same
-// literal strings that existed before this feature (hardcoded "Recent
-// Activity" heading, no tabs, no t() added there), so a non-Simple-POS
-// tenant's page is byte-identical to before.
-has($wv, '<h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> Recent Activity</h5>', 'non-Simple-POS branch keeps the original hardcoded heading verbatim');
-has($wv, 'render_warehouse_activity_items($recent_movements, false)', 'non-Simple-POS branch reuses the SAME data-rendering function (not a forked copy that could drift)');
-has($wv, 'render_warehouse_activity_items($recent_movements, true)', 'Simple-POS branch reuses the identical function for its Recent Activity pane too — one source either way');
+// The non-Simple-POS branch keeps its original layout (plain card, no tabs).
+// Its heading is translated since 2026-10-11 (shop pages translation request),
+// like the rest of the page.
+has($wv, '<h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> <?= htmlspecialchars(t(\'Recent Activity\')) ?></h5>', 'non-Simple-POS branch keeps its plain-card heading (now translated)');
+// Both branches render activity through the SAME function, never a forked copy.
+substr_count($wv, 'render_warehouse_activity_items($recent_movements)') === 2 ? pass('both branches (Simple POS pane + plain card) reuse the one activity-rendering function') : fail('both branches (Simple POS pane + plain card) reuse the one activity-rendering function');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('6. Runtime — warehouse-batches.js executed for real (Node)');
