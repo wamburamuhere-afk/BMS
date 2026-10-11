@@ -3127,6 +3127,24 @@ function updateCashBalanceUI() {
         if (h && document.activeElement !== h) h.focus({ preventScroll: true });
     }
 
+    // Mobile/touch view only: focusing the hidden input made the on-screen
+    // keyboard pop up after every product tap. inputmode="none" keeps the field
+    // focusable for scanners but tells the device not to show its keyboard.
+    // Desktop is left unchanged.
+    function isMobilePosView() {
+        return window.innerWidth < 992 ||
+               (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    }
+    function applyScanInputMode() {
+        var h = document.getElementById('hiddenScanInput');
+        if (!h) return;
+        if (isMobilePosView()) h.setAttribute('inputmode', 'none');
+        else h.removeAttribute('inputmode');
+    }
+    applyScanInputMode();
+    document.addEventListener('DOMContentLoaded', applyScanInputMode);
+    window.addEventListener('resize', applyScanInputMode);
+
     // Show the "SCANNER READY" badge once DOM is ready
     document.addEventListener('DOMContentLoaded', function () {
         var badge = document.getElementById('scannerReadyBadge');
