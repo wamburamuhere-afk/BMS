@@ -3255,7 +3255,12 @@ function updateMobileCartFab() {
             const qtyCtl = item.serial_numbers
                 ? '<span class="badge bg-secondary fs-6">' + item.quantity + '</span>'
                 : '<button type="button" class="btn btn-outline-secondary pos-sheet-btn" onclick="updateCartQuantity(' + index + ', -1)" aria-label="-">&minus;</button>'
-                  + '<span class="fw-bold px-2" style="min-width:2rem;text-align:center;">' + item.quantity + '</span>'
+                  // Typeable qty (numeric keypad). Empty/0 reverts — removing is the trash button's job.
+                  + '<input type="number" class="form-control fw-bold text-center pos-sheet-qty" inputmode="numeric" pattern="[0-9]*" min="1" step="1"'
+                  +   ' value="' + item.quantity + '" aria-label="' + PT.quantityLabel + '"'
+                  +   ' onfocus="this.select()"'
+                  +   ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}"'
+                  +   ' onchange="var q=parseInt(this.value,10);if(q>=1){updateCartQuantityInput(' + index + ',q);}else{this.value=cart[' + index + '].quantity;}">'
                   + '<button type="button" class="btn btn-outline-secondary pos-sheet-btn" onclick="updateCartQuantity(' + index + ', 1)" aria-label="+">+</button>';
             html += '<div class="py-2 border-bottom">'
                 + '<div class="d-flex justify-content-between align-items-start">'
