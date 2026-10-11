@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-11 — feat(pos): type the quantity directly in the mobile cart
+
+**Files:** `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/pos.php`
+In the mobile cart sheet ("Muuzo wa Sasa", simple mode) the quantity between − and + was plain text, so a large quantity (e.g. 349) meant pressing + hundreds of times. The desktop cart already had a typeable box.
+- `pos_scripts_new.php` (`updateMobileCartFab`) — the quantity is now a number input (`.pos-sheet-qty`, `inputmode="numeric"` so phones show the digit keypad). Tapping selects the old value so typing replaces it; Enter/Done or tapping away applies it via the existing `updateCartQuantityInput()` (same as desktop). Empty or 0 reverts to the previous quantity (removing stays on the trash button). − / + unchanged; serial-tracked lines stay read-only.
+- `pos.php` — `.pos-sheet-qty` style: 64×40px to match the − / + buttons, browser spin arrows hidden.
+
+---
+
 ## 2026-10-11 — fix(pos): on-screen keyboard popped up after every product tap on mobile
 
 **Files:** `app/bms/pos/pos_scripts_new.php`

@@ -1026,6 +1026,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 #mobileCartFab { min-width: 0; }
 .pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.pos-sheet-qty { width: 64px; height: 40px; padding: 0 4px; font-size: 1.05rem; -moz-appearance: textfield; }
+.pos-sheet-qty::-webkit-outer-spin-button, .pos-sheet-qty::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 #mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
 #mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
 /* The sheet already shows the total in the VAT/total block above. */
