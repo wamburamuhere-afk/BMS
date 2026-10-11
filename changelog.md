@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-11 — fix(pos): on-screen keyboard popped up after every product tap on mobile
+
+**Files:** `app/bms/pos/pos_scripts_new.php`
+On phones/tablets, tapping a product added it to the cart but also opened the on-screen keyboard. Cause: the barcode-scanner code re-focuses the hidden `#hiddenScanInput` text field after any click on a non-button element (product cards are `div`s), and a focused text field opens the mobile keyboard.
+- New `applyScanInputMode()` sets `inputmode="none"` on `#hiddenScanInput` in mobile view only (width < 992px or a touch/coarse pointer), re-checked on resize. The field still takes focus, so scanners keep working; the device just doesn't show its keyboard. Desktop is unchanged. Search, amount and other real inputs still open the keyboard as before.
+
+---
+
 ## 2026-10-08 — fix(tenants): new self-registered companies were left without their migrations (product create failed: Unknown column 'supplier_id')
 
 **Files:** `core/tenant_migration_runner.php`, `core/tenant_provisioner.php`
