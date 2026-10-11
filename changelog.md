@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-10-11 — fix(shop pages): full Swahili translation, "Shop" wording, hide switched-off modules
+
+**Files:** `ajax_get_warehouse.php`, `app/bms/stock/warehouses.php`, `app/bms/stock/warehouse_view.php`, `core/terminology.php`, `lang/sw.php`, `tests/test_shop_pages_i18n_and_modules_cli.php` (new), `tests/test_warehouse_batches_tab_cli.php`
+For a POS company in shop mode, the shop screens mixed English and Swahili, said "Warehouse"/"Ghala", and showed fields for modules the superadmin had switched off.
+- **Edit Shop form** (`ajax_get_warehouse.php`) — every label, option and error now goes through `t()`/`wLabel()` (loads the user's language, since this endpoint never includes `header.php`). Shop wording in shop mode ("Shop Name", "Shop Code (Auto-generated)", "Set as Primary Shop"). The **Project** field only shows when Projects is on (`projectsModuleActive()`), **POS Mode** only when Restaurant POS is on.
+- **Add Shop form** (`warehouses.php`) — POS Mode/Restaurant options hidden when Restaurant POS is off (saves "retail" as before).
+- **Edit save** (`warehouses.php`) — a hidden Project / POS Mode field now keeps the stored value instead of wiping it (before, saving a shop would have cleared its project link and reset a restaurant shop to retail).
+- **Shop details page** (`warehouse_view.php`) — all text translated; Shop wording; ignores `?project_id=` when Projects is off (no Project / Contract No / Back to Project). English fixes: "Total Stock Item" → "Total Products", "Health" → "Stock Level", "Out/Low/Over" → "Out of Stock/Low Stock/Overstocked", "min" → "Reorder at", "Default" → "Main Area", "Contact Person" → "Manager", "Storage Locations" → "Storage Areas". Status showed the raw word "success" instead of a badge — now a proper translated badge. Activity entries show real names ("Sold", "Received from Another Shop") instead of database codes. Table footer/pagination translated.
+- **Shop list** (`warehouses.php`) — "Locations" → "Storage Areas"; breadcrumb "Inventory" → "Products in Stock" in shop mode; status labels via new `warehouseStatusLabel()`; messages that contain a code/name are now translatable (and the code is HTML-escaped). "Transfer Stock" now passes `warehouse_id` (the parameter the transfers page reads; it was `from_warehouse_id`, which was ignored).
+- **`core/terminology.php`** — new `warehouseStatusLabel()` and `stockMovementLabel()`.
+- **`lang/sw.php`** — 57 new translations; fixed wrong/confusing ones: "Ghala" no longer used for stock ("Stoki ya Sasa", "Thamani ya Stoki", "Stoki Imeisha", "Hamisha Stoki"), "Export" → "Pakua" (was the same word as Transfer), "City" → "Mji", "Code" → "Msimbo", "S/NO" → "Na.", "Notes" → "Maelezo ya Ziada", "POS Mode" → "Aina ya Mauzo (POS)", "Vipimo" → "idadi ya bidhaa"; shop status "Linatumika / Halitumiki / Limefungwa kwa Matengenezo" (was "Hai").
+- **Tests** — new `tests/test_shop_pages_i18n_and_modules_cli.php` (53 checks, no DB). `test_warehouse_batches_tab_cli.php` updated: it pinned the old untranslated heading.
+Verified end-to-end in a browser against a migrated database (88 checks): Swahili + English, shop company (Projects/Restaurant off) and full company (both on), add/edit/duplicate-code/details flows, no JavaScript errors.
+
+---
+
 ## 2026-10-11 — feat(pos): type the quantity directly in the mobile cart
 
 **Files:** `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/pos.php`

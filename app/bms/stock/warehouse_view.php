@@ -13,6 +13,11 @@ includeHeader();
 // Get warehouse ID
 $warehouse_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+// A closed Projects module must leave no trace here (breadcrumb, back link,
+// print header) even when an old link still carries ?project_id=.
+if (!projectsModuleActive()) {
+    $project_id = 0;
+}
 
 if ($warehouse_id <= 0) {
     $_SESSION['error'] = isShopLabel() ? "Invalid shop ID" : "Invalid warehouse ID";
@@ -123,15 +128,15 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
     <!-- Print Header -->
     <div class="d-none d-print-block text-center mb-4">
 
-        <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">WAREHOUSE INVENTORY REPORT</h2>
+        <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= htmlspecialchars(wLabel('Warehouse Stock Report', 'Shop Stock Report')) ?></h2>
         <h5 class="text-muted"><?= caseFormat($warehouse['warehouse_name']) ?> (<?= htmlspecialchars($warehouse['warehouse_code']) ?>)</h5>
         <?php if (!empty($project_name)): ?>
-        <p class="mb-0" style="font-size: 11pt; font-weight: 700;">Project: <?= htmlspecialchars($project_name) ?></p>
+        <p class="mb-0" style="font-size: 11pt; font-weight: 700;"><?= htmlspecialchars(t('Project:')) ?> <?= htmlspecialchars($project_name) ?></p>
         <?php endif; ?>
         <?php if (!empty($contract_no)): ?>
-        <p class="mb-0 text-muted" style="font-size: 10pt; font-weight: 600;">Contract No: <?= htmlspecialchars($contract_no) ?></p>
+        <p class="mb-0 text-muted" style="font-size: 10pt; font-weight: 600;"><?= htmlspecialchars(t('Contract No:')) ?> <?= htmlspecialchars($contract_no) ?></p>
         <?php endif; ?>
-        <p class="small text-muted">Generated on: <?= date('F d, Y H:i') ?></p>
+        <p class="small text-muted"><?= htmlspecialchars(t('Generated on:')) ?> <?= date('F d, Y H:i') ?></p>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
@@ -141,7 +146,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <?php if($project_id > 0): ?>
-                        <li class="breadcrumb-item"><a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>">Project Details</a></li>
+                        <li class="breadcrumb-item"><a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>"><?= htmlspecialchars(t('Project Details')) ?></a></li>
                     <?php else: ?>
                         <li class="breadcrumb-item"><a href="warehouses.php"><?= wLabel('Warehouses', 'Shops') ?></a></li>
                     <?php endif; ?>
@@ -151,11 +156,11 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="fw-bold"><i class="bi bi-house-door text-success"></i> <?= caseFormat($warehouse['warehouse_name'] ?? '') ?></h2>
-                    <p class="text-muted mb-0">Code: <span class="badge bg-light text-dark"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></span></p>
+                    <p class="text-muted mb-0"><?= htmlspecialchars(t('Code:')) ?> <span class="badge bg-light text-dark"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></span></p>
                 </div>
                 <div class="d-flex gap-2">
                     <a href="<?= $project_id > 0 ? getUrl('project_view') . '?id=' . $project_id . '#procurements' : getUrl('warehouses') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> <?= $project_id > 0 ? 'Back to Project' : 'Back to List' ?>
+                        <i class="bi bi-arrow-left"></i> <?= htmlspecialchars($project_id > 0 ? t('Back to Project') : wLabel('Back to Warehouses', 'Back to Shops')) ?>
                     </a>
                 </div>
             </div>
@@ -209,7 +214,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <div class="stats-icon"><i class="bi bi-geo-alt"></i></div>
                     <div>
                         <h4 class="mb-0 fw-bold"><?= count($locations) ?></h4>
-                        <small class="text-uppercase small fw-bold">Active Locations</small>
+                        <small class="text-uppercase small fw-bold"><?= htmlspecialchars(t('Active Storage Areas')) ?></small>
                     </div>
                 </div>
             </div>
@@ -220,7 +225,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <div class="stats-icon"><i class="bi bi-box"></i></div>
                     <div>
                         <h4 class="mb-0 fw-bold"><?= number_format($total_items) ?></h4>
-                        <small class="text-uppercase small fw-bold">Total Stock Item</small>
+                        <small class="text-uppercase small fw-bold"><?= htmlspecialchars(t('Total Products')) ?></small>
                     </div>
                 </div>
             </div>
@@ -231,7 +236,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <div class="stats-icon"><i class="bi bi-layers"></i></div>
                     <div>
                         <h4 class="mb-0 fw-bold"><?= number_format($total_quantity, 0) ?></h4>
-                        <small class="text-uppercase small fw-bold">Total Quantity</small>
+                        <small class="text-uppercase small fw-bold"><?= htmlspecialchars(t('Total Quantity')) ?></small>
                     </div>
                 </div>
             </div>
@@ -242,7 +247,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <div class="stats-icon"><i class="bi bi-cash-stack"></i></div>
                     <div>
                         <h4 class="mb-0 fw-bold"><?= format_currency($total_value_cost) ?></h4>
-                        <small class="text-uppercase small fw-bold">Stock Value (Cost)</small>
+                        <small class="text-uppercase small fw-bold"><?= htmlspecialchars(t('Stock Value (at Cost)')) ?></small>
                     </div>
                 </div>
             </div>
@@ -259,15 +264,15 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                 <div class="card-body">
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item px-0 d-flex justify-content-between">
-                            <span class="text-muted">Status</span>
-                            <?= get_status_badge($warehouse['status']) ?>
+                            <span class="text-muted"><?= htmlspecialchars(t('Status')) ?></span>
+                            <span class="badge bg-<?= get_status_badge($warehouse['status']) ?>"><?= htmlspecialchars(warehouseStatusLabel($warehouse['status'])) ?></span>
                         </li>
                         <li class="list-group-item px-0 d-flex justify-content-between">
-                            <span class="text-muted">Primary</span>
-                            <span><?= $warehouse['is_primary'] ? '<span class="text-primary fw-bold">Yes</span>' : 'No' ?></span>
+                            <span class="text-muted"><?= htmlspecialchars(wLabel('Primary Warehouse', 'Primary Shop')) ?></span>
+                            <span><?= $warehouse['is_primary'] ? '<span class="text-primary fw-bold">' . htmlspecialchars(t('Yes')) . '</span>' : htmlspecialchars(t('No')) ?></span>
                         </li>
                         <li class="list-group-item px-0">
-                            <span class="text-muted d-block mb-1">Capacity</span>
+                            <span class="text-muted d-block mb-1"><?= htmlspecialchars(t('Capacity')) ?></span>
                             <?php
                             $cap_total = (float)($warehouse['capacity'] ?? 0);
                             if ($cap_total > 0):
@@ -275,62 +280,62 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                 $cap_color = $cap_pct >= 90 ? 'danger' : ($cap_pct >= 70 ? 'warning' : 'success');
                             ?>
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="small fw-semibold"><?= number_format($total_quantity, 0) ?> / <?= number_format($cap_total, 0) ?> units</span>
+                                <span class="small fw-semibold"><?= number_format($total_quantity, 0) ?> / <?= number_format($cap_total, 0) ?> <?= htmlspecialchars(t('items')) ?></span>
                                 <span class="badge bg-<?= $cap_color ?>"><?= $cap_pct ?>%</span>
                             </div>
                             <div style="height:10px;background:#e9ecef;border-radius:5px;overflow:hidden;">
                                 <div style="height:100%;width:<?= $cap_pct ?>%;background:var(--bs-<?= $cap_color ?>);border-radius:5px;"></div>
                             </div>
                             <?php else: ?>
-                            <span class="text-muted fst-italic small">Not set</span>
+                            <span class="text-muted fst-italic small"><?= htmlspecialchars(t('Not set')) ?></span>
                             <?php endif; ?>
                         </li>
                         <li class="list-group-item px-0">
-                            <span class="text-muted d-block mb-1">Location</span>
-                            <strong><i class="bi bi-geo-alt"></i> <?= !empty($warehouse['location']) ? caseFormat($warehouse['location']) : 'Not specified' ?></strong>
+                            <span class="text-muted d-block mb-1"><?= htmlspecialchars(t('Location')) ?></span>
+                            <strong><i class="bi bi-geo-alt"></i> <?= !empty($warehouse['location']) ? caseFormat($warehouse['location']) : htmlspecialchars(t('Not specified')) ?></strong>
                         </li>
                         <li class="list-group-item px-0">
-                            <span class="text-muted d-block mb-1">Full Address</span>
-                            <span><?= !empty($warehouse['address']) ? nl2br(caseFormat($warehouse['address'])) : 'No address provided' ?></span>
+                            <span class="text-muted d-block mb-1"><?= htmlspecialchars(t('Address')) ?></span>
+                            <span><?= !empty($warehouse['address']) ? nl2br(caseFormat($warehouse['address'])) : htmlspecialchars(t('No address provided')) ?></span>
                         </li>
                         <li class="list-group-item px-0">
-                            <span class="text-muted d-block mb-1">Contact Person</span>
-                            <strong><?= !empty($warehouse['contact_person']) ? caseFormat($warehouse['contact_person']) : 'N/A' ?></strong>
+                            <span class="text-muted d-block mb-1"><?= htmlspecialchars(t('Manager')) ?></span>
+                            <strong><?= !empty($warehouse['contact_person']) ? caseFormat($warehouse['contact_person']) : htmlspecialchars(t('N/A')) ?></strong>
                         </li>
                         <li class="list-group-item px-0 d-flex justify-content-between">
-                            <span class="text-muted">Phone</span>
-                            <span><?= htmlspecialchars($warehouse['phone'] ?: 'N/A') ?></span>
+                            <span class="text-muted"><?= htmlspecialchars(t('Phone')) ?></span>
+                            <span><?= htmlspecialchars($warehouse['phone'] ?: t('N/A')) ?></span>
                         </li>
                         <li class="list-group-item px-0 d-flex justify-content-between">
-                            <span class="text-muted">Email</span>
-                            <span><?= htmlspecialchars($warehouse['email'] ?: 'N/A') ?></span>
+                            <span class="text-muted"><?= htmlspecialchars(t('Email')) ?></span>
+                            <span><?= htmlspecialchars($warehouse['email'] ?: t('N/A')) ?></span>
                         </li>
                     </ul>
                 </div>
                 <div class="card-footer bg-light">
-                    <small class="text-muted">Created by: <?= !empty($warehouse['creator_name']) ? caseFormat($warehouse['creator_name']) : 'System' ?> (<?= date('M d, Y', strtotime($warehouse['created_at'])) ?>)</small>
+                    <small class="text-muted"><?= htmlspecialchars(t('Created by:')) ?> <?= !empty($warehouse['creator_name']) ? caseFormat($warehouse['creator_name']) : htmlspecialchars(t('System')) ?> (<?= date('M d, Y', strtotime($warehouse['created_at'])) ?>)</small>
                 </div>
             </div>
 
             <!-- Locations List -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Storage Locations</h5>
-                    <button class="btn btn-sm btn-link" onclick="manageLocations(<?= $warehouse_id ?>)">Manage</button>
+                    <h5 class="mb-0"><?= htmlspecialchars(t('Storage Areas')) ?></h5>
+                    <button class="btn btn-sm btn-link" onclick="manageLocations(<?= $warehouse_id ?>)"><?= htmlspecialchars(t('Manage')) ?></button>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">Location Name</th>
-                                    <th>Code</th>
-                                    <th class="text-center">Active</th>
+                                    <th class="ps-3"><?= htmlspecialchars(t('Area Name')) ?></th>
+                                    <th><?= htmlspecialchars(t('Code')) ?></th>
+                                    <th class="text-center"><?= htmlspecialchars(t('In Use')) ?></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($locations)): ?>
-                                    <tr><td colspan="3" class="text-center py-3">No locations defined</td></tr>
+                                    <tr><td colspan="3" class="text-center py-3"><?= htmlspecialchars(t('No storage areas added yet')) ?></td></tr>
                                 <?php else: ?>
                                     <?php foreach ($locations as $loc): ?>
                                         <tr>
@@ -353,9 +358,9 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
             // which chrome wraps it (plain card vs. Simple-POS tab pane) —
             // only the wrapper differs, never the content.
             if (!function_exists('render_warehouse_activity_items')) {
-                function render_warehouse_activity_items(array $recent_movements, bool $empty_translated = false): string {
+                function render_warehouse_activity_items(array $recent_movements): string {
                     if (empty($recent_movements)) {
-                        $msg = $empty_translated ? t('No movements recorded yet') : 'No movements recorded yet';
+                        $msg = t('No stock activity yet');
                         return '<div class="text-center py-3 text-muted small">' . htmlspecialchars($msg) . '</div>';
                     }
                     $in_types = ['purchase_in','adjustment_in','transfer_in','return_in','production_in','found','correction'];
@@ -365,7 +370,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                         $mv_color = $mv_in ? 'success' : 'danger';
                         $mv_icon  = $mv_in ? 'bi-arrow-down-circle-fill' : 'bi-arrow-up-circle-fill';
                         $mv_sign  = $mv_in ? '+' : '−';
-                        $mv_label = ucwords(str_replace('_', ' ', $mv['movement_type']));
+                        $mv_label = htmlspecialchars(stockMovementLabel($mv['movement_type']));
                         $mv_date  = date('d M', strtotime($mv['movement_date'] ?: $mv['created_at']));
                         $html .= '<li class="list-group-item px-3 py-2">'
                                . '<div class="d-flex align-items-start gap-2">'
@@ -407,7 +412,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                             <span class="badge bg-light text-dark border"><?= t('Last 8') ?></span>
                         </div>
                         <div class="card-body p-0">
-                            <?= render_warehouse_activity_items($recent_movements, true) ?>
+                            <?= render_warehouse_activity_items($recent_movements) ?>
                         </div>
                     </div>
                     <div class="tab-pane fade" id="pane-warehouse-batches" role="tabpanel">
@@ -419,11 +424,11 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
             <!-- Recent Activity — unchanged for non-Simple-POS tenants -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> Recent Activity</h5>
-                    <span class="badge bg-light text-dark border">Last 8</span>
+                    <h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> <?= htmlspecialchars(t('Recent Activity')) ?></h5>
+                    <span class="badge bg-light text-dark border"><?= htmlspecialchars(t('Last 8')) ?></span>
                 </div>
                 <div class="card-body p-0">
-                    <?= render_warehouse_activity_items($recent_movements, false) ?>
+                    <?= render_warehouse_activity_items($recent_movements) ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -433,10 +438,10 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 d-print-none">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-box-seam text-success"></i> Current Inventory</h5>
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-box-seam text-success"></i> <?= htmlspecialchars(t('Current Stock')) ?></h5>
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-outline-success" onclick="transferStock(<?= $warehouse_id ?>)">
-                            <i class="bi bi-truck"></i> Transfer Stock
+                            <i class="bi bi-truck"></i> <?= htmlspecialchars(t('Transfer Stock')) ?>
                         </button>
                     </div>
                 </div>
@@ -446,7 +451,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                         <div class="d-flex align-items-center gap-3 flex-wrap">
                             <div class="btn-group dropdown shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; color: #444;">
-                                    <i class="bi bi-clipboard text-info me-1"></i> Copy
+                                    <i class="bi bi-clipboard text-info me-1"></i> <?= htmlspecialchars(t('Copy')) ?>
                                 </button>
                                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportTable()" style="background: #fff; color: #444;">
@@ -454,25 +459,25 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                 </button>
                                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="window.print()" style="background: #fff; color: #444;">
-                                    <i class="bi bi-printer text-primary me-1"></i> Print
+                                    <i class="bi bi-printer text-primary me-1"></i> <?= htmlspecialchars(t('Print')) ?>
                                 </button>
                             </div>
 
                             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
-                                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
+                                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> <?= htmlspecialchars(t('Show:')) ?></span>
                                 <select class="form-select form-select-sm border-0 fw-bold p-0" id="tableLength" style="width: 60px; box-shadow: none; background: transparent;">
                                     <option value="10">10</option>
                                     <option value="25" selected>25</option>
                                     <option value="50">50</option>
                                     <option value="100">100</option>
-                                    <option value="-1">All</option>
+                                    <option value="-1"><?= htmlspecialchars(t('All')) ?></option>
                                 </select>
                             </div>
                         </div>
                         <div class="d-flex align-items-center warehouse-search-box">
                             <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
                                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                                <input type="text" id="customSearch" class="form-control border-start-0" placeholder="Search inventory...">
+                                <input type="text" id="customSearch" class="form-control border-start-0" placeholder="<?= htmlspecialchars(t('Search products...')) ?>">
                             </div>
                         </div>
                     </div>
@@ -480,13 +485,13 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-hover align-middle" id="warehouseStockTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th>S/NO</th>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>Location</th>
-                                    <th class="text-center">Quantity</th>
-                                    <th class="text-center">Health</th>
-                                    <th class="text-end">Value</th>
+                                    <th><?= htmlspecialchars(t('S/NO')) ?></th>
+                                    <th><?= htmlspecialchars(t('Product')) ?></th>
+                                    <th><?= htmlspecialchars(t('SKU')) ?></th>
+                                    <th><?= htmlspecialchars(t('Storage Area')) ?></th>
+                                    <th class="text-center"><?= htmlspecialchars(t('Quantity')) ?></th>
+                                    <th class="text-center"><?= htmlspecialchars(t('Stock Level')) ?></th>
+                                    <th class="text-end"><?= htmlspecialchars(t('Value')) ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -496,33 +501,33 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                     $s_reord  = (float)($s['reorder_level']   ?? 0);
                                     $s_maxlvl = (float)($s['max_stock_level'] ?? 0);
                                     if ($s_qty <= 0) {
-                                        $h_label = 'Out'; $h_badge = 'danger';  $h_row = 'table-danger';
+                                        $h_label = t('Out of Stock'); $h_badge = 'danger';  $h_row = 'table-danger';
                                     } elseif ($s_reord > 0 && $s_qty < $s_reord) {
-                                        $h_label = 'Low'; $h_badge = 'warning'; $h_row = 'table-warning';
+                                        $h_label = t('Low Stock'); $h_badge = 'warning'; $h_row = 'table-warning';
                                     } elseif ($s_maxlvl > 0 && $s_qty > $s_maxlvl) {
-                                        $h_label = 'Over'; $h_badge = 'info';   $h_row = '';
+                                        $h_label = t('Overstocked'); $h_badge = 'info';   $h_row = '';
                                     } else {
-                                        $h_label = 'OK';  $h_badge = 'success'; $h_row = '';
+                                        $h_label = t('OK');  $h_badge = 'success'; $h_row = '';
                                     }
                                 ?>
                                 <tr class="<?= $h_row ?>">
                                     <td><?= $index + 1 ?></td>
                                     <td>
                                         <strong><?= caseFormat($s['product_name'] ?? '') ?></strong><br>
-                                        <small class="text-muted"><?= caseFormat($s['category_name'] ?? 'N/A') ?> | <?= caseFormat($s['brand_name'] ?? 'N/A') ?></small>
+                                        <small class="text-muted"><?= $s['category_name'] ? caseFormat($s['category_name']) : htmlspecialchars(t('N/A')) ?> | <?= $s['brand_name'] ? caseFormat($s['brand_name']) : htmlspecialchars(t('N/A')) ?></small>
                                     </td>
                                     <td><code class="custom-code text-dark"><?= htmlspecialchars(($s['sku'] ?: $s['product_code']) ?? '') ?></code></td>
                                     <td>
-                                        <span class="badge bg-light text-dark"><i class="bi bi-geo"></i> <?= htmlspecialchars(($s['location_name'] ?: 'Default') ?? '') ?></span>
+                                        <span class="badge bg-light text-dark"><i class="bi bi-geo"></i> <?= htmlspecialchars(($s['location_name'] ?: t('Main Area')) ?? '') ?></span>
                                     </td>
                                     <td class="text-center">
                                         <span class="fw-bold"><?= format_number($s['stock_quantity'], 0) ?></span>
                                         <?php if ($s_reord > 0): ?>
-                                        <div style="font-size:0.65rem;color:#aaa;">min <?= number_format($s_reord, 0) ?></div>
+                                        <div style="font-size:0.65rem;color:#aaa;"><?= htmlspecialchars(t('Reorder at')) ?> <?= number_format($s_reord, 0) ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-<?= $h_badge ?>"><?= $h_label ?></span>
+                                        <span class="badge bg-<?= $h_badge ?>"><?= htmlspecialchars($h_label) ?></span>
                                     </td>
                                     <td class="text-end">
                                         <?= format_currency($s_value) ?>
@@ -532,7 +537,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                             </tbody>
                             <tfoot class="table-light fw-bold">
                                 <tr>
-                                    <td colspan="4" class="text-end">Total:</td>
+                                    <td colspan="4" class="text-end"><?= htmlspecialchars(t('Total:')) ?></td>
                                     <td class="text-center"><?= number_format($total_quantity, 0) ?></td>
                                     <td></td>
                                     <td class="text-end"><?= format_currency($total_value_cost) ?></td>
@@ -691,7 +696,18 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         dom: 'rtip',
         language: {
-            search: "Filter Stock:"
+            search: <?= json_encode(t('Search:')) ?>,
+            info: <?= json_encode(t('Showing _START_ to _END_ of _TOTAL_ entries')) ?>,
+            infoEmpty: <?= json_encode(t('Showing 0 to 0 of 0 entries')) ?>,
+            infoFiltered: <?= json_encode(t('(filtered from _MAX_ total entries)')) ?>,
+            emptyTable: <?= json_encode(t('No products in stock yet')) ?>,
+            zeroRecords: <?= json_encode(t('No matching products found')) ?>,
+            paginate: {
+                first: <?= json_encode(t('First')) ?>,
+                last: <?= json_encode(t('Last')) ?>,
+                next: <?= json_encode(t('Next')) ?>,
+                previous: <?= json_encode(t('Previous')) ?>
+            }
         }
     });
 
@@ -714,7 +730,7 @@ function copyTable() {
     window.getSelection().addRange(range);
     document.execCommand('copy');
     window.getSelection().removeAllRanges();
-    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1000, showConfirmButton: false });
+    Swal.fire({ icon: 'success', title: <?= json_encode(t('Copied!')) ?>, text: <?= json_encode(t('Table data copied to clipboard')) ?>, timer: 1000, showConfirmButton: false });
 }
 
 function exportTable() {
@@ -731,7 +747,7 @@ function exportTable() {
     link.style.display = 'none';
     link.setAttribute('target', '_blank');
     link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv_string));
-    link.setAttribute('download', 'Warehouse_Inventory.csv');
+    link.setAttribute('download', <?= json_encode(isShopLabel() ? 'Shop_Stock.csv' : 'Warehouse_Stock.csv') ?>);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

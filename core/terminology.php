@@ -67,3 +67,52 @@ if (!function_exists('wLabelE')) {
         echo htmlspecialchars(wLabel($warehouseText, $shopText, $isPosCoreScreen));
     }
 }
+
+if (!function_exists('warehouseStatusLabel')) {
+    /**
+     * Display label for a warehouses.status value (active/inactive/maintenance).
+     *
+     * The plain 'Active' key is shared app-wide (users, products, ...) and its
+     * Swahili ("Hai") reads oddly for a shop, so shop/warehouse status uses its
+     * own context keys. lang/en.php is empty by design, so English falls back
+     * to the plain word passed as t()'s default.
+     */
+    function warehouseStatusLabel(?string $status): string
+    {
+        switch (strtolower((string)$status)) {
+            case 'active':      return t('Shop status: Active', 'Active');
+            case 'inactive':    return t('Shop status: Inactive', 'Inactive');
+            case 'maintenance': return t('Shop status: Under Maintenance', 'Under Maintenance');
+        }
+        return t(ucfirst((string)$status));
+    }
+}
+
+if (!function_exists('stockMovementLabel')) {
+    /**
+     * Human label for a stock_movements.movement_type code, instead of the raw
+     * code with underscores swapped for spaces ("Sale Out", "Transfer In").
+     */
+    function stockMovementLabel(?string $type): string
+    {
+        switch ((string)$type) {
+            case 'purchase_in':    return t('Stock Received');
+            case 'sale_out':       return t('Sold');
+            case 'adjustment_in':  return t('Stock Added (Adjustment)');
+            case 'adjustment_out': return t('Stock Removed (Adjustment)');
+            case 'transfer_in':    return wLabel('Received from Another Warehouse', 'Received from Another Shop');
+            case 'transfer_out':   return wLabel('Sent to Another Warehouse', 'Sent to Another Shop');
+            case 'return_in':      return t('Returned by Customer');
+            case 'return_out':     return t('Returned to Supplier');
+            case 'production_in':  return t('Produced');
+            case 'production_out': return t('Used in Production');
+            case 'damaged':        return t('Damaged');
+            case 'expired':        return t('Expired');
+            case 'found':          return t('Found');
+            case 'theft':          return t('Theft');
+            case 'correction':     return t('Correction');
+            case 'issue_out':      return t('Issued Out');
+        }
+        return ucwords(str_replace('_', ' ', (string)$type));
+    }
+}
