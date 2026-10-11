@@ -14,6 +14,13 @@ $can_manage_warehouse_settings = isAdmin() || canEdit('warehouses');
 
 // Handle form submissions BEFORE includeHeader() to allow redirects
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Messages that carry a value (a code, a name) can't be looked up by the
+    // display-time t() below, so they are translated here, in the user's
+    // saved language, while being built.
+    if (isset($_SESSION['user_lang'])) {
+        loadLanguage($_SESSION['user_lang']);
+    }
+
     // CSRF protection
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         // Stored untranslated: header.php (which resolves the user's language)
@@ -65,9 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check_stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_code = ?");
             $check_stmt->execute([$warehouse_code]);
             if ($check_stmt->fetch()) {
-                $errors[] = isShopLabel()
-                    ? "Shop code '{$warehouse_code}' already exists. Please use a different code."
-                    : "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
+                $errors[] = sprintf(wLabel("Warehouse code '%s' already exists. Please use a different code.", "Shop code '%s' already exists. Please use a different code."), htmlspecialchars($warehouse_code));
             }
         }
         // Hiding the option in the dropdown is not a control — a tampered POST
@@ -177,9 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Only reachable if the auto-grant insert itself failed
                     // (e.g. a DB error) — a genuine "created but contact your
                     // admin" case rather than the normal path.
-                    $_SESSION['warning'] = [isShopLabel()
-                        ? "Shop '{$safe_name}' was created successfully, but you don't have access to view it yet. Contact your admin to grant you access."
-                        : "Warehouse '{$safe_name}' was created successfully, but you don't have access to view it yet. Contact your admin to grant you access."];
+                    $_SESSION['warning'] = [sprintf(wLabel("Warehouse '%s' was created successfully, but you don't have access to view it yet. Contact your admin to grant you access.", "Shop '%s' was created successfully, but you don't have access to view it yet. Contact your admin to grant you access."), $safe_name)];
                 }
                 header("Location: warehouses.php");
                 exit();
@@ -222,6 +225,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pos_mode = in_array($_POST['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)
             ? $_POST['pos_mode'] : 'retail';
 
+        // The edit form hides Project when the Projects module is off and POS
+        // Mode when Restaurant POS is off. A field that wasn't sent keeps its
+        // stored value, so saving a shop never silently clears either one.
+        if (!array_key_exists('project_id', $_POST) || !array_key_exists('pos_mode', $_POST)) {
+            $keep_stmt = $pdo->prepare("SELECT project_id, pos_mode FROM warehouses WHERE warehouse_id = ?");
+            $keep_stmt->execute([$warehouse_id]);
+            $keep_row = $keep_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            if (!array_key_exists('project_id', $_POST)) {
+                $project_id = isset($keep_row['project_id']) ? (int)$keep_row['project_id'] : null;
+            }
+            if (!array_key_exists('pos_mode', $_POST) && in_array($keep_row['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)) {
+                $pos_mode = $keep_row['pos_mode'];
+            }
+        }
+
         // Validate input
         $errors = [];
         if (empty($warehouse_name)) {
@@ -234,9 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check_stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_code = ? AND warehouse_id != ?");
             $check_stmt->execute([$warehouse_code, $warehouse_id]);
             if ($check_stmt->fetch()) {
-                $errors[] = isShopLabel()
-                    ? "Shop code '{$warehouse_code}' already exists. Please use a different code."
-                    : "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
+                $errors[] = sprintf(wLabel("Warehouse code '%s' already exists. Please use a different code.", "Shop code '%s' already exists. Please use a different code."), htmlspecialchars($warehouse_code));
             }
         }
         // Gate the record being edited: a warehouse on someone else's project is
@@ -778,7 +794,7 @@ function get_primary_badge($is_primary) {
                 </div>
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Total Locations') ?></p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Total Storage Areas') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['total_locations'] ?></h3>
                     </div>
                 </div>
@@ -795,7 +811,7 @@ function get_primary_badge($is_primary) {
         <nav aria-label="breadcrumb" class="mb-3 d-print-none">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
-                <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>"><?= t('Inventory') ?></a></li>
+                <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>"><?= wLabel('Inventory', 'Products in Stock') ?></a></li>
                 <li class="breadcrumb-item active"><?= wLabel('Warehouses', 'Shops') ?></li>
             </ol>
         </nav>
@@ -859,7 +875,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['total_locations'] ?></h4>
-                                <p class="mb-0"><?= t('Total Locations') ?></p>
+                                <p class="mb-0"><?= t('Total Storage Areas') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-map" style="font-size: 2rem;"></i>
@@ -942,7 +958,7 @@ function get_primary_badge($is_primary) {
                             <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
                             <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= wLabel('Active Warehouses', 'Active Shops') ?></option>
                             <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= wLabel('Inactive Warehouses', 'Inactive Shops') ?></option>
-                            <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= t('Maintenance') ?></option>
+                            <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= warehouseStatusLabel('maintenance') ?></option>
                         </select>
                     </div>
                     <div class="col-md-4 d-flex align-items-end justify-content-end">
@@ -1009,7 +1025,7 @@ function get_primary_badge($is_primary) {
                                     <th><?= wLabel('Warehouse Name', 'Shop Name') ?></th>
                                     <th><?= t('Location') ?></th>
                                     <th><?= t('Contact') ?></th>
-                                    <th class="text-center"><?= t('Locations') ?></th>
+                                    <th class="text-center"><?= t('Storage Areas') ?></th>
                                     <th class="text-center"><?= t('Products') ?></th>
                                     <th class="text-end"><?= t('Stock Value') ?></th>
                                     <th class="text-center"><?= t('Status') ?></th>
@@ -1104,7 +1120,7 @@ function get_primary_badge($is_primary) {
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-<?= get_status_badge($warehouse['status'] ?? '') ?>">
-                                            <?= t(ucfirst($warehouse['status'] ?? '')) ?>
+                                            <?= htmlspecialchars(warehouseStatusLabel($warehouse['status'] ?? '')) ?>
                                         </span>
                                     </td>
                                     <td class="text-center">
@@ -1132,7 +1148,7 @@ function get_primary_badge($is_primary) {
                                                 <?php if (!posSimpleModeEnabled()): ?>
                                                 <li>
                                                     <a class="dropdown-item" href="#" onclick="manageLocations(<?= $warehouse['warehouse_id'] ?>)">
-                                                        <i class="bi bi-map text-info"></i> <?= t('Manage Locations') ?>
+                                                        <i class="bi bi-map text-info"></i> <?= t('Manage Storage Areas') ?>
                                                     </a>
                                                 </li>
                                                 <?php endif; ?>
@@ -1271,9 +1287,9 @@ function get_primary_badge($is_primary) {
                             <div class="col-md-4 mb-3">
                                 <label for="status" class="form-label"><?= t('Status') ?></label>
                                 <select class="form-select" id="status" name="status" required>
-                                    <option value="active" selected><?= t('Active') ?></option>
-                                    <option value="inactive"><?= t('Inactive') ?></option>
-                                    <option value="maintenance"><?= t('Maintenance') ?></option>
+                                    <option value="active" selected><?= warehouseStatusLabel('active') ?></option>
+                                    <option value="inactive"><?= warehouseStatusLabel('inactive') ?></option>
+                                    <option value="maintenance"><?= warehouseStatusLabel('maintenance') ?></option>
                                 </select>
                             </div>
                             <div class="col-md-4 mb-3">
@@ -1286,6 +1302,7 @@ function get_primary_badge($is_primary) {
                             </div>
                         </div>
 
+                        <?php if (tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos')): ?>
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="pos_mode" class="form-label"><?= t('POS Mode') ?></label>
@@ -1297,6 +1314,7 @@ function get_primary_badge($is_primary) {
                                 <small class="text-muted"><?= wLabel('Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.', 'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this shop in POS.') ?></small>
                             </div>
                         </div>
+                        <?php endif; ?>
 
                         <div class="mb-3">
                             <label for="notes" class="form-label"><?= t('Notes') ?></label>
@@ -1364,9 +1382,9 @@ function get_primary_badge($is_primary) {
                             <label for="status" class="form-label"><?= t('Status') ?></label>
                             <select class="form-select" id="status" name="status">
                                 <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
-                                <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= t('Active') ?></option>
-                                <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= t('Inactive') ?></option>
-                                <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= t('Maintenance') ?></option>
+                                <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= warehouseStatusLabel('active') ?></option>
+                                <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= warehouseStatusLabel('inactive') ?></option>
+                                <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= warehouseStatusLabel('maintenance') ?></option>
                             </select>
                         </div>
                     </div>
@@ -1412,7 +1430,7 @@ function get_primary_badge($is_primary) {
 
     // Transfer stock
     function transferStock(warehouseId) {
-        window.location.href = '<?= getUrl("stock_transfers") ?>?from_warehouse_id=' + warehouseId;
+        window.location.href = '<?= getUrl("stock_transfers") ?>?warehouse_id=' + warehouseId;
     }
 
     function deleteWarehouse(warehouseId) {
@@ -1495,7 +1513,7 @@ function get_primary_badge($is_primary) {
     function toggleWarehouseStatus(warehouseId, currentStatus) {
         const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
         const action = newStatus === 'active' ? 'activate' : 'deactivate';
-        const actionLabel = newStatus === 'active' ? <?= json_encode(t('activate')) ?> : <?= json_encode(t('deactivate')) ?>;
+        const actionLabel = newStatus === 'active' ? <?= json_encode(t('Shop action: activate', 'activate')) ?> : <?= json_encode(t('Shop action: deactivate', 'deactivate')) ?>;
 
         Swal.fire({
             title: <?= json_encode(t('Confirm Action')) ?>,
@@ -1518,7 +1536,7 @@ function get_primary_badge($is_primary) {
                     success: function(response) {
                         const result = JSON.parse(response);
                         if (result.success) {
-                            const doneLabel = newStatus === 'active' ? <?= json_encode(t('activated')) ?> : <?= json_encode(t('deactivated')) ?>;
+                            const doneLabel = newStatus === 'active' ? <?= json_encode(t('Shop action: activated', 'activated')) ?> : <?= json_encode(t('Shop action: deactivated', 'deactivated')) ?>;
                             Swal.fire({
                                 icon: 'success',
                                 title: <?= json_encode(t('Status Updated')) ?>,
@@ -1604,7 +1622,7 @@ function get_primary_badge($is_primary) {
     function exportWarehouses() {
         logReportAction('Exported Warehouse List', 'User exported warehouse records to CSV');
         const table = document.getElementById('warehousesTable');
-        let csv = '<?= t('Code') ?>,<?= t('Name') ?>,<?= t('Location') ?>,<?= t('Contact') ?>,<?= t('Locations') ?>,<?= t('Products') ?>,<?= t('Stock Value') ?>,<?= t('Status') ?>\n';
+        let csv = '<?= t('Code') ?>,<?= t('Name') ?>,<?= t('Location') ?>,<?= t('Contact') ?>,<?= t('Storage Areas') ?>,<?= t('Products') ?>,<?= t('Stock Value') ?>,<?= t('Status') ?>\n';
         
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
