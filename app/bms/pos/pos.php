@@ -165,7 +165,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> <?= t('Point of Sale') ?>
+                <i class="bi bi-cash-register"></i> <?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
                       title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>">

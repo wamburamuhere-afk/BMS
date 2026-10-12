@@ -8,6 +8,11 @@ require_once ROOT_DIR . '/core/activity_log_helpers.php'; // shared verb classif
 // can see the system-wide activity log.
 autoEnforcePermission('audit_logs');
 $is_admin = isAdmin();
+// The table's AJAX branches below answer before header.php runs, so load the
+// reader's language here for activityDisplayText().
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
 // Pagination setup
 $limit = isset($_GET['limit']) ? ($_GET['limit'] === 'all' ? -1 : (int)$_GET['limit']) : 10;
@@ -256,7 +261,7 @@ $company_vrn = get_setting('company_vrn', '');
                 '<span class="text-muted">' . ($sn++) . '</span>',
                 '<small class="text-muted text-nowrap">' . date('d/m/y, H:i', strtotime($f['timestamp'])) . '</small>',
                 '<span class="badge bg-' . $badge . ' rounded-pill">' . htmlspecialchars($f['type']) . '</span>',
-                htmlspecialchars($f['description']),
+                htmlspecialchars(activityDisplayText($f['description'])),
                 $refHtml,
                 htmlspecialchars($f['user_name']),
             ];
@@ -547,7 +552,7 @@ if (isset($_GET['ajax'])) {
                 <?= ucfirst(str_replace('_', ' ', $activity['type'] ?? 'Unknown')) ?>
             </span>
         </td>
-        <td data-label="Description"><?= htmlspecialchars($activity['description'] ?? '-') ?></td>
+        <td data-label="Description"><?= htmlspecialchars(activityDisplayText($activity['description'] ?? '-')) ?></td>
         <td data-label="Reference">
             <?php 
             $ref = (string)$activity['reference'];

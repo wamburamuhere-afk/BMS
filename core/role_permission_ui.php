@@ -29,10 +29,18 @@ if (!function_exists('rolePermissionRelevantModules')) {
 }
 
 if (!function_exists('rolePermissionRetiredKeys')) {
-    /** Pages with no effect anywhere; hidden from the matrix, existing grants kept. */
+    /**
+     * Pages with no effect anywhere; hidden from the matrix, existing grants kept.
+     *
+     * audit_report / activity_log: activity history is controlled by ONE box,
+     * "Audit Logs" (audit_logs) — the dashboard's Recent Activities, the Audit
+     * Logs page, the Activity Log page and the old Audit Report link (which only
+     * redirects to Audit Logs) all check it. Showing three boxes for the same
+     * data let an admin untick one and still leave the data visible.
+     */
     function rolePermissionRetiredKeys(): array
     {
-        return ['tax_settings'];
+        return ['tax_settings', 'audit_report', 'activity_log'];
     }
 }
 
@@ -95,6 +103,11 @@ if (!function_exists('rolePermissionTabName')) {
     {
         if (array_intersect(featureForPageKey($pageKey), ['pos', 'pos_advanced', 'restaurant_pos'])) {
             return 'Point of Sale';
+        }
+        // The one activity-history box sits with the reports, where admins look
+        // for it (it replaces the retired "Audit Report" row there).
+        if ($pageKey === 'audit_logs') {
+            return 'Reports';
         }
         return ($moduleName === null || $moduleName === '') ? 'Other' : $moduleName;
     }

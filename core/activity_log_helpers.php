@@ -62,3 +62,21 @@ if (!function_exists('activityViewDedupExclusion')) {
         )";
     }
 }
+
+if (!function_exists('activityDisplayText')) {
+    /**
+     * Translate a stored activity description for display. Descriptions are
+     * saved in English at write time (before the reader's language is known),
+     * so fixed texts are looked up here instead; anything with no catalog entry
+     * (most carry a name or number) is shown exactly as stored.
+     */
+    function activityDisplayText(?string $text): string
+    {
+        $text = (string)$text;
+        $logoutPrefix = 'Logged out of the system — session lasted ';
+        if (strpos($text, $logoutPrefix) === 0) {
+            return sprintf(t('Logged out of the system — session lasted %s'), substr($text, strlen($logoutPrefix)));
+        }
+        return t($text);
+    }
+}
