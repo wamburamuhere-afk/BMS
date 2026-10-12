@@ -179,6 +179,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
 ?>
 <style>
 .mm-thead th{background:#fff!important;color:#212529;border-bottom:2px solid #dee2e6!important;text-align:center;font-weight:600;font-size:.8rem;padding:10px 8px}
+.mm-sno{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f0f2f5;color:#6b7280;font-size:.7rem;font-weight:700;flex-shrink:0}
+.mm-kv{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.mm-kv:last-child{border:0}
+.mm-kv .kv-lbl{color:#9ca3af}
+.mm-kv .kv-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
 </style>
 <div class="container-fluid py-4 px-4">
     <div class="d-flex align-items-center gap-2 mb-4">
@@ -241,14 +246,17 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
     </ul>
 
     <!-- Report table -->
+    <?php $sno = 1; ?>
+    <div id="tableView">
     <div class="table-responsive">
-        <table id="reportTable" class="table table-hover align-middle w-100">
+        <table id="reportTable" data-bms-cards="off" class="table table-hover align-middle w-100">
             <?php if ($reportTab === 'txn_summary'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Type') ?></th><th class="text-end"><?= t('Count') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Fees (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Count') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Fees (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th></tr></thead>
             <tbody>
                 <?php $totV=0; $totF=0; $totC=0; $totN=0;
                       foreach ($reportData as $r): $totV+=$r['volume']; $totF+=$r['fees']; $totC+=$r['commission']; $totN+=$r['cnt']; ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><?= caseFormat(str_replace('_',' ',$r['txn_type'])) ?></td>
                     <td class="text-end"><?= number_format((int)$r['cnt']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['volume']) ?></td>
@@ -256,14 +264,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                     <td class="text-end"><?= number_format((float)$r['commission']) ?></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totF) ?></td><td class="text-end"><?= number_format($totC) ?></td></tr>
             </tbody>
+            <tfoot><tr class="fw-bold border-top border-2"><td></td><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totF) ?></td><td class="text-end"><?= number_format($totC) ?></td></tr></tfoot>
 
             <?php elseif ($reportTab === 'float_position'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Agent') ?></th><th><?= t('Till') ?></th><th><?= t('Network') ?></th><th class="text-end"><?= t('Float Balance') ?></th><th class="text-end"><?= t('Cash Balance') ?></th><th><?= t('Snapshot At') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Agent') ?></th><th><?= t('Till') ?></th><th><?= t('Network') ?></th><th class="text-end"><?= t('Float Balance') ?></th><th class="text-end"><?= t('Cash Balance') ?></th><th><?= t('Snapshot At') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><?= caseFormat($r['agent_name']) ?></td>
                     <td><?= safe_output($r['till_number']) ?></td>
                     <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
@@ -275,12 +284,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'commission'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Earned (TZS)') ?></th><?php if ($showReceived): ?><th class="text-end"><?= t('Received (TZS)') ?></th><th class="text-end"><?= t('Outstanding (TZS)') ?></th><?php endif; ?></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Network') ?></th><th class="text-end"><?= t('Earned (TZS)') ?></th><?php if ($showReceived): ?><th class="text-end"><?= t('Received (TZS)') ?></th><th class="text-end"><?= t('Outstanding (TZS)') ?></th><?php endif; ?></tr></thead>
             <tbody>
                 <?php $totE=0; $totR=0;
                       foreach ($reportData as $r): $totE+=$r['earned']; $totR+=$r['received'];
                           $outstanding = max(0, (float)$r['earned'] - (float)$r['received']); ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
                     <td class="text-end"><?= number_format((float)$r['earned']) ?></td>
                     <?php if ($showReceived): ?>
@@ -289,14 +299,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                     <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totE) ?></td><?php if ($showReceived): ?><td class="text-end"><?= number_format($totR) ?></td><td class="text-end"><?= number_format(max(0,$totE-$totR)) ?></td><?php endif; ?></tr>
             </tbody>
+            <tfoot><tr class="fw-bold border-top border-2"><td></td><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totE) ?></td><?php if ($showReceived): ?><td class="text-end"><?= number_format($totR) ?></td><td class="text-end"><?= number_format(max(0,$totE-$totR)) ?></td><?php endif; ?></tr></tfoot>
 
             <?php elseif ($reportTab === 'agent_perf'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Code') ?></th><th><?= t('Agent') ?></th><th><?= t('Region') ?></th><th class="text-end"><?= t('Txns') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Tills') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Code') ?></th><th><?= t('Agent') ?></th><th><?= t('Region') ?></th><th class="text-end"><?= t('Txns') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Tills') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><code><?= safe_output($r['agent_code']) ?></code></td>
                     <td><?= caseFormat($r['agent_name']) ?></td>
                     <td><?= caseFormat($r['region'] ?? null) ?></td>
@@ -309,10 +320,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'shift_summary'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Code') ?></th><th><?= t('Till') ?></th><th><?= t('Agent') ?></th><th><?= t('Teller') ?></th><th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Cash Var') ?></th><th class="text-end"><?= t('Float Var') ?></th><th><?= t('Status') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Code') ?></th><th><?= t('Till') ?></th><th><?= t('Agent') ?></th><th><?= t('Teller') ?></th><th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Cash Var') ?></th><th class="text-end"><?= t('Float Var') ?></th><th><?= t('Status') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><code><?= safe_output($r['shift_code']) ?></code></td>
                     <td><?= safe_output($r['till_number']) ?></td>
                     <td><?= caseFormat($r['agent_name']) ?></td>
@@ -327,10 +339,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'void_suspicious'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Code') ?></th><th><?= t('Date') ?></th><th><?= t('Type') ?></th><th><?= t('Network') ?></th><th><?= t('Agent') ?></th><th class="text-end"><?= t('Amount') ?></th><th><?= t('Status') ?></th><th><?= t('Reason') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Code') ?></th><th><?= t('Date') ?></th><th><?= t('Type') ?></th><th><?= t('Network') ?></th><th><?= t('Agent') ?></th><th class="text-end"><?= t('Amount') ?></th><th><?= t('Status') ?></th><th><?= t('Reason') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($reportData as $r): ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><code><?= safe_output($r['txn_code']) ?></code></td>
                     <td><?= safe_output($r['txn_date']) ?></td>
                     <td><?= caseFormat(str_replace('_',' ',$r['txn_type'])) ?></td>
@@ -347,11 +360,12 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
             </tbody>
 
             <?php elseif ($reportTab === 'network_comparison'): ?>
-            <thead class="mm-thead"><tr><th><?= t('Network') ?></th><th class="text-end"><?= t('Transactions') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Active Agents') ?></th></tr></thead>
+            <thead class="mm-thead"><tr><th class="text-center" style="width:48px"><?= t('S/No') ?></th><th><?= t('Network') ?></th><th class="text-end"><?= t('Transactions') ?></th><th class="text-end"><?= t('Volume (TZS)') ?></th><th class="text-end"><?= t('Commission (TZS)') ?></th><th class="text-end"><?= t('Active Agents') ?></th></tr></thead>
             <tbody>
                 <?php $totV=0; $totC=0; $totN=0;
                       foreach ($reportData as $r): $totV+=$r['volume']; $totC+=$r['commission']; $totN+=$r['txn_count']; ?>
                 <tr>
+                    <td class="text-center text-muted small"><?= $sno++ ?></td>
                     <td><span class="badge rounded-pill" style="background:<?= safe_output($r['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($r['network_name']) ?></span></td>
                     <td class="text-end"><?= number_format((int)$r['txn_count']) ?></td>
                     <td class="text-end"><?= number_format((float)$r['volume']) ?></td>
@@ -359,11 +373,13 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Reports', "Viewed MM report: $r
                     <td class="text-end"><?= $r['agents'] ?></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="fw-bold border-top border-2"><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totC) ?></td><td></td></tr>
             </tbody>
+            <tfoot><tr class="fw-bold border-top border-2"><td></td><td><?= t('Total') ?></td><td class="text-end"><?= number_format($totN) ?></td><td class="text-end"><?= number_format($totV) ?></td><td class="text-end"><?= number_format($totC) ?></td><td></td></tr></tfoot>
             <?php endif; ?>
         </table>
     </div>
+    </div><!-- end tableView -->
+    <div id="cardView" class="row g-2 d-none"></div>
 </div>
 
 <script>
@@ -371,12 +387,50 @@ $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#reportTable')) {
         const dt = $('#reportTable').DataTable({
             responsive: false, scrollX: true, pageLength: 50, order: [],
+            columnDefs: [{ orderable: false, targets: 0 }],
             dom: 'rtipB',
             language: { emptyTable: '<?= addslashes(t('No records found for the selected filters.')) ?>' },
-            buttons: [{ extend: 'excelHtml5', className: 'd-none', filename: 'mm-report', exportOptions: { columns: ':not(:last-child)' } }]
+            // No action column on reports — export every column (incl. the Total footer)
+            buttons: [{ extend: 'excelHtml5', className: 'd-none', filename: 'mm-report', footer: true }],
+            drawCallback: function () { renderReportCards(this.api()); }
         });
         $('#exportBtn')?.on('click', function () { dt.button('.buttons-excel').trigger(); });
     }
+    function applyView() {
+        const mobile = window.innerWidth < 768;
+        $('#tableView').toggleClass('d-none', mobile);
+        $('#cardView').toggleClass('d-none', !mobile);
+    }
+    applyView(); $(window).on('resize', applyView);
 });
+
+// Columns differ per report, so cards are built from the table's own headers + cells:
+// S/No badge, first data column as the title, every other column as a label/value line.
+function renderReportCards(api) {
+    const labels = api.columns().header().toArray().map(h => $(h).text().trim());
+    const nodes  = api.rows({ page: 'current' }).nodes().toArray();
+    if (!nodes.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted"><?= addslashes(t('No records found for the selected filters.')) ?></div>'); return; }
+    const card = (sno, cells) => {
+        let kv = '';
+        for (let i = 2; i < cells.length; i++) {
+            kv += `<div class="mm-kv"><span class="kv-lbl">${safeOutput(labels[i] || '')}</span><span class="kv-val">${cells[i].innerHTML.trim() || '—'}</span></div>`;
+        }
+        return `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              ${sno !== '' ? `<span class="mm-sno">${safeOutput(sno)}</span>` : ''}
+              <span class="fw-semibold" style="font-size:.95rem">${cells[1] ? cells[1].innerHTML.trim() : ''}</span>
+            </div>
+            ${kv}
+          </div>
+        </div></div>`;
+    };
+    // Cell HTML is already server-escaped (safe_output / caseFormat), so it is reused as-is.
+    let html = nodes.map(tr => { const c = tr.querySelectorAll('td'); return card(c[0].textContent.trim(), c); }).join('');
+    const foot = api.table().footer();
+    const footRow = foot ? foot.querySelector('tr') : null;
+    if (footRow) html += card('', footRow.querySelectorAll('td'));
+    $('#cardView').html(html);
+}
 </script>
 <?php includeFooter(); ?>

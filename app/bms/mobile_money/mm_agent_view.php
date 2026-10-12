@@ -116,7 +116,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
         <div class="card border-0 shadow-sm mb-2">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table id="tillsTable" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
+                    <table id="tillsTable" data-bms-cards="off" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
                         <thead class="mm-thead">
                             <tr>
                                 <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
@@ -184,26 +184,56 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Agent', 'Viewed agent: ' . $age
     <!-- Sub-agents section -->
     <?php if (!empty($subAgents)): ?>
     <h5 class="mb-2"><i class="bi bi-diagram-2 text-info me-2"></i><?= t('Sub-Agents') ?></h5>
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr><th><?= t('Code') ?></th><th><?= t('Name') ?></th><th><?= t('Phone') ?></th><th><?= t('Location') ?></th><th><?= t('Status') ?></th></tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($subAgents as $sa): ?>
-                    <tr>
-                        <td><code><?= safe_output($sa['agent_code']) ?></code></td>
-                        <td><a href="<?= getUrl('mm_agent_view') ?>?id=<?= $sa['agent_id'] ?>"><?= caseFormat($sa['agent_name']) ?></a></td>
-                        <td><?= safe_output($sa['phone_primary'] ?: '—') ?></td>
-                        <td class="small text-muted"><?= caseFormat(implode(', ', array_filter([$sa['region'], $sa['district']])) ?: null) ?></td>
-                        <td><span class="badge <?= $sa['status']==='active'?'bg-success':($sa['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>"><?= ucfirst(safe_output($sa['status'])) ?></span></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+    <div id="subAgentsTableView">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table id="subAgentsTable" data-bms-cards="off" class="table table-hover align-middle mb-0 w-100" style="font-size:.88rem">
+                        <thead class="mm-thead">
+                            <tr>
+                                <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
+                                <th class="text-center"><?= t('Code') ?></th>
+                                <th class="text-center"><?= t('Name') ?></th>
+                                <th class="text-center"><?= t('Phone') ?></th>
+                                <th class="text-center"><?= t('Location') ?></th>
+                                <th class="text-center"><?= t('Status') ?></th>
+                                <th class="text-center"><?= t('Actions') ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $ssno = 1; foreach ($subAgents as $sa):
+                                $saLocation = implode(', ', array_filter([$sa['region'], $sa['district']])); ?>
+                            <tr data-id="<?= (int)$sa['agent_id'] ?>"
+                                data-code="<?= htmlspecialchars($sa['agent_code'] ?? '') ?>"
+                                data-name="<?= caseFormat($sa['agent_name']) ?>"
+                                data-phone="<?= htmlspecialchars($sa['phone_primary'] ?: '—') ?>"
+                                data-location="<?= $saLocation !== '' ? caseFormat($saLocation) : '—' ?>"
+                                data-status="<?= htmlspecialchars($sa['status']) ?>">
+                                <td class="text-center text-muted small"><?= $ssno++ ?></td>
+                                <td><code class="small"><?= safe_output($sa['agent_code']) ?></code></td>
+                                <td><a href="<?= getUrl('mm_agent_view') ?>?id=<?= $sa['agent_id'] ?>"><?= caseFormat($sa['agent_name']) ?></a></td>
+                                <td class="small"><?= safe_output($sa['phone_primary'] ?: '—') ?></td>
+                                <td class="small text-muted"><?= caseFormat($saLocation ?: null) ?></td>
+                                <td class="text-center"><span class="badge <?= $sa['status']==='active'?'bg-success':($sa['status']==='suspended'?'bg-warning text-dark':'bg-secondary') ?>" style="font-size:.72rem"><?= ucfirst(safe_output($sa['status'])) ?></span></td>
+                                <td class="text-center">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
+                                            <li><a class="dropdown-item" href="<?= getUrl('mm_agent_view') ?>?id=<?= $sa['agent_id'] ?>"><i class="bi bi-eye me-2 text-info"></i><?= t('View') ?></a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
+    <div id="subAgentsCardView" class="row g-2 mb-4 d-none"></div>
     <?php endif; ?>
 </div>
 
@@ -439,12 +469,21 @@ $(document).ready(function () {
             drawCallback: function () { renderTillCards(this.api().rows({page:'current'}).nodes()); applyView(); }
         });
     }
+    // DataTable for sub-agents (section only rendered when the agent has sub-agents)
+    if ($('#subAgentsTable').length && !$.fn.DataTable.isDataTable('#subAgentsTable')) {
+        $('#subAgentsTable').DataTable({
+            responsive: false, scrollX: true, pageLength: 25,
+            order: [[2, 'asc']], columnDefs: [{orderable: false, targets: [0, 6]}],
+            dom: 'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No sub-agents.')) ?>' },
+            buttons: [{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
+            drawCallback: function () { renderSubAgentCards(this.api().rows({page:'current'}).nodes()); applyView(); }
+        });
+    }
     function applyView() {
-        if (window.innerWidth < 768) {
-            $('#tillsTableView').addClass('d-none'); $('#tillsCardView').removeClass('d-none');
-        } else {
-            $('#tillsTableView').removeClass('d-none'); $('#tillsCardView').addClass('d-none');
-        }
+        const mobile = window.innerWidth < 768;
+        $('#tillsTableView, #subAgentsTableView').toggleClass('d-none', mobile);
+        $('#tillsCardView, #subAgentsCardView').toggleClass('d-none', !mobile);
     }
     applyView(); $(window).on('resize', applyView);
 
@@ -520,6 +559,32 @@ function renderTillCards(nodes) {
         </div></div>`;
     });
     $('#tillsCardView').html(html);
+}
+
+function renderSubAgentCards(nodes) {
+    if (!nodes.length) { $('#subAgentsCardView').html('<div class="col-12 text-center py-4 text-muted"><?= t('No sub-agents.') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const id = $tr.data('id'), status = String($tr.data('status'));
+        const sBadge = status === 'active' ? 'bg-success' : (status === 'suspended' ? 'bg-warning text-dark' : 'bg-secondary');
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${idx + 1}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="fw-semibold mb-2" style="font-size:.95rem">${safeOutput(String($tr.data('name')))}</div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Code') ?></span><span class="kv-val"><code>${safeOutput(String($tr.data('code')))}</code></span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Phone') ?></span><span class="kv-val">${safeOutput(String($tr.data('phone')))}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Location') ?></span><span class="kv-val">${safeOutput(String($tr.data('location')))}</span></div>
+          </div>
+          <div class="mm-card-foot">
+            <a href="<?= getUrl('mm_agent_view') ?>?id=${id}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1"></i><?= t('View') ?></a>
+          </div>
+        </div></div>`;
+    });
+    $('#subAgentsCardView').html(html);
 }
 </script>
 

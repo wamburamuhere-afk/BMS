@@ -103,7 +103,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Compliance/KYC', 'Viewed MM KYC Re
         <div class="tab-pane fade show active" id="kycRecordsTab">
             <div id="kycTableView">
             <div class="table-responsive">
-                <table id="kycTable" class="table table-hover align-middle w-100">
+                <table id="kycTable" data-bms-cards="off" class="table table-hover align-middle w-100">
                     <thead class="mm-thead">
                         <tr>
                             <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
@@ -147,7 +147,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Compliance/KYC', 'Viewed MM KYC Re
             <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i><?= t('These transactions require KYC documentation but have not been captured.') ?></div>
             <div id="pendingTableView">
             <div class="table-responsive">
-                <table id="pendingTable" class="table table-hover align-middle w-100">
+                <table id="pendingTable" data-bms-cards="off" class="table table-hover align-middle w-100">
                     <thead class="mm-thead">
                         <tr>
                             <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
