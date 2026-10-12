@@ -23,7 +23,7 @@ if (!isset($_SESSION['user_id'])) {
 
 if (!canEdit('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to close POS shifts')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access Denied: you do not have permission to close POS shifts', 'Access Denied: you do not have permission to close a sales shift')]);
     exit();
 }
 try {

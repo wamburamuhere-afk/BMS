@@ -37,9 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_setting('pos_loyalty_spend_per_point', max(1, (float)($_POST['pos_loyalty_spend_per_point'] ?? 1000)));
             save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
         }
-        $success_msg = t("POS settings updated successfully");
+        $success_msg = wLabel('POS settings updated successfully', 'Selling settings updated successfully');
     } catch (Exception $e) {
-        $error_msg = sprintf(t("Error updating POS settings: %s"), $e->getMessage());
+        $error_msg = sprintf(wLabel('Error updating POS settings: %s', 'Error updating selling settings: %s'), $e->getMessage());
     }
 }
 
@@ -63,8 +63,8 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-0"><i class="bi bi-cart"></i> <?= t('POS Settings') ?></h2>
-            <p class="text-muted"><?= t('Point of Sale configuration') ?></p>
+            <h2 class="mb-0"><i class="bi bi-cart"></i> <?= wLabel('POS Settings', 'Selling Settings') ?></h2>
+            <p class="text-muted"><?= wLabel('Point of Sale configuration', 'Display, discounts and other options for the Sell screen') ?></p>
         </div>
     </div>
 
@@ -116,7 +116,7 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                                 <option value="percentage" <?= $pos_discount_type == 'percentage' ? 'selected' : '' ?>><?= t('Percentage (%)') ?></option>
                                 <option value="fixed" <?= $pos_discount_type == 'fixed' ? 'selected' : '' ?>><?= t('Fixed Amount (Constant)') ?></option>
                             </select>
-                            <div class="form-text"><?= t('Choose how discounts are applied in the POS interface (Percentage vs Constant Amount).') ?></div>
+                            <div class="form-text"><?= wLabel('Choose how discounts are applied in the POS interface (Percentage vs Constant Amount).', 'Choose how discounts are applied on the Sell screen (Percentage vs Constant Amount).') ?></div>
                         </div>
 
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Receipt Printing') ?></h6>
@@ -162,13 +162,13 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                         <?php else: ?>
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Loyalty Program') ?></h6>
                         <div class="alert alert-light border small mb-0">
-                            <i class="bi bi-lock me-1"></i> <?= sprintf(t('Loyalty points are part of %s — not included in your current plan.'), '<strong>' . t('POS Advanced') . '</strong>') ?>
+                            <i class="bi bi-lock me-1"></i> <?= sprintf(t('Loyalty points are part of %s — not included in your current plan.'), '<strong>' . wLabel('POS Advanced', 'Advanced Selling Features') . '</strong>') ?>
                         </div>
                         <?php endif; ?>
 
                         <div class="mt-4 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_pos" class="btn btn-primary px-5">
-                                <i class="bi bi-save me-2"></i> <?= t('Save POS Settings') ?>
+                                <i class="bi bi-save me-2"></i> <?= wLabel('Save POS Settings', 'Save Selling Settings') ?>
                             </button>
                         </div>
                     </form>
@@ -211,7 +211,7 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                 <div class="card-body p-4">
                     <h6 class="fw-bold mb-3 text-dark text-uppercase small"><?= t('Registers / Tills') ?></h6>
                     <div class="alert alert-light border small mb-0">
-                        <i class="bi bi-lock me-1"></i> <?= sprintf(t('Multi-register (multi-till) management is part of %s — not included in your current plan. You still have one default register/till to sign in at.'), '<strong>' . t('POS Advanced') . '</strong>') ?>
+                        <i class="bi bi-lock me-1"></i> <?= sprintf(t('Multi-register (multi-till) management is part of %s — not included in your current plan. You still have one default register/till to sign in at.'), '<strong>' . wLabel('POS Advanced', 'Advanced Selling Features') . '</strong>') ?>
                     </div>
                 </div>
             </div>

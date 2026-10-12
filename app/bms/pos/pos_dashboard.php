@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/pos_nav.php';
 autoEnforcePermission('pos');
 
-$page_title = 'POS Workspace';
+$page_title = wLabel('POS Workspace', 'Sales Overview');
 require_once 'header.php';
 
 // Phase 30 (pos_upgrade_plan.md §9) — this page is the POS hub: header.php's
@@ -35,7 +35,7 @@ $company_logo = getSetting('company_logo', '');
 
     <!-- ── Page header ── -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h4 class="mb-0 text-primary"><i class="bi bi-shop me-2"></i><?= t('POS Workspace') ?></h4>
+        <h4 class="mb-0 text-primary"><i class="bi bi-shop me-2"></i><?= wLabel('POS Workspace', 'Sales Overview') ?></h4>
         <div id="posWorkspaceActions" class="d-flex align-items-center gap-2">
             <button id="btnToggleDash" class="btn btn-primary btn-sm pos-workspace-action">
                 <i class="bi bi-speedometer2 me-1"></i> <?= t('Sales Dashboard') ?>
@@ -745,7 +745,7 @@ const T = {
     loading: <?= json_encode(t('Loading…')) ?>,
     noSalesThisMonth: <?= json_encode(t('No sales this month')) ?>,
     netSalesLabel: <?= json_encode(t('Net Sales')) ?>,
-    salesHistoryPrintTitle: <?= json_encode(t('POS Sales History')) ?>,
+    salesHistoryPrintTitle: <?= json_encode(wLabel('POS Sales History', 'Sales History')) ?>,
     viewReceipt: <?= json_encode(t('View Receipt')) ?>,
     receivePayment: <?= json_encode(t('Receive Payment')) ?>,
     returnRefund: <?= json_encode(t('Return / Refund')) ?>,
@@ -758,7 +758,7 @@ const T = {
     showingXofY: <?= json_encode(t('Showing _START_–_END_ of _TOTAL_')) ?>,
     due: <?= json_encode(t('due')) ?>,
     paid: <?= json_encode(t('paid')) ?>,
-    salesHistoryReportTitle: <?= json_encode(t('POS Sales History Report')) ?>,
+    salesHistoryReportTitle: <?= json_encode(wLabel('POS Sales History Report', 'Sales History Report')) ?>,
     periodLabel: <?= json_encode(t('Period:')) ?>,
     printedByLabel: <?= json_encode(t('Printed by:')) ?>,
     printedByFooter: <?= json_encode(t('This document was')) ?>,
