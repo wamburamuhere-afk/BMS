@@ -394,7 +394,7 @@ return [
     'Inventory Status' => 'Hali ya Ghala',
     'Total Products' => 'Jumla ya Bidhaa',
     'Low Stock' => 'Stoki Kidogo',
-    'View Inventory Alerts' => 'Angalia Tahadhari za Ghala',
+    'View Inventory Alerts' => 'Angalia Tahadhari za Stoki',
 
     // ------------------------------------------------------------------
     // Dashboard — sidebar (Recent Activities, Your Performance)
@@ -5232,5 +5232,12 @@ return [
     'Returned to Supplier' => 'Imerudishwa kwa Msambazaji',
     'Produced' => 'Imezalishwa',
     'Used in Production' => 'Imetumika Kuzalisha',
+
+    // 2026-10-12 — Shop mode 'Sell' label, translated activity texts
+    'Sell' => 'Uza',
+    "Today's Sales" => 'Mauzo ya Leo',
+    'Start Selling' => 'Anza Kuuza',
+    'Logged in to the system' => 'Ameingia kwenye mfumo',
+    'Logged out of the system — session lasted %s' => 'Ametoka kwenye mfumo — alikaa kwa %s',
 
 ];

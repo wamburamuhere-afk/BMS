@@ -1288,7 +1288,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>?type=outbound"><i class="bi bi-box-arrow-up-right"></i> <?= t('DN (Outbound)') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('pos')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?></a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header"><?= t('Returns') ?></h6></li>
                                 <?php if(canView('sales_returns')): ?>
@@ -1302,7 +1302,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php elseif(canView('pos')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('pos') ?>">
-                                <i class="bi bi-cart-check"></i> <?= t('POS') ?>
+                                <i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?>
                             </a>
                         </li>
                         <?php endif; ?>
@@ -1650,7 +1650,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('tax_report') ?>"><i class="bi bi-percent"></i> <?= t('Tax Report') ?></a><?php endif; ?>
                                         <?php if(canView('wht_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('WHT Report') ?></a><?php endif; ?>
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_receivable_report') ?>"><i class="bi bi-cash-coin"></i> <?= t('WHT Credit (Received)') ?></a><?php endif; ?>
-                                        <?php if(canView('audit_report')): ?><a class="dropdown-item" href="<?= getUrl('audit_report') ?>"><i class="bi bi-shield-check"></i> <?= t('Audit Report') ?></a><?php endif; ?>
                                         <?php if(canView('audit_logs')): ?><a class="dropdown-item" href="<?= getUrl('audit_logs') ?>"><i class="bi bi-clock-history"></i> <?= t('Audit Logs') ?></a><?php endif; ?>
                                         <?php if(canView('compliance_report')): ?><a class="dropdown-item" href="<?= getUrl('compliance_report') ?>"><i class="bi bi-file-check"></i> <?= t('Compliance') ?></a><?php endif; ?>
                                         <?php if(canView('employee_report')): ?><a class="dropdown-item" href="<?= getUrl('employee_report') ?>"><i class="bi bi-person-badge"></i> <?= t('Employee Report') ?></a><?php endif; ?>
@@ -2011,7 +2010,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         <a class="bn-item<?= $__bn_on('dashboard') ? ' active' : '' ?>" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i><span><?= t('Dashboard') ?></span></a>
         <?php endif; ?>
         <?php if (canView('pos')): ?>
-        <a class="bn-item<?= $__bn_on('pos') ? ' active' : '' ?>" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i><span><?= t('POS') ?></span></a>
+        <a class="bn-item<?= $__bn_on('pos') ? ' active' : '' ?>" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i><span><?= htmlspecialchars(wLabel('POS', 'Sell')) ?></span></a>
         <?php endif; ?>
         <?php if (canView('products')): ?>
         <a class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" href="<?= getUrl('products') ?>"><i class="bi bi-box"></i><span><?= t('Products') ?></span></a>

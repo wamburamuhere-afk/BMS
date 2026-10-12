@@ -44,7 +44,7 @@ $company_logo = getSetting('company_logo', '');
                 <i class="bi bi-clock-history me-1"></i> <?= t('Shift History') ?>
             </a>
             <a id="posWorkspaceOpenPos" href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm pos-workspace-action">
-                <i class="bi bi-bag-plus me-1"></i> <?= t('Open POS') ?>
+                <i class="bi bi-bag-plus me-1"></i> <?= htmlspecialchars(wLabel('Open POS', 'Start Selling')) ?>
             </a>
         </div>
     </div>
