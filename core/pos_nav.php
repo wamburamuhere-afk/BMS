@@ -38,7 +38,7 @@ if (!function_exists('posNavGroups')) {
             $groups[] = [
                 'key'         => 'catalog_setup',
                 'label'       => t('Catalog Setup'),
-                'description' => t('Price Groups and other catalog-level POS configuration.'),
+                'description' => wLabel('Price Groups and other catalog-level POS configuration.', 'Price Groups and other price settings.'),
                 'url'         => 'pos/price-groups',
                 'primary'     => false,
             ];
@@ -77,7 +77,7 @@ if (!function_exists('posNavGroups')) {
         $groups[] = [
             'key'         => 'settings',
             'label'       => t('Settings'),
-            'description' => t('POS configuration: registers, receipts, loyalty.'),
+            'description' => wLabel('POS configuration: registers, receipts, loyalty.', 'Selling settings: registers, receipts, customer points.'),
             'url'         => 'pos_config_settings',
             'primary'     => false,
         ];

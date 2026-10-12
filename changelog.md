@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-12 — fix(shop mode): replace "POS" wording with selling words everywhere
+
+**Files:** `header.php`, `core/pos_nav.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/pos/pos_credit_customers.php`, `app/constant/settings/pos_config_settings.php`, `app/constant/settings/help.php`, `app/constant/settings/user_roles.php`, `app/constant/reports/sales_report.php`, `app/bms/customer/customer_details.php`, `app/bms/Suppliers/supplier_details.php`, `app/bms/stock/warehouse_batches_tab.php`, `app/bms/product/services.php`, `app/bms/product/products.php`, `api/pos/{close_shift,open_shift,hold_sale,delete_held_sale,process_sale,create_return,receive_payment,void_sale}.php`, `lang/sw.php`, `tests/test_activity_log_permission_and_sell_label_cli.php`
+After "POS" became "Uza / Sell" in the menu (2026-10-12), 34 other texts still said "POS" in shop mode. Each now goes through `wLabel()` (same rule as Duka/Shop), so a full ERP company keeps "POS":
+- **Menus/pages:** POS Settings → Selling Settings (Mipangilio ya Kuuza); POS Workspace → Sales Overview (Muhtasari wa Mauzo, incl. page title); POS Sales History (+ Report) → Sales History; Roles & Permissions tab "Point of Sale" → Selling (Kuuza); sales report filter "POS Only" → Shop Sales Only (Mauzo ya Dukani Pekee).
+- **Messages:** customer/supplier/batch/services texts, Max discount, discount type hint, Advanced Selling Features, price-group description, settings saved/error.
+- **Permission errors (API):** sell, open/close a sales shift, hold/delete held sales, void, returns, receive payments — no "POS".
+- **Help:** "How do I sell?", "Tap Sell in the menu", module list, keyboard shortcut label.
+- **Swahili gaps fixed:** 22 POS screen texts that never had Swahili (sale/return/payment errors, credit-sale due date dialog, View Cart, POS settings Display section, Receive Stock supplier hint). `tests/test_pos_i18n_coverage_cli.php` now passes fully (was 17 failures).
+Verified in a browser: shop mode (Swahili + English) shows no "POS" on dashboard, Sell screen, Sales Overview, Selling Settings, Help, Roles & Permissions and Sales report; full ERP keeps POS wording (30 checks). Earlier suites still pass (88 + 18).
+
+---
+
 ## 2026-10-12 — fix(permissions): one "Audit Logs" switch for all activity history; shop mode "Uza/Sell" label
 
 **Files:** `core/role_permission_ui.php`, `core/permissions.php`, `app/constant/reports/audit_report.php`, `header.php`, `app/dashboard.php`, `app/activity_log.php`, `core/activity_log_helpers.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/pos/shift_history.php`, `lang/sw.php`, `tests/test_activity_log_permission_and_sell_label_cli.php` (new)

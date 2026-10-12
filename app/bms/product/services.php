@@ -218,7 +218,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
                 <h4 class="fw-bold mb-1"><i class="bi bi-box-seam me-2"></i><?= wLabel('Non-Inventory Products', 'Services') ?></h4>
-                <p class="mb-0 opacity-75 small"><?= tenantFeatureEnabled('sales') ? t('Virtual products & services — used in Sales, Invoices and POS only') : t('Services you sell at the POS') ?></p>
+                <p class="mb-0 opacity-75 small"><?= tenantFeatureEnabled('sales') ? wLabel('Virtual products & services — used in Sales, Invoices and POS only', 'Virtual products & services — used in Sales, Invoices and the Sell screen only') : wLabel('Services you sell at the POS', 'Services you sell') ?></p>
             </div>
             <div class="d-flex gap-2 flex-nowrap">
                 <?php if ($can_create): ?>

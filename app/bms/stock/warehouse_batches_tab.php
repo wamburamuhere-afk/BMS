@@ -45,7 +45,7 @@
     <div class="text-center py-5 d-none" id="whBatchesEmpty">
         <i class="bi bi-inbox" style="font-size:3rem;color:#ccc;"></i>
         <h5 class="mt-3 text-muted"><?= t('No batches recorded for this shop yet') ?></h5>
-        <p class="text-muted small px-3"><?= t('A batch is created automatically the first time a product is added with opening stock, or whenever you restock at the POS.') ?></p>
+        <p class="text-muted small px-3"><?= wLabel('A batch is created automatically the first time a product is added with opening stock, or whenever you restock at the POS.', 'A batch is created automatically the first time a product is added with opening stock, or whenever you receive new stock.') ?></p>
     </div>
 </div>
 
