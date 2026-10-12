@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-12 — feat(mobile): left side menu (☰) and 5-item bottom bar with "Uza" in the centre (Simple POS)
+
+**Files:** `header.php`, `app/dashboard.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_mobile_side_menu_cli.php` (new)
+Phones only (Simple POS); desktop unchanged. Style "A", chosen from three clickable mockups.
+- **Bottom bar:** 5 items — Dashibodi · Bidhaa · **Uza** (raised blue circle, centre) · Matumizi · Ripoti. "Zaidi" removed. Items still follow each user's permissions.
+- **☰ side menu:** one menu sliding over the page from the left (page behind darkened) replaces the "Zaidi" and account bottom sheets. Header: initials, name, role · company; groups **Biashara Yangu** (Wateja, Wasambazaji, Huduma, Pokea Mzigo, Ziara za Wateja), **Mipangilio** (Msimamizi, Mipangilio ya Kuuza, Mipangilio ya Rangi), **Akaunti Yangu** (Rasilimali Watu Yangu, Wasifu, Msaada), **Toka**. Same `canView()` gates as before.
+- **Closing:** ✕, tap outside, swipe left, the phone's **Back** button (closes the menu instead of leaving the page), or choosing an item.
+- **Bar stays put:** it sits on its own layer, page bounce is off on phones, and it hides only while a real keyboard is open (a text field has focus) — no longer on address-bar movement, never for the hidden scanner field.
+- **Fixes found while testing:** dashboard's date + "Vitendo vya Haraka" buttons overflowed the phone screen (page rendered 461px wide on a 390px phone) — they now wrap. POS badge "GHALA NDOGO" → "STOKI KIDOGO". Sell screen "Sehemu ya Kazi" button → "Muhtasari" in shop mode.
+Verified in a phone-sized browser (390×844, touch): 35 checks (bar order and position, no movement on scroll, all four ways to close, Back keeps the page, item navigation and history, cashier permissions, desktop unchanged, no JS errors); earlier suites still pass (88 + 18 + 30). New no-DB test: 38 checks (fails 22 on the old code).
+
+---
+
 ## 2026-10-12 — fix(shop mode): replace "POS" wording with selling words everywhere
 
 **Files:** `header.php`, `core/pos_nav.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/pos/pos_credit_customers.php`, `app/constant/settings/pos_config_settings.php`, `app/constant/settings/help.php`, `app/constant/settings/user_roles.php`, `app/constant/reports/sales_report.php`, `app/bms/customer/customer_details.php`, `app/bms/Suppliers/supplier_details.php`, `app/bms/stock/warehouse_batches_tab.php`, `app/bms/product/services.php`, `app/bms/product/products.php`, `api/pos/{close_shift,open_shift,hold_sale,delete_held_sale,process_sale,create_return,receive_payment,void_sale}.php`, `lang/sw.php`, `tests/test_activity_log_permission_and_sell_label_cli.php`

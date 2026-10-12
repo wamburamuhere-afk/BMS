@@ -1204,7 +1204,7 @@ function get_progress_color($percentage) {
                         <span class="badge bg-primary"><?= htmlspecialchars(t($user_role)) ?></span>
                     </p>
                 </div>
-                <div class="d-flex flex-row gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-md-auto">
+                <div class="d-flex flex-row flex-wrap gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-md-auto">
                     <!-- Date Range Selector -->
                     <div class="dropdown flex-fill flex-md-grow-0">
                         <button class="btn btn-outline-primary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
