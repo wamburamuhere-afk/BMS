@@ -1403,7 +1403,7 @@ return [
     'If your cash drawer is wired to your receipt printer\'s kick port, it opens automatically every time a receipt prints — including just now, if one did.' => 'Iwapo droo yako ya fedha imeunganishwa na mlango wa mashine ya kuchapisha risiti, hufunguka kiotomatiki kila risiti inapochapishwa — ikiwemo sasa hivi, ikiwa risiti imechapishwa.',
     'Insufficient Payment' => 'Malipo Hayatoshi',
     'Invalid Discount' => 'Punguzo Batili',
-    'LOW STOCK' => 'GHALA NDOGO',
+    'LOW STOCK' => 'STOKI KIDOGO',
     'Load' => 'Pakia',
     'Load Held Sale?' => 'Pakia Muuzo Uliowekwa Pembeni?',
     'Loaded' => 'Imepakiwa',
@@ -5328,5 +5328,12 @@ return [
     'You do not have permission to receive payments' => 'Huna ruhusa ya kupokea malipo',
     'You do not have permission to void sales' => 'Huna ruhusa ya kubatilisha mauzo',
     'This action is only available in Simple POS mode.' => 'Kitendo hiki kinapatikana tu katika Hali Rahisi ya POS.',
+
+    // 2026-10-12 — Phone side menu
+    'Overview' => 'Muhtasari',
+    'My Account' => 'Akaunti Yangu',
+    'Menu' => 'Menyu',
+    'Open menu' => 'Fungua menyu',
+    'Close menu' => 'Funga menyu',
 
 ];
