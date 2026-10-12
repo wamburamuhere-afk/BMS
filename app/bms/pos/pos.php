@@ -193,7 +193,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                      the stats/shift-history/catalog-setup hub for whoever wants it,
                      without forcing every cashier through it first every day. -->
                 <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= wLabel('POS Workspace — stats, shift history, catalog setup', 'Sales Overview — stats, shift history, catalog setup') ?>">
-                    <i class="bi bi-speedometer2"></i> <?= t('Workspace') ?>
+                    <i class="bi bi-speedometer2"></i> <?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?>
                 </a>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
