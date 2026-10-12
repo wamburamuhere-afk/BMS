@@ -5,6 +5,7 @@
 // File: dashboard.php
 require_once __DIR__ . '/../roots.php';
 require_once ROOT_DIR . '/core/feature_registry.php';
+require_once ROOT_DIR . '/core/activity_log_helpers.php';
 
 // When Mobile Money is the only enabled module, the general ERP dashboard is
 // meaningless (no sales, no stock, no invoices). Send the user straight to the
@@ -1239,7 +1240,7 @@ function get_progress_color($percentage) {
                         <ul class="dropdown-menu">
                             <?php if ($company_type != 'microfinance'): ?>
                                 <?php if(canView('pos')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canCreate('invoices')): ?>
                                 <li><a class="dropdown-item" href="invoice_create"><i class="bi bi-receipt"></i> <?= t('Create Invoice') ?></a></li>
@@ -1552,7 +1553,7 @@ function get_progress_color($percentage) {
                         <div class="flex-fill" style="min-width: 130px;">
                             <a href="pos" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-cart-check display-6"></i>
-                                <div class="mt-2"><?= t('POS') ?></div>
+                                <div class="mt-2"><?= htmlspecialchars(wLabel('POS', 'Sell')) ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1682,7 +1683,7 @@ function get_progress_color($percentage) {
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($dashboard_stats['pos_today']['pos_revenue_today'] ?? 0) ?></h4>
-                            <p class="mb-0"><?= t("Today's POS Sales") ?></p>
+                            <p class="mb-0"><?= htmlspecialchars(wLabel("Today's POS Sales", "Today's Sales")) ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-cart-check" style="font-size: 2rem;"></i>
@@ -2024,7 +2025,7 @@ function get_progress_color($percentage) {
                                         <i class="bi <?= $icon ?> <?= $color ?> me-2"></i>
                                         <?php
                                         $displayText = !empty($activity['description']) ? $activity['description'] : $activity['type'];
-                                        echo htmlspecialchars((string)$displayText);
+                                        echo htmlspecialchars(activityDisplayText((string)$displayText));
                                         ?>
                                     </h6>
                                     <small class="text-muted text-nowrap"><?= $activity['time_ago'] ?></small>
@@ -2124,7 +2125,11 @@ $(document).ready(function() {
     // Load performance chart — read the dropdown's own default (Daily for
     // Simple Mode, Monthly otherwise; see $defaultChartPeriod) rather than
     // hardcoding a period here, so the two can never disagree.
-    loadPerformanceChart($('#chartPeriod').val());
+    // The chart card is only rendered for users allowed to see it; without the
+    // canvas there is nothing to load (and getContext() on null would throw).
+    if (document.getElementById('performanceChart')) {
+        loadPerformanceChart($('#chartPeriod').val());
+    }
 
     // Auto-refresh dashboard every 5 minutes
     setTimeout(function() {
@@ -2220,6 +2225,7 @@ function deltaChipHtml(pct) {
 }
 
 function renderChart(data) {
+    if (!document.getElementById('performanceChart')) return;
     if (POS_SIMPLE_MODE) { renderSimpleChart(data); return; }
     renderNormalChart(data);
 }

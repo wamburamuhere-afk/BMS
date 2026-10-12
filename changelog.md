@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-12 — fix(permissions): one "Audit Logs" switch for all activity history; shop mode "Uza/Sell" label
+
+**Files:** `core/role_permission_ui.php`, `core/permissions.php`, `app/constant/reports/audit_report.php`, `header.php`, `app/dashboard.php`, `app/activity_log.php`, `core/activity_log_helpers.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/pos/shift_history.php`, `lang/sw.php`, `tests/test_activity_log_permission_and_sell_label_cli.php` (new)
+- **Activity history permission:** three role permissions covered the same data — "Audit Report" (Reports), "Audit Logs" and "Activity Log" (System Settings). The dashboard's Recent Activities, the Audit Logs page and the Activity Log page all check **Audit Logs**, so unticking "Audit Report" left everything visible. Now:
+  - The Roles & Permissions matrix shows only **Audit Logs**, in the **Reports** tab. "Audit Report" and "Activity Log" are retired from the matrix (existing grants kept, no effect).
+  - The old Audit Report page (a redirect to Audit Logs) enforces `audit_logs` instead of `financial_reports`; its duplicate menu link is removed; `hasReportsAccess()` counts `audit_logs`.
+  - A role without Audit Logs sees no Recent Activities box, no Audit Logs menu link, and is sent to "unauthorized" on /audit_logs, /activity_log and /audit_report.
+  - **Existing grants are not changed automatically** — after deploy, untick "Audit Logs" in the Reports tab for roles that must not see activity history.
+- **Activity texts:** stored English texts like "Logged in to the system" now display translated (`activityDisplayText()`), on the dashboard and the Activity Log page (incl. its AJAX table, which now loads the reader's language).
+- **Shop mode label:** POS links (top menu, bottom bar, dashboard shortcuts), the POS page heading and "Open POS" buttons read **"Uza" / "Sell"** and **"Anza Kuuza" / "Start Selling"**; the dashboard card "Today's POS Sales" reads **"Mauzo ya Leo"**. Full ERP companies (Projects on, no Shop Mode) keep "POS". English key "Sell" is used because "Sale" already means one sale record ("Muuzo").
+- **Dashboard:** "View Inventory Alerts" → "Angalia Tahadhari za Stoki" (was "Ghala"). Fixed a JavaScript error for non-admin users ("getContext of null") when the performance chart card isn't shown to them.
+Verified in a browser against a migrated database with a real non-admin cashier role (18 checks) plus the earlier shop-pages suite (88 checks); new no-DB test (44 checks).
+
+---
+
 ## 2026-10-11 — fix(shop pages): full Swahili translation, "Shop" wording, hide switched-off modules
 
 **Files:** `ajax_get_warehouse.php`, `app/bms/stock/warehouses.php`, `app/bms/stock/warehouse_view.php`, `core/terminology.php`, `lang/sw.php`, `tests/test_shop_pages_i18n_and_modules_cli.php` (new), `tests/test_warehouse_batches_tab_cli.php`
