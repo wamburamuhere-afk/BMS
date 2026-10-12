@@ -97,3 +97,30 @@ foreach (['Sell', 'Start Selling', 'Logged in to the system', 'Logged out of the
 }
 ok(($sw['View Inventory Alerts'] ?? '') === 'Angalia Tahadhari za Stoki', 'dashboard alerts button no longer says Ghala');
 ok(strpos($dash, "wLabel(\"Today's POS Sales\", \"Today's Sales\")") !== false && ($sw["Today's Sales"] ?? '') === 'Mauzo ya Leo', 'dashboard card: "Mauzo ya Leo" in shop mode (no "POS")');
+
+section('7. Shop mode: no "POS" left in selling wording');
+$pairs = [];
+$files = ['header.php', 'app/constant/settings/pos_config_settings.php', 'app/bms/pos/pos_credit_customers.php', 'app/bms/pos/pos_dashboard.php', 'app/bms/pos/pos.php', 'app/bms/customer/customer_details.php', 'app/bms/Suppliers/supplier_details.php', 'app/bms/stock/warehouse_batches_tab.php', 'app/bms/product/services.php', 'app/bms/product/products.php', 'core/pos_nav.php', 'app/constant/settings/help.php', 'app/constant/settings/user_roles.php', 'app/constant/reports/sales_report.php', 'api/pos/close_shift.php', 'api/pos/delete_held_sale.php', 'api/pos/hold_sale.php', 'api/pos/open_shift.php', 'api/pos/process_sale.php', 'api/pos/create_return.php', 'api/pos/receive_payment.php', 'api/pos/void_sale.php'];
+$q = "'((?:[^'\\\\]|\\\\.)*)'";
+foreach ($files as $f) {
+    preg_match_all("/\\bwLabel\\(\\s*$q\\s*,\\s*$q\\s*\\)/", $src($f), $m, PREG_SET_ORDER);
+    foreach ($m as $mm) if (preg_match('/\\bPOS\\b|Point of Sale/', stripslashes($mm[1]))) $pairs[stripslashes($mm[1])] = stripslashes($mm[2]);
+}
+ok(count($pairs) >= 30, count($pairs) . ' POS strings switch to selling wording in shop mode');
+$GLOBALS['__bms_features'] = $shop;
+$bad = [];
+foreach (['en', 'sw'] as $lang) {
+    loadLanguage($lang);
+    foreach ($pairs as $erpText => $shopText) {
+        $out = wLabel($erpText, $shopText);
+        if (preg_match('/\\bPOS\\b/', $out) || ($lang === 'sw' && !isset($sw[$shopText]))) $bad[] = "$lang: $shopText => $out";
+    }
+}
+ok(empty($bad), 'shop mode (en + sw): none of them shows "POS", all have Swahili' . ($bad ? ' — ' . implode(' | ', array_slice($bad, 0, 5)) : ''));
+$GLOBALS['__bms_features'] = $erp;
+loadLanguage('en');
+$kept = 0; foreach ($pairs as $erpText => $shopText) if (wLabel($erpText, $shopText) === $erpText) $kept++;
+ok($kept === count($pairs), 'full ERP: every one keeps its original POS wording');
+unset($GLOBALS['__bms_features']);
+ok(strpos($src('app/bms/pos/pos_dashboard.php'), "\$page_title = wLabel('POS Workspace', 'Sales Overview');") !== false, 'Sales Overview page title');
+ok(strpos($src('app/constant/settings/help.php'), '<span class="small">POS</span>') === false, 'help: no hard-coded "POS" shortcut label');

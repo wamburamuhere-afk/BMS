@@ -1692,7 +1692,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if (isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> <?= t('Admin') ?></a></li>
                                 <?php endif; ?>
-                                <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> <?= t('POS Settings') ?></a></li><?php endif; ?>
+                                <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> <?= wLabel('POS Settings', 'Selling Settings') ?></a></li><?php endif; ?>
                                 <?php if ($_set_color_visible): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> <?= t('Color Setting') ?></a></li><?php endif; ?>
                                 <?php endif; ?>
                             </ul>
@@ -2055,7 +2055,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <div class="bn-group"><?= t('Settings') ?></div>
             <div class="list-group list-group-flush">
                 <?php if (isAdmin()): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i><?= t('Admin') ?></a><?php endif; ?>
-                <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= t('POS Settings') ?></a><?php endif; ?>
+                <?php if (canView('pos_config_settings')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i><?= wLabel('POS Settings', 'Selling Settings') ?></a><?php endif; ?>
                 <?php if ($_set_color_visible): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i><?= t('Color Setting') ?></a><?php endif; ?>            </div>
             <?php endif; ?>
             <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>

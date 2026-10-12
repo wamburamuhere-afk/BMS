@@ -130,11 +130,20 @@ $company_name = get_setting('company_name', 'Business Management System');
                             </h2>
                             <div id="gs2" class="accordion-collapse collapse" data-bs-parent="#accordionGettingStarted">
                                 <div class="accordion-body text-muted">
-                                    <?= t('<p>The main navigation bar at the top contains all modules:</p>
+                                    <?= wLabel('<p>The main navigation bar at the top contains all modules:</p>
                                     <ul>
                                         <li><strong>Dashboard</strong> – Overview of business performance</li>
                                         <li><strong>Finance</strong> – Accounts, transactions, expenses</li>
                                         <li><strong>Sales</strong> – Products, customers, orders, invoices, POS</li>
+                                        <li><strong>Operations</strong> – Employees, payroll, assets</li>
+                                        <li><strong>Reports</strong> – Financial and business reports</li>
+                                        <li><strong>Admin</strong> – User management and system settings</li>
+                                    </ul>
+                                    <p>Click your <strong>profile icon</strong> (top-right) to access personal settings, change password, or log out.</p>', '<p>The main navigation bar at the top contains all modules:</p>
+                                    <ul>
+                                        <li><strong>Dashboard</strong> – Overview of business performance</li>
+                                        <li><strong>Finance</strong> – Accounts, transactions, expenses</li>
+                                        <li><strong>Sales</strong> – Products, customers, orders, invoices, Sell</li>
                                         <li><strong>Operations</strong> – Employees, payroll, assets</li>
                                         <li><strong>Reports</strong> – Financial and business reports</li>
                                         <li><strong>Admin</strong> – User management and system settings</li>
@@ -215,13 +224,20 @@ $company_name = get_setting('company_name', 'Business Management System');
                         <div class="accordion-item faq-item">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s3">
-                                    <?= t('How do I use the POS (Point of Sale)?') ?>
+                                    <?= wLabel('How do I use the POS (Point of Sale)?', 'How do I sell?') ?>
                                 </button>
                             </h2>
                             <div id="s3" class="accordion-collapse collapse" data-bs-parent="#accordionSales">
                                 <div class="accordion-body text-muted">
-                                    <?= t('<ol>
+                                    <?= wLabel('<ol>
                                         <li>Go to <strong>Sales → POS</strong></li>
+                                        <li>Start a new <strong>shift</strong> by entering the opening balance</li>
+                                        <li>Search or browse products and click to add them to the cart</li>
+                                        <li>Adjust quantities as needed</li>
+                                        <li>Click <strong>"Pay"</strong> and select payment method (Cash, M-Pesa, Card)</li>
+                                        <li>Complete the transaction and print the receipt</li>
+                                    </ol>', '<ol>
+                                        <li>Tap <strong>Sell</strong> in the menu</li>
                                         <li>Start a new <strong>shift</strong> by entering the opening balance</li>
                                         <li>Search or browse products and click to add them to the cart</li>
                                         <li>Adjust quantities as needed</li>
@@ -433,7 +449,7 @@ $company_name = get_setting('company_name', 'Business Management System');
                         <span><kbd>Alt</kbd> + <kbd>N</kbd></span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="small">POS</span>
+                        <span class="small"><?= htmlspecialchars(wLabel('POS', 'Sell')) ?></span>
                         <span><kbd>Alt</kbd> + <kbd>P</kbd></span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center py-2">

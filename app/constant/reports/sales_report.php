@@ -127,7 +127,7 @@ $date_to     = $_GET['date_to']   ?? ($isSimplePOS ? date('Y-m-t')  : date('Y-12
                     <select name="source" id="f-source" class="form-select" style="width:100%">
                         <option value=""><?= t('All Sources') ?></option>
                         <option value="invoice"><?= t('Invoice Only') ?></option>
-                        <option value="pos"><?= t('POS Only') ?></option>
+                        <option value="pos"><?= htmlspecialchars(wLabel('POS Only', 'Shop Sales Only')) ?></option>
                     </select>
                 </div>
                 <?php endif; ?>

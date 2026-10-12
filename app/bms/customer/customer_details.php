@@ -1857,7 +1857,7 @@ global $company_name, $company_logo;
                  more detail (repay/void actions) — this is the full picture, read-only. -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt-cutoff me-2"></i> <?= t('POS Sales History') ?></h6>
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt-cutoff me-2"></i> <?= wLabel('POS Sales History', 'Sales History') ?></h6>
                 </div>
                 <div class="card-body p-0">
                     <div id="salesHistoryLoading" class="text-center py-4">
@@ -1882,7 +1882,7 @@ global $company_name, $company_logo;
                     <div id="salesHistoryCards" class="px-2 d-none"></div>
                     <div class="text-center py-4 d-none" id="salesHistoryEmpty">
                         <i class="bi bi-receipt" style="font-size:2.5rem;color:#ccc;"></i>
-                        <p class="mt-2 mb-0 text-muted"><?= t('No POS sales recorded for this customer yet.') ?></p>
+                        <p class="mt-2 mb-0 text-muted"><?= wLabel('No POS sales recorded for this customer yet.', 'No sales recorded for this customer yet.') ?></p>
                     </div>
                 </div>
             </div>

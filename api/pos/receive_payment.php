@@ -27,7 +27,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
-if (!canEdit('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('You do not have permission to receive POS payments')]); exit; }
+if (!canEdit('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => wLabel('You do not have permission to receive POS payments', 'You do not have permission to receive payments')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 if (empty($_SERVER['HTTP_AUTHORIZATION'])) csrf_check();
 

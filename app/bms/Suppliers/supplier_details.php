@@ -913,7 +913,7 @@ global $company_name, $company_logo;
                     <?php else: ?>
                     <div class="text-center py-4 text-muted">
                         <i class="bi bi-box-seam" style="font-size:2.5rem;color:#ccc;"></i>
-                        <p class="mt-2 mb-0"><?= t('No stock received from this supplier yet. Use "Receive Stock" in the POS and choose this supplier.') ?></p>
+                        <p class="mt-2 mb-0"><?= wLabel('No stock received from this supplier yet. Use "Receive Stock" in the POS and choose this supplier.', 'No stock received from this supplier yet. Use "Receive Stock" on the Sell screen and choose this supplier.') ?></p>
                     </div>
                     <?php endif; ?>
                 </div>

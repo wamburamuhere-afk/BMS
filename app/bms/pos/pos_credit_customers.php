@@ -32,7 +32,7 @@ $can_delete = canDelete('pos');
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('pos_dashboard') ?>"><?= t('POS Workspace') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('pos_dashboard') ?>"><?= wLabel('POS Workspace', 'Sales Overview') ?></a></li>
             <li class="breadcrumb-item active"><?= t('Who Owes Me') ?></li>
         </ol>
     </nav>
