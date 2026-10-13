@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-10-13 — feat(sales prints): service documents print Service Name + Description; Invoices in the Sales menu
+
+**Service layout on Quotation, Sales Order and Invoice prints** (instruction: when a service is selected, hide Product Code and split "Item / Description" into "Service Name" and "Description" taken from services.php; products must not change)
+- `app/bms/sales/quotations/print_quotation.php`, `print_quotation_meadow.php`, `print_quotation_noir.php`, `print_quotation_terra.php`
+- `app/bms/sales/print_sales_order.php`, `print_sales_order_confirmation.php`, `print_sales_order_ledger.php`, `print_sales_order_studio.php`
+- `app/bms/invoice/invoice_print.php`, `invoice_print_onyx.php`, `invoice_print_summit.php`, `invoice_print_wave.php`
+- In each: the item query also reads `products.is_service` and `products.description`. When every line is a service (which is what the "Service" switch on the create form produces — it lists services only), the table prints S/NO, Service Name, Description, Qty, Unit Price, Total. The description is the one saved on the service in services.php; if that is empty, the line's own description is used. Both cells wrap long text inside the cell. A document with any product line prints exactly as before. No database change.
+
+**Invoices in the Sales menu**
+- `header.php` — Sales menu shows Invoices after POS, with the same link and `canView('invoices')` check as the existing Finance → Sales & Purchases entry, which stays.
+
+- `tests/test_service_print_columns_cli.php` (new) + `.github/workflows/php-lint.yml` — new suite added to CI.
+
+Verified: `tests/test_service_print_columns_cli.php` 244/244 — every one of the 12 designs rendered for a service-only, a product-only and a mixed document created by the test (and removed afterwards). Long text checked in Chrome on the default quotation, sales order and invoice prints: no cell overflows. The Sales menu link was checked in the source, not clicked in a browser.
+
+---
+
 ## 2026-10-13 — feat(customer visits): choose services on a visit; WhatsApp and email share only the PDF
 
 **Services on a Customer Visit** (instruction: "kwenye Customer Visit, inabidi uweke option ya kuchagua ni Services gani ambayo Sales Officer ka-intend kuuza kwa mteja husika")
