@@ -47,14 +47,21 @@ try {
     }
 
     if ($hasTable('invoice_items')) {
-        if (!$column('invoice_items', 'discount_percent')) {
-            $pdo->exec("ALTER TABLE invoice_items ADD COLUMN discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER tax_amount");
-            echo "  + invoice_items.discount_percent added\n";
-        }
-        if (!$column('invoice_items', 'discount_amount')) {
-            $pdo->exec("ALTER TABLE invoice_items ADD COLUMN discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER discount_percent");
-            echo "  + invoice_items.discount_amount added\n";
-        }
+        // Two deploys can run this at the same moment (two merges close together):
+        // both see the column missing and both try to add it. The loser's
+        // "duplicate column" (1060) means the work is done, not a failure.
+        $addColumn = function (string $name, string $ddl) use ($pdo, $column) {
+            if ($column('invoice_items', $name)) return;
+            try {
+                $pdo->exec("ALTER TABLE invoice_items ADD COLUMN $ddl");
+                echo "  + invoice_items.$name added\n";
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1060) throw $e;
+                echo "  · invoice_items.$name already added by a concurrent run\n";
+            }
+        };
+        $addColumn('discount_percent', "discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00");
+        $addColumn('discount_amount',  "discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00");
     }
 
     // Cached invoiced quantity per sales-order line, from invoices that are not
