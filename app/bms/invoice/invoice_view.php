@@ -341,7 +341,7 @@ includeHeader();
                                 ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold text-dark"><?= caseFormat($item['product_name']) ?></div>
+                                        <div class="fw-bold text-dark"><?= caseFormat($item['product_name']) ?></div><?php if (!empty($item['description'])): ?><div class="small text-muted"><?= htmlspecialchars($item['description']) ?></div><?php endif; ?>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-light text-dark border"><?= $item['quantity'] ?></span>

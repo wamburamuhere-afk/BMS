@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-10-13 — fix(sales): service form, stock rules, search, reversal links, descriptions (service-sales Phase 2)
+
+- `app/bms/product/services.php` — the edit form had two fields named `unit` with the same id and the hidden one won, so a changed unit never saved; the duplicate is removed. New optional Category field, rendered in full mode only (the Simple POS form is unchanged).
+- `api/update_nip_product.php` — saves unit and category; a form without a category field (Simple POS) leaves the category alone. `api/create_nip_product.php` / `update_nip_product.php` — reject a negative price and a duplicate service name in the same shop (or company-wide); another shop may reuse a name.
+- `api/account/save_sales_order.php`, `api/account/check_stock.php` — services are skipped by the stock check (a service order with a warehouse chosen was refused for "Insufficient stock").
+- `api/account/save_invoice.php` — a warehouse is required only when a line holds stock. `invoice_create.php` switches to Service mode on its own when a services-only sales order is loaded.
+- `api/account/get_products.php`, invoice / sales-order edit forms — search also matches the Item Code.
+- `core/revenue_posting.php` — an invoice's revenue and COGS reversals now set `reverses_entry_id` to the entry they cancel.
+- Descriptions: quotation and sales-order lines now save the description (picked up from the service); it is carried to invoices and shown under the item name on the quotation, sales-order and invoice views and on all quotation (4) and sales-order (4) prints.
+- `includes/sales_unlinked_lines_js.php` (new) — before saving a quotation, sales order or invoice, warns about lines typed by hand (not linked to a catalogue item, so missing from product/service reports). Warning only; such lines stay allowed. Swahili strings added to `lang/sw.php`.
+- `tests/test_lpo_invoice_warehouse_cli.php` — assertion updated to the new warehouse rule.
+- Not touched: any `api/pos/*` or `app/bms/pos/*` file.
+
+Verified: `tests/test_service_sales_phase2_cli.php` (new) 30/30; Phase 1 test 38/38 still passing; related suites re-run (only the pre-existing `test_pos_simple_mode_cli` failures remain, identical on develop); edited forms render with no PHP errors and their inline JS parses.
+
+---
+
 ## 2026-10-13 — fix(sales): services keep their money right from quotation to invoice (service-sales Phase 1)
 
 An end-to-end test of selling a service found an invoice raised from a sales order dropping its VAT and discount (2,183,000 became 2,000,000), the same sales order invoiceable any number of times, large amounts clipped at 99,999,999.99, and invoiced services deletable.

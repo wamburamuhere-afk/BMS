@@ -103,7 +103,8 @@ try {
                     p.product_id,
                     p.product_name,
                     p.sku,
-                    COALESCE(ps.stock_quantity, 0) AS stock_quantity
+                    COALESCE(ps.stock_quantity, 0) AS stock_quantity,
+                    (COALESCE(p.is_service, 0) = 1 OR COALESCE(p.track_inventory, 1) = 0) AS no_stock
                 FROM products p
                 LEFT JOIN product_stocks ps
                     ON ps.product_id = p.product_id
@@ -120,6 +121,7 @@ try {
 
             $shortages = [];
             foreach ($requested as $pid => $qtyNeeded) {
+                if (!empty($stockMap[$pid]['no_stock'])) continue; // services hold no stock
                 $available = isset($stockMap[$pid]) ? (float)$stockMap[$pid]['stock_quantity'] : 0.0;
                 if ($available + 1e-9 < $qtyNeeded) {
                     $name = $stockMap[$pid]['product_name'] ?? ('Product #' . $pid);
@@ -300,12 +302,13 @@ try {
         $itemStmt = $pdo->prepare("
             INSERT INTO sales_order_items (
                 order_id, product_id, product_name, sku, quantity, unit,
-                unit_price, tax_rate, discount_percent, line_total, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                unit_price, tax_rate, discount_percent, line_total, description, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $itemStmt->execute([
             $sales_order_id, $item['product_id'] ?: null, $item['product_name'], $item['sku'],
-            $qty, $item['unit'] ?? 'pcs', $price, $tax_rate, $discount_percent, $line_total
+            $qty, $item['unit'] ?? 'pcs', $price, $tax_rate, $discount_percent, $line_total,
+            trim((string)($item['description'] ?? '')) ?: null
         ]);
     }
 

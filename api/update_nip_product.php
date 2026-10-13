@@ -4,6 +4,19 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
+// A second active service with the same name in the same place (one shop, or
+// company-wide) makes it impossible to tell them apart on documents and reports.
+// Different shops may each have their own "Delivery".
+function nipDuplicateName(PDO $pdo, string $name, ?int $warehouseId, int $excludeId = 0): bool
+{
+    $st = $pdo->prepare("SELECT 1 FROM products
+                          WHERE is_service = 1 AND status <> 'deleted' AND product_id <> ?
+                            AND LOWER(TRIM(product_name)) = LOWER(TRIM(?))
+                            AND COALESCE(warehouse_id, 0) = ? LIMIT 1");
+    $st->execute([$excludeId, $name, (int)$warehouseId]);
+    return (bool)$st->fetchColumn();
+}
+
 try {
     if (!isset($_SESSION['user_id'])) {
         throw new Exception('Unauthorized access');
@@ -66,6 +79,12 @@ try {
     if (empty($product_data['product_name'])) {
         throw new Exception('Product name is required');
     }
+    if ($product_data['selling_price'] < 0) {
+        throw new Exception('Selling price cannot be negative');
+    }
+    if (nipDuplicateName($pdo, $product_data['product_name'], $product_data['warehouse_id'], $product_id)) {
+        throw new Exception('A service named "' . $product_data['product_name'] . '" already exists here. Use a different name or edit the existing one.');
+    }
 
     $stmt = $pdo->prepare("
         UPDATE products SET
@@ -83,6 +102,17 @@ try {
         WHERE product_id = :product_id
     ");
     $stmt->execute($product_data);
+
+    // Unit and category are saved only when the form sends them: the Simple POS
+    // form has no category field, so an edit there must not clear one.
+    $unit = trim((string)($_POST['unit'] ?? ''));
+    if ($unit !== '' && $unit !== 'other') {
+        $pdo->prepare("UPDATE products SET unit = ? WHERE product_id = ?")->execute([mb_substr($unit, 0, 50), $product_id]);
+    }
+    if (array_key_exists('category_id', $_POST)) {
+        $cat = (int)$_POST['category_id'];
+        $pdo->prepare("UPDATE products SET category_id = ? WHERE product_id = ?")->execute([$cat > 0 ? $cat : null, $product_id]);
+    }
 
     // 2. Refresh Components (BOM)
     // Delete existing components
