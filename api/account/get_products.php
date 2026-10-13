@@ -32,11 +32,19 @@ try {
             p.cost_price,
             p.purchase_price,
             p.tax_rate,
+            -- Services keep their registered VAT in tax_id with tax_rate left at 0
+            -- (tax_rate is what the POS cart reads, so it is deliberately not
+            -- written). Sales documents read this resolved rate instead.
+            CASE WHEN p.is_service = 1 AND COALESCE(p.tax_id, 0) > 0
+                 THEN COALESCE(tr.rate_percentage, p.tax_rate)
+                 ELSE p.tax_rate END AS sales_tax_rate,
+            p.contract_item_no,
             p.is_service,
             " . ($warehouse_id > 0 ? "COALESCE(ps.stock_quantity, 0) as current_stock" : "p.current_stock") . ",
             c.category_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN tax_rates tr ON tr.rate_id = p.tax_id
     ";
     
     if ($warehouse_id > 0) {

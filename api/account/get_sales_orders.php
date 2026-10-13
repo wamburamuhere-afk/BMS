@@ -89,6 +89,20 @@ try {
         $params[] = $warehouse_filter;
     }
 
+    // Invoice form picker: only orders that still have a quantity left to bill
+    // (cancelled invoices don't count), and not just the first page of them.
+    if (!empty($_GET['for_invoicing'])) {
+        $where_conditions[] = "EXISTS (
+            SELECT 1 FROM sales_order_items fi_soi
+             WHERE fi_soi.order_id = so.sales_order_id
+               AND fi_soi.quantity > COALESCE((
+                   SELECT SUM(fi_ii.quantity)
+                     FROM invoice_items fi_ii
+                     JOIN invoices fi_i ON fi_i.invoice_id = fi_ii.invoice_id AND fi_i.status <> 'cancelled'
+                    WHERE fi_ii.order_item_id = fi_soi.order_item_id), 0) + 0.0005)";
+        $length = 500;
+    }
+
     $where_sql = implode(" AND ", $where_conditions);
 
     // Phase C — project-scope filter. Nullable, not strict: a sales order

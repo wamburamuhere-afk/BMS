@@ -1063,10 +1063,19 @@ function searchProducts(term = '') {
                 <td>${product.sku || 'N/A'}</td>
                 <td>${product.current_stock || 0}</td>
                 <td>${product.selling_price || 0}</td>
-                <td>${product.tax_rate || 0}%</td>
+                <td>${parseFloat(product.sales_tax_rate ?? product.tax_rate) || 0}%</td>
             </tr>
         `);
     });
+}
+
+// Select the option matching a VAT rate; a registered rate outside the
+// standard list is added rather than silently dropped to 0%.
+function selectTaxRate($sel, rate) {
+    const r = parseFloat(rate) || 0;
+    let match = $sel.find('option').filter(function () { return parseFloat(this.value) === r; }).first();
+    if (!match.length) match = $(`<option value="${r}">${r}%</option>`).appendTo($sel);
+    $sel.val(match.val());
 }
 
 function selectProduct(productId) {
@@ -1078,7 +1087,7 @@ function selectProduct(productId) {
         row.find('.item-sku').val(product.sku || '');
         row.find('.item-unit').val(product.unit || 'pcs');
         row.find('.item-price').val(product.selling_price || 0);
-        row.find('.item-tax').val(product.tax_rate || 0);
+        selectTaxRate(row.find('.item-tax'), product.sales_tax_rate ?? product.tax_rate);
         
         $('#productSearchResults').hide();
         
