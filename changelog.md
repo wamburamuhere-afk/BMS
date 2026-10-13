@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-10-13 — feat(customer visits): choose services on a visit; WhatsApp and email share only the PDF
+
+**Services on a Customer Visit** (instruction: "kwenye Customer Visit, inabidi uweke option ya kuchagua ni Services gani ambayo Sales Officer ka-intend kuuza kwa mteja husika")
+- `app/bms/field_reports/field_visits.php` — the visit form has an optional, searchable multi-select "Services you intend to sell", listing the active services from the Services page. The services show in the visits table (new column), on phone cards, and as "Services offered most" under More statistics.
+- `core/field_reports_schema.php` — new table `field_visit_services` (visit ↔ service; the service name is copied when saved so the report reads correctly if a service is renamed later). Migrations `2026_10_13_field_visit_services_and_shares` (tenant + legacy).
+- `core/field_reports.php` — `frServiceOptions`, `frAttachServices`, `frValidateServices`, `frSaveVisitServices`, `frServiceCounts`; `frFetchVisits` attaches services to every visit.
+- `api/field_reports/save.php` — validates the chosen services (active services only, at most 20) and saves the visit and its services in one transaction. An edit that does not send the field (older app) leaves the services unchanged.
+- `api/field_reports/_common.php`, `list.php` — services and service counts in the list data. `core/field_reports_report.php` — a "Services offered" column in the print page, the PDF and the Excel export.
+
+**Share only the PDF**
+- `includes/field_reports/report_share.php` — WhatsApp shares only the PDF file (the text summary is gone). Where the device cannot attach a file, WhatsApp opens with only a link to the same PDF.
+- `api/field_reports/share_link.php` (new) + `field_report_pdf.php` (new public page, route `report-pdf`) — the link's token is random, only its SHA-256 is stored, the PDF is kept in the database (`field_report_shares`), and the link expires after 7 days; a wrong or expired link shows "Report not available". At most 20 links per user per hour.
+- `api/field_reports/email_report.php` — the email body is now only the sender's own message and one line saying the report is attached as a PDF (no summary table). `api/field_reports/report_data.php` no longer builds the WhatsApp text. File name built in one place: `frReportFilename()`.
+- `lang/sw.php` — Swahili for the new texts. `tests/test_webroot_quarantine_cli.php` — the new public page added to the approved entry points.
+
+Verified: `tests/test_field_reports_cli.php` 272/272 (26 new checks: services save/edit/clear/validation, list, print, PDF data, Excel, ownership; share link creation, token stored only as a hash, PDF served without login, wrong and expired links refused). The public link was also fetched through the local web server (`dev.bms.local`). Pages render with no PHP errors and their scripts parse. Not clicked through in a real browser.
+
+---
+
 ## 2026-10-13 — feat(reports): Service Sales Report; Product Analysis and service page show service sales properly (service-sales Phase 3)
 
 - **New Service Sales Report** — `app/constant/reports/service_sales_report.php` + `api/account/get_service_sales_report.php`. Per service: code (Item Code), category, quantity, documents, customers, gross, discount, net revenue, VAT, share of total, average price, last sold; totals row; Excel export and print. Charts: top services by revenue, monthly trend of the top 5, revenue by category, quoted vs invoiced with conversion rate. Filters: dates, source (invoices / POS / both), customer, category, project. Invoices count only once posted to the ledger and not cancelled; POS service sales are net of returns; lines typed by hand appear as one "Not linked" row. Project/warehouse scope applied for non-admins.

@@ -1,9 +1,10 @@
 <?php
 // POST to (one or more addresses, comma/space separated), message (optional), date_from,
 // date_to, user_id (admins only), lang, pdf (base64 of the PDF built in the browser).
-// Emails the Customer Visits report with the PDF attached. The subject and the summary
-// in the body are rebuilt here from the database — only the attachment comes from the
-// browser, and it must really be a PDF.
+// Emails the Customer Visits report with the PDF attached. The PDF is the report: the body
+// carries only the sender's own message and one line saying the PDF is attached. The subject
+// is rebuilt here from the database — only the attachment comes from the browser, and it
+// must really be a PDF.
 require_once __DIR__ . '/_common.php';
 require_once ROOT_DIR . '/core/field_reports_report.php';
 require_once ROOT_DIR . '/core/mailer.php';
@@ -45,7 +46,6 @@ $userId = frScopeUserId($_POST['user_id'] ?? null);   // non-admin => always sel
 $lang = frReportLang($_POST['lang'] ?? null);
 
 try {
-    $visits  = frFetchVisits($pdo, $from, $to_, $userId);
     $subject = frReportSubject($pdo, $userId);
     $s = $pdo->prepare("SELECT email FROM users WHERE user_id = ?");
     $s->execute([$me]);
@@ -57,27 +57,16 @@ try {
 $userLang = $_SESSION['user_lang'] ?? 'en';
 
 loadLanguage($lang);   // the email speaks the report's language
-$company = getSetting('company_name', 'BMS');
 $range   = frRangeLabel($from, $to_, $lang);
-$sender  = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: ($_SESSION['username'] ?? '');
 $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
-$rowsHtml = '';
-foreach (frReportSummary(frStats($visits)) as $label => $value) {
-    $rowsHtml .= '<tr><td style="padding:6px 10px;border:1px solid #dee2e6;">' . $e($label) . '</td>'
-               . '<td style="padding:6px 10px;border:1px solid #dee2e6;text-align:right;font-weight:bold;">' . (int)$value . '</td></tr>';
-}
+// The PDF is the report: the body only says so, plus the sender's own message if typed.
 $body = ($note !== '' ? '<p>' . nl2br($e($note)) . '</p>' : '')
-      . '<p><strong>' . $e(t('Staff')) . ':</strong> ' . $e($subject) . '<br>'
-      . '<strong>' . $e(t('Date')) . ':</strong> ' . $e($range) . '</p>'
-      . '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;margin:6px 0 14px;">' . $rowsHtml . '</table>'
-      . '<p>' . $e(t('The full report is attached as a PDF.')) . '</p>'
-      . '<p style="color:#6c757d;">' . $e(sprintf(t('Sent by %s'), $sender)) . '</p>';
+      . '<p>' . $e(t('The Customer Visits report is attached as a PDF.')) . '</p>';
 $mailSubject = t('CUSTOMER VISITS REPORT') . ' — ' . $subject . ' — ' . $range;
 
 // Attach under a readable name; the temporary copy is removed whatever happens.
-$slug = trim(preg_replace('/[^A-Za-z0-9]+/', '_', $subject), '_') ?: 'staff';
-$name = ($lang === 'sw' ? 'Ripoti_ya_Ziara_' : 'Customer_Visits_Report_') . $slug . '_' . $from . ($from !== $to_ ? '_to_' . $to_ : '') . '.pdf';
+$name = frReportFilename($subject, $lang, $from, $to_);
 $dir  = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'bms_fr_' . bin2hex(random_bytes(8));
 $path = $dir . DIRECTORY_SEPARATOR . $name;
 $sent = false;

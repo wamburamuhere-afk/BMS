@@ -25,6 +25,7 @@ if (!function_exists('frReportColumns')) {
             'client'   => t('Client name'),
             'phone'    => t('Phone'),
             'business' => t('Business'),
+            'services' => t('Services offered'),
         ];
         if ($merged) {
             $c['given'] = t('Given');
@@ -59,6 +60,7 @@ if (!function_exists('frReportColumns')) {
                 'client'   => $v['client_name'],
                 'phone'    => trim((string)$v['client_phone']) !== '' ? $v['client_phone'] : '—',   // optional
                 'business' => frBusinessLabel($v),
+                'services' => implode(', ', array_map(fn($s) => $s['name'], $v['services'] ?? [])) ?: '—',
                 'card'     => (int)$v['gave_business_card'] ? $yes : $no,
                 'trial'    => (int)$v['gave_trial_link'] ? $yes : $no,
                 'training' => (int)$v['gave_training'] ? $yes : $no,
@@ -87,7 +89,7 @@ if (!function_exists('frReportColumns')) {
     function frReportLandscapeWeights(): array
     {
         return ['sno' => 3, 'date' => 7, 'time' => 5, 'staff' => 10, 'location' => 14, 'client' => 11, 'phone' => 10,
-                'business' => 10, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12];
+                'business' => 10, 'services' => 12, 'card' => 7, 'trial' => 8, 'training' => 8, 'interest' => 8, 'joined' => 8, 'follow_up' => 9, 'notes' => 12];
     }
 
     /** "Report submitted at 15:20 — updated after it was submitted" / "not submitted yet"; null when not one person's day. */
@@ -120,6 +122,13 @@ if (!function_exists('frReportColumns')) {
         $s->execute([$userId]);
         $u = $s->fetch(PDO::FETCH_ASSOC);
         return $u ? frStaffName($u) : '—';
+    }
+
+    /** The PDF's file name: "Ripoti_ya_Ziara_Asha_Juma_2026-10-13.pdf" / "Customer_Visits_Report_...". */
+    function frReportFilename(string $subject, string $lang, string $from, string $to): string
+    {
+        $slug = trim(preg_replace('/[^A-Za-z0-9]+/', '_', $subject), '_') ?: 'staff';
+        return ($lang === 'sw' ? 'Ripoti_ya_Ziara_' : 'Customer_Visits_Report_') . $slug . '_' . $from . ($from !== $to ? '_to_' . $to : '') . '.pdf';
     }
 
     /** Report language from the request: 'sw' | 'en', else the user's own language. */

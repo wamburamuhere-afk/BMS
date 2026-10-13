@@ -50,6 +50,8 @@ function frRowOut(array $r): array
         'interest'           => $r['interest'] ?? '',
         'interest_label'     => $r['interest'] ? t($interest[$r['interest']] ?? '') : '',
         'notes'              => $r['notes'] ?? '',
+        'services'           => $r['services'] ?? [],
+        'service_ids'        => array_map(fn($s) => (int)$s['product_id'], $r['services'] ?? []),
         'joined'             => (int)$r['joined'],
         'joined_at'          => $r['joined_at'],
         'follow_up_date'     => $r['follow_up_date'] ?? null,

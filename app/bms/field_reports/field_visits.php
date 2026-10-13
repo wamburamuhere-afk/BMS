@@ -21,6 +21,8 @@ if ($is_admin) {
                  ->fetchAll(PDO::FETCH_ASSOC);
 }
 $userLang = function_exists('currentLanguage') && currentLanguage() === 'sw' ? 'sw' : 'en';
+// Services (Services page) a Sales Officer can say they intend to sell on a visit.
+try { $serviceOptions = frServiceOptions($pdo); } catch (PDOException $e) { $serviceOptions = []; }
 $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => ['warning', 'bi-hourglass-split'], 'not_interested' => ['danger', 'bi-emoji-frown']];
 ?>
 <div class="container-fluid mt-3" id="frPage">
@@ -66,7 +68,12 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
         <button class="btn btn-sm btn-link px-0 text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#moreStats" aria-expanded="false" id="moreStatsBtn">
             <i class="bi bi-bar-chart me-1"></i><?= t('More statistics') ?> <i class="bi bi-chevron-down small"></i>
         </button>
-        <div class="collapse" id="moreStats"><div class="row g-2 pt-1" id="statCards"></div></div>
+        <div class="collapse" id="moreStats"><div class="row g-2 pt-1" id="statCards"></div>
+            <div class="card border-0 shadow-sm mt-2 d-none" id="serviceStatsCard"><div class="card-body p-2">
+                <div class="small fw-bold text-primary mb-1"><i class="bi bi-briefcase me-1"></i><?= t('Services offered most') ?></div>
+                <div class="d-flex flex-wrap gap-1" id="serviceStats"></div>
+            </div></div>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -130,7 +137,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
             <thead class="fr-thead"><tr>
                 <th><?= t('S/No') ?></th><th><?= t('Date') ?></th><th><?= t('Time') ?></th>
                 <?php if ($is_admin): ?><th><?= t('Staff') ?></th><?php endif; ?>
-                <th><?= t('Place visited') ?></th><th><?= t('Client name') ?></th><th><?= t('Phone') ?></th><th><?= t('Business') ?></th>
+                <th><?= t('Place visited') ?></th><th><?= t('Client name') ?></th><th><?= t('Phone') ?></th><th><?= t('Business') ?></th><th><?= t('Services offered') ?></th>
                 <th class="text-center"><?= t('Card') ?></th><th class="text-center"><?= t('Trial') ?></th><th class="text-center"><?= t('Training') ?></th>
                 <th><?= t('Response') ?></th><th><?= t('Follow-up') ?></th>
                 <th class="text-end"><?= t('Actions') ?></th>
@@ -175,6 +182,20 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
                     <div class="col-12 col-md-6 d-none" id="vOtherWrap">
                         <label class="form-label fw-bold" for="vOther"><?= t('Describe the business') ?> <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="business_other" id="vOther" maxlength="150">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold" for="vServices"><?= t('Services you intend to sell') ?> <small class="text-muted fw-normal">(<?= t('optional') ?>)</small></label>
+                        <input type="hidden" name="services_sent" value="1">
+                        <?php if ($serviceOptions): ?>
+                        <select class="form-select" name="service_ids[]" id="vServices" multiple>
+                            <?php foreach ($serviceOptions as $so): ?>
+                            <option value="<?= (int)$so['product_id'] ?>"><?= safe_output($so['product_name']) ?><?= !empty($so['contract_item_no']) ? ' (' . safe_output($so['contract_item_no']) . ')' : '' ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text"><?= t('Choose one or more services you plan to sell to this customer.') ?></div>
+                        <?php else: ?>
+                        <div class="form-text"><?= t('No services yet. Add them on the Services page to choose them here.') ?></div>
+                        <?php endif; ?>
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-bold" for="vLocation"><?= t('Place visited') ?> <span class="text-danger">*</span></label>
@@ -284,6 +305,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 }
 .fr-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:600; }
 .fr-yes { background:#0d6efd; color:#fff; } .fr-no { background:#e9ecef; color:#495057; }
+.fr-svc { background:#cfe2ff; color:#084298; }
 .fr-stat { background:#e7f0ff; border:1px solid #b6ccfe; }
 .fr-main-stat { background:#0d6efd; color:#fff; }
 .fr-toggle { min-width: 0 !important; white-space: normal; }   /* global .btn{min-width:85px} */
@@ -334,6 +356,7 @@ $(function () {
         'call' => t('Call'), 'followedUp' => t('Followed up'), 'newVisit' => t('New visit'),
         'dueToday' => t('due today'), 'daysLate' => t('%d days late'), 'followUp' => t('Follow-up'), 'gpsConfirmed' => t('GPS confirmed'),
         'interest' => array_map('t', frInterestLabels()),
+        'services' => t('Services offered'), 'chooseServices' => t('Choose services...'),
     ]) ?>;
 
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -348,6 +371,8 @@ $(function () {
         : `${dmy(r.follow_up_date)}${r.follow_up_done ? ' <i class="bi bi-check-circle-fill text-success" title="' + esc(L.followedUp) + '"></i>' : ''}`;
     const gpsMark = r => r.latitude !== null
         ? ` <a href="https://maps.google.com/?q=${r.latitude},${r.longitude}" target="_blank" rel="noopener" title="${esc(r.gps_verified ? L.gpsConfirmed : 'GPS')}"><i class="bi ${r.gps_verified ? 'bi-geo-alt-fill text-success' : 'bi-pin-map text-primary'}"></i></a>` : '';
+    const servicesTxt = r => (r.services || []).length ? (r.services || []).map(s => esc(s.name)).join(', ') : '<span class="text-muted">—</span>';
+    const servicesBadges = r => (r.services || []).map(s => `<span class="fr-badge fr-svc">${esc(s.name)}</span>`).join(' ');
     let rows = [], follows = [];
 
     $('.select2-static').not('#visitModal .select2-static').select2({ theme: 'bootstrap-5', width: '100%' });
@@ -355,6 +380,9 @@ $(function () {
         $(this).find('.select2-static').each(function () {
             if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#visitModal'), placeholder: <?= json_encode(t('Select...')) ?>, allowClear: true, width: '100%' });
         });
+        if ($('#vServices').length && !$('#vServices').hasClass('select2-hidden-accessible')) {
+            $('#vServices').select2({ theme: 'bootstrap-5', dropdownParent: $('#visitModal'), placeholder: L.chooseServices, closeOnSelect: false, width: '100%' });
+        }
         if (!$('#vId').val()) $('#vPhone').trigger('focus');
     });
 
@@ -393,6 +421,7 @@ $(function () {
                     <div><i class="bi bi-geo-alt text-primary"></i> ${esc(r.location)}${gpsMark(r)}</div>
                     <div>${r.client_phone ? `<a href="tel:${esc(r.client_phone)}" class="text-decoration-none"><i class="bi bi-telephone text-primary"></i> ${esc(r.client_phone)}</a> · ` : ''}${esc(r.business_label)}</div>
                     ${IS_ADMIN ? `<div class="text-muted">${L.staff}: ${esc(r.staff_name)}</div>` : ''}
+                    ${(r.services || []).length ? `<div class="mt-1"><i class="bi bi-briefcase text-primary"></i> ${servicesBadges(r)}</div>` : ''}
                     <div class="d-flex flex-wrap gap-1 mt-1">${ynL(L.cardShort, r.gave_business_card)} ${ynL(L.trialShort, r.gave_trial_link)} ${ynL(L.trainingShort, r.gave_training)} ${r.interest ? interestBadge(r) : ''}${joinedBadge(r)}</div>
                     ${r.follow_up_date ? `<div class="mt-1 small"><i class="bi bi-calendar-event text-primary"></i> ${L.followUp}: ${followTxt(r)}</div>` : ''}
                 </div>
@@ -411,6 +440,11 @@ $(function () {
         const keys = ['people', 'places', 'cards', 'trials', 'trainings'];
         $('#statCards').html(keys.map(k => `<div class="col-6 col-md"><div class="card border-0 shadow-sm text-center p-2 fr-stat h-100">
             <div class="fs-4 fw-bold text-primary">${Number(s[k] || 0)}</div><div class="small">${L[k]}</div></div></div>`).join(''));
+    }
+
+    function renderServiceStats(list) {
+        $('#serviceStatsCard').toggleClass('d-none', !list.length);
+        $('#serviceStats').html(list.map(s => `<span class="fr-badge fr-svc">${esc(s.name)} <b>${Number(s.count)}</b></span>`).join(' '));
     }
 
     function renderFollowUps(list) {
@@ -468,13 +502,14 @@ $(function () {
             table.clear().rows.add(rows.map((r, i) => {
                 const cells = [i + 1, dmy(r.visit_date), esc(r.visit_time || '—')];
                 if (IS_ADMIN) cells.push(esc(r.staff_name));
-                cells.push(esc(r.location) + gpsMark(r), esc(r.client_name) + joinedBadge(r), r.client_phone ? esc(r.client_phone) : '<span class="text-muted">—</span>', esc(r.business_label),
+                cells.push(esc(r.location) + gpsMark(r), esc(r.client_name) + joinedBadge(r), r.client_phone ? esc(r.client_phone) : '<span class="text-muted">—</span>', esc(r.business_label), servicesTxt(r),
                     `<div class="text-center">${yn(r.gave_business_card)}</div>`, `<div class="text-center">${yn(r.gave_trial_link)}</div>`,
                     `<div class="text-center">${yn(r.gave_training)}</div>`, interestBadge(r), followTxt(r), actions(r));
                 cells._row = r;
                 return cells;
             })).draw();
             renderStats(res.stats);
+            renderServiceStats(res.service_counts || []);
             renderDayStatus(res);
             renderStaff(res.staff_summary || []);
         }).fail(() => Swal.fire({ icon: 'error', title: L.error, text: L.serverError }));
@@ -536,7 +571,7 @@ $(function () {
         const keepLoc = $('#vLocation').val(), keepLat = $('#vLat').val(), keepLng = $('#vLng').val(), keepAcc = $('#vAcc').val();
         const keepOpen = !$('#vWhenFields').hasClass('d-none'), keepDate = $('#vDate').val();
         $('#visitForm')[0].reset();
-        $('#vId').val(''); $('#vBusiness').val('').trigger('change');
+        $('#vId').val(''); $('#vBusiness').val('').trigger('change'); $('#vServices').val(null).trigger('change');
         $('#phoneWarn').addClass('d-none').empty(); $('#vOtherWrap').addClass('d-none');
         $('#visitForm .is-invalid').removeClass('is-invalid');
         const now = serverNow();
@@ -626,6 +661,7 @@ $(function () {
     function showErrors(r) {
         const errs = r.errors || {};
         Object.keys(errs).forEach(k => $(`#visitForm [name="${k}"]`).addClass('is-invalid'));
+        if (errs.service_ids) $('#vServices').addClass('is-invalid');
         if (errs.visit_date || errs.visit_time) setWhen(true, $('#vDate').val(), $('#vTime').val());
         Swal.fire({ icon: 'error', title: L.error, text: r.message || L.serverError });
     }
@@ -644,6 +680,7 @@ $(function () {
             $('#vNotes').val(r.notes); setGps(r.latitude, r.longitude, r.gps_accuracy_m);   // the stored accuracy, re-saved unchanged
             // Set before showing: Select2 (initialised on first show) reads the current value.
             $('#vBusiness').val(r.business_type).trigger('change');
+            $('#vServices').val((r.service_ids || []).map(String)).trigger('change');
             bootstrap.Modal.getOrCreateInstance(document.getElementById('visitModal')).show();
         } else if (act === 'delete') {
             Swal.fire({ title: L.deleteQ, text: L.cannotUndo, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: L.yesDelete, cancelButtonText: L.cancel })

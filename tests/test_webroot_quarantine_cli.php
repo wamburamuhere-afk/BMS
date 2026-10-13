@@ -28,6 +28,7 @@ $keepers = [
     'ajax_toggle_warehouse_status.php', 'ajax_get_transfer_items.php',
     'print_transfer.php',
     'calculate_penalties.php', // possible server crontab target; has own CLI guard
+    'field_report_pdf.php',    // public, token-gated, read-only: a shared Customer Visits report PDF
 ];
 
 // ── 1. Webroot only contains the approved entry points ────────────────────
