@@ -58,7 +58,8 @@ try {
             p.product_id,
             p.product_name,
             p.sku,
-            COALESCE(ps.stock_quantity, 0) AS stock_quantity
+            COALESCE(ps.stock_quantity, 0) AS stock_quantity,
+            (COALESCE(p.is_service, 0) = 1 OR COALESCE(p.track_inventory, 1) = 0) AS no_stock
         FROM products p
         LEFT JOIN product_stocks ps
             ON ps.product_id = p.product_id
@@ -75,6 +76,7 @@ try {
 
     $shortages = [];
     foreach ($requested as $pid => $qtyNeeded) {
+        if (!empty($stockMap[$pid]['no_stock'])) continue; // services hold no stock
         $stockQty = isset($stockMap[$pid]) ? (float)$stockMap[$pid]['stock_quantity'] : 0.0;
         if ($stockQty + 1e-9 < $qtyNeeded) {
             $row = $stockMap[$pid] ?? ['product_id' => $pid, 'product_name' => 'Unknown', 'sku' => null, 'stock_quantity' => 0];

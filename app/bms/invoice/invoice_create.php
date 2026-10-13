@@ -550,6 +550,7 @@ function generate_invoice_number() {
     </div>
 </div>
 
+<?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let itemCount = 0;
@@ -569,7 +570,7 @@ $(document).ready(function() {
     $('#invoiceForm').on('submit', function(e) {
         e.preventDefault();
         console.log('[invoice_create] submit fired');
-        saveInvoice('pending');
+        bmsConfirmUnlinkedLines(() => saveInvoice('pending'));
     });
 
     // Hide search results on click outside
@@ -631,6 +632,15 @@ function setTaxSelect($sel, rate) {
         match = $(`<option value="${r}">${r}%</option>`).appendTo($sel);
     }
     $sel.val(match.val());
+}
+
+// An order made only of services needs no warehouse: switch Service mode on.
+function matchServiceModeToLines(items) {
+    const allServices = items.length > 0 && items.every(it => parseInt(it.is_service, 10) === 1);
+    if (allServices && !$('#is_service_invoice').is(':checked')) {
+        $('#is_service_invoice').prop('checked', true);
+        toggleServiceInvoiceMode();
+    }
 }
 
 function addItemRow(item = null) {
@@ -808,7 +818,8 @@ function searchProducts(term = '') {
         results = productsCache.filter(p =>
             (p.product_name && p.product_name.toLowerCase().includes(searchTerm)) ||
             (p.sku && p.sku.toLowerCase().includes(searchTerm)) ||
-            (p.barcode && p.barcode.toLowerCase().includes(searchTerm))
+            (p.barcode && p.barcode.toLowerCase().includes(searchTerm)) ||
+            (p.contract_item_no && p.contract_item_no.toLowerCase().includes(searchTerm))
         );
     }
     
@@ -891,6 +902,7 @@ function loadOrderItems() {
             res.data.forEach(item => {
                 addItemRow(item);
             });
+            matchServiceModeToLines(res.data);
         }
     }, 'json');
 }
@@ -976,8 +988,10 @@ $(document).ready(function() {
         'unit_price'         => floatval($i['unit_price'] ?? 0),
         'tax_rate'           => floatval($i['tax_rate'] ?? 0),
         'discount_percent'   => floatval($i['discount_percent'] ?? 0),
+        'is_service'         => intval($i['is_service'] ?? 0),
     ], $order_items)) ?>;
     soItems.forEach(function(item) { addItemRow(item); });
+    matchServiceModeToLines(soItems);
 
     <?php if (!empty($order['notes'])): ?>
     $('textarea[name="notes"]').val(<?= json_encode($order['notes']) ?>);

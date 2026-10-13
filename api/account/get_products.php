@@ -73,8 +73,9 @@ try {
     }
     
     if (!empty($search)) {
-        $query .= " AND (p.product_name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ?)";
+        $query .= " AND (p.product_name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.contract_item_no LIKE ?)";
         $searchTerm = "%$search%";
+        $params[] = $searchTerm;
         $params[] = $searchTerm;
         $params[] = $searchTerm;
         $params[] = $searchTerm;
