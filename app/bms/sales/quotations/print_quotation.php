@@ -495,7 +495,7 @@ if ($cust_address !== '') {
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
-                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?></td>
+                <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?><?php if (!empty($item['description'])): ?><br><small style="color:#6c757d;font-size:10px;"><?= htmlspecialchars($item['description']) ?></small><?php endif; ?></td>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>

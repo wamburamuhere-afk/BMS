@@ -494,6 +494,7 @@ includeHeader();
     </div>
 </div>
 
+<?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let currentItemIndex = null;
@@ -632,6 +633,7 @@ function addItemRow(product = null) {
                 </div>
                 <input type="hidden" class="item-product-id" name="items[${index}][product_id]"
                        value="${product && product.product_id != null ? product.product_id : ''}">
+                <input type="hidden" class="item-description" name="items[${index}][description]">
             </td>
             <td class="inv-col">
                 <input type="text" class="form-control item-sku" name="items[${index}][sku]"
@@ -679,6 +681,7 @@ function addItemRow(product = null) {
     $('#itemsBody').append($row);
 
     if (product) {
+        $row.find('.item-description').val(product.description || '');
         $row.find('.item-unit').val(product.unit || 'pcs');
         if (product.tax_rate != null) { $row.find('.item-tax').val(product.tax_rate); }
     }
@@ -815,6 +818,7 @@ function selectProduct(productId) {
         const row = $(`#item-row-${currentItemIndex}`);
         row.find('.item-name').val(product.product_name);
         row.find('.item-product-id').val(product.product_id);
+        row.find('.item-description').val(product.description || '');
         row.find('.item-sku').val(product.sku || '');
         row.find('.item-unit').val(product.unit || 'pcs');
         row.find('.item-price').val(product.selling_price || 0);
@@ -980,6 +984,7 @@ function collectItems() {
     $('[id^="item-row-"]').each(function() {
         const item = {
             product_id: $(this).find('.item-product-id').val(),
+            description: $(this).find('.item-description').val() || '',
             product_name: $(this).find('.item-name').val(),
             sku: $(this).find('.item-sku').val(),
             quantity: $(this).find('.item-quantity').val(),
@@ -993,8 +998,9 @@ function collectItems() {
     return items;
 }
 
-function saveQuotation(status) {
+function saveQuotation(status, unlinkedConfirmed = false) {
     if (!validateForm(status === 'draft')) { return; }
+    if (!unlinkedConfirmed) { bmsConfirmUnlinkedLines(() => saveQuotation(status, true)); return; }
 
     const formData = new FormData($('#quotationForm')[0]);
     formData.append('status', status);

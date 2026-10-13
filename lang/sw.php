@@ -5336,4 +5336,11 @@ return [
     'Open menu' => 'Fungua menyu',
     'Close menu' => 'Funga menyu',
 
+    // 2026-10-13 — Sales documents: hand-typed line warning
+    'Lines not linked to a product or service' => 'Mistari isiyounganishwa na bidhaa au huduma',
+    'These lines were typed by hand, so they will not appear in product and service sales reports:' => 'Mistari hii imeandikwa kwa mkono, kwa hiyo haitaonekana kwenye ripoti za mauzo ya bidhaa na huduma:',
+    'Pick the item from the search list to link it, or save anyway.' => 'Chagua kipengee kutoka kwenye orodha ya utafutaji ili kukiunganisha, au hifadhi hivyo hivyo.',
+    'Save anyway' => 'Hifadhi hivyo hivyo',
+    'Go back' => 'Rudi',
+
 ];

@@ -100,7 +100,18 @@ try {
     }
     // Required on creation only — existing invoices may predate this field
     // (invoice_edit.php has no Service-Invoice toggle to know their intent).
-    if (!$is_update && !$is_service_invoice && !$warehouse_id) {
+    // ...and only when a line actually holds stock: an all-services invoice
+    // needs no warehouse even if the Service toggle was left off.
+    $stockLineIds = array_filter(array_map(fn($it) => (int)($it['product_id'] ?? 0), $items));
+    $hasStockLine = false;
+    if ($stockLineIds) {
+        $ph = implode(',', array_fill(0, count($stockLineIds), '?'));
+        $sl = $pdo->prepare("SELECT COUNT(*) FROM products WHERE product_id IN ($ph)
+                              AND COALESCE(is_service, 0) = 0 AND COALESCE(track_inventory, 1) = 1");
+        $sl->execute(array_values($stockLineIds));
+        $hasStockLine = (int)$sl->fetchColumn() > 0;
+    }
+    if (!$is_update && !$is_service_invoice && $hasStockLine && !$warehouse_id) {
         throw new Exception(isShopLabel() ? "Shop is required for inventory invoices" : "Warehouse is required for inventory invoices");
     }
 

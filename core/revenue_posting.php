@@ -209,7 +209,27 @@ if (!function_exists('reverseInvoiceCOGS')) {
     /** Reverse an invoice's COGS entry (invoice cancelled/voided after approval). */
     function reverseInvoiceCOGS(PDO $pdo, int $invoiceId, int $userId): array
     {
-        return reverseAccrualEntry($pdo, 'invoice_cogs', $invoiceId, $userId);
+        $out = reverseAccrualEntry($pdo, 'invoice_cogs', $invoiceId, $userId);
+        if (!empty($out['entry_id'])) {
+            $o = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'invoice_cogs' AND entity_id = ? AND status = 'posted' ORDER BY entry_id LIMIT 1");
+            $o->execute([$invoiceId]);
+            linkLedgerReversal($pdo, (int)$out['entry_id'], (int)$o->fetchColumn());
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('linkLedgerReversal')) {
+    /** Points a reversal entry at the entry it cancels (journal_entries.reverses_entry_id). */
+    function linkLedgerReversal(PDO $pdo, int $reversalId, int $originalId): void
+    {
+        if ($reversalId <= 0 || $originalId <= 0) return;
+        try {
+            $pdo->prepare("UPDATE journal_entries SET reverses_entry_id = ? WHERE entry_id = ? AND reverses_entry_id IS NULL")
+                ->execute([$originalId, $reversalId]);
+        } catch (Throwable $e) {
+            error_log('linkLedgerReversal: ' . $e->getMessage());
+        }
     }
 }
 
@@ -274,6 +294,7 @@ if (!function_exists('reverseInvoiceRevenue')) {
                 $lines, $pid, $invoiceId, 'invoice_void', date('Y-m-d'), $userId, $whId
             );
             $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entry;
+            linkLedgerReversal($pdo, (int)$entry, $origId);
         } catch (Throwable $e) {
             error_log("reverseInvoiceRevenue invoice $invoiceId: " . $e->getMessage());
             $out['reason'] = 'reverse_error';
