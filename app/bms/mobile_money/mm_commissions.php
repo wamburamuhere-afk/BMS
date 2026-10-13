@@ -123,8 +123,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
 </style>
         <!-- Earned tab -->
         <div class="tab-pane fade show active" id="earnedTab">
+            <div id="earnedTableView">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table id="earnedTable" data-bms-cards="off" class="table table-hover align-middle w-100">
                     <thead class="mm-thead">
                         <tr>
                             <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
@@ -134,7 +135,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                     </thead>
                     <tbody>
                         <?php $sno = 1; foreach ($networkEarned as $row): ?>
-                        <tr>
+                        <tr data-network="<?= caseFormat($row['network_name']) ?>" data-color="<?= safe_output($row['color_hex'] ?: '#6c757d') ?>" data-earned="<?= number_format((float)$row['earned']) ?>">
                             <td class="text-center text-muted small"><?= $sno++ ?></td>
                             <td>
                                 <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($row['network_name']) ?></span>
@@ -145,12 +146,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                     </tbody>
                 </table>
             </div>
+            </div><!-- end earnedTableView -->
+            <div id="earnedCardView" class="row g-2 d-none"></div>
         </div>
 
         <!-- Received tab -->
         <div class="tab-pane fade" id="receivedTab">
+            <div id="receivedTableView">
             <div class="table-responsive">
-                <table id="receivedTable" class="table table-hover align-middle w-100">
+                <table id="receivedTable" data-bms-cards="off" class="table table-hover align-middle w-100">
                     <thead class="mm-thead">
                         <tr>
                             <th class="text-center" style="width:48px"><?= t('S/No') ?></th>
@@ -164,7 +168,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                     </thead>
                     <tbody>
                         <?php $rsno = 1; foreach ($receivedRows as $row): ?>
-                        <tr>
+                        <tr data-network="<?= caseFormat($row['network_name']) ?>" data-color="<?= safe_output($row['color_hex'] ?: '#6c757d') ?>" data-period="<?= safe_output($row['period_from']) ?> → <?= safe_output($row['period_to']) ?>" data-amount="<?= number_format((float)$row['amount_received']) ?>" data-bank="<?= caseFormat($row['bank_name'] ?? null) ?>" data-ref="<?= safe_output($row['reference_no'] ?? '—') ?>" data-status="<?= safe_output($row['status']) ?>">
                             <td class="text-center text-muted small"><?= $rsno++ ?></td>
                             <td>
                                 <span class="badge rounded-pill" style="background:<?= safe_output($row['color_hex'] ?: '#6c757d') ?>"><?= caseFormat($row['network_name']) ?></span>
@@ -187,6 +191,8 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
                     </tbody>
                 </table>
             </div>
+            </div><!-- end receivedTableView -->
+            <div id="receivedCardView" class="row g-2 d-none"></div>
         </div>
     </div>
 </div>
@@ -263,9 +269,30 @@ logActivity($pdo, $_SESSION['user_id'], 'View Commissions', 'Viewed Mobile Money
 
 <script>
 $(document).ready(function () {
-    if (!$.fn.DataTable.isDataTable('#receivedTable')) {
-        $('#receivedTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[1,'asc']], columnDefs:[{orderable:false,targets:0}] });
+    if (!$.fn.DataTable.isDataTable('#earnedTable')) {
+        $('#earnedTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[2,'desc']], columnDefs:[{orderable:false,targets:0}], dom: 'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No commission earned yet.')) ?>' },
+            buttons: [{ extend: 'excelHtml5', className: 'd-none' }],
+            drawCallback: function () { renderEarnedCards(this.api().rows({page:'current'}).nodes()); }
+        });
     }
+    if ($('#receivedTable').length && !$.fn.DataTable.isDataTable('#receivedTable')) {
+        $('#receivedTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [[1,'asc']], columnDefs:[{orderable:false,targets:0}], dom: 'rtipB',
+            language: { emptyTable: '<?= addslashes(t('No commission receipts recorded.')) ?>' },
+            buttons: [{ extend: 'excelHtml5', className: 'd-none' }],
+            drawCallback: function () { renderReceivedCards(this.api().rows({page:'current'}).nodes()); }
+        });
+    }
+    function applyView() {
+        const mobile = window.innerWidth < 768;
+        $('#earnedTableView, #receivedTableView').toggleClass('d-none', mobile);
+        $('#earnedCardView, #receivedCardView').toggleClass('d-none', !mobile);
+    }
+    applyView(); $(window).on('resize', applyView);
+    // Tables initialised inside a hidden tab need their scrollX header re-measured when shown
+    $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function () {
+        $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+    });
 
     $('#receiveModal').on('shown.bs.modal', function () {
         $(this).find('.select2-static').each(function () {
@@ -304,5 +331,47 @@ $(document).ready(function () {
         $(this).find('[id$="-message"]').html('');
     });
 });
+
+function renderEarnedCards(nodes) {
+    if (!nodes.length) { $('#earnedCardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No commission earned yet.') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${idx + 1}</span>
+              <span class="badge rounded-pill" style="background:${safeOutput(String($tr.data('color')))}">${safeOutput(String($tr.data('network')))}</span>
+            </div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Earned (TZS)') ?></span><span class="kv-val fw-bold">${safeOutput(String($tr.data('earned')))}</span></div>
+          </div>
+        </div></div>`;
+    });
+    $('#earnedCardView').html(html);
+}
+
+function renderReceivedCards(nodes) {
+    if (!nodes.length) { $('#receivedCardView').html('<div class="col-12 text-center py-5 text-muted"><?= t('No commission receipts recorded.') ?></div>'); return; }
+    let html = '';
+    $(nodes).each(function (idx) {
+        const $tr = $(this);
+        const status = String($tr.data('status'));
+        const sBadge = status === 'posted' ? 'bg-success' : (status === 'void' ? 'bg-danger' : 'bg-secondary');
+        html += `<div class="col-12"><div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden">
+          <div class="card-body p-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="mm-sno">${idx + 1}</span>
+              <span class="badge ${sBadge}" style="font-size:.73rem">${safeOutput(status.charAt(0).toUpperCase()+status.slice(1))}</span>
+            </div>
+            <div class="mb-2"><span class="badge rounded-pill" style="background:${safeOutput(String($tr.data('color')))}">${safeOutput(String($tr.data('network')))}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Period') ?></span><span class="kv-val">${safeOutput(String($tr.data('period')))}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Amount (TZS)') ?></span><span class="kv-val fw-bold">${safeOutput(String($tr.data('amount')))}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Bank Account') ?></span><span class="kv-val">${safeOutput(String($tr.data('bank')))}</span></div>
+            <div class="mm-kv"><span class="kv-lbl"><?= t('Reference') ?></span><span class="kv-val">${safeOutput(String($tr.data('ref')))}</span></div>
+          </div>
+        </div></div>`;
+    });
+    $('#receivedCardView').html(html);
+}
 </script>
 <?php includeFooter(); ?>
