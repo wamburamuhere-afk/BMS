@@ -2,37 +2,14 @@
 /**
  * migrations/tenant/2026_09_26_mm_compliance_tables.php
  *
- * Phase 0 — Mobile Money module: compliance/KYC table.
- * Creates: mm_kyc_records
+ * Retired 2026-10-13: the Mobile Money module was removed from BMS (it moved to
+ * the LMS product) and its tables are dropped by 2026_10_13_drop_mm_tables.
+ * This setup step is kept only so the filename stays known to the migration
+ * runners; it now does nothing. It must not fail: a failing tenant migration
+ * stops every later migration for that tenant, which is what happened to newly
+ * registered tenants once the tables this file used to touch were gone.
  */
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 
-require_once __DIR__ . '/../../core/tenant_migration_bootstrap.php';
-global $pdo;
-
-echo "Starting tenant migration: mm_compliance_tables...\n";
-
-try {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `mm_kyc_records` (
-            `kyc_id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `mm_txn_id`         BIGINT UNSIGNED NOT NULL,
-            `customer_phone`    VARCHAR(20)  NOT NULL DEFAULT '',
-            `customer_name`     VARCHAR(120) NOT NULL DEFAULT '',
-            `id_type`           ENUM('nida','voters','passport','driving_licence') NOT NULL,
-            `id_number`         VARCHAR(40)  NOT NULL DEFAULT '',
-            `id_photo_path`     VARCHAR(255) NULL DEFAULT NULL,
-            `captured_by`       INT UNSIGNED NOT NULL,
-            `captured_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`kyc_id`),
-            UNIQUE KEY `ux_mm_kyc_txn` (`mm_txn_id`),
-            KEY `idx_mm_kyc_phone` (`customer_phone`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    ");
-    echo "  + mm_kyc_records created.\n";
-
-    echo "Migration complete: mm_compliance_tables.\n";
-} catch (PDOException $e) {
-    echo "Migration FAILED: " . $e->getMessage() . "\n";
-    exit(1);
-}
+echo "Skipped 2026_09_26_mm_compliance_tables: Mobile Money module was removed — nothing to do.
+";

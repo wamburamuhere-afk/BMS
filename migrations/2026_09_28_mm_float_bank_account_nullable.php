@@ -1,26 +1,15 @@
 <?php
+/**
+ * migrations/2026_09_28_mm_float_bank_account_nullable.php
+ *
+ * Retired 2026-10-13: the Mobile Money module was removed from BMS (it moved to
+ * the LMS product) and its tables are dropped by 2026_10_13_drop_mm_tables.
+ * This setup step is kept only so the filename stays known to the migration
+ * runners; it now does nothing. It must not fail: a failing tenant migration
+ * stops every later migration for that tenant, which is what happened to newly
+ * registered tenants once the tables this file used to touch were gone.
+ */
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 
-require_once __DIR__ . '/../roots.php';
-global $pdo;
-
-echo "Starting migration: make mm_float_movements.bank_account_id nullable...\n";
-
-try {
-    // Check current column definition
-    $col = $pdo->query("SHOW COLUMNS FROM mm_float_movements LIKE 'bank_account_id'")->fetch(PDO::FETCH_ASSOC);
-
-    if (!$col) {
-        echo "  Column bank_account_id not found — skipping.\n";
-    } elseif (stripos($col['Null'], 'YES') !== false) {
-        echo "  Column already nullable — skipping.\n";
-    } else {
-        $pdo->exec("ALTER TABLE mm_float_movements MODIFY COLUMN bank_account_id INT UNSIGNED NULL DEFAULT NULL");
-        echo "  + bank_account_id altered to NULL DEFAULT NULL.\n";
-    }
-
-    echo "Migration complete.\n";
-} catch (PDOException $e) {
-    echo "Migration FAILED: " . $e->getMessage() . "\n";
-    exit(1);
-}
+echo "Skipped 2026_09_28_mm_float_bank_account_nullable: Mobile Money module was removed — nothing to do.
+";
