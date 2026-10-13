@@ -4,7 +4,7 @@
  *
  *   php tests/test_role_permission_ui_cli.php
  *
- *   1. registry gaps closed (mm_shifts -> mobile_money, pos_restock -> pos)
+ *   1. registry gaps closed (field_visits -> field_reports, pos_restock -> pos)
  *   2. relevance map points at real features and real permission rows
  *   3. POS + Warehouses tenant: only relevant rows, POS rows in one tab
  *   4. no tenant resolved: every non-hidden row shows, nothing preserved
@@ -45,7 +45,7 @@ echo "\nBMS — Roles & Permissions matrix: module-aware display\n";
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('1. Registry gaps closed');
-ok("mm_shifts is owned by mobile_money", featureForPageKey('mm_shifts') === ['mobile_money']);
+ok("field_visits is owned by field_reports", featureForPageKey('field_visits') === ['field_reports']);
 ok("pos_restock is owned by pos",        featureForPageKey('pos_restock') === ['pos']);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ withFeatures(['pos', 'warehouses']);
 $m = loadRolePermissionMatrix($pdo);
 $vis = keysOf($m['visible']);
 
-foreach (['mm_shifts', 'color_settings', 'payment_create', 'attendance_settings', 'policy_management',
+foreach (['field_visits', 'color_settings', 'payment_create', 'attendance_settings', 'policy_management',
           'sms_templates', 'zoom_settings', 'invoices', 'quotations', 'employees', 'payroll', 'tenders',
           'crm_leads', 'purchase_orders', 'grn', 'projects'] as $pk) {
     if (isset($idByKey[$pk])) ok("hidden: $pk", !in_array($pk, $vis, true));
@@ -102,8 +102,8 @@ withFeatures(['pos', 'warehouses', 'sales']);
 ok('Color Setting returns when Sales is on', rolePermissionVisible('color_settings'));
 withFeatures(['pos', 'warehouses', 'procurement']);
 ok('Color Setting returns when Procurement is on', rolePermissionVisible('color_settings'));
-withFeatures(['pos', 'warehouses', 'mobile_money']);
-ok('MM Shifts returns when Mobile Money is on', rolePermissionVisible('mm_shifts'));
+withFeatures(['pos', 'warehouses', 'field_reports']);
+ok('Customer Visits returns when Field Reports is on', rolePermissionVisible('field_visits'));
 withFeatures(['pos', 'warehouses', 'hr']);
 ok('Attendance Settings returns when HR is on', rolePermissionVisible('attendance_settings'));
 
@@ -181,7 +181,7 @@ ok('no workflow key is stale (unused in code and events)' . ($stale ? ' — stal
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('6. Real save (rolled back)');
-$need = ['mm_shifts', 'pos', 'customers', 'tenders', 'purchase_orders', 'user_roles', 'tax_settings'];
+$need = ['field_visits', 'pos', 'customers', 'tenders', 'purchase_orders', 'user_roles', 'tax_settings'];
 $have = array_filter($need, fn($k) => isset($idByKey[$k]));
 ok('fixture permission rows exist: ' . implode(', ', $need), count($have) === count($need));
 
@@ -193,7 +193,7 @@ if (count($have) === count($need)) {
         $rid = (int)$pdo->lastInsertId();
 
         $grant = $pdo->prepare("INSERT INTO role_permissions (role_id, permission_id, can_view, can_create, can_edit, can_delete, can_review, can_approve) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $grant->execute([$rid, $idByKey['mm_shifts'], 1, 1, 1, 0, 0, 0]);   // module off -> must survive
+        $grant->execute([$rid, $idByKey['field_visits'], 1, 1, 1, 0, 0, 0]);   // module off -> must survive
         $grant->execute([$rid, $idByKey['pos'], 1, 0, 0, 0, 1, 1]);         // shown, stale review/approve
         $grant->execute([$rid, $idByKey['user_roles'], 1, 0, 0, 0, 0, 0]);  // locked row -> cleared as before
         $grant->execute([$rid, $idByKey['tax_settings'], 1, 1, 1, 0, 0, 0]); // retired row -> kept
@@ -213,8 +213,8 @@ if (count($have) === count($need)) {
         ];
         saveRolePermissionGrants($pdo, $rid, $submitted, loadRolePermissionMatrix($pdo));
 
-        $r = $row('mm_shifts');
-        ok('hidden-module grant (MM Shifts) survives the save', count($r) === 1 && (int)$r[0]['can_view'] === 1 && (int)$r[0]['can_edit'] === 1);
+        $r = $row('field_visits');
+        ok('hidden-module grant (Customer Visits) survives the save', count($r) === 1 && (int)$r[0]['can_view'] === 1 && (int)$r[0]['can_edit'] === 1);
         $r = $row('pos');
         ok('POS grant saved once with view+create', count($r) === 1 && (int)$r[0]['can_view'] === 1 && (int)$r[0]['can_create'] === 1);
         ok('POS review/approve forced off (no workflow)', (int)$r[0]['can_review'] === 0 && (int)$r[0]['can_approve'] === 0);
@@ -228,20 +228,20 @@ if (count($have) === count($need)) {
         saveRolePermissionGrants($pdo, $rid, [$idByKey['tax_settings'] => ['view' => 'on']], loadRolePermissionMatrix($pdo));
         $cnt = $pdo->prepare("SELECT COUNT(*) FROM role_permissions WHERE role_id = ?");
         $cnt->execute([$rid]);
-        ok('empty save leaves only the preserved grants (MM Shifts + Tax)', (int)$cnt->fetchColumn() === 2 && count($row('mm_shifts')) === 1);
+        ok('empty save leaves only the preserved grants (Customer Visits + Tax)', (int)$cnt->fetchColumn() === 2 && count($row('field_visits')) === 1);
         $r = $row('tax_settings');
         ok('crafted POST cannot change the retired Tax grant', count($r) === 1 && (int)$r[0]['can_edit'] === 1);
 
         // Module switched back on: grant is there and now editable.
         withFeatures(null);
-        ok('re-enabled module: preserved grant visible again', count($row('mm_shifts')) === 1);
+        ok('re-enabled module: preserved grant visible again', count($row('field_visits')) === 1);
         $submitted = [
             $idByKey['purchase_orders'] => ['view' => 'on', 'review' => 'on', 'approve' => 'on'],
         ];
         saveRolePermissionGrants($pdo, $rid, $submitted, loadRolePermissionMatrix($pdo));
         $r = $row('purchase_orders');
         ok('workflow page keeps review+approve', count($r) === 1 && (int)$r[0]['can_review'] === 1 && (int)$r[0]['can_approve'] === 1);
-        ok('all rows on screen: unticked MM Shifts now removed', $row('mm_shifts') === []);
+        ok('all rows on screen: unticked Customer Visits now removed', $row('field_visits') === []);
 
         saveRolePermissionGrants($pdo, $rid, $submitted, loadRolePermissionMatrix($pdo));
         ok('saving twice creates no duplicates', count($row('purchase_orders')) === 1);
