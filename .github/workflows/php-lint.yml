@@ -153,3 +153,8 @@ jobs:
         run: |
           echo "Running stock_movements ENUM safety guard..."
           php tests/test_stock_movements_enum_safety_cli.php
+
+      - name: Service print columns (quotation / sales order / invoice)
+        run: |
+          echo "Running service print columns test suite..."
+          php tests/test_service_print_columns_cli.php

@@ -58,13 +58,15 @@ try {
     logActivity($pdo, $_SESSION['user_id'], "Print Sales Order", "$user_name printed Sales Order #{$order['order_number']} (Ledger template)");
 
     $stmtItems = $pdo->prepare("
-        SELECT soi.*, p.product_name, p.sku, p.unit
+        SELECT soi.*, p.product_name, p.sku, p.unit, p.is_service AS svc_is_service, p.description AS svc_description
         FROM sales_order_items soi
         LEFT JOIN products p ON soi.product_id = p.product_id
         WHERE soi.order_id = ?
     ");
     $stmtItems->execute([$sales_order_id]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+    // Every line a service = created with the Service switch on: print Service Name + Description, no Product Code.
+    $svcLayout = !empty($items) && !array_filter($items, fn($r) => (int)($r['svc_is_service'] ?? 0) !== 1);
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 } catch (Exception $e) {
@@ -310,8 +312,13 @@ $status_display = $status_map[$order['status']] ?? strtoupper($order['status']);
         <thead>
             <tr>
                 <th class="text-center" style="width:34px;">S/NO</th>
+                <?php if ($svcLayout): ?>
+                <th class="text-center" style="width:30%;">Service Name</th>
+                <th class="text-center">Description</th>
+                <?php else: ?>
                 <th class="text-center" style="width:90px;">Product Code</th>
                 <th class="text-center">Item / Description</th>
+                <?php endif; ?>
                 <th class="text-right" style="width:70px;">Qty</th>
                 <th class="text-right" style="width:95px;">Unit Price</th>
                 <th class="text-right" style="width:105px;">Total (<?= $currency ?>)</th>
@@ -324,8 +331,14 @@ $status_display = $status_map[$order['status']] ?? strtoupper($order['status']);
             ?>
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
+                <?php if ($svcLayout):
+                    $svcDesc = trim((string)($item['svc_description'] ?? '')) !== '' ? (string)$item['svc_description'] : (string)($item['description'] ?? ''); ?>
+                <td style="overflow-wrap:anywhere;word-break:break-word;"><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? '', 'Unknown Service') ?></td>
+                <td style="overflow-wrap:anywhere;word-break:break-word;white-space:pre-line;"><?= htmlspecialchars(trim($svcDesc), ENT_QUOTES, 'UTF-8') ?></td>
+                <?php else: ?>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
                 <td><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? 'Unknown Product') ?><?php if (!empty($item['description'])): ?><br><small style="color:#6c757d;font-size:10px;"><?= htmlspecialchars($item['description']) ?></small><?php endif; ?></td>
+                <?php endif; ?>
                 <td class="text-right"><?= floatval($item['quantity']) ?><?= $unit ?></td>
                 <td class="text-right"><?= number_format($item['unit_price'], 2) ?></td>
                 <td class="text-right fw-bold"><?= number_format($lineTotal, 2) ?></td>

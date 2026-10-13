@@ -1132,6 +1132,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('pos')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?></a></li>
                                 <?php endif; ?>
+                                <?php if(canView('invoices')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
+                                <?php endif; ?>
                                 <li><h6 class="dropdown-header"><?= t('Returns') ?></h6></li>
                                 <?php if(canView('sales_returns')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('sales_returns') ?>"><i class="bi bi-arrow-return-left"></i> <?= t('Sales Returns') ?></a></li>
