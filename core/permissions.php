@@ -728,6 +728,7 @@ function getPagePermissionMapping()
         'customer_analysis.php'    => 'customer_analysis',
         'employee_report.php'      => 'employee_report',
         'product_analysis.php'     => 'product_analysis',
+        'service_sales_report.php' => 'service_sales_report',
         'trends_analysis.php'      => 'trends_analysis',
         'asset_report.php'         => 'asset_report',
         'inventory_report.php'     => 'inventory_report',
@@ -760,7 +761,7 @@ function hasReportsAccess()
     $reportPermissions = [
         'income_statement', 'balance_sheet', 'cash_flow', 'trial_balance', 'ledger_report',
         'sales_report', 'purchase_report', 'inventory_report', 'profit_loss_report', 'expense_report',
-        'performance_dashboard', 'customer_analysis', 'product_analysis', 'sales_forecast', 'trends_analysis',
+        'performance_dashboard', 'customer_analysis', 'product_analysis', 'service_sales_report', 'sales_forecast', 'trends_analysis',
         'tax_report', 'audit_logs', 'compliance_report', 'employee_report', 'asset_report',
         'financial_statements', 'pos_user_sales_report', 'pos_profit_report',
     ];
