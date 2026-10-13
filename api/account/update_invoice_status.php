@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/vat.php';
 require_once __DIR__ . '/../../core/revenue_posting.php';
+require_once __DIR__ . '/../../core/sales_invoicing.php';
 
 header('Content-Type: application/json');
 
@@ -109,6 +110,8 @@ try {
             reverseInvoiceCOGS($pdo, (int)$invoice_id, (int)$userId);
             // Un-recognise output VAT stamp — idempotent.
             reverseOutputVat($pdo, (int)$invoice_id);
+            // Its sales-order quantities become billable again.
+            soRefreshInvoicedQuantities($pdo, soIdsForInvoice($pdo, (int)$invoice_id));
         }
     }
 

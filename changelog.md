@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-10-13 — fix(sales): services keep their money right from quotation to invoice (service-sales Phase 1)
+
+An end-to-end test of selling a service found an invoice raised from a sales order dropping its VAT and discount (2,183,000 became 2,000,000), the same sales order invoiceable any number of times, large amounts clipped at 99,999,999.99, and invoiced services deletable.
+
+- `core/sales_invoicing.php` (new) — one place that works out how much of each sales-order line is still billable (cancelled invoices don't count), guards it under a row lock, refreshes `sales_order_items.quantity_invoiced`, and rejects amounts too large to store.
+- `api/account/get_sales_order_items.php`, `app/bms/invoice/invoice_create.php` — order lines now carry the agreed price, VAT, discount and description, and only the quantity still open; the line keeps its link to the order line. The form gets a Disc % column and a Discount total; order-derived price/VAT/discount are locked.
+- `api/account/save_invoice.php` — per-line discount, VAT charged after discount (same rule as quotations/sales orders), quantity guard, amount guard.
+- `api/account/update_invoice_status.php`, `api/account/delete_invoice.php` — cancelling or deleting an invoice frees its sales-order quantity.
+- `api/account/get_sales_orders.php` — `for_invoicing=1` lists only orders with something left to bill (the invoice form uses it; the Sales Orders page is unchanged).
+- `api/account/get_products.php` — new `sales_tax_rate` field (a service's registered VAT) and `contract_item_no`; quotation, sales-order and invoice forms use it. `products.tax_rate` is deliberately not written, because the POS cart reads it.
+- `api/account/save_quotation.php`, `api/account/save_sales_order.php` — reject amounts too large to store instead of clipping them.
+- `api/delete_product.php` — an item on a quotation, invoice or credit note can no longer be deleted (set it Inactive). POS sales are not checked: POS behaviour is unchanged.
+- Invoice prints (default, Onyx, Summit, Wave) — show the discount and the stored VAT; "VAT (18%)" label is now "VAT". `core/revenue_posting.php` ledger line label likewise.
+- Migrations `2026_10_13_sales_documents_money_and_line_discount` (tenant + legacy) — money columns of quotation/sales-order/invoice lines and invoice headers widened to DECIMAL(15,2), `invoice_items.discount_percent/discount_amount` added, `quantity_invoiced` back-filled. Idempotent.
+- Not touched: any `api/pos/*` or `app/bms/pos/*` file.
+
+Verified: `tests/test_service_sales_phase1_cli.php` (new) 38/38 — quotation → sales order → invoice totals and ledger, double-billing guard, cancel frees quantity, partial invoicing, large/impossible amounts, delete guard, all four invoice prints; ZZTEST data removed afterwards.
+
+---
+
 ## 2026-10-13 — fix: finish the Mobile Money removal (header parse error blocked the deploy)
 
 The removal merged earlier today (PR #2451) left `header.php` unparseable, which failed the lint job and blocked the production deploy. It also left references to deleted files that lint cannot see.

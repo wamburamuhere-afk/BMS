@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/sales_invoicing.php';   // assertSalesAmountsFit
 
 header('Content-Type: application/json');
 
@@ -151,6 +152,12 @@ try {
         $subtotal += $line_subtotal; // Subtotal before discount
         $tax_total += $line_tax;
         $total_ordered += $qty;
+
+        $line_name = trim((string)($item['product_name'] ?? '')) ?: 'an item';
+        assertSalesAmountsFit([
+            "Unit price of $line_name" => $price,
+            "Line total of $line_name" => $taxable_amount + $line_tax,
+        ]);
     }
     
     $shipping_cost = floatval($_POST['shipping_cost'] ?? 0);
@@ -160,6 +167,7 @@ try {
     }, 0);
     
     $grand_total = ($subtotal - $discount_amount_total) + $tax_total + $shipping_cost;
+    assertSalesAmountsFit(['Subtotal' => $subtotal, 'Grand total' => $grand_total]);
 
     // Optional column support: po_no (some installs may not have it yet)
     $hasPoNoColumn = false;

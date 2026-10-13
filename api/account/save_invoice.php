@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/vat.php';
 require_once __DIR__ . '/../../core/workflow.php';          // workflowActorSnapshot / CaptureSignature
 require_once __DIR__ . '/../../core/revenue_posting.php';   // postInvoiceRevenue / postInvoiceCOGS
+require_once __DIR__ . '/../../core/sales_invoicing.php';   // sales-order remaining-quantity guard
 
 header('Content-Type: application/json');
 error_reporting(E_ERROR | E_PARSE);
@@ -103,24 +104,44 @@ try {
         throw new Exception(isShopLabel() ? "Shop is required for inventory invoices" : "Warehouse is required for inventory invoices");
     }
 
-    // Calculate totals
+    // Calculate totals. VAT is charged on the line after its discount, the same
+    // rule save_quotation.php / save_sales_order.php use, so an invoice raised
+    // from a sales order reproduces the order's figures exactly.
     $subtotal = 0;
     $tax_total = 0;
-    
-    // Validate items and calculate
-    foreach ($items as $item) {
+    $line_discount_total = 0;
+    $lines = [];
+
+    foreach ($items as $key => $item) {
         $qty = floatval($item['quantity']);
         $price = floatval($item['unit_price']);
         $tax_rate = floatval($item['tax_rate'] ?? 0);
-        
+        $discount_percent = min(max(floatval($item['discount_percent'] ?? 0), 0), 100);
+
         $line_subtotal = $qty * $price;
-        $line_tax = $line_subtotal * ($tax_rate / 100);
-        
+        $line_discount = round($line_subtotal * ($discount_percent / 100), 2);
+        $line_tax = ($line_subtotal - $line_discount) * ($tax_rate / 100);
+        $line_total = $line_subtotal - $line_discount + $line_tax;
+
+        $name = trim((string)($item['product_name'] ?? '')) ?: 'Line ' . ((int)$key + 1);
+        assertSalesAmountsFit([
+            "Unit price of $name" => $price,
+            "Line total of $name" => $line_total,
+        ]);
+
         $subtotal += $line_subtotal;
+        $line_discount_total += $line_discount;
         $tax_total += $line_tax;
+        $lines[$key] = compact('qty', 'price', 'tax_rate', 'discount_percent', 'line_discount', 'line_tax', 'line_total');
     }
-    
-    $grand_total = $subtotal + $tax_total - $discount + $shipping;
+
+    $discount = floatval($discount) + $line_discount_total;
+    $grand_total = $subtotal - $discount + $tax_total + $shipping;
+    assertSalesAmountsFit(['Invoice subtotal' => $subtotal, 'Invoice total' => $grand_total]);
+
+    // Orders this invoice billed before the edit — their quantities are freed
+    // or re-counted once the new lines are saved.
+    $priorSoIds = $is_update ? soIdsForInvoice($pdo, (int)$invoice_id) : [];
 
     if ($invoice_id > 0) {
         // Re-code on edit, but only while the invoice is NOT yet posted to the GL
@@ -218,41 +239,48 @@ try {
             (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']);
     }
 
+    // A sales-order line can only be billed up to the quantity still open on it.
+    $touchedSoIds = soAssertInvoiceable($pdo, $items, $order_id ? (int)$order_id : null, (int)$invoice_id);
+
+    // Older tenants may not have run the line-discount migration yet.
+    $hasLineDiscount = (bool)$pdo->query("SHOW COLUMNS FROM invoice_items LIKE 'discount_amount'")->fetch();
+
     // Insert Items - NOTE: column name must match table `invoice_items` (line_total)
-    $itemStmt = $pdo->prepare("
+    $itemStmt = $pdo->prepare($hasLineDiscount ? "
+        INSERT INTO invoice_items (
+            invoice_id, order_item_id, product_id, product_name, description,
+            quantity, unit, unit_price, tax_rate, tax_amount, discount_percent, discount_amount, line_total
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    " : "
         INSERT INTO invoice_items (
             invoice_id, order_item_id, product_id, product_name, description,
             quantity, unit, unit_price, tax_rate, tax_amount, line_total
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
-    foreach ($items as $item) {
-        $qty = floatval($item['quantity']);
-        $price = floatval($item['unit_price']);
-        $tax_rate = floatval($item['tax_rate'] ?? 0);
-        $line_subtotal = $qty * $price;
-        $line_tax = $line_subtotal * ($tax_rate / 100);
-        $line_total = $line_subtotal + $line_tax;
-
-        $itemStmt->execute([
+    foreach ($items as $key => $item) {
+        $l = $lines[$key];
+        $row = [
             $invoice_id,
-            $item['order_item_id'] ?: null,
-            $item['product_id'] ?: null,
+            !empty($item['order_item_id']) ? (int)$item['order_item_id'] : null,
+            !empty($item['product_id']) ? (int)$item['product_id'] : null,
             $item['product_name'],
             $item['description'] ?? '',
-            $qty,
+            $l['qty'],
             $item['unit'] ?? 'pcs',
-            $price,
-            $tax_rate,
-            $line_tax,
-            $line_total
-        ]);
+            $l['price'],
+            $l['tax_rate'],
+            $l['line_tax'],
+        ];
+        if ($hasLineDiscount) {
+            $row[] = $l['discount_percent'];
+            $row[] = $l['line_discount'];
+        }
+        $row[] = $l['line_total'];
+        $itemStmt->execute($row);
     }
-    
-    // Update Sales Order Status if linked
-    if ($order_id) {
-         // Logic to update sales order status/invoiced amount could go here
-    }
+
+    soRefreshInvoicedQuantities($pdo, array_merge($priorSoIds, $touchedSoIds, $order_id ? [(int)$order_id] : []));
 
     // Accrue a newly-created invoice into the ONE canonical ledger right away
     // (invoices are auto-approved, mirroring bills): Dr Accounts Receivable /
