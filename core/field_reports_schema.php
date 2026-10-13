@@ -77,6 +77,38 @@ if (!function_exists('fieldReportsEnsureSchema')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
 
+        // Services the Sales Officer intended to sell on a visit (from Services).
+        // The name is copied at save time so the report still reads correctly if
+        // the service is renamed or deactivated later.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `field_visit_services` (
+                `visit_id`     INT UNSIGNED NOT NULL,
+                `product_id`   INT UNSIGNED NOT NULL,
+                `service_name` VARCHAR(255) NOT NULL,
+                `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`visit_id`, `product_id`),
+                KEY `idx_fvs_product` (`product_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+
+        // A report PDF shared as a link (WhatsApp where the device cannot attach
+        // a file). Only the SHA-256 of the token is stored; the PDF lives here,
+        // not in a public folder, and is served only until it expires.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `field_report_shares` (
+                `share_id`   INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `token_hash` CHAR(64) NOT NULL,
+                `filename`   VARCHAR(190) NOT NULL,
+                `pdf`        MEDIUMBLOB NOT NULL,
+                `created_by` INT UNSIGNED NOT NULL,
+                `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `expires_at` DATETIME NOT NULL,
+                PRIMARY KEY (`share_id`),
+                UNIQUE KEY `ux_frs_token` (`token_hash`),
+                KEY `idx_frs_expires` (`expires_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+
         $pdo->prepare("
             INSERT IGNORE INTO permissions (page_key, page_name, description, module_name)
             VALUES (?, ?, ?, ?)

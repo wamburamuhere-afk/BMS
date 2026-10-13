@@ -116,7 +116,74 @@ if (!function_exists('frBusinessTypes')) {
         $rows = $s->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$r) $r['staff_name'] = frStaffName($r);
         unset($r);
+        frAttachServices($pdo, $rows);
         return $rows;
+    }
+
+    /** Active services (Services page) a Sales Officer can say they intend to sell. */
+    function frServiceOptions(PDO $pdo): array
+    {
+        return $pdo->query("SELECT product_id, product_name, contract_item_no FROM products
+                             WHERE is_service = 1 AND status = 'active' ORDER BY product_name")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Adds 'services' => [[product_id, name], ...] to each visit row. */
+    function frAttachServices(PDO $pdo, array &$rows): void
+    {
+        foreach ($rows as &$r) $r['services'] = [];
+        unset($r);
+        $ids = array_values(array_unique(array_map(fn($r) => (int)$r['visit_id'], $rows)));
+        if (!$ids) return;
+        try {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $s = $pdo->prepare("SELECT visit_id, product_id, service_name FROM field_visit_services
+                                 WHERE visit_id IN ($ph) ORDER BY service_name");
+            $s->execute($ids);
+            $by = [];
+            foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $x) {
+                $by[(int)$x['visit_id']][] = ['product_id' => (int)$x['product_id'], 'name' => $x['service_name']];
+            }
+        } catch (PDOException $e) {
+            return;   // table not created yet on this tenant — no services to show
+        }
+        foreach ($rows as &$r) $r['services'] = $by[(int)$r['visit_id']] ?? [];
+        unset($r);
+    }
+
+    /**
+     * Validates the chosen service ids. Returns [ids => names] or a string error.
+     * Only active services may be chosen; at most 20 per visit.
+     */
+    function frValidateServices(PDO $pdo, $raw)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', is_array($raw) ? $raw : []), fn($i) => $i > 0)));
+        if (!$ids) return [];
+        if (count($ids) > 20) return t('Choose at most 20 services.');
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $s = $pdo->prepare("SELECT product_id, product_name FROM products
+                             WHERE product_id IN ($ph) AND is_service = 1 AND status = 'active'");
+        $s->execute($ids);
+        $found = [];
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $p) $found[(int)$p['product_id']] = $p['product_name'];
+        if (count($found) !== count($ids)) return t('Choose services from the list.');
+        return $found;
+    }
+
+    /** Replaces a visit's services (call inside the caller's flow after validation). */
+    function frSaveVisitServices(PDO $pdo, int $visitId, array $services): void
+    {
+        $pdo->prepare("DELETE FROM field_visit_services WHERE visit_id = ?")->execute([$visitId]);
+        $ins = $pdo->prepare("INSERT INTO field_visit_services (visit_id, product_id, service_name) VALUES (?, ?, ?)");
+        foreach ($services as $pid => $name) $ins->execute([$visitId, (int)$pid, mb_substr((string)$name, 0, 255)]);
+    }
+
+    /** How many visits offered each service, most offered first: [name => count]. */
+    function frServiceCounts(array $rows): array
+    {
+        $c = [];
+        foreach ($rows as $r) foreach ($r['services'] ?? [] as $s) $c[$s['name']] = ($c[$s['name']] ?? 0) + 1;
+        arsort($c);
+        return $c;
     }
 
     /** Counts for a set of visits. A client (same phone) counts once for people/joined. */

@@ -14,6 +14,8 @@ try {
         'date_to' => $to,
         'scope_user_id' => $userId,
         'stats' => frStats($rows),
+        // Which services the team offered most in this period.
+        'service_counts' => array_map(fn($n, $c) => ['name' => $n, 'count' => $c], array_keys($sc = frServiceCounts($rows)), array_values($sc)),
         'rows' => array_map('frRowOut', $rows),
         'day_status' => null,
         'staff_summary' => [],

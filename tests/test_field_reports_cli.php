@@ -13,6 +13,8 @@
  *   6. print report            — Kiswahili + English, landscape + portrait, footer
  *   7. Excel export            — BOM, translated headings, formula guard
  *   8. stats                   — a client is counted once (normalised phone)
+ *  17. services on a visit     — choose services (Services page), shown in list/print/PDF/Excel
+ *  18. PDF-only sharing        — WhatsApp carries the PDF (or only a link to it), never text
  *
  * Fixtures: two existing non-admin users in DIFFERENT roles, both given FULL
  * field_visits rights (so only the ownership rule can stop them), plus admin.
@@ -551,14 +553,15 @@ try {
     ok(strpos($pp, '.k-sno{width:') !== false && strpos($pp, 'table-layout: fixed') !== false, 'print layout untouched (fixed widths, same columns)');
     $kit = file_get_contents(ROOT_DIR . '/includes/field_reports/report_share.php');
     ok(strpos($kit, "rowPageBreak: 'avoid'") !== false && strpos($kit, "showHead: 'everyPage'") !== false && strpos($kit, 'getTextWidth') !== false, 'PDF: rows never split, headings on every page, widths measured so words are not cut');
-    ok(strpos($kit, 'navigator.canShare') !== false && strpos($kit, 'https://wa.me/?text=') !== false, 'WhatsApp: phone share sheet with the PDF; computer falls back to wa.me (choose a contact)');
+    ok(strpos($kit, 'navigator.canShare') !== false && strpos($kit, 'https://wa.me/?text=') !== false, 'WhatsApp: share sheet with the PDF; elsewhere wa.me with a link to the PDF');
+    ok(strpos($kit, 'navigator.share({ files: [file] })') !== false && strpos($kit, 'share_text') === false, 'WhatsApp shares only the PDF file — no text summary');
 
     [$c, , $j] = call('api/field_reports/report_data.php', $A, false, 'GET', $range + ['lang' => 'sw', 'user_id' => (string)$B]);
     ok($c === 200 && !empty($j['success']), 'report data (sw) answers');
     ok(($j['columns'][0]['label'] ?? '') === 'Na.' && ($j['labels']['title'] ?? '') === 'RIPOTI YA ZIARA ZA WATEJA', 'PDF columns/labels in Swahili ("Na.")');
     $flat = json_encode($j['rows'] ?? [], JSON_UNESCAPED_UNICODE);
     ok(strpos($flat, "Asha A $tag") !== false && strpos($flat, "Baraka B $tag") === false, "A asking ?user_id=B gets only A's rows in the PDF");
-    ok(preg_match('/^Ripoti_ya_Ziara_.+_' . $day1 . '\.pdf$/', $j['filename'] ?? '') === 1 && strpos($j['share_text'] ?? '', '*RIPOTI YA ZIARA ZA WATEJA*') === 0, 'PDF file name + WhatsApp text');
+    ok(preg_match('/^Ripoti_ya_Ziara_.+_' . $day1 . '\.pdf$/', $j['filename'] ?? '') === 1 && !array_key_exists('share_text', $j), 'PDF file name; no WhatsApp text summary any more');
     ok(($j['status'] ?? '') !== '' && count($j['summary'] ?? []) === 7 && count($j['columns'] ?? []) === count($j['rows'][0] ?? []), 'status line, 7 summary boxes, a cell per column');
     ok(array_sum(array_column($j['columns'] ?? [], 'weight')) > 0 && ($j['columns'][0]['weight'] ?? 0) === frReportLandscapeWeights()['sno'], 'PDF uses the print page widths');
 
@@ -585,12 +588,95 @@ try {
     ok(($m['to'] ?? []) === ['boss@example.com', 'deputy@example.com'], 'sent to both addresses');
     ok(!empty($m['attachment_exists']) && ($m['attachment_head'] ?? '') === '%PDF-' && preg_match('/^Ripoti_ya_Ziara_.+\.pdf$/', $m['attachment_name'] ?? '') === 1, 'the PDF is attached under a readable name');
     ok(!empty($m['attachment']) && !file_exists($m['attachment']) && !is_dir(dirname($m['attachment'])), 'the temporary copy is removed after sending');
-    ok(strpos($m['subject'] ?? '', 'RIPOTI YA ZIARA ZA WATEJA') === 0 && strpos($m['body'] ?? '', 'Ziara') !== false && strpos($m['body'] ?? '', "Habari $tag") !== false, 'subject + summary in Swahili, with the typed message');
+    ok(strpos($m['subject'] ?? '', 'RIPOTI YA ZIARA ZA WATEJA') === 0 && strpos($m['body'] ?? '', 'imeambatishwa kama PDF') !== false && strpos($m['body'] ?? '', "Habari $tag") !== false, 'subject in Swahili; body = the typed message + "report attached as a PDF"');
+    ok(strpos($m['body'] ?? '', '<table') === false, 'email body carries no summary table — the PDF is the report');
     ok(strpos($m['subject'] ?? '', 'Baraka') === false, "A's email with ?user_id=B is still about A");
     [$c, , $j] = $send(['message' => "<script>alert(1)</script> $tag"]);
     $m = json_decode((string)@file_get_contents($mail), true) ?: [];
     ok(strpos($m['body'] ?? '', '<script>') === false && strpos($m['body'] ?? '', '&lt;script&gt;') !== false, 'the typed message is escaped in the email');
     @unlink($mail);
+
+    // ═════════════════════════════════════════════════════════════════
+    section('17. Services the Sales Officer intends to sell');
+    $mkSvc = function (string $name, string $status) use ($pdo) {
+        $pdo->prepare("INSERT INTO products (product_name, is_service, track_inventory, status, selling_price, unit, created_at)
+                       VALUES (?, 1, 0, ?, 1000, 'job', NOW())")->execute([$name, $status]);
+        return (int)$pdo->lastInsertId();
+    };
+    $svc1 = $mkSvc("Smart BMS $tag", 'active');
+    $svc2 = $mkSvc("Smart POS $tag", 'active');
+    $svcOff = $mkSvc("Old Service $tag", 'inactive');
+    $createdSvc = [$svc1, $svc2, $svcOff];
+    [, $page] = call('app/bms/field_reports/field_visits.php', $A, false, 'GET', ['__lang' => 'en']);
+    ok(strpos($page, 'name="service_ids[]"') !== false && strpos($page, "Smart BMS $tag") !== false && strpos($page, "Old Service $tag") === false,
+       'form lists active services to choose (inactive ones hidden)');
+    ok(strpos($page, 'name="services_sent" value="1"') !== false, 'form marks that it carries the services field');
+
+    [$c, , $j] = save($A, false, visit(['client_name' => "Svc client $tag", 'services_sent' => '1', 'service_ids' => [(string)$svc1, (string)$svc2]]));
+    $sv = (int)($j['visit_id'] ?? 0);
+    $got = $pdo->prepare("SELECT product_id, service_name FROM field_visit_services WHERE visit_id = ? ORDER BY product_id");
+    $got->execute([$sv]);
+    $rowsSvc = $got->fetchAll(PDO::FETCH_ASSOC);
+    ok($c === 200 && count($rowsSvc) === 2 && $rowsSvc[0]['service_name'] === "Smart BMS $tag", 'visit saved with two services (names kept)');
+    [, , $l] = call('api/field_reports/list.php', $A, false, 'GET', ['date_from' => $day1, 'date_to' => $day1]);
+    $lv = current(array_filter($l['rows'] ?? [], fn($r) => (int)$r['visit_id'] === $sv)) ?: [];
+    ok(($lv['service_ids'] ?? []) === [$svc1, $svc2] && count($lv['services'] ?? []) === 2, 'list returns the visit\'s services');
+    $counts = array_column($l['service_counts'] ?? [], 'count', 'name');
+    ok(($counts["Smart BMS $tag"] ?? 0) === 1, 'list counts how often each service was offered');
+
+    [$c] = save($A, false, visit(['visit_id' => (string)$sv, 'client_name' => "Svc client $tag"]));
+    $got->execute([$sv]);
+    ok($c === 200 && count($got->fetchAll()) === 2, 'an edit without the services field (older app) keeps the services');
+    [$c] = save($A, false, visit(['visit_id' => (string)$sv, 'client_name' => "Svc client $tag", 'services_sent' => '1', 'service_ids' => [(string)$svc2]]));
+    $got->execute([$sv]);
+    $after = $got->fetchAll(PDO::FETCH_ASSOC);
+    ok($c === 200 && count($after) === 1 && (int)$after[0]['product_id'] === $svc2, 'an edit can change the services');
+    [$c] = save($A, false, visit(['visit_id' => (string)$sv, 'client_name' => "Svc client $tag", 'services_sent' => '1']));
+    $got->execute([$sv]);
+    ok($c === 200 && count($got->fetchAll()) === 0, 'an edit can clear the services (optional field)');
+    foreach ([[[(string)$svcOff], 'an inactive service'], [['99999999'], 'an unknown id'],
+              [array_map('strval', range(900001, 900021)), 'more than 20 services']] as [$ids, $label]) {
+        [$c, , $j] = save($A, false, visit(['client_name' => "Bad svc $tag", 'services_sent' => '1', 'service_ids' => $ids]));
+        ok($c === 422 && isset($j['errors']['service_ids']), "rejects $label → 422");
+    }
+    save($A, false, visit(['visit_id' => (string)$sv, 'client_name' => "Svc client $tag", 'services_sent' => '1', 'service_ids' => [(string)$svc1]]));
+    [, , $rd] = call('api/field_reports/report_data.php', $A, false, 'GET', ['date_from' => $day1, 'date_to' => $day1, 'lang' => 'en']);
+    $keys = array_column($rd['columns'] ?? [], 'key');
+    $si = array_search('services', $keys, true);
+    $cells = array_map(fn($r) => $r[$si] ?? '', $rd['rows'] ?? []);
+    ok($si !== false && in_array("Smart BMS $tag", $cells, true), 'PDF data has a Services column with the service');
+    [, $csv] = call('api/field_reports/export.php', $A, false, 'GET', ['date_from' => $day1, 'date_to' => $day1, 'lang' => 'en']);
+    ok(strpos($csv, 'Services offered') !== false && strpos($csv, "Smart BMS $tag") !== false, 'Excel export has the Services column');
+    [, $pp] = call('app/bms/field_reports/field_report_print.php', $A, false, 'GET', ['date_from' => $day1, 'date_to' => $day1, 'lang' => 'sw']);
+    ok(strpos($pp, 'Huduma Zilizopendekezwa') !== false && strpos($pp, "Smart BMS $tag") !== false && strpos($pp, '.k-services{width:') !== false,
+       'print page (sw) shows the Services column with its width');
+    [, , $lb] = call('api/field_reports/list.php', $B, false, 'GET', ['date_from' => $day1, 'date_to' => $day1]);
+    ok(!array_filter($lb['rows'] ?? [], fn($r) => (int)$r['visit_id'] === $sv), "B still never sees A's visit (or its services)");
+
+    // ═════════════════════════════════════════════════════════════════
+    section('18. WhatsApp without file sharing: only a link to the PDF');
+    $pdf = base64_encode("%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF\n");
+    [$c] = call('api/field_reports/share_link.php', $A, false, 'GET', []);
+    ok($c === 405, "share link via GET → 405 (got $c)");
+    [$c] = call('api/field_reports/share_link.php', $A, false, 'POST', ['pdf' => base64_encode('<html>no</html>'), 'date_from' => $day1, 'date_to' => $day1]);
+    ok($c === 422, 'a file that is not a PDF is refused → 422');
+    [$c, , $j] = call('api/field_reports/share_link.php', $A, false, 'POST', ['pdf' => $pdf, 'date_from' => $day1, 'date_to' => $day1, 'lang' => 'sw', 'user_id' => (string)$B]);
+    $url = (string)($j['url'] ?? '');
+    ok($c === 200 && preg_match('#/report-pdf\?t=([a-f0-9]{48})$#', $url, $tm) === 1, 'link created: /report-pdf?t=<48 hex>');
+    $tok = $tm[1] ?? '';
+    $row = $pdo->prepare("SELECT filename, created_by, TIMESTAMPDIFF(DAY, NOW(), expires_at) AS days, token_hash FROM field_report_shares WHERE token_hash = ?");
+    $row->execute([hash('sha256', $tok)]);
+    $sh = $row->fetch(PDO::FETCH_ASSOC) ?: [];
+    ok((int)($sh['created_by'] ?? 0) === $A && in_array((int)($sh['days'] ?? 0), [6, 7], true) && strpos($sh['filename'] ?? '', 'Baraka') === false,
+       'stored by A, expires in 7 days, and A asking for B still gets A\'s file name');
+    ok((int)$pdo->query("SELECT COUNT(*) FROM field_report_shares WHERE token_hash = " . $pdo->quote($tok))->fetchColumn() === 0, 'the raw token is never stored (only its hash)');
+    [$c, $body] = call('field_report_pdf.php', 0, false, 'GET', ['t' => $tok]);
+    ok($c === 200 && strncmp($body, '%PDF-', 5) === 0, 'the link opens the PDF without logging in');
+    [$c, $body] = call('field_report_pdf.php', 0, false, 'GET', ['t' => str_repeat('a', 48)]);
+    ok($c === 404 && strpos($body, 'Report not available') !== false && strpos($body, '%PDF') === false, 'a wrong token → 404, no PDF');
+    $pdo->prepare("UPDATE field_report_shares SET expires_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE) WHERE token_hash = ?")->execute([hash('sha256', $tok)]);
+    [$c] = call('field_report_pdf.php', 0, false, 'GET', ['t' => $tok]);
+    ok($c === 404, 'an expired link → 404');
 } finally {
     // ── Cleanup: only what this run created ───────────────────────────
     $pdo->prepare("DELETE FROM field_visits WHERE location LIKE ? OR client_name LIKE ? OR notes LIKE ?")
@@ -605,6 +691,11 @@ try {
         $pdo->prepare("DELETE FROM activity_logs WHERE user_id IN (?, ?, ?) AND created_at >= ? AND (description LIKE '%field visit%' OR description LIKE '%field report%')")
             ->execute([$A, $B, $adminId, $logStart]);
     } catch (PDOException $e) { /* no activity_logs table */ }
+    try {
+        $pdo->exec("DELETE fvs FROM field_visit_services fvs LEFT JOIN field_visits v ON v.visit_id = fvs.visit_id WHERE v.visit_id IS NULL");
+        $pdo->prepare("DELETE FROM field_report_shares WHERE created_by IN (?, ?, ?) AND created_at >= ?")->execute([$A, $B, $adminId, $logStart]);
+        if (!empty($createdSvc)) $pdo->exec("DELETE FROM products WHERE product_id IN (" . implode(',', array_map('intval', $createdSvc)) . ") AND product_name LIKE " . $pdo->quote("%$tag"));
+    } catch (PDOException $e) { echo "    ! cleanup of services/shares: " . $e->getMessage() . "\n"; }
     $left = (int)$pdo->query("SELECT COUNT(*) FROM field_visits WHERE client_name LIKE " . $pdo->quote("%$tag%"))->fetchColumn();
     echo "\nCleanup: " . ($left === 0 ? 'all test rows removed' : "$left rows LEFT BEHIND") . "\n";
 }
