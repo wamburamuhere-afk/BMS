@@ -54,6 +54,15 @@ if ($followUp !== '') {
     elseif (frValidDate($date) && $followUp > date('Y-m-d', strtotime($date . ' +1 year'))) $errors['follow_up_date'] = t('Choose a follow-up date within a year.');
 }
 
+// Services the Sales Officer intends to sell (optional). Only touched when the form
+// sends the field, so an older app version without it never wipes a visit's services.
+$servicesSent = isset($_POST['services_sent']);
+$services = [];
+if ($servicesSent) {
+    $services = frValidateServices($pdo, $_POST['service_ids'] ?? []);
+    if (is_string($services)) { $errors['service_ids'] = $services; $services = []; }
+}
+
 $lat = $_POST['latitude'] ?? ''; $lng = $_POST['longitude'] ?? ''; $acc = $_POST['gps_accuracy_m'] ?? '';
 $lat = ($lat === '' || $lat === null) ? null : (is_numeric($lat) && $lat >= -90 && $lat <= 90 ? (float)$lat : false);
 $lng = ($lng === '' || $lng === null) ? null : (is_numeric($lng) && $lng >= -180 && $lng <= 180 ? (float)$lng : false);
@@ -70,6 +79,7 @@ $vals = [
 ];
 
 try {
+    $pdo->beginTransaction();   // the visit and its services are saved together
     if ($existing) {
         $pdo->prepare("UPDATE field_visits SET visit_date = ?, visit_time = ?, location = ?, latitude = ?, longitude = ?, gps_accuracy_m = ?,
                 client_name = ?, client_phone = ?, phone_normalized = ?, business_type = ?, business_other = ?,
@@ -78,9 +88,11 @@ try {
             // A changed follow-up date is a new follow-up: its "done" mark is cleared.
             ($existing['follow_up_date'] ?? null) === ($followUp !== '' ? $followUp : null) ? ($existing['follow_up_done_at'] ?? null) : null,
             $me, $id]));
+        if ($servicesSent) frSaveVisitServices($pdo, $id, $services);
         $owner = (int)$existing['user_id'];
         frMarkChanged($pdo, $owner, $date);
         if ($existing['visit_date'] !== $date) frMarkChanged($pdo, $owner, $existing['visit_date']);
+        $pdo->commit();
         logActivity($pdo, $me, 'Update field visit', "Updated field visit #$id ($name, $location)");
         frJson(['success' => true, 'message' => t('Visit updated.'), 'visit_id' => $id]);
     }
@@ -89,10 +101,13 @@ try {
             gave_business_card, gave_trial_link, gave_training, interest, notes, follow_up_date, user_id, created_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")->execute(array_merge($vals, [$me, $me]));
     $newId = (int)$pdo->lastInsertId();
+    if ($servicesSent) frSaveVisitServices($pdo, $newId, $services);
     frMarkChanged($pdo, $me, $date);
+    $pdo->commit();
     logActivity($pdo, $me, 'Add field visit', "Recorded field visit #$newId ($name, $location)");
     frJson(['success' => true, 'message' => t('Visit saved.'), 'visit_id' => $newId]);
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('field_reports/save: ' . $e->getMessage());
     frJson(['success' => false, 'message' => t('Server error')], 500);
 }

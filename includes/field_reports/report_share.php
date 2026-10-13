@@ -6,9 +6,13 @@
  * frRenderShareKit() prints (once) the email dialog, a toast and window.FrShare:
  *   FrShare.prepare(params)   build the PDF in the background (call when a menu opens)
  *   FrShare.download(params)  save the PDF
- *   FrShare.whatsapp(params)  phone: share sheet with the PDF (WhatsApp → choose a contact);
- *                             computer: PDF downloaded + WhatsApp opens to choose a contact
- *   FrShare.email(params)     dialog: type the address(es), send with the PDF attached
+ *   FrShare.whatsapp(params)  only the PDF is shared, never a text summary: where the device
+ *                             can attach files (phones, most computers) the share sheet carries
+ *                             the PDF itself (WhatsApp → choose a contact); elsewhere WhatsApp
+ *                             opens with just a link to the same PDF (expires after 7 days —
+ *                             api/field_reports/share_link.php)
+ *   FrShare.email(params)     dialog: type the address(es), send with the PDF attached (the
+ *                             email body is only your message + "report attached")
  *   FrShare.invalidate()      forget built PDFs (after the visits change)
  * params = { date_from, date_to, user_id, lang } — the same as the print page.
  *
@@ -25,10 +29,9 @@ if (!function_exists('frRenderShareKit')) {
         $done = true;
         $L = [
             'preparing' => t('Preparing the report...'), 'failed' => t('The report could not be prepared. Check your internet and try again.'),
-            'downloaded' => t('PDF downloaded.'), 'waFallback' => t('The PDF was downloaded. Attach it in the WhatsApp chat that opens.'),
+            'downloaded' => t('PDF downloaded.'), 'waLink' => t('WhatsApp opened with a link to the PDF. The link works for 7 days.'),
             'ready' => t('The report is ready'), 'tapShare' => t('Tap to share it on WhatsApp.'), 'shareNow' => t('Share now'),
             'sending' => t('Sending...'), 'serverError' => t('Server error. Please try again.'), 'enterEmail' => t('Enter an email address.'),
-            'attachHint' => t('(The PDF report is attached.)'),
         ];
         ?>
 <div class="frs-backdrop" id="frsEmail" hidden>
@@ -301,18 +304,36 @@ if (!function_exists('frRenderShareKit')) {
         return prepare(p).then(r => { saveBlob(r.blob, r.d.filename); toast(L.downloaded); }).catch(fail).finally(() => busy(btn, false));
     }
 
+    // Only the PDF file — no text — so the chat receives exactly the downloadable report.
     function shareFile(r) {
         const file = new File([r.blob], r.d.filename, { type: 'application/pdf' });
-        return navigator.share({ files: [file], text: r.d.share_text });
+        return navigator.share({ files: [file] });
     }
-    function canShareFiles(r) {
-        try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [new File([r.blob], r.d.filename, { type: 'application/pdf' })] })); } catch (e) { return false; }
+    // Decided at the tap (before the PDF exists) so a window for the link can be opened
+    // inside the tap itself — browsers block windows opened later.
+    function deviceSharesFiles() {
+        try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [new File(['%PDF-'], 'r.pdf', { type: 'application/pdf' })] })); } catch (e) { return false; }
+    }
+    function blobToBase64(blob) {
+        return new Promise((ok, bad) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1] || ''); fr.onerror = bad; fr.readAsDataURL(blob); });
+    }
+    // No file sharing here: keep the PDF behind an expiring link and send only that link.
+    function shareLink(p, r) {
+        return blobToBase64(r.blob).then(b64 => {
+            const fd = new FormData();
+            Object.entries({ _csrf: CSRF, pdf: b64, date_from: p.date_from || '', date_to: p.date_to || '', user_id: p.user_id || '', lang: p.lang || '' })
+                .forEach(([k, v]) => fd.append(k, v));
+            return fetch(API + 'share_link.php', { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-CSRF-Token': CSRF } })
+                .then(res => res.json().catch(() => ({ success: false, message: L.serverError })));
+        }).then(res => { if (!res.success) throw new Error(res.message || L.serverError); return res.url; });
     }
     function whatsapp(p, btn) {
+        const files = deviceSharesFiles();
+        const win = files ? null : window.open('', '_blank');   // opened in the tap, filled in below
         busy(btn, true);
         return prepare(p).then(r => {
             busy(btn, false);
-            if (canShareFiles(r)) {
+            if (files) {
                 // Phone: the share sheet carries the PDF itself — pick WhatsApp, then the contact.
                 return shareFile(r).catch(e => {
                     if (e && e.name === 'AbortError') return;          // the user closed the sheet
@@ -324,11 +345,12 @@ if (!function_exists('frRenderShareKit')) {
                     throw e;
                 });
             }
-            // Computer: PDF downloaded, WhatsApp opens on "choose a contact" with the summary.
-            saveBlob(r.blob, r.d.filename);
-            window.open('https://wa.me/?text=' + encodeURIComponent(r.d.share_text + '\n\n' + L.attachHint), '_blank', 'noopener');
-            toast(L.waFallback);
-        }).catch(fail).finally(() => busy(btn, false));
+            return shareLink(p, r).then(url => {
+                const wa = 'https://wa.me/?text=' + encodeURIComponent(url);
+                if (win && !win.closed) { win.opener = null; win.location.href = wa; } else window.open(wa, '_blank', 'noopener');
+                toast(L.waLink);
+            });
+        }).catch(e => { if (win && !win.closed) win.close(); fail(e); }).finally(() => busy(btn, false));
     }
 
     // ── Email dialog ──
@@ -347,9 +369,6 @@ if (!function_exists('frRenderShareKit')) {
         prepare(p).then(x => { $('frsFile').textContent = x.d.filename; }).catch(() => { $('frsFile').textContent = '—'; });
     }
     function showErr(m) { $('frsErr').textContent = m; $('frsErr').hidden = false; }
-    function blobToBase64(blob) {
-        return new Promise((ok, bad) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1] || ''); fr.onerror = bad; fr.readAsDataURL(blob); });
-    }
     document.addEventListener('submit', function (e) {
         if (e.target.id !== 'frsEmailForm') return;
         e.preventDefault();

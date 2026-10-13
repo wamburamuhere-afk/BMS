@@ -34,14 +34,7 @@ $footer    = $lang === 'sw'
     : 'This document was Printed by ' . caseFormat($printedBy) . ' — ' . $role . ' on ' . $at;
 $rangeLabel = frRangeLabel($from, $to, $lang);
 
-// WhatsApp / email text: the headline numbers, so the reader knows what is attached.
-$lines = ['*' . t('CUSTOMER VISITS REPORT') . '*', t('Staff') . ': ' . $subject, t('Date') . ': ' . $rangeLabel, ''];
-foreach ($summary as $label => $value) $lines[] = $label . ': ' . (int)$value;
-$lines[] = '';
-$lines[] = $company;
-
-$slug = trim(preg_replace('/[^A-Za-z0-9]+/', '_', $subject), '_') ?: 'staff';
-$filename = ($lang === 'sw' ? 'Ripoti_ya_Ziara_' : 'Customer_Visits_Report_') . $slug . '_' . $from . ($from !== $to ? '_to_' . $to : '') . '.pdf';
+$filename = frReportFilename($subject, $lang, $from, $to);
 
 frJson([
     'success'  => true,
@@ -67,5 +60,4 @@ frJson([
     'footer'   => $footer,
     'brand'    => 'Powered By BJP Technologies © ' . date('Y') . ', All Rights Reserved',
     'filename' => $filename,
-    'share_text' => implode("\n", $lines),
 ]);

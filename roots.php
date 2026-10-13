@@ -221,6 +221,10 @@ $routes = [
     // api/stock/generate_shop_catalog_link.php.
     'shop-catalog'   => ROOT_DIR . '/shop_catalog.php',
     'shop_catalog'   => ROOT_DIR . '/shop_catalog.php',
+    // Public, unauthenticated — a Customer Visits report PDF shared as an expiring
+    // link (api/field_reports/share_link.php). Token-gated, read-only.
+    'report-pdf'     => ROOT_DIR . '/field_report_pdf.php',
+    'report_pdf'     => ROOT_DIR . '/field_report_pdf.php',
 
     // ========================================================================
     // ACCOUNTS MODULE (App Directory)

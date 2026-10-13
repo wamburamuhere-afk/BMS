@@ -5380,4 +5380,19 @@ return [
     'Quotation' => 'Nukuu',
     'No open quotations' => 'Hakuna nukuu zilizo wazi',
 
+    // 2026-10-13 — Customer Visits: services on a visit, PDF-only sharing
+    'Services you intend to sell' => 'Huduma unazokusudia kuuza',
+    'Choose one or more services you plan to sell to this customer.' => 'Chagua huduma moja au zaidi unazopanga kumuuzia mteja huyu.',
+    'No services yet. Add them on the Services page to choose them here.' => 'Bado hakuna huduma. Ziongeze kwenye ukurasa wa Huduma ili uzichague hapa.',
+    'Services offered' => 'Huduma Zilizopendekezwa',
+    'Services offered most' => 'Huduma Zilizopendekezwa Zaidi',
+    'Choose services...' => 'Chagua huduma...',
+    'Choose at most 20 services.' => 'Chagua huduma zisizozidi 20.',
+    'Choose services from the list.' => 'Chagua huduma kutoka kwenye orodha.',
+    'The Customer Visits report is attached as a PDF.' => 'Ripoti ya Ziara za Wateja imeambatishwa kama PDF.',
+    'WhatsApp opened with a link to the PDF. The link works for 7 days.' => 'WhatsApp imefunguka na kiungo cha PDF. Kiungo kinafanya kazi kwa siku 7.',
+    'Too many reports shared in the last hour. Please try again later.' => 'Ripoti nyingi sana zimeshirikiwa ndani ya saa moja iliyopita. Tafadhali jaribu tena baadaye.',
+    'Report not available' => 'Ripoti haipatikani',
+    'This link has expired or is not valid. Ask the sender to share the report again.' => 'Kiungo hiki kimeisha muda au si sahihi. Mwombe aliyekutumia ashiriki ripoti tena.',
+
 ];
