@@ -6,6 +6,17 @@
  * Desktop (≥ 768px) : toggle buttons (table ↔ card) in card-header; preference saved.
  * Print              : always table view — handled entirely by responsive.css @media print.
  */
+
+// HTML-escape helper used by page-level card renderers (renderCards etc.). Many pages call
+// safeOutput() without defining it; a page that declares its own keeps its own version.
+if (typeof window.safeOutput !== 'function') {
+    window.safeOutput = function (s) {
+        return s == null ? '' : String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    };
+}
+
 (function ($) {
     'use strict';
 
@@ -534,6 +545,8 @@
             $(document).on('init.dt', function (e, settings) {
                 var tableEl = settings.nTable;
                 if (!tableEl.id) return;
+                // Page renders its own cards for this table (e.g. #kycCardView) — don't add a second set
+                if (tableEl.getAttribute('data-bms-cards') === 'off') return;
 
                 setTimeout(function () {
                     var dt = $(tableEl).DataTable();

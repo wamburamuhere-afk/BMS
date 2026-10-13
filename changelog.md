@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-12 — fix(mobile money): every list is a DataTable on desktop and cards on phones; S/No first; gear Actions
+
+**Files:** `app/bms/mobile_money/mm_transactions.php`, `app/bms/mobile_money/mm_commissions.php`, `app/bms/mobile_money/mm_reports.php`, `app/bms/mobile_money/mm_agent_view.php`, `app/bms/mobile_money/mm_compliance.php`, `assets/js/bms-mobile-cards.js`, `tests/test_mm_tables_cards_cli.php` (new)
+- **Phones showed empty card views (bug):** the card code on 9 MM pages calls `safeOutput()`, but only `mm_float`/`mm_shifts` defined it, so on a phone the cards stayed blank. Added one global fallback in `bms-mobile-cards.js`; pages that define their own keep it.
+- **Commissions:** the "Earned by Network" table was plain HTML → now a DataTable with phone cards; "Received Payments" gets its own phone cards. Tables in the hidden tab re-measure when the tab opens.
+- **Reports (all 7):** S/No column added; Total rows moved into the table footer (sorting no longer moves them); phone cards built from each report's own columns, plus a Total card; Excel export no longer drops the last column.
+- **Agent view:** Sub-Agents table → DataTable with S/No, a gear Actions menu (View) and phone cards.
+- **Transactions:** the lone eye button in the "View" column → standard gear Actions menu.
+- **No duplicate cards:** tables that build their own cards (tills, sub-agents, KYC, pending KYC, commissions) are marked `data-bms-cards="off"` so the global auto-card script doesn't add a second set.
+Verified: new test 143 checks (all 7 report types, commissions, agent view, transactions, compliance). Browser check at 1400px and 390px on every changed table: desktop = DataTable shown, cards hidden; phone = table hidden, cards shown with one card per row (+ Total), no duplicate auto-cards. Earlier MM suites unchanged (3 suites fail the same way on develop without this change).
+
+---
+
 ## 2026-10-12 — feat(mobile): left side menu (☰) and 5-item bottom bar with "Uza" in the centre (Simple POS)
 
 **Files:** `header.php`, `app/dashboard.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_mobile_side_menu_cli.php` (new)

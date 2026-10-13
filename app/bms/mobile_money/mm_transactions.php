@@ -192,7 +192,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
                                 <th class="text-center"><?= t('Commission') ?></th>
                                 <th class="text-center"><?= t('Customer') ?></th>
                                 <th class="text-center"><?= t('Status') ?></th>
-                                <th class="text-center"><?= t('View') ?></th>
+                                <th class="text-center"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -222,8 +222,15 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
                                 <td>
                                     <span class="badge <?= $tx['status'] === 'posted' ? 'bg-success' : 'bg-secondary' ?>" style="font-size:.7rem"><?= ucfirst(safe_output($tx['status'])) ?></span>
                                 </td>
-                                <td class="text-end">
-                                    <a href="<?= getUrl('mm_transaction_view') ?>?id=<?= $tx['mm_txn_id'] ?>" class="btn btn-sm btn-outline-secondary" title="<?= t('View') ?>"><i class="bi bi-eye"></i></a>
+                                <td class="text-center">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:130px;font-size:.85rem">
+                                            <li><a class="dropdown-item" href="<?= getUrl('mm_transaction_view') ?>?id=<?= $tx['mm_txn_id'] ?>"><i class="bi bi-eye me-2 text-info"></i><?= t('View') ?></a></li>
+                                        </ul>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -309,7 +316,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View MM Transactions', 'Viewed transact
 <script>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#txnTable')) {
-        $('#txnTable').DataTable({ responsive:false, scrollX:true, pageLength:50, order:[[2,'desc']], columnDefs:[{orderable:false,targets:0}], dom:'rtipB',
+        $('#txnTable').DataTable({ responsive:false, scrollX:true, pageLength:50, order:[[2,'desc']], columnDefs:[{orderable:false,targets:[0,10]}], dom:'rtipB',
             language: { emptyTable: '<?= addslashes(t('No transactions found for the selected filters.')) ?>' },
             buttons:[{extend:'excelHtml5',className:'d-none',exportOptions:{columns:':not(:last-child)'}}],
             drawCallback: function () { renderCards(this.api().rows({page:'current'}).nodes()); }
