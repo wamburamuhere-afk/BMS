@@ -98,15 +98,6 @@ function canView($pageKey)
         return true;
     }
     
-    // MM agent grants cap the role (core/mm_scope.php) — after the admin bypass.
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'view')) {
-        return false;
-    }
-    // MM-only tenant: the MM dashboard is every user's landing page.
-    if ($pageKey === 'mm_dashboard' && function_exists('mmScopeIsMmOnlyTenant') && mmScopeIsMmOnlyTenant()) {
-        return true;
-    }
-
     return $_SESSION['permissions'][$pageKey]['view'] ?? false;
 }
 
@@ -131,10 +122,6 @@ function canCreate($pageKey)
         return true;
     }
     
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'create')) {
-        return false;
-    }
-
     return $_SESSION['permissions'][$pageKey]['create'] ?? false;
 }
 
@@ -159,10 +146,6 @@ function canEdit($pageKey)
         return true;
     }
     
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'edit')) {
-        return false;
-    }
-
     return $_SESSION['permissions'][$pageKey]['edit'] ?? false;
 }
 
@@ -187,10 +170,6 @@ function canDelete($pageKey)
         return true;
     }
     
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'delete')) {
-        return false;
-    }
-
     return $_SESSION['permissions'][$pageKey]['delete'] ?? false;
 }
 
@@ -215,10 +194,6 @@ function canReview($pageKey)
         return true;
     }
 
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'workflow')) {
-        return false;
-    }
-
     return (bool)($_SESSION['permissions'][$pageKey]['review'] ?? false);
 }
 
@@ -241,10 +216,6 @@ function canApprove($pageKey)
     // Admin always has access
     if (isAdmin()) {
         return true;
-    }
-
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'workflow')) {
-        return false;
     }
 
     return (bool)($_SESSION['permissions'][$pageKey]['approve'] ?? false);
@@ -272,9 +243,6 @@ function canSubmit($pageKey)
     if (isAdmin()) {
         return true;
     }
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'workflow')) {
-        return false;
-    }
     // explicit column if one ever exists, else fall back to create/edit rights
     return (bool)($_SESSION['permissions'][$pageKey]['submit'] ?? false)
         || (bool)($_SESSION['permissions'][$pageKey]['create'] ?? false)
@@ -301,9 +269,6 @@ function canReject($pageKey)
 
     if (isAdmin()) {
         return true;
-    }
-    if (function_exists('mmGrantAllowsPage') && !mmGrantAllowsPage((string)$pageKey, 'workflow')) {
-        return false;
     }
     return (bool)($_SESSION['permissions'][$pageKey]['reject'] ?? false)
         || (bool)($_SESSION['permissions'][$pageKey]['approve'] ?? false);
@@ -359,11 +324,6 @@ function requireViewPermission($pageKey, $redirectUrl = 'unauthorized')
     }
 
     if (!canView($pageKey)) {
-        // Denied by MM agent grants (not by the role) → back to the MM dashboard.
-        if ($pageKey !== 'mm_dashboard' && function_exists('mmGrantAllowsPage')
-            && !mmGrantAllowsPage((string)$pageKey, 'view')) {
-            mmDenyToDashboard();
-        }
         http_response_code(403);
         redirectTo($redirectUrl);
     }

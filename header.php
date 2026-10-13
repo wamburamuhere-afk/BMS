@@ -940,15 +940,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         <!-- BOTTOM NAVIGATION BAR -->
         <nav class="navbar navbar-expand-lg navbar-dark bottom-header">
             <div class="container-fluid px-4">
-                <?php
-                // Compute before the hamburger so we can decide its target.
-                $__mm_only = function_exists('tenantOnlyHasModule') && tenantOnlyHasModule('mobile_money');
-                ?>
-                <?php if (!$__mm_only): ?>
                 <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <?php endif; ?>
                 <?php if (posSimpleModeEnabled()): ?>
                 <!-- Simple POS mobile: Language + ☰ (opens the left side menu). Desktop: hidden. -->
                 <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
@@ -965,112 +959,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <i class="bi bi-list"></i>
                     </button>
                 </div>
-                <?php elseif ($__mm_only): ?>
-                <!-- MM-only mobile: Language + Settings list. Desktop: hidden. -->
-                <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
-                    <button type="button" class="btn btn-outline-light"
-                        onclick="event.stopPropagation();bmsToggleLang();"
-                        title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>"
-                        style="font-size:0.65rem;padding:1px 7px;border-radius:14px;font-weight:700;letter-spacing:0.3px;line-height:1.4;">
-                        <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
-                    </button>
-                    <button type="button" class="btn btn-outline-light"
-                        onclick="event.stopPropagation();if(window.bootstrap){['mmReportsSheet','mmMoreSheet'].forEach(function(id){var e=document.getElementById(id);if(e){var o=bootstrap.Offcanvas.getInstance(e);if(o)o.hide();}});bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('mmSettingsSheet')).show();}"
-                        title="<?= htmlspecialchars(t('Settings')) ?>"
-                        style="font-size:0.8rem;padding:2px 6px;line-height:1.4;">
-                        <i class="bi bi-list"></i>
-                    </button>
-                </div>
                 <?php endif; ?>
 
                 <!-- Bottom Row: Navigation Modules -->
                 <div class="header-nav-bar w-100">
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <?php if ($__mm_only): ?>
-                        <!-- ── MM-only desktop nav ──────────────────────────────────────────
-                             When this tenant's sole non-core feature is mobile_money, MM
-                             items spread out as first-class nav links instead of being
-                             compressed into one dropdown. Other module sections are hidden.
-                        ─────────────────────────────────────────────────────────────────── -->
-                        <?php if (canView('mm_dashboard')): ?>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('mm_dashboard') ?>">
-                                <i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?>
-                            </a>
-                        </li>
-                        <?php endif; ?>
-                        <?php if (canView('mm_transactions')): ?>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('mm_transactions') ?>">
-                                <i class="bi bi-arrow-left-right"></i> <?= t('Transactions') ?>
-                            </a>
-                        </li>
-                        <?php endif; ?>
-                        <?php if (canView('mm_float')): ?>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('mm_float') ?>">
-                                <i class="bi bi-cash-stack"></i> <?= t('Float') ?>
-                            </a>
-                        </li>
-                        <?php endif; ?>
-                        <?php if (canView('mm_reports')): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="mmReportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-graph-up"></i> <?= t('Reports') ?>
-                            </a>
-                            <ul class="dropdown-menu" aria-labelledby="mmReportsDropdown">
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=txn_summary"><i class="bi bi-table me-1"></i><?= t('Transaction Summary') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=float_position"><i class="bi bi-cash-stack me-1"></i><?= t('Float Position') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=commission"><i class="bi bi-coin me-1"></i><?= t('Commission Report') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=agent_perf"><i class="bi bi-person-check me-1"></i><?= t('Agent Performance') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=shift_summary"><i class="bi bi-clock-history me-1"></i><?= t('Shift Summary') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=void_suspicious"><i class="bi bi-exclamation-triangle me-1"></i><?= t('Void & Suspicious') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>?report=network_comparison"><i class="bi bi-broadcast me-1"></i><?= t('Network Comparison') ?></a></li>
-                            </ul>
-                        </li>
-                        <?php endif; ?>
-                        <?php if (canView('expenses')): ?>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('expenses') ?>">
-                                <i class="bi bi-receipt"></i> <?= t('Expenses') ?>
-                            </a>
-                        </li>
-                        <?php endif; ?>
-                        <?php
-                        $_mm_settings_visible = isAdmin()
-                            || canView('mm_shifts') || canView('mm_commissions')
-                            || canView('mm_reconciliation') || canView('mm_compliance')
-                            || canView('mm_commission_rates');
-                        ?>
-                        <?php if ($_mm_settings_visible): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="mmSettingsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-sliders"></i> <?= t('Settings') ?>
-                            </a>
-                            <ul class="dropdown-menu" aria-labelledby="mmSettingsDropdown">
-                                <li><h6 class="dropdown-header"><?= t('System Configuration') ?></h6></li>
-                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear me-1"></i> <?= t('Admin') ?></a></li><?php endif; ?>
-                                <?php if (canView('mm_shifts')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_shifts') ?>"><i class="bi bi-clock-history me-1"></i><?= t('Teller Shifts') ?></a></li><?php endif; ?>
-                                <?php if (canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance')): ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><h6 class="dropdown-header"><?= t('Operations') ?></h6></li>
-                                <?php endif; ?>
-                                <?php if (canView('mm_commissions')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_commissions') ?>"><i class="bi bi-coin me-1"></i><?= t('Commissions') ?></a></li><?php endif; ?>
-                                <?php if (canView('mm_reconciliation')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_reconciliation') ?>"><i class="bi bi-check2-square me-1"></i><?= t('Reconciliation') ?></a></li><?php endif; ?>
-                                <?php if (canView('mm_compliance')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_compliance') ?>"><i class="bi bi-shield-check me-1"></i><?= t('Compliance / KYC') ?></a></li><?php endif; ?>
-                                <?php if (isAdmin() || canView('mm_commission_rates')): ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><h6 class="dropdown-header"><?= t('Setup') ?></h6></li>
-                                <?php endif; ?>
-                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('mm_agents') ?>"><i class="bi bi-shop-window me-1"></i><?= t('Agents / Outlets') ?></a></li><?php endif; ?>
-                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li><?php endif; ?>
-                                <?php if (isAdmin()): ?><li><a class="dropdown-item" href="<?= getUrl('mm_user_agent_grants') ?>"><i class="bi bi-person-check me-1"></i><?= t('User Access Grants') ?></a></li><?php endif; ?>
-                                <?php if (canView('mm_commission_rates')): ?><li><a class="dropdown-item" href="<?= getUrl('mm_commission_rates') ?>"><i class="bi bi-percent me-1"></i><?= t('Commission Rates') ?></a></li><?php endif; ?>
-                            </ul>
-                        </li>
-                        <?php endif; ?>
-                        <?php else: // not $__mm_only — show the full multi-module nav ?>
                         <!-- Core Modules -->
                         <?php if(canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')): ?>
                         <li class="nav-item dropdown">
@@ -1200,58 +1094,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php endif; ?>
                                 <?php if(canView('crm_pipeline')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline_stages') ?>"><i class="bi bi-gear me-1"></i><?= t('Pipeline Stages') ?></a></li>
-                                <?php endif; ?>
-                            </ul>
-                        </li>
-                        <?php endif; ?>
-
-                        <!-- Mobile Money (2026-09-26) -->
-                        <?php if(tenantFeatureEnabled('mobile_money') && (canView('mm_dashboard') || canView('mm_transactions') || isAdmin())): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="mmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-phone-vibrate"></i> <?= t('Mobile Transactions') ?>
-                            </a>
-                            <ul class="dropdown-menu" aria-labelledby="mmDropdown">
-                                <?php if(canView('mm_dashboard')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_dashboard') ?>"><i class="bi bi-speedometer2 me-1"></i><?= t('Dashboard') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_transactions')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_transactions') ?>"><i class="bi bi-arrow-left-right me-1"></i><?= t('Transactions') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_shifts')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_shifts') ?>"><i class="bi bi-clock-history me-1"></i><?= t('Teller Shifts') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_float')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_float') ?>"><i class="bi bi-cash-stack me-1"></i><?= t('Float Management') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_commissions')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_commissions') ?>"><i class="bi bi-coin me-1"></i><?= t('Commissions') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_reconciliation')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reconciliation') ?>"><i class="bi bi-check2-square me-1"></i><?= t('Reconciliation') ?></a></li>
-                                <?php endif; ?>
-                                <?php if (isAdmin() || canView('mm_commission_rates')): ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><h6 class="dropdown-header"><?= t('Setup') ?></h6></li>
-                                <?php endif; ?>
-                                <?php if(isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_agents') ?>"><i class="bi bi-shop-window me-1"></i><?= t('Agents / Outlets') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_networks') ?>"><i class="bi bi-broadcast me-1"></i><?= t('Networks') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_user_agent_grants') ?>"><i class="bi bi-person-check me-1"></i><?= t('User Access Grants') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_commission_rates')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_commission_rates') ?>"><i class="bi bi-percent me-1"></i><?= t('Commission Rates') ?></a></li>
-                                <?php endif; ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <?php if(canView('mm_reports')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_reports') ?>"><i class="bi bi-bar-chart me-1"></i><?= t('Reports') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('mm_compliance')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('mm_compliance') ?>"><i class="bi bi-shield-check me-1"></i><?= t('Compliance / KYC') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -1698,7 +1540,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </ul>
                         </li>
                         <?php endif; ?>
-                        <?php endif; // $__mm_only — multi-module nav ends here ?>
                     </ul>
 
                     <!-- User Account (right side of bottom nav — matches Vikundi) -->
@@ -1740,203 +1581,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
     </div><!-- /.header-wrapper -->
 
-    <?php
-    // $__mm_only was computed before the desktop nav above — still in scope here.
-    ?>
-
-    <?php if ($__mm_only): ?>
-    <?php
-    // ── Mobile Money · phone bottom navigation bar ──────────────────────────
-    // Appears only when this tenant's sole non-core feature is 'mobile_money'
-    // (tenantOnlyHasModule('mobile_money') === true). Mirrors the Simple POS
-    // bar pattern exactly — same CSS classes, same d-lg-none rule, same JS.
-    // Desktop (>= 992 px) is completely untouched. 5 tabs: Dashboard,
-    // Transactions, Shifts, Reports (offcanvas list), More (offcanvas menu).
-    $__bn_dark = (($_SESSION['theme'] ?? 'light') === 'dark');
-    $__bn_cur  = rtrim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
-    $__bn_on   = function (string $page) use ($__bn_cur): bool {
-        $p = rtrim((string)parse_url(getUrl($page), PHP_URL_PATH), '/');
-        return $p !== '' && ($__bn_cur === $p || str_starts_with($__bn_cur, $p . '/'));
-    };
-    $__bn_reports_on = $__bn_on('mm_reports');
-    ?>
-    <style>
-        .bms-bnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
-            background: <?= $__bn_dark ? '#24282d' : '#ffffff' ?>;
-            border-top: 1px solid <?= $__bn_dark ? '#3a3f45' : '#dee2e6' ?>;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.10);
-            padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
-        .bms-bnav .bn-item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
-            padding: 4px 1px; background: none; border: 0; text-decoration: none;
-            color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; font-size: clamp(0.54rem, 2.1vw, 0.68rem); font-weight: 500; line-height: 1.15; }
-        .bms-bnav .bn-item i { font-size: clamp(1.05rem, 3.8vw, 1.3rem); line-height: 1; }
-        .bms-bnav .bn-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .bms-bnav .bn-item.active { color: #0d6efd; font-weight: 700; }
-        .bms-sheet { height: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0;
-            <?= $__bn_dark ? 'background:#24282d;color:#e1e7ec;' : '' ?> }
-        .bms-sheet .list-group-item { display: flex; align-items: center; gap: 10px; padding: 0.8rem 0.25rem; font-size: 0.95rem;
-            <?= $__bn_dark ? 'background:transparent;color:#e1e7ec;border-color:#3a3f45;' : 'background:transparent;' ?> }
-        .bms-sheet .list-group-item i { width: 1.4rem; text-align: center; color: #0d6efd; }
-        .bms-sheet .bn-group { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: #6c757d; padding: 0.9rem 0.25rem 0.2rem; }
-        .bms-sheet .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
-        @media (max-width: 991.98px) {
-            body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
-            .bottom-header .header-nav-bar { display: none !important; }
-            body.bms-kb-open .bms-bnav { display: none !important; }
-        }
-    </style>
-
-    <!-- MM bottom nav bar (mobile only) -->
-    <nav class="bms-bnav d-flex d-lg-none d-print-none" aria-label="<?= htmlspecialchars(t('Main Menu')) ?>">
-        <?php if (canView('mm_dashboard')): ?>
-        <a class="bn-item<?= $__bn_on('mm_dashboard') ? ' active' : '' ?>" href="<?= getUrl('mm_dashboard') ?>">
-            <i class="bi bi-speedometer2"></i><span><?= t('Dashboard') ?></span>
-        </a>
-        <?php endif; ?>
-        <?php if (canView('mm_transactions')): ?>
-        <a class="bn-item<?= $__bn_on('mm_transactions') ? ' active' : '' ?>" href="<?= getUrl('mm_transactions') ?>">
-            <i class="bi bi-arrow-left-right"></i><span><?= t('Transactions') ?></span>
-        </a>
-        <?php endif; ?>
-        <?php if (canView('mm_shifts')): ?>
-        <a class="bn-item<?= $__bn_on('mm_shifts') ? ' active' : '' ?>" href="<?= getUrl('mm_shifts') ?>">
-            <i class="bi bi-clock-history"></i><span><?= t('Shifts') ?></span>
-        </a>
-        <?php endif; ?>
-        <?php if (canView('mm_reports')): ?>
-        <button type="button" class="bn-item<?= $__bn_reports_on ? ' active' : '' ?>"
-                data-bs-toggle="offcanvas" data-bs-target="#mmReportsSheet" aria-controls="mmReportsSheet">
-            <i class="bi bi-graph-up"></i><span><?= t('Reports') ?></span>
-        </button>
-        <?php endif; ?>
-        <?php if (canView('mm_float') || isAdmin()): ?>
-        <button type="button" class="bn-item"
-                data-bs-toggle="offcanvas" data-bs-target="#mmMoreSheet" aria-controls="mmMoreSheet">
-            <i class="bi bi-three-dots"></i><span><?= t('More') ?></span>
-        </button>
-        <?php endif; ?>
-    </nav>
-
-    <?php if (canView('mm_reports')): ?>
-    <!-- MM Reports offcanvas — all 7 report types as a bottom slide-up list -->
-    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
-         id="mmReportsSheet" aria-labelledby="mmReportsSheetLabel">
-        <div class="offcanvas-header pb-0">
-            <h6 class="offcanvas-title fw-bold" id="mmReportsSheetLabel">
-                <i class="bi bi-bar-chart text-warning me-1"></i><?= t('Mobile Money Reports') ?>
-            </h6>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
-        <div class="offcanvas-body pt-1">
-            <div class="list-group list-group-flush">
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=txn_summary">
-                    <i class="bi bi-arrow-left-right"></i><?= t('Transaction Summary') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=float_position">
-                    <i class="bi bi-currency-exchange"></i><?= t('Float Position') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=commission">
-                    <i class="bi bi-coin"></i><?= t('Commission') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=agent_perf">
-                    <i class="bi bi-person-check"></i><?= t('Agent Performance') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=shift_summary">
-                    <i class="bi bi-clock-history"></i><?= t('Shift Summary') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=void_suspicious">
-                    <i class="bi bi-exclamation-triangle"></i><?= t('Void & Suspicious') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reports') ?>?report=network_comparison">
-                    <i class="bi bi-broadcast"></i><?= t('Network Comparison') ?></a>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-
-    <!-- MM More offcanvas — operational pages not already in bottom tabs (Float, Agents) -->
-    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
-         id="mmMoreSheet" aria-labelledby="mmMoreSheetLabel">
-        <div class="offcanvas-header pb-0">
-            <h6 class="offcanvas-title fw-bold" id="mmMoreSheetLabel">
-                <i class="bi bi-three-dots text-primary me-1"></i><?= t('More') ?>
-            </h6>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
-        <div class="offcanvas-body pt-1">
-            <div class="list-group list-group-flush">
-                <?php if (canView('mm_float')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_float') ?>">
-                    <i class="bi bi-currency-exchange"></i><?= t('Float Management') ?></a>
-                <?php endif; ?>
-                <?php if (isAdmin()): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_agents') ?>">
-                    <i class="bi bi-shop-window"></i><?= t('Agent Outlets') ?></a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- MM Settings offcanvas — mirrors desktop Settings dropdown + profile/account -->
-    <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1"
-         id="mmSettingsSheet" aria-labelledby="mmSettingsSheetLabel">
-        <div class="offcanvas-header pb-0">
-            <h6 class="offcanvas-title fw-bold" id="mmSettingsSheetLabel">
-                <i class="bi bi-sliders text-primary me-1"></i><?= t('Settings') ?>
-            </h6>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
-        <div class="offcanvas-body pt-0">
-            <?php if (isAdmin() || canView('mm_commissions') || canView('mm_reconciliation') || canView('mm_compliance') || canView('mm_commission_rates')): ?>
-            <div class="bn-group"><?= t('Settings') ?></div>
-            <div class="list-group list-group-flush">
-                <?php if (isAdmin()): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('system_settings') ?>">
-                    <i class="bi bi-gear"></i><?= t('Admin') ?></a>
-                <?php endif; ?>
-                <?php if (canView('mm_commissions')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commissions') ?>">
-                    <i class="bi bi-coin"></i><?= t('Commissions') ?></a>
-                <?php endif; ?>
-                <?php if (canView('mm_reconciliation')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_reconciliation') ?>">
-                    <i class="bi bi-clipboard-check"></i><?= t('Reconciliation') ?></a>
-                <?php endif; ?>
-                <?php if (canView('mm_compliance')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_compliance') ?>">
-                    <i class="bi bi-shield-check"></i><?= t('Compliance / KYC') ?></a>
-                <?php endif; ?>
-                <?php if (canView('mm_commission_rates')): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_commission_rates') ?>">
-                    <i class="bi bi-percent"></i><?= t('Commission Rates') ?></a>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-            <?php if (isAdmin()): ?>
-            <div class="bn-group"><?= t('Setup') ?></div>
-            <div class="list-group list-group-flush">
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_agents') ?>">
-                    <i class="bi bi-shop-window"></i><?= t('Agents / Outlets') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_networks') ?>">
-                    <i class="bi bi-broadcast"></i><?= t('Networks') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('mm_user_agent_grants') ?>">
-                    <i class="bi bi-person-check"></i><?= t('User Access Grants') ?></a>
-            </div>
-            <?php endif; ?>
-            <div class="bn-group"><?= htmlspecialchars(t($user_role)) ?></div>
-            <div class="list-group list-group-flush">
-                <?php if (!empty($_SESSION['employee_id'])): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_hr') ?>">
-                    <i class="bi bi-person-workspace"></i><?= t('My HR') ?></a>
-                <?php endif; ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>">
-                    <i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
-                <button type="button" class="list-group-item list-group-item-action text-start fw-normal"
-                    style="background:none;border:0;border-bottom:1px solid var(--bs-list-group-border-color,rgba(0,0,0,.125));border-radius:0;padding:0.8rem 0.25rem;"
-                    onclick="bmsToggleLang();">
-                    <i class="bi bi-globe2" style="width:1.4rem;text-align:center;color:#0d6efd;display:inline-block;margin-right:10px;"></i><?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>
-                </button>
-                <a class="list-group-item list-group-item-action text-danger fw-bold" href="<?= getUrl('logout') ?>">
-                    <i class="bi bi-box-arrow-right text-danger"></i><?= t('Logout') ?></a>
-            </div>
-        </div>
-    </div>
-
-    <script>
+<script>
     (function () {
         document.addEventListener('DOMContentLoaded', function () {
             var menu = document.getElementById('navbarNav');

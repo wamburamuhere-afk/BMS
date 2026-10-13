@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-10-13 — chore: remove Mobile Money module from BMS
+
+Mobile Money has moved to the LMS product. No real data existed in BMS.
+
+**Deleted (MM-exclusive files):**
+- `app/bms/mobile_money/` — 15 page files
+- `api/mobile_money/` — 15 API endpoints
+- `core/mm_posting.php`, `core/mm_float_service.php`, `core/mm_scope.php`, `core/mm_nav.php`
+- `actions/superadmin_tenant_mm_simple_mode.php`
+- `app/constant/settings/mm_user_agent_grants.php`
+- ~20 test files (`tests/test_mm_*`, `tests/mm_scope_*`)
+- `mobile_money.md`, `mm_agent_scope_plan.md`
+
+**Edited (shared files — MM references removed):**
+- `core/feature_registry.php` — removed `mobile_money` module entry
+- `core/permissions.php` — removed all `mmGrantAllowsPage`/`mmScopeIs`/`mmDenyTo` hooks
+- `header.php` — removed MM-only nav branch, MM dropdown, MM phone bottom nav + offcanvases
+- `app/dashboard.php` — removed MM-only tenant redirect
+- `app/superadmin/tenant_view.php` — removed MM "More" button + `openMmMoreModal()` function
+
+**Not touched:** `mobile_money` as a payment method string in invoice/POS/expense dropdowns — kept as a valid payment type.
+
+**New migrations:**
+- `migrations/tenant/2026_10_13_drop_mm_tables.php` — drops all 13 mm_* tables from each tenant DB
+- `migrations/2026_10_13_drop_mm_tables_legacy_db.php` — drops same tables from the legacy DB
+
+---
+
 ## 2026-10-12 — fix(mobile money): every list is a DataTable on desktop and cards on phones; S/No first; gear Actions
 
 **Files:** `app/bms/mobile_money/mm_transactions.php`, `app/bms/mobile_money/mm_commissions.php`, `app/bms/mobile_money/mm_reports.php`, `app/bms/mobile_money/mm_agent_view.php`, `app/bms/mobile_money/mm_compliance.php`, `assets/js/bms-mobile-cards.js`, `tests/test_mm_tables_cards_cli.php` (new)
@@ -168,8 +196,6 @@ Both API endpoints called `canSeeAllDocuments()` (defined in `core/document_acce
 never included that file. `roots.php` does not auto-include it, so every request produced
 `Call to undefined function canSeeAllDocuments()` — confirmed via Sentry production alert.
 Fix: added `require_once __DIR__ . '/../core/document_access.php'` to both files.
-
----
 
 ---
 
