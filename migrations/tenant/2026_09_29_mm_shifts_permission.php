@@ -2,31 +2,14 @@
 /**
  * migrations/tenant/2026_09_29_mm_shifts_permission.php
  *
- * Adds the missing mm_shifts permission row to the Mobile Money module.
- * mm_shifts was omitted from 2026_09_26_mm_permissions — this backfills it.
- * Idempotent via INSERT IGNORE.
+ * Retired 2026-10-13: the Mobile Money module was removed from BMS (it moved to
+ * the LMS product) and its tables are dropped by 2026_10_13_drop_mm_tables.
+ * This setup step is kept only so the filename stays known to the migration
+ * runners; it now does nothing. It must not fail: a failing tenant migration
+ * stops every later migration for that tenant, which is what happened to newly
+ * registered tenants once the tables this file used to touch were gone.
  */
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 
-require_once __DIR__ . '/../../core/tenant_migration_bootstrap.php';
-global $pdo;
-
-echo "Starting tenant migration: mm_shifts_permission...\n";
-
-try {
-    $pdo->prepare("
-        INSERT IGNORE INTO permissions (page_key, page_name, description, module_name)
-        VALUES (?, ?, ?, ?)
-    ")->execute([
-        'mm_shifts',
-        'MM Shifts',
-        'Open and close teller shifts; view shift history',
-        'Mobile Money',
-    ]);
-
-    echo "  · permission 'mm_shifts' ensured.\n";
-    echo "Migration complete: mm_shifts_permission.\n";
-} catch (PDOException $e) {
-    echo "Migration FAILED: " . $e->getMessage() . "\n";
-    exit(1);
-}
+echo "Skipped 2026_09_29_mm_shifts_permission: Mobile Money module was removed — nothing to do.
+";

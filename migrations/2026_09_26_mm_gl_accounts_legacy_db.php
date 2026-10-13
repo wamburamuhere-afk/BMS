@@ -1,8 +1,15 @@
 <?php
+/**
+ * migrations/2026_09_26_mm_gl_accounts_legacy_db.php
+ *
+ * Retired 2026-10-13: the Mobile Money module was removed from BMS (it moved to
+ * the LMS product) and its tables are dropped by 2026_10_13_drop_mm_tables.
+ * This setup step is kept only so the filename stays known to the migration
+ * runners; it now does nothing. It must not fail: a failing tenant migration
+ * stops every later migration for that tenant, which is what happened to newly
+ * registered tenants once the tables this file used to touch were gone.
+ */
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 
-require_once __DIR__ . '/../roots.php';
-global $pdo;
-
-echo "Starting migration (legacy): MM GL accounts provisioning...\n";
-require __DIR__ . '/tenant/2026_09_26_mm_gl_accounts.php';
+echo "Skipped 2026_09_26_mm_gl_accounts_legacy_db: Mobile Money module was removed — nothing to do.
+";
