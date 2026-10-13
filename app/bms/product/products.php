@@ -2044,7 +2044,7 @@ function generate_barcode_local() {
                                         <input type="number" class="form-control" name="discount_rate" id="modal_discount_rate" value="0.00" step="0.01" onkeyup="modalCalcMinPrice()">
                                         <span class="input-group-text">%</span>
                                     </div>
-                                    <small class="text-muted"><?= t('Max discount allowed in POS') ?></small>
+                                    <small class="text-muted"><?= wLabel('Max discount allowed in POS', 'Max discount allowed when selling') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Min Selling Price') ?></label>

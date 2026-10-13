@@ -138,6 +138,14 @@ if ($preselect_document_id > 0) {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Access Level</label>
+                                    <select class="form-select" name="access_level">
+                                        <option value="private">Private — only me</option>
+                                        <option value="restricted">Restricted — assigned users</option>
+                                        <option value="public">Public — everyone with library access</option>
+                                    </select>
+                                </div>
                                 <div class="col-12">
                                     <label class="form-label">File Selection *</label>
                                     <input type="file" class="form-control" name="document_file" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp">

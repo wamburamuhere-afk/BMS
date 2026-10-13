@@ -165,7 +165,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> <?= t('Point of Sale') ?>
+                <i class="bi bi-cash-register"></i> <?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
                       title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>">
@@ -192,8 +192,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                      "POS" link goes straight here) — this is the one way back to
                      the stats/shift-history/catalog-setup hub for whoever wants it,
                      without forcing every cashier through it first every day. -->
-                <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= t('POS Workspace — stats, shift history, catalog setup') ?>">
-                    <i class="bi bi-speedometer2"></i> <?= t('Workspace') ?>
+                <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= wLabel('POS Workspace — stats, shift history, catalog setup', 'Sales Overview — stats, shift history, catalog setup') ?>">
+                    <i class="bi bi-speedometer2"></i> <?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?>
                 </a>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
@@ -1026,6 +1026,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 #mobileCartFab { min-width: 0; }
 .pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.pos-sheet-qty { width: 64px; height: 40px; padding: 0 4px; font-size: 1.05rem; -moz-appearance: textfield; }
+.pos-sheet-qty::-webkit-outer-spin-button, .pos-sheet-qty::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 #mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
 #mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
 /* The sheet already shows the total in the VAT/total block above. */

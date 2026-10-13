@@ -35,7 +35,7 @@ if (!isset($_SESSION['user_id'])) {
 
 if (!canCreate('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to process POS sales')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access Denied: you do not have permission to process POS sales', 'Access Denied: you do not have permission to sell')]);
     exit();
 }
 

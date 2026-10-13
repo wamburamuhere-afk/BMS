@@ -393,8 +393,8 @@ return [
     'Retention Rate' => 'Kiwango cha Uhifadhi',
     'Inventory Status' => 'Hali ya Ghala',
     'Total Products' => 'Jumla ya Bidhaa',
-    'Low Stock' => 'Ghala Kidogo',
-    'View Inventory Alerts' => 'Angalia Tahadhari za Ghala',
+    'Low Stock' => 'Stoki Kidogo',
+    'View Inventory Alerts' => 'Angalia Tahadhari za Stoki',
 
     // ------------------------------------------------------------------
     // Dashboard — sidebar (Recent Activities, Your Performance)
@@ -445,7 +445,7 @@ return [
     // Dashboard — handleAlertAction() JS dictionary (DASH_I18N)
     // ------------------------------------------------------------------
     'Low Stock Alert' => 'Tahadhari ya Ghala Kidogo',
-    'Current Stock' => 'Ghala ya Sasa',
+    'Current Stock' => 'Stoki ya Sasa',
     'Reorder level' => 'Kiwango cha Kuagiza Tena',
     'It is recommended to restock this item soon to avoid out-of-stock situations.' => 'Inashauriwa kuongeza ghala ya bidhaa hii hivi karibuni ili kuepuka hali ya kuisha kwa ghala.',
     'Overdue Payment' => 'Malipo Yaliyochelewa',
@@ -506,7 +506,7 @@ return [
     'All Categories' => 'Aina Zote',
     'Country' => 'Nchi',
     'Filter by country' => 'Chuja kwa nchi',
-    'City' => 'Jiji',
+    'City' => 'Mji',
     'Filter by city' => 'Chuja kwa jiji',
     'Clear' => 'Futa',
     'Apply Filters' => 'Tumia Vichujio',
@@ -524,7 +524,7 @@ return [
     'Customers Records' => 'Kumbukumbu za Wateja',
     'Table View' => 'Mwonekano wa Jedwali',
     'Card View' => 'Mwonekano wa Kadi',
-    'Code' => 'Nambari',
+    'Code' => 'Msimbo',
     'Customer Name' => 'Jina la Mteja',
     'Contact Info' => 'Maelezo ya Mawasiliano',
     'Address' => 'Anwani',
@@ -821,7 +821,7 @@ return [
     'Show all products' => 'Onyesha bidhaa zote',
     'Total Products' => 'Jumla ya Bidhaa',
     'Current Value' => 'Thamani ya Sasa',
-    'Out of Stock' => 'Ghala Imeisha',
+    'Out of Stock' => 'Stoki Imeisha',
 
     // ------------------------------------------------------------------
     // Products — filters, actions bar
@@ -852,7 +852,7 @@ return [
     'View Details' => 'Angalia Maelezo',
     'Edit Product' => 'Hariri Bidhaa',
     'Adjust Stock' => 'Rekebisha Ghala',
-    'Transfer Stock' => 'Hamisha Ghala',
+    'Transfer Stock' => 'Hamisha Stoki',
     'Duplicate Product' => 'Nakili Bidhaa',
     'Create Purchase Order' => 'Tengeneza Oda ya Ununuzi',
     'Deactivate Product' => 'Zima Bidhaa',
@@ -865,7 +865,7 @@ return [
     // ------------------------------------------------------------------
     // Products — Stock Adjustment modal
     // ------------------------------------------------------------------
-    'Current Stock' => 'Ghala ya Sasa',
+    'Current Stock' => 'Stoki ya Sasa',
     'Available Stock' => 'Ghala Iliyopo',
     'Adjustment Type' => 'Aina ya Marekebisho',
     'Add Stock' => 'Ongeza Ghala',
@@ -1153,7 +1153,7 @@ return [
     'Search products...' => 'Tafuta bidhaa...',
     'No Services Found' => 'Hakuna Huduma Zilizopatikana',
     'Try adjusting your filters.' => 'Jaribu kurekebisha vichujio vyako.',
-    'S/NO' => 'NA',
+    'S/NO' => 'Na.',
     'Item Code' => 'Msimbo wa Kipengele',
     'SKU/Code:' => 'SKU/Msimbo:',
     'Project:' => 'Mradi:',
@@ -1403,7 +1403,7 @@ return [
     'If your cash drawer is wired to your receipt printer\'s kick port, it opens automatically every time a receipt prints — including just now, if one did.' => 'Iwapo droo yako ya fedha imeunganishwa na mlango wa mashine ya kuchapisha risiti, hufunguka kiotomatiki kila risiti inapochapishwa — ikiwemo sasa hivi, ikiwa risiti imechapishwa.',
     'Insufficient Payment' => 'Malipo Hayatoshi',
     'Invalid Discount' => 'Punguzo Batili',
-    'LOW STOCK' => 'GHALA NDOGO',
+    'LOW STOCK' => 'STOKI KIDOGO',
     'Load' => 'Pakia',
     'Load Held Sale?' => 'Pakia Muuzo Uliowekwa Pembeni?',
     'Loaded' => 'Imepakiwa',
@@ -1589,7 +1589,7 @@ return [
     'Expected Cash' => 'Fedha Inayotarajiwa',
     'Gross Sales' => 'Mauzo Jumla',
     'No transactions in this shift' => 'Hakuna miamala kwenye zamu hii',
-    'Notes' => 'Maelezo',
+    'Notes' => 'Maelezo ya Ziada',
     'Opened:' => 'Ilifunguliwa:',
     'Other (bank transfer / voucher / loyalty)' => 'Nyingine (uhamisho wa benki / hati / uaminifu)',
     'Register:' => 'Rejista:',
@@ -2085,7 +2085,7 @@ return [
     'Manage stock adjustments, corrections and losses' => 'Simamia marekebisho ya ghala, masahihisho na hasara',
     'New Adjustment' => 'Marekebisho Mapya',
     'Bulk Upload' => 'Pakia kwa Wingi',
-    'Filters & Parameters' => 'Vichujio na Vigezo',
+    'Filters & Parameters' => 'Tafuta na Chuja',
     'Search' => 'Tafuta',
     'Ref #, SKU or Notes' => 'Namba ya Rejea, SKU au Maelezo',
     'All Warehouses' => 'Maghala Yote',
@@ -2233,7 +2233,7 @@ return [
     'All Statuses' => 'Hali Zote',
     'Inactive Warehouses' => 'Maghala Yasiyofanya Kazi',
     'Inactive Shops' => 'Maduka Yasiyofanya Kazi',
-    'Export' => 'Hamisha',
+    'Export' => 'Pakua',
     'warehouses' => 'maghala',
     'shops' => 'maduka',
     'Warehouses List' => 'Orodha ya Maghala',
@@ -2246,16 +2246,16 @@ return [
     'Warehouse Name' => 'Jina la Ghala',
     'Shop Name' => 'Jina la Duka',
     'Contact' => 'Mawasiliano',
-    'Stock Value' => 'Thamani ya Ghala',
+    'Stock Value' => 'Thamani ya Stoki',
     'No location' => 'Hakuna eneo',
     'Below reorder level' => 'Chini ya kiwango cha kuagiza upya',
     'low' => 'kidogo',
-    'Out of stock' => 'Ghala Imeisha',
+    'Out of stock' => 'Stoki Imeisha',
     'out' => 'imeisha',
     'Overstocked' => 'Imezidi Kiwango',
     'over' => 'zaidi',
-    'Units received in last 30 days' => 'Vipimo vilivyopokewa siku 30 zilizopita',
-    'Units dispatched in last 30 days' => 'Vipimo vilivyotolewa siku 30 zilizopita',
+    'Units received in last 30 days' => 'Idadi ya bidhaa zilizopokelewa siku 30 zilizopita',
+    'Units dispatched in last 30 days' => 'Idadi ya bidhaa zilizotoka siku 30 zilizopita',
     'vs 30 days ago' => 'ikilinganishwa na siku 30 zilizopita',
     'Manage Locations' => 'Simamia Maeneo',
     'No Warehouses Found' => 'Hakuna Maghala Yaliyopatikana',
@@ -2270,7 +2270,7 @@ return [
     'Link this shop to a specific project' => 'Unganisha duka hili na mradi maalum',
     'Manager Name' => 'Jina la Msimamizi',
     'Manager Phone' => 'Simu ya Msimamizi',
-    'Capacity (units)' => 'Uwezo (vipimo)',
+    'Capacity (units)' => 'Uwezo wa Kuhifadhi (idadi ya bidhaa)',
     'Maximum storage capacity' => 'Uwezo wa juu wa kuhifadhi',
     'Set as Primary Warehouse' => 'Weka kama Ghala Kuu',
     'Set as Primary Shop' => 'Weka kama Duka Kuu',
@@ -2284,9 +2284,9 @@ return [
     'Clear All' => 'Futa Vyote',
     'Error loading warehouse data. Please try again.' => 'Hitilafu wakati wa kupakia taarifa za ghala. Tafadhali jaribu tena.',
     'Error loading shop data. Please try again.' => 'Hitilafu wakati wa kupakia taarifa za duka. Tafadhali jaribu tena.',
-    'product(s) with' => 'bidhaa zenye',
-    'units of stock' => 'vipimo vya ghala',
-    'storage location(s)' => 'eneo/maeneo ya kuhifadhi',
+    'product(s) with' => 'bidhaa zenye idadi ya',
+    'units of stock' => 'kwenye stoki',
+    'storage location(s)' => 'sehemu za kuhifadhi',
     'The following will also be permanently removed:' => 'Yafuatayo pia yatafutwa kabisa:',
     'Delete Warehouse?' => 'Futa Ghala?',
     'Delete Shop?' => 'Futa Duka?',
@@ -2375,12 +2375,12 @@ return [
     'Location deleted successfully!' => 'Eneo limefutwa kwa mafanikio!',
 
     // Warehouses — POS Mode field (merged from feat/restaurant-pos-mode-setup)
-    'POS Mode' => 'Hali ya POS',
+    'POS Mode' => 'Aina ya Mauzo (POS)',
     'Retail' => 'Rejareja',
     'Wholesale' => 'Jumla',
     'Hybrid (Retail + Restaurant)' => 'Mchanganyiko (Rejareja + Mkahawa)',
-    'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.' => 'Mkahawa/Mchanganyiko hufungua Sakafu na Meza, Onyesho la Jikoni, na Uhifadhi wa Nafasi kwa ghala hili katika POS.',
-    'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this shop in POS.' => 'Mkahawa/Mchanganyiko hufungua Sakafu na Meza, Onyesho la Jikoni, na Uhifadhi wa Nafasi kwa duka hili katika POS.',
+    'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.' => 'Mkahawa/Mchanganyiko huwezesha Maeneo na Meza, Skrini ya Jikoni, na Booking ya Meza kwa ghala hili katika POS.',
+    'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this shop in POS.' => 'Mkahawa/Mchanganyiko huwezesha Maeneo na Meza, Skrini ya Jikoni, na Booking ya Meza kwa duka hili katika POS.',
 
     // Settings > Tax (app/constant/settings/tax_settings.php)
     'Tax settings updated successfully!' => 'Mipangilio ya kodi imesasishwa kwa mafanikio!',
@@ -4474,7 +4474,7 @@ return [
     'items' => 'bidhaa',
     'Search products…' => 'Tafuta bidhaa…',
     'In Stock' => 'Inapatikana',
-    'Out of Stock' => 'Haipatikani',
+    'Out of Stock' => 'Stoki Imeisha',
     'available' => 'zilizopo',
     'Nothing to show here yet.' => 'Hakuna kitu cha kuonyesha hapa bado.',
     'No products match your search.' => 'Hakuna bidhaa zinazolingana na utafutaji wako.',
@@ -5175,5 +5175,165 @@ return [
     'The email could not be sent. Check the email settings or try again.' => 'Barua pepe haikuweza kutumwa. Angalia mipangilio ya Email au jaribu tena.',
     'Report sent to %s.' => 'Ripoti imetumwa kwa %s.',
     'done' => 'imefanyika',
+
+    // 2026-10-11 — Shop pages (shop list, edit form, shop details page)
+    'Invalid warehouse ID' => 'Namba ya ghala si sahihi',
+    'Invalid shop ID' => 'Namba ya duka si sahihi',
+    'Warehouse not found' => 'Ghala halikupatikana',
+    'Shop not found' => 'Duka halikupatikana',
+    'Warehouse code \'%s\' already exists. Please use a different code.' => 'Msimbo wa ghala \'%s\' tayari upo. Tafadhali tumia msimbo mwingine.',
+    'Shop code \'%s\' already exists. Please use a different code.' => 'Msimbo wa duka \'%s\' tayari upo. Tafadhali tumia msimbo mwingine.',
+    'Warehouse \'%s\' was created successfully, but you don\'t have access to view it yet. Contact your admin to grant you access.' => 'Ghala \'%s\' limeundwa kwa mafanikio, lakini bado huna ruhusa ya kuliona. Wasiliana na msimamizi wa mfumo akupe ruhusa.',
+    'Shop \'%s\' was created successfully, but you don\'t have access to view it yet. Contact your admin to grant you access.' => 'Duka \'%s\' limeundwa kwa mafanikio, lakini bado huna ruhusa ya kuliona. Wasiliana na msimamizi wa mfumo akupe ruhusa.',
+    'Products in Stock' => 'Bidhaa Zilizopo',
+    'Total Storage Areas' => 'Jumla ya Sehemu za Kuhifadhi',
+    'Storage Areas' => 'Sehemu za Kuhifadhi',
+    'Storage Area' => 'Sehemu ya Kuhifadhi',
+    'Manage Storage Areas' => 'Simamia Sehemu za Kuhifadhi',
+    'Active Storage Areas' => 'Sehemu za Kuhifadhi Zinazotumika',
+    'Area Name' => 'Jina la Sehemu',
+    'No storage areas added yet' => 'Hakuna sehemu za kuhifadhi zilizoongezwa bado',
+    'Shop action: activate' => 'kuwezesha',
+    'Shop action: deactivate' => 'kusitisha',
+    'Shop action: activated' => 'limewezeshwa',
+    'Shop action: deactivated' => 'limesitishwa',
+    'Shop status: Active' => 'Linatumika',
+    'Shop status: Inactive' => 'Halitumiki',
+    'Shop status: Under Maintenance' => 'Limefungwa kwa Matengenezo',
+    'Warehouse Stock Report' => 'Ripoti ya Stoki ya Ghala',
+    'Shop Stock Report' => 'Ripoti ya Stoki ya Duka',
+    'Back to Warehouses' => 'Rudi kwenye Maghala',
+    'Back to Shops' => 'Rudi kwenye Maduka',
+    'Warehouse Information' => 'Taarifa za Ghala',
+    'Shop Information' => 'Taarifa za Duka',
+    'Primary Warehouse' => 'Ghala Kuu',
+    'Primary Shop' => 'Duka Kuu',
+    'Code:' => 'Msimbo:',
+    'Stock Value (at Cost)' => 'Thamani ya Stoki (kwa Bei ya Kununua)',
+    'Capacity' => 'Uwezo wa Kuhifadhi',
+    'Manager' => 'Msimamizi',
+    'Created by:' => 'Imeundwa na:',
+    'Manage' => 'Simamia',
+    'In Use' => 'Inatumika',
+    'No stock activity yet' => 'Hakuna shughuli za stoki bado',
+    'Last 8' => '8 za Mwisho',
+    'Stock Level' => 'Kiwango cha Stoki',
+    'Main Area' => 'Sehemu Kuu',
+    'Reorder at' => 'Agiza tena ikifika',
+    'No products in stock yet' => 'Hakuna bidhaa kwenye stoki bado',
+    'No matching products found' => 'Hakuna bidhaa zinazolingana',
+    'Received from Another Warehouse' => 'Imepokelewa kutoka Ghala Jingine',
+    'Sent to Another Warehouse' => 'Imetumwa Ghala Jingine',
+    'Received from Another Shop' => 'Imepokelewa kutoka Duka Jingine',
+    'Sent to Another Shop' => 'Imetumwa Duka Jingine',
+    'Stock Added (Adjustment)' => 'Stoki Imeongezwa (Marekebisho)',
+    'Stock Removed (Adjustment)' => 'Stoki Imepunguzwa (Marekebisho)',
+    'Returned by Customer' => 'Imerudishwa na Mteja',
+    'Returned to Supplier' => 'Imerudishwa kwa Msambazaji',
+    'Produced' => 'Imezalishwa',
+    'Used in Production' => 'Imetumika Kuzalisha',
+
+    // 2026-10-12 — Shop mode 'Sell' label, translated activity texts
+    'Sell' => 'Uza',
+    "Today's Sales" => 'Mauzo ya Leo',
+    'Start Selling' => 'Anza Kuuza',
+    'Logged in to the system' => 'Ameingia kwenye mfumo',
+    'Logged out of the system — session lasted %s' => 'Ametoka kwenye mfumo — alikaa kwa %s',
+
+    // 2026-10-12 — Shop mode: 'POS' wording replaced with selling words
+    'Shop Sales Only' => 'Mauzo ya Dukani Pekee',
+    // POS selling messages that never had Swahili
+    '— Not specified —' => '— Haijabainishwa —',
+    'Optional — which supplier this batch was ordered from.' => 'Si lazima — msambazaji aliyeleta mzigo huu.',
+    'Display' => 'Muonekano',
+    'Products shown on open (desktop)' => 'Bidhaa zinazoonyeshwa mwanzoni (kompyuta)',
+    'How many products to show in the product grid when no search or category filter is active. Searching or tapping a category always shows all matching results.' => 'Idadi ya bidhaa zinazoonyeshwa kwenye skrini ya bidhaa kabla ya kutafuta au kuchagua kundi. Ukitafuta au ukibonyeza kundi, bidhaa zote zinazolingana huonyeshwa.',
+    'Products shown on open (mobile)' => 'Bidhaa zinazoonyeshwa mwanzoni (simu)',
+    'Same as above but for phones and small tablets (screen width below 768 px). Default is 10 for faster loading on mobile.' => 'Sawa na hapo juu lakini kwa simu na tablet ndogo (upana wa skrini chini ya 768 px). Kawaida ni 10 ili ifunguke haraka kwenye simu.',
+    'This sale\'s warehouse does not match the warehouse your current shift is locked to.' => 'Ghala la mauzo haya halilingani na ghala ambalo zamu yako ya sasa imefungwa nalo.',
+    'The selected table does not belong to this shop.' => 'Meza uliyochagua si ya duka hili.',
+    'This sale\'s shop does not match the shop your current shift is locked to.' => 'Duka la mauzo haya halilingani na duka ambalo zamu yako ya sasa imefungwa nalo.',
+    'Sale already recorded.' => 'Mauzo haya yameshahifadhiwa.',
+    'Amount tendered (%s) is less than the sale total (%s). Check your discounts or totals and resubmit.' => 'Kiasi kilicholipwa (%s) ni pungufu ya jumla ya mauzo (%s). Angalia punguzo au jumla kisha jaribu tena.',
+    'Access denied: this register\'s warehouse is not in your assigned scope.' => 'Ruhusa imekataliwa: ghala la rejista hii haliko kwenye wigo wako.',
+    'Access denied: this register\'s shop is not in your assigned scope.' => 'Ruhusa imekataliwa: duka la rejista hii haliko kwenye wigo wako.',
+    'Return already recorded.' => 'Marejesho haya yameshahifadhiwa.',
+    'Payment already recorded.' => 'Malipo haya yameshahifadhiwa.',
+    'View Cart' => 'Angalia Kikapu',
+    'When will this be paid back?' => 'Deni hili litalipwa lini?',
+    'Set a due date for this credit sale so it can be tracked.' => 'Weka tarehe ya kulipa deni hili ili liweze kufuatiliwa.',
+    'Confirm Credit Sale' => 'Thibitisha Mauzo ya Mkopo',
+    'Please choose a due date.' => 'Tafadhali chagua tarehe ya kulipa.',
+    'Due date cannot be in the past.' => 'Tarehe ya kulipa haiwezi kuwa iliyopita.',
+    'Selling' => 'Kuuza',
+    '<p>The main navigation bar at the top contains all modules:</p>
+                                    <ul>
+                                        <li><strong>Dashboard</strong> – Overview of business performance</li>
+                                        <li><strong>Finance</strong> – Accounts, transactions, expenses</li>
+                                        <li><strong>Sales</strong> – Products, customers, orders, invoices, Sell</li>
+                                        <li><strong>Operations</strong> – Employees, payroll, assets</li>
+                                        <li><strong>Reports</strong> – Financial and business reports</li>
+                                        <li><strong>Admin</strong> – User management and system settings</li>
+                                    </ul>
+                                    <p>Click your <strong>profile icon</strong> (top-right) to access personal settings, change password, or log out.</p>' => '<p>Upau mkuu wa uelekezaji juu una moduli zote:</p>
+                                    <ul>
+                                        <li><strong>Dashibodi</strong> – Muhtasari wa utendaji wa biashara</li>
+                                        <li><strong>Fedha</strong> – Akaunti, miamala, matumizi</li>
+                                        <li><strong>Mauzo</strong> – Bidhaa, wateja, oda, ankara, Uza</li>
+                                        <li><strong>Uendeshaji</strong> – Wafanyakazi, mishahara, mali</li>
+                                        <li><strong>Ripoti</strong> – Ripoti za kifedha na biashara</li>
+                                        <li><strong>Msimamizi</strong> – Usimamizi wa watumiaji na mipangilio ya mfumo</li>
+                                    </ul>
+                                    <p>Bofya <strong>aikoni ya wasifu</strong> (juu-kulia) ili kufikia mipangilio binafsi, kubadilisha nenosiri, au kutoka.</p>',
+    '<ol>
+                                        <li>Tap <strong>Sell</strong> in the menu</li>
+                                        <li>Start a new <strong>shift</strong> by entering the opening balance</li>
+                                        <li>Search or browse products and click to add them to the cart</li>
+                                        <li>Adjust quantities as needed</li>
+                                        <li>Click <strong>"Pay"</strong> and select payment method (Cash, M-Pesa, Card)</li>
+                                        <li>Complete the transaction and print the receipt</li>
+                                    </ol>' => '<ol>
+                                        <li>Bonyeza <strong>Uza</strong> kwenye menyu</li>
+                                        <li>Anza <strong>zamu</strong> mpya kwa kuweka salio la ufunguzi</li>
+                                        <li>Tafuta au vinjari bidhaa na bofya kuziongeza kwenye kikapu</li>
+                                        <li>Rekebisha idadi inavyohitajika</li>
+                                        <li>Bofya <strong>"Lipa"</strong> na chagua njia ya malipo (Fedha Taslimu, M-Pesa, Kadi)</li>
+                                        <li>Kamilisha muamala na uchapishe risiti</li>
+                                    </ol>',
+    'Selling Settings' => 'Mipangilio ya Kuuza',
+    'Sales Overview' => 'Muhtasari wa Mauzo',
+    'Sales History Report' => 'Ripoti ya Historia ya Mauzo',
+    'No sales recorded for this customer yet.' => 'Bado hakuna mauzo kwa mteja huyu.',
+    'No stock received from this supplier yet. Use "Receive Stock" on the Sell screen and choose this supplier.' => 'Bado hakuna mzigo uliopokelewa kutoka kwa msambazaji huyu. Tumia "Pokea Mzigo" kwenye skrini ya Uza na umchague msambazaji huyu.',
+    'A batch is created automatically the first time a product is added with opening stock, or whenever you receive new stock.' => 'Mzigo huundwa kiotomatiki mara ya kwanza bidhaa inapoongezwa ikiwa na kiasi cha awali, au kila unapopokea mzigo mpya.',
+    'Services you sell' => 'Huduma unazouza',
+    'Virtual products & services — used in Sales, Invoices and the Sell screen only' => 'Bidhaa na huduma za kidijitali — hutumika kwenye Mauzo, Ankara na skrini ya Uza pekee',
+    'Selling settings: registers, receipts, customer points.' => 'Mipangilio ya kuuza: rejista, risiti, pointi za wateja.',
+    'Display, discounts and other options for the Sell screen' => 'Muonekano, punguzo na mipangilio mingine ya skrini ya Uza',
+    'Save Selling Settings' => 'Hifadhi Mipangilio ya Kuuza',
+    'Selling settings updated successfully' => 'Mipangilio ya kuuza imesasishwa kwa mafanikio',
+    'Error updating selling settings: %s' => 'Hitilafu katika kusasisha mipangilio ya kuuza: %s',
+    'Max discount allowed when selling' => 'Punguzo la juu linaloruhusiwa wakati wa kuuza',
+    'Choose how discounts are applied on the Sell screen (Percentage vs Constant Amount).' => 'Chagua jinsi punguzo linavyotumika kwenye skrini ya Uza (Asilimia au Kiasi Maalum).',
+    'Advanced Selling Features' => 'Vipengele vya Ziada vya Kuuza',
+    'Price Groups and other price settings.' => 'Makundi ya Bei na mipangilio mingine ya bei.',
+    'How do I sell?' => 'Ninauzaje bidhaa?',
+    'Sales Overview — stats, shift history, catalog setup' => 'Muhtasari wa Mauzo — takwimu, historia ya zamu, usanidi wa katalogi',
+    'Access Denied: you do not have permission to close a sales shift' => 'Ruhusa Imekataliwa: huna ruhusa ya kufunga zamu ya mauzo',
+    'Access Denied: you do not have permission to delete held sales' => 'Ruhusa Imekataliwa: huna ruhusa ya kufuta mauzo yaliyosimamishwa',
+    'Access Denied: you do not have permission to hold sales' => 'Ruhusa Imekataliwa: huna ruhusa ya kusimamisha mauzo',
+    'Access Denied: you do not have permission to open a sales shift' => 'Ruhusa Imekataliwa: huna ruhusa ya kufungua zamu ya mauzo',
+    'Access Denied: you do not have permission to sell' => 'Ruhusa Imekataliwa: huna ruhusa ya kuuza',
+    'You do not have permission to process returns' => 'Huna ruhusa ya kupokea bidhaa zilizorudishwa',
+    'You do not have permission to receive payments' => 'Huna ruhusa ya kupokea malipo',
+    'You do not have permission to void sales' => 'Huna ruhusa ya kubatilisha mauzo',
+    'This action is only available in Simple POS mode.' => 'Kitendo hiki kinapatikana tu katika Hali Rahisi ya POS.',
+
+    // 2026-10-12 — Phone side menu
+    'Overview' => 'Muhtasari',
+    'My Account' => 'Akaunti Yangu',
+    'Menu' => 'Menyu',
+    'Open menu' => 'Fungua menyu',
+    'Close menu' => 'Funga menyu',
 
 ];

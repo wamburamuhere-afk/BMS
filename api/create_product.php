@@ -242,6 +242,15 @@ try {
     $initial_expiry_date = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
 
     if ($initial_stock) {
+        // Same list the form renders, so a hand-crafted request can't stock a
+        // shop the user was never offered.
+        require_once __DIR__ . '/../core/warehouse_scope.php';
+        $allowedShopIds = array_map('intval', array_column(warehousesForSelect($pdo), 'warehouse_id'));
+        foreach ($initial_stock as $warehouse_id => $quantity) {
+            if ((float)$quantity > 0 && !in_array((int)$warehouse_id, $allowedShopIds, true)) {
+                throw new Exception('You do not have access to one of the selected shops.');
+            }
+        }
         foreach ($initial_stock as $warehouse_id => $quantity) {
             if ($quantity > 0) {
                 // Every stock intake becomes a real, trackable batch — the same

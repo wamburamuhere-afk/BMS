@@ -499,7 +499,7 @@ function getRoleBadgeColor($role_name) {
                                                                 data-bs-toggle="tab" 
                                                                 data-bs-target="#<?= $tabId ?>" 
                                                                 type="button" role="tab">
-                                                            <?= htmlspecialchars($module_name) ?>
+                                                            <?= htmlspecialchars($module_name === 'Point of Sale' ? wLabel('Point of Sale', 'Selling') : $module_name) ?>
                                                             <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1"><?= count($module_permissions) ?></span>
                                                         </button>
                                                     </li>

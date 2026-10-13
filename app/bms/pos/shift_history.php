@@ -60,7 +60,7 @@ foreach ($shifts as $s) {
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0"><i class="bi bi-clock-history me-2"></i><?= t('Shift History') ?></h4>
-        <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm"><i class="bi bi-bag-plus me-1"></i> <?= t('Open POS') ?></a>
+        <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm"><i class="bi bi-bag-plus me-1"></i> <?= htmlspecialchars(wLabel('Open POS', 'Start Selling')) ?></a>
     </div>
 
     <div class="row g-3 mb-4">

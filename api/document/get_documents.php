@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/document_access.php';
 global $pdo, $pdo_accounts;
 
 // Set headers

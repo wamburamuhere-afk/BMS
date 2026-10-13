@@ -95,3 +95,41 @@ if (!defined('BMS_MOBILE_PRODUCT_FIELDS')) {
         return $rel;
     }
 }
+
+if (!function_exists('mobileShopQuantities')) {
+    /**
+     * Per-shop quantities from the request, as [warehouse_id => quantity].
+     * Accepts a list of {warehouse_id, quantity}, a {warehouse_id: quantity}
+     * map, or either as a JSON string (multipart requests carrying an image).
+     * Returns null when the key is absent.
+     *
+     * @throws InvalidArgumentException
+     */
+    function mobileShopQuantities(array $body, string $key): ?array
+    {
+        if (!array_key_exists($key, $body)) return null;
+        $raw = $body[$key];
+        if (is_string($raw)) {
+            $raw = trim($raw) === '' ? [] : json_decode($raw, true);
+            if (!is_array($raw)) throw new InvalidArgumentException("$key must be a list of {warehouse_id, quantity}");
+        }
+        if (!is_array($raw)) throw new InvalidArgumentException("$key must be a list of {warehouse_id, quantity}");
+
+        $out = [];
+        foreach ($raw as $k => $v) {
+            if (is_array($v)) {
+                $wid = $v['warehouse_id'] ?? null;
+                $qty = $v['quantity'] ?? null;
+            } else {
+                $wid = $k;
+                $qty = $v;
+            }
+            if (!is_numeric($wid) || (int)$wid <= 0) throw new InvalidArgumentException("$key: every entry needs a valid warehouse_id");
+            if (!is_numeric($qty) || (float)$qty < 0) throw new InvalidArgumentException("$key: quantity must be a non-negative number");
+            $wid = (int)$wid;
+            if (isset($out[$wid])) throw new InvalidArgumentException("$key: warehouse_id $wid is listed more than once");
+            $out[$wid] = (float)$qty;
+        }
+        return $out;
+    }
+}

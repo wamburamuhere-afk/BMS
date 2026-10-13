@@ -58,6 +58,25 @@ if (!function_exists('tenantMigrationFiles')) {
     }
 }
 
+if (!function_exists('tenantMigrationPhpBinary')) {
+    /**
+     * The PHP command-line binary used to run a migration file as a subprocess.
+     *
+     * PHP_BINARY is the CLI only when this process IS the CLI (deploy, cron).
+     * Under a web server it is empty (mod_php) or the php-fpm binary, and neither
+     * can execute a script file. Registration calls this runner from a web
+     * request, so a new company's migrations used to fail at the very first file.
+     */
+    function tenantMigrationPhpBinary(): string
+    {
+        if (PHP_SAPI === 'cli' && PHP_BINARY !== '') return PHP_BINARY;
+        foreach ([PHP_BINDIR . '/php', '/usr/bin/php', '/usr/local/bin/php'] as $candidate) {
+            if (@is_executable($candidate)) return $candidate;
+        }
+        return 'php';
+    }
+}
+
 if (!function_exists('logTenantMigrationEvent')) {
     /** Best-effort audit row. A logging failure must never abort a migration run. */
     function logTenantMigrationEvent(?int $tenantId, ?string $subdomain, string $migration, string $status, ?string $message = null): void
@@ -182,7 +201,7 @@ if (!function_exists('runTenantMigrations')) {
 
                 $output = [];
                 $exitCode = 0;
-                exec(PHP_BINARY . ' ' . escapeshellarg($file) . ' 2>&1', $output, $exitCode);
+                exec(escapeshellarg(tenantMigrationPhpBinary()) . ' ' . escapeshellarg($file) . ' 2>&1', $output, $exitCode);
 
                 putenv('TENANT_MIGRATION_DB_HOST');
                 putenv('TENANT_MIGRATION_DB_NAME');

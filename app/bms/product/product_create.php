@@ -46,11 +46,9 @@ try {
 // re-enable the full form per tenant via "Advanced Product"
 // (advancedProductEnabled(), core/pos_nav.php) even while Simple Mode is on.
 $simpleProductForm = posSimpleModeEnabled() && !advancedProductEnabled();
-// The Shop picker only appears when there's a genuine choice to make — one
-// shop in scope is auto-assigned silently, same pattern already used for
-// Expenses' Paid From/Account fields.
+// One shop in scope → a single Opening Stock box for it; several → one
+// quantity row per shop, so a product can start stocked in many shops at once.
 $showShopPicker = count($warehouses) > 1;
-$onlyWarehouseId = (count($warehouses) === 1) ? (int)$warehouses[0]['warehouse_id'] : 0;
 
 // Get measurement units
 try {
@@ -224,26 +222,45 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                             </div>
 
                             <?php if ($showShopPicker): ?>
-                            <div class="col-md-6 mt-4">
-                                <label for="simple_shop_id" class="form-label fw-bold"><?= wLabel('Warehouse', 'Shop') ?></label>
-                                <select class="form-select bg-light border-0 py-2" id="simple_shop_id">
-                                    <option value=""><?= wLabel('Select Warehouse', 'Select Shop') ?></option>
-                                    <?php foreach ($warehouses as $warehouse): ?>
-                                        <option value="<?= (int)$warehouse['warehouse_id'] ?>"><?= htmlspecialchars($warehouse['warehouse_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div class="col-md-12 mt-4">
+                                <label class="form-label fw-bold"><?= wLabel('Opening Stock per Warehouse', 'Opening Stock per Shop') ?></label>
+                                <p class="text-muted small mb-2"><?= wLabel('Enter the quantity each warehouse starts with. Leave 0 for warehouses that will not hold this product yet.', 'Enter the quantity each shop starts with. Leave 0 for shops that will not hold this product yet.') ?></p>
+                                <div class="table-responsive border rounded">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th><?= wLabel('Warehouse', 'Shop') ?></th>
+                                                <th style="width:200px;" class="text-center"><?= t('Opening Stock') ?></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($warehouses as $warehouse): ?>
+                                            <tr>
+                                                <td class="fw-semibold"><?= htmlspecialchars($warehouse['warehouse_name']) ?></td>
+                                                <td>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" class="form-control text-center"
+                                                               name="initial_stock[<?= (int)$warehouse['warehouse_id'] ?>]"
+                                                               min="0" step="0.001" value="0">
+                                                        <span class="input-group-text unit-label">pcs</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <?php else: ?>
-                            <input type="hidden" id="simple_shop_id" value="<?= $onlyWarehouseId ?>">
-                            <?php endif; ?>
-
+                            <?php elseif (count($warehouses) === 1): ?>
                             <div class="col-md-6 mt-4">
-                                <label for="simple_opening_stock" class="form-label fw-bold"><?= t('Opening Stock') ?></label>
+                                <label for="initial_stock_single" class="form-label fw-bold"><?= t('Opening Stock') ?></label>
                                 <div class="input-group">
-                                    <input type="number" class="form-control bg-light border-0" id="simple_opening_stock" min="0" step="0.001" value="0">
+                                    <input type="number" class="form-control bg-light border-0" id="initial_stock_single"
+                                           name="initial_stock[<?= (int)$warehouses[0]['warehouse_id'] ?>]" min="0" step="0.001" value="0">
                                     <span class="input-group-text bg-light unit-label">pcs</span>
                                 </div>
                             </div>
+                            <?php endif; ?>
 
                             <!-- 2026-09-18 request: a real, optional "Low Stock" threshold —
                                  previously hidden entirely for Simple POS. Maps to

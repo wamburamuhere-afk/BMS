@@ -26,6 +26,179 @@ Mobile Money has moved to the LMS product. No real data existed in BMS.
 - `migrations/tenant/2026_10_13_drop_mm_tables.php` — drops all 13 mm_* tables from each tenant DB
 - `migrations/2026_10_13_drop_mm_tables_legacy_db.php` — drops same tables from the legacy DB
 
+---
+
+## 2026-10-12 — fix(mobile money): every list is a DataTable on desktop and cards on phones; S/No first; gear Actions
+
+**Files:** `app/bms/mobile_money/mm_transactions.php`, `app/bms/mobile_money/mm_commissions.php`, `app/bms/mobile_money/mm_reports.php`, `app/bms/mobile_money/mm_agent_view.php`, `app/bms/mobile_money/mm_compliance.php`, `assets/js/bms-mobile-cards.js`, `tests/test_mm_tables_cards_cli.php` (new)
+- **Phones showed empty card views (bug):** the card code on 9 MM pages calls `safeOutput()`, but only `mm_float`/`mm_shifts` defined it, so on a phone the cards stayed blank. Added one global fallback in `bms-mobile-cards.js`; pages that define their own keep it.
+- **Commissions:** the "Earned by Network" table was plain HTML → now a DataTable with phone cards; "Received Payments" gets its own phone cards. Tables in the hidden tab re-measure when the tab opens.
+- **Reports (all 7):** S/No column added; Total rows moved into the table footer (sorting no longer moves them); phone cards built from each report's own columns, plus a Total card; Excel export no longer drops the last column.
+- **Agent view:** Sub-Agents table → DataTable with S/No, a gear Actions menu (View) and phone cards.
+- **Transactions:** the lone eye button in the "View" column → standard gear Actions menu.
+- **No duplicate cards:** tables that build their own cards (tills, sub-agents, KYC, pending KYC, commissions) are marked `data-bms-cards="off"` so the global auto-card script doesn't add a second set.
+Verified: new test 143 checks (all 7 report types, commissions, agent view, transactions, compliance). Browser check at 1400px and 390px on every changed table: desktop = DataTable shown, cards hidden; phone = table hidden, cards shown with one card per row (+ Total), no duplicate auto-cards. Earlier MM suites unchanged (3 suites fail the same way on develop without this change).
+
+---
+
+## 2026-10-12 — feat(mobile): left side menu (☰) and 5-item bottom bar with "Uza" in the centre (Simple POS)
+
+**Files:** `header.php`, `app/dashboard.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_mobile_side_menu_cli.php` (new)
+Phones only (Simple POS); desktop unchanged. Style "A", chosen from three clickable mockups.
+- **Bottom bar:** 5 items — Dashibodi · Bidhaa · **Uza** (raised blue circle, centre) · Matumizi · Ripoti. "Zaidi" removed. Items still follow each user's permissions.
+- **☰ side menu:** one menu sliding over the page from the left (page behind darkened) replaces the "Zaidi" and account bottom sheets. Header: initials, name, role · company; groups **Biashara Yangu** (Wateja, Wasambazaji, Huduma, Pokea Mzigo, Ziara za Wateja), **Mipangilio** (Msimamizi, Mipangilio ya Kuuza, Mipangilio ya Rangi), **Akaunti Yangu** (Rasilimali Watu Yangu, Wasifu, Msaada), **Toka**. Same `canView()` gates as before.
+- **Closing:** ✕, tap outside, swipe left, the phone's **Back** button (closes the menu instead of leaving the page), or choosing an item.
+- **Bar stays put:** it sits on its own layer, page bounce is off on phones, and it hides only while a real keyboard is open (a text field has focus) — no longer on address-bar movement, never for the hidden scanner field.
+- **Fixes found while testing:** dashboard's date + "Vitendo vya Haraka" buttons overflowed the phone screen (page rendered 461px wide on a 390px phone) — they now wrap. POS badge "GHALA NDOGO" → "STOKI KIDOGO". Sell screen "Sehemu ya Kazi" button → "Muhtasari" in shop mode.
+Verified in a phone-sized browser (390×844, touch): 35 checks (bar order and position, no movement on scroll, all four ways to close, Back keeps the page, item navigation and history, cashier permissions, desktop unchanged, no JS errors); earlier suites still pass (88 + 18 + 30). New no-DB test: 38 checks (fails 22 on the old code).
+
+---
+
+## 2026-10-12 — fix(shop mode): replace "POS" wording with selling words everywhere
+
+**Files:** `header.php`, `core/pos_nav.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/pos/pos_credit_customers.php`, `app/constant/settings/pos_config_settings.php`, `app/constant/settings/help.php`, `app/constant/settings/user_roles.php`, `app/constant/reports/sales_report.php`, `app/bms/customer/customer_details.php`, `app/bms/Suppliers/supplier_details.php`, `app/bms/stock/warehouse_batches_tab.php`, `app/bms/product/services.php`, `app/bms/product/products.php`, `api/pos/{close_shift,open_shift,hold_sale,delete_held_sale,process_sale,create_return,receive_payment,void_sale}.php`, `lang/sw.php`, `tests/test_activity_log_permission_and_sell_label_cli.php`
+After "POS" became "Uza / Sell" in the menu (2026-10-12), 34 other texts still said "POS" in shop mode. Each now goes through `wLabel()` (same rule as Duka/Shop), so a full ERP company keeps "POS":
+- **Menus/pages:** POS Settings → Selling Settings (Mipangilio ya Kuuza); POS Workspace → Sales Overview (Muhtasari wa Mauzo, incl. page title); POS Sales History (+ Report) → Sales History; Roles & Permissions tab "Point of Sale" → Selling (Kuuza); sales report filter "POS Only" → Shop Sales Only (Mauzo ya Dukani Pekee).
+- **Messages:** customer/supplier/batch/services texts, Max discount, discount type hint, Advanced Selling Features, price-group description, settings saved/error.
+- **Permission errors (API):** sell, open/close a sales shift, hold/delete held sales, void, returns, receive payments — no "POS".
+- **Help:** "How do I sell?", "Tap Sell in the menu", module list, keyboard shortcut label.
+- **Swahili gaps fixed:** 22 POS screen texts that never had Swahili (sale/return/payment errors, credit-sale due date dialog, View Cart, POS settings Display section, Receive Stock supplier hint). `tests/test_pos_i18n_coverage_cli.php` now passes fully (was 17 failures).
+Verified in a browser: shop mode (Swahili + English) shows no "POS" on dashboard, Sell screen, Sales Overview, Selling Settings, Help, Roles & Permissions and Sales report; full ERP keeps POS wording (30 checks). Earlier suites still pass (88 + 18).
+
+---
+
+## 2026-10-12 — fix(permissions): one "Audit Logs" switch for all activity history; shop mode "Uza/Sell" label
+
+**Files:** `core/role_permission_ui.php`, `core/permissions.php`, `app/constant/reports/audit_report.php`, `header.php`, `app/dashboard.php`, `app/activity_log.php`, `core/activity_log_helpers.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/pos/shift_history.php`, `lang/sw.php`, `tests/test_activity_log_permission_and_sell_label_cli.php` (new)
+- **Activity history permission:** three role permissions covered the same data — "Audit Report" (Reports), "Audit Logs" and "Activity Log" (System Settings). The dashboard's Recent Activities, the Audit Logs page and the Activity Log page all check **Audit Logs**, so unticking "Audit Report" left everything visible. Now:
+  - The Roles & Permissions matrix shows only **Audit Logs**, in the **Reports** tab. "Audit Report" and "Activity Log" are retired from the matrix (existing grants kept, no effect).
+  - The old Audit Report page (a redirect to Audit Logs) enforces `audit_logs` instead of `financial_reports`; its duplicate menu link is removed; `hasReportsAccess()` counts `audit_logs`.
+  - A role without Audit Logs sees no Recent Activities box, no Audit Logs menu link, and is sent to "unauthorized" on /audit_logs, /activity_log and /audit_report.
+  - **Existing grants are not changed automatically** — after deploy, untick "Audit Logs" in the Reports tab for roles that must not see activity history.
+- **Activity texts:** stored English texts like "Logged in to the system" now display translated (`activityDisplayText()`), on the dashboard and the Activity Log page (incl. its AJAX table, which now loads the reader's language).
+- **Shop mode label:** POS links (top menu, bottom bar, dashboard shortcuts), the POS page heading and "Open POS" buttons read **"Uza" / "Sell"** and **"Anza Kuuza" / "Start Selling"**; the dashboard card "Today's POS Sales" reads **"Mauzo ya Leo"**. Full ERP companies (Projects on, no Shop Mode) keep "POS". English key "Sell" is used because "Sale" already means one sale record ("Muuzo").
+- **Dashboard:** "View Inventory Alerts" → "Angalia Tahadhari za Stoki" (was "Ghala"). Fixed a JavaScript error for non-admin users ("getContext of null") when the performance chart card isn't shown to them.
+Verified in a browser against a migrated database with a real non-admin cashier role (18 checks) plus the earlier shop-pages suite (88 checks); new no-DB test (44 checks).
+
+---
+
+## 2026-10-11 — fix(shop pages): full Swahili translation, "Shop" wording, hide switched-off modules
+
+**Files:** `ajax_get_warehouse.php`, `app/bms/stock/warehouses.php`, `app/bms/stock/warehouse_view.php`, `core/terminology.php`, `lang/sw.php`, `tests/test_shop_pages_i18n_and_modules_cli.php` (new), `tests/test_warehouse_batches_tab_cli.php`
+For a POS company in shop mode, the shop screens mixed English and Swahili, said "Warehouse"/"Ghala", and showed fields for modules the superadmin had switched off.
+- **Edit Shop form** (`ajax_get_warehouse.php`) — every label, option and error now goes through `t()`/`wLabel()` (loads the user's language, since this endpoint never includes `header.php`). Shop wording in shop mode ("Shop Name", "Shop Code (Auto-generated)", "Set as Primary Shop"). The **Project** field only shows when Projects is on (`projectsModuleActive()`), **POS Mode** only when Restaurant POS is on.
+- **Add Shop form** (`warehouses.php`) — POS Mode/Restaurant options hidden when Restaurant POS is off (saves "retail" as before).
+- **Edit save** (`warehouses.php`) — a hidden Project / POS Mode field now keeps the stored value instead of wiping it (before, saving a shop would have cleared its project link and reset a restaurant shop to retail).
+- **Shop details page** (`warehouse_view.php`) — all text translated; Shop wording; ignores `?project_id=` when Projects is off (no Project / Contract No / Back to Project). English fixes: "Total Stock Item" → "Total Products", "Health" → "Stock Level", "Out/Low/Over" → "Out of Stock/Low Stock/Overstocked", "min" → "Reorder at", "Default" → "Main Area", "Contact Person" → "Manager", "Storage Locations" → "Storage Areas". Status showed the raw word "success" instead of a badge — now a proper translated badge. Activity entries show real names ("Sold", "Received from Another Shop") instead of database codes. Table footer/pagination translated.
+- **Shop list** (`warehouses.php`) — "Locations" → "Storage Areas"; breadcrumb "Inventory" → "Products in Stock" in shop mode; status labels via new `warehouseStatusLabel()`; messages that contain a code/name are now translatable (and the code is HTML-escaped). "Transfer Stock" now passes `warehouse_id` (the parameter the transfers page reads; it was `from_warehouse_id`, which was ignored).
+- **`core/terminology.php`** — new `warehouseStatusLabel()` and `stockMovementLabel()`.
+- **`lang/sw.php`** — 57 new translations; fixed wrong/confusing ones: "Ghala" no longer used for stock ("Stoki ya Sasa", "Thamani ya Stoki", "Stoki Imeisha", "Hamisha Stoki"), "Export" → "Pakua" (was the same word as Transfer), "City" → "Mji", "Code" → "Msimbo", "S/NO" → "Na.", "Notes" → "Maelezo ya Ziada", "POS Mode" → "Aina ya Mauzo (POS)", "Vipimo" → "idadi ya bidhaa"; shop status "Linatumika / Halitumiki / Limefungwa kwa Matengenezo" (was "Hai").
+- **Tests** — new `tests/test_shop_pages_i18n_and_modules_cli.php` (53 checks, no DB). `test_warehouse_batches_tab_cli.php` updated: it pinned the old untranslated heading.
+Verified end-to-end in a browser against a migrated database (88 checks): Swahili + English, shop company (Projects/Restaurant off) and full company (both on), add/edit/duplicate-code/details flows, no JavaScript errors.
+
+---
+
+## 2026-10-11 — feat(pos): type the quantity directly in the mobile cart
+
+**Files:** `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/pos.php`
+In the mobile cart sheet ("Muuzo wa Sasa", simple mode) the quantity between − and + was plain text, so a large quantity (e.g. 349) meant pressing + hundreds of times. The desktop cart already had a typeable box.
+- `pos_scripts_new.php` (`updateMobileCartFab`) — the quantity is now a number input (`.pos-sheet-qty`, `inputmode="numeric"` so phones show the digit keypad). Tapping selects the old value so typing replaces it; Enter/Done or tapping away applies it via the existing `updateCartQuantityInput()` (same as desktop). Empty or 0 reverts to the previous quantity (removing stays on the trash button). − / + unchanged; serial-tracked lines stay read-only.
+- `pos.php` — `.pos-sheet-qty` style: 64×40px to match the − / + buttons, browser spin arrows hidden.
+
+---
+
+## 2026-10-11 — fix(pos): on-screen keyboard popped up after every product tap on mobile
+
+**Files:** `app/bms/pos/pos_scripts_new.php`
+On phones/tablets, tapping a product added it to the cart but also opened the on-screen keyboard. Cause: the barcode-scanner code re-focuses the hidden `#hiddenScanInput` text field after any click on a non-button element (product cards are `div`s), and a focused text field opens the mobile keyboard.
+- New `applyScanInputMode()` sets `inputmode="none"` on `#hiddenScanInput` in mobile view only (width < 992px or a touch/coarse pointer), re-checked on resize. The field still takes focus, so scanners keep working; the device just doesn't show its keyboard. Desktop is unchanged. Search, amount and other real inputs still open the keyboard as before.
+
+---
+
+## 2026-10-08 — fix(tenants): new self-registered companies were left without their migrations (product create failed: Unknown column 'supplier_id')
+
+**Files:** `core/tenant_migration_runner.php`, `core/tenant_provisioner.php`
+A company created through public registration got only the schema snapshot; none of the `migrations/tenant/` scripts ran. Creating a product then failed with `SQLSTATE[42S22]: Unknown column 'supplier_id'` (`product_batches` also lacked `manufacturing_date`, `wholesale_price`, `selling_price`).
+Cause: registration runs the migration runner inside a web request, and the runner started each migration with `exec(PHP_BINARY ...)`. Under a web server `PHP_BINARY` is empty (mod_php) or the php-fpm binary, so the very first migration failed ("Permission denied") and the runner stopped for that company. The provisioner then logged the step as `ok`, so nothing flagged it.
+- `core/tenant_migration_runner.php` — new `tenantMigrationPhpBinary()` returns the real PHP CLI binary (`PHP_BINARY` when already on the CLI, otherwise `PHP_BINDIR/php`, `/usr/bin/php`, `/usr/local/bin/php`); used to start each migration. Deploy/cron runs are unchanged.
+- `core/tenant_provisioner.php` — the `apply_tenant_migrations` step is now logged `failed` (not `ok`) when a migration fails, so it shows in `tenant_provisioning_log`.
+Existing companies stuck in this state are repaired by the next deploy, whose CLI run applies every pending migration to every company.
+Verified on Apache mod_php with a fresh snapshot database: before the fix 0 migrations applied (failed at `2026_09_04_backfill_file_size_columns.php`); after the fix all 71 applied and the product-batch INSERT succeeds.
+
+---
+
+## 2026-10-06 — feat(mobile-api): product opening stock / stock edits for several shops
+
+**Files:** `api/mobile/products/_fields.php`, `api/mobile/products/create.php`, `api/mobile/products/update.php`, `tests/test_mobile_product_per_shop_stock_cli.php`
+Brings the mobile app in line with the web "Opening Stock per Shop" change.
+- `_fields.php` — new `mobileShopQuantities()`: reads a list of `{warehouse_id, quantity}` (or a map, or either as a JSON string for multipart), rejecting missing ids, negative quantities and duplicate shops with 422.
+- `create.php` — new `initial_stocks`: one batch + movement + ledger entry per shop with quantity > 0. Response adds `opening_stock_by_shop[]`; `current_stock` is the total. Old `warehouse_id` + `initial_stock` still work.
+- `update.php` — new `stocks`: new level per shop, each change posted as its own adjustment. Response adds `stock_adjustments[]` and keeps `stock_adjustment` (first entry). Old `warehouse_id` + `current_stock` still work.
+- Both refuse the whole request (403, nothing saved) if any listed shop is outside the user's scope.
+- API doc artifact bumped to v27.
+- Tests: 28 checks — multi-shop create/update, JSON-string form, legacy single-shop fields, validation, and staff refused for an unassigned shop on create and update.
+
+---
+
+## 2026-10-06 — fix(products): opening stock per shop + shop-access check on create/edit
+
+**Files:** `app/bms/product/product_create.php`, `app/bms/product/product_create_footer.php`, `api/create_product.php`, `api/update_product.php`, `tests/test_product_create_simple_pos_cli.php`
+The Simple POS Add Product form had one Shop dropdown and one Opening Stock box, so a new product could only start stocked in a single shop.
+- `product_create.php` — the dropdown is replaced by an **Opening Stock per Shop** list: one quantity row for every shop the user can access (admin: all shops; staff: their assigned shops only). With exactly one shop it stays a single Opening Stock box.
+- `product_create_footer.php` — removed the single-shop reader; the existing `initial_stock[...]` collector sends every shop with a quantity above 0.
+- `api/create_product.php` / `api/update_product.php` — stock can only be written to shops in the user's own list (`warehousesForSelect()`, the same list the form shows). A request naming any other shop is refused and fully rolled back. Admins are unaffected.
+- Edit page already listed one stock row per shop; it now gets the same server-side shop check.
+- Tests: 58 checks — per-shop inputs render for every active shop, a two-shop save creates one batch + stock row per shop, and a staff user is refused for an unassigned shop on both create and edit (with positive controls).
+
+---
+
+## 2026-10-05 — feat(pwa): hide the desktop app title bar (window controls overlay)
+
+**Files:** `manifest.json`, `header.php`, `login.php`
+On desktop, the installed app showed a Windows/Chrome title bar with the Smart BMS icon and "Smart BMS — Business Management System - Business Management System". Now:
+- `manifest.json` — `display_override: ["window-controls-overlay"]` removes that title bar in the installed desktop app (Chrome/Edge), so the company's own header sits at the top; `name` shortened to "Smart BMS" so the text is not doubled if a user switches the title bar back on.
+- `header.php` — rules that apply **only** in that mode: the top branding bar is draggable (to move the window), the date/location keep clear of the minimise/maximise/close buttons, and those buttons are tinted to the header blue. Company name, logo, colours and layout are unchanged; browser tabs and phones are unaffected.
+- `login.php` — invisible drag strip at the top in that mode so the window can still be moved from the login screen.
+
+---
+
+## 2026-10-05 — fix(pwa): keep browser address bar / tabs white (theme-color)
+
+**Files:** `header.php`, `login.php`, `offline.html`, `manifest.json`
+The PWA change set `theme-color` / `theme_color` to `#0d6efd`, which tinted the mobile browser's address bar, tab strip and new-tab button blue. Set back to `#ffffff` so the browser chrome stays white as before; the app's own blue page header (CSS in `header.php`) is unchanged.
+
+---
+
+## 2026-10-05 — feat(pwa): make BMS installable on phone/desktop as "Smart BMS"
+
+**Files:** `manifest.json` (new), `sw.js` (new), `offline.html` (new), `header.php`, `login.php`
+Adds Progressive Web App support so users can install the system from the browser ("Add to Home screen" / "Install app") on Android, iOS, Windows and macOS.
+- `manifest.json` — name "Smart BMS", standalone display, theme `#0d6efd`; `start_url`/`scope` are relative (`./`), so routing stays with `roots.php` and it works on both bms. and demo. hosts.
+- `sw.js` — never caches pages (per-user financial data + CSRF tokens); only shows `offline.html` when a page load fails with no network.
+- `header.php`, `login.php` — manifest link, theme-color, iOS meta tags, apple-touch-icon, service-worker registration.
+- Icons use the Smart BMS logo (navy `#161B6E` dots + grey `#A9A9AE` grid), redrawn at full resolution from the supplied 99×102 PNG so they stay sharp at 512 px. They are embedded as 16-colour PNG data URIs (manifest icons + apple-touch-icon, ~2–7 KB each) so the change is text-only; the offline page shows the same logo as inline SVG.
+
+---
+
+## 2026-10-05 — fix(documents): quick-upload always saved as private — added access_level field to wizard
+
+**Files:** `app/constant/document/select_document_add_esignature.php`, `api/document/quick_upload_document.php`
+The signing-wizard quick-upload form had no Access Level field; the handler hardcoded `access_level = 'private'`.
+Documents uploaded this way were never visible to other users regardless of intent.
+Fix: added Access Level select (Private / Restricted / Public) to the form; handler now reads and whitelists `$_POST['access_level']`, falling back to `'private'`.
+
+---
+
+## 2026-10-05 — fix(documents): add missing require_once for document_access.php — hotfix for Sentry fatal error
+
+**Files:** `api/get_documents.php`, `api/document/get_documents.php`
+Both API endpoints called `canSeeAllDocuments()` (defined in `core/document_access.php`) but
+never included that file. `roots.php` does not auto-include it, so every request produced
+`Call to undefined function canSeeAllDocuments()` — confirmed via Sentry production alert.
+Fix: added `require_once __DIR__ . '/../core/document_access.php'` to both files.
+
+---
+
 ## 2026-10-05 — feat(superadmin) Phase 5: two-step sign-in for the platform operator
 
 This account reaches every company on the platform and had **one password** protecting it, with no second factor anywhere in the codebase. A single reused or phished credential was the whole of the defence.

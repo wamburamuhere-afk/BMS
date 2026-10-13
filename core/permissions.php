@@ -724,7 +724,7 @@ function getPagePermissionMapping()
         'cash_flow.php'            => 'cash_flow',
         'trial_balance.php'        => 'trial_balance',
         'financial_statements.php' => 'financial_statements',
-        'audit_report.php'         => 'audit_report',
+        'audit_report.php'         => 'audit_logs',
         'compliance_report.php'    => 'compliance',
         'customer_analysis.php'    => 'customer_analysis',
         'employee_report.php'      => 'employee_report',
@@ -762,7 +762,7 @@ function hasReportsAccess()
         'income_statement', 'balance_sheet', 'cash_flow', 'trial_balance', 'ledger_report',
         'sales_report', 'purchase_report', 'inventory_report', 'profit_loss_report', 'expense_report',
         'performance_dashboard', 'customer_analysis', 'product_analysis', 'sales_forecast', 'trends_analysis',
-        'tax_report', 'audit_report', 'compliance_report', 'employee_report', 'asset_report',
+        'tax_report', 'audit_logs', 'compliance_report', 'employee_report', 'asset_report',
         'financial_statements', 'pos_user_sales_report', 'pos_profit_report',
     ];
     foreach ($reportPermissions as $perm) {

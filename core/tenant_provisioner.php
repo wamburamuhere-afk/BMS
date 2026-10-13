@@ -713,8 +713,11 @@ if (!function_exists('provisionTenant')) {
                 } else {
                     $msg = 'runner noop: ' . ($mr['reason'] ?? 'no tenants found');
                 }
-                $step('apply_tenant_migrations', 'ok', $msg);
-                logProvisioningStep($tenantId, $subdomain, 'apply_tenant_migrations', 'ok', $msg);
+                // A migration that failed must not be logged as "ok" — that is what
+                // hid the missing columns on a new company until its first product.
+                $migStatus = (!empty($t0['failed']) || !empty($t0['error'])) ? 'failed' : 'ok';
+                $step('apply_tenant_migrations', $migStatus, $msg);
+                logProvisioningStep($tenantId, $subdomain, 'apply_tenant_migrations', $migStatus, $msg);
             } catch (Throwable $e) {
                 $step('apply_tenant_migrations', 'failed', $e->getMessage());
                 logProvisioningStep($tenantId, $subdomain, 'apply_tenant_migrations', 'failed', $e->getMessage());
