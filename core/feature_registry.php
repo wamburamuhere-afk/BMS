@@ -547,31 +547,6 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'app/constant/accounts/payment_voucher_print.php',
                 ],
             ],
-            // 2026-09-26: Mobile Money Agent Management module.
-            // Manages wakala (agent) outlets, tills, float, transactions,
-            // teller shifts, daily reconciliation, commission tracking and
-            // BOT compliance. Fully self-contained — depends_on: [] means it
-            // works even when every other optional module is switched off.
-            // default: false — superadmin enables per tenant from features.php.
-            'mobile_money' => [
-                'label'       => 'Mobile Money',
-                'description' => 'Manage mobile money agent operations: transactions, float, commissions, teller shifts, daily reconciliation and BOT compliance across M-Pesa, Airtel Money, Tigo Pesa, HaloPesa and T-Pesa.',
-                'default'     => false,
-                'sort_order'  => 25,
-                'page_keys'   => [
-                    'mm_dashboard', 'mm_agents', 'mm_networks', 'mm_transactions',
-                    'mm_float', 'mm_commissions', 'mm_commission_rates',
-                    'mm_reconciliation', 'mm_reports', 'mm_compliance',
-                    'mm_shifts',
-                ],
-                'depends_on'  => [],
-                'paths'       => [
-                    'app/bms/mobile_money/',
-                    'api/mobile_money/',
-                    'core/mm_posting.php',
-                    'core/mm_float_service.php',
-                ],
-            ],
             // 2026-10-03: Field Reports (marketing) — staff record client visits
             // in the field and print/download a daily report. Every user sees
             // only their own visits; admins see all staff. default: false —
@@ -773,7 +748,6 @@ if (!function_exists('tenantOnlyHasModule')) {
      *
      * Usage: redirect to a module-specific landing page instead of the
      * generic ERP dashboard when a tenant subscribed to a single vertical.
-     *   if (tenantOnlyHasModule('mobile_money')) { redirect to mm_dashboard; }
      */
     function tenantOnlyHasModule(string $module): bool
     {
