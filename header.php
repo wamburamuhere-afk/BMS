@@ -1581,28 +1581,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
     </div><!-- /.header-wrapper -->
 
-<script>
-    (function () {
-        document.addEventListener('DOMContentLoaded', function () {
-            var menu = document.getElementById('navbarNav');
-            if (menu && window.bootstrap) {
-                menu.addEventListener('show.bs.collapse', function () { document.body.classList.add('bms-menu-open'); });
-                menu.addEventListener('hidden.bs.collapse', function () { document.body.classList.remove('bms-menu-open'); });
-            }
-        });
-        if (window.visualViewport) {
-            var maxH = window.innerHeight;
-            var check = function () {
-                maxH = Math.max(maxH, window.innerHeight);
-                document.body.classList.toggle('bms-kb-open', window.visualViewport.height < maxH * 0.75);
-            };
-            window.visualViewport.addEventListener('resize', check);
-            window.addEventListener('orientationchange', function () { maxH = 0; setTimeout(function () { maxH = window.innerHeight; check(); }, 300); });
-        }
-    })();
-    </script>
-
-    <?php elseif (posSimpleModeEnabled()): ?>
+    <?php if (posSimpleModeEnabled()): ?>
     <?php
     // ── Simple POS · phone bottom navigation bar ───────────────────────────
     // On phones the header menu sits behind the ☰ button, so every action
@@ -1826,7 +1805,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
     })();
     </script>
-    <?php endif; // MM-only or posSimpleModeEnabled() bottom bar ?>
+    <?php endif; // posSimpleModeEnabled() bottom bar ?>
 
     <script>
     /* Runs synchronously — header is in the DOM, body content not yet rendered */

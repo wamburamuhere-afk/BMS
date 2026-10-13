@@ -28,8 +28,8 @@ register_shutdown_function(function () {
 });
 
 $h = (string)file_get_contents("$root/header.php");
-$simpleStart = strpos($h, '<?php elseif (posSimpleModeEnabled()): ?>');
-$simpleEnd   = strpos($h, '<?php endif; // MM-only or posSimpleModeEnabled() bottom bar ?>');
+$simpleStart = strrpos($h, '<?php if (posSimpleModeEnabled()): ?>');
+$simpleEnd   = strpos($h, '<?php endif; // posSimpleModeEnabled() bottom bar ?>');
 $sec = substr($h, (int)$simpleStart, (int)$simpleEnd - (int)$simpleStart);
 
 section('1. Lint');

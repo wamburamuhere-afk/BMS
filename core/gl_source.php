@@ -30,10 +30,6 @@ if (!function_exists('gl_source_link')) {
             'grn'     => ['grn_view',        'GRN'],        // approve_grn → receipt_id
             'payroll' => ['payroll_details', 'Payroll'],   // update_payroll_status → payroll_id
             'expense'        => ['expenses/view',       'Expense'],       // update_expense_status → expense_id
-            // 2026-09-26: Mobile Money module
-            'mm_transaction' => ['mm_transaction_view', 'MM Transaction'], // postMMTransaction → mm_txn_id
-            'mm_float_move'  => ['mm_recon_view',       'MM Float Movement'],
-            'mm_commission'  => ['mm_commissions',      'MM Commission Received'],
         ];
     }
 

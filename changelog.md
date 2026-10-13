@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-13 — fix: finish the Mobile Money removal (header parse error blocked the deploy)
+
+The removal merged earlier today (PR #2451) left `header.php` unparseable, which failed the lint job and blocked the production deploy. It also left references to deleted files that lint cannot see.
+
+- `header.php` — the Simple POS bottom bar was the `elseif` half of the deleted Mobile Money block; now a plain `if`. Leftover Mobile Money script removed.
+- `roots.php` — removed `require_once core/mm_scope.php` (deleted file: fatal on every request), `MOBILE_MONEY_DIR`, and the 17 `mm_*` routes.
+- `index.php` — removed the Mobile-Money-only landing redirect.
+- `core/permissions.php`, `core/gl_source.php`, `core/tenant_admin.php` — removed the `mm_user_agent_grants` file map entry, three `mm_*` ledger source links, and the two unused MM Simple Mode functions.
+- `migrations/tenant/2026_10_13_remove_mm_permissions.php`, `migrations/2026_10_13_remove_mm_permissions_legacy_db.php` (new) — delete the 12 `mm_*` permission rows, their role grants and the `mm_simple_mode` setting, so they stop showing in Roles & Permissions.
+- `tests/test_mm_tables_cards_cli.php` deleted (tested removed pages); `tests/test_role_permission_ui_cli.php` and `tests/test_mobile_side_menu_cli.php` updated to stop relying on Mobile Money.
+
+Verified: full-repo `php -l` clean; `roots.php` loads; dashboard, expenses and payment pages render as admin with the menu and no Mobile Money links; role-permission test 123/123, side-menu test 38/38.
+
+---
+
 ## 2026-10-13 — chore: remove Mobile Money module from BMS
 
 Mobile Money has moved to the LMS product. No real data existed in BMS.
