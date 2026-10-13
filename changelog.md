@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-13 — feat(reports): Service Sales Report; Product Analysis and service page show service sales properly (service-sales Phase 3)
+
+- **New Service Sales Report** — `app/constant/reports/service_sales_report.php` + `api/account/get_service_sales_report.php`. Per service: code (Item Code), category, quantity, documents, customers, gross, discount, net revenue, VAT, share of total, average price, last sold; totals row; Excel export and print. Charts: top services by revenue, monthly trend of the top 5, revenue by category, quoted vs invoiced with conversion rate. Filters: dates, source (invoices / POS / both), customer, category, project. Invoices count only once posted to the ledger and not cancelled; POS service sales are net of returns; lines typed by hand appear as one "Not linked" row. Project/warehouse scope applied for non-admins.
+- Registered as page key `service_sales_report` (route, file map, reports gate, Sales module). Migrations `2026_10_13_service_sales_report_permission` (tenant + legacy) create the permission and give view access to every role that can already view Product Analysis.
+- Reports menu: the link appears in the full Reports menu only; the Simple POS report list is unchanged.
+- `api/account/get_product_analysis_report.php`, `app/constant/reports/product_analysis.php` — new Products / Services filter; services show their Item Code; revenue is after line discounts; analysis starts from the sold lines, so a deleted item or a hand-typed line no longer disappears; service badge in the table.
+- `app/bms/product/service_view.php` — in full mode the service page also shows invoice sales (invoices, customers, net revenue, last invoiced), the last 10 invoices and open quotations. Simple POS mode keeps the POS-only view.
+- `lang/sw.php` — Swahili labels for the new texts.
+- Not touched: any `api/pos/*` or `app/bms/pos/*` file.
+
+Verified: `tests/test_service_sales_phase3_cli.php` (new) 23/23 — report figures (net/discount/VAT, cancelled excluded, Item Code, unlinked row, ranking, trend, quoted vs invoiced, filters, permission refused without grant), Product Analysis filter, and both full and Simple POS modes (setting switched briefly and restored); Phase 1 (38/38) and Phase 2 (30/30) tests still pass; related suites match develop.
+
+---
+
 ## 2026-10-13 — fix(sales): service form, stock rules, search, reversal links, descriptions (service-sales Phase 2)
 
 - `app/bms/product/services.php` — the edit form had two fields named `unit` with the same id and the hidden one won, so a changed unit never saved; the duplicate is removed. New optional Category field, rendered in full mode only (the Simple POS form is unchanged).
