@@ -75,6 +75,31 @@ try {
         exit();
     }
 
+    // Sales documents keep a link to the item for reporting. Deleting it would
+    // drop those sales from every product/service report, so deactivate instead.
+    // (POS sales are deliberately not checked here — POS behaviour is unchanged.)
+    foreach ([
+        'quotation_items'   => 'quotations',
+        'invoice_items'     => 'invoices',
+        'credit_note_items' => 'credit notes',
+    ] as $table => $label) {
+        try {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM `$table` WHERE product_id = ?");
+            $stmt->execute([$product_id]);
+            $used = (int)$stmt->fetchColumn();
+        } catch (PDOException $e) {
+            $used = 0; // table absent on this tenant
+        }
+        if ($used > 0) {
+            $pdo->rollBack();
+            echo json_encode([
+                'success' => false,
+                'message' => "Cannot delete: '{$product['product_name']}' appears on $used existing $label. Set it to Inactive instead so past sales stay in the reports."
+            ]);
+            exit();
+        }
+    }
+
     // Delete related stock movements
     $pdo->prepare("DELETE FROM stock_movements WHERE product_id = ?")->execute([$product_id]);
 

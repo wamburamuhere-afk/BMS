@@ -92,7 +92,7 @@ if (!function_exists('postInvoiceRevenue')) {
         $lines = [['account_id' => $ar, 'type' => 'debit', 'amount' => $grand, 'description' => $desc]];
         if ($vat && $tax > 0) {
             $lines[] = ['account_id' => (int)$rev, 'type' => 'credit', 'amount' => $revenue, 'description' => 'Sales revenue (net of VAT)'];
-            $lines[] = ['account_id' => (int)$vat, 'type' => 'credit', 'amount' => $tax,     'description' => 'Output VAT (18%)'];
+            $lines[] = ['account_id' => (int)$vat, 'type' => 'credit', 'amount' => $tax,     'description' => 'Output VAT'];
         } else {
             // No VAT (or VAT account unavailable) → full amount is revenue.
             $lines[] = ['account_id' => (int)$rev, 'type' => 'credit', 'amount' => $grand, 'description' => 'Sales revenue'];

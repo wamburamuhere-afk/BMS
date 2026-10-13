@@ -373,9 +373,14 @@ $accent = getSetting('print_template_color_inv_wave', '#164a91');
         <div class="totals">
             <div class="totals-row"><span>Subtotal:</span><span><?= $currency ?> <?= number_format($subtotal, 2) ?></span></div>
             <?php
-            $tax_amount = floatval($invoice['grand_total'] ?? 0) - $subtotal;
+            $discount_amount = floatval($invoice['discount_amount'] ?? 0);
+            // Stored header VAT (charged after line discounts); older rows fall back to the difference.
+            $tax_amount = isset($invoice['tax_amount']) ? floatval($invoice['tax_amount']) : floatval($invoice['grand_total'] ?? 0) - $subtotal + $discount_amount;
+            if ($discount_amount > 0.004): ?>
+            <div class="totals-row"><span>Discount:</span><span>- <?= $currency ?> <?= number_format($discount_amount, 2) ?></span></div>
+            <?php endif;
             if ($tax_amount > 0): ?>
-            <div class="totals-row"><span>VAT (18%):</span><span><?= $currency ?> <?= number_format($tax_amount, 2) ?></span></div>
+            <div class="totals-row"><span>VAT:</span><span><?= $currency ?> <?= number_format($tax_amount, 2) ?></span></div>
             <?php endif; ?>
             <div class="totals-row grand-total"><span>GRAND TOTAL</span><span><?= $currency ?> <?= number_format($invoice['grand_total'], 2) ?></span></div>
             <?php

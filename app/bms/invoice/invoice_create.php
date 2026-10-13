@@ -57,23 +57,9 @@ if ($order_id > 0) {
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($order) {
-        $stmt = $pdo->prepare("
-            SELECT 
-                soi.*,
-                p.product_name,
-                p.sku,
-                p.unit,
-                soi.quantity - IFNULL(SUM(ii.quantity), 0) as available_quantity
-            FROM sales_order_items soi
-            LEFT JOIN products p ON soi.product_id = p.product_id
-            LEFT JOIN invoice_items ii ON soi.order_item_id = ii.order_item_id
-            WHERE soi.order_id = ?
-            GROUP BY soi.order_item_id
-            HAVING available_quantity > 0
-        ");
-        $stmt->execute([$order_id]);
-        $order_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+        require_once ROOT_DIR . '/core/sales_invoicing.php';
+        $order_items = soInvoiceableLines($pdo, (int)$order_id);
+
         if (!$customer && $order['customer_id']) {
             $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ?");
             $stmt->execute([$order['customer_id']]);
@@ -82,6 +68,18 @@ if ($order_id > 0) {
         }
     }
 }
+
+// VAT choices for invoice lines — the same BMS standard (0% / 18%) the
+// quotation and sales-order forms offer.
+$invoice_tax_rates = [];
+foreach ($pdo->query("SELECT rate_name, rate_percentage FROM tax_rates WHERE status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC) as $tr) {
+    $pct = (float)$tr['rate_percentage'];
+    if (($pct == 0 || $pct == 18) && !isset($invoice_tax_rates[(string)$pct])) {
+        $invoice_tax_rates[(string)$pct] = ['rate' => $pct, 'label' => $tr['rate_name']];
+    }
+}
+if (!$invoice_tax_rates) $invoice_tax_rates = ['0' => ['rate' => 0, 'label' => 'No Tax'], '18' => ['rate' => 18, 'label' => 'VAT']];
+$invoice_tax_rates = array_values($invoice_tax_rates);
 
 // Get outbound Delivery Note details if provided (DN(Outbound) -> Invoice chain)
 $delivery = null;
@@ -466,6 +464,7 @@ function generate_invoice_number() {
                                         <th width="15%" class="inv-col">Quantity</th>
                                         <th width="10%" class="inv-col">Unit</th>
                                         <th width="25%" class="price-col-header">Unit Price</th>
+                                        <th width="8%">Disc %</th>
                                         <th width="10%" class="inv-col">Tax</th>
                                         <th width="10%" class="text-end item-total-col">Total</th>
                                         <th width="5%" class="text-center"></th>
@@ -501,7 +500,11 @@ function generate_invoice_number() {
                                     <span id="subtotal" class="fw-bold">0.00</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>VAT (18%):</span>
+                                    <span>Discount:</span>
+                                    <span id="discount-total" class="fw-bold text-danger">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>VAT:</span>
                                     <span id="tax-total" class="fw-bold">0.00</span>
                                 </div>
                                 <hr>
@@ -613,39 +616,65 @@ function toggleServiceInvoiceMode() {
     loadProductsCache();
 }
 
+const INVOICE_TAX_RATES = <?= json_encode($invoice_tax_rates) ?>;
+
+function escAttr(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
+// Select the option matching a VAT rate; a registered rate outside the
+// standard list is added rather than silently dropped to 0%.
+function setTaxSelect($sel, rate) {
+    const r = parseFloat(rate) || 0;
+    let match = $sel.find('option').filter(function () { return parseFloat(this.value) === r; }).first();
+    if (!match.length) {
+        match = $(`<option value="${r}">${r}%</option>`).appendTo($sel);
+    }
+    $sel.val(match.val());
+}
+
 function addItemRow(item = null) {
     const idx = itemCount++;
+    const fromOrder = !!(item && item.order_item_id);
+    const lock = fromOrder ? 'readonly' : '';
+    const remaining = fromOrder && item.remaining_quantity ? parseFloat(item.remaining_quantity) : null;
+    const taxOptions = INVOICE_TAX_RATES.map(t => `<option value="${t.rate}">${escAttr(t.label)} (${t.rate}%)</option>`).join('');
     const html = `
         <tr id="item-row-${idx}">
             <td class="ps-3">
                 <div class="input-group input-group-sm">
-                    <input type="text" class="form-control item-name" name="items[${idx}][product_name]" 
-                           value="${item ? item.product_name : ''}" placeholder="Type to search..." required
-                           oninput="openProductSearch(${idx}, this.value)"
-                           onclick="openProductSearch(${idx}, this.value)"
+                    <input type="text" class="form-control item-name" name="items[${idx}][product_name]"
+                           value="${item ? escAttr(item.product_name) : ''}" placeholder="Type to search..." required
+                           ${fromOrder ? 'readonly' : `oninput="openProductSearch(${idx}, this.value)" onclick="openProductSearch(${idx}, this.value)"`}
                            autocomplete="off">
-                    <input type="hidden" class="item-product-id" name="items[${idx}][product_id]" value="${item ? item.product_id : ''}">
-                    <button type="button" class="btn btn-outline-secondary" onclick="openProductSearch(${idx})">
+                    <input type="hidden" class="item-product-id" name="items[${idx}][product_id]" value="${item && item.product_id ? item.product_id : ''}">
+                    <input type="hidden" class="item-order-item-id" name="items[${idx}][order_item_id]" value="${fromOrder ? item.order_item_id : ''}">
+                    <input type="hidden" class="item-description" name="items[${idx}][description]" value="${item ? escAttr(item.description) : ''}">
+                    ${fromOrder ? '' : `<button type="button" class="btn btn-outline-secondary" onclick="openProductSearch(${idx})">
                         <i class="bi bi-search"></i>
-                    </button>
+                    </button>`}
                 </div>
+                ${fromOrder ? `<div class="form-text small text-primary"><i class="bi bi-link-45deg"></i> From sales order${remaining !== null ? ` — ${remaining} left to invoice` : ''}</div>` : ''}
             </td>
             <td class="inv-col">
-                <input type="number" class="form-control form-control-sm item-qty" name="items[${idx}][quantity]" 
-                       value="${item ? item.quantity : 1}" step="0.01" required onchange="calculateTotals()">
+                <input type="number" class="form-control form-control-sm item-qty" name="items[${idx}][quantity]"
+                       value="${item ? item.quantity : 1}" step="0.01" min="0.001" ${remaining !== null ? `max="${remaining}"` : ''} required onchange="calculateTotals()">
             </td>
             <td class="inv-col">
-                <input type="text" class="form-control form-control-sm item-unit" name="items[${idx}][unit]" 
-                       value="${item ? item.unit : 'pcs'}" readonly>
+                <input type="text" class="form-control form-control-sm item-unit" name="items[${idx}][unit]"
+                       value="${item && item.unit ? escAttr(item.unit) : 'pcs'}" readonly>
             </td>
             <td>
-                <input type="number" class="form-control form-control-sm item-price" name="items[${idx}][unit_price]" 
-                       value="${item ? item.unit_price : 0}" step="0.01" required onchange="calculateTotals()">
+                <input type="number" class="form-control form-control-sm item-price" name="items[${idx}][unit_price]"
+                       value="${item ? item.unit_price : 0}" step="0.01" min="0" required ${lock} onchange="calculateTotals()">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm item-discount" name="items[${idx}][discount_percent]"
+                       value="${item && item.discount_percent ? parseFloat(item.discount_percent) : 0}" step="0.01" min="0" max="100" ${lock} onchange="calculateTotals()">
             </td>
             <td class="inv-col">
-                <select class="form-select form-select-sm item-tax" name="items[${idx}][tax_rate]" onchange="calculateTotals()">
-                    <option value="0" ${item && item.tax_rate == 0 ? 'selected' : ''}>0%</option>
-                    <option value="18" ${item && item.tax_rate == 18 ? 'selected' : ''}>18%</option>
+                <select class="form-select form-select-sm item-tax" name="items[${idx}][tax_rate]" onchange="calculateTotals()" ${fromOrder ? 'style="pointer-events:none;background-color:#e9ecef" tabindex="-1"' : ''}>
+                    ${taxOptions}
                 </select>
             </td>
             <td class="text-end fw-bold item-total item-total-col">0.00</td>
@@ -655,9 +684,10 @@ function addItemRow(item = null) {
         </tr>
     `;
     $('#itemsBody').append(html);
-    
+    setTaxSelect($(`#item-row-${idx} .item-tax`), item ? (item.sales_tax_rate ?? item.tax_rate) : 0);
+
     // No column hiding — all columns remain visible in both inventory and non-inventory mode
-    
+
     calculateTotals();
 }
 
@@ -668,27 +698,33 @@ function removeItemRow(idx) {
     }
 }
 
+// Same arithmetic as api/account/save_invoice.php: VAT on the line after discount.
 function calculateTotals() {
     let subtotal = 0;
+    let discountTotal = 0;
     let taxTotal = 0;
-    
+
     $('#itemsBody tr').each(function() {
         const qty = parseFloat($(this).find('.item-qty').val()) || 0;
         const price = parseFloat($(this).find('.item-price').val()) || 0;
         const taxRate = parseFloat($(this).find('.item-tax').val()) || 0;
-        
-        const lineTotal = qty * price;
-        const lineTax = lineTotal * (taxRate / 100);
-        
-        subtotal += lineTotal;
+        const discPct = Math.min(Math.max(parseFloat($(this).find('.item-discount').val()) || 0, 0), 100);
+
+        const gross = qty * price;
+        const disc = Math.round(gross * discPct) / 100;
+        const lineTax = (gross - disc) * (taxRate / 100);
+
+        subtotal += gross;
+        discountTotal += disc;
         taxTotal += lineTax;
-        
-        $(this).find('.item-total').text(lineTotal.toFixed(2));
+
+        $(this).find('.item-total').text((gross - disc + lineTax).toFixed(2));
     });
-    
+
     $('#subtotal').text(subtotal.toFixed(2));
+    $('#discount-total').text(discountTotal.toFixed(2));
     $('#tax-total').text(taxTotal.toFixed(2));
-    $('#grand-total').text((subtotal + taxTotal).toFixed(2));
+    $('#grand-total').text((subtotal - discountTotal + taxTotal).toFixed(2));
 }
 
 function saveInvoice(status) {
@@ -811,8 +847,10 @@ function selectProduct(id) {
         if (isNaN(price)) price = 0;
         
         row.find('.item-price').val(price.toFixed(2));
-        row.find('.item-tax').val(parseInt(p.tax_rate) || 0);
-        
+        row.find('.item-description').val(p.description || '');
+        row.find('.item-order-item-id').val('');
+        setTaxSelect(row.find('.item-tax'), p.sales_tax_rate ?? p.tax_rate);
+
         $('#productSearchResults').hide();
         calculateTotals();
         row.find('.item-qty').focus();
@@ -829,7 +867,7 @@ function loadCustomerInfo() {
     }
     
     // Fetch sales orders for this customer
-    $.get('<?= getUrl('/api/account/get_sales_orders.php') ?>', { customer: customerId, status: 'approved' }, function(res) {
+    $.get('<?= getUrl('/api/account/get_sales_orders.php') ?>', { customer: customerId, status: 'approved', for_invoicing: 1 }, function(res) {
         if (res.success) {
             let options = '<option value="">Select Sales Order</option>';
             res.data.forEach(order => {
@@ -928,12 +966,16 @@ $(document).ready(function() {
     $('#itemsBody').empty();
     itemCount = 0;
     const soItems = <?= json_encode(array_map(fn($i) => [
-        'product_id'   => intval($i['product_id'] ?? 0),
-        'product_name' => $i['product_name'] ?? '',
-        'quantity'     => floatval($i['available_quantity'] ?? $i['quantity'] ?? 0),
-        'unit'         => $i['unit'] ?? 'pcs',
-        'unit_price'   => floatval($i['unit_price'] ?? 0),
-        'tax_rate'     => floatval($i['tax_rate'] ?? 0),
+        'order_item_id'      => intval($i['order_item_id']),
+        'product_id'         => intval($i['product_id'] ?? 0),
+        'product_name'       => $i['product_name'] ?? '',
+        'description'        => $i['description'] ?? '',
+        'quantity'           => floatval($i['remaining_quantity']),
+        'remaining_quantity' => floatval($i['remaining_quantity']),
+        'unit'               => $i['unit'] ?? 'pcs',
+        'unit_price'         => floatval($i['unit_price'] ?? 0),
+        'tax_rate'           => floatval($i['tax_rate'] ?? 0),
+        'discount_percent'   => floatval($i['discount_percent'] ?? 0),
     ], $order_items)) ?>;
     soItems.forEach(function(item) { addItemRow(item); });
 

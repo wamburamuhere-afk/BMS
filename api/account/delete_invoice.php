@@ -77,12 +77,17 @@ try {
     // Payable by the exact amount posted; no-op if it was never approved).
     reverseOutputVat($pdo, (int)$invoice_id);
 
+    require_once __DIR__ . '/../../core/sales_invoicing.php';
+    $billedSoIds = soIdsForInvoice($pdo, (int)$invoice_id);
+
     // Delete items
     $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
-    
+
     // Delete invoice
     $pdo->prepare("DELETE FROM invoices WHERE invoice_id = ?")->execute([$invoice_id]);
-    
+
+    soRefreshInvoicedQuantities($pdo, $billedSoIds);
+
     $pdo->commit();
 
     // Phase 3a — financial-write audit trail.

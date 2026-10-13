@@ -20,23 +20,11 @@ assertScopeForRecord('sales_orders', 'sales_order_id', $order_id);
 
 try {
     global $pdo;
-    
-    $stmt = $pdo->prepare("
-        SELECT 
-            soi.*,
-            p.product_name,
-            p.sku,
-            p.unit,
-            p.selling_price as unit_price,
-            p.tax_rate
-        FROM sales_order_items soi
-        LEFT JOIN products p ON soi.product_id = p.product_id
-        WHERE soi.order_id = ?
-    ");
-    $stmt->execute([$order_id]);
-    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode(['success' => true, 'data' => $items]);
+    require_once __DIR__ . '/../../core/sales_invoicing.php';
+
+    // The agreed price, VAT and discount come from the order line itself (not
+    // the current catalogue), and only the quantity not yet invoiced is offered.
+    echo json_encode(['success' => true, 'data' => soInvoiceableLines($pdo, $order_id)]);
 
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
