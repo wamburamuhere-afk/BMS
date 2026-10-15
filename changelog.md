@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-15 — fix(quotations): gate on quotations permission, not sales_orders
+
+**Quotation pages blocked even when role had Quotations VIEW granted** — every quotation page (`quotations.php`, `quotation_create/edit/view/form.php`) was calling `autoEnforcePermission('sales_orders')`, and the three write APIs (`save_quotation`, `delete_quotation`, `update_quotation_status`) were checking `canCreate/Edit/Delete('sales_orders')`. A role with only the Quotations row granted was blocked everywhere. `core/permissions.php` sub-page map also routed the five quotation sub-pages to `sales_orders`.
+- Changed all page gates and CRUD API checks to use `'quotations'`
+- Updated `core/permissions.php` sub-page map: `quotation_create/edit/view/form.php` and `print_quotation.php` → `'quotations'`
+- Review/approve workflow intentionally stays on `canReview/canApprove('sales_orders')` (Option A — controlled by the Sales Orders row as shown in the permissions UI)
+
+---
+
 ## 2026-10-15 — fix(test): update Sales-Invoices CI assertion for data-nav-companion
 
 - `tests/test_service_print_columns_cli.php` — the assertion that checked the Sales-menu Invoices link pattern used a regex that expected `<a class="dropdown-item" href=...` immediately after the canView gate; our change added a PHP comment and `data-nav-companion` attribute, so the regex was loosened to allow optional PHP comment tags between the gate and the `<li>`, and any attributes on the `<a>`. All 244 assertions pass.
