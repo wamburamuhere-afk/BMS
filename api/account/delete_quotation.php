@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-if (!canDelete('sales_orders')) {
+if (!canDelete('quotations')) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to delete quotations']);
     exit;

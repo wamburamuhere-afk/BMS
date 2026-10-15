@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-if (!canEdit('sales_orders')) {
+if (!canEdit('quotations')) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to update quotation status']);
     exit;

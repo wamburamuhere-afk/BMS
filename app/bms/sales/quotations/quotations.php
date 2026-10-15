@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../../../../roots.php';
 
 // Enforce permission BEFORE any output
-autoEnforcePermission('sales_orders');
+autoEnforcePermission('quotations');
 
 includeHeader();
 

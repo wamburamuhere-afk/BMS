@@ -6,6 +6,6 @@
 require_once __DIR__ . '/../../../../roots.php';
 
 // Phase 5a — defense-in-depth: gate the entry point. quotation_form.php gates again.
-autoEnforcePermission('sales_orders');
+autoEnforcePermission('quotations');
 
 require_once __DIR__ . '/quotation_form.php';

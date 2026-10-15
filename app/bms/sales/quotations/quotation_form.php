@@ -7,7 +7,7 @@
 // no stock blocking, no "switch to sales order".
 require_once __DIR__ . '/../../../../roots.php';
 
-autoEnforcePermission('sales_orders');
+autoEnforcePermission('quotations');
 
 global $pdo;
 
