@@ -115,6 +115,50 @@ try {
     error_log('service_view sales: ' . $e->getMessage());
 }
 
+// ── Invoice sales and open quotations (full mode only) ─────────────────────
+// Simple POS shops sell through the POS only, so their page stays as above.
+// Invoices count once posted to the ledger and not cancelled — the same rule
+// as the Service Sales Report.
+$showDocSales = !posSimpleModeEnabled();
+$svc_inv = ['invoices' => 0, 'customers' => 0, 'qty' => 0.0, 'net' => 0.0, 'last' => null];
+$svc_inv_recent = [];
+$svc_open_quotes = [];
+if ($showDocSales) {
+    try {
+        $invScope = scopeFilterSqlNullable('project', 'i') . scopeFilterSqlNullable('warehouse', 'i');
+        $hasLineDisc = (bool)$pdo->query("SHOW COLUMNS FROM invoice_items LIKE 'discount_amount'")->fetch();
+        $netExpr = $hasLineDisc ? "ii.quantity * ii.unit_price - COALESCE(ii.discount_amount, 0)" : "ii.quantity * ii.unit_price";
+        $posted = "i.status <> 'cancelled' AND EXISTS (SELECT 1 FROM journal_entries je WHERE je.entity_type = 'invoice' AND je.entity_id = i.invoice_id AND je.status = 'posted')";
+        $iq = $pdo->prepare("SELECT COUNT(DISTINCT i.invoice_id) AS invoices, COUNT(DISTINCT i.customer_id) AS customers,
+                                    COALESCE(SUM(ii.quantity), 0) AS qty, COALESCE(SUM($netExpr), 0) AS net, MAX(i.invoice_date) AS last
+                               FROM invoice_items ii JOIN invoices i ON i.invoice_id = ii.invoice_id
+                              WHERE ii.product_id = ? AND $posted" . $invScope);
+        $iq->execute([$product_id]);
+        $ir = $iq->fetch(PDO::FETCH_ASSOC) ?: [];
+        $svc_inv = ['invoices' => (int)($ir['invoices'] ?? 0), 'customers' => (int)($ir['customers'] ?? 0),
+                    'qty' => (float)($ir['qty'] ?? 0), 'net' => (float)($ir['net'] ?? 0), 'last' => $ir['last'] ?? null];
+        $ir2 = $pdo->prepare("SELECT i.invoice_id, i.invoice_number, i.invoice_date, c.customer_name,
+                                     ii.quantity, ($netExpr) AS net
+                                FROM invoice_items ii JOIN invoices i ON i.invoice_id = ii.invoice_id
+                                LEFT JOIN customers c ON c.customer_id = i.customer_id
+                               WHERE ii.product_id = ? AND $posted" . $invScope . "
+                            ORDER BY i.invoice_date DESC, i.invoice_id DESC LIMIT 10");
+        $ir2->execute([$product_id]);
+        $svc_inv_recent = $ir2->fetchAll(PDO::FETCH_ASSOC);
+        $oq = $pdo->prepare("SELECT q.sales_order_id, q.order_number, q.order_date, q.status, c.customer_name,
+                                    qi.quantity * qi.unit_price * (1 - COALESCE(qi.discount_percent, 0) / 100) AS net
+                               FROM quotation_items qi JOIN quotations q ON q.sales_order_id = qi.order_id
+                               LEFT JOIN customers c ON c.customer_id = q.customer_id
+                              WHERE qi.product_id = ? AND q.status IN ('draft','pending','reviewed','approved') AND q.converted_to_so_id IS NULL"
+                              . scopeFilterSqlNullable('project', 'q') . "
+                           ORDER BY q.order_date DESC, q.sales_order_id DESC LIMIT 10");
+        $oq->execute([$product_id]);
+        $svc_open_quotes = $oq->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('service_view invoice sales: ' . $e->getMessage());
+    }
+}
+
 // Global company name for branding
 $display_company_name = $GLOBALS['DISPLAY_COMPANY_NAME'] ?? 'BUSINESS MANAGEMENT SYSTEM';
 $company_logo = getSetting('company_logo', '');
@@ -530,6 +574,73 @@ $company_logo = getSetting('company_logo', '');
             <?php endif; ?>
         </div>
     </div>
+
+    <?php if ($showDocSales): ?>
+    <!-- Invoice sales and open quotations (full mode only) -->
+    <h6 class="fw-bold text-primary mb-2"><i class="bi bi-file-earmark-text me-2"></i><?= t('Invoice Sales') ?></h6>
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= (int)$svc_inv['invoices'] ?></div><div class="small text-muted"><?= t('Invoices') ?></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= (int)$svc_inv['customers'] ?></div><div class="small text-muted"><?= t('Customers') ?></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= format_currency($svc_inv['net']) ?></div><div class="small text-muted"><?= t('Net Revenue') ?></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-2 h-100">
+            <div class="fs-6 fw-bold text-primary"><?= $svc_inv['last'] ? format_date($svc_inv['last']) : '—' ?></div><div class="small text-muted"><?= t('Last Invoiced') ?></div></div></div>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-7"><div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i><?= t('Recent Invoices (Last 10)') ?></h6></div>
+            <div class="card-body p-0">
+                <?php if ($svc_inv_recent): ?>
+                <div class="table-responsive"><table class="table table-hover align-middle mb-0" id="svcRecentInvoices">
+                    <thead class="bg-light small text-uppercase"><tr>
+                        <th style="width:50px;"><?= t('S/NO') ?></th><th><?= t('Date') ?></th><th><?= t('Invoice') ?></th><th><?= t('Customer') ?></th>
+                        <th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Net') ?></th></tr></thead>
+                    <tbody>
+                        <?php foreach ($svc_inv_recent as $i => $iv): ?>
+                        <tr>
+                            <td><?= $i + 1 ?></td>
+                            <td class="text-nowrap"><?= format_date($iv['invoice_date']) ?></td>
+                            <td><a href="<?= getUrl('invoice_view') ?>?id=<?= (int)$iv['invoice_id'] ?>" class="text-decoration-none"><?= caseFormat($iv['invoice_number']) ?></a></td>
+                            <td><?= !empty($iv['customer_name']) ? caseFormat($iv['customer_name']) : '—' ?></td>
+                            <td class="text-end"><?= format_number($iv['quantity'], 2) ?></td>
+                            <td class="text-end fw-bold text-nowrap"><?= format_currency($iv['net']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table></div>
+                <?php else: ?>
+                <p class="text-center text-muted py-4 mb-0"><?= t('Not invoiced yet') ?></p>
+                <?php endif; ?>
+            </div>
+        </div></div>
+        <div class="col-12 col-lg-5"><div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-file-text me-2"></i><?= t('Open Quotations') ?></h6></div>
+            <div class="card-body p-0">
+                <?php if ($svc_open_quotes): ?>
+                <div class="table-responsive"><table class="table table-hover align-middle mb-0" id="svcOpenQuotes">
+                    <thead class="bg-light small text-uppercase"><tr>
+                        <th><?= t('Quotation') ?></th><th><?= t('Customer') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Value') ?></th></tr></thead>
+                    <tbody>
+                        <?php foreach ($svc_open_quotes as $q): ?>
+                        <tr>
+                            <td><a href="<?= getUrl('quotation_view') ?>?id=<?= (int)$q['sales_order_id'] ?>" class="text-decoration-none"><?= caseFormat($q['order_number']) ?></a>
+                                <div class="small text-muted"><?= format_date($q['order_date']) ?></div></td>
+                            <td><?= !empty($q['customer_name']) ? caseFormat($q['customer_name']) : '—' ?></td>
+                            <td><span class="badge" style="background:#cfe2ff;color:#084298"><?= htmlspecialchars(t(ucfirst($q['status']))) ?></span></td>
+                            <td class="text-end fw-bold text-nowrap"><?= format_currency($q['net']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table></div>
+                <?php else: ?>
+                <p class="text-center text-muted py-4 mb-0"><?= t('No open quotations') ?></p>
+                <?php endif; ?>
+            </div>
+        </div></div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <script>

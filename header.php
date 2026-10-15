@@ -1472,6 +1472,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                     <div class="col-lg-3 mega-column">
                                         <h6><?= t('Business Reports') ?></h6>
                                         <?php if(canView('sales_report')): ?><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> <?= t('Sales Report') ?></a><?php endif; ?>
+                                        <?php if(canView('service_sales_report')): ?><a class="dropdown-item" href="<?= getUrl('service_sales_report') ?>"><i class="bi bi-briefcase"></i> <?= t('Service Sales Report') ?></a><?php endif; ?>
                                         <?php if(canView('purchase_report')): ?><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> <?= t('Purchase Report') ?></a><?php endif; ?>
                                         <?php if(canView('received_invoices')): ?><a class="dropdown-item" href="<?= getUrl('po_invoice_report') ?>"><i class="bi bi-clipboard-data"></i> <?= t('PO vs Invoice Report') ?></a><?php endif; ?>
                                         <?php if(canView('inventory_report')): ?><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> <?= t('Inventory Report') ?></a><?php endif; ?>
