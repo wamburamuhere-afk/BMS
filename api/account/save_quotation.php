@@ -27,13 +27,13 @@ $quotation_id = isset($_POST['quotation_id']) ? intval($_POST['quotation_id']) :
 $is_update = ($quotation_id > 0);
 
 if ($is_update) {
-    if (!canEdit('sales_orders')) {
+    if (!canEdit('quotations')) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to edit quotations']);
         exit;
     }
 } else {
-    if (!canCreate('sales_orders')) {
+    if (!canCreate('quotations')) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to create quotations']);
         exit;

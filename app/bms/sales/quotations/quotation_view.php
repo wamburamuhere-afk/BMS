@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 
-autoEnforcePermission('sales_orders');
+autoEnforcePermission('quotations');
 
 global $pdo;
 
