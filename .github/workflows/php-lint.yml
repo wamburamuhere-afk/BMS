@@ -169,3 +169,4 @@ jobs:
           php tests/test_subscription_payment_cli.php
           php tests/test_tenant_migration_health_cli.php
           php tests/test_service_price_terms_cli.php
+          php tests/test_document_line_terms_cli.php

@@ -291,3 +291,118 @@ if (!function_exists('vssSet')) {
         }
     }
 }
+
+/* ── Document lines (Quotation / Sales Order / Invoice) ────────────────────── */
+
+if (!defined('SPT_LINE_TABLES')) {
+    // table => primary key. convert_quote_to_order.php copies every quotation-line
+    // column into sales_order_items, so all three must always gain these together.
+    define('SPT_LINE_TABLES', ['quotation_items' => 'order_item_id', 'sales_order_items' => 'order_item_id', 'invoice_items' => 'invoice_item_id']);
+}
+
+if (!function_exists('sptEnsureLineColumns')) {
+    function sptEnsureLineColumns(PDO $pdo): void
+    {
+        $cols = [
+            'price_term_id'       => "ADD COLUMN `price_term_id` INT UNSIGNED NULL DEFAULT NULL",
+            'price_term_label'    => "ADD COLUMN `price_term_label` VARCHAR(100) NULL DEFAULT NULL",
+            'term_duration_value' => "ADD COLUMN `term_duration_value` INT UNSIGNED NULL DEFAULT NULL",
+            'term_duration_unit'  => "ADD COLUMN `term_duration_unit` VARCHAR(10) NULL DEFAULT NULL",
+        ];
+        foreach (array_keys(SPT_LINE_TABLES) as $t) {
+            if (!$pdo->query("SHOW TABLES LIKE " . $pdo->quote($t))->fetch()) continue;
+            foreach ($cols as $c => $ddl) {
+                if ($pdo->query("SHOW COLUMNS FROM `$t` LIKE " . $pdo->quote($c))->fetch()) continue;
+                try {
+                    $pdo->exec("ALTER TABLE `$t` $ddl");
+                    echo "  + $t.$c added\n";
+                } catch (PDOException $e) {
+                    if ((int)($e->errorInfo[1] ?? 0) !== 1060) throw $e;   // a concurrent run added it
+                }
+            }
+        }
+    }
+}
+
+if (!function_exists('sptLineColumnsReady')) {
+    function sptLineColumnsReady(PDO $pdo, string $table): bool
+    {
+        static $ready = [];
+        if (!empty($ready[$table])) return true;
+        try {
+            return $ready[$table] = (bool)$pdo->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "` LIKE 'term_duration_unit'")->fetch();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+}
+
+if (!function_exists('sptStripTermLine')) {
+    /** Remove a previous "Term: …" line the form or server appended. */
+    function sptStripTermLine(?string $description): string
+    {
+        $d = preg_replace('/(^|\R)Term: [^\r\n]*/u', '', (string)$description);
+        return trim((string)$d);
+    }
+}
+
+if (!function_exists('sptResolveLineTerm')) {
+    /**
+     * The term recorded on one document line, read from the DATABASE (never the
+     * browser): it must belong to the line's product and not be deleted (an
+     * inactive term is still accepted, so an older document can be re-saved).
+     * The description ends with "Term: <label>" so every existing print shows it.
+     *
+     * @return array{price_term_id:?int, price_term_label:?string, term_duration_value:?int, term_duration_unit:?string, description:string}
+     * @throws InvalidArgumentException
+     */
+    function sptResolveLineTerm(PDO $pdo, $productId, $termId, ?string $description, string $lineName = 'a line'): array
+    {
+        $none = ['price_term_id' => null, 'price_term_label' => null, 'term_duration_value' => null,
+                 'term_duration_unit' => null, 'description' => trim((string)$description)];
+        $termId = (int)$termId;
+        if ($termId <= 0 || !sptReady($pdo)) return $none;
+
+        $st = $pdo->prepare("SELECT term_id, product_id, term_label, duration_value, duration_unit
+                               FROM service_price_terms WHERE term_id = ? AND status <> 'deleted'");
+        $st->execute([$termId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t || (int)$t['product_id'] !== (int)$productId) {
+            throw new InvalidArgumentException("The term chosen for $lineName does not belong to that service. Choose the term again.");
+        }
+        $desc = sptStripTermLine($description);
+        return [
+            'price_term_id'       => (int)$t['term_id'],
+            'price_term_label'    => $t['term_label'],
+            'term_duration_value' => (int)$t['duration_value'],
+            'term_duration_unit'  => $t['duration_unit'],
+            'description'         => ($desc !== '' ? $desc . "\n" : '') . 'Term: ' . $t['term_label'],
+        ];
+    }
+}
+
+if (!function_exists('sptStampLine')) {
+    /** Write the resolved term onto a just-inserted line (no-op without a term or before the migration). */
+    function sptStampLine(PDO $pdo, string $table, int $lineId, array $resolved): void
+    {
+        if ($lineId <= 0 || empty($resolved['price_term_id']) || !isset(SPT_LINE_TABLES[$table])) return;
+        if (!sptLineColumnsReady($pdo, $table)) return;
+        $pk = SPT_LINE_TABLES[$table];
+        $pdo->prepare("UPDATE `$table` SET price_term_id = ?, price_term_label = ?, term_duration_value = ?, term_duration_unit = ?
+                        WHERE `$pk` = ?")
+            ->execute([$resolved['price_term_id'], $resolved['price_term_label'], $resolved['term_duration_value'],
+                       $resolved['term_duration_unit'], $lineId]);
+    }
+}
+
+if (!function_exists('sptTermOfSalesOrderLine')) {
+    /** The term recorded on a sales-order line — an invoice raised from it inherits it. */
+    function sptTermOfSalesOrderLine(PDO $pdo, int $orderItemId): ?int
+    {
+        if ($orderItemId <= 0 || !sptLineColumnsReady($pdo, 'sales_order_items')) return null;
+        $st = $pdo->prepare("SELECT price_term_id FROM sales_order_items WHERE order_item_id = ?");
+        $st->execute([$orderItemId]);
+        $v = $st->fetchColumn();
+        return $v ? (int)$v : null;
+    }
+}

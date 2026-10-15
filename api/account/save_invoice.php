@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/service_price_terms.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/vat.php';
 require_once __DIR__ . '/../../core/workflow.php';          // workflowActorSnapshot / CaptureSignature
@@ -271,12 +272,20 @@ try {
 
     foreach ($items as $key => $item) {
         $l = $lines[$key];
+        // Optional price term — verified against the DB; a line raised from a
+        // sales-order line inherits that line's term.
+        $termId = $item['price_term_id'] ?? null;
+        if (empty($termId) && !empty($item['order_item_id'])) {
+            $termId = sptTermOfSalesOrderLine($pdo, (int)$item['order_item_id']);
+        }
+        $term = sptResolveLineTerm($pdo, $item['product_id'] ?? null, $termId,
+            (string)($item['description'] ?? ''), trim((string)($item['product_name'] ?? '')) ?: 'a line');
         $row = [
             $invoice_id,
             !empty($item['order_item_id']) ? (int)$item['order_item_id'] : null,
             !empty($item['product_id']) ? (int)$item['product_id'] : null,
             $item['product_name'],
-            $item['description'] ?? '',
+            $term['description'],
             $l['qty'],
             $item['unit'] ?? 'pcs',
             $l['price'],
@@ -289,6 +298,7 @@ try {
         }
         $row[] = $l['line_total'];
         $itemStmt->execute($row);
+        sptStampLine($pdo, 'invoice_items', (int)$pdo->lastInsertId(), $term);
     }
 
     soRefreshInvoicedQuantities($pdo, array_merge($priorSoIds, $touchedSoIds, $order_id ? [(int)$order_id] : []));

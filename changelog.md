@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-15 — feat(sales) Phase 2: choose the price term on Quotation / Sales Order / Invoice lines
+
+**A service priced by term asks "which term?" on documents and takes that term's price** (workflows and statuses unchanged)
+- `migrations/tenant/2026_10_15_document_line_price_terms.php` + `_legacy_db` mirror — `price_term_id`, `price_term_label`, `term_duration_value`, `term_duration_unit` (nullable) on `quotation_items`, `sales_order_items` and `invoice_items` together (`convert_quote_to_order.php` copies every quotation-line column into the sales order).
+- `core/service_price_terms.php` — `sptResolveLineTerm()` checks the chosen term against the DATABASE (must belong to that line's service; never trusts the browser), snapshots label + length, and ends the description with one "Term: <label>" line so every existing print shows it with no template change; `sptStampLine()`; `sptTermOfSalesOrderLine()`.
+- `api/account/save_quotation.php`, `save_sales_order.php`, `save_invoice.php` — record the term per line; a wrong term rejects the whole document (rolled back). An invoice line raised from a sales-order line inherits that line's term. Lines without a term are stored exactly as before; old/mobile clients that send no term keep working.
+- `assets/js/line_price_terms.js` (new) + `includes/line_price_terms_js.php` — the Term select (Select2) under the item name; choosing a term sets price + description; reopening a saved document restores its term without overwriting a negotiated price; saving is blocked until a term is chosen. Wired into `quotation_form.php`, `sales_order_create.php`, `sales_order_edit.php`, `invoice_create.php`, `invoice_edit.php`.
+- `tests/test_document_line_terms_cli.php` (new, 31; 13 in CI) — quotation → convert → sales order → invoice through the real endpoints, wrong-term refusal + rollback, term switch without duplicate Term lines, snapshot history, used terms kept inactive. Ledger entries the test creates are removed.
+
+Verified: 31/31; the 17 existing quotation/sales-order/invoice suites give identical results on this branch and on a clean `origin/main` (`test_invoice_three_approval_cli` and `test_lpo_module_cli` fail the same 2 checks on both). Checked in Chrome on rendered pages: the service-terms editor and the quotation line Term select work with no JavaScript errors.
+
+**Noticed, not changed:** `app/bms/invoice/invoice_edit.php` rows have no description or sales-order-link fields, so re-saving an invoice from the edit page clears line descriptions and order links (pre-existing).
+
+---
+
 ## 2026-10-15 — feat(services) Phase 1: optional price by term on services
 
 **A service can be priced by term** (instruction: register services as now, plus an optional, not hardcoded "price over time"; when filled, the selling price is "choose a term"; Service Details shows the terms and hides the materials table when there are none)
