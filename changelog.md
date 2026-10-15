@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-15 — feat(services) Phase 1: optional price by term on services
+
+**A service can be priced by term** (instruction: register services as now, plus an optional, not hardcoded "price over time"; when filled, the selling price is "choose a term"; Service Details shows the terms and hides the materials table when there are none)
+- `core/service_price_terms.php` (new) — `service_price_terms` (any label, length in days/weeks/months/years, price, description, default) and `vendor_subscription_services`. Validation (`sptParse`), save/sync (`sptSave`): a term removed from the form is soft-deleted, or kept `inactive` if a document already used it. A service with terms stores its default term's price in `selling_price` and its cheapest in `min_selling_price`, so POS (which enforces the minimum), lists and reports keep reading one number.
+- `migrations/tenant/2026_10_15_service_price_terms.php` + `migrations/2026_10_15_service_price_terms_legacy_db.php` — creates both tables (idempotent). No column added to `products`.
+- `api/create_nip_product.php`, `api/update_nip_product.php` — accept `price_terms` in the same transaction; a form that doesn't send terms leaves them alone (and the price is re-synced to the default term). The "BMS system subscription" flag is accepted only on the platform root (`isPlatformVendorContext()`), and requires month/year terms.
+- `api/account/get_service_price_terms.php` (new) — one service's terms for the Edit form. `api/account/get_products.php` — adds `has_price_terms` + `price_terms` for the document forms (next phase).
+- `app/bms/product/services.php` + `includes/service_price_terms_editor.php` (new) — "Price by term (optional)" editor in the full Add/Edit form (S/NO, term name, length, price, description, default; selling price becomes read-only "Depends on term"); list shows "From TSh x · N terms". The Simple POS short form is untouched.
+- `app/bms/product/service_view.php` — "Price by term" card; the Material Components table appears only when the service has materials (otherwise an "Add Materials" link in Assembly Information).
+- `tests/test_service_price_terms_cli.php` (new, 47; 16 in CI) — validation, the real create/update/read endpoints, the vendor-only flag, and the rendered pages in full and Simple POS modes.
+
+Verified: 47/47 locally; the existing service suites (`test_service_sales_phase1-3`, `test_service_print_columns`) pass; `test_services_simple_pos_cli` (a `nipDuplicateName()` redeclare in its own harness) and `test_pos_detail_pages_cli` (117/2) fail identically on a clean `origin/main`.
+
+---
+
 ## 2026-10-15 — feat(subscriptions) Phase 0: one payment path for tenant subscriptions; migration-health badge fixed
 
 **Groundwork for BJP's customer-subscription flow** (plan: `customer_subscription_plan.md`)

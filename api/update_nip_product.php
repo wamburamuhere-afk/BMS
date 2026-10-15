@@ -2,6 +2,8 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/code_generator.php';
+require_once __DIR__ . '/../core/service_price_terms.php';
+require_once __DIR__ . '/../core/vendor_context.php';
 global $pdo;
 
 // A second active service with the same name in the same place (one shop, or
@@ -40,6 +42,12 @@ try {
     $cols = $pdo->query("SHOW COLUMNS FROM products")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('project_id', $cols)) {
         $pdo->exec("ALTER TABLE products ADD COLUMN project_id INT NULL DEFAULT NULL");
+    }
+
+    // Optional price-by-term. null = the form did not send terms (leave them as they are).
+    $price_terms = sptParse($_POST['price_terms'] ?? null);
+    if ($price_terms && !sptReady($pdo)) {
+        throw new Exception('Price terms are not available yet — the database update has not run. Save without terms or try again shortly.');
     }
 
     $pdo->beginTransaction();
@@ -136,6 +144,27 @@ try {
                 floatval($comp['total_qty'] ?? 1)
             ]);
         }
+    }
+
+    // 3. Price terms. Whether or not this form sent them, a service that has
+    // terms keeps selling_price = its default term and min = its cheapest term.
+    if ($price_terms !== null && sptReady($pdo)) {
+        sptSave($pdo, $product_id, $price_terms, (int)$user_id);
+    }
+    $active_terms = sptForProduct($pdo, $product_id);
+    if ($active_terms) {
+        $def = $active_terms[0]['price']; $min = null;
+        foreach ($active_terms as $t) {
+            if ((int)$t['is_default'] === 1) $def = $t['price'];
+            $min = $min === null ? (float)$t['price'] : min($min, (float)$t['price']);
+        }
+        $pdo->prepare("UPDATE products SET selling_price = ?, min_selling_price = ? WHERE product_id = ?")
+            ->execute([$def, $min, $product_id]);
+    }
+    // The subscription flag exists only on the platform root, and only when the
+    // form rendered it (so an edit from elsewhere never clears it by omission).
+    if (isPlatformVendorContext() && !empty($_POST['subscription_flag_sent'])) {
+        vssSet($pdo, $product_id, !empty($_POST['is_subscription']), $active_terms, (int)$user_id);
     }
 
     $pdo->commit();
