@@ -7,6 +7,7 @@ if (is_file(__DIR__ . '/core/ai_service.php')) require_once __DIR__ . '/core/ai_
 // posSimpleModeEnabled() — Reports/Finance menus collapse to a shopkeeper-simple
 // view when a tenant turns this on (POS Settings). See pos_config_settings.php.
 require_once __DIR__ . '/core/pos_nav.php';
+require_once __DIR__ . '/core/nav_menu.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -965,12 +966,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <div class="header-nav-bar w-100">
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <!-- Core Modules -->
-                        <?php if(canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="coreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-house"></i> <?= posSimpleModeEnabled() ? t('My Business') : t('Core') ?>
-                            </a>
+                        <!-- Core Modules — every group below is rendered by bmsNavMenu()
+                             (core/nav_menu.php): 0 granted links = hidden, 1 = direct header
+                             link, 2+ = dropdown. Simple POS mode keeps each group's original gate. -->
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="coreDropdown">
                                 <li><h6 class="dropdown-header"><?= posSimpleModeEnabled() ? t('My Business') : t('Business Core') ?></h6></li>
                                 <?php if(canView('dashboard')): ?>
@@ -983,17 +982,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> <?= t('Suppliers') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('suppliers') && tenantFeatureEnabled('projects')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> <?= t('Sub-Contractors') ?></a></li>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> <?= t('Sub-Contractors') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= wLabel('Inventory Products', 'Shop Products') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Service') ?></a></li>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Service') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'coreDropdown',
+                            '<i class="bi bi-house"></i> ' . (posSimpleModeEnabled() ? t('My Business') : t('Core')),
+                            canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')); ?>
 
                         <!-- Financial Modules -->
                         <?php
@@ -1013,11 +1013,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         $financeModuleOpen = !posSimpleModeEnabled()
                             && (canView('expenses') || canView('budget') || canView('chart_of_accounts') || canView('bank_accounts') || canView('cash_register'));
                         ?>
-                        <?php if($financeModuleOpen): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="financeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-cash-stack"></i> <?= t('Finance') ?>
-                            </a>
+                        <?php if(!posSimpleModeEnabled()): ?>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="financeDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Accounting') ?></h6></li>
                                 <?php if(canView('expenses')): ?>
@@ -1057,7 +1054,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><h6 class="dropdown-header"><?= t('Sales & Purchases') ?></h6></li>
                                 <?php if(canView('invoices')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('receive_payment') ?>"><i class="bi bi-cash-stack"></i> <?= t('Receive Payment') ?></a></li>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('receive_payment') ?>"><i class="bi bi-cash-stack"></i> <?= t('Receive Payment') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('purchase_orders')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i> <?= t('Purchase Orders') ?></a></li>
@@ -1066,7 +1063,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('payment_vouchers') ?>"><i class="bi bi-credit-card"></i> <?= t('Payment Vouchers') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
+                        <?php bmsNavMenu(ob_get_clean(), 'financeDropdown', '<i class="bi bi-cash-stack"></i> ' . t('Finance'), $financeModuleOpen); ?>
                         <?php elseif(canView('expenses')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('expenses') ?>">
@@ -1076,11 +1073,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- CRM -->
-                        <?php if(canView('crm_dashboard') || canView('crm_leads') || canView('crm_pipeline')): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="crmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-funnel"></i> <?= t('CRM') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="crmDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Customer Relations') ?></h6></li>
                                 <?php if(canView('crm_dashboard')): ?>
@@ -1093,11 +1086,11 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline') ?>"><i class="bi bi-kanban me-1"></i><?= t('Pipeline Board') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('crm_pipeline')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline_stages') ?>"><i class="bi bi-gear me-1"></i><?= t('Pipeline Stages') ?></a></li>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('crm/pipeline_stages') ?>"><i class="bi bi-gear me-1"></i><?= t('Pipeline Stages') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'crmDropdown', '<i class="bi bi-funnel"></i> ' . t('CRM'),
+                            canView('crm_dashboard') || canView('crm_leads') || canView('crm_pipeline')); ?>
 
                         <!-- Sales -->
                         <?php
@@ -1108,13 +1101,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         // buried inside a "Sales" dropdown that would otherwise exist
                         // only to hold it. Once Sales is open again, POS moves back
                         // inside it as before.
+                        // (That flagship gate now applies in Simple POS mode only; otherwise
+                        // bmsNavMenu() shows Sales as soon as any of its pages is granted,
+                        // and POS alone still collapses to the same direct link.)
                         $salesModuleOpen = canView('sales_orders');
                         ?>
-                        <?php if($salesModuleOpen): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-cart"></i> <?= t('Sales') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="salesDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Sales Operations') ?></h6></li>
                                 <?php if(canView('quotations')): ?>
@@ -1133,7 +1125,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('invoices')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
+                                <?php // companion: Invoices' own header entry lives under Finance, so it is not counted here (no duplicate direct link) ?>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header"><?= t('Returns') ?></h6></li>
                                 <?php if(canView('sales_returns')): ?>
@@ -1143,8 +1136,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('credit_notes') ?>"><i class="bi bi-receipt"></i> <?= t('Credit Notes') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php elseif(canView('pos')): ?>
+                        <?php $__sales_shown = bmsNavMenu(ob_get_clean(), 'salesDropdown', '<i class="bi bi-cart"></i> ' . t('Sales'), $salesModuleOpen); ?>
+                        <?php if(!$__sales_shown && canView('pos')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('pos') ?>">
                                 <i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?>
@@ -1182,16 +1175,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
                         <?php else: ?>
-                        <?php if(canView('products') || canView('warehouses')): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-boxes"></i> <?= wLabel('Inventory', 'Shop') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="inventoryDropdown">
                                 <li><h6 class="dropdown-header"><?= wLabel('Stock Management', 'Shop Management') ?></h6></li>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= wLabel('Inventory Products', 'Shop Products') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Services') ?></a></li>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Services') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('categories')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Categories') ?></a></li>
@@ -1210,16 +1199,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('locations') ?>"><i class="bi bi-geo-alt"></i> <?= t('Locations') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'inventoryDropdown', '<i class="bi bi-boxes"></i> ' . wLabel('Inventory', 'Shop'),
+                            canView('products') || canView('warehouses')); ?>
                         <?php endif; ?>
 
                         <!-- Purchases -->
-                        <?php if (!posSimpleModeEnabled() && (canView('suppliers')|| canView('rfq') || canView('purchase_orders') || canView('tenders'))): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="purchasesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-basket"></i> <?= t('Procurement') ?>
-                            </a>
+                        <?php if (!posSimpleModeEnabled()): ?>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="purchasesDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Procurement') ?></h6></li>
 
@@ -1234,7 +1220,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i><?= t('Purchase Order') ?></a></li>
                                 <?php endif; ?>
                                  <?php if(canView('grn')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>"><i class="bi bi-file-earmark-check"></i> <?= t('DN') ?></a></li>
+                                <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('delivery_notes') ?>"><i class="bi bi-file-earmark-check"></i> <?= t('DN') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('grn')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('grn') ?>"><i class="bi bi-check-square"></i> <?= t('GRN') ?></a></li>
@@ -1255,15 +1241,11 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('tenders') ?>"><i class="bi bi-clipboard-check"></i> <?= t('Tenders') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
+                        <?php bmsNavMenu(ob_get_clean(), 'purchasesDropdown', '<i class="bi bi-basket"></i> ' . t('Procurement'), false); ?>
                         <?php endif; ?>
-                        
+
                         <!-- Operations -->
-                        <?php if(canView('employees') || canView('assets')): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="operationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-gear"></i> <?= t('Operations') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="operationsDropdown">
                                 <?php if(canView('hr_dashboard') || canView('employees') || canView('employee_lifecycle') || canView('employee_contracts') || canView('org_chart')): ?>
                                 <li><h6 class="dropdown-header"><?= t('Workforce') ?></h6></li>
@@ -1351,8 +1333,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('maintenance') ?>"><i class="bi bi-tools"></i> <?= t('Maintenance') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'operationsDropdown', '<i class="bi bi-gear"></i> ' . t('Operations'),
+                            canView('employees') || canView('assets')); ?>
                         
                         <!-- Projects -->
                         <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
@@ -1364,11 +1346,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- Comms -->
-                        <?php if(canView('message_center') || canView('notification_center') || canView('ai_assistant')): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="communicationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-chat"></i> <?= t('Comms') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="communicationDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Communication') ?></h6></li>
                                 <?php if(canView('ai_assistant') && function_exists('aiConfigured') && aiConfigured()): ?>
@@ -1391,8 +1369,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('leads') ?>"><i class="bi bi-person-plus"></i> <?= t('Leads') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'communicationDropdown', '<i class="bi bi-chat"></i> ' . t('Comms'),
+                            canView('message_center') || canView('notification_center') || canView('ai_assistant')); ?>
 
                         <!-- Docs — 'audit_logs' is deliberately NOT part of this menu's gate: it is an
                              always-on report (not tied to the 'documents'/'compliance' features), and
@@ -1403,11 +1381,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         $show_doc_mgmt = canView('document_library') || canView('document_templates') || canView('e_signatures');
                         $show_doc_compliance = canView('compliance_documents');
                         ?>
-                        <?php if($show_doc_mgmt || $show_doc_compliance): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="documentsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-files"></i> <?= t('Docs') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="documentsDropdown">
                                 <?php if($show_doc_mgmt): ?>
                                 <li><h6 class="dropdown-header"><?= t('Document Management') ?></h6></li>
@@ -1426,8 +1400,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('compliance_documents') ?>"><i class="bi bi-shield-check"></i> <?= t('Compliance') ?></a></li>
                                 <?php endif; ?>
                             </ul>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'documentsDropdown', '<i class="bi bi-files"></i> ' . t('Docs'),
+                            $show_doc_mgmt || $show_doc_compliance); ?>
 
                         <!-- Customer Visits (marketing) — module 'field_reports', off by default -->
                         <?php if(canView('field_visits')): ?>
@@ -1437,11 +1411,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- Reports -->
-                        <?php if(hasReportsAccess()): ?>
-                        <li class="nav-item<?= posSimpleModeEnabled() ? '' : ' mega-dropdown' ?>">
-                            <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-graph-up"></i> <?= t('Reports') ?>
-                            </a>
+                        <?php ob_start(); ?>
                             <?php if (posSimpleModeEnabled()): ?>
                             <!-- Simple Mode — a short, plain-language report list for a small
                                  shop with no accountant. Same canView() gates as the full menu
@@ -1504,8 +1474,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 </div>
                             </div>
                             <?php endif; // posSimpleModeEnabled() ?>
-                        </li>
-                        <?php endif; ?>
+                        <?php bmsNavMenu(ob_get_clean(), 'reportsDropdown', '<i class="bi bi-graph-up"></i> ' . t('Reports'),
+                            hasReportsAccess(), posSimpleModeEnabled() ? 'nav-item' : 'nav-item mega-dropdown'); ?>
 
                         <!-- Settings — each item gated individually. Everything strictly
                              admin-only (Users, Roles & Permissions, Payments, Backup, Login

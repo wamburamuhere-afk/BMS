@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-15 — feat(header): the menu shows only what a role can open — one granted page = a direct link
+
+**Header menu follows the role's permissions** (instruction: a Staff role granted only Invoices, Quotations and Customer Visits saw only "Customer Visits"; when a menu has one granted page, show that page in the header, when it has two or more, show the menu name; leave Point of Sale mode exactly as it is)
+- `core/nav_menu.php` (new) — `bmsNavMenu()` draws each header group from its already-permission-checked links: no granted link = hidden, one = that page as a direct header link, two or more = the normal dropdown, with section titles that have no links under them removed. A link marked `data-nav-companion` sits behind the same permission as its neighbour (Receive Payment with Invoices, Services with Products, Sub-Contractors with Suppliers, DN with GRN, Pipeline Stages with Pipeline Board) and is not counted, so one permission is one item.
+- `header.php` — Core, Finance, CRM, Sales, Inventory, Procurement, Operations, Comms, Docs and Reports now go through `bmsNavMenu()`. A group appears as soon as any one of its pages is granted. Before, Finance only appeared with Expenses/Budget/Chart of Accounts/Bank Accounts/Cash Register and Sales only with Sales Orders, so Invoices and Quotations were granted but never reachable. Invoices stays in both Finance and Sales (added to Sales 2026-10-13), but the Sales copy is not counted, so it never shows twice in the header. Settings is unchanged.
+- Simple POS mode is untouched: every group keeps its original condition and markup there, POS on its own still shows as a direct link, and Finance still gives way to the Expenses link.
+
+- `tests/test_header_nav_menu_cli.php` (new) + `.github/workflows/php-lint.yml` — new suite added to CI (CI runs the no-database part).
+
+Verified: `tests/test_header_nav_menu_cli.php` 23/23 — the real header rendered for temporary roles (created in a transaction and rolled back): Staff with Invoices + Quotations + Customer Visits gets exactly those three direct links and no dropdown; Quotations + Sales Orders + Invoices gets a Sales dropdown and Invoices once; a POS-only role keeps its direct POS link. Admin with every module on, admin in Simple POS mode and a limited role in Simple POS mode all render the same menu as the header before this change. `tests/test_pos_simple_mode_cli.php` shows the same 7 failures with and without this change (they already fail on `develop`). Not checked by clicking in a browser.
+
+---
+
 ## 2026-10-13 — feat(sales prints): service documents print Service Name + Description; Invoices in the Sales menu
 
 **Service layout on Quotation, Sales Order and Invoice prints** (instruction: when a service is selected, hide Product Code and split "Item / Description" into "Service Name" and "Description" taken from services.php; products must not change)
