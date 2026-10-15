@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-10-15 — fix(test): update Sales-Invoices CI assertion for data-nav-companion
+
+- `tests/test_service_print_columns_cli.php` — the assertion that checked the Sales-menu Invoices link pattern used a regex that expected `<a class="dropdown-item" href=...` immediately after the canView gate; our change added a PHP comment and `data-nav-companion` attribute, so the regex was loosened to allow optional PHP comment tags between the gate and the `<li>`, and any attributes on the `<a>`. All 244 assertions pass.
+
+---
+
 ## 2026-10-15 — feat(header): the menu shows only what a role can open — one granted page = a direct link
 
 **Header menu follows the role's permissions** (instruction: a Staff role granted only Invoices, Quotations and Customer Visits saw only "Customer Visits"; when a menu has one granted page, show that page in the header, when it has two or more, show the menu name; leave Point of Sale mode exactly as it is)
