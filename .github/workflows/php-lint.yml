@@ -158,3 +158,8 @@ jobs:
         run: |
           echo "Running service print columns test suite..."
           php tests/test_service_print_columns_cli.php
+
+      - name: Header nav — only granted items (0 hidden / 1 direct link / 2+ dropdown)
+        run: |
+          echo "Running header nav menu test suite..."
+          php tests/test_header_nav_menu_cli.php
