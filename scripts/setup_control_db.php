@@ -456,6 +456,33 @@ try {
     ");
     say('  · table tenant_payments ready');
 
+    // Where a payment came from: typed in by an operator, or a paid BJP invoice
+    // (core/vendor_bridge.php). UNIQUE(source, source_ref) is what stops one
+    // invoice extending a tenant twice; manual rows leave source_ref NULL,
+    // which MySQL never treats as a duplicate.
+    $tpCols = $admin->query("
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'tenant_payments'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ([
+        'source'     => "ADD COLUMN `source` ENUM('manual','vendor_invoice') NOT NULL DEFAULT 'manual' AFTER `notes`",
+        'source_ref' => "ADD COLUMN `source_ref` VARCHAR(64) NULL AFTER `source`",
+    ] as $col => $clause) {
+        if (!in_array($col, $tpCols, true)) {
+            $admin->exec("ALTER TABLE `{$controlDb}`.`tenant_payments` {$clause}");
+            say("  + tenant_payments.{$col} added");
+        }
+    }
+    $hasTpIdx = $admin->query("
+        SELECT 1 FROM information_schema.statistics
+        WHERE table_schema = " . $admin->quote($controlDb) . "
+          AND table_name = 'tenant_payments' AND index_name = 'uq_tp_source'
+    ")->fetchColumn();
+    if (!$hasTpIdx) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenant_payments` ADD UNIQUE KEY `uq_tp_source` (`source`, `source_ref`)");
+        say('  + tenant_payments unique (source, source_ref) added');
+    }
+
     // ── Superadmin notifications ─────────────────────────────────────────────
     // One row per event (trial/subscription expired). Drives the bell badge in
     // the superadmin header. Deduplicated per (tenant_id, type) per day.
@@ -591,11 +618,24 @@ try {
         // is NOT the same as 0 (cut off the moment it expires). "They asked for
         // more time" should not mean giving every other customer more time too.
         'grace_days'           => "ADD COLUMN `grace_days` TINYINT UNSIGNED NULL AFTER `grace_until`",
+        // The customer (in BJP's own books, on the platform's root domain) who
+        // pays for this tenant. Set by "Make real customer" on Customer Visits
+        // or by an operator; read by the invoice → subscription bridge.
+        'vendor_customer_id'   => "ADD COLUMN `vendor_customer_id` INT NULL AFTER `grace_days`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
             say("  + tenants.{$col} added");
         }
+    }
+    $hasVcIdx = $admin->query("
+        SELECT 1 FROM information_schema.statistics
+        WHERE table_schema = " . $admin->quote($controlDb) . "
+          AND table_name = 'tenants' AND index_name = 'idx_tenants_vendor_customer'
+    ")->fetchColumn();
+    if (!$hasVcIdx) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` ADD KEY `idx_tenants_vendor_customer` (`vendor_customer_id`)");
+        say('  + tenants index on vendor_customer_id added');
     }
 
     // Backfill trial_ends_at for existing rows that pre-date the column.

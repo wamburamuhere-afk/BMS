@@ -1101,35 +1101,50 @@ if (!function_exists('tenantMigrationHealth')) {
      */
     function tenantMigrationHealth(int $tenantId): array
     {
-        $out = ['total' => 0, 'failed' => 0, 'last_failure' => null];
+        $out = ['total' => 0, 'failed' => 0, 'last_failure' => null, 'last_resolved' => null];
         try {
-            $cpdo = getControlPdo();
-            $st = $cpdo->prepare("
-                SELECT COUNT(*) AS total, SUM(status = 'failed') AS failed
-                FROM tenant_migration_log WHERE tenant_id = ?
+            $st = getControlPdo()->prepare("
+                SELECT id, migration_name, status, message, created_at
+                FROM tenant_migration_log WHERE tenant_id = ? ORDER BY id ASC
             ");
             $st->execute([$tenantId]);
-            $row = $st->fetch();
-            if ($row) {
-                $out['total']  = (int)$row['total'];
-                $out['failed'] = (int)$row['failed'];
-            }
+            $events = $st->fetchAll(PDO::FETCH_ASSOC);
 
-            if ($out['failed'] > 0) {
-                $st2 = $cpdo->prepare("
-                    SELECT migration_name, message, created_at
-                    FROM tenant_migration_log
-                    WHERE tenant_id = ? AND status = 'failed'
-                    ORDER BY created_at DESC LIMIT 1
-                ");
-                $st2->execute([$tenantId]);
-                $f = $st2->fetch();
-                if ($f) {
-                    $out['last_failure'] = [
-                        'migration_name' => (string)$f['migration_name'],
-                        'message'        => $f['message'] !== null ? (string)$f['message'] : null,
-                        'created_at'     => (string)$f['created_at'],
-                    ];
+            // The log is append-only: a failure is still "open" only while it is
+            // the LATEST event for that migration (same rule as dashboard.php).
+            // '(all)' marks a connection/credential failure, not a file — any
+            // later successful event for this tenant means it has recovered.
+            $latest = [];
+            $applied = [];
+            $lastOkId = 0;
+            foreach ($events as $e) {
+                $latest[$e['migration_name']] = $e;
+                if ($e['status'] === 'ok') {
+                    $applied[$e['migration_name']] = true;
+                    $lastOkId = (int)$e['id'];
+                }
+            }
+            $out['total'] = count($applied);
+
+            $open = [];
+            foreach ($latest as $name => $e) {
+                if ($e['status'] !== 'failed') continue;
+                if ($name === '(all)' && $lastOkId > (int)$e['id']) continue;
+                $open[] = $e;
+            }
+            $out['failed'] = count($open);
+
+            $shape = fn(array $e): array => [
+                'migration_name' => (string)$e['migration_name'],
+                'message'        => $e['message'] !== null ? (string)$e['message'] : null,
+                'created_at'     => (string)$e['created_at'],
+            ];
+            if ($open) {
+                usort($open, fn($a, $b) => (int)$b['id'] <=> (int)$a['id']);
+                $out['last_failure'] = $shape($open[0]);
+            } else {
+                for ($i = count($events) - 1; $i >= 0; $i--) {
+                    if ($events[$i]['status'] === 'failed') { $out['last_resolved'] = $shape($events[$i]); break; }
                 }
             }
         } catch (Throwable $e) {

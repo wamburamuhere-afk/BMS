@@ -833,6 +833,12 @@ if ($hasContext ?? false):
                             on <?= safe_output($migrationHealth['last_failure']['created_at'], '') ?><br>
                             <?= safe_output($migrationHealth['last_failure']['message'] ?? '', 'No detail recorded.') ?>
                         </div>
+                        <?php elseif (!empty($migrationHealth['last_resolved'])): ?>
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <code><?= safe_output($migrationHealth['last_resolved']['migration_name'], '') ?></code>
+                            failed on <?= safe_output($migrationHealth['last_resolved']['created_at'], '') ?> and succeeded on a later run — nothing to fix.
+                        </p>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
@@ -1144,6 +1150,8 @@ if ($hasContext ?? false):
                                    value="<?= date('Y-m-d') ?>">
                         </div>
 
+                        <div class="form-text mb-2">If the tenant is already paid up (or still on trial) past this date, the new period starts when the current one ends — no days are lost.</div>
+
                         <div class="alert alert-info py-2 small" id="subPreview" style="display:none">
                             <i class="bi bi-info-circle me-1"></i>
                             Subscription will run until <strong id="previewEndsAt">—</strong>
@@ -1382,7 +1390,15 @@ function postAction(data, title, redirect) {
             document.getElementById('subPreview').style.display = 'none';
             return;
         }
-        const starts = new Date(startsAtVal);
+        // Same rule as applySubscriptionPayment(): never start before the date already paid through.
+        const paidThrough = <?= json_encode((function () use ($tenant) {
+            $d = [];
+            if (!empty($tenant['subscription_ends_at'])) $d[] = substr((string)$tenant['subscription_ends_at'], 0, 10);
+            if (($tenant['status'] ?? '') === 'trial' && !empty($tenant['trial_ends_at'])) $d[] = substr((string)$tenant['trial_ends_at'], 0, 10);
+            return $d ? max($d) : null;
+        })()) ?>;
+        const base = (paidThrough && paidThrough > startsAtVal) ? paidThrough : startsAtVal;
+        const starts = new Date(base);
         const ends = new Date(starts);
         ends.setMonth(ends.getMonth() + selectedMonths);
         const formatted = ends.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });

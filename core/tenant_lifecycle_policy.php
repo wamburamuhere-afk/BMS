@@ -261,6 +261,146 @@ if (!function_exists('extendTenantAccess')) {
     }
 }
 
+if (!function_exists('controlColumnExists')) {
+    /**
+     * Control-DB schema is applied by an operator (scripts/setup_control_db.php),
+     * not by deploy, so code shipped ahead of that run must check before using a
+     * newer column. Cached per request.
+     */
+    function controlColumnExists(string $table, string $column): bool
+    {
+        static $cache = [];
+        $key = "$table.$column";
+        if (!array_key_exists($key, $cache)) {
+            try {
+                $st = getControlPdo()->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "` LIKE "
+                    . getControlPdo()->quote($column));
+                $cache[$key] = (bool)($st && $st->fetch());
+            } catch (Throwable $e) {
+                $cache[$key] = false;
+            }
+        }
+        return $cache[$key];
+    }
+}
+
+if (!function_exists('applySubscriptionPayment')) {
+    /**
+     * Record a paid subscription period for one tenant — the ONE code path used
+     * by the operator's Record Payment form and by the BJP invoice bridge.
+     *
+     * Rules:
+     *   - the period starts at the LATER of $startsAt (default today) and the
+     *     date the tenant's access currently runs to, so paying early never
+     *     loses days already paid for (or still left on the trial)
+     *   - trial → active; suspended BY an expiry → active; suspended by an
+     *     operator stays suspended unless $resumeManual
+     *   - grace window cleared; payment_status = current
+     *   - ($source, $sourceRef) is unique: the same invoice can never extend twice
+     *
+     * @return array{ok:bool, error:?string, starts_at:?string, ends_at:?string, activated:bool, duplicate:bool}
+     */
+    function applySubscriptionPayment(
+        int $tenantId, int $months, int $amountTzs, string $source = 'manual', ?string $sourceRef = null,
+        ?string $notes = null, ?int $recordedBy = null, ?string $startsAt = null, bool $resumeManual = false
+    ): array {
+        $res = ['ok' => false, 'error' => null, 'starts_at' => null, 'ends_at' => null, 'activated' => false, 'duplicate' => false];
+        $fail = function (string $m) use (&$res): array { $res['error'] = $m; return $res; };
+
+        if ($months < 1 || $months > 120)   return $fail('Duration must be between 1 and 120 months.');
+        if ($amountTzs < 0)                 return $fail('Amount cannot be negative.');
+        if (!in_array($source, ['manual', 'vendor_invoice'], true)) return $fail('Unknown payment source.');
+        if ($startsAt !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $startsAt)) return $fail('Invalid start date.');
+
+        $hasSource = controlColumnExists('tenant_payments', 'source') && controlColumnExists('tenant_payments', 'source_ref');
+        if ($source !== 'manual' && (!$hasSource || $sourceRef === null || $sourceRef === '')) {
+            return $fail('The control database has not been upgraded for automatic payments (run scripts/setup_control_db.php).');
+        }
+
+        $ctrl = getControlPdo();
+        $ownTxn = !$ctrl->inTransaction();
+        try {
+            if ($ownTxn) $ctrl->beginTransaction();
+
+            $st = $ctrl->prepare("SELECT * FROM tenants WHERE id = ? FOR UPDATE");
+            $st->execute([$tenantId]);
+            $t = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$t) throw new RuntimeException('Tenant not found.');
+            $status = (string)$t['status'];
+            if (in_array($status, ['deleted', 'archived'], true)) {
+                throw new RuntimeException('This tenant is closed. Reactivate it before recording a payment.');
+            }
+
+            if ($source !== 'manual') {
+                $dup = $ctrl->prepare("SELECT ends_at FROM tenant_payments WHERE source = ? AND source_ref = ? LIMIT 1");
+                $dup->execute([$source, $sourceRef]);
+                $prevEnd = $dup->fetchColumn();
+                if ($prevEnd !== false) {
+                    if ($ownTxn) $ctrl->commit();
+                    $res['ok'] = true; $res['duplicate'] = true; $res['ends_at'] = (string)$prevEnd;
+                    return $res;
+                }
+            }
+
+            // The date access currently runs to: paid period first, then any trial left.
+            $today = date('Y-m-d');
+            $base  = $startsAt ?? $today;
+            $governing = [$t['subscription_ends_at'] ?? null];
+            if ($status === 'trial') $governing[] = $t['trial_ends_at'] ?? null;
+            foreach ($governing as $d) {
+                if (!empty($d)) {
+                    $d = substr((string)$d, 0, 10);
+                    if ($d > $base) $base = $d;
+                }
+            }
+            $endsAt = date('Y-m-d', strtotime("$base +$months months"));
+
+            $autoSuspended = $status === 'suspended'
+                && in_array((string)($t['suspension_reason'] ?? ''), ['trial_expired', 'subscription_expired'], true);
+            $activate = $status === 'trial' || $autoSuspended || ($status === 'suspended' && $resumeManual);
+
+            $cycleMap = [1 => 'monthly', 3 => 'quarterly', 6 => 'biannual', 12 => 'annual'];
+            $set = "subscription_ends_at = ?, billing_amount_tzs = ?, next_billing_date = ?,
+                    payment_status = 'current', grace_until = NULL";
+            $params = [$endsAt, $amountTzs, $endsAt];
+            if (isset($cycleMap[$months])) { $set .= ", billing_cycle = ?"; $params[] = $cycleMap[$months]; }
+            if ($activate) {
+                $set .= ", status = 'active', suspended_at = NULL, suspension_reason = NULL,
+                          activated_at = IFNULL(activated_at, NOW())";
+            }
+            $params[] = $tenantId;
+            $ctrl->prepare("UPDATE tenants SET $set WHERE id = ?")->execute($params);
+
+            $cols = "tenant_id, amount_tzs, duration_months, starts_at, ends_at, notes, recorded_by, recorded_at";
+            $vals = "?, ?, ?, ?, ?, ?, ?, NOW()";
+            $p = [$tenantId, $amountTzs, $months, $base, $endsAt, $notes !== null && $notes !== '' ? mb_substr($notes, 0, 500) : null, $recordedBy];
+            if ($hasSource) { $cols .= ", source, source_ref"; $vals .= ", ?, ?"; $p[] = $source; $p[] = $sourceRef; }
+            $ctrl->prepare("INSERT INTO tenant_payments ($cols) VALUES ($vals)")->execute($p);
+
+            if (function_exists('logTenantAdminAction')) {
+                logTenantAdminAction($tenantId, (string)$t['subdomain'], 'payment_recorded',
+                    number_format($amountTzs) . " TZS for {$months} month(s); runs {$base} → {$endsAt}"
+                    . ($source !== 'manual' ? " (from {$sourceRef})" : '')
+                    . ($activate && $status !== 'active' ? '; tenant activated' : ''));
+            }
+
+            if ($ownTxn) $ctrl->commit();
+            $res['ok'] = true; $res['starts_at'] = $base; $res['ends_at'] = $endsAt;
+            $res['activated'] = $activate && $status !== 'active';
+            return $res;
+        } catch (Throwable $e) {
+            if ($ownTxn && $ctrl->inTransaction()) { try { $ctrl->rollBack(); } catch (Throwable $_) {} }
+            if ($e instanceof PDOException && (int)($e->errorInfo[1] ?? 0) === 1062 && $source !== 'manual') {
+                $res['ok'] = true; $res['duplicate'] = true;   // a concurrent run recorded it first
+                return $res;
+            }
+            if ($e instanceof RuntimeException) return $fail($e->getMessage());
+            error_log("applySubscriptionPayment($tenantId): " . $e->getMessage());
+            return $fail('Could not record the payment. Please try again.');
+        }
+    }
+}
+
 if (!function_exists('setTenantGraceDays')) {
     /**
      * Give one tenant their own grace period, or clear it back to the platform

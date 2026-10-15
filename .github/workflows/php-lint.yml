@@ -163,3 +163,8 @@ jobs:
         run: |
           echo "Running header nav menu test suite..."
           php tests/test_header_nav_menu_cli.php
+
+      - name: Subscription payments + vendor context (root-domain-only features)
+        run: |
+          php tests/test_subscription_payment_cli.php
+          php tests/test_tenant_migration_health_cli.php
