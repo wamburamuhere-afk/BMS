@@ -71,7 +71,7 @@ $invAt = strpos($sales, "getUrl('invoices')");
 $retAt = strpos($sales, "t('Returns')");
 check($invAt !== false, 'Sales menu has an Invoices link');
 check($posAt !== false && $invAt !== false && $retAt !== false && $posAt < $invAt && $invAt < $retAt, 'Invoices sits right after POS, before the Returns group');
-check((bool)preg_match("/<\?php if\(canView\('invoices'\)\): \?>\s*<li><a class=\"dropdown-item\" href=\"<\?= getUrl\('invoices'\) \?>\">/", $sales), 'Sales-menu Invoices uses the same canView(\'invoices\') gate and link');
+check((bool)preg_match("/<\?php if\(canView\('invoices'\)\): \?>(\s*<\?php[^?]*\?>)*\s*<li><a class=\"dropdown-item\"[^>]*href=\"<\?= getUrl\('invoices'\) \?>\"/", $sales), 'Sales-menu Invoices uses the same canView(\'invoices\') gate and link (now a data-nav-companion)');
 check(substr_count($hdr, "href=\"<?= getUrl('invoices') ?>\"") === 2, 'Finance > Sales & Purchases still has its Invoices link');
 
 // ─────────────────────────────────────────────────────────────────────────
