@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-15 — feat(subscriptions) Phase 0: one payment path for tenant subscriptions; migration-health badge fixed
+
+**Groundwork for BJP's customer-subscription flow** (plan: `customer_subscription_plan.md`)
+- `core/tenant_lifecycle_policy.php` — new `applySubscriptionPayment()`: the single way a paid period is recorded (the operator's Record Payment now; the BJP invoice bridge in a later phase). Fixes two bugs in the old action: a **trial tenant who paid stayed `trial`** and was suspended when the trial ended (now becomes `active`), and **paying early restarted the period from today** and lost the days already paid for (now counts from the later of the chosen date and the current end date, keeping any trial days left). Expiry-suspended tenants resume; operator-suspended ones stay suspended unless "re-activate" is ticked. `(source, source_ref)` is unique so one invoice can never extend twice. `controlColumnExists()` lets code run before an operator applies the new control-DB columns.
+- `actions/superadmin_record_payment.php` — now calls `applySubscriptionPayment()`. `app/superadmin/tenant_view.php` — the payment modal's preview uses the same start-date rule.
+- `scripts/setup_control_db.php` — `tenants.vendor_customer_id` (+ index); `tenant_payments.source`, `source_ref`, `UNIQUE(source, source_ref)`. Idempotent. **Operator step:** run it on bms and demo.
+- `core/vendor_context.php` (new) — `isPlatformVendorContext()`: true only on the platform root domain (BJP's own install, where `register.php` also lives); false on every tenant subdomain and on installs without multi-tenancy.
+- **Tenant → Usage & Analytics → Deploy / Migration Health showed "1 failed" for every tenant.** `tenantMigrationHealth()` (`core/tenant_admin.php`) counted every `failed` row ever logged, and the log is append-only, so `2026_10_13_sales_documents_money_and_line_discount.php`, which failed once in a concurrent-deploy race (fixed by `6fe14fbb`) and then succeeded on re-run, stayed red forever. It now judges each migration by its latest event, as `app/superadmin/dashboard.php` already did; `(all)` connection failures clear on any later success; "total" counts migrations applied, not log rows. A resolved failure shows as a grey note.
+- `tests/test_subscription_payment_cli.php` (new, 33) + `tests/test_tenant_migration_health_cli.php` (new, 11), both wired into `.github/workflows/php-lint.yml` (CI runs the database-free part).
+
+Verified: both new suites pass locally; the control-DB script applied the new columns once and was a no-op on a second run. `test_tenant_admin_panel_cli`, `test_tenant_control_db_cli`, `test_feature_panel_cli` and `test_quota_panel_cli` fail identically on a clean `origin/main` checkout (local tenant provisioning has no credential key), so those failures pre-date this change; `test_tenant_expiry_policy_cli` and `test_superadmin_urls_cli` pass.
+
+---
+
 ## 2026-10-15 — fix(quotations): gate on quotations permission, not sales_orders
 
 **Quotation pages blocked even when role had Quotations VIEW granted** — every quotation page (`quotations.php`, `quotation_create/edit/view/form.php`) was calling `autoEnforcePermission('sales_orders')`, and the three write APIs (`save_quotation`, `delete_quotation`, `update_quotation_status`) were checking `canCreate/Edit/Delete('sales_orders')`. A role with only the Quotations row granted was blocked everywhere. `core/permissions.php` sub-page map also routed the five quotation sub-pages to `sales_orders`.
