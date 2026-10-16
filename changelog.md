@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(invoices): pending→reviewed→approved workflow with GL posting on approval
+
+**File:** `api/account/save_invoice.php`
+
+New invoices now enter the review/approval workflow instead of being auto-approved:
+- Default status on create changed from `approved` to `pending`
+- Removed auto-stamp of creator as both reviewer and approver
+- Removed immediate GL posting on create — GL now fires only on approval via `approve_invoice.php`
+- Created-by e-signature still captured on create; reviewed/approved signatures captured by their respective APIs (already built)
+- Existing approved invoices are untouched (GL entries intact, payments unaffected)
+
 ## 2026-10-16 — fix(invoice_create): allow whole-number quantities for service items from SO
 
 **File:** `app/bms/invoice/invoice_create.php`
