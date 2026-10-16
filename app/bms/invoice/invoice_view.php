@@ -15,9 +15,10 @@ if (!isAuthenticated()) {
 autoEnforcePermission('invoices');
 
 // Three-approval workflow capabilities (mirrored to JS below)
-$inv_can_review  = canReview('invoices');
-$inv_can_approve = canApprove('invoices');
-$inv_is_admin    = isAdmin();
+$inv_can_review       = canReview('invoices');
+$inv_can_approve      = canApprove('invoices');
+$inv_can_void_payment = canEdit('invoices');
+$inv_is_admin         = isAdmin();
 
 // Get Invoice ID
 $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -401,7 +402,8 @@ includeHeader();
                                    <th>Reference</th>
                                    <th>Received Method</th>
                                    <th class="text-end">Amount</th>
-                                   <th class="text-end pe-4">Balance After</th>
+                                   <th class="text-end">Balance After</th>
+                                   <?php if ($inv_can_void_payment): ?><th class="text-center pe-4">Action</th><?php endif; ?>
                                </tr>
                            </thead>
                            <tbody>
@@ -409,8 +411,11 @@ includeHeader();
                                $running_bal   = floatval($invoice['grand_total']);
                                $total_pmt_sum = 0;
                                foreach (array_reverse($payments) as $payment):
-                                   $running_bal   -= floatval($payment['amount']);
-                                   $total_pmt_sum += floatval($payment['amount']);
+                                   $is_completed = ($payment['status'] ?? 'completed') === 'completed';
+                                   if ($is_completed) {
+                                       $running_bal   -= floatval($payment['amount']);
+                                       $total_pmt_sum += floatval($payment['amount']);
+                                   }
                                ?>
                                <?php
                                $pmt_method_labels = [
@@ -427,14 +432,28 @@ includeHeader();
                                    $pmt_method_display = $pmt_method_labels[$payment['payment_method']] ?? ucfirst(str_replace('_', ' ', $payment['payment_method']));
                                }
                                ?>
-                               <tr>
+                               <tr class="<?= !$is_completed ? 'text-muted' : '' ?>">
                                    <td class="ps-4"><?= date('M d, Y', strtotime($payment['payment_date'])) ?></td>
                                    <td><?= caseFormat($payment['reference_number'] ?? '-') ?></td>
                                    <td><?= caseFormat($pmt_method_display) ?></td>
-                                   <td class="text-end font-monospace text-success fw-bold"><?= number_format($payment['amount'], 2) ?></td>
-                                   <td class="text-end pe-4 font-monospace <?= $running_bal <= 0 ? 'text-success fw-bold' : 'text-warning fw-semibold' ?>">
-                                       <?= number_format(max(0, $running_bal), 2) ?>
+                                   <td class="text-end font-monospace <?= $is_completed ? 'text-success fw-bold' : 'text-decoration-line-through text-muted' ?>">
+                                       <?= number_format($payment['amount'], 2) ?>
+                                       <?php if (!$is_completed): ?><br><small class="badge bg-secondary fw-normal">Voided</small><?php endif; ?>
                                    </td>
+                                   <td class="text-end font-monospace <?= $is_completed ? ($running_bal <= 0 ? 'text-success fw-bold' : 'text-warning fw-semibold') : 'text-muted' ?>">
+                                       <?= $is_completed ? number_format(max(0, $running_bal), 2) : '—' ?>
+                                   </td>
+                                   <?php if ($inv_can_void_payment): ?>
+                                   <td class="text-center pe-4">
+                                       <?php if ($is_completed): ?>
+                                       <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="voidPayment(<?= $payment['payment_id'] ?>, '<?= addslashes($payment['reference_number'] ?? '') ?>')">
+                                           <i class="bi bi-x-octagon me-1"></i>Void
+                                       </button>
+                                       <?php else: ?>
+                                       <span class="text-muted small">—</span>
+                                       <?php endif; ?>
+                                   </td>
+                                   <?php endif; ?>
                                </tr>
                                <?php endforeach; ?>
                            </tbody>
@@ -442,7 +461,8 @@ includeHeader();
                                <tr>
                                    <td colspan="3" class="ps-4 text-end fw-bold text-muted">Total Paid:</td>
                                    <td class="text-end font-monospace fw-bold text-success"><?= number_format($total_pmt_sum, 2) ?></td>
-                                   <td class="pe-4"></td>
+                                   <td class="<?= $inv_can_void_payment ? '' : 'pe-4' ?>"></td>
+                                   <?php if ($inv_can_void_payment): ?><td class="pe-4"></td><?php endif; ?>
                                </tr>
                            </tfoot>
                        </table> 
@@ -677,6 +697,31 @@ const INV_PRINT_TEMPLATES = {
 function printInvoiceDoc(template) {
     const base = INV_PRINT_TEMPLATES[template] || INV_PRINT_TEMPLATES.standard;
     window.open(base + '?id=' + INV_ID, '_blank');
+}
+
+function voidPayment(paymentId, ref) {
+    Swal.fire({
+        title: 'Void this payment?',
+        html: ref ? `Reference: <strong>${ref}</strong><br><br>` : '' +
+            'This will reverse the GL receipt entry, restore the invoice balance, and unwind the bank register.<br><br><strong>This cannot be undone.</strong>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, void it',
+        cancelButtonText: 'Cancel'
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/void_payment.php') ?>', { payment_id: paymentId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Payment Voided', text: res.message, timer: 2500, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json').fail(function(xhr) {
+            Swal.fire('Error', 'Request failed (' + xhr.status + '). Please try again.', 'error');
+        });
+    });
 }
 
 function reviewThisInvoice() {
