@@ -18,6 +18,7 @@ autoEnforcePermission('invoices');
 $inv_can_review       = canReview('invoices');
 $inv_can_approve      = canApprove('invoices');
 $inv_can_void_payment = canEdit('invoices');
+$inv_can_revert       = canEdit('invoices');
 $inv_is_admin         = isAdmin();
 
 // Get Invoice ID
@@ -89,6 +90,7 @@ $wf = [
     'approved_by_name' => $invoice['approved_by_name'] ?? '',
     'approved_by_role' => $invoice['approved_by_role'] ?? '',
     'approved_at'      => $invoice['approved_at']      ?? '',
+    '_status'          => $invoice['status'],
 ];
 
 // Fetch Invoice Items
@@ -227,6 +229,16 @@ includeHeader();
                 <a href="<?= getUrl('payment_create') ?>?invoice=<?= $invoice['invoice_id'] ?>" class="btn btn-success">
                     <i class="bi bi-cash-coin"></i> Record Payment
                 </a>
+            <?php endif; ?>
+            <?php if ($inv_can_revert && in_array($invoice['status'], ['reviewed','approved'], true)): ?>
+                <button type="button" class="btn btn-outline-warning" onclick="revertToPending(<?= $invoice['invoice_id'] ?>, '<?= addslashes($invoice['invoice_number']) ?>', '<?= $invoice['status'] ?>')">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Send Back to Pending
+                </button>
+            <?php endif; ?>
+            <?php if ($inv_can_revert && in_array($invoice['status'], ['pending','reviewed','approved','overdue','partial'], true)): ?>
+                <button type="button" class="btn btn-outline-danger" onclick="cancelInvoice(<?= $invoice['invoice_id'] ?>, '<?= addslashes($invoice['invoice_number']) ?>', '<?= $invoice['status'] ?>')">
+                    <i class="bi bi-x-circle me-1"></i> Cancel Invoice
+                </button>
             <?php endif; ?>
         </div>
     </div>
@@ -697,6 +709,62 @@ const INV_PRINT_TEMPLATES = {
 function printInvoiceDoc(template) {
     const base = INV_PRINT_TEMPLATES[template] || INV_PRINT_TEMPLATES.standard;
     window.open(base + '?id=' + INV_ID, '_blank');
+}
+
+function revertToPending(invId, invNum, currentStatus) {
+    const glWarning = currentStatus === 'approved'
+        ? '<br><br><strong>The GL revenue entry will be reversed</strong> (Dr Revenue / Cr AR) until the invoice is re-approved.'
+        : '';
+    Swal.fire({
+        title: 'Send Back to Pending?',
+        html: `Invoice <strong>${invNum}</strong> will return to <strong>Pending</strong>.<br>
+               The Reviewed By and Approved By stamps will be cleared.${glWarning}`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#fd7e14',
+        confirmButtonText: 'Yes, send back',
+        cancelButtonText: 'Cancel'
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/revert_invoice_to_pending.php') ?>', { invoice_id: invId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Sent Back to Pending', text: res.message, timer: 2500, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json').fail(function(xhr) {
+            Swal.fire('Error', 'Request failed (' + xhr.status + '). Please try again.', 'error');
+        });
+    });
+}
+
+function cancelInvoice(invId, invNum, currentStatus) {
+    const glNote = ['approved','overdue','partial'].includes(currentStatus)
+        ? '<br><br>The GL revenue entry will be reversed and any linked Sales Order quantities will be freed.'
+        : '';
+    Swal.fire({
+        title: 'Cancel Invoice?',
+        html: `Invoice <strong>${invNum}</strong> will be marked <strong>Cancelled</strong>.<br>
+               This cannot be undone.${glNote}`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, cancel it',
+        cancelButtonText: 'Keep Invoice'
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: invId, status: 'cancelled' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Invoice Cancelled', text: res.message, timer: 2500, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json').fail(function(xhr) {
+            Swal.fire('Error', 'Request failed (' + xhr.status + '). Please try again.', 'error');
+        });
+    });
 }
 
 function voidPayment(paymentId, ref) {

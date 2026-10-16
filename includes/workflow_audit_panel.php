@@ -40,6 +40,13 @@ $fmt = function ($dt) {
     .wf-audit-panel .wf-empty { font-style: italic; color: #adb5bd; font-size: 11px; }
 </style>
 
+<?php
+// Progressive display: show only cells relevant to the current workflow stage.
+// _status is optional — callers that don't set it get all three cells (backward compatible).
+$_wf_status       = $wf['_status'] ?? '';
+$_show_reviewed   = ($_wf_status === '') || ($_wf_status !== 'pending');
+$_show_approved   = ($_wf_status === '') || !in_array($_wf_status, ['pending', 'reviewed'], true);
+?>
 <div class="wf-audit-panel">
     <div class="wf-cell">
         <div class="wf-label">Created By</div>
@@ -56,6 +63,7 @@ $fmt = function ($dt) {
         <?php endif; ?>
     </div>
 
+    <?php if ($_show_reviewed): ?>
     <div class="wf-cell">
         <div class="wf-label">Reviewed By</div>
         <?php if (!empty($wf['reviewed_by_name'])): ?>
@@ -70,7 +78,9 @@ $fmt = function ($dt) {
             <div class="wf-empty">Pending review</div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 
+    <?php if ($_show_approved): ?>
     <div class="wf-cell">
         <div class="wf-label">Approved By</div>
         <?php if (!empty($wf['approved_by_name'])): ?>
@@ -85,4 +95,5 @@ $fmt = function ($dt) {
             <div class="wf-empty">Pending approval</div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 </div>
