@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(invoices): cancel + send-back-to-pending buttons + progressive audit panel
+
+**Files:** `app/bms/invoice/invoice_view.php`, `api/account/revert_invoice_to_pending.php`, `includes/workflow_audit_panel.php`
+
+- **Cancel Invoice** button: shown for `pending`/`reviewed`/`approved`/`overdue`/`partial` statuses; gated by `canEdit('invoices')`; POSTs to `update_invoice_status.php`; blocked by API if completed payments exist
+- **Send Back to Pending** button: shown for `reviewed` or `approved`; calls new `revert_invoice_to_pending.php`; if approved, reverses GL revenue + COGS + VAT; clears `reviewed_by`/`approved_by` stamps and deletes `workflow_signatures` rows for those actions; blocks if completed payments exist
+- **Progressive audit panel** (`workflow_audit_panel.php`): `pending` → Created By only; `reviewed` → Created By + Reviewed By; `approved`+others → all three; backward-compatible (callers that don't set `_status` still see all three)
+
 ## 2026-10-16 — feat(invoices): void payment button in invoice_view.php
 
 **File:** `app/bms/invoice/invoice_view.php`
