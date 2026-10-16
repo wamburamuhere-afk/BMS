@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(invoices): void payment button in invoice_view.php
+
+**File:** `app/bms/invoice/invoice_view.php`
+
+Added a Void button to each completed payment row in the payment history table:
+- `$inv_can_void_payment = canEdit('invoices')` gates button visibility
+- Actions column added to the payment table header (shown only when gated)
+- Running balance and payment total now count only `completed` payments (voided rows show strikethrough + "Voided" badge and are excluded from the totals)
+- `voidPayment(paymentId, ref)` JS function: Swal confirmation → POST to `api/account/void_payment.php` → reload on success
+- `void_payment.php` was fully built (June 2026) but had no UI surface — this completes that feature
+- After void, invoice status auto-reverts: paid→approved (no remaining completed payments), partial→approved (some remain)
+
+---
+
 ## 2026-10-16 — feat(invoices): pending→reviewed→approved workflow with GL posting on approval
 
 **File:** `api/account/save_invoice.php`
