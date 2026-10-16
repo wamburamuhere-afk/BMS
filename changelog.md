@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-16 — fix(invoice_create): allow whole-number quantities for service items from SO
+
+**File:** `app/bms/invoice/invoice_create.php`
+
+Two bugs in the invoice line quantity `<input>`:
+1. `min="0.001"` + `step="0.01"` were misaligned — `(6 − 0.001) % 0.01 ≠ 0` so the browser rejected whole numbers like 6 and suggested 5.991 as the "nearest valid value". Fixed by changing `min` to `"0.01"`.
+2. Service/non-inventory items coming from a Sales Order were getting a `max` attribute set to the SO remaining quantity. Services have no stock cap, so the `max` is now skipped when `item.is_service === 1`.
+
 ## 2026-10-15 — fix(quotations): gate on quotations permission, not sales_orders
 
 **Quotation pages blocked even when role had Quotations VIEW granted** — every quotation page (`quotations.php`, `quotation_create/edit/view/form.php`) was calling `autoEnforcePermission('sales_orders')`, and the three write APIs (`save_quotation`, `delete_quotation`, `update_quotation_status`) were checking `canCreate/Edit/Delete('sales_orders')`. A role with only the Quotations row granted was blocked everywhere. `core/permissions.php` sub-page map also routed the five quotation sub-pages to `sales_orders`.
