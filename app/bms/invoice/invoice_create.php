@@ -647,7 +647,7 @@ function addItemRow(item = null) {
     const idx = itemCount++;
     const fromOrder = !!(item && item.order_item_id);
     const lock = fromOrder ? 'readonly' : '';
-    const remaining = fromOrder && item.remaining_quantity ? parseFloat(item.remaining_quantity) : null;
+    const remaining = fromOrder && item.remaining_quantity && !parseInt(item.is_service || 0) ? parseFloat(item.remaining_quantity) : null;
     const taxOptions = INVOICE_TAX_RATES.map(t => `<option value="${t.rate}">${escAttr(t.label)} (${t.rate}%)</option>`).join('');
     const html = `
         <tr id="item-row-${idx}">
@@ -668,7 +668,7 @@ function addItemRow(item = null) {
             </td>
             <td class="inv-col">
                 <input type="number" class="form-control form-control-sm item-qty" name="items[${idx}][quantity]"
-                       value="${item ? item.quantity : 1}" step="0.01" min="0.001" ${remaining !== null ? `max="${remaining}"` : ''} required onchange="calculateTotals()">
+                       value="${item ? item.quantity : 1}" step="0.01" min="0.01" ${remaining !== null ? `max="${remaining}"` : ''} required onchange="calculateTotals()">
             </td>
             <td class="inv-col">
                 <input type="text" class="form-control form-control-sm item-unit" name="items[${idx}][unit]"
