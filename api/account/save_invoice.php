@@ -79,16 +79,15 @@ try {
     $delivery_id = !empty($_POST['delivery_id']) ? intval($_POST['delivery_id']) : null;
     $customer_lpo_id = !empty($_POST['customer_lpo_id']) ? intval($_POST['customer_lpo_id']) : null;
 
-    // Invoices skip the review/approval workflow — a new invoice is born
-    // 'approved' and accrues to the GL immediately (like a bill). On update,
-    // preserve the existing row's status (transitions still happen via payment
-    // recording, void/reverse, etc.).
+    // New invoices enter the review → approve workflow (pending → reviewed → approved).
+    // GL posting fires only on approval via approve_invoice.php.
+    // On update, preserve the existing row's status.
     if ($is_update) {
         $existing = $pdo->prepare("SELECT status FROM invoices WHERE invoice_id = ?");
         $existing->execute([$invoice_id]);
         $status = $existing->fetchColumn() ?: 'pending';
     } else {
-        $status = 'approved';
+        $status = 'pending';
     }
     $project_id   = !empty($_POST['project_id'])   ? intval($_POST['project_id'])   : null;
     $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
@@ -223,31 +222,14 @@ try {
         ]);
         $invoice_id = $pdo->lastInsertId();
 
-        // ── e-signature capture (Created By) ─ Issue 1 fix
+        // ── e-signature capture (Created By) ──────────────────────────────────
         $wfActor = workflowActorSnapshot();
         workflowCaptureSignature(
             $pdo, 'invoice', (int)$invoice_id, 'created',
             (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
         );
-
-        // Invoices are auto-approved (no separate review/approve steps), so stamp
-        // the creator as BOTH reviewer and approver and capture their e-signature
-        // for each stage — the printout then shows real names, not "Not yet …".
-        $stampSelf = $pdo->prepare("
-            UPDATE invoices
-               SET reviewed_by = ?, reviewed_by_name = ?, reviewed_by_role = ?, reviewed_at = NOW(),
-                   approved_by = ?, approved_by_name = ?, approved_by_role = ?, approved_at = NOW()
-             WHERE invoice_id = ?
-        ");
-        $stampSelf->execute([
-            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role'],
-            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role'],
-            (int)$invoice_id
-        ]);
-        workflowCaptureSignature($pdo, 'invoice', (int)$invoice_id, 'reviewed',
-            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']);
-        workflowCaptureSignature($pdo, 'invoice', (int)$invoice_id, 'approved',
-            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']);
+        // Reviewed and Approved signatures are captured later by
+        // review_invoice.php and approve_invoice.php respectively.
     }
 
     // A sales-order line can only be billed up to the quantity still open on it.
@@ -293,14 +275,8 @@ try {
 
     soRefreshInvoicedQuantities($pdo, array_merge($priorSoIds, $touchedSoIds, $order_id ? [(int)$order_id] : []));
 
-    // Accrue a newly-created invoice into the ONE canonical ledger right away
-    // (invoices are auto-approved, mirroring bills): Dr Accounts Receivable /
-    // Cr Sales Revenue / Cr Output VAT, plus Dr COGS / Cr Inventory for product
-    // lines. Both are idempotent and run inside this transaction.
-    if (!$is_update) {
-        postInvoiceRevenue($pdo, (int)$invoice_id, (int)$_SESSION['user_id']);
-        postInvoiceCOGS($pdo, (int)$invoice_id, (int)$_SESSION['user_id']);
-    }
+    // GL posting (Dr AR / Cr Revenue / Cr Output VAT + Dr COGS / Cr Inventory)
+    // fires only on approval via approve_invoice.php — not on create.
 
     $pdo->commit();
 
