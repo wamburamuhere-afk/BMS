@@ -167,6 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('users'); ?>
 <div class="container mt-4">
     <div class="row mb-4">
         <div class="col-12">
@@ -336,6 +337,7 @@ $(function () {
 });
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php 
 include(FOOTER_FILE); 
 ob_end_flush(); // Flush output buffer

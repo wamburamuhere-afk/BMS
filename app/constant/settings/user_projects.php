@@ -244,6 +244,7 @@ $stats = $pdo->query("
 require_once 'header.php';
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('user_projects'); ?>
 <div class="container-fluid mt-4">
 
     <!-- Page Header -->
@@ -382,6 +383,7 @@ require_once 'header.php';
     </div>
 </div>
 
+<?php settingsAdminShellClose(); ?>
 <?php include 'footer.php'; ?>
 
 <script>

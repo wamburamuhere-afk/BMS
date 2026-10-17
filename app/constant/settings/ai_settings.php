@@ -54,6 +54,7 @@ $providers = [
     'openrouter' => 'OpenRouter  (any model via base URL)',
 ];
 ?>
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('ai_settings'); ?>
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
@@ -300,4 +301,5 @@ $(function () {
 });
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php require_once __DIR__ . '/../../../footer.php'; ?>

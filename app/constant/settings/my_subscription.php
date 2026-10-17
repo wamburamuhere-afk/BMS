@@ -14,6 +14,7 @@ $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
 $page_title = 'My Subscription';
 require_once __DIR__ . '/../../../header.php';
 ?>
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('my_subscription'); ?>
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;">
         <h4 class="mb-0"><i class="bi bi-credit-card-2-front text-primary me-2"></i><?= t('My Subscription') ?></h4>
@@ -221,4 +222,5 @@ $(function () {
 });
 </script>
 <?php endif; ?>
+<?php settingsAdminShellClose(); ?>
 <?php require_once __DIR__ . '/../../../footer.php'; ?>

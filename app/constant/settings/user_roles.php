@@ -262,6 +262,7 @@ function getRoleBadgeColor($role_name) {
 }
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('user_roles'); ?>
 <div class="container-fluid mt-4">
     <!-- Page Header -->
     <div class="row mb-4">
@@ -837,6 +838,7 @@ function getRoleBadgeColor($role_name) {
     <!-- Toast notifications will be inserted here -->
 </div>
 
+<?php settingsAdminShellClose(); ?>
 <?php include("footer.php"); ?>
 
 <!-- DataTables -->
