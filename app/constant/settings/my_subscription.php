@@ -45,6 +45,7 @@ require_once __DIR__ . '/../../../header.php';
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabInvoices" type="button"><?= t('Invoices') ?></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabQuotes" type="button"><?= t('Quotations') ?></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPayments" type="button"><?= t('Payments') ?></button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabContracts" type="button"><?= t('Contracts') ?> <span class="badge rounded-pill d-none" id="contractsToSign" style="background:#0d6efd;color:#fff">0</span></button></li>
     </ul>
     <div class="tab-content">
         <div class="tab-pane fade show active" id="tabInvoices">
@@ -58,6 +59,12 @@ require_once __DIR__ . '/../../../header.php';
                 <thead class="table-light"><tr><th>S/NO</th><th><?= t('Quotation') ?></th><th><?= t('Date') ?></th><th><?= t('Valid until') ?></th><th class="text-end"><?= t('Total') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
                 <tbody></tbody></table></div>
             <div class="d-md-none row g-2" id="cardsQuotes"></div>
+        </div>
+        <div class="tab-pane fade" id="tabContracts">
+            <div class="d-none d-md-block"><table id="tblContracts" class="table table-hover align-middle w-100" data-bms-cards="off">
+                <thead class="table-light"><tr><th>S/NO</th><th><?= t('Contract') ?></th><th><?= t('Service') ?></th><th><?= t('Period') ?></th><th><?= t('From') ?></th><th><?= t('To') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
+                <tbody></tbody></table></div>
+            <div class="d-md-none row g-2" id="cardsContracts"></div>
         </div>
         <div class="tab-pane fade" id="tabPayments">
             <div class="d-none d-md-block"><table id="tblPayments" class="table table-hover align-middle w-100" data-bms-cards="off">
@@ -82,6 +89,8 @@ $(function () {
         'paid' => t('Paid'), 'partial' => t('Partly paid'), 'unpaid' => t('Unpaid'), 'approved' => t('Approved'), 'accepted' => t('Accepted'), 'cancelled' => t('Replaced'),
         'auto' => t('BJP invoice'), 'manual' => t('Recorded by BJP'), 'months' => t('months'),
         'noServices' => t('BJP has not published subscription periods yet.'),
+        'sign' => t('Sign'), 'awaiting_customer' => t('Waiting for your signature'), 'signed' => t('Signed'),
+        'awaiting_bjp' => t('Being prepared by BJP'), 'opening' => t('Opening the signing page...'),
     ]) ?>;
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const money = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -96,7 +105,7 @@ $(function () {
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2"><li><a class="dropdown-item py-2 rounded" href="${esc(url)}" target="_blank" rel="noopener"><i class="bi bi-eye text-primary me-2"></i>${L.view}</a></li></ul></div>` : '';
     const dt = (id, cols) => $(id).DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtip',
         language: { emptyTable: L.none, zeroRecords: L.none }, columnDefs: [{ targets: cols, orderable: false }] });
-    const tInv = dt('#tblInvoices', [0, 7]), tQt = dt('#tblQuotes', [0, 6]), tPay = dt('#tblPayments', [0]);
+    const tInv = dt('#tblInvoices', [0, 7]), tQt = dt('#tblQuotes', [0, 6]), tPay = dt('#tblPayments', [0]), tCon = dt('#tblContracts', [0, 7]);
     const cards = (sel, list, fn) => $(sel).html(list.length ? list.map(fn).join('') : `<div class="col-12 text-center py-4 text-muted">${L.none}</div>`);
     const cardBtn = url => url ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;gap:4px;padding:6px;"><a class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px" href="${esc(url)}" target="_blank" rel="noopener"><i class="bi bi-eye"></i></a></div></div>` : '';
 
@@ -151,6 +160,41 @@ $(function () {
         });
     }
 
+    function contractActions(c) {
+        let items = '';
+        if (c.view_url) items += `<li><a class="dropdown-item py-2 rounded" href="${esc(c.view_url)}" target="_blank" rel="noopener"><i class="bi bi-eye text-primary me-2"></i>${L.view}</a></li>`;
+        if (c.state === 'awaiting_customer') items += `<li><button class="dropdown-item py-2 rounded" data-sign="${c.contract_id}"><i class="bi bi-pen text-primary me-2"></i>${L.sign}</button></li>`;
+        return items ? `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>` : '';
+    }
+    const cBadge = st => { const m = { signed: ['#052c65', '#fff'], awaiting_customer: ['#0d6efd', '#fff'], awaiting_bjp: ['#e9ecef', '#495057'] }; const [b, f] = m[st] || ['#e9ecef', '#495057'];
+        return `<span class="badge" style="background:${b};color:${f}">${esc(L[st] || st)}</span>`; };
+    function loadContracts() {
+        $.getJSON(API, { action: 'contracts' }).done(r => {
+            if (!r.success) return;
+            const list = r.contracts || [];
+            const toSign = list.filter(c => c.state === 'awaiting_customer').length;
+            $('#contractsToSign').text(toSign).toggleClass('d-none', !toSign);
+            tCon.clear().rows.add(list.map((c, i) => [i + 1, esc(c.code), esc(c.service), esc(c.period), dmy(c.period_start), dmy(c.period_end), cBadge(c.state), contractActions(c)])).draw();
+            cards('#cardsContracts', list, c => `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+                <div class="d-flex justify-content-between"><span class="fw-bold">${esc(c.code)}</span>${cBadge(c.state)}</div>
+                <div class="small">${esc(c.service)} · ${esc(c.period)}</div><div class="small text-muted">${dmy(c.period_start)} → ${dmy(c.period_end)}</div></div>
+                ${(c.view_url || c.state === 'awaiting_customer') ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;gap:4px;padding:6px;">
+                    ${c.view_url ? `<a class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px" href="${esc(c.view_url)}" target="_blank" rel="noopener"><i class="bi bi-eye"></i></a>` : ''}
+                    ${c.state === 'awaiting_customer' ? `<button class="btn btn-sm btn-primary" style="flex:1;padding:3px 4px" data-sign="${c.contract_id}"><i class="bi bi-pen"></i></button>` : ''}
+                </div></div>` : ''}</div></div>`);
+        });
+    }
+    $(document).on('click', '[data-sign]', function () {
+        const id = $(this).data('sign');
+        // Open the window first (a popup opened after an AJAX call is blocked), then point it at the signing page.
+        const w = window.open('', '_blank');
+        if (w) w.document.write(`<p style="font-family:sans-serif;padding:20px">${L.opening}</p>`);
+        $.ajax({ url: API, type: 'POST', dataType: 'json', data: { action: 'contract_sign', _csrf: CSRF, contract_id: id } })
+            .done(r => { if (r.success && r.sign_url) { if (w) w.location.href = r.sign_url; else window.location.href = r.sign_url; }
+                         else { if (w) w.close(); Swal.fire({ icon: 'error', title: L.error, text: r.message }); } })
+            .fail(x => { if (w) w.close(); Swal.fire({ icon: 'error', title: L.error, text: (x.responseJSON || {}).message || L.unreachable }); });
+    });
+
     $(document).on('click', '[data-req]', function () {
         const b = $(this);
         Swal.fire({ title: L.confirmQ, text: L.confirmTxt.replace('%s', money(b.data('price')) + ' TZS').replace('%p', b.data('label')),
@@ -173,7 +217,7 @@ $(function () {
         });
     });
 
-    loadStatus(); loadCatalog(); loadDocs();
+    loadStatus(); loadCatalog(); loadDocs(); loadContracts();
 });
 </script>
 <?php endif; ?>

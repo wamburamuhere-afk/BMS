@@ -45,5 +45,15 @@ $p = $sptPrefix;
             <?= t('when an invoice for it is fully paid, the customer\'s company gets the term\'s months added automatically. Terms must be in months or years.') ?>
         </label>
     </div>
+    <div class="mt-2">
+        <label class="form-label small fw-bold" for="<?= $p ?>_contract_template"><?= t('Contract template') ?> <span class="text-muted fw-normal">(<?= t('optional') ?>)</span></label>
+        <select class="form-select form-select-sm select2-static" name="contract_template_id" id="<?= $p ?>_contract_template">
+            <option value=""><?= t('No contract') ?></option>
+            <?php foreach (($contractTemplates ?? []) as $ct): ?>
+            <option value="<?= (int)$ct['id'] ?>"><?= safe_output($ct['template_name'], '') ?></option>
+            <?php endforeach; ?>
+        </select>
+        <div class="form-text"><?= t('When a subscription invoice is paid, a contract is made from this Document Template for BJP and then the customer to sign. Tokens such as {{customer_name}}, {{period}}, {{period_start}}, {{period_end}}, {{amount}} are filled in.') ?></div>
+    </div>
     <?php endif; ?>
 </div>

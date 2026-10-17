@@ -116,7 +116,7 @@ if (!function_exists('plDocTokenRead')) {
         [$payload, $sig] = explode('.', $token);
         if (!hash_equals(hash_hmac('sha256', 'doc|' . $payload, $k), $sig)) return null;
         $parts = explode('|', (string)base64_decode(strtr($payload, '-_', '+/')));
-        if (count($parts) !== 4 || (int)$parts[3] < time() || !in_array($parts[0], ['quotation', 'invoice'], true)) return null;
+        if (count($parts) !== 4 || (int)$parts[3] < time() || !in_array($parts[0], ['quotation', 'invoice', 'contract'], true)) return null;
         return ['type' => $parts[0], 'id' => (int)$parts[1], 'customer_id' => (int)$parts[2]];
     }
 }

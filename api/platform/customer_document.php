@@ -17,6 +17,28 @@ $tok = plDocTokenRead((string)($_GET['t'] ?? ''));
 if (!$tok) $deny('This link has expired. Open the document again from My Subscription.', 403);
 
 global $pdo;
+if ($tok['type'] === 'contract') {
+    // The contract PDF itself: the customer's final signed copy once it exists, else BJP's signed copy.
+    require_once __DIR__ . '/../../core/subscription_contracts.php';
+    $st = $pdo->prepare("SELECT * FROM customer_contracts WHERE contract_id = ? AND customer_id = ?");
+    $st->execute([$tok['id'], $tok['customer_id']]);
+    $contract = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$contract) $deny('Not found', 404);
+    $s = scState($pdo, $contract);
+    $docId = $s['final_document_id'] ?? $s['bjp_signed_document_id'];
+    if (!$docId) $deny('This contract is not ready yet.', 404);
+    $d = $pdo->prepare("SELECT file_path, document_code FROM documents WHERE id = ?");
+    $d->execute([$docId]);
+    $doc = $d->fetch(PDO::FETCH_ASSOC);
+    $full = $doc ? realpath(ROOT_DIR . '/' . ltrim((string)$doc['file_path'], '/')) : false;
+    $uploads = realpath(ROOT_DIR . '/uploads');
+    if (!$full || !$uploads || strpos($full, $uploads) !== 0 || !is_file($full)) $deny('Not found', 404);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9_.-]/', '_', (string)$doc['document_code']) . '.pdf"');
+    header('Content-Length: ' . filesize($full));
+    readfile($full);
+    exit;
+}
 if ($tok['type'] === 'quotation') {
     $h = $pdo->prepare("SELECT order_number AS number, order_date AS date, quote_valid_until AS second_date, subtotal, tax_amount,
                                discount_amount, grand_total, currency, status, notes, customer_id, NULL AS paid_amount, NULL AS balance_due

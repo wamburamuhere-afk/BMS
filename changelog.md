@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(subscriptions) Phase 6: subscription contract after payment, signed by BJP and then the customer
+
+**When a subscription invoice is paid, the contract is made automatically; BJP signs it, then the customer signs it digitally from My Subscription — no visit needed, and both sides keep the signed copy.** Nothing is signed automatically: both signatures use the existing E-Signature flows.
+- `core/subscription_contracts.php` (new) + `migrations/tenant/2026_10_16_subscription_contracts.php` + `_legacy_db` — `customer_contracts` (one per invoice), `vendor_subscription_services.contract_template_id`, `subscription.contract_ready` notification (to users who can create documents). The contract is a real PDF on the letterhead (`generateLetterPdf()`), made from a Document Template BJP writes; extra tokens `{{customer_name}} {{customer_tin}} {{customer_address}} {{service_name}} {{period}} {{period_start}} {{period_end}} {{amount}} {{invoice_number}} {{web_address}}`. Its status (waiting for BJP → waiting for the customer → signed by both) is read from the E-Signature records.
+- `core/vendor_bridge.php` — after a payment extends the company, the contract for that invoice is created (once; only when the service has a contract template).
+- Services (platform root): "Contract template" select (Select2) under the subscription flag — `includes/service_price_terms_editor.php`, `app/bms/product/services.php`, `api/create_nip_product.php`, `api/update_nip_product.php`, `api/account/get_service_price_terms.php`, `core/service_price_terms.php` (`vssContractTemplate`, `vssSetContractTemplate`).
+- Customer side: gateway actions `contracts` and `contract_sign_link` (`core/platform_gateway.php`) — a fresh one-time link to the existing `sign-document` page, created when the customer clicks Sign (older unused links stop working; only BJP's signed copy can be signed); `api/my_subscription.php` + My Subscription → **Contracts** tab (View / Sign); `api/platform/customer_document.php` serves the contract PDF (final copy once signed).
+- BJP side: Customer Details → Platform company card lists the customer's contracts with their state, **Sign as BJP** (opens E-Signatures on that document) and Open (`api/platform/customer_platform_link.php`, `app/bms/customer/customer_details.php`).
+- `tests/test_subscription_contracts_cli.php` (new, 28; 4 in CI) — template → real invoice + payment → contract PDF with tokens filled → once only / none without template → customer blocked until BJP signs → signing link, token hash only, old link expires → signed by both → final PDF to the customer only.
+
+Verified: 28/28; the Phase 1, 3, 4 and 5 suites still pass (47, 39, 33, 36); inline scripts of Services, Customer Details and My Subscription pass `node --check`; no test data or files left behind.
+
+---
+
 ## 2026-10-16 — feat(subscriptions) Phase 5: "My Subscription" in each company's own system
 
 **A company admin sees how long access runs, chooses a period (BJP raises an approved quotation at once — catalogue price, no approval wait), and sees the quotations and invoices BJP issued to them.** A company never opens BJP's database:

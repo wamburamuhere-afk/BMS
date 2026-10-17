@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/vendor_context.php';
 require_once __DIR__ . '/../../core/vendor_link.php';
 require_once __DIR__ . '/../../core/vendor_bridge.php';
+require_once __DIR__ . '/../../core/subscription_contracts.php';
 
 header('Content-Type: application/json');
 $out = function (array $b, int $code = 200) { http_response_code($code); echo json_encode($b); exit; };
@@ -29,7 +30,13 @@ $list = function () use ($cid) {
 };
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $out(['success' => true, 'ready' => vlLinkReady(), 'tenants' => $list(), 'can_edit' => canEdit('customers')]);
+    $contracts = array_map(fn($k) => [
+        'code' => $k['document_code'], 'service' => $k['product_name'], 'period' => $k['period_label'],
+        'invoice' => $k['invoice_ref'], 'state' => $k['state'], 'document_id' => (int)$k['document_id'],
+        'signed_document_id' => $k['final_document_id'] ?? $k['bjp_signed_document_id'],
+    ], scForCustomer($pdo, $cid));
+    $out(['success' => true, 'ready' => vlLinkReady(), 'tenants' => $list(), 'can_edit' => canEdit('customers'),
+          'contracts' => $contracts, 'can_sign' => canCreate('documents')]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') $out(['success' => false, 'message' => 'Method not allowed'], 405);

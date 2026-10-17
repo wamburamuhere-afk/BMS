@@ -188,6 +188,9 @@ if (!function_exists('vbProcessInvoice')) {
                 return ['state' => 'alerted', 'message' => (string)$r['error']];
             }
             vbResolveAlerts($ref, 'applied');
+            // Phase 6: the subscription agreement for this payment (only if the service has a contract template).
+            require_once __DIR__ . '/subscription_contracts.php';
+            scCreateForInvoice($pdo, $invoiceId, $t, $r['starts_at'] ?? null, $r['ends_at'] ?? null);
             return ['state' => 'done', 'message' => $r['duplicate'] ? 'already applied' : "extended {$t['subdomain']} by $months month(s) to {$r['ends_at']}",
                     'tenant_id' => (int)$t['id'], 'months' => $months, 'ends_at' => (string)$r['ends_at']];
         } catch (Throwable $e) {

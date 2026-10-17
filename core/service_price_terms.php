@@ -267,6 +267,36 @@ if (!function_exists('vssIsSubscription')) {
     }
 }
 
+if (!function_exists('vssContractTemplate')) {
+    /** The Document Template a subscription service's contract is made from (Phase 6), or null. */
+    function vssContractTemplate(PDO $pdo, int $productId): ?int
+    {
+        try {
+            $st = $pdo->prepare("SELECT contract_template_id FROM vendor_subscription_services WHERE product_id = ?");
+            $st->execute([$productId]);
+            $v = $st->fetchColumn();
+            return $v ? (int)$v : null;
+        } catch (Throwable $e) {
+            return null;   // column not there yet
+        }
+    }
+}
+
+if (!function_exists('vssSetContractTemplate')) {
+    /** 0 = no contract. Only an active template with content is accepted. Skipped before the migration ran. */
+    function vssSetContractTemplate(PDO $pdo, int $productId, int $templateId): void
+    {
+        if (!$pdo->query("SHOW COLUMNS FROM `vendor_subscription_services` LIKE 'contract_template_id'")->fetch()) return;
+        if ($templateId > 0) {
+            $ok = $pdo->prepare("SELECT 1 FROM document_templates WHERE id = ? AND is_active = 1 AND content IS NOT NULL");
+            $ok->execute([$templateId]);
+            if (!$ok->fetchColumn()) throw new InvalidArgumentException('The chosen contract template is not available.');
+        }
+        $pdo->prepare("UPDATE vendor_subscription_services SET contract_template_id = ? WHERE product_id = ?")
+            ->execute([$templateId > 0 ? $templateId : null, $productId]);
+    }
+}
+
 if (!function_exists('vssSet')) {
     /**
      * Mark/unmark a service as a BMS subscription. Callers gate this on

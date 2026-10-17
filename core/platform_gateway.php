@@ -16,6 +16,7 @@ require_once __DIR__ . '/platform_link.php';
 require_once __DIR__ . '/vendor_context.php';
 require_once __DIR__ . '/vendor_link.php';
 require_once __DIR__ . '/service_price_terms.php';
+require_once __DIR__ . '/subscription_contracts.php';
 
 if (!function_exists('pgHandle')) {
     /** @param array $headers X-Platform-Tenant / -Ts / -Sig @return array{0:int,1:array} [http code, body] */
@@ -34,6 +35,11 @@ if (!function_exists('pgHandle')) {
         switch ((string)($req['action'] ?? '')) {
             case 'catalog':   return [200, pgCatalog($pdo) + ['linked' => $cid > 0]];
             case 'documents': return [200, $cid > 0 ? pgDocuments($pdo, $cid) : ['success' => true, 'linked' => false, 'quotations' => [], 'invoices' => []]];
+            case 'contracts':
+                return [200, $cid > 0 ? pgContracts($pdo, $cid) : ['success' => true, 'linked' => false, 'contracts' => []]];
+            case 'contract_sign_link':
+                if ($cid <= 0) return [200, ['success' => false, 'message' => 'Your company is not linked to a customer account at BJP yet.']];
+                return [200, pgContractSignLink($pdo, $tenant, $cid, (int)($req['contract_id'] ?? 0))];
             case 'request_quote':
                 if ($cid <= 0) {
                     return [200, ['success' => false, 'linked' => false,
@@ -94,6 +100,45 @@ if (!function_exists('pgDocuments')) {
             'view_token' => plDocToken('invoice', (int)$r['id'], $cid),
         ], $i->fetchAll(PDO::FETCH_ASSOC));
         return ['success' => true, 'linked' => true, 'quotations' => $quotes, 'invoices' => $invoices];
+    }
+}
+
+if (!function_exists('pgContracts')) {
+    function pgContracts(PDO $pdo, int $cid): array
+    {
+        $out = [];
+        foreach (scForCustomer($pdo, $cid) as $c) {
+            if ($c['state'] === 'cancelled') continue;
+            // The customer sees a contract once BJP has signed it (and the final copy once they signed too).
+            $viewDoc = $c['state'] === 'signed' ? $c['final_document_id'] : ($c['state'] === 'awaiting_customer' ? $c['bjp_signed_document_id'] : null);
+            $out[] = [
+                'contract_id' => (int)$c['contract_id'], 'code' => $c['document_code'], 'service' => $c['product_name'],
+                'period' => $c['period_label'], 'period_start' => $c['period_start'], 'period_end' => $c['period_end'],
+                'invoice' => $c['invoice_ref'], 'state' => $c['state'], 'date' => substr((string)$c['created_at'], 0, 10),
+                'view_token' => $viewDoc ? plDocToken('contract', (int)$c['contract_id'], $cid) : null,
+            ];
+        }
+        return ['success' => true, 'linked' => true, 'contracts' => $out];
+    }
+}
+
+if (!function_exists('pgContractSignLink')) {
+    function pgContractSignLink(PDO $pdo, array $tenant, int $cid, int $contractId): array
+    {
+        $st = $pdo->prepare("SELECT cc.*, c.customer_name, c.company_name, c.email FROM customer_contracts cc
+                               JOIN customers c ON c.customer_id = cc.customer_id
+                              WHERE cc.contract_id = ? AND cc.customer_id = ?");
+        $st->execute([$contractId, $cid]);
+        $c = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$c) return ['success' => false, 'message' => 'Contract not found.'];
+        $state = scState($pdo, $c)['state'];
+        if ($state === 'awaiting_bjp') return ['success' => false, 'message' => 'BJP has not signed this contract yet. It will be ready for you shortly.'];
+        if ($state !== 'awaiting_customer') return ['success' => false, 'message' => 'This contract is already signed.'];
+        $email = trim((string)($c['email'] ?: ($tenant['owner_email'] ?? '')));
+        $token = scCustomerSignLink($pdo, $c, (string)($c['company_name'] ?: $c['customer_name']), $email);
+        if ($token === null) return ['success' => false, 'message' => 'Could not prepare the signing page. Please try again.'];
+        $url = (function_exists('buildUrl') ? buildUrl('sign-document') : '/sign-document') . '?token=' . $token;
+        return ['success' => true, 'sign_url' => $url];
     }
 }
 

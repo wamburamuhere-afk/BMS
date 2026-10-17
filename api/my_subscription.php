@@ -7,6 +7,8 @@
  *   GET  action=catalog    → subscription periods BJP sells            (signed call to the platform root)
  *   GET  action=documents  → this company's quotations + invoices from BJP
  *   POST action=request    → product_id, term_id → an approved quotation at BJP
+ *   GET  action=contracts  → subscription contracts BJP has signed for this company
+ *   POST action=contract_sign → contract_id → a one-time link to sign it
  *
  * The tenant id is always this server's own (bmsCurrentTenantId()), never from the request.
  */
@@ -68,6 +70,25 @@ if ($action === 'documents') {
         }
     }
     $out($r, !empty($r['success']) ? 200 : 502);
+}
+
+if ($action === 'contracts') {
+    $r = plCall($tenantId, 'contracts');
+    if (!empty($r['success'])) {
+        foreach ($r['contracts'] ?? [] as $i => $c) {
+            $r['contracts'][$i]['view_url'] = $docUrl($c['view_token'] ?? null);
+            unset($r['contracts'][$i]['view_token']);
+        }
+    }
+    $out($r, !empty($r['success']) ? 200 : 502);
+}
+
+if ($action === 'contract_sign') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') $out(['success' => false, 'message' => 'Method not allowed'], 405);
+    csrf_check();
+    $r = plCall($tenantId, 'contract_sign_link', ['contract_id' => (int)($_POST['contract_id'] ?? 0)]);
+    if (!empty($r['success'])) logActivity($pdo, (int)$_SESSION['user_id'], 'Contract signing', 'Opened the BJP subscription contract for signing');
+    $out($r, !empty($r['success']) ? 200 : 422);
 }
 
 if ($action === 'request') {

@@ -47,6 +47,7 @@ try {
         'success'         => true,
         'data'            => $terms,
         'is_subscription' => isPlatformVendorContext() && vssIsSubscription($pdo, $productId),
+        'contract_template_id' => isPlatformVendorContext() ? vssContractTemplate($pdo, $productId) : null,
     ]);
 } catch (Throwable $e) {
     error_log('get_service_price_terms: ' . $e->getMessage());

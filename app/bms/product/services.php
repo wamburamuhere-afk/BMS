@@ -108,6 +108,9 @@ $svc_price_html = function (array $svc) use ($svc_terms): string {
         . (int)$t['count'] . ' ' . ($t['count'] === 1 ? t('term') : t('terms')) . '</span>';
 };
 $isVendor = isPlatformVendorContext();
+$contractTemplates = $isVendor
+    ? $pdo->query("SELECT id, template_name FROM document_templates WHERE is_active = 1 AND content IS NOT NULL ORDER BY template_name")->fetchAll(PDO::FETCH_ASSOC)
+    : [];
 
 // ?edit=N (the service page's Edit button, pos_detail_pages_plan.md C4): open that
 // service's Edit form on load — same row shape as the list, same scope.
@@ -1667,6 +1670,8 @@ function sptReset(prefix) {
     body.innerHTML = '';
     const sub = document.getElementById(prefix + '_is_subscription');
     if (sub) sub.checked = false;
+    const tpl = document.getElementById(prefix + '_contract_template');
+    if (tpl) $(tpl).val('').trigger('change');
     sptSync(prefix);
 }
 
@@ -1679,6 +1684,8 @@ function sptLoad(prefix, productId) {
             (json.data || []).forEach(t => sptAddRow(prefix, t));
             const sub = document.getElementById(prefix + '_is_subscription');
             if (sub) sub.checked = !!json.is_subscription;
+            const tpl = document.getElementById(prefix + '_contract_template');
+            if (tpl) $(tpl).val(json.contract_template_id ? String(json.contract_template_id) : '').trigger('change');
         })
         .catch(() => {});
 }
@@ -1973,8 +1980,8 @@ $(function () {
     // because Select2 fires the native 'change' on selection, and
     // filterWarehouses() re-syncs the warehouse Select2 after it rebuilds it.
     const svcModalSelects = {
-        addServiceModal: ['#svc_tax_id', '#svc_project_id', '#svc_warehouse_id'],
-        editSvcModal:    ['#edit_svc_tax', '#edit_svc_project_id', '#edit_svc_warehouse_id']
+        addServiceModal: ['#svc_tax_id', '#svc_project_id', '#svc_warehouse_id', '#svc_contract_template'],
+        editSvcModal:    ['#edit_svc_tax', '#edit_svc_project_id', '#edit_svc_warehouse_id', '#edit_svc_contract_template']
     };
     Object.keys(svcModalSelects).forEach(function (modalId) {
         const modalEl = document.getElementById(modalId);

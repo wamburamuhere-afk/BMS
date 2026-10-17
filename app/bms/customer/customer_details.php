@@ -624,6 +624,8 @@ global $company_name, $company_logo;
                     'save' => t('Link'), 'cancel' => t('Cancel'), 'req' => t('Enter the company web address.'),
                     'unlinkQ' => t('Remove this link?'), 'unlinkTxt' => t('Paid invoices will no longer extend this company\'s access.'),
                     'error' => t('Error'), 'notReady' => t('The platform database has not been upgraded yet. Ask the administrator to run the platform setup.'),
+                    'contracts' => t('Subscription contracts'), 'signBjp' => t('Sign as BJP'), 'open' => t('Open'),
+                    'awaiting_bjp' => t('Waiting for BJP signature'), 'awaiting_customer' => t('Waiting for the customer'), 'signed' => t('Signed by both'),
                 ]) ?>;
                 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
                 function render(list, ready) {
@@ -635,9 +637,24 @@ global $company_name, $company_logo;
                         ${CAN ? `<button type="button" class="btn btn-sm btn-outline-danger" data-unlink="${t.id}" title="${esc(T.unlink)}"><i class="bi bi-x-lg"></i></button>` : ''}
                     </div>`).join(''));
                 }
-                const load = () => $.getJSON(URL_, { customer_id: CID }).done(r => r.success && render(r.tenants || [], r.ready));
+                const SIGN_URL = '<?= getUrl('select_document_add_esignature') ?>', DOC_URL = '<?= getUrl('document_library') ?>';
+                function renderContracts(list, canSign) {
+                    $('#platformContracts').remove();
+                    if (!list.length) return;
+                    const badge = st => { const m = { signed: ['#052c65', '#fff'], awaiting_customer: ['#0d6efd', '#fff'], awaiting_bjp: ['#e9ecef', '#495057'] };
+                        const [b, f] = m[st] || ['#e9ecef', '#495057']; return `<span class="badge" style="background:${b};color:${f}">${esc(T[st] || st)}</span>`; };
+                    $('#platformLinkBody').append(`<div id="platformContracts" class="mt-3"><div class="small fw-bold text-primary mb-1">${T.contracts}</div>` +
+                        list.map(k => `<div class="border rounded p-2 mb-1">
+                            <div class="d-flex justify-content-between align-items-center gap-2"><span class="fw-bold small">${esc(k.code)}</span>${badge(k.state)}</div>
+                            <div class="small text-muted">${esc(k.service || '')} · ${esc(k.period || '')} · ${esc(k.invoice)}</div>
+                            <div class="mt-1 d-flex gap-1">
+                                ${k.state === 'awaiting_bjp' && canSign ? `<a class="btn btn-sm btn-primary" href="${SIGN_URL}?document_id=${k.document_id}"><i class="bi bi-pen"></i> ${T.signBjp}</a>` : ''}
+                                <a class="btn btn-sm btn-outline-primary" href="${DOC_URL}?action=view&document_id=${k.signed_document_id || k.document_id}" target="_blank" rel="noopener"><i class="bi bi-eye"></i> ${T.open}</a>
+                            </div></div>`).join('') + '</div>');
+                }
+                const load = () => $.getJSON(URL_, { customer_id: CID }).done(r => { if (r.success) { render(r.tenants || [], r.ready); renderContracts(r.contracts || [], !!r.can_sign); } });
                 const post = data => $.ajax({ url: URL_, type: 'POST', dataType: 'json', data: Object.assign({ _csrf: CSRF_, customer_id: CID }, data) })
-                    .done(r => { if (r.success) { render(r.tenants || [], true); Swal.fire({ icon: 'success', title: r.message, timer: 1800, showConfirmButton: false }); }
+                    .done(r => { if (r.success) { load(); Swal.fire({ icon: 'success', title: r.message, timer: 1800, showConfirmButton: false }); }
                                  else Swal.fire({ icon: 'error', title: T.error, text: r.message }); })
                     .fail(x => Swal.fire({ icon: 'error', title: T.error, text: (x.responseJSON || {}).message || '' }));
                 $('#btnPlatformLink').on('click', () => Swal.fire({ title: T.q, text: T.hint, input: 'text', showCancelButton: true,

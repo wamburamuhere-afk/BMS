@@ -132,6 +132,7 @@ try {
     }
     if ($is_subscription) {
         vssSet($pdo, (int)$product_id, true, $price_terms ?? [], (int)$user_id);
+        vssSetContractTemplate($pdo, (int)$product_id, (int)($_POST['contract_template_id'] ?? 0));
     }
 
     // Auto-generate the company-prefixed Item Code, e.g. BFS-NIP-0001.

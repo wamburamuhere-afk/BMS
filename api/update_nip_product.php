@@ -165,6 +165,7 @@ try {
     // form rendered it (so an edit from elsewhere never clears it by omission).
     if (isPlatformVendorContext() && !empty($_POST['subscription_flag_sent'])) {
         vssSet($pdo, $product_id, !empty($_POST['is_subscription']), $active_terms, (int)$user_id);
+        if (!empty($_POST['is_subscription'])) vssSetContractTemplate($pdo, $product_id, (int)($_POST['contract_template_id'] ?? 0));
     }
 
     $pdo->commit();
