@@ -162,7 +162,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-header bg-white p-4 border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="mb-0 fw-bold"><i class="bi bi-phone me-2 text-success"></i><?= t('Mobile Money') ?></h5>
-                        <button type="button" class="btn btn-success btn-sm" onclick="openAccountModal('mobile')">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openAccountModal('mobile')">
                             <i class="bi bi-plus-circle me-1"></i><?= t('Add Mobile Money') ?>
                         </button>
                     </div>
@@ -320,8 +320,15 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
                     <div class="pa-meta">${esc(holder(a))}${hiddenNote}</div>
                 </div>
                 <div class="pa-actions">
-                    <button type="button" class="btn btn-sm btn-outline-primary" title="${esc(TXT.edit)}" onclick="openAccountModal('${kind}', ${i})"><i class="bi bi-pencil"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" title="${esc(TXT.remove)}" onclick="removeAccount('${kind}', ${i})"><i class="bi bi-trash"></i></button>
+                    <div class="dropdown">
+                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="openAccountModal('${kind}', ${i}); return false;"><i class="bi bi-pencil me-2 text-primary"></i>${esc(TXT.edit)}</a></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="removeAccount('${kind}', ${i}); return false;"><i class="bi bi-trash me-2"></i>${esc(TXT.remove)}</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>`;
         }).join('');
