@@ -127,6 +127,8 @@ if (!function_exists('bmsFeatureRegistry')) {
                     // primary lens is still sales/quotation analytics.
                     'performance_dashboard', 'customer_analysis', 'product_analysis',
                     'sales_forecast', 'trends_analysis',
+                    // 2026-10-13: service sales from invoices (+ POS) — Sales module data.
+                    'service_sales_report',
                 ],
                 'paths'       => ['api/sales/'],
                 // Verified in code, not assumed: sales_order_create.php has

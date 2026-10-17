@@ -30,6 +30,7 @@ $date_from    = $_GET['date_from']    ?? date('Y-01-01');
 $date_to      = $_GET['date_to']      ?? date('Y-12-31');
 $project_id   = (isset($_GET['project_id'])   && $_GET['project_id']   !== '') ? (int)$_GET['project_id']   : null;
 $warehouse_id = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ? (int)$_GET['warehouse_id'] : null;
+$item_type    = in_array($_GET['item_type'] ?? '', ['', 'product', 'service'], true) ? ($_GET['item_type'] ?? '') : '';
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success'=>false,'message'=>'Invalid date range']); exit;
@@ -66,27 +67,45 @@ try {
     // Aggregated PER-PRODUCT first (each source individually), so joining
     // two one-to-many item tables to `products` at once can't fan out and
     // inflate SUMs — a classic multi-join bug avoided here on purpose.
+    // Revenue is after line discounts (invoice discount_amount; POS line_total
+    // is already net). The analysis starts from the sold lines, so an item that
+    // was deleted later, or a line typed by hand, still counts.
+    $hasLineDiscount = (bool)$pdo->query("SHOW COLUMNS FROM invoice_items LIKE 'discount_amount'")->fetch();
+    $invNet = $hasLineDiscount ? "ii.quantity * ii.unit_price - COALESCE(ii.discount_amount, 0)" : "ii.quantity * ii.unit_price";
+    $U = fn(string $col) => "CONVERT($col USING utf8mb4) COLLATE utf8mb4_unicode_ci";
     $combined = "
-        SELECT ii.product_id, ii.quantity AS qty, ii.unit_price AS unit_price, (ii.quantity * ii.unit_price) AS revenue
+        SELECT COALESCE(ii.product_id, 0) AS product_id, {$U('ii.product_name')} AS line_name,
+               ii.quantity AS qty, ii.unit_price AS unit_price, ($invNet) AS revenue
           FROM invoice_items ii
           JOIN invoices i ON ii.invoice_id = i.invoice_id AND $invCond
         UNION ALL
-        SELECT psi.product_id, psi.quantity, psi.unit_price, (psi.quantity * psi.unit_price)
+        SELECT psi.product_id, {$U('psi.product_name')}, psi.quantity, psi.unit_price, COALESCE(psi.line_total, psi.quantity * psi.unit_price)
           FROM pos_sale_items psi
           JOIN pos_sales ps ON psi.sale_id = ps.sale_id AND $posCond
     ";
+    $typeCond = '';
+    if ($item_type === 'service') $typeCond = " WHERE (ci.product_id = 0 OR p.is_service = 1)";
+    if ($item_type === 'product') $typeCond = " WHERE p.product_id IS NOT NULL AND COALESCE(p.is_service, 0) = 0";
 
     $stmt = $pdo->prepare("
-        SELECT p.product_code, p.product_name,
-               COALESCE(c.category_name, 'Uncategorised') AS category,
-               COUNT(ci.product_id)                       AS times_sold,
-               COALESCE(SUM(ci.qty), 0)                   AS qty_sold,
-               COALESCE(SUM(ci.revenue), 0)                AS revenue,
-               COALESCE(AVG(ci.unit_price), 0)             AS avg_price
-          FROM products p
+        SELECT ci.product_id,
+               MAX(CASE WHEN p.is_service = 1
+                        THEN COALESCE(NULLIF({$U('p.contract_item_no')}, ''), NULLIF({$U('p.product_code')}, ''), '')
+                        ELSE COALESCE(NULLIF({$U('p.product_code')}, ''), NULLIF({$U('p.contract_item_no')}, ''), '') END) AS product_code,
+               CASE WHEN ci.product_id = 0 THEN 'Not linked to an item'
+                    ELSE MAX(COALESCE({$U('p.product_name')}, ci.line_name)) END   AS product_name,
+               MAX(COALESCE({$U('c.category_name')}, 'Uncategorised'))             AS category,
+               MAX(COALESCE(p.is_service, 0))                                      AS is_service,
+               MAX(CASE WHEN ci.product_id > 0 AND p.product_id IS NULL THEN 1 ELSE 0 END) AS deleted,
+               COUNT(*)                                                            AS times_sold,
+               COALESCE(SUM(ci.qty), 0)                                            AS qty_sold,
+               COALESCE(SUM(ci.revenue), 0)                                        AS revenue,
+               COALESCE(AVG(ci.unit_price), 0)                                     AS avg_price
+          FROM ($combined) ci
+          LEFT JOIN products p   ON p.product_id = ci.product_id AND ci.product_id > 0
           LEFT JOIN categories c ON p.category_id = c.category_id
-          LEFT JOIN ($combined) ci ON ci.product_id = p.product_id
-      GROUP BY p.product_id, p.product_code, p.product_name, c.category_name
+          $typeCond
+      GROUP BY ci.product_id
         HAVING qty_sold > 0
       ORDER BY revenue DESC
     ");

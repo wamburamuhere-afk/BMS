@@ -62,6 +62,12 @@ $currency  = get_setting('currency', 'TZS');
                         <option value=""><?= wLabel('All My Warehouses', 'All My Shops') ?></option>
                         <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
                     </select></div>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Type') ?></label>
+                    <select name="item_type" id="f-type" class="form-select" style="width:100%">
+                        <option value=""><?= t('Products and Services') ?></option>
+                        <option value="product"><?= t('Products only') ?></option>
+                        <option value="service"><?= t('Services only') ?></option>
+                    </select></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
         </div>
@@ -158,7 +164,7 @@ $(function () {
     }
 
     function loadReport() {
-        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '', warehouse_id: $('#f-warehouse').val() || '' };
+        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '', warehouse_id: $('#f-warehouse').val() || '', item_type: $('#f-type').val() || '' };
         $.getJSON(DATA_URL, params).done(function (res) {
             if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
             $('#stat-products').text(num(res.summary.products_sold));
@@ -168,7 +174,10 @@ $(function () {
             renderCharts(res.charts);
             table.clear();
             res.rows.forEach((r, i) => table.row.add([
-                i + 1, r.product_code || '', r.product_name ? caseFormatJs(r.product_name) : '', r.category || 'Uncategorised',
+                i + 1, $('<span>').text(r.product_code || '').html(),
+                $('<span>').text((r.product_name ? caseFormatJs(r.product_name) : '') + (+r.deleted ? ' (deleted)' : '')).html()
+                    + (+r.is_service ? ' <span class="badge" style="background:#cfe2ff;color:#084298">Service</span>' : ''),
+                $('<span>').text(r.category || 'Uncategorised').html(),
                 num(r.times_sold), num(r.qty_sold), fmt(r.avg_price), fmt(r.revenue)
             ]));
             table.draw();
@@ -178,6 +187,7 @@ $(function () {
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
     $('#f-project').on('change', loadReport);
     $('#f-warehouse').on('change', loadReport);
+    $('#f-type').on('change', loadReport);
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Product Analysis', 'Loaded product performance report');
 });

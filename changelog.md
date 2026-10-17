@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-10-13 — feat(reports): Service Sales Report; Product Analysis and service page show service sales properly (service-sales Phase 3)
+
+- **New Service Sales Report** — `app/constant/reports/service_sales_report.php` + `api/account/get_service_sales_report.php`. Per service: code (Item Code), category, quantity, documents, customers, gross, discount, net revenue, VAT, share of total, average price, last sold; totals row; Excel export and print. Charts: top services by revenue, monthly trend of the top 5, revenue by category, quoted vs invoiced with conversion rate. Filters: dates, source (invoices / POS / both), customer, category, project. Invoices count only once posted to the ledger and not cancelled; POS service sales are net of returns; lines typed by hand appear as one "Not linked" row. Project/warehouse scope applied for non-admins.
+- Registered as page key `service_sales_report` (route, file map, reports gate, Sales module). Migrations `2026_10_13_service_sales_report_permission` (tenant + legacy) create the permission and give view access to every role that can already view Product Analysis.
+- Reports menu: the link appears in the full Reports menu only; the Simple POS report list is unchanged.
+- `api/account/get_product_analysis_report.php`, `app/constant/reports/product_analysis.php` — new Products / Services filter; services show their Item Code; revenue is after line discounts; analysis starts from the sold lines, so a deleted item or a hand-typed line no longer disappears; service badge in the table.
+- `app/bms/product/service_view.php` — in full mode the service page also shows invoice sales (invoices, customers, net revenue, last invoiced), the last 10 invoices and open quotations. Simple POS mode keeps the POS-only view.
+- `lang/sw.php` — Swahili labels for the new texts.
+- Not touched: any `api/pos/*` or `app/bms/pos/*` file.
+
+Verified: `tests/test_service_sales_phase3_cli.php` (new) 23/23 — report figures (net/discount/VAT, cancelled excluded, Item Code, unlinked row, ranking, trend, quoted vs invoiced, filters, permission refused without grant), Product Analysis filter, and both full and Simple POS modes (setting switched briefly and restored); Phase 1 (38/38) and Phase 2 (30/30) tests still pass; related suites match develop.
+
+---
+
+## 2026-10-13 — fix(sales): service form, stock rules, search, reversal links, descriptions (service-sales Phase 2)
+
+- `app/bms/product/services.php` — the edit form had two fields named `unit` with the same id and the hidden one won, so a changed unit never saved; the duplicate is removed. New optional Category field, rendered in full mode only (the Simple POS form is unchanged).
+- `api/update_nip_product.php` — saves unit and category; a form without a category field (Simple POS) leaves the category alone. `api/create_nip_product.php` / `update_nip_product.php` — reject a negative price and a duplicate service name in the same shop (or company-wide); another shop may reuse a name.
+- `api/account/save_sales_order.php`, `api/account/check_stock.php` — services are skipped by the stock check (a service order with a warehouse chosen was refused for "Insufficient stock").
+- `api/account/save_invoice.php` — a warehouse is required only when a line holds stock. `invoice_create.php` switches to Service mode on its own when a services-only sales order is loaded.
+- `api/account/get_products.php`, invoice / sales-order edit forms — search also matches the Item Code.
+- `core/revenue_posting.php` — an invoice's revenue and COGS reversals now set `reverses_entry_id` to the entry they cancel.
+- Descriptions: quotation and sales-order lines now save the description (picked up from the service); it is carried to invoices and shown under the item name on the quotation, sales-order and invoice views and on all quotation (4) and sales-order (4) prints.
+- `includes/sales_unlinked_lines_js.php` (new) — before saving a quotation, sales order or invoice, warns about lines typed by hand (not linked to a catalogue item, so missing from product/service reports). Warning only; such lines stay allowed. Swahili strings added to `lang/sw.php`.
+- `tests/test_lpo_invoice_warehouse_cli.php` — assertion updated to the new warehouse rule.
+- Not touched: any `api/pos/*` or `app/bms/pos/*` file.
+
+Verified: `tests/test_service_sales_phase2_cli.php` (new) 30/30; Phase 1 test 38/38 still passing; related suites re-run (only the pre-existing `test_pos_simple_mode_cli` failures remain, identical on develop); edited forms render with no PHP errors and their inline JS parses.
+
+---
+
 ## 2026-10-13 — fix(sales): services keep their money right from quotation to invoice (service-sales Phase 1)
 
 An end-to-end test of selling a service found an invoice raised from a sales order dropping its VAT and discount (2,183,000 became 2,000,000), the same sales order invoiceable any number of times, large amounts clipped at 99,999,999.99, and invoiced services deletable.

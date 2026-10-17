@@ -111,6 +111,7 @@ $categories = $pdo->query("SELECT category_id, category_name FROM categories WHE
     AND category_id IN (SELECT DISTINCT category_id FROM products WHERE is_service = 1 AND status <> 'deleted' AND category_id IS NOT NULL)
     ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $tax_rates  = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status='active' ORDER BY rate_name")->fetchAll(PDO::FETCH_ASSOC);
+$form_categories = $pdo->query("SELECT category_id, category_name FROM categories WHERE status='active' AND type='product' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $brands     = $pdo->query("SELECT brand_id, brand_name FROM brands WHERE status='active' ORDER BY brand_name")->fetchAll(PDO::FETCH_ASSOC);
 $units      = $pdo->query("SELECT unit_code, unit_name FROM product_units WHERE status='active' ORDER BY unit_name ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -620,6 +621,17 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     <textarea class="form-control bg-light border-0" name="description"
                                         rows="2" placeholder="<?= t('Describe this service...') ?>"></textarea>
                                 </div>
+                                <?php if (!$simpleServiceForm): ?>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold small"><?= t('Category') ?> <span class="text-muted fw-normal">(<?= t('optional') ?>)</span></label>
+                                    <select class="form-select form-select-sm bg-light border-0" name="category_id" id="svc_category_id">
+                                        <option value=""><?= t('Uncategorised') ?></option>
+                                        <?php foreach ($form_categories as $fc): ?>
+                                        <option value="<?= (int)$fc['category_id'] ?>"><?= htmlspecialchars($fc['category_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <?php endif; ?>
                                 <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                     <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                     <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" placeholder="<?= t('Auto-generated on save') ?>" readonly>
@@ -780,7 +792,6 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                 <input type="hidden" name="product_id" id="edit_svc_id">
                 <input type="hidden" name="is_service" value="1">
                 <input type="hidden" name="track_inventory" value="0">
-                <input type="hidden" name="unit" id="edit_svc_unit" value="job">
                 <input type="hidden" name="status" id="edit_svc_status" value="active">
 
                 <div class="modal-body p-4">
@@ -812,6 +823,17 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                         <label class="form-label fw-bold small"><?= t('Description') ?></label>
                                         <textarea class="form-control bg-light border-0" name="description" id="edit_svc_desc" rows="2"></textarea>
                                     </div>
+                                    <?php if (!$simpleServiceForm): ?>
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold small"><?= t('Category') ?> <span class="text-muted fw-normal">(<?= t('optional') ?>)</span></label>
+                                        <select class="form-select form-select-sm bg-light border-0" name="category_id" id="edit_svc_category_id">
+                                            <option value=""><?= t('Uncategorised') ?></option>
+                                            <?php foreach ($form_categories as $fc): ?>
+                                            <option value="<?= (int)$fc['category_id'] ?>"><?= htmlspecialchars($fc['category_name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <?php endif; ?>
                                     <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                         <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                         <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" id="edit_svc_contract_no" readonly>
@@ -1541,6 +1563,8 @@ function openEditSvcModal(product) {
     document.getElementById('edit_svc_id').value = product.product_id;
     document.getElementById('edit_svc_name').value = product.product_name;
     document.getElementById('edit_svc_desc').value = product.description || '';
+    const editCat = document.getElementById('edit_svc_category_id');
+    if (editCat) editCat.value = product.category_id || '';
     
     // Reset and handle custom units
     resetUnitSelect('edit_svc_unit_container');

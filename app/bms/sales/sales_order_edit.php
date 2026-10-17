@@ -618,6 +618,7 @@ $is_quote = ($sales_order['is_quote'] == 1);
 
 
 
+<?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let currentItemIndex = null;
@@ -676,9 +677,9 @@ $(document).ready(function() {
         e.preventDefault();
         <?php if ($sales_order_id > 0 && $sales_order): ?>
         // When editing, preserve the current status
-        createSalesOrder('<?= $sales_order['status'] ?>');
+        bmsConfirmUnlinkedLines(() => createSalesOrder('<?= $sales_order['status'] ?>'));
         <?php else: ?>
-        createSalesOrder('pending');
+        bmsConfirmUnlinkedLines(() => createSalesOrder('pending'));
         <?php endif; ?>
     });
     
@@ -929,6 +930,7 @@ function addItemRow(product = null) {
                 </div>
                 <input type="hidden" class="item-product-id"
                        name="items[${index}][product_id]">
+                <input type="hidden" class="item-description" name="items[${index}][description]">
             </td>
             <td>
                 <input type="text" class="form-control item-sku"
@@ -986,6 +988,7 @@ function addItemRow(product = null) {
     if (product) {
         $row.find('.item-name').val(product.product_name || '');
         $row.find('.item-product-id').val(product.product_id != null ? product.product_id : '');
+        $row.find('.item-description').val(product.description || '');
         $row.find('.item-sku').val(product.sku || '');
         $row.find('.item-quantity').val(product.quantity != null ? product.quantity : 1);
         $row.find('.item-price').val(product.unit_price != null ? product.unit_price : (product.selling_price || 0));
@@ -1034,7 +1037,8 @@ function searchProducts(term = '') {
         results = productsCache.filter(p =>
             (p.product_name && p.product_name.toLowerCase().includes(searchTerm)) ||
             (p.sku && p.sku.toLowerCase().includes(searchTerm)) ||
-            (p.barcode && p.barcode.toLowerCase().includes(searchTerm))
+            (p.barcode && p.barcode.toLowerCase().includes(searchTerm)) ||
+            (p.contract_item_no && p.contract_item_no.toLowerCase().includes(searchTerm))
         );
     }
 
@@ -1084,6 +1088,7 @@ function selectProduct(productId) {
         const row = $(`#item-row-${currentItemIndex}`);
         row.find('.item-name').val(product.product_name);
         row.find('.item-product-id').val(product.product_id);
+        row.find('.item-description').val(product.description || '');
         row.find('.item-sku').val(product.sku || '');
         row.find('.item-unit').val(product.unit || 'pcs');
         row.find('.item-price').val(product.selling_price || 0);
@@ -1354,6 +1359,7 @@ function createSalesOrder(status = 'pending') {
     $('[id^="item-row-"]').each(function() {
         const item = {
             product_id: $(this).find('.item-product-id').val(),
+            description: $(this).find('.item-description').val() || '',
             product_name: $(this).find('.item-name').val(),
             sku: $(this).find('.item-sku').val(),
             quantity: $(this).find('.item-quantity').val(),

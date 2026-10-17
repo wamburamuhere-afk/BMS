@@ -189,8 +189,8 @@ try {
     $itemStmt = $pdo->prepare("
         INSERT INTO quotation_items (
             order_id, product_id, product_name, sku, quantity, unit,
-            unit_price, tax_rate, discount_percent, line_total, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            unit_price, tax_rate, discount_percent, line_total, description, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
     foreach ($items as $item) {
         $qty              = floatval($item['quantity'] ?? 1);
@@ -207,6 +207,7 @@ try {
         $itemStmt->execute([
             $quotation_id, $item['product_id'] ?: null, $item['product_name'], $item['sku'] ?? '',
             $qty, $item['unit'] ?? 'pcs', $price, $tax_rate, $discount_percent, $line_total,
+            trim((string)($item['description'] ?? '')) ?: null,
         ]);
     }
 

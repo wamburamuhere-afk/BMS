@@ -89,7 +89,7 @@ section('6. Backend — save_lpo.php always requires warehouse_id, persists it')
 (strpos($saveLpo, 'project_id, warehouse_id, issue_date') !== false) ? pass('INSERT persists warehouse_id') : fail('INSERT does not persist warehouse_id');
 
 section('7. Backend — save_invoice.php requires warehouse_id on CREATE only, unless service');
-(strpos($saveInv, 'if (!$is_update && !$is_service_invoice && !$warehouse_id)') !== false) ? pass('required gate is create-only + service-aware') : fail('required gate does not match the intended rule');
+(strpos($saveInv, 'if (!$is_update && !$is_service_invoice && $hasStockLine && !$warehouse_id)') !== false) ? pass('required gate is create-only + service-aware + only when a stock line is present') : fail('required gate does not match the intended rule');
 (strpos($saveInv, 'project_id = ?, warehouse_id = ?, invoice_date') !== false) ? pass('UPDATE persists warehouse_id') : fail('UPDATE does not persist warehouse_id');
 (strpos($saveInv, 'project_id, warehouse_id, invoice_date') !== false) ? pass('INSERT persists warehouse_id') : fail('INSERT does not persist warehouse_id');
 

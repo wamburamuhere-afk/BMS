@@ -301,7 +301,7 @@ require_once 'header.php';
                                 ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div>
+                                        <div class="fw-bold"><?= caseFormat($item['product_name']) ?></div><?php if (!empty($item['description'])): ?><div class="small text-muted"><?= htmlspecialchars($item['description']) ?></div><?php endif; ?>
                                         <?php if($item['sku']): ?>
                                             <small class="text-muted">SKU: <?= caseFormat($item['sku']) ?></small>
                                         <?php endif; ?>
