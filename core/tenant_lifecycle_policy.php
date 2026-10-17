@@ -261,6 +261,29 @@ if (!function_exists('extendTenantAccess')) {
     }
 }
 
+if (!function_exists('tenantLifecycleLog')) {
+    /**
+     * Write to tenant_admin_log from either side: the superadmin panel (uses its
+     * own logTenantAdminAction, which records the operator) or BJP's own install
+     * (no superadmin session — the acting BJP user is named in actor_email).
+     */
+    function tenantLifecycleLog(int $tenantId, string $subdomain, string $action, string $detail, ?string $actor = null): void
+    {
+        if (function_exists('logTenantAdminAction') && function_exists('currentSuperadmin') && currentSuperadmin() !== null) {
+            logTenantAdminAction($tenantId, $subdomain, $action, $detail);
+            return;
+        }
+        try {
+            getControlPdo()->prepare("INSERT INTO tenant_admin_log (superadmin_id, actor_email, tenant_id, subdomain, action, detail, ip_address)
+                                      VALUES (NULL, ?, ?, ?, ?, ?, ?)")
+                ->execute([$actor !== null ? mb_substr($actor, 0, 191) : 'system', $tenantId, $subdomain, $action,
+                           mb_substr($detail, 0, 500), substr((string)($_SERVER['REMOTE_ADDR'] ?? 'cli'), 0, 45)]);
+        } catch (Throwable $e) {
+            error_log('tenantLifecycleLog: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('controlColumnExists')) {
     /**
      * Control-DB schema is applied by an operator (scripts/setup_control_db.php),
@@ -377,12 +400,11 @@ if (!function_exists('applySubscriptionPayment')) {
             if ($hasSource) { $cols .= ", source, source_ref"; $vals .= ", ?, ?"; $p[] = $source; $p[] = $sourceRef; }
             $ctrl->prepare("INSERT INTO tenant_payments ($cols) VALUES ($vals)")->execute($p);
 
-            if (function_exists('logTenantAdminAction')) {
-                logTenantAdminAction($tenantId, (string)$t['subdomain'], 'payment_recorded',
-                    number_format($amountTzs) . " TZS for {$months} month(s); runs {$base} → {$endsAt}"
-                    . ($source !== 'manual' ? " (from {$sourceRef})" : '')
-                    . ($activate && $status !== 'active' ? '; tenant activated' : ''));
-            }
+            tenantLifecycleLog($tenantId, (string)$t['subdomain'], 'payment_recorded',
+                number_format($amountTzs) . " TZS for {$months} month(s); runs {$base} → {$endsAt}"
+                . ($source !== 'manual' ? " (from {$sourceRef})" : '')
+                . ($activate && $status !== 'active' ? '; tenant activated' : ''),
+                $source !== 'manual' ? 'BJP invoice bridge' : null);
 
             if ($ownTxn) $ctrl->commit();
             $res['ok'] = true; $res['starts_at'] = $base; $res['ends_at'] = $endsAt;

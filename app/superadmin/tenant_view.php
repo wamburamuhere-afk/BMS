@@ -53,6 +53,13 @@ try {
     if ($tenant) {
         $log = tenantAdminLog($id, 50);
         $migrationHealth = tenantMigrationHealth($id);
+        // Open alerts from the BJP invoice bridge for this tenant (table may not exist yet).
+        try {
+            $baSt = getControlPdo()->prepare("SELECT id, invoice_ref, kind, message, created_at FROM vendor_bridge_alerts
+                                               WHERE tenant_id = ? AND resolved_at IS NULL ORDER BY created_at DESC LIMIT 20");
+            $baSt->execute([$id]);
+            $bridgeAlerts = $baSt->fetchAll();
+        } catch (Throwable $_e) { $bridgeAlerts = []; }
         // Payment history — best-effort; table may not exist on older installs
         try {
             $phStmt = getControlPdo()->prepare("
@@ -1013,6 +1020,33 @@ if ($hasContext ?? false):
         </div>
         </div>
 
+        <!-- Paid by (the BJP customer linked to this tenant) -->
+        <div class="col-12">
+        <div class="card detail-card">
+            <div class="card-header"><i class="bi bi-person-badge text-primary me-1"></i> Paid by (BJP customer)</div>
+            <div class="card-body small">
+            <?php if (!array_key_exists('vendor_customer_id', $tenant)): ?>
+                <span class="text-muted">The control database has not been upgraded for this yet — run <code>php scripts/setup_control_db.php</code>.</span>
+            <?php elseif (empty($tenant['vendor_customer_id'])): ?>
+                <span class="text-muted">Not linked. Link it from BJP's system: <strong>Customer Visits</strong> (mark the visit joined with this company's web address, then <em>Make real customer</em>) or the customer's page (<em>Platform company → Link</em>). Until then, paid BJP invoices cannot extend this tenant automatically.</span>
+            <?php else: ?>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div><span class="fw-semibold"><?= safe_output($tenant['vendor_customer_label'] ?? '', 'Customer #' . (int)$tenant['vendor_customer_id']) ?></span>
+                        <div class="text-muted">A fully paid BJP invoice for this customer's subscription service extends this tenant automatically.</div></div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="btnVendorUnlink"><i class="bi bi-x-lg me-1"></i>Remove link</button>
+                </div>
+            <?php endif; ?>
+            <?php foreach (($bridgeAlerts ?? []) as $ba): ?>
+                <div class="alert alert-warning py-2 px-2 mt-2 mb-0 d-flex justify-content-between align-items-start gap-2">
+                    <div><strong>Invoice <?= safe_output($ba['invoice_ref'], '') ?>:</strong> <?= safe_output($ba['message'], '') ?>
+                        <div class="text-muted" style="font-size:.75rem"><?= safe_output($ba['created_at'], '') ?></div></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-resolve-alert="<?= (int)$ba['id'] ?>">Done</button>
+                </div>
+            <?php endforeach; ?>
+            </div>
+        </div>
+        </div>
+
         <!-- Payment history card -->
         <div class="col-12">
         <div class="card detail-card">
@@ -1041,7 +1075,9 @@ if ($hasContext ?? false):
                             <td><?= (int)$p['duration_months'] ?> month<?= $p['duration_months'] != 1 ? 's' : '' ?></td>
                             <td class="small"><?= date('d M Y', strtotime((string)$p['starts_at'])) ?></td>
                             <td class="small"><?= date('d M Y', strtotime((string)$p['ends_at'])) ?></td>
-                            <td class="small text-muted"><?= htmlspecialchars($p['recorded_by_email'] ?? 'system', ENT_QUOTES) ?></td>
+                            <td class="small text-muted"><?= ($p['source'] ?? 'manual') === 'vendor_invoice'
+                                ? '<span class="badge" style="background:#cfe2ff;color:#084298">BJP invoice ' . htmlspecialchars((string)$p['source_ref'], ENT_QUOTES) . '</span>'
+                                : htmlspecialchars($p['recorded_by_email'] ?? 'system', ENT_QUOTES) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars($p['notes'] ?? '', ENT_QUOTES) ?></td>
                         </tr>
                     <?php endforeach; ?>
@@ -2327,6 +2363,33 @@ function doPurge() {
         icon: 'warning', confirmButtonColor: '#dc3545', confirmButtonText: 'Remove permanently'
     }, { action: 'purge' }, 'Removed', 'tenants.php');
 }
+
+// Remove the tenant ↔ BJP customer link (customer_subscription_plan.md Phase 3).
+document.getElementById('btnVendorUnlink')?.addEventListener('click', function () {
+    Swal.fire({ title: 'Remove this link?', text: 'Paid BJP invoices will no longer extend this tenant until it is linked again.',
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Remove link' })
+    .then(r => {
+        if (!r.isConfirmed) return;
+        const fd = new FormData();
+        fd.append('_csrf', <?= json_encode(csrf_token()) ?>); fd.append('tenant_id', '<?= (int)$id ?>'); fd.append('action', 'unlink');
+        fetch('/actions/superadmin_tenant_vendor_customer.php', { method: 'POST', body: fd })
+            .then(x => x.json())
+            .then(j => j.success ? Swal.fire({ icon: 'success', title: j.message, timer: 1800, showConfirmButton: false }).then(() => location.reload())
+                                 : Swal.fire({ icon: 'error', title: 'Error', text: j.message }))
+            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }));
+    });
+});
+
+document.addEventListener('click', function (e) {
+    const b = e.target.closest('[data-resolve-alert]');
+    if (!b) return;
+    b.disabled = true;
+    const fd = new FormData();
+    fd.append('_csrf', <?= json_encode(csrf_token()) ?>); fd.append('action', 'resolve_alert'); fd.append('alert_id', b.dataset.resolveAlert);
+    fetch('/actions/superadmin_tenant_vendor_customer.php', { method: 'POST', body: fd })
+        .then(r => r.json()).then(j => { if (j.success) location.reload(); else { b.disabled = false; Swal.fire({ icon: 'error', title: 'Error', text: j.message }); } })
+        .catch(() => { b.disabled = false; });
+});
 
 // Context-aware tab auto-open — open Billing tab for payment/subscription events
 (function () {

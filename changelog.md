@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-10-15 — feat(subscriptions) Phases 3+4: visited client → real customer linked to its company; a paid BJP invoice extends that company automatically
+
+**Customer Visits → real customer** (instruction: a visited client is not a customer by default; when they joined via the free trial and need the service, someone makes them a real customer; "joined" carries the subdomain so an invoice for that customer is known to the superadmin and applied automatically). Platform root (`bms.bjptechnologies.co.tz`) only — everywhere else "Mark as joined" is unchanged.
+- `core/field_reports_schema.php` + `migrations/tenant/2026_10_15_customer_visits_tenant_link.php` + `_legacy_db` — `field_visits.tenant_id`, `tenant_subdomain`, `customer_id`.
+- `core/vendor_link.php` (new) — the customer ↔ tenant link (one place: `tenants.vendor_customer_id` + a `vendor_customer_label` snapshot), subdomain normalising, same-phone/email matching, and creating a customer exactly like Customers → Add (company code, §18 defaults, its ledger sub-account). A company linked to one customer cannot be re-linked to another.
+- `api/field_reports/toggle_joined.php` — "Mark as joined" also takes the company's web address (checked against the platform); un-joining keeps the link of a visit that already became a customer. `api/field_reports/make_customer.php` (new) — preview (prefilled from the company's registration, existing link, matches) + create or link. `api/field_reports/_common.php` — rows carry `tenant_subdomain`, `customer_id`.
+- `app/bms/field_reports/field_visits.php` — joined badge shows the company; Actions: *Add company web address* → *Make real customer* → *View customer*; "Make real customer" modal.
+- `app/bms/customer/customer_details.php` + `api/platform/customer_platform_link.php` (new) — "Platform company" card: link/unlink a company that registered without a visit.
+- **Superadmin** (`app/superadmin/tenant_view.php`, `core/tenant_admin.php` `getTenant()`, `actions/superadmin_tenant_vendor_customer.php` new) — Billing → "Paid by (BJP customer)" with Remove link, open bridge alerts with Done, Payment History shows "BJP invoice …" as the source. The panel never opens BJP's own database (it shows the stored label), so linking is done from BJP's side — a deliberate change to plan decision D1.
+
+**Paid BJP invoice → tenant subscription**
+- `core/vendor_bridge.php` (new) — called after commit by `record_payment.php`, `save_receipt.php`, `apply_customer_advance.php`; queued in `vendor_bridge_outbox` first, then applied. Recomputes the money actually received (a hand-marked "paid" in `update_invoice_status.php` is never applied). Months = Σ quantity × term length over subscription-service lines; one invoice extends once (`tenant_payments` unique source). Never guesses: a missing term, no linked company, or several linked companies raise a `vendor_bridge_alerts` row for the superadmin; linking the customer later applies a waiting invoice at once and closes its alert. `void_payment.php` alerts only — access is never shortened automatically.
+- `core/tenant_lifecycle_policy.php` — `tenantLifecycleLog()`: the tenant audit log now also records actions taken from BJP's side (bridge payments, links), naming the actor.
+- `scripts/setup_control_db.php` — `tenants.vendor_customer_label`, `vendor_bridge_alerts`. **Operator step:** run it on bms and demo.
+- `migrations/tenant/2026_10_15_vendor_bridge_outbox.php` + `_legacy_db`; `api/cron/vendor_bridge_retry.php` (new, `CRON_SECRET`, call on the platform root) retries anything left pending.
+- `app/superadmin/dashboard.php` — "Paid BJP invoices waiting for a decision" in Needs attention, with Done.
+- Tests: `tests/test_customer_visit_link_cli.php` (new, 39) and `tests/test_vendor_bridge_cli.php` (new, 33) — real visits, customers, invoices and payments (record_payment, save_receipt, void_payment, update_invoice_status) on the platform root and off it; all test data (incl. ledger, bank-register and control-DB rows) removed. The four new suites from Phases 1–4 were also fixed to run their cleanup before `exit()` (PHP skips later shutdown functions after an exit).
+
+Verified: 39/39 and 33/33; 20 Customer-Visits/customer/superadmin suites and 15 payment suites give identical results on this branch and a clean `origin/main`; every inline script on the changed pages passes `node --check` in both platform-root and normal mode.
+
+---
+
 ## 2026-10-15 — feat(sales) Phase 2: choose the price term on Quotation / Sales Order / Invoice lines
 
 **A service priced by term asks "which term?" on documents and takes that term's price** (workflows and statuses unchanged)

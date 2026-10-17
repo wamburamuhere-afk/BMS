@@ -599,6 +599,61 @@ global $company_name, $company_logo;
                     </table>
                 </div>
             </div>
+
+            <?php
+            // Platform root only (BJP selling the system): the companies this customer pays for.
+            require_once __DIR__ . '/../../../core/vendor_context.php';
+            if (isPlatformVendorContext()):
+            ?>
+            <div class="card mt-3" id="platformLinkCard">
+                <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-globe"></i> <?= t('Platform company') ?></h6>
+                    <?php if ($can_edit_customers): ?>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnPlatformLink"><i class="bi bi-link-45deg"></i> <?= t('Link') ?></button>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body" id="platformLinkBody"><div class="text-muted small"><?= t('Loading...') ?></div></div>
+            </div>
+            <script>
+            $(function () {
+                const URL_ = '<?= buildUrl('api/platform/customer_platform_link.php') ?>', CID = <?= (int)$customer_id ?>;
+                const CSRF_ = <?= json_encode(csrf_token()) ?>, CAN = <?= json_encode($can_edit_customers) ?>;
+                const T = <?= json_encode([
+                    'none' => t('Not linked to any company on the platform.'), 'unlink' => t('Remove link'),
+                    'q' => t('Company web address'), 'hint' => t('The address the company logs in at, e.g. dukalajuma'),
+                    'save' => t('Link'), 'cancel' => t('Cancel'), 'req' => t('Enter the company web address.'),
+                    'unlinkQ' => t('Remove this link?'), 'unlinkTxt' => t('Paid invoices will no longer extend this company\'s access.'),
+                    'error' => t('Error'), 'notReady' => t('The platform database has not been upgraded yet. Ask the administrator to run the platform setup.'),
+                ]) ?>;
+                const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                function render(list, ready) {
+                    if (!ready) { $('#platformLinkBody').html(`<div class="small text-muted">${T.notReady}</div>`); $('#btnPlatformLink').addClass('d-none'); return; }
+                    if (!list.length) { $('#platformLinkBody').html(`<div class="small text-muted">${T.none}</div>`); return; }
+                    $('#platformLinkBody').html(list.map(t => `<div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1">
+                        <div><div class="fw-bold">${esc(t.company_name)}</div><small class="text-primary">${esc(t.subdomain)}</small>
+                        <span class="badge ms-1" style="background:${t.status === 'active' ? '#0d6efd' : '#e9ecef'};color:${t.status === 'active' ? '#fff' : '#495057'}">${esc(t.status)}</span></div>
+                        ${CAN ? `<button type="button" class="btn btn-sm btn-outline-danger" data-unlink="${t.id}" title="${esc(T.unlink)}"><i class="bi bi-x-lg"></i></button>` : ''}
+                    </div>`).join(''));
+                }
+                const load = () => $.getJSON(URL_, { customer_id: CID }).done(r => r.success && render(r.tenants || [], r.ready));
+                const post = data => $.ajax({ url: URL_, type: 'POST', dataType: 'json', data: Object.assign({ _csrf: CSRF_, customer_id: CID }, data) })
+                    .done(r => { if (r.success) { render(r.tenants || [], true); Swal.fire({ icon: 'success', title: r.message, timer: 1800, showConfirmButton: false }); }
+                                 else Swal.fire({ icon: 'error', title: T.error, text: r.message }); })
+                    .fail(x => Swal.fire({ icon: 'error', title: T.error, text: (x.responseJSON || {}).message || '' }));
+                $('#btnPlatformLink').on('click', () => Swal.fire({ title: T.q, text: T.hint, input: 'text', showCancelButton: true,
+                    confirmButtonText: T.save, cancelButtonText: T.cancel, confirmButtonColor: '#0d6efd',
+                    inputAttributes: { autocapitalize: 'off', autocomplete: 'off', maxlength: 63 },
+                    inputValidator: v => String(v || '').trim() ? undefined : T.req })
+                    .then(x => { if (x.isConfirmed) post({ action: 'link', subdomain: x.value }); }));
+                $(document).on('click', '[data-unlink]', function () {
+                    const tid = $(this).data('unlink');
+                    Swal.fire({ title: T.unlinkQ, text: T.unlinkTxt, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545',
+                        confirmButtonText: T.unlink, cancelButtonText: T.cancel }).then(x => { if (x.isConfirmed) post({ action: 'unlink', tenant_id: tid }); });
+                });
+                load();
+            });
+            </script>
+            <?php endif; ?>
         </div>
 
         <!-- Right Column - Detailed Information -->

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/vendor_bridge.php';   // paid subscription invoice → tenant access
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/wht.php';
@@ -224,6 +225,9 @@ try {
     }
 
     $pdo->commit();
+
+    // BJP's own install: a fully paid subscription invoice extends the customer's company.
+    vendorOnInvoicesSettled($pdo, [$invoice_id]);
 
     // Bank register — net cash deposited (gross amount minus WHT withheld by customer)
     if ($received_into_account_id && $status === 'completed') {

@@ -54,6 +54,9 @@ function frRowOut(array $r): array
         'service_ids'        => array_map(fn($s) => (int)$s['product_id'], $r['services'] ?? []),
         'joined'             => (int)$r['joined'],
         'joined_at'          => $r['joined_at'],
+        // Platform root only: the client's company on the platform, and the customer it became.
+        'tenant_subdomain'   => $r['tenant_subdomain'] ?? null,
+        'customer_id'        => !empty($r['customer_id']) ? (int)$r['customer_id'] : null,
         'follow_up_date'     => $r['follow_up_date'] ?? null,
         'follow_up_done'     => !empty($r['follow_up_done_at']) ? 1 : 0,
         // GPS-confirmed: a position was captured with ±100 m or better (3.4).

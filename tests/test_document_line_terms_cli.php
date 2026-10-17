@@ -17,6 +17,8 @@ function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  ✅ $m\n";
 function section($t) { echo "\n── $t ──\n"; }
 register_shutdown_function(function () {
     global $pass, $fail; static $done = false; if ($done) return; $done = true;
+    // exit() below stops any later shutdown function, so test data is removed here first.
+    foreach (array_reverse($GLOBALS['TEST_CLEANUPS'] ?? []) as $fn) { try { $fn(); } catch (Throwable $e) { echo "cleanup error: {$e->getMessage()}\n"; } }
     echo "\nPasses: $pass\nFailures: $fail\n";
     exit($fail === 0 ? 0 : 1);
 });
@@ -54,6 +56,10 @@ if (!$uid || !$wid || !$cust) { echo "SKIP B: needs an admin, a warehouse and a 
 $made = ['qt' => [], 'so' => [], 'inv' => []];
 $cleanup = function () use ($pdo, &$made) {
     $in = fn(array $a) => $a ? implode(',', array_map('intval', $a)) : '0';
+    // By marker too, so rows left by an interrupted earlier run are removed as well.
+    $made['inv'] = array_merge($made['inv'], $pdo->query("SELECT invoice_id FROM invoices WHERE notes = 'DLT-TEST'")->fetchAll(PDO::FETCH_COLUMN));
+    $made['qt']  = array_merge($made['qt'],  $pdo->query("SELECT sales_order_id FROM quotations WHERE reference = 'DLT-TEST'")->fetchAll(PDO::FETCH_COLUMN));
+    $made['so']  = array_merge($made['so'],  $pdo->query("SELECT sales_order_id FROM sales_orders WHERE reference = 'DLT-TEST'")->fetchAll(PDO::FETCH_COLUMN));
     $inv = $in($made['inv']); $so = $in($made['so']); $qt = $in($made['qt']);
     $pdo->exec("DELETE jei FROM journal_entry_items jei JOIN journal_entries je ON je.entry_id = jei.entry_id
                  WHERE je.entity_type IN ('invoice','invoice_cogs','invoice_void') AND je.entity_id IN ($inv)");
@@ -76,7 +82,7 @@ $cleanup = function () use ($pdo, &$made) {
     }
 };
 $cleanup();
-register_shutdown_function($cleanup);
+$GLOBALS['TEST_CLEANUPS'][] = $cleanup;
 
 function runPhp(string $code): string {
     $tmp = tempnam(sys_get_temp_dir(), 'dlt_');

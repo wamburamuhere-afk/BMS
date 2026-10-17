@@ -127,7 +127,18 @@ if (!function_exists('getTenant')) {
         ");
         $st->execute([$id]);
         $row = $st->fetch();
-        return $row === false ? null : $row;
+        if ($row === false) return null;
+
+        // The paying BJP customer (customer_subscription_plan.md Phase 3) — read separately
+        // so a control DB the operator has not upgraded yet still loads every tenant.
+        try {
+            $v = getControlPdo()->prepare("SELECT vendor_customer_id, vendor_customer_label FROM tenants WHERE id = ?");
+            $v->execute([$id]);
+            $row += (array)$v->fetch();
+        } catch (Throwable $e) {
+            // columns not there yet — the panel says so
+        }
+        return $row;
     }
 }
 

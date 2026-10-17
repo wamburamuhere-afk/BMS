@@ -19,6 +19,8 @@ function throws(callable $f): ?string { try { $f(); return null; } catch (Invali
 
 register_shutdown_function(function () {
     global $pass, $fail; static $done = false; if ($done) return; $done = true;
+    // exit() below stops any later shutdown function, so test data is removed here first.
+    foreach (array_reverse($GLOBALS['TEST_CLEANUPS'] ?? []) as $fn) { try { $fn(); } catch (Throwable $e) { echo "cleanup error: {$e->getMessage()}\n"; } }
     echo "\nPasses: $pass\nFailures: $fail\n";
     exit($fail === 0 ? 0 : 1);
 });
@@ -69,7 +71,7 @@ $cleanup = function () use ($pdo, $origSimple, $origAdv) {
     save_setting('pos_advanced_product', $origAdv);
 };
 $cleanup();
-register_shutdown_function($cleanup);
+$GLOBALS['TEST_CLEANUPS'][] = $cleanup;
 
 function runPhp(string $code): string {
     $tmp = tempnam(sys_get_temp_dir(), 'spt_');

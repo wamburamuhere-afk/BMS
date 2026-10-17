@@ -456,6 +456,27 @@ try {
     ");
     say('  · table tenant_payments ready');
 
+    // The paid-BJP-invoice → subscription bridge (core/vendor_bridge.php) never
+    // guesses: when it cannot apply a payment safely it leaves one of these for
+    // the superadmin. One open row per (invoice_ref, kind).
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`vendor_bridge_alerts` (
+            `id`          INT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`   INT          NULL,
+            `customer_id` INT          NULL,
+            `invoice_ref` VARCHAR(64)  NOT NULL,
+            `kind`        ENUM('no_term','not_linked','many_tenants','apply_failed','payment_voided') NOT NULL,
+            `message`     VARCHAR(500) NOT NULL,
+            `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `resolved_at` DATETIME     NULL,
+            `resolved_by` VARCHAR(191) NULL,
+            KEY `idx_vba_open` (`resolved_at`),
+            KEY `idx_vba_tenant` (`tenant_id`),
+            KEY `idx_vba_ref` (`invoice_ref`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table vendor_bridge_alerts ready');
+
     // Where a payment came from: typed in by an operator, or a paid BJP invoice
     // (core/vendor_bridge.php). UNIQUE(source, source_ref) is what stops one
     // invoice extending a tenant twice; manual rows leave source_ref NULL,
@@ -622,6 +643,9 @@ try {
         // pays for this tenant. Set by "Make real customer" on Customer Visits
         // or by an operator; read by the invoice → subscription bridge.
         'vendor_customer_id'   => "ADD COLUMN `vendor_customer_id` INT NULL AFTER `grace_days`",
+        // "BJP-CUST-0042 — Duka la Juma", copied at link time so the superadmin panel
+        // can say who pays without ever opening BJP's own database.
+        'vendor_customer_label' => "ADD COLUMN `vendor_customer_label` VARCHAR(255) NULL AFTER `vendor_customer_id`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
