@@ -174,3 +174,4 @@ jobs:
           php tests/test_vendor_bridge_cli.php
           php tests/test_my_subscription_cli.php
           php tests/test_subscription_contracts_cli.php
+          php tests/test_most_profitable_products_cli.php

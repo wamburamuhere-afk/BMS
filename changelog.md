@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(reports) Phase 7: Most Profitable Products
+
+**Which products and services earn the most after their cost** (instruction: add a "Most Profitable Products" report so the customer can see which items make the most profit). Built into the existing Product Analysis report — same filters, scope and print — and reachable as its own entry in Reports.
+- `api/account/get_product_analysis_report.php` — each sold line now carries its cost on the SAME basis the ledger posts as cost of goods sold (invoice lines: quantity × cost price; POS lines: batch cost, else quantity × cost price, skipping a cost above the selling price); services post no cost of goods, so a service's recorded materials cost is shown as an estimate (`cost_basis`: ledger / estimate / none). Adds cost, profit, margin per row; total cost, gross profit, margin; `sort=profit`; top-by-profit chart; and a reconciliation of the report's goods cost against the ledger's COGS for the same period and scope (`glProfitLoss`), so any gap is visible.
+- `app/constant/reports/product_analysis.php` — Sort by (Revenue / Profit), Gross Profit + Margin cards, Cost / Profit / Margin columns ("est." marks an estimated service cost; a loss shows in red), "Top by Profit" chart, reconciliation note; `?view=profit` opens it as **Most Profitable Products**.
+- `header.php` — "Most Profitable Products" under Reports (full menu and the Simple POS report list), behind the same `product_analysis` permission.
+- `tests/test_most_profitable_products_cli.php` (new, 16; 4 in CI) — a real invoice of known goods and services: exact cost/profit/margin per row, profit vs revenue ordering, and the report-vs-ledger difference unchanged by the new invoice (proves the same cost basis).
+
+Verified: 16/16; report runs on the local data (report goods cost 532,052,290 vs ledger 532,030,090 — the 22,200 gap is shown in the note, not hidden); 7 related suites identical to a clean `origin/main`; page script passes `node --check`.
+
+---
+
 ## 2026-10-16 — feat(subscriptions) Phase 6: subscription contract after payment, signed by BJP and then the customer
 
 **When a subscription invoice is paid, the contract is made automatically; BJP signs it, then the customer signs it digitally from My Subscription — no visit needed, and both sides keep the signed copy.** Nothing is signed automatically: both signatures use the existing E-Signature flows.
