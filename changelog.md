@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(payment-settings): multiple bank + mobile money accounts on quotations, invoices and vouchers
+
+**Files:** `core/payment_accounts.php` (new), `app/constant/settings/payment_settings.php`, `app/bms/invoice/invoice_print.php`, `invoice_print_onyx.php`, `invoice_print_summit.php`, `invoice_print_wave.php`, `app/bms/sales/quotations/print_quotation.php`, `print_quotation_meadow.php`, `print_quotation_noir.php`, `print_quotation_terra.php`, `app/constant/accounts/payment_voucher_print.php`, `lang/sw.php`, `tests/test_multi_payment_accounts_cli.php` (new)
+
+- **Payment Settings:** bank and mobile money accounts are now lists. Each shows as a card; **Add** or the pencil opens a centred popup (bank: name, account no., optional SWIFT; mobile: network/type, number, optional account/reference; "show on documents" toggle). Live preview on the right.
+- **Registered name:** choose "Same name for all accounts" (type once) or "Some accounts have a different name" (per-account name box; blank = default). Default name reuses the existing `account_name` setting.
+- **Storage:** new `system_settings` keys `payment_bank_accounts` / `payment_mobile_accounts` (JSON) and `payment_name_mode`. Until the page is first saved, the old single-account keys are read, so existing details keep printing. On save the first account is mirrored back into the old keys for any older screen.
+- **Prints (Layout A · compact lines):** all 9 templates call `renderPaymentAccountsBlock()`. The common registered name prints once on top, one line per account, a different name shows in brackets on its own line. Box CSS (`min-width:0`, `overflow-wrap:anywhere`, wrapping flex lines) keeps long numbers/names inside the box; verified no spill at A4 width and with the box squeezed to 200px.
+- Settings form now verifies the CSRF token; save is logged to activity log. 35 Swahili strings added.
+
 ## 2026-10-16 — feat(invoices): cancel + send-back-to-pending buttons + progressive audit panel
 
 **Files:** `app/bms/invoice/invoice_view.php`, `api/account/revert_invoice_to_pending.php`, `includes/workflow_audit_panel.php`
