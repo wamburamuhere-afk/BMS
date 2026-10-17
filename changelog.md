@@ -1,5 +1,124 @@
 # BMS Changelog
 
+## 2026-10-16 — test(subscriptions) Phase 8: the whole story end to end
+
+- After merging `main` (invoices now go pending → reviewed → approved, ledger posting on approval): the payment suites (`test_vendor_bridge_cli`, `test_subscription_contracts_cli`, `test_most_profitable_products_cli`, the e2e suite) review and approve each invoice before paying it — exactly what BJP staff now do; the e2e suite gained that step (18). No change to the subscription code was needed: the bridge acts only on real money received.
+
+- `tests/test_customer_subscription_e2e_cli.php` (new, 17) — through the real endpoints: visit (no customer yet) → joined with the company's web address → Make real customer (linked) → the company's admin picks "6 Months" in My Subscription → approved quotation → BJP converts it to a sales order → invoice (line inherits the term) → payment → company trial → active until exactly 6 months after its trial's last day → contract for that period → BJP signs → customer signing link → signed by both; running everything again doubles nothing.
+- `core/vendor_link.php` — loads `tenant_resolver.php` itself (a pasted `https://x.bms…` web address was only normalised when another file had happened to load it; the CI run caught it).
+- `customer_subscription_plan.md` — every phase marked done, decisions D1/D3 recorded as changed, operator steps for go-live, and the list of test suites.
+
+Verified: all 10 new suites pass together — 291 checks, 0 failures, no data left behind — and each passes in CI mode (no database).
+
+---
+
+## 2026-10-16 — feat(reports) Phase 7: Most Profitable Products
+
+**Which products and services earn the most after their cost** (instruction: add a "Most Profitable Products" report so the customer can see which items make the most profit). Built into the existing Product Analysis report — same filters, scope and print — and reachable as its own entry in Reports.
+- `api/account/get_product_analysis_report.php` — each sold line now carries its cost on the SAME basis the ledger posts as cost of goods sold (invoice lines: quantity × cost price; POS lines: batch cost, else quantity × cost price, skipping a cost above the selling price); services post no cost of goods, so a service's recorded materials cost is shown as an estimate (`cost_basis`: ledger / estimate / none). Adds cost, profit, margin per row; total cost, gross profit, margin; `sort=profit`; top-by-profit chart; and a reconciliation of the report's goods cost against the ledger's COGS for the same period and scope (`glProfitLoss`), so any gap is visible.
+- `app/constant/reports/product_analysis.php` — Sort by (Revenue / Profit), Gross Profit + Margin cards, Cost / Profit / Margin columns ("est." marks an estimated service cost; a loss shows in red), "Top by Profit" chart, reconciliation note; `?view=profit` opens it as **Most Profitable Products**.
+- `header.php` — "Most Profitable Products" under Reports (full menu and the Simple POS report list), behind the same `product_analysis` permission.
+- `tests/test_most_profitable_products_cli.php` (new, 16; 4 in CI) — a real invoice of known goods and services: exact cost/profit/margin per row, profit vs revenue ordering, and the report-vs-ledger difference unchanged by the new invoice (proves the same cost basis).
+
+Verified: 16/16; report runs on the local data (report goods cost 532,052,290 vs ledger 532,030,090 — the 22,200 gap is shown in the note, not hidden); 7 related suites identical to a clean `origin/main`; page script passes `node --check`.
+
+---
+
+## 2026-10-16 — feat(subscriptions) Phase 6: subscription contract after payment, signed by BJP and then the customer
+
+**When a subscription invoice is paid, the contract is made automatically; BJP signs it, then the customer signs it digitally from My Subscription — no visit needed, and both sides keep the signed copy.** Nothing is signed automatically: both signatures use the existing E-Signature flows.
+- `core/subscription_contracts.php` (new) + `migrations/tenant/2026_10_16_subscription_contracts.php` + `_legacy_db` — `customer_contracts` (one per invoice), `vendor_subscription_services.contract_template_id`, `subscription.contract_ready` notification (to users who can create documents). The contract is a real PDF on the letterhead (`generateLetterPdf()`), made from a Document Template BJP writes; extra tokens `{{customer_name}} {{customer_tin}} {{customer_address}} {{service_name}} {{period}} {{period_start}} {{period_end}} {{amount}} {{invoice_number}} {{web_address}}`. Its status (waiting for BJP → waiting for the customer → signed by both) is read from the E-Signature records.
+- `core/vendor_bridge.php` — after a payment extends the company, the contract for that invoice is created (once; only when the service has a contract template).
+- Services (platform root): "Contract template" select (Select2) under the subscription flag — `includes/service_price_terms_editor.php`, `app/bms/product/services.php`, `api/create_nip_product.php`, `api/update_nip_product.php`, `api/account/get_service_price_terms.php`, `core/service_price_terms.php` (`vssContractTemplate`, `vssSetContractTemplate`).
+- Customer side: gateway actions `contracts` and `contract_sign_link` (`core/platform_gateway.php`) — a fresh one-time link to the existing `sign-document` page, created when the customer clicks Sign (older unused links stop working; only BJP's signed copy can be signed); `api/my_subscription.php` + My Subscription → **Contracts** tab (View / Sign); `api/platform/customer_document.php` serves the contract PDF (final copy once signed).
+- BJP side: Customer Details → Platform company card lists the customer's contracts with their state, **Sign as BJP** (opens E-Signatures on that document) and Open (`api/platform/customer_platform_link.php`, `app/bms/customer/customer_details.php`).
+- `tests/test_subscription_contracts_cli.php` (new, 28; 4 in CI) — template → real invoice + payment → contract PDF with tokens filled → once only / none without template → customer blocked until BJP signs → signing link, token hash only, old link expires → signed by both → final PDF to the customer only.
+
+Verified: 28/28; the Phase 1, 3, 4 and 5 suites still pass (47, 39, 33, 36); inline scripts of Services, Customer Details and My Subscription pass `node --check`; no test data or files left behind.
+
+---
+
+## 2026-10-16 — feat(subscriptions) Phase 5: "My Subscription" in each company's own system
+
+**A company admin sees how long access runs, chooses a period (BJP raises an approved quotation at once — catalogue price, no approval wait), and sees the quotations and invoices BJP issued to them.** A company never opens BJP's database:
+- `core/platform_link.php` (new) — signed server-to-server calls from a company's server to the platform root (HMAC over tenant id + timestamp + body, ±120 s; key derived from the server-only `TENANT_CRED_KEY`, so no new secret), and short-lived signed links (30 min) to a customer copy of one document.
+- `core/platform_gateway.php` + `api/platform/tenant_gateway.php` (new, platform root only) — `catalog` (subscription services + month/year terms), `documents` (that company's quotations + invoices), `request_quote` (approved quotation with the term on its line, reference `SELF-SERVICE T<id>`; a newer request replaces an open one; notifies users who can create invoices). Answers only for the customer linked to the signed tenant.
+- `api/platform/customer_document.php` (new) — read-only customer copy (letterhead, lines with their Term, totals, paid/balance, how to pay, Print / Save as PDF). BJP's own print pages still require a BJP login.
+- `api/my_subscription.php` + `app/constant/settings/my_subscription.php` (new) + route `my_subscription` + Settings → Plan & Modules → **My Subscription** (company subdomains only, admins only): stat cards, period cards, Invoices / Quotations / Payments (DataTables with S/NO, gear → View; phone cards).
+- `migrations/tenant/2026_10_16_subscription_request_notification.php` + `_legacy_db` — `subscription.request_received` notification event.
+- Plan decision D3 changed: no read-only MySQL user is needed; the signed gateway replaces it.
+- `tests/test_my_subscription_cli.php` (new, 36; 14 in CI) — signatures (other tenant / changed body / stale / missing), document tokens (tampered / expired / other customer), catalog, approved quotation + replacement, unlinked company, customer copy, company-side guards (admin-only, tenant-only), page render.
+
+Verified: 36/36 locally, 14/14 in CI mode; inline scripts of My Subscription and Settings pass `node --check`; no test data left behind.
+
+---
+
+## 2026-10-15 — feat(subscriptions) Phases 3+4: visited client → real customer linked to its company; a paid BJP invoice extends that company automatically
+
+**Customer Visits → real customer** (instruction: a visited client is not a customer by default; when they joined via the free trial and need the service, someone makes them a real customer; "joined" carries the subdomain so an invoice for that customer is known to the superadmin and applied automatically). Platform root (`bms.bjptechnologies.co.tz`) only — everywhere else "Mark as joined" is unchanged.
+- `core/field_reports_schema.php` + `migrations/tenant/2026_10_15_customer_visits_tenant_link.php` + `_legacy_db` — `field_visits.tenant_id`, `tenant_subdomain`, `customer_id`.
+- `core/vendor_link.php` (new) — the customer ↔ tenant link (one place: `tenants.vendor_customer_id` + a `vendor_customer_label` snapshot), subdomain normalising, same-phone/email matching, and creating a customer exactly like Customers → Add (company code, §18 defaults, its ledger sub-account). A company linked to one customer cannot be re-linked to another.
+- `api/field_reports/toggle_joined.php` — "Mark as joined" also takes the company's web address (checked against the platform); un-joining keeps the link of a visit that already became a customer. `api/field_reports/make_customer.php` (new) — preview (prefilled from the company's registration, existing link, matches) + create or link. `api/field_reports/_common.php` — rows carry `tenant_subdomain`, `customer_id`.
+- `app/bms/field_reports/field_visits.php` — joined badge shows the company; Actions: *Add company web address* → *Make real customer* → *View customer*; "Make real customer" modal.
+- `app/bms/customer/customer_details.php` + `api/platform/customer_platform_link.php` (new) — "Platform company" card: link/unlink a company that registered without a visit.
+- **Superadmin** (`app/superadmin/tenant_view.php`, `core/tenant_admin.php` `getTenant()`, `actions/superadmin_tenant_vendor_customer.php` new) — Billing → "Paid by (BJP customer)" with Remove link, open bridge alerts with Done, Payment History shows "BJP invoice …" as the source. The panel never opens BJP's own database (it shows the stored label), so linking is done from BJP's side — a deliberate change to plan decision D1.
+
+**Paid BJP invoice → tenant subscription**
+- `core/vendor_bridge.php` (new) — called after commit by `record_payment.php`, `save_receipt.php`, `apply_customer_advance.php`; queued in `vendor_bridge_outbox` first, then applied. Recomputes the money actually received (a hand-marked "paid" in `update_invoice_status.php` is never applied). Months = Σ quantity × term length over subscription-service lines; one invoice extends once (`tenant_payments` unique source). Never guesses: a missing term, no linked company, or several linked companies raise a `vendor_bridge_alerts` row for the superadmin; linking the customer later applies a waiting invoice at once and closes its alert. `void_payment.php` alerts only — access is never shortened automatically.
+- `core/tenant_lifecycle_policy.php` — `tenantLifecycleLog()`: the tenant audit log now also records actions taken from BJP's side (bridge payments, links), naming the actor.
+- `scripts/setup_control_db.php` — `tenants.vendor_customer_label`, `vendor_bridge_alerts`. **Operator step:** run it on bms and demo.
+- `migrations/tenant/2026_10_15_vendor_bridge_outbox.php` + `_legacy_db`; `api/cron/vendor_bridge_retry.php` (new, `CRON_SECRET`, call on the platform root) retries anything left pending.
+- `app/superadmin/dashboard.php` — "Paid BJP invoices waiting for a decision" in Needs attention, with Done.
+- Tests: `tests/test_customer_visit_link_cli.php` (new, 39) and `tests/test_vendor_bridge_cli.php` (new, 33) — real visits, customers, invoices and payments (record_payment, save_receipt, void_payment, update_invoice_status) on the platform root and off it; all test data (incl. ledger, bank-register and control-DB rows) removed. The four new suites from Phases 1–4 were also fixed to run their cleanup before `exit()` (PHP skips later shutdown functions after an exit).
+
+Verified: 39/39 and 33/33; 20 Customer-Visits/customer/superadmin suites and 15 payment suites give identical results on this branch and a clean `origin/main`; every inline script on the changed pages passes `node --check` in both platform-root and normal mode.
+
+---
+
+## 2026-10-15 — feat(sales) Phase 2: choose the price term on Quotation / Sales Order / Invoice lines
+
+**A service priced by term asks "which term?" on documents and takes that term's price** (workflows and statuses unchanged)
+- `migrations/tenant/2026_10_15_document_line_price_terms.php` + `_legacy_db` mirror — `price_term_id`, `price_term_label`, `term_duration_value`, `term_duration_unit` (nullable) on `quotation_items`, `sales_order_items` and `invoice_items` together (`convert_quote_to_order.php` copies every quotation-line column into the sales order).
+- `core/service_price_terms.php` — `sptResolveLineTerm()` checks the chosen term against the DATABASE (must belong to that line's service; never trusts the browser), snapshots label + length, and ends the description with one "Term: <label>" line so every existing print shows it with no template change; `sptStampLine()`; `sptTermOfSalesOrderLine()`.
+- `api/account/save_quotation.php`, `save_sales_order.php`, `save_invoice.php` — record the term per line; a wrong term rejects the whole document (rolled back). An invoice line raised from a sales-order line inherits that line's term. Lines without a term are stored exactly as before; old/mobile clients that send no term keep working.
+- `assets/js/line_price_terms.js` (new) + `includes/line_price_terms_js.php` — the Term select (Select2) under the item name; choosing a term sets price + description; reopening a saved document restores its term without overwriting a negotiated price; saving is blocked until a term is chosen. Wired into `quotation_form.php`, `sales_order_create.php`, `sales_order_edit.php`, `invoice_create.php`, `invoice_edit.php`.
+- `tests/test_document_line_terms_cli.php` (new, 31; 13 in CI) — quotation → convert → sales order → invoice through the real endpoints, wrong-term refusal + rollback, term switch without duplicate Term lines, snapshot history, used terms kept inactive. Ledger entries the test creates are removed.
+
+Verified: 31/31; the 17 existing quotation/sales-order/invoice suites give identical results on this branch and on a clean `origin/main` (`test_invoice_three_approval_cli` and `test_lpo_module_cli` fail the same 2 checks on both). Checked in Chrome on rendered pages: the service-terms editor and the quotation line Term select work with no JavaScript errors.
+
+**Noticed, not changed:** `app/bms/invoice/invoice_edit.php` rows have no description or sales-order-link fields, so re-saving an invoice from the edit page clears line descriptions and order links (pre-existing).
+
+---
+
+## 2026-10-15 — feat(services) Phase 1: optional price by term on services
+
+**A service can be priced by term** (instruction: register services as now, plus an optional, not hardcoded "price over time"; when filled, the selling price is "choose a term"; Service Details shows the terms and hides the materials table when there are none)
+- `core/service_price_terms.php` (new) — `service_price_terms` (any label, length in days/weeks/months/years, price, description, default) and `vendor_subscription_services`. Validation (`sptParse`), save/sync (`sptSave`): a term removed from the form is soft-deleted, or kept `inactive` if a document already used it. A service with terms stores its default term's price in `selling_price` and its cheapest in `min_selling_price`, so POS (which enforces the minimum), lists and reports keep reading one number.
+- `migrations/tenant/2026_10_15_service_price_terms.php` + `migrations/2026_10_15_service_price_terms_legacy_db.php` — creates both tables (idempotent). No column added to `products`.
+- `api/create_nip_product.php`, `api/update_nip_product.php` — accept `price_terms` in the same transaction; a form that doesn't send terms leaves them alone (and the price is re-synced to the default term). The "BMS system subscription" flag is accepted only on the platform root (`isPlatformVendorContext()`), and requires month/year terms.
+- `api/account/get_service_price_terms.php` (new) — one service's terms for the Edit form. `api/account/get_products.php` — adds `has_price_terms` + `price_terms` for the document forms (next phase).
+- `app/bms/product/services.php` + `includes/service_price_terms_editor.php` (new) — "Price by term (optional)" editor in the full Add/Edit form (S/NO, term name, length, price, description, default; selling price becomes read-only "Depends on term"); list shows "From TSh x · N terms". The Simple POS short form is untouched.
+- `app/bms/product/service_view.php` — "Price by term" card; the Material Components table appears only when the service has materials (otherwise an "Add Materials" link in Assembly Information).
+- `tests/test_service_price_terms_cli.php` (new, 47; 16 in CI) — validation, the real create/update/read endpoints, the vendor-only flag, and the rendered pages in full and Simple POS modes.
+
+Verified: 47/47 locally; the existing service suites (`test_service_sales_phase1-3`, `test_service_print_columns`) pass; `test_services_simple_pos_cli` (a `nipDuplicateName()` redeclare in its own harness) and `test_pos_detail_pages_cli` (117/2) fail identically on a clean `origin/main`.
+
+---
+
+## 2026-10-15 — feat(subscriptions) Phase 0: one payment path for tenant subscriptions; migration-health badge fixed
+
+**Groundwork for BJP's customer-subscription flow** (plan: `customer_subscription_plan.md`)
+- `core/tenant_lifecycle_policy.php` — new `applySubscriptionPayment()`: the single way a paid period is recorded (the operator's Record Payment now; the BJP invoice bridge in a later phase). Fixes two bugs in the old action: a **trial tenant who paid stayed `trial`** and was suspended when the trial ended (now becomes `active`), and **paying early restarted the period from today** and lost the days already paid for (now counts from the later of the chosen date and the current end date, keeping any trial days left). Expiry-suspended tenants resume; operator-suspended ones stay suspended unless "re-activate" is ticked. `(source, source_ref)` is unique so one invoice can never extend twice. `controlColumnExists()` lets code run before an operator applies the new control-DB columns.
+- `actions/superadmin_record_payment.php` — now calls `applySubscriptionPayment()`. `app/superadmin/tenant_view.php` — the payment modal's preview uses the same start-date rule.
+- `scripts/setup_control_db.php` — `tenants.vendor_customer_id` (+ index); `tenant_payments.source`, `source_ref`, `UNIQUE(source, source_ref)`. Idempotent. **Operator step:** run it on bms and demo.
+- `core/vendor_context.php` (new) — `isPlatformVendorContext()`: true only on the platform root domain (BJP's own install, where `register.php` also lives); false on every tenant subdomain and on installs without multi-tenancy.
+- **Tenant → Usage & Analytics → Deploy / Migration Health showed "1 failed" for every tenant.** `tenantMigrationHealth()` (`core/tenant_admin.php`) counted every `failed` row ever logged, and the log is append-only, so `2026_10_13_sales_documents_money_and_line_discount.php`, which failed once in a concurrent-deploy race (fixed by `6fe14fbb`) and then succeeded on re-run, stayed red forever. It now judges each migration by its latest event, as `app/superadmin/dashboard.php` already did; `(all)` connection failures clear on any later success; "total" counts migrations applied, not log rows. A resolved failure shows as a grey note.
+- `tests/test_subscription_payment_cli.php` (new, 33) + `tests/test_tenant_migration_health_cli.php` (new, 11), both wired into `.github/workflows/php-lint.yml` (CI runs the database-free part).
+
+Verified: both new suites pass locally; the control-DB script applied the new columns once and was a no-op on a second run. `test_tenant_admin_panel_cli`, `test_tenant_control_db_cli`, `test_feature_panel_cli` and `test_quota_panel_cli` fail identically on a clean `origin/main` checkout (local tenant provisioning has no credential key), so those failures pre-date this change; `test_tenant_expiry_policy_cli` and `test_superadmin_urls_cli` pass.
+
+---
+
 ## 2026-10-16 — feat(invoices): cancel + send-back-to-pending buttons + progressive audit panel
 
 **Files:** `app/bms/invoice/invoice_view.php`, `api/account/revert_invoice_to_pending.php`, `includes/workflow_audit_panel.php`

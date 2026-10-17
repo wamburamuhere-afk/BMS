@@ -2,6 +2,8 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/code_generator.php';
+require_once __DIR__ . '/../core/service_price_terms.php';
+require_once __DIR__ . '/../core/vendor_context.php';
 global $pdo;
 
 // A second active service with the same name in the same place (one shop, or
@@ -75,6 +77,13 @@ try {
     if ($product_data['selling_price'] < 0) {
         throw new Exception('Selling price cannot be negative');
     }
+    // Optional price-by-term (core/service_price_terms.php). Validated before the insert.
+    $price_terms = sptParse($_POST['price_terms'] ?? null);
+    if ($price_terms && !sptReady($pdo)) {
+        throw new Exception('Price terms are not available yet — the database update has not run. Save without terms or try again shortly.');
+    }
+    $is_subscription = isPlatformVendorContext() && !empty($_POST['is_subscription']);
+
     if (nipDuplicateName($pdo, $product_data['product_name'], $product_data['warehouse_id'])) {
         throw new Exception('A service named "' . $product_data['product_name'] . '" already exists here. Use a different name or edit the existing one.');
     }
@@ -112,6 +121,18 @@ try {
                 floatval($comp['total_qty'] ?? 1)
             ]);
         }
+    }
+
+    // 3. Price terms: the default term's price becomes the selling price and the
+    // cheapest term the minimum, so POS and every list keep reading one number.
+    if ($price_terms) {
+        $sum = sptSave($pdo, (int)$product_id, $price_terms, (int)$user_id);
+        $pdo->prepare("UPDATE products SET selling_price = ?, min_selling_price = ? WHERE product_id = ?")
+            ->execute([$sum['default_price'], $sum['min_price'], $product_id]);
+    }
+    if ($is_subscription) {
+        vssSet($pdo, (int)$product_id, true, $price_terms ?? [], (int)$user_id);
+        vssSetContractTemplate($pdo, (int)$product_id, (int)($_POST['contract_template_id'] ?? 0));
     }
 
     // Auto-generate the company-prefixed Item Code, e.g. BFS-NIP-0001.

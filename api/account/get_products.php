@@ -2,6 +2,7 @@
 // scope-audit: skip — product search/lookup helper for forms; product catalog is global
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/service_price_terms.php';
 
 header('Content-Type: application/json');
 
@@ -86,7 +87,25 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
+    // Services with price terms: the form asks "which term?" and takes its price.
+    $withTerms = sptProductIdsWithTerms($pdo, array_column($products, 'product_id'));
+    foreach ($products as &$p) {
+        $p['has_price_terms'] = isset($withTerms[(int)$p['product_id']]);
+        $p['price_terms'] = $p['has_price_terms']
+            ? array_map(fn($t) => [
+                'term_id'        => (int)$t['term_id'],
+                'term_label'     => $t['term_label'],
+                'duration_value' => (int)$t['duration_value'],
+                'duration_unit'  => $t['duration_unit'],
+                'price'          => (float)$t['price'],
+                'description'    => $t['description'],
+                'is_default'     => (int)$t['is_default'] === 1,
+              ], sptForProduct($pdo, (int)$p['product_id']))
+            : [];
+    }
+    unset($p);
+
     echo json_encode(['success' => true, 'data' => $products]);
 
 } catch (PDOException $e) {

@@ -56,6 +56,11 @@ if (!function_exists('fieldReportsEnsureSchema')) {
             'follow_up_date'    => "ADD COLUMN `follow_up_date` DATE NULL DEFAULT NULL AFTER `notes`",
             'follow_up_done_at' => "ADD COLUMN `follow_up_done_at` DATETIME NULL DEFAULT NULL AFTER `follow_up_date`",
             'follow_up_done_by' => "ADD COLUMN `follow_up_done_by` INT UNSIGNED NULL DEFAULT NULL AFTER `follow_up_done_at`",
+            // A joined client's own company on the platform, and the customer record it
+            // became (customer_subscription_plan.md Phase 3). Only BJP's root install fills them.
+            'tenant_id'         => "ADD COLUMN `tenant_id` INT NULL DEFAULT NULL AFTER `joined_marked_by`",
+            'tenant_subdomain'  => "ADD COLUMN `tenant_subdomain` VARCHAR(63) NULL DEFAULT NULL AFTER `tenant_id`",
+            'customer_id'       => "ADD COLUMN `customer_id` INT NULL DEFAULT NULL AFTER `tenant_subdomain`",
         ] as $col => $ddl) {
             if (!isset($have[$col])) $pdo->exec("ALTER TABLE `field_visits` $ddl");
         }
