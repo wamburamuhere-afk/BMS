@@ -82,6 +82,7 @@ $dbSize  = getDatabaseSize($pdo);
 $apiUrl  = getUrl('api/backup_actions.php');
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('backup_restore'); ?>
 <div class="container-fluid">
     <div class="row">
         <div class="col-12 mt-4">
@@ -449,6 +450,7 @@ function deleteBackup(filename, rowHash) {
 }
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php
 require_once __DIR__ . '/../../../footer.php';
 ob_end_flush();

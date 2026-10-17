@@ -375,15 +375,18 @@ check(
     'header.php still has the old standalone Backup dropdown item — should have moved into Settings > Admin'
 );
 
+// The Settings > Admin list now lives in includes/settings_admin_nav.php,
+// shared by system_settings.php and every page it links to.
+$navSrc = (string) @file_get_contents($root . '/includes/settings_admin_nav.php');
 check(
-    (bool) preg_match('/href="<\?= getUrl\(\'backup_restore\'\) \?>"/', $settingsSrc),
-    'system_settings.php now links to backup_restore.php from within Settings > Admin',
-    'system_settings.php has no link to backup_restore.php — the Backup entry point is missing entirely'
+    str_contains($settingsSrc, 'settingsAdminDesktopNav(') && (bool) preg_match("/\['key' => 'backup_restore'[^\]]*\]/", $navSrc, $backupItem),
+    'Settings > Admin (shared list) links to backup_restore.php',
+    'the Settings > Admin list has no link to backup_restore.php — the Backup entry point is missing entirely'
 );
 
-// The link must be a genuine navigation (no data-bs-toggle="tab"), so it
-// opens the real page rather than trying to render a local tab-pane.
-if (preg_match('/<a class="list-group-item[^"]*"\s+href="<\?= getUrl\(\'backup_restore\'\) \?>">/s', $settingsSrc)) {
+// The link must be a genuine navigation (no 'tab' key → no data-bs-toggle="tab"),
+// so it opens the real page rather than trying to render a local tab-pane.
+if (!empty($backupItem[0]) && !str_contains($backupItem[0], "'tab' =>")) {
     pass('the Backup link is a plain navigation (no data-bs-toggle="tab") — opens the real page, not a local pane');
 } else {
     fail('the Backup link is not structured as a plain nav link — check it isn\'t wired as a Bootstrap tab pointing at a (now-deleted) local pane');

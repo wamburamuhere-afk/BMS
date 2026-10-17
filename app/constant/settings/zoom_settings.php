@@ -24,6 +24,7 @@ $clientId    = getSetting('zoom_client_id', '');
 $hasSecret   = getSetting('zoom_client_secret_enc', '') !== '';
 $hostEmail   = getSetting('zoom_host_email', '');
 ?>
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('zoom_settings'); ?>
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
@@ -142,4 +143,5 @@ $(function () {
 });
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php require_once __DIR__ . '/../../../footer.php'; ?>

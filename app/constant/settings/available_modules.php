@@ -26,6 +26,7 @@ $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
 $modules  = listAvailableModulesForTenant($tenantId);
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('available_modules'); ?>
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0"><i class="bi bi-grid text-primary me-2"></i><?= t('Available Modules') ?></h4>
@@ -122,4 +123,5 @@ $(document).ready(function () {
 });
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php require_once __DIR__ . '/../../../footer.php'; ?>

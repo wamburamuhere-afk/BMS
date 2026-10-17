@@ -37,6 +37,7 @@ if (isset($_SESSION['user_id'])) {
 }
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('users'); ?>
 <div class="container-fluid mt-4">
     <div class="row mb-4">
         <div class="col-12">
@@ -121,6 +122,7 @@ if (isset($_SESSION['user_id'])) {
     </div>
 </div>
 
+<?php settingsAdminShellClose(); ?>
 <?php include(FOOTER_FILE); ?>
 
 
