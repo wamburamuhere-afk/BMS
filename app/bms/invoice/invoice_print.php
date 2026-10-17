@@ -95,15 +95,9 @@ try {
 } catch (Exception $e) {}
 
 // Bank / Payment Settings
-$bank = ['bank_name'=>'','account_name'=>'','account_number'=>'','swift_code'=>'','check_payable_to'=>'','mpesa_paybill'=>'','mpesa_account_no'=>''];
-try {
-    $stmtB = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('bank_name','account_name','account_number','swift_code','check_payable_to','mpesa_paybill','mpesa_account_no')");
-    $stmtB->execute();
-    while ($r = $stmtB->fetch(PDO::FETCH_ASSOC)) {
-        $bank[$r['setting_key']] = $r['setting_value'];
-    }
-} catch (Exception $e) {}
-$has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !empty($bank['check_payable_to']);
+require_once ROOT_DIR . '/core/payment_accounts.php';
+$pa = getPaymentAccounts($pdo);
+$has_bank = paymentAccountsHasAny($pa);
 
 
 $creator_name  = trim($invoice['creator_name']  ?? '');
@@ -573,36 +567,7 @@ $wf = [
         <?php if ($has_bank): ?>
         <div class="bank-details">
             <h3>Bank Details</h3>
-            <?php if (!empty($bank['bank_name'])): ?>
-            <div class="bank-section">
-                <strong>Bank Transfer</strong>
-                <p>Bank: <?= htmlspecialchars($bank['bank_name']) ?></p>
-                <?php if (!empty($bank['account_name'])): ?>
-                <p>Account Name: <?= htmlspecialchars($bank['account_name']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($bank['account_number'])): ?>
-                <p>Account No: <?= htmlspecialchars($bank['account_number']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($bank['swift_code'])): ?>
-                <p>SWIFT / BIC: <?= htmlspecialchars($bank['swift_code']) ?></p>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($bank['mpesa_paybill'])): ?>
-            <div class="bank-section">
-                <strong>Mobile Money</strong>
-                <p>Paybill: <?= htmlspecialchars($bank['mpesa_paybill']) ?></p>
-                <?php if (!empty($bank['mpesa_account_no'])): ?>
-                <p>Account: <?= htmlspecialchars($bank['mpesa_account_no']) ?></p>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($bank['check_payable_to'])): ?>
-            <div class="bank-section">
-                <strong>Cheque</strong>
-                <p>Payable to: <?= htmlspecialchars($bank['check_payable_to']) ?></p>
-            </div>
-            <?php endif; ?>
+            <?= renderPaymentAccountsBlock($pa) ?>
         </div>
         <?php else: ?>
         <div style="flex:1;"></div>
