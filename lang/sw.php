@@ -5431,5 +5431,7 @@ return [
     'Bank Details' => 'Taarifa za Benki',
     'Nothing to show yet.' => 'Bado hakuna cha kuonyesha.',
     'Remove this account?' => 'Ondoa akaunti hii?',
+    // Settings › Admin side drawer
+    'All settings' => 'Mipangilio yote',
 
 ];

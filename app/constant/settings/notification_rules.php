@@ -21,6 +21,7 @@ $page_title = 'Notification Rules';
 require_once __DIR__ . '/../../../header.php';
 ?>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('notification_rules'); ?>
 <div class="container-fluid mt-4" id="nrApp">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -328,4 +329,5 @@ $('#addTargetModal').on('shown.bs.modal', function () {
 $(document).ready(loadRules);
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php require_once __DIR__ . '/../../../footer.php'; ?>

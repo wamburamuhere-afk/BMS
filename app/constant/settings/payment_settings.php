@@ -87,6 +87,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
     [data-bs-theme="dark"] .pa-mode:has(input:checked) { background: rgba(13,110,253,.15); }
 </style>
 
+<?php require_once ROOT_DIR . '/includes/settings_admin_nav.php'; settingsAdminShellOpen('payment_settings'); ?>
 <div class="container-fluid">
     <div class="row">
         <div class="col-12 mt-4">
@@ -439,6 +440,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
 })();
 </script>
 
+<?php settingsAdminShellClose(); ?>
 <?php
 require_once __DIR__ . '/../../../footer.php';
 ob_end_flush();

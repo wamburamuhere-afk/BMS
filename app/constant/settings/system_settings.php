@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('system_settings');
 
 require_once 'header.php';
+require_once ROOT_DIR . '/includes/settings_admin_nav.php';
 
 if (!isAdmin()) {
     header('Location: unauthorized.php');
@@ -169,9 +170,9 @@ if ($_POST) {
 }
 
 // Settings are handled by global helpers in helpers.php
-$projectsEnabled = function_exists('projectsModuleActive') ? projectsModuleActive() : true;
 ?>
 
+<?= settingsAdminNavAssets(true) ?>
 <div class="container-fluid mt-4">
     <!-- Page Header -->
     <div class="row mb-4">
@@ -202,228 +203,12 @@ $projectsEnabled = function_exists('projectsModuleActive') ? projectsModuleActiv
 
     <!-- Settings UI -->
     <div class="row g-4">
-        <!-- Sidebar Navigation -->
-        <div class="col-lg-3">
-            <div class="card border-0 shadow-sm sticky-top" style="top: 100px; z-index: 100;">
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush settings-nav" id="settingsTabs" role="tablist">
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('System Configuration') ?></div>
-                        <a class="list-group-item list-group-item-action active py-3 px-4 border-0 border-start border-4 border-transparent"
-                           id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-selected="true">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-primary-soft text-primary">
-                                    <i class="bi bi-building"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('General') ?></h6>
-                                    <small class="text-muted"><?= t('Business identity & basics') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           id="email-tab" data-bs-toggle="tab" data-bs-target="#email" type="button" role="tab" aria-selected="false">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-info-soft text-info">
-                                    <i class="bi bi-envelope"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Email Config') ?></h6>
-                                    <small class="text-muted"><?= t('SMTP & notifications') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           id="sms-tab" data-bs-toggle="tab" data-bs-target="#sms" type="button" role="tab" aria-selected="false">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-warning-soft text-warning">
-                                    <i class="bi bi-chat-text"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('SMS Gateway') ?></h6>
-                                    <small class="text-muted"><?= t('Providers & settings') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab" aria-selected="false">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-dark-soft text-dark">
-                                    <i class="bi bi-shield-lock"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Security') ?></h6>
-                                    <small class="text-muted"><?= t('Sessions & audits') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <!-- The rest of this list are plain navigation links (no data-bs-toggle="tab"),
-                             not local tab-panes — each opens its own real, unmodified page. They're
-                             gathered here rather than as separate top-nav Settings items because all
-                             ten are strictly admin-only: reaching THIS page already required
-                             isAdmin(), so grouping them here means a non-admin never even sees them
-                             as menu entries anywhere, on top of each page's own isAdmin() gate. Grouped
-                             under sub-headers (2026-07-31) purely for visual scanning — same links,
-                             same order-independent gates, just sectioned like the top-nav Settings
-                             dropdown's "System Configuration" / "Business Settings" headers. -->
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Access & Security') ?></div>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('users') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-primary-soft text-primary">
-                                    <i class="bi bi-people"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Users') ?></h6>
-                                    <small class="text-muted"><?= t('Accounts & roles') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('user_roles') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-primary-soft text-primary">
-                                    <i class="bi bi-shield-check"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Roles & Permissions') ?></h6>
-                                    <small class="text-muted"><?= t('What each role can do') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <!-- Login History moved to Activity Logs (linked from there, admin-only) —
-                             see app/activity_log.php. Kept out of this list so admin oversight
-                             tools live in one place instead of being split across two menus. -->
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('backup_restore') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-indigo-soft text-indigo">
-                                    <i class="bi bi-cloud-arrow-down"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Backup') ?></h6>
-                                    <small class="text-muted"><?= t('Database recovery') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Plan & Modules') ?></div>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('available_modules') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-primary-soft text-primary">
-                                    <i class="bi bi-grid"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Available Modules') ?></h6>
-                                    <small class="text-muted"><?= t('What your plan includes, request more') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <?php if (function_exists('bmsCurrentTenantId') && bmsCurrentTenantId() !== null): ?>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('my_subscription') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-primary-soft text-primary">
-                                    <i class="bi bi-credit-card-2-front"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('My Subscription') ?></h6>
-                                    <small class="text-muted"><?= t('Time left, renew, quotations and invoices from BJP') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <?php endif; ?>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Business & Finance') ?></div>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('payment_settings') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-success-soft text-success">
-                                    <i class="bi bi-credit-card"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Payments') ?></h6>
-                                    <small class="text-muted"><?= t('Bank & gateway details') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('company_profile') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-warning-soft text-warning">
-                                    <i class="bi bi-building"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Company Profile') ?></h6>
-                                    <small class="text-muted"><?= t('Logo, TIN/VRN, addresses') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Communication & Integrations') ?></div>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('notification_rules') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-danger-soft text-danger">
-                                    <i class="bi bi-bell-fill"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Notification Rules') ?></h6>
-                                    <small class="text-muted"><?= t("Who's notified, per event") ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <?php if (tenantFeatureEnabled('hr')): ?>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('zoom_settings') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-info-soft text-info">
-                                    <i class="bi bi-camera-video"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('Zoom Integration') ?></h6>
-                                    <small class="text-muted"><?= t('Video meeting config') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <?php endif; ?>
-                        <?php if (tenantFeatureEnabled('ai_assistant')): ?>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('ai_settings') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-info-soft text-info">
-                                    <i class="bi bi-stars"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold"><?= t('AI Assistant') ?></h6>
-                                    <small class="text-muted"><?= t('AI configuration & API key') ?></small>
-                                </div>
-                            </div>
-                        </a>
-                        <?php endif; ?>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">
-                            <?= $projectsEnabled ? t('Projects') : wLabel('Warehouse Access', 'Shop Access') ?>
-                        </div>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('user_projects') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-primary-soft text-primary">
-                                    <i class="bi bi-diagram-3"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">
-                                        <?= $projectsEnabled ? t('Project Assignments') : wLabel('Warehouse Access', 'Shop Access') ?>
-                                    </h6>
-                                    <small class="text-muted">
-                                        <?= $projectsEnabled ? t("Who's assigned to which project") : wLabel('Grant users access to warehouses', 'Grant users access to shops') ?>
-                                    </small>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Sidebar Navigation (shared with every Settings › Admin page) -->
+        <?= settingsAdminDesktopNav('general', true) ?>
 
         <!-- Tab Content -->
         <div class="col-lg-9">
+            <?= settingsAdminMobileNav('general', true) ?>
             <div class="tab-content settings-content shadow-sm rounded-4 bg-white p-4 p-md-5" id="settingsTabsContent">
 
                 <!-- General Settings Tab -->
@@ -924,36 +709,6 @@ body {
     justify-content: center;
     border-radius: 12px;
     font-size: 1.25rem;
-}
-
-.settings-nav .list-group-item {
-    transition: all 0.3s ease;
-    border-radius: 0 !important;
-}
-
-.settings-nav .list-group-item:hover {
-    background-color: #f8f9fa;
-    color: var(--bs-primary);
-}
-
-.settings-nav .list-group-item.active {
-    background-color: white;
-    color: var(--bs-primary);
-    border-left-color: var(--bs-primary) !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.settings-nav .sidebar-group-header {
-    font-size: 0.7rem;
-    letter-spacing: 0.06em;
-    padding-top: 0.85rem !important;
-    padding-bottom: 0.35rem !important;
-    pointer-events: none;
-}
-
-.settings-nav .sidebar-group-header:hover {
-    background-color: #f8f9fa !important;
-    color: #6c757d !important;
 }
 
 .settings-content {

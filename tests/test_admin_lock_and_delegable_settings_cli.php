@@ -186,9 +186,11 @@ foreach ($RETIRED as $file => $key) {
 }
 
 section('5b. system_settings.php now hosts plain nav links to every other locked page');
-$settingsPageSrc = readSrc($root, 'app/constant/settings/system_settings.php');
+// The list itself lives in includes/settings_admin_nav.php (shared with every
+// page it links to), rendered by system_settings.php via settingsAdminDesktopNav().
+$settingsPageSrc = readSrc($root, 'app/constant/settings/system_settings.php') . "\n" . readSrc($root, 'includes/settings_admin_nav.php');
 foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile', 'notification_rules', 'user_projects', 'ai_settings'] as $key) {
-    check(str_contains($settingsPageSrc, "getUrl('$key')"), "system_settings.php links to '$key'", "system_settings.php is missing a link to '$key' — it should be reachable from inside the Admin page");
+    check(str_contains($settingsPageSrc, "getUrl('$key')") || str_contains($settingsPageSrc, "'key' => '$key'"), "system_settings.php links to '$key'", "system_settings.php is missing a link to '$key' — it should be reachable from inside the Admin page");
 }
 // These must be plain navigation links, not local tab-panes (no matching
 // data-bs-toggle="tab" id for any of these).
