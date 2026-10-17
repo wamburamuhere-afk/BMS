@@ -143,18 +143,89 @@ if (!function_exists('sptParse')) {
     }
 }
 
+if (!function_exists('sptPlanColumnReady')) {
+    /** service_price_terms.plan_id + service_plans exist (service_plans_plan.md Phase 2 migration ran). */
+    function sptPlanColumnReady(PDO $pdo): bool
+    {
+        static $ready = false;   // only a positive answer is cached
+        if (!$ready) {
+            try {
+                $ready = sptReady($pdo)
+                    && (bool)$pdo->query("SHOW COLUMNS FROM `service_price_terms` LIKE 'plan_id'")->fetch()
+                    && (bool)$pdo->query("SHOW TABLES LIKE 'service_plans'")->fetch();
+            } catch (Throwable $e) {
+                return false;
+            }
+        }
+        return $ready;
+    }
+}
+
+if (!function_exists('sptDisplayLabel')) {
+    /** What a document line shows: "Plan — Term" for a plan's term, else the term label. Fits the 100-char snapshot. */
+    function sptDisplayLabel(?string $planName, string $termLabel): string
+    {
+        $planName = trim((string)$planName);
+        $label = $planName !== '' ? $planName . ' — ' . $termLabel : $termLabel;
+        return mb_substr($label, 0, 100);
+    }
+}
+
 if (!function_exists('sptForProduct')) {
-    /** @return array<int, array> ordered as the user arranged them */
+    /**
+     * @return array<int, array> ordered as the user arranged them. After the plans
+     * migration each row also carries plan_id, plan_name and display_label.
+     */
     function sptForProduct(PDO $pdo, int $productId, bool $activeOnly = true): array
     {
         if (!sptReady($pdo)) return [];
-        $st = $pdo->prepare("SELECT term_id, product_id, term_label, duration_value, duration_unit, price, description,
-                                    sort_order, is_default, status
-                               FROM service_price_terms
-                              WHERE product_id = ? AND status " . ($activeOnly ? "= 'active'" : "<> 'deleted'") . "
-                              ORDER BY sort_order, term_id");
+        $plans = sptPlanColumnReady($pdo);
+        $st = $pdo->prepare("SELECT t.term_id, t.product_id, t.term_label, t.duration_value, t.duration_unit, t.price, t.description,
+                                    t.sort_order, t.is_default, t.status"
+                           . ($plans ? ", t.plan_id, sp.plan_name" : "") . "
+                               FROM service_price_terms t"
+                           . ($plans ? " LEFT JOIN service_plans sp ON sp.plan_id = t.plan_id" : "") . "
+                              WHERE t.product_id = ? AND t.status " . ($activeOnly ? "= 'active'" : "<> 'deleted'") . "
+                              ORDER BY t.sort_order, t.term_id");
         $st->execute([$productId]);
-        return $st->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $r['plan_id'] = isset($r['plan_id']) && $r['plan_id'] !== null ? (int)$r['plan_id'] : null;
+            $r['plan_name'] = $r['plan_name'] ?? null;
+            $r['display_label'] = sptDisplayLabel($r['plan_name'], (string)$r['term_label']);
+        }
+        unset($r);
+        return $rows;
+    }
+}
+
+if (!function_exists('vssPlatformProduct')) {
+    /**
+     * The platform product (control DB product_key, e.g. bms_shop) this service
+     * sells, or null. Such a service's plans and prices live in Superadmin and
+     * are read-only in BJP's books (service_plans_plan.md D1).
+     */
+    function vssPlatformProduct(PDO $pdo, int $productId): ?string
+    {
+        if ($productId <= 0 || !sptReady($pdo)) return null;
+        try {
+            $st = $pdo->prepare("SELECT platform_product_key FROM vendor_subscription_services WHERE product_id = ?");
+            $st->execute([$productId]);
+            $v = $st->fetchColumn();
+            return ($v !== false && $v !== null && $v !== '') ? (string)$v : null;
+        } catch (Throwable $e) {
+            return null;   // column not there yet
+        }
+    }
+}
+
+if (!function_exists('sptAssertNotMapped')) {
+    /** Server-side lock: a service mapped to a platform product never takes local prices. */
+    function sptAssertNotMapped(PDO $pdo, int $productId): void
+    {
+        if (vssPlatformProduct($pdo, $productId) !== null) {
+            throw new InvalidArgumentException("This service's plans and prices are managed in Superadmin → Plans. They cannot be changed here.");
+        }
     }
 }
 
@@ -217,27 +288,41 @@ if (!function_exists('sptSave')) {
      */
     function sptSave(PDO $pdo, int $productId, array $rows, int $userId): array
     {
+        if ($rows) sptAssertNotMapped($pdo, $productId);
+
         $existing = [];
         foreach (sptForProduct($pdo, $productId, false) as $e) $existing[(int)$e['term_id']] = $e;
 
+        // A row's plan_id (set by spSave() in core/service_plans.php) is written
+        // only after the plans migration; a plain term row clears it.
+        $planCol = sptPlanColumnReady($pdo);
         $keep = [];
         $upd = $pdo->prepare("UPDATE service_price_terms SET term_label = ?, duration_value = ?, duration_unit = ?, price = ?,
-                                     description = ?, sort_order = ?, is_default = ?, status = 'active', updated_by = ?
+                                     description = ?, sort_order = ?, is_default = ?, status = 'active', updated_by = ?"
+                             . ($planCol ? ", plan_id = ?" : "") . "
                                WHERE term_id = ? AND product_id = ?");
         $ins = $pdo->prepare("INSERT INTO service_price_terms
-                                (product_id, term_label, duration_value, duration_unit, price, description, sort_order, is_default, status, created_by)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)");
+                                (product_id, term_label, duration_value, duration_unit, price, description, sort_order, is_default, status, created_by"
+                             . ($planCol ? ", plan_id" : "") . ")
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?" . ($planCol ? ", ?" : "") . ")");
         foreach ($rows as $r) {
+            $plan = isset($r['plan_id']) && (int)$r['plan_id'] > 0 ? (int)$r['plan_id'] : null;
             if ($r['term_id'] !== null) {
                 if (!isset($existing[$r['term_id']])) {
                     throw new InvalidArgumentException('One of the price terms no longer exists. Reload the page and try again.');
                 }
-                $upd->execute([$r['term_label'], $r['duration_value'], $r['duration_unit'], $r['price'], $r['description'],
-                               $r['sort_order'], $r['is_default'], $userId, $r['term_id'], $productId]);
+                $args = [$r['term_label'], $r['duration_value'], $r['duration_unit'], $r['price'], $r['description'],
+                         $r['sort_order'], $r['is_default'], $userId];
+                if ($planCol) $args[] = $plan;
+                $args[] = $r['term_id'];
+                $args[] = $productId;
+                $upd->execute($args);
                 $keep[$r['term_id']] = true;
             } else {
-                $ins->execute([$productId, $r['term_label'], $r['duration_value'], $r['duration_unit'], $r['price'],
-                               $r['description'], $r['sort_order'], $r['is_default'], $userId]);
+                $args = [$productId, $r['term_label'], $r['duration_value'], $r['duration_unit'], $r['price'],
+                         $r['description'], $r['sort_order'], $r['is_default'], $userId];
+                if ($planCol) $args[] = $plan;
+                $ins->execute($args);
             }
         }
 
@@ -305,10 +390,11 @@ if (!function_exists('vssSet')) {
      *
      * @throws InvalidArgumentException
      */
-    function vssSet(PDO $pdo, int $productId, bool $on, array $terms, int $userId): void
+    function vssSet(PDO $pdo, int $productId, bool $on, array $terms, int $userId, bool $mapped = false): void
     {
         if ($on) {
-            if (!$terms) throw new InvalidArgumentException('A system subscription needs at least one price term (e.g. 1 Month, 1 Year).');
+            // A service mapped to a platform product takes its prices from Superadmin — no local terms.
+            if (!$terms && !$mapped) throw new InvalidArgumentException('A system subscription needs at least one price term (e.g. 1 Month, 1 Year).');
             foreach ($terms as $t) {
                 if (sptMonths((int)$t['duration_value'], (string)$t['duration_unit']) === null) {
                     throw new InvalidArgumentException('Price term "' . $t['term_label'] . '": a system subscription can only use months or years.');
@@ -393,20 +479,26 @@ if (!function_exists('sptResolveLineTerm')) {
         $termId = (int)$termId;
         if ($termId <= 0 || !sptReady($pdo)) return $none;
 
-        $st = $pdo->prepare("SELECT term_id, product_id, term_label, duration_value, duration_unit
-                               FROM service_price_terms WHERE term_id = ? AND status <> 'deleted'");
+        $plans = sptPlanColumnReady($pdo);
+        $st = $pdo->prepare("SELECT t.term_id, t.product_id, t.term_label, t.duration_value, t.duration_unit"
+                           . ($plans ? ", sp.plan_name" : ", NULL AS plan_name") . "
+                               FROM service_price_terms t"
+                           . ($plans ? " LEFT JOIN service_plans sp ON sp.plan_id = t.plan_id" : "") . "
+                              WHERE t.term_id = ? AND t.status <> 'deleted'");
         $st->execute([$termId]);
         $t = $st->fetch(PDO::FETCH_ASSOC);
         if (!$t || (int)$t['product_id'] !== (int)$productId) {
             throw new InvalidArgumentException("The term chosen for $lineName does not belong to that service. Choose the term again.");
         }
+        // A plan's term is recorded as "Plan — Term" so the line says which plan was sold.
+        $label = sptDisplayLabel($t['plan_name'], (string)$t['term_label']);
         $desc = sptStripTermLine($description);
         return [
             'price_term_id'       => (int)$t['term_id'],
-            'price_term_label'    => $t['term_label'],
+            'price_term_label'    => $label,
             'term_duration_value' => (int)$t['duration_value'],
             'term_duration_unit'  => $t['duration_unit'],
-            'description'         => ($desc !== '' ? $desc . "\n" : '') . 'Term: ' . $t['term_label'],
+            'description'         => ($desc !== '' ? $desc . "\n" : '') . 'Term: ' . $label,
         ];
     }
 }

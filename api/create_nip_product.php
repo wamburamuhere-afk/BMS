@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/code_generator.php';
 require_once __DIR__ . '/../core/service_price_terms.php';
+require_once __DIR__ . '/../core/service_plans.php';
 require_once __DIR__ . '/../core/vendor_context.php';
 global $pdo;
 
@@ -82,7 +83,8 @@ try {
     if ($price_terms && !sptReady($pdo)) {
         throw new Exception('Price terms are not available yet — the database update has not run. Save without terms or try again shortly.');
     }
-    $is_subscription = isPlatformVendorContext() && !empty($_POST['is_subscription']);
+    // Optional plans (each with its own terms) — core/service_plans.php.
+    $service_plans = spParse($_POST['service_plans'] ?? null);
 
     if (nipDuplicateName($pdo, $product_data['product_name'], $product_data['warehouse_id'])) {
         throw new Exception('A service named "' . $product_data['product_name'] . '" already exists here. Use a different name or edit the existing one.');
@@ -123,17 +125,10 @@ try {
         }
     }
 
-    // 3. Price terms: the default term's price becomes the selling price and the
-    // cheapest term the minimum, so POS and every list keep reading one number.
-    if ($price_terms) {
-        $sum = sptSave($pdo, (int)$product_id, $price_terms, (int)$user_id);
-        $pdo->prepare("UPDATE products SET selling_price = ?, min_selling_price = ? WHERE product_id = ?")
-            ->execute([$sum['default_price'], $sum['min_price'], $product_id]);
-    }
-    if ($is_subscription) {
-        vssSet($pdo, (int)$product_id, true, $price_terms ?? [], (int)$user_id);
-        vssSetContractTemplate($pdo, (int)$product_id, (int)($_POST['contract_template_id'] ?? 0));
-    }
+    // 3. Price terms / plans / platform product: the default price becomes the
+    // selling price and the cheapest the minimum, so POS and every list keep
+    // reading one number. The subscription flag counts only on the platform root.
+    spSaveFromForm($pdo, (int)$product_id, $price_terms, $service_plans, $_POST, (int)$user_id, true);
 
     // Auto-generate the company-prefixed Item Code, e.g. BFS-NIP-0001.
     // Sequential & gap-free via core/code_generator.php; the allocation shares

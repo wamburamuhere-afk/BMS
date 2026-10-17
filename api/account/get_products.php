@@ -96,6 +96,8 @@ try {
             ? array_map(fn($t) => [
                 'term_id'        => (int)$t['term_id'],
                 'term_label'     => $t['term_label'],
+                'plan_name'      => $t['plan_name'] ?? null,
+                'display_label'  => $t['display_label'] ?? $t['term_label'],   // "Plan — Term" for a plan's term
                 'duration_value' => (int)$t['duration_value'],
                 'duration_unit'  => $t['duration_unit'],
                 'price'          => (float)$t['price'],

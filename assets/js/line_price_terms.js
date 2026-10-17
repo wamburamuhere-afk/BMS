@@ -45,7 +45,7 @@
         if (opts.selectName) $sel.attr('name', opts.selectName);   // form-posted documents (invoices)
         $sel.append(new Option(window.BMS_LINE_TERMS_I18N ? window.BMS_LINE_TERMS_I18N.choose : 'Choose term…', ''));
         terms.forEach(t => {
-            const o = new Option(t.term_label + ' — ' + Number(t.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), String(t.term_id));
+            const o = new Option((t.display_label || t.term_label) + ' — ' + Number(t.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), String(t.term_id));
             $sel.append(o);
         });
         $box.append($sel);
@@ -71,7 +71,7 @@
             const id = $sel.val();
             const t = terms.find(x => String(x.term_id) === String(id));
             if (t && (fromUser || !opts.keepPrice)) $price.val(t.price);
-            setDescription($desc, t ? t.term_label : (id ? (opts.savedTermLabel || '') : ''));
+            setDescription($desc, t ? (t.display_label || t.term_label) : (id ? (opts.savedTermLabel || '') : ''));
             if (typeof opts.onChange === 'function') opts.onChange($row);
         };
         $sel.on('change', () => apply(true));

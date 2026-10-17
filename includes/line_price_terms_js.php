@@ -5,4 +5,4 @@
 window.BMS_LINE_TERMS_URL  = <?= json_encode(getUrl('api/account/get_service_price_terms.php')) ?>;
 window.BMS_LINE_TERMS_I18N = <?= json_encode(['choose' => t('Choose term…')], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 </script>
-<script src="<?= getUrl('assets/js/line_price_terms.js') ?>?v=1"></script>
+<script src="<?= getUrl('assets/js/line_price_terms.js') ?>?v=2"></script>

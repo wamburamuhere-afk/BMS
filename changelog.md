@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-17 — feat(plans): plans on BJP's services — Basic/Pro tiers with prices per term, or mapped live to a Superadmin product (service plans Phase 2)
+
+**Files:** `migrations/tenant/2026_10_17_service_plans.php` (new), `core/service_plans.php` (new), `core/service_price_terms.php`, `core/platform_gateway.php`, `includes/service_price_terms_editor.php`, `includes/line_price_terms_js.php`, `assets/js/line_price_terms.js`, `app/bms/product/services.php`, `app/bms/product/service_view.php`, `api/create_nip_product.php`, `api/update_nip_product.php`, `api/account/get_service_price_terms.php`, `api/account/get_products.php`, `tests/test_service_plans_bjp_form_cli.php` (new), `changelog.md`
+
+- **Tenant DB (idempotent):** new `service_plans` + `service_plan_items`; `service_price_terms.plan_id`; `vendor_subscription_services.platform_product_key` (unique — one service per platform product).
+- **Add/Edit Service › Pricing & Planning:** a "Plans" bar opens a side drawer (tabs per plan: name, short description, Most popular, prices per term with one default across all plans, "What's included" lines). Existing plain terms can be moved into a first plan. Cancel/Escape restores what was there. A service has plain terms **or** plans, never both.
+- **Platform mapping (BJP's install, admins only):** a service can be linked to a Superadmin product; its plans and prices are then read live from Superadmin and shown read-only, local plans/terms are retired, and the service is forced to be a subscription. Unmapping returns it to normal.
+- **Documents:** a plan term shows as "Plan — Term" in the line term picker, on Service Details and on the line snapshot. The server still re-checks every term. Plans/terms already used on a document are made inactive, never deleted.
+- **Services list:** shows "From <lowest price>" with an "N plans" or "From Superadmin" pill.
+- Plain services and ordinary quotations, sales orders and invoices behave exactly as before. Tests: new suite 82/82; regressions green (price terms 47, vendor bridge 33, my subscription 36, subscription e2e 18, contracts 28, catalogue 101, quotations 130, invoice scope 13, SO approvals 105, quotation customer box 49). Browser-checked: drawer open/type/Escape and the read-only mapped view.
+
 ## 2026-10-17 — feat(plans): sellable plan catalogue — products, prices per term, included lines, add-ons (service plans Phase 1)
 
 **Files:** `scripts/setup_control_db.php`, `core/plans.php`, `actions/superadmin_plans.php`, `app/superadmin/plans.php`, `tests/test_service_plans_catalog_cli.php` (new), `changelog.md`

@@ -64,7 +64,7 @@ if (!function_exists('pgCatalog')) {
                 foreach (sptForProduct($pdo, (int)$r['product_id']) as $t) {
                     $m = sptMonths((int)$t['duration_value'], (string)$t['duration_unit']);
                     if ($m === null) continue;
-                    $terms[] = ['term_id' => (int)$t['term_id'], 'term_label' => $t['term_label'], 'months' => $m,
+                    $terms[] = ['term_id' => (int)$t['term_id'], 'term_label' => $t['display_label'] ?? $t['term_label'], 'months' => $m,
                                 'price' => (float)$t['price'], 'description' => $t['description'], 'is_default' => (int)$t['is_default'] === 1];
                 }
                 if ($terms) $out[] = ['product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'description' => $r['description'], 'terms' => $terms];

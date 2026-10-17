@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/service_price_terms.php';
+require_once __DIR__ . '/../../core/service_plans.php';
 require_once __DIR__ . '/../../core/vendor_context.php';
 
 header('Content-Type: application/json');
@@ -33,21 +34,41 @@ try {
         exit;
     }
 
-    $terms = array_map(fn($t) => [
+    $termShape = fn($t) => [
         'term_id'        => (int)$t['term_id'],
         'term_label'     => $t['term_label'],
+        'plan_id'        => $t['plan_id'] ?? null,
+        'display_label'  => $t['display_label'] ?? $t['term_label'],
         'duration_value' => (int)$t['duration_value'],
         'duration_unit'  => $t['duration_unit'],
         'price'          => (float)$t['price'],
         'description'    => $t['description'],
         'is_default'     => (int)$t['is_default'] === 1,
-    ], sptForProduct($pdo, $productId));
+    ];
+    $terms = array_map($termShape, sptForProduct($pdo, $productId));
+
+    // Plans (core/service_plans.php): `data` above stays the flat list every line picker reads.
+    $plans = array_map(fn($p) => [
+        'plan_id'    => $p['plan_id'],
+        'plan_name'  => $p['plan_name'],
+        'tagline'    => $p['tagline'],
+        'is_popular' => $p['is_popular'],
+        'items'      => $p['items'],
+        'terms'      => array_map($termShape, $p['terms']),
+    ], spPlansForProduct($pdo, $productId));
+
+    $vendor = isPlatformVendorContext();
+    $platformKey = $vendor ? vssPlatformProduct($pdo, $productId) : null;
 
     echo json_encode([
         'success'         => true,
         'data'            => $terms,
-        'is_subscription' => isPlatformVendorContext() && vssIsSubscription($pdo, $productId),
-        'contract_template_id' => isPlatformVendorContext() ? vssContractTemplate($pdo, $productId) : null,
+        'plans'           => $plans,
+        'is_subscription' => $vendor && vssIsSubscription($pdo, $productId),
+        'contract_template_id' => $vendor ? vssContractTemplate($pdo, $productId) : null,
+        // A mapped service: its plans are Superadmin's, read live and shown read-only.
+        'platform_product_key' => $platformKey,
+        'platform_plans'  => $platformKey !== null ? spPlatformPlans($platformKey) : [],
     ]);
 } catch (Throwable $e) {
     error_log('get_service_price_terms: ' . $e->getMessage());
