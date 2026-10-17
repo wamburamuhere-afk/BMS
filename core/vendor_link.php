@@ -10,6 +10,7 @@
  * a customer automatically — a person decides.
  */
 require_once __DIR__ . '/control_db.php';
+require_once __DIR__ . '/tenant_resolver.php';           // tenantBaseDomain
 require_once __DIR__ . '/tenant_lifecycle_policy.php';   // controlColumnExists
 
 if (!function_exists('vlLinkReady')) {
@@ -27,7 +28,7 @@ if (!function_exists('vlNormalizeSubdomain')) {
         $s = strtolower(trim($raw));
         $s = preg_replace('#^https?://#', '', $s);
         $s = explode('/', $s)[0];
-        $base = function_exists('tenantBaseDomain') ? tenantBaseDomain() : null;
+        $base = tenantBaseDomain();
         if ($base && substr($s, -strlen('.' . $base)) === '.' . $base) $s = substr($s, 0, -strlen('.' . $base));
         return preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $s) ? $s : '';
     }

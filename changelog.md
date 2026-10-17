@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-16 — test(subscriptions) Phase 8: the whole story end to end
+
+- `tests/test_customer_subscription_e2e_cli.php` (new, 17) — through the real endpoints: visit (no customer yet) → joined with the company's web address → Make real customer (linked) → the company's admin picks "6 Months" in My Subscription → approved quotation → BJP converts it to a sales order → invoice (line inherits the term) → payment → company trial → active until exactly 6 months after its trial's last day → contract for that period → BJP signs → customer signing link → signed by both; running everything again doubles nothing.
+- `core/vendor_link.php` — loads `tenant_resolver.php` itself (a pasted `https://x.bms…` web address was only normalised when another file had happened to load it; the CI run caught it).
+- `customer_subscription_plan.md` — every phase marked done, decisions D1/D3 recorded as changed, operator steps for go-live, and the list of test suites.
+
+Verified: all 10 new suites pass together — 291 checks, 0 failures, no data left behind — and each passes in CI mode (no database).
+
+---
+
 ## 2026-10-16 — feat(reports) Phase 7: Most Profitable Products
 
 **Which products and services earn the most after their cost** (instruction: add a "Most Profitable Products" report so the customer can see which items make the most profit). Built into the existing Product Analysis report — same filters, scope and print — and reachable as its own entry in Reports.

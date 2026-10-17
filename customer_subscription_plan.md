@@ -1,6 +1,6 @@
 # Plan: Service Price Terms + BMS Customer Subscriptions
 
-**Status:** IN PROGRESS. Approved by the owner on 2026-10-15.
+**Status:** ALL PHASES (0–8) BUILT AND TESTED, 2026-10-16. Approved by the owner on 2026-10-15. Awaiting PR review + the operator steps below.
 **Branch:** `feat/customer-subscription` (worktree `../bms-subscription`), PR into `develop`
 **Source:** Boss's suggestions plus the owner's corrections (conversation of 2026-10-15)
 
@@ -52,7 +52,7 @@
 
 ---
 
-## PHASE 1: Service price terms
+## PHASE 1: Service price terms ✅ DONE
 
 **Database** (`migrations/tenant/` + `_legacy_db` mirror):
 ```
@@ -71,17 +71,17 @@ No new columns are added to `products`.
 
 **Lists and details:** the Services list shows "From 10,000 · 4 terms". `service_view.php` gets a "Price by term" card, and the components table renders only when the service actually has components.
 
-## PHASE 2: Term on Quotation / Sales Order / Invoice lines
+## PHASE 2: Term on Quotation / Sales Order / Invoice lines ✅ DONE
 
 The same nullable columns are added to `quotation_items`, `sales_order_items` and `invoice_items`: `price_term_id`, `price_term_label`, `term_duration_value`, `term_duration_unit`. They must be added to **all three together**, because `convert_quote_to_order.php` copies every quotation-line column into `sales_order_items`. Values are stored as a snapshot, filled by the server from the DB and never trusted from the client.
 
 Forms (`quotation_form.php`, sales order create/edit, invoice create/edit): a Term select appears for a service with terms; choosing one fills `unit_price` and appends "(Term: 6 Months)" to the line description, so existing prints show it without template changes. Editing reloads the stored term. An invoice raised from a sales order takes the term from the order line. `save_quotation.php`, `save_sales_order.php` and `save_invoice.php` store and validate the term (it must belong to that product and be active). Statuses and workflows are untouched (R1). Older and mobile clients that send no term keep working.
 
-## PHASE 3: Customer Visits → real customer + tenant link
+## PHASE 3: Customer Visits → real customer + tenant link ✅ DONE
 
 `field_visits` gets `tenant_id`, `tenant_subdomain`, `customer_id`. In vendor context, "Mark as joined" opens a modal with an optional subdomain field, checked against the control DB. For a joined visit with a tenant, "Make real customer" either reuses the customer already linked to that tenant or offers a phone/email match, or else creates a customer through the normal path (`nextCode('CUST')`), prefilled from the visit and the tenant's registration. It then sets `field_visits.customer_id` and `tenants.vendor_customer_id`. Superadmin's tenant view gets a "BJP customer" panel to link or unlink self-registered tenants. Outside vendor context, "Mark as joined" is exactly as today.
 
-## PHASE 4: Payment bridge
+## PHASE 4: Payment bridge ✅ DONE
 
 `record_payment.php`, `save_receipt.php` and `apply_customer_advance.php` call `vendorOnInvoiceSettled()` after commit. `update_invoice_status.php` (marking paid without money) does **not**. `void_payment.php` raises an alert only and never shortens access. Rules:
 - vendor context only;
@@ -94,7 +94,7 @@ Forms (`quotation_form.php`, sales order create/edit, invoice create/edit): a Te
 
 Superadmin shows the payment source and the open alerts.
 
-## PHASE 5: "My Subscription" inside the customer's tenant
+## PHASE 5: "My Subscription" inside the customer's tenant ✅ DONE
 
 Admin-only page on tenant subdomains:
 - **Status:** read from the control DB, for this tenant only.
@@ -102,15 +102,15 @@ Admin-only page on tenant subdomains:
 - **Documents:** that customer's quotations and invoices; the PDF opens through a short-lived signed link to the existing print page.
 - **Contracts:** added in Phase 6.
 
-## PHASE 6: Contracts after payment
+## PHASE 6: Contracts after payment ✅ DONE
 
 `customer_contracts` in BJP's DB, built from templates via `document_merge.php`. A draft is created when a subscription invoice is paid. A BJP signer signs (role-based), then the existing `request_external_signature.php` flow sends it to the customer. Signed PDFs are locked and their hash recorded. The contracts also appear in My Subscription.
 
-## PHASE 7: Most Profitable Products
+## PHASE 7: Most Profitable Products ✅ DONE
 
 Extend `product_analysis` with cost, profit and margin, sorted by profit. Cost uses the same basis as `postInvoiceCOGS` / POS COGS. A reconciliation line compares the totals against `glProfitLoss`. Project and warehouse scope apply (§23), and the report is also shown in the Simple POS report list.
 
-## PHASE 8: Final end-to-end and regression
+## PHASE 8: Final end-to-end and regression ✅ DONE
 
 1. The full story on demo: visit → joined + subdomain → customer → My Subscription request → approved quote → invoice → payment → +months → contract → signed.
 2. Shop-tenant regression: Simple POS and Shop Mode unchanged.
@@ -121,9 +121,20 @@ Extend `product_analysis` with cost, profit and margin, sorted by profit. Cost u
 
 | # | Decision |
 |---|---|
-| D1 | Self-registered tenants with no visit are linked by **superadmin** on the tenant page. |
+| D1 | ~~Linked by superadmin~~ → **changed:** linked from BJP's side (Customer Details → Platform company), because the superadmin panel never opens BJP's own database. Superadmin shows who pays (stored label) and can remove a link. |
 | D2 | After a self-service quotation is auto-approved, **BJP staff create the invoice** through the normal flow. |
-| D3 | Tenants read BJP documents through a **read-only** MySQL user (operator step). |
+| D3 | ~~Read-only MySQL user~~ → **changed:** a signed server-to-server gateway on the platform root (HMAC with a key derived from `TENANT_CRED_KEY`); no extra database user. Documents open as a read-only customer copy via a 30-minute signed link. |
 | D4 | The superadmin payment bugs are fixed first (done in Phase 0). |
 | D5 | Web forms require a term for a service that has terms; APIs still accept none. |
 | D6 | A voided payment raises an alert only; access is never shortened automatically. |
+
+## Operator steps before go-live (owner)
+
+1. On **bms** and **demo**: `php scripts/setup_control_db.php` (adds `tenants.vendor_customer_id/_label`, `tenant_payments.source/source_ref`, `vendor_bridge_alerts`). Until then manual payments keep working; automatic ones wait.
+2. Schedule `https://bms.bjptechnologies.co.tz/api/cron/vendor_bridge_retry.php` (Bearer `CRON_SECRET`, e.g. every 15 minutes) — a safety net; payments normally apply at once.
+3. In BJP's own system: create the subscription service(s) with price terms, tick "BMS system subscription", choose a contract template (Documents → Templates, using the `{{customer_name}}`, `{{period}}`, `{{period_start}}`, `{{period_end}}`, `{{amount}}` … tokens).
+4. Link existing paying companies to their customers (Customer Visits → joined + web address → Make real customer, or Customer Details → Platform company → Link).
+
+## Test suites (all wired into CI; CI runs the database-free part)
+
+`test_tenant_migration_health_cli` (11) · `test_subscription_payment_cli` (33) · `test_service_price_terms_cli` (47) · `test_document_line_terms_cli` (31) · `test_customer_visit_link_cli` (39) · `test_vendor_bridge_cli` (33) · `test_my_subscription_cli` (36) · `test_subscription_contracts_cli` (28) · `test_most_profitable_products_cli` (16) · `test_customer_subscription_e2e_cli` (17) — **291 checks, 0 failures**, no data left behind.
