@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-17 — feat(plans): sellable plan catalogue — products, prices per term, included lines, add-ons (service plans Phase 1)
+
+**Files:** `scripts/setup_control_db.php`, `core/plans.php`, `actions/superadmin_plans.php`, `app/superadmin/plans.php`, `tests/test_service_plans_catalog_cli.php` (new), `changelog.md`
+
+- **Control DB (idempotent setup):** new `platform_products` (seeds *BMS Shop Mode* / *BMS Full*, both hidden from registration, no plans seeded), `plan_prices`, `plan_items`, `plan_addons`, `plan_addon_prices`, `vendor_link_queue`; new columns `plans.product_key/tagline/max_shops/is_public/is_popular/tier_rank`, `tenants.max_shops/scheduled_plan_key/scheduled_plan_at`; `vendor_bridge_alerts.kind` gains `possible_match`.
+- **Superadmin › Plans:** the edit form now has product (Select2), tagline, tier, Public / Most popular, Max shops, a Prices table (length + month/year, name, TZS price, default), "What's included" lines and Add-ons (raise shops or users, priced per plan term). Cards show product, Public/Hidden, shop limit and prices.
+- **Rules (server-side, every save):** prices are retired, never deleted, and a saved term's length cannot change (issued documents point at it); re-adding a term revives its row; exactly one default; no two terms of the same length; a public plan needs a product and a price; one "Most popular" per product; add-ons only for a limited quota and only for the plan's own terms; the blank plan can never be sold. Saves are one transaction.
+- **For later phases:** `listPublicOffers()` (public shape, no ids) and `planOfferPrice(plan_key, term_key)` resolve what a customer may buy server-side. `applyPlanToTenant()` now also sets the tenant's shop limit.
+- **Fix:** the Edit button no longer embeds plan JSON in the HTML attribute (an apostrophe in a name broke it).
+- Legacy plan saves (no catalogue fields) behave exactly as before. Tests: new suite 101/101; `test_plans_cli.php` 48/48.
+
 ## 2026-10-17 — feat(settings): Settings › Admin list stays on every admin page (left column on desktop, side drawer on phones)
 
 **Files:** `includes/settings_admin_nav.php` (new), `app/constant/settings/system_settings.php`, `users.php`, `add_user.php`, `edit_user.php`, `user_roles.php`, `backup_restore.php`, `available_modules.php`, `my_subscription.php`, `payment_settings.php`, `company_profile.php`, `notification_rules.php`, `zoom_settings.php`, `ai_settings.php`, `user_projects.php`, `lang/sw.php`, `tests/test_settings_admin_drawer_cli.php` (new), `tests/test_admin_lock_and_delegable_settings_cli.php`, `tests/test_backup_restore_csrf_cli.php`, `changelog.md`
