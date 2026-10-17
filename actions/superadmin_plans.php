@@ -45,6 +45,23 @@ if ($action === 'create' || $action === 'update') {
         'sort_order'     => (int)($_POST['sort_order'] ?? 0),
         'feature_keys'   => array_map('strval', (array)($_POST['feature_keys'] ?? [])),
     ];
+    // The service-plan part of the form (service_plans_plan.md Phase 1). The
+    // `catalog` marker matters: jQuery drops an empty array from the POST, so
+    // "every price removed" must still reach createPlan()/updatePlan() as [].
+    // Every value is re-validated there; nothing here is trusted.
+    if ((string)($_POST['catalog'] ?? '') === '1') {
+        $in += [
+            'product_key' => (string)($_POST['product_key'] ?? ''),
+            'tagline'     => (string)($_POST['tagline'] ?? ''),
+            'max_shops'   => $toLimit((string)($_POST['max_shops'] ?? '')),
+            'tier_rank'   => (int)($_POST['tier_rank'] ?? 0),
+            'is_public'   => (string)($_POST['is_public'] ?? '') === '1',
+            'is_popular'  => (string)($_POST['is_popular'] ?? '') === '1',
+            'prices'      => array_values(array_filter((array)($_POST['prices'] ?? []), 'is_array')),
+            'items'       => array_values(array_filter((array)($_POST['items'] ?? []), 'is_array')),
+            'addons'      => array_values(array_filter((array)($_POST['addons'] ?? []), 'is_array')),
+        ];
+    }
 
     if ($action === 'create') {
         $r = createPlan($in);
