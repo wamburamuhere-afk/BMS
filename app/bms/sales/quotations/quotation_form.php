@@ -496,6 +496,7 @@ includeHeader();
 
 <?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
+<?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
 <script>
 let currentItemIndex = null;
 let itemCount = 0;
@@ -684,6 +685,12 @@ function addItemRow(product = null) {
         $row.find('.item-description').val(product.description || '');
         $row.find('.item-unit').val(product.unit || 'pcs');
         if (product.tax_rate != null) { $row.find('.item-tax').val(product.tax_rate); }
+        // Price by term: a saved line keeps its term and price; a scanned service offers its terms.
+        BmsLineTerms.attach($row, product, {
+            savedTermId: product.price_term_id || null, savedTermLabel: product.price_term_label || '',
+            keepPrice: !!product.price_term_id,
+            onChange: () => { calculateItemTotal(index); calculateTotals(); }
+        });
     }
 
     calculateItemTotal(index);
@@ -823,6 +830,8 @@ function selectProduct(productId) {
         row.find('.item-unit').val(product.unit || 'pcs');
         row.find('.item-price').val(product.selling_price || 0);
         selectTaxRate(row.find('.item-tax'), product.sales_tax_rate ?? product.tax_rate);
+        const idx = currentItemIndex;
+        BmsLineTerms.attach(row, product, { onChange: () => { calculateItemTotal(idx); calculateTotals(); } });
         $('#productSearchResults').hide();
         calculateItemTotal(currentItemIndex);
         calculateTotals();
@@ -991,7 +1000,8 @@ function collectItems() {
             unit: $(this).find('.item-unit').val(),
             unit_price: $(this).find('.item-price').val(),
             tax_rate: $(this).find('.item-tax').val(),
-            discount_percent: $(this).find('.item-discount').val()
+            discount_percent: $(this).find('.item-discount').val(),
+            price_term_id: BmsLineTerms.value($(this))
         };
         if (item.product_name && item.quantity) { items.push(item); }
     });
@@ -1055,6 +1065,10 @@ function saveQuotationFinal() {
 }
 
 function validateForm(isDraft = false) {
+    if (BmsLineTerms.missing($('#itemsBody')).length) {
+        Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this document is priced by term. Choose its term before saving.')) ?> });
+        return false;
+    }
     if ($('[id^="item-row-"]').length === 0) {
         Swal.fire({ icon: 'warning', title: 'No Items', text: 'Please add at least one item to the quotation.' });
         return false;

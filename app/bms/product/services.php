@@ -96,6 +96,22 @@ $stmt->bindValue(':offset', $offset,   PDO::PARAM_INT);
 $stmt->execute();
 $all_nip_services = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Services priced by term show "From <cheapest> · N terms" instead of one price.
+require_once ROOT_DIR . '/core/service_price_terms.php';
+require_once ROOT_DIR . '/core/vendor_context.php';
+$svc_terms = sptSummary($pdo, array_column($all_nip_services, 'product_id'));
+$svc_price_html = function (array $svc) use ($svc_terms): string {
+    $t = $svc_terms[(int)$svc['product_id']] ?? null;
+    if (!$t) return format_currency($svc['selling_price']);
+    return t('From') . ' ' . format_currency($t['min'])
+        . ' <span class="badge rounded-pill ms-1" style="background:#e7f0ff;color:#0d6efd;border:1px solid #b6ccfe;font-weight:600;">'
+        . (int)$t['count'] . ' ' . ($t['count'] === 1 ? t('term') : t('terms')) . '</span>';
+};
+$isVendor = isPlatformVendorContext();
+$contractTemplates = $isVendor
+    ? $pdo->query("SELECT id, template_name FROM document_templates WHERE is_active = 1 AND content IS NOT NULL ORDER BY template_name")->fetchAll(PDO::FETCH_ASSOC)
+    : [];
+
 // ?edit=N (the service page's Edit button, pos_detail_pages_plan.md C4): open that
 // service's Edit form on load — same row shape as the list, same scope.
 $edit_svc = null;
@@ -381,7 +397,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center py-2 mb-2">
                                     <span class="text-muted small"><?= t('Price:') ?></span>
-                                    <span class="fw-bold text-primary" style="font-size: 1rem;"><?= format_currency($svc['selling_price']) ?></span>
+                                    <span class="fw-bold text-primary" style="font-size: 1rem;"><?= $svc_price_html($svc) ?></span>
                                 </div>
                             </div>
 
@@ -482,7 +498,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                 <span class="text-muted small">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="fw-bold"><?= format_currency($svc['selling_price']) ?></td>
+                            <td class="fw-bold"><?= $svc_price_html($svc) ?></td>
                             <td>
                                 <?php if (!empty($svc['tax_name'])): ?>
                                 <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
@@ -733,6 +749,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                         </div>
 
+                        <?php if (!$simpleServiceForm) { $sptPrefix = 'svc'; include ROOT_DIR . '/includes/service_price_terms_editor.php'; } ?>
+
                         <div class="table-responsive rounded-3 bg-white shadow-sm border overflow-hidden<?= $simpleServiceForm ? ' d-none' : '' ?>">
                             <table class="table table-hover align-middle mb-0" id="svcComponentTable">
                                 <thead class="bg-dark text-white text-center">
@@ -933,6 +951,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                 </div>
                             </div>
                         </div>
+
+                        <?php if (!$simpleServiceForm) { $sptPrefix = 'edit_svc'; include ROOT_DIR . '/includes/service_price_terms_editor.php'; } ?>
 
                         <div class="table-responsive rounded-3 bg-white shadow-sm border overflow-hidden<?= $simpleServiceForm ? ' d-none' : '' ?>">
                             <table class="table table-hover align-middle mb-0" id="editSvcComponentTable">
@@ -1549,12 +1569,134 @@ function selectSvcInventoryProductEdit(index, prod) {
     }
 }
 
+// ── Price by term (optional) — core/service_price_terms.php ─────────────────
+const SPT_I18N = <?= json_encode([
+    'units' => ['day' => t('Days'), 'week' => t('Weeks'), 'month' => t('Months'), 'year' => t('Years')],
+    'name_ph' => t('e.g. 3 Months'), 'desc_ph' => t('Optional'), 'remove' => t('Remove term'),
+    'hint' => t("Depends on term — this is the default term's price."),
+], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+
+function sptBody(prefix) { return document.getElementById(prefix + '_spt_body'); }
+function sptSellInput(prefix) { return document.getElementById(prefix === 'svc' ? 'svc_sell' : 'edit_svc_sell'); }
+
+function sptAddRow(prefix, term) {
+    const body = sptBody(prefix);
+    if (!body) return;
+    term = term || {};
+    const tr = document.createElement('tr');
+    if (term.term_id) tr.dataset.termId = term.term_id;
+    tr.innerHTML = `
+        <td class="spt-sno small text-muted"></td>
+        <td><input type="text" class="form-control form-control-sm spt-label" maxlength="100"></td>
+        <td><div class="input-group input-group-sm">
+            <input type="number" class="form-control spt-value" min="1" max="1000" step="1" style="max-width:80px;">
+            <select class="form-select spt-unit"></select></div></td>
+        <td><input type="number" class="form-control form-control-sm spt-price" min="0" step="0.01"></td>
+        <td><input type="text" class="form-control form-control-sm spt-desc" maxlength="1000"></td>
+        <td class="text-center"><input class="form-check-input spt-default" type="radio" name="${prefix}_spt_default"></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger spt-remove"><i class="bi bi-trash"></i></button></td>`;
+    const unit = tr.querySelector('.spt-unit');
+    Object.entries(SPT_I18N.units).forEach(([k, v]) => unit.add(new Option(v, k)));
+    tr.querySelector('.spt-label').placeholder = SPT_I18N.name_ph;
+    tr.querySelector('.spt-desc').placeholder = SPT_I18N.desc_ph;
+    tr.querySelector('.spt-remove').title = SPT_I18N.remove;
+    tr.querySelector('.spt-label').value = term.term_label || '';
+    tr.querySelector('.spt-value').value = term.duration_value || 1;
+    unit.value = term.duration_unit || 'month';
+    tr.querySelector('.spt-price').value = (term.price !== undefined && term.price !== null) ? term.price : '';
+    tr.querySelector('.spt-desc').value = term.description || '';
+    const isFirst = body.children.length === 0;
+    tr.querySelector('.spt-default').checked = term.term_id ? !!term.is_default : isFirst;
+    tr.querySelector('.spt-remove').addEventListener('click', () => {
+        const wasDefault = tr.querySelector('.spt-default').checked;
+        tr.remove();
+        if (wasDefault && body.firstElementChild) body.firstElementChild.querySelector('.spt-default').checked = true;
+        sptSync(prefix);
+    });
+    tr.addEventListener('input', () => sptSync(prefix));
+    tr.addEventListener('change', () => sptSync(prefix));
+    body.appendChild(tr);
+    sptSync(prefix);
+    if (!term.term_id) tr.querySelector('.spt-label').focus();
+}
+
+// With terms, the selling price is the default term's price (read-only); without, it is typed as before.
+function sptSync(prefix) {
+    const body = sptBody(prefix);
+    if (!body) return;
+    const rows = Array.from(body.children);
+    rows.forEach((tr, i) => { tr.querySelector('.spt-sno').textContent = i + 1; });
+    document.getElementById(prefix + '_spt_wrap').classList.toggle('d-none', rows.length === 0);
+    const sell = sptSellInput(prefix);
+    if (!sell) return;
+    let hint = document.getElementById(prefix + '_spt_hint');
+    if (!hint) {
+        hint = document.createElement('div');
+        hint.id = prefix + '_spt_hint';
+        hint.className = 'form-text text-primary d-none';
+        hint.textContent = SPT_I18N.hint;
+        sell.closest('.input-group').after(hint);
+    }
+    if (rows.length) {
+        const def = rows.find(tr => tr.querySelector('.spt-default').checked) || rows[0];
+        sell.value = parseFloat(def.querySelector('.spt-price').value) || 0;
+        sell.readOnly = true;
+        hint.classList.remove('d-none');
+    } else {
+        sell.readOnly = false;
+        hint.classList.add('d-none');
+    }
+    if (prefix === 'svc') calcSvcMargin(); else calcSvcMarginEdit();
+}
+
+function sptCollect(prefix) {
+    const body = sptBody(prefix);
+    const field = document.getElementById(prefix + '_price_terms');
+    if (!body || !field) return;
+    field.value = JSON.stringify(Array.from(body.children).map(tr => ({
+        term_id: tr.dataset.termId ? parseInt(tr.dataset.termId, 10) : null,
+        term_label: tr.querySelector('.spt-label').value.trim(),
+        duration_value: tr.querySelector('.spt-value').value,
+        duration_unit: tr.querySelector('.spt-unit').value,
+        price: tr.querySelector('.spt-price').value,
+        description: tr.querySelector('.spt-desc').value.trim(),
+        is_default: tr.querySelector('.spt-default').checked ? 1 : 0,
+    })));
+}
+
+function sptReset(prefix) {
+    const body = sptBody(prefix);
+    if (!body) return;
+    body.innerHTML = '';
+    const sub = document.getElementById(prefix + '_is_subscription');
+    if (sub) sub.checked = false;
+    const tpl = document.getElementById(prefix + '_contract_template');
+    if (tpl) $(tpl).val('').trigger('change');
+    sptSync(prefix);
+}
+
+function sptLoad(prefix, productId) {
+    if (!sptBody(prefix)) return;
+    fetch(`${SVC_APP_URL}/api/account/get_service_price_terms.php?product_id=${encodeURIComponent(productId)}`)
+        .then(r => r.json())
+        .then(json => {
+            if (!json.success) return;
+            (json.data || []).forEach(t => sptAddRow(prefix, t));
+            const sub = document.getElementById(prefix + '_is_subscription');
+            if (sub) sub.checked = !!json.is_subscription;
+            const tpl = document.getElementById(prefix + '_contract_template');
+            if (tpl) $(tpl).val(json.contract_template_id ? String(json.contract_template_id) : '').trigger('change');
+        })
+        .catch(() => {});
+}
+
 function openAddSvcModal() {
     document.getElementById('addServiceForm').reset();
     resetUnitSelect('svc_unit_container');
     document.getElementById('svcComponentBody').innerHTML = '';
     document.getElementById('add-service-message').innerHTML = '';
     addSvcComponentRow(); // Start with one empty row
+    sptReset('svc');
     new bootstrap.Modal(document.getElementById('addServiceModal')).show();
 }
 
@@ -1603,6 +1745,8 @@ function openEditSvcModal(product) {
     
     document.getElementById('edit-svc-message').innerHTML = '';
     document.getElementById('editSvcComponentBody').innerHTML = '';
+    sptReset('edit_svc');
+    sptLoad('edit_svc', product.product_id);
     
     // Fetch components if they exist
     fetch(`${SVC_APP_URL}/api/get_nip_components.php?id=${product.product_id}`)
@@ -1666,6 +1810,7 @@ function submitSvcForm(addAnother) {
     }
     Swal.fire({ title: SVC_I18N.saving, allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
 
+    sptCollect('svc');
     const data = new FormData(form);
     fetch(`${SVC_APP_URL}/api/create_nip_product.php`, { method:'POST', body:data })
     .then(r => r.json())
@@ -1699,6 +1844,7 @@ document.getElementById('editSvcForm').addEventListener('submit', function(e) {
     
     Swal.fire({ title: SVC_I18N.saving_changes, allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
 
+    sptCollect('edit_svc');
     const data = new FormData(form);
     fetch(`${SVC_APP_URL}/api/update_nip_product.php`, { method:'POST', body:data })
     .then(r => r.json())
@@ -1834,8 +1980,8 @@ $(function () {
     // because Select2 fires the native 'change' on selection, and
     // filterWarehouses() re-syncs the warehouse Select2 after it rebuilds it.
     const svcModalSelects = {
-        addServiceModal: ['#svc_tax_id', '#svc_project_id', '#svc_warehouse_id'],
-        editSvcModal:    ['#edit_svc_tax', '#edit_svc_project_id', '#edit_svc_warehouse_id']
+        addServiceModal: ['#svc_tax_id', '#svc_project_id', '#svc_warehouse_id', '#svc_contract_template'],
+        editSvcModal:    ['#edit_svc_tax', '#edit_svc_project_id', '#edit_svc_warehouse_id', '#edit_svc_contract_template']
     };
     Object.keys(svcModalSelects).forEach(function (modalId) {
         const modalEl = document.getElementById(modalId);

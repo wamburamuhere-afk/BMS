@@ -6,6 +6,7 @@
 // status 'pending' (the entry point of the pending -> reviewed -> approved
 // workflow). Editing a quotation never changes its workflow status.
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/service_price_terms.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/sales_invoicing.php';   // assertSalesAmountsFit
 
@@ -204,11 +205,16 @@ try {
         $line_tax       = $taxable * ($tax_rate / 100);
         $line_total     = $taxable + $line_tax;
 
+        // Optional price term (core/service_price_terms.php) — verified against the DB.
+        $term = sptResolveLineTerm($pdo, $item['product_id'] ?? null, $item['price_term_id'] ?? null,
+            (string)($item['description'] ?? ''), trim((string)($item['product_name'] ?? '')) ?: 'a line');
+
         $itemStmt->execute([
             $quotation_id, $item['product_id'] ?: null, $item['product_name'], $item['sku'] ?? '',
             $qty, $item['unit'] ?? 'pcs', $price, $tax_rate, $discount_percent, $line_total,
-            trim((string)($item['description'] ?? '')) ?: null,
+            $term['description'] !== '' ? $term['description'] : null,
         ]);
+        sptStampLine($pdo, 'quotation_items', (int)$pdo->lastInsertId(), $term);
     }
 
     $pdo->commit();

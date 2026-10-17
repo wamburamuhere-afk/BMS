@@ -1425,6 +1425,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('expense_report')): ?><li><a class="dropdown-item" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('Expense Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('pos') && canView('pos_user_sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i> <?= t('Sales by User Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('pos') && canView('pos_profit_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Profit Report') ?></a></li><?php endif; ?>
+                                <?php if(canView('product_analysis')): ?><li><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>?view=profit"><i class="bi bi-trophy"></i> <?= t('Most Profitable Products') ?></a></li><?php endif; ?>
                             </ul>
                             <?php else: ?>
                             <div class="dropdown-menu mega-dropdown-menu" aria-labelledby="reportsDropdown">
@@ -1458,6 +1459,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                         <?php if(canView('performance_dashboard')): ?><a class="dropdown-item" href="<?= getUrl('performance_dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Performance') ?></a><?php endif; ?>
                                         <?php if(canView('customer_analysis')): ?><a class="dropdown-item" href="<?= getUrl('customer_analysis') ?>"><i class="bi bi-people"></i> <?= t('Customer Analysis') ?></a><?php endif; ?>
                                         <?php if(canView('product_analysis')): ?><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>"><i class="bi bi-box"></i> <?= t('Product Analysis') ?></a><?php endif; ?>
+                                        <?php if(canView('product_analysis')): ?><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>?view=profit"><i class="bi bi-trophy"></i> <?= t('Most Profitable Products') ?></a><?php endif; ?>
                                         <?php if(canView('sales_forecast')): ?><a class="dropdown-item" href="<?= getUrl('sales_forecast') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Sales Forecast') ?></a><?php endif; ?>
                                         <?php if(canView('trends_analysis')): ?><a class="dropdown-item" href="<?= getUrl('trends_analysis') ?>"><i class="bi bi-activity"></i> <?= t('Trends') ?></a><?php endif; ?>
                                     </div>

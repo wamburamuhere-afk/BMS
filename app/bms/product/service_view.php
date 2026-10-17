@@ -70,6 +70,15 @@ $comp_stmt = $pdo->prepare("
 $comp_stmt->execute([$product_id]);
 $components = $comp_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// The materials table appears only when the service actually has materials.
+$show_components = !$hideMaterialComponents && count($components) > 0;
+
+// Optional price by term (core/service_price_terms.php).
+require_once ROOT_DIR . '/core/service_price_terms.php';
+$price_terms = sptForProduct($pdo, (int)$product_id);
+$terms_min = null;
+foreach ($price_terms as $pt) $terms_min = $terms_min === null ? (float)$pt['price'] : min($terms_min, (float)$pt['price']);
+
 // Calculate totals from fetched data
 $assembly_cost = 0;
 foreach ($components as $comp) {
@@ -404,7 +413,7 @@ $company_logo = getSetting('company_logo', '');
                             <div class="p-2 bg-light rounded text-center border dashboard-stat-card">
                                 <div class="d-flex justify-content-between align-items-center px-2">
                                     <small class="text-muted fw-bold uppercase" style="font-size: 0.65rem;"><?= t('Selling Price') ?></small>
-                                    <div class="fw-bold text-success" style="white-space: nowrap;"><?= format_currency($svc['selling_price']) ?></div>
+                                    <div class="fw-bold text-success" style="white-space: nowrap;"><?= $price_terms ? t('From') . ' ' . format_currency($terms_min) : format_currency($svc['selling_price']) ?></div>
                                 </div>
                             </div>
                         </div>
@@ -475,13 +484,63 @@ $company_logo = getSetting('company_logo', '');
                                 <span class="spec-label">Base Assembly Qty</span>
                                 <span class="spec-value"><?= number_format($svc['assembly_quantity'] ?: 1, 2) ?> Jobs</span>
                             </div>
+                            <?php if (!$show_components): ?>
+                            <div class="spec-item">
+                                <span class="spec-label"><?= t('Materials') ?></span>
+                                <span class="spec-value">
+                                    <?= t('None linked') ?>
+                                    <a href="<?= getUrl($from_project > 0 ? 'project_view' : 'nip_materials') ?><?= $from_project > 0 ? '?id=' . (int)$from_project . '&open_add=1' : '' ?>" class="ms-2 small d-print-none"><i class="bi bi-boxes me-1"></i><?= t('Add Materials') ?></a>
+                                </span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($price_terms): ?>
+                <!-- Price by term -->
+                <div class="col-12">
+                    <div class="bg-white rounded-4 border overflow-hidden">
+                        <div class="p-3 bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-range me-2"></i><?= t('Price by term') ?></h6>
+                            <small class="opacity-75"><?= count($price_terms) ?> <?= count($price_terms) === 1 ? t('term') : t('terms') ?></small>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light">
+                                    <tr class="small text-uppercase">
+                                        <th class="ps-4 py-3" style="width:6%;"><?= t('S/No') ?></th>
+                                        <th><?= t('Term') ?></th>
+                                        <th><?= t('Length') ?></th>
+                                        <th class="text-end"><?= t('Price (TSh)') ?></th>
+                                        <th><?= t('Description') ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($price_terms as $i => $pt): ?>
+                                    <tr>
+                                        <td class="ps-4"><?= $i + 1 ?></td>
+                                        <td class="fw-bold">
+                                            <?= safe_output($pt['term_label']) ?>
+                                            <?php if ((int)$pt['is_default'] === 1): ?>
+                                            <span class="badge rounded-pill ms-1" style="background:#0d6efd;color:#fff;"><?= t('Default') ?></span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?= safe_output(sptDurationText((int)$pt['duration_value'], (string)$pt['duration_unit'])) ?></td>
+                                        <td class="text-end fw-bold text-primary"><?= format_currency($pt['price']) ?></td>
+                                        <td class="small text-muted"><?= safe_output($pt['description'] ?? '', '—') ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
                 <?php endif; ?>
 
                 <!-- Bottom: Material List -->
-                <?php if (!$hideMaterialComponents): ?>
+                <?php if ($show_components): ?>
                 <div class="col-12">
                     <div class="svc-comp-panel bg-white rounded-4 border overflow-hidden mt-2">
                         <div class="svc-comp-header p-3 bg-primary text-white d-flex justify-content-between align-items-center">
@@ -718,7 +777,7 @@ function loadSvcComponents(page) {
     });
 }
 
-<?php if (!$hideMaterialComponents): ?>
+<?php if ($show_components): ?>
 $(function() { loadSvcComponents(1); });
 <?php endif; ?>
 </script>

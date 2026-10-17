@@ -552,6 +552,7 @@ function generate_invoice_number() {
 
 <?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
+<?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
 <script>
 let itemCount = 0;
 $(document).ready(function() {
@@ -695,6 +696,13 @@ function addItemRow(item = null) {
     `;
     $('#itemsBody').append(html);
     setTaxSelect($(`#item-row-${idx} .item-tax`), item ? (item.sales_tax_rate ?? item.tax_rate) : 0);
+    // A line raised from a sales order inherits that line's term on the server (price is locked here).
+    if (item && !fromOrder) {
+        BmsLineTerms.attach($(`#item-row-${idx}`), item, {
+            savedTermId: item.price_term_id || null, savedTermLabel: item.price_term_label || '',
+            keepPrice: !!item.price_term_id, selectName: `items[${idx}][price_term_id]`, onChange: () => calculateTotals()
+        });
+    }
 
     // No column hiding — all columns remain visible in both inventory and non-inventory mode
 
@@ -738,6 +746,10 @@ function calculateTotals() {
 }
 
 function saveInvoice(status) {
+    if (BmsLineTerms.missing($('#itemsBody')).length) {
+        Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this invoice is priced by term. Choose its term before saving.')) ?> });
+        return;
+    }
     const data = $('#invoiceForm').serialize() + '&status=' + status;
     $.post('<?= buildUrl('/api/account/save_invoice.php') ?>', data, function(res) {
         if (res.success) {
@@ -861,6 +873,7 @@ function selectProduct(id) {
         row.find('.item-description').val(p.description || '');
         row.find('.item-order-item-id').val('');
         setTaxSelect(row.find('.item-tax'), p.sales_tax_rate ?? p.tax_rate);
+        BmsLineTerms.attach(row, p, { selectName: `items[${currentItemIndex}][price_term_id]`, onChange: () => calculateTotals() });
 
         $('#productSearchResults').hide();
         calculateTotals();

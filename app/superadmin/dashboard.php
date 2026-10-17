@@ -411,6 +411,29 @@ try {
     error_log('superadmin dashboard (billing due soon): ' . $e->getMessage());
 }
 
+// Paid BJP subscription invoices the bridge could not apply by itself (core/vendor_bridge.php).
+try {
+    $rows = getControlPdo()->query("
+        SELECT a.id AS alert_id, a.tenant_id, a.customer_id, a.invoice_ref, a.kind, a.message, a.created_at,
+               t.company_name, t.subdomain
+          FROM vendor_bridge_alerts a
+          LEFT JOIN tenants t ON t.id = a.tenant_id
+         WHERE a.resolved_at IS NULL
+         ORDER BY a.created_at DESC
+         LIMIT 50
+    ")->fetchAll();
+    if ($rows) {
+        $attention['bridge_alerts'] = [
+            'title' => 'Paid BJP invoices waiting for a decision',
+            'icon'  => 'bi-receipt-cutoff',
+            'color' => 'warning',
+            'items' => $rows,
+        ];
+    }
+} catch (Throwable $e) {
+    // table not created yet (scripts/setup_control_db.php) — nothing to show
+}
+
 $attentionTotal = array_sum(array_map(fn($g) => count($g['items']), $attention));
 
 // ── MRR calculation (P7) ────────────────────────────────────────────────────
@@ -488,6 +511,11 @@ function saAttentionItemHtml(string $key, array $it): string
         case 'billing_due_soon':
             $body = '<div class="fw-semibold small">' . safe_output($it['company_name'] ?? $it['subdomain'], 'Unknown') . ' <span class="text-muted fw-normal">(' . safe_output($it['subdomain'], '') . ')</span></div>'
                   . '<div class="text-muted" style="font-size:.75rem;">Next billing: ' . safe_output($it['next_billing_date'] ?? '—', '—') . ' · Status: ' . safe_output($it['payment_status'], 'unknown') . '</div>';
+            break;
+        case 'bridge_alerts':
+            $body = '<div class="fw-semibold small">Invoice ' . safe_output($it['invoice_ref'], '') . ($it['subdomain'] ? ' <span class="text-muted fw-normal">(' . safe_output($it['subdomain'], '') . ')</span>' : '') . '</div>'
+                  . '<div class="text-muted" style="font-size:.75rem;">' . safe_output($it['message'], '') . ' · ' . saTimeAgo((string)$it['created_at']) . '</div>'
+                  . '<button type="button" class="btn btn-xs btn-outline-primary mt-1" data-resolve-alert="' . (int)$it['alert_id'] . '">Done</button>';
             break;
         default:
             $body = '<div class="small text-muted">' . safe_output(json_encode($it), '') . '</div>';
@@ -835,6 +863,19 @@ new Chart(document.getElementById('saFeatureChart'), {
     }
 });
 <?php endif; ?>
+</script>
+<script>
+// Bridge alert "Done" (actions/superadmin_tenant_vendor_customer.php, action=resolve_alert).
+document.addEventListener('click', function (e) {
+    const b = e.target.closest('[data-resolve-alert]');
+    if (!b) return;
+    b.disabled = true;
+    const fd = new FormData();
+    fd.append('_csrf', <?= json_encode(csrf_token()) ?>); fd.append('action', 'resolve_alert'); fd.append('alert_id', b.dataset.resolveAlert);
+    fetch('/actions/superadmin_tenant_vendor_customer.php', { method: 'POST', body: fd })
+        .then(r => r.json()).then(j => { if (j.success) location.reload(); else { b.disabled = false; b.textContent = j.message || 'Error'; } })
+        .catch(() => { b.disabled = false; });
+});
 </script>
 </body>
 </html>

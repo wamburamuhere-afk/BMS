@@ -6,11 +6,14 @@ ob_start();
 $page_title = 'Customer Visits';
 require_once __DIR__ . '/../../../roots.php';
 require_once ROOT_DIR . '/core/field_reports.php';
+require_once ROOT_DIR . '/core/vendor_context.php';
 autoEnforcePermission('field_visits');
 includeHeader();
 
 $can_create = canCreate('field_visits');
 $can_edit   = canEdit('field_visits');
+// BJP's own install (platform root): a joined client's company and the customer it became.
+$isVendor   = isPlatformVendorContext();
 $is_admin   = isAdmin();   // fresh call, after header.php
 $me         = (int)$_SESSION['user_id'];
 $today      = date('Y-m-d');
@@ -316,11 +319,56 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
 @media (max-width: 767.98px) { .fr-head-actions .btn:not(#btnAddVisit) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; } }
 </style>
 
+<?php if ($isVendor): ?>
+<!-- Make real customer (platform root only) -->
+<div class="modal fade" id="mkCustModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-person-badge me-1"></i> <?= t('Make real customer') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="mkCustForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="visit_id" id="mkVisitId">
+                    <input type="hidden" name="mode" value="create">
+                    <div class="p-2 rounded mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe;" id="mkCompany"></div>
+                    <div id="mkExisting" class="mb-3"></div>
+                    <div class="row g-2">
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Customer / company name') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="customer_name" id="mkName" maxlength="255" required></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Contact person') ?></label>
+                            <input type="text" class="form-control" name="contact_person" id="mkContact" maxlength="100"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Phone') ?></label>
+                            <input type="tel" class="form-control" name="phone" id="mkPhone" maxlength="50"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Email') ?></label>
+                            <input type="email" class="form-control" name="email" id="mkEmail" maxlength="100"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('TIN') ?> <span class="text-muted fw-normal">(<?= t('optional') ?>)</span></label>
+                            <input type="text" class="form-control" name="tin_number" id="mkTin" maxlength="100"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Business') ?></label>
+                            <input type="text" class="form-control" name="business" id="mkBusiness" maxlength="255"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Physical address') ?></label>
+                            <input type="text" class="form-control" name="address" id="mkAddress" maxlength="255"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold"><?= t('Postal address') ?></label>
+                            <input type="text" class="form-control" name="postal_address" id="mkPostal" maxlength="255"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary" id="mkCreateBtn"><i class="bi bi-check-circle me-1"></i> <?= t('Create customer') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 $(function () {
     const IS_ADMIN = <?= json_encode($is_admin) ?>, CAN_CREATE = <?= json_encode($can_create) ?>, CAN_EDIT = <?= json_encode($can_edit) ?>, ME = <?= $me ?>, TODAY = <?= json_encode($today) ?>;
     const API = '<?= buildUrl('api/field_reports/') ?>', PRINT_URL = '<?= getUrl('field_reports/print') ?>';
     const CSRF = <?= json_encode(csrf_token()) ?>, USER_LANG = <?= json_encode($userLang) ?>;
+    const IS_VENDOR = <?= json_encode($isVendor) ?>, BASE_DOMAIN = <?= json_encode((string)(tenantBaseDomain() ?? '')) ?>, CUSTOMER_URL = '<?= getUrl('customers/details') ?>';
     // One clock — the server's (EAT), whatever the phone's clock or time zone says
     // (customer_visits_ux_plan 1.3): "now" = server time at page load + time elapsed since.
     const SERVER_NOW = <?= json_encode(date('Y-m-d H:i:s')) ?>, LOADED_AT = Date.now();
@@ -357,6 +405,12 @@ $(function () {
         'dueToday' => t('due today'), 'daysLate' => t('%d days late'), 'followUp' => t('Follow-up'), 'gpsConfirmed' => t('GPS confirmed'),
         'interest' => array_map('t', frInterestLabels()),
         'services' => t('Services offered'), 'chooseServices' => t('Choose services...'),
+        'addCompany' => t('Add company web address'), 'makeCustomer' => t('Make real customer'), 'viewCustomer' => t('View customer'),
+        'subdomainQ' => t('Company web address'), 'subdomainHint' => t('The address they log in at, e.g. dukalajuma — leave blank if you do not know it yet.'),
+        'subdomainReq' => t('Enter the company web address.'), 'save' => t('Save'), 'customerBadge' => t('Customer'),
+        'company' => t('Company on the platform'), 'linkedAlready' => t('This company is already linked to a customer:'),
+        'useThis' => t('Use this customer'), 'sameClient' => t('These existing customers have the same phone or email:'),
+        'notReady' => t('The platform database has not been upgraded yet. Ask the administrator to run the platform setup.'),
     ]) ?>;
 
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -401,11 +455,22 @@ $(function () {
     }
 
     // "Joined" is a status (a badge) — marking it is an action, inside the Actions menu.
-    const joinedBadge = r => r.joined ? ` <span class="fr-badge fr-yes text-nowrap">✓ ${L.joinedBtn}</span>` : '';
+    const joinedBadge = r => (r.joined ? ` <span class="fr-badge fr-yes text-nowrap">✓ ${L.joinedBtn}${IS_VENDOR && r.tenant_subdomain ? ' · ' + esc(r.tenant_subdomain) : ''}</span>` : '')
+        + (IS_VENDOR && r.customer_id ? ` <a href="${CUSTOMER_URL}?id=${r.customer_id}" class="fr-badge fr-svc text-nowrap text-decoration-none"><i class="bi bi-person-badge"></i> ${L.customerBadge}</a>` : '');
+    // Platform root only: the next step for a joined client — name its company, then make it a customer.
+    function vendorStep(r) {
+        if (!IS_VENDOR || !r.joined) return null;
+        if (r.customer_id) return { act: 'viewcust', icon: 'bi-person-badge', label: L.viewCustomer };
+        if (!r.can_edit) return null;
+        if (!r.tenant_subdomain) return { act: 'setsub', icon: 'bi-globe', label: L.addCompany };
+        return { act: 'makecust', icon: 'bi-person-plus', label: L.makeCustomer };
+    }
 
     function actions(r) {
         let items = '';
         if (r.can_edit) items += `<li><button class="dropdown-item py-2 rounded" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}"><i class="bi ${r.joined ? 'bi-person-x' : 'bi-person-check'} text-primary me-2"></i>${r.joined ? L.unmarkJoined : L.markJoined}</button></li>`;
+        const vs = vendorStep(r);
+        if (vs) items += `<li><button class="dropdown-item py-2 rounded" data-act="${vs.act}" data-id="${r.visit_id}"><i class="bi ${vs.icon} text-primary me-2"></i>${vs.label}</button></li>`;
         if (r.can_edit) items += `<li><button class="dropdown-item py-2 rounded" data-act="edit" data-id="${r.visit_id}"><i class="bi bi-pencil text-primary me-2"></i>${L.edit}</button></li>`;
         if (r.can_delete) items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" data-act="delete" data-id="${r.visit_id}"><i class="bi bi-trash text-danger me-2"></i>${L.delete}</button></li>`;
         if (!items) return '';
@@ -425,7 +490,8 @@ $(function () {
                     <div class="d-flex flex-wrap gap-1 mt-1">${ynL(L.cardShort, r.gave_business_card)} ${ynL(L.trialShort, r.gave_trial_link)} ${ynL(L.trainingShort, r.gave_training)} ${r.interest ? interestBadge(r) : ''}${joinedBadge(r)}</div>
                     ${r.follow_up_date ? `<div class="mt-1 small"><i class="bi bi-calendar-event text-primary"></i> ${L.followUp}: ${followTxt(r)}</div>` : ''}
                 </div>
-                ${r.can_edit || r.can_delete ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                ${r.can_edit || r.can_delete || vendorStep(r) ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                    ${vendorStep(r) ? `<button class="btn btn-sm btn-outline-primary" data-act="${vendorStep(r).act}" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(vendorStep(r).label)}" aria-label="${esc(vendorStep(r).label)}"><i class="bi ${vendorStep(r).icon}"></i></button>` : ''}
                     ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(r.joined ? L.unmarkJoined : L.markJoined)}" aria-label="${esc(r.joined ? L.unmarkJoined : L.markJoined)}"><i class="bi ${r.joined ? 'bi-person-x' : 'bi-person-check'}"></i></button>` : ''}
                     ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="edit" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.edit)}" aria-label="${esc(L.edit)}"><i class="bi bi-pencil"></i></button>` : ''}
                     ${r.can_delete ? `<button class="btn btn-sm btn-outline-danger" data-act="delete" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.delete)}" aria-label="${esc(L.delete)}"><i class="bi bi-trash"></i></button>` : ''}
@@ -686,7 +752,15 @@ $(function () {
             Swal.fire({ title: L.deleteQ, text: L.cannotUndo, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: L.yesDelete, cancelButtonText: L.cancel })
                 .then(x => { if (x.isConfirmed) post('delete.php', { visit_id: id }); });
         } else if (act === 'joined') {
-            post('toggle_joined.php', { visit_id: id, joined: $(this).data('joined') });
+            const joining = String($(this).data('joined')) === '1';
+            if (IS_VENDOR && joining) askSubdomain(false).then(sub => { if (sub !== null) post('toggle_joined.php', { visit_id: id, joined: 1, subdomain: sub }); });
+            else post('toggle_joined.php', { visit_id: id, joined: $(this).data('joined') });
+        } else if (act === 'setsub') {
+            askSubdomain(true).then(sub => { if (sub) post('toggle_joined.php', { visit_id: id, joined: 1, subdomain: sub }); });
+        } else if (act === 'makecust') {
+            openMakeCustomer(id);
+        } else if (act === 'viewcust') {
+            window.location.href = CUSTOMER_URL + '?id=' + r.customer_id;
         }
     });
     $(document).on('click', '[data-fact]', function () {
@@ -696,6 +770,62 @@ $(function () {
         else openNew(f.client_phone);
     });
     $('#visitModal').on('hidden.bs.modal', () => $('#vFollowUp').attr('min', TODAY));
+
+    // Resolves with the typed address ('' when optional and left blank) or null when cancelled.
+    function askSubdomain(required) {
+        return Swal.fire({
+            title: L.subdomainQ, text: L.subdomainHint, input: 'text',
+            inputAttributes: { autocapitalize: 'off', autocomplete: 'off', maxlength: 63 },
+            inputPlaceholder: 'dukalajuma' + (BASE_DOMAIN ? '.' + BASE_DOMAIN : ''),
+            showCancelButton: true, confirmButtonText: L.save, cancelButtonText: L.cancel, confirmButtonColor: '#0d6efd',
+            inputValidator: v => (required && !String(v || '').trim()) ? L.subdomainReq : undefined,
+        }).then(x => x.isConfirmed ? String(x.value || '').trim() : null);
+    }
+
+    function openMakeCustomer(id) {
+        $.getJSON(API + 'make_customer.php', { visit_id: id }).done(res => {
+            if (!res.success) { Swal.fire({ icon: 'error', title: L.error, text: res.message }); return; }
+            if (!res.link_ready) { Swal.fire({ icon: 'warning', title: L.error, text: L.notReady }); return; }
+            const p = res.prefill || {};
+            $('#mkVisitId').val(id);
+            $('#mkCompany').html(`<small class="text-muted">${L.company}</small><div class="fw-bold">${esc(res.tenant.company_name)} <span class="text-primary">· ${esc(res.tenant.subdomain)}</span></div>`);
+            $('#mkName').val(p.customer_name || ''); $('#mkContact').val(p.contact_person || ''); $('#mkPhone').val(p.phone || '');
+            $('#mkEmail').val(p.email || ''); $('#mkTin').val(''); $('#mkBusiness').val(p.business || '');
+            $('#mkAddress').val(p.address || ''); $('#mkPostal').val(p.postal_address || '');
+            const pick = c => `<div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1">
+                <div><span class="fw-bold">${esc(c.customer_name)}</span> <small class="text-muted">${esc(c.customer_code || '')} ${c.phone ? '· ' + esc(c.phone) : ''} ${c.email ? '· ' + esc(c.email) : ''}</small></div>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-mklink="${c.customer_id}">${L.useThis}</button></div>`;
+            let html = '';
+            if (res.linked_customer) html = `<div class="small fw-bold mb-1">${L.linkedAlready}</div>` + pick(res.linked_customer);
+            else if ((res.matches || []).length) html = `<div class="small fw-bold mb-1">${L.sameClient}</div>` + res.matches.map(pick).join('');
+            $('#mkExisting').html(html);
+            // An already-linked company can only be linked to its customer, never given a second one.
+            $('#mkCreateBtn').toggleClass('d-none', !!res.linked_customer || !res.can_create);
+            $('#mkCustForm .row :input').prop('disabled', !!res.linked_customer || !res.can_create);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('mkCustModal')).show();
+        }).fail(x => Swal.fire({ icon: 'error', title: L.error, text: (x.responseJSON || {}).message || L.serverError }));
+    }
+    function mkSubmit(data, $btn) {
+        const orig = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+        $.ajax({ url: API + 'make_customer.php', type: 'POST', data: Object.assign({ _csrf: CSRF }, data), dataType: 'json' })
+            .done(res => {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('mkCustModal')).hide();
+                    loadData();
+                    Swal.fire({ icon: 'success', title: res.message, timer: 2200, showConfirmButton: false });
+                } else Swal.fire({ icon: 'error', title: L.error, text: res.message });
+            })
+            .fail(x => Swal.fire({ icon: 'error', title: L.error, text: (x.responseJSON || {}).message || L.serverError }))
+            .always(() => $btn.prop('disabled', false).html(orig));
+    }
+    $('#mkCustForm').on('submit', function (e) {
+        e.preventDefault();
+        mkSubmit(Object.fromEntries(new FormData(this).entries()), $('#mkCreateBtn'));
+    });
+    $(document).on('click', '[data-mklink]', function () {
+        mkSubmit({ visit_id: $('#mkVisitId').val(), mode: 'link', customer_id: $(this).data('mklink') }, $(this));
+    });
 
     function post(file, data) {
         $.ajax({ url: API + file, type: 'POST', data: Object.assign({ _csrf: CSRF }, data), dataType: 'json' })
