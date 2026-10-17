@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-16 — feat(subscriptions) Phase 5: "My Subscription" in each company's own system
+
+**A company admin sees how long access runs, chooses a period (BJP raises an approved quotation at once — catalogue price, no approval wait), and sees the quotations and invoices BJP issued to them.** A company never opens BJP's database:
+- `core/platform_link.php` (new) — signed server-to-server calls from a company's server to the platform root (HMAC over tenant id + timestamp + body, ±120 s; key derived from the server-only `TENANT_CRED_KEY`, so no new secret), and short-lived signed links (30 min) to a customer copy of one document.
+- `core/platform_gateway.php` + `api/platform/tenant_gateway.php` (new, platform root only) — `catalog` (subscription services + month/year terms), `documents` (that company's quotations + invoices), `request_quote` (approved quotation with the term on its line, reference `SELF-SERVICE T<id>`; a newer request replaces an open one; notifies users who can create invoices). Answers only for the customer linked to the signed tenant.
+- `api/platform/customer_document.php` (new) — read-only customer copy (letterhead, lines with their Term, totals, paid/balance, how to pay, Print / Save as PDF). BJP's own print pages still require a BJP login.
+- `api/my_subscription.php` + `app/constant/settings/my_subscription.php` (new) + route `my_subscription` + Settings → Plan & Modules → **My Subscription** (company subdomains only, admins only): stat cards, period cards, Invoices / Quotations / Payments (DataTables with S/NO, gear → View; phone cards).
+- `migrations/tenant/2026_10_16_subscription_request_notification.php` + `_legacy_db` — `subscription.request_received` notification event.
+- Plan decision D3 changed: no read-only MySQL user is needed; the signed gateway replaces it.
+- `tests/test_my_subscription_cli.php` (new, 36; 14 in CI) — signatures (other tenant / changed body / stale / missing), document tokens (tampered / expired / other customer), catalog, approved quotation + replacement, unlinked company, customer copy, company-side guards (admin-only, tenant-only), page render.
+
+Verified: 36/36 locally, 14/14 in CI mode; inline scripts of My Subscription and Settings pass `node --check`; no test data left behind.
+
+---
+
 ## 2026-10-15 — feat(subscriptions) Phases 3+4: visited client → real customer linked to its company; a paid BJP invoice extends that company automatically
 
 **Customer Visits → real customer** (instruction: a visited client is not a customer by default; when they joined via the free trial and need the service, someone makes them a real customer; "joined" carries the subdomain so an invoice for that customer is known to the superadmin and applied automatically). Platform root (`bms.bjptechnologies.co.tz`) only — everywhere else "Mark as joined" is unchanged.
