@@ -14,6 +14,7 @@
  * the cash was banked when the advance was received.
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/vendor_bridge.php';   // paid subscription invoice → tenant access
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/customer_advance.php';   // advance helpers
@@ -121,6 +122,9 @@ try {
         ->execute([$totalPaid, $totalPaid, $newStatus, $apply_date, $invoice_id]);
 
     $pdo->commit();
+
+    // BJP's own install: a fully paid subscription invoice extends the customer's company.
+    vendorOnInvoicesSettled($pdo, [$invoice_id]);
 
     logActivity($pdo, $_SESSION['user_id'], "Applied advance " . number_format($applied_total, 2) . " to invoice #$invoice_id (customer #$customer_id)");
 

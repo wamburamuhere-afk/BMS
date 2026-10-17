@@ -293,6 +293,7 @@ $warehouses = warehousesForSelect($pdo);
 </div>
 
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
+<?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
 <script>
 let itemCount = 0;
 let productsCache = [];
@@ -382,6 +383,12 @@ function addItemRow(item = null) {
         </tr>
     `;
     $('#itemsBody').append(html);
+    if (item) {
+        BmsLineTerms.attach($(`#item-row-${idx}`), item, {
+            savedTermId: item.price_term_id || null, savedTermLabel: item.price_term_label || '',
+            keepPrice: !!item.price_term_id, selectName: `items[${idx}][price_term_id]`, onChange: () => calculateTotals()
+        });
+    }
     calculateTotals();
 }
 
@@ -416,6 +423,10 @@ function calculateTotals() {
 }
 
 function saveInvoice(status) {
+    if (BmsLineTerms.missing($('#itemsBody')).length) {
+        Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this invoice is priced by term. Choose its term before saving.')) ?> });
+        return;
+    }
     const data = $('#invoiceForm').serialize() + '&status=' + status;
     // Uses the same save_invoice endpoint - it checks for invoice_id to update
     $.post('<?= buildUrl('/api/account/save_invoice.php') ?>', data, function(res) {
@@ -520,6 +531,7 @@ function selectProduct(id) {
         
         row.find('.item-price').val(price.toFixed(2));
         row.find('.item-tax').val(parseInt(p.tax_rate) || 0);
+        BmsLineTerms.attach(row, p, { selectName: `items[${currentItemIndex}][price_term_id]`, onChange: () => calculateTotals() });
         
         $('#productSearchResults').hide();
         calculateTotals();

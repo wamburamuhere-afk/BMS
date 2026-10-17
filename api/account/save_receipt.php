@@ -15,6 +15,7 @@
  * cash-accounting path is introduced.
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/vendor_bridge.php';   // paid subscription invoice → tenant access
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
@@ -150,6 +151,9 @@ try {
     }
 
     $pdo->commit();
+
+    // BJP's own install: a fully paid subscription invoice extends the customer's company.
+    vendorOnInvoicesSettled($pdo, array_keys($clean));
 
     logActivity($pdo, $_SESSION['user_id'], "Recorded receipt $payment_number (" . number_format($amount, 2) . ") across " . count($clean) . " invoice(s)");
 

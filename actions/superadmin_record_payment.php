@@ -2,13 +2,14 @@
 /**
  * actions/superadmin_record_payment.php
  *
- * Records a subscription payment for a tenant:
- *   - Inserts a row into tenant_payments (the payment ledger).
- *   - Updates tenants.subscription_ends_at, billing_cycle, billing_amount_tzs,
- *     next_billing_date, payment_status = 'current'.
- *   - Optionally activates a suspended tenant (param activate = '1').
+ * Records a subscription payment for a tenant through applySubscriptionPayment()
+ * (core/tenant_lifecycle_policy.php) — the same path the BJP invoice bridge uses.
+ * The period starts at the later of the chosen date and the current end date;
+ * a trial or expiry-suspended tenant becomes active; activate = '1' also
+ * resumes a tenant an operator suspended by hand.
  */
 require_once __DIR__ . '/../core/tenant_admin.php';
+require_once __DIR__ . '/../core/tenant_lifecycle_policy.php';
 require_once __DIR__ . '/../helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -60,11 +61,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $startsAt)) {
     exit;
 }
 
-$cycleMap = [1 => 'monthly', 3 => 'quarterly', 6 => 'biannual', 12 => 'annual'];
-$billingCycle = $cycleMap[$durationMonths];
-
 try {
-    $ctrl   = getControlPdo();
     $tenant = getTenant($tenantId);
     if ($tenant === null) {
         http_response_code(404);
@@ -72,59 +69,25 @@ try {
         exit;
     }
 
-    // Calculate subscription end date
-    $endsAt = date('Y-m-d', strtotime("{$startsAt} +{$durationMonths} months"));
-
-    $ctrl->beginTransaction();
-
-    // 1. Insert payment record
-    $ctrl->prepare("
-        INSERT INTO tenant_payments
-            (tenant_id, amount_tzs, duration_months, starts_at, ends_at, notes, recorded_by, recorded_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-    ")->execute([
-        $tenantId, $amountTzs, $durationMonths, $startsAt, $endsAt,
-        $notes !== '' ? $notes : null,
-        currentSuperadmin()['id'],
-    ]);
-
-    // 2. Update tenant billing fields
-    $newStatus = null;
-    if ($activate && $tenant['status'] === 'suspended') {
-        $newStatus = 'active';
+    $r = applySubscriptionPayment(
+        $tenantId, $durationMonths, $amountTzs, 'manual', null,
+        $notes !== '' ? $notes : null, (int)currentSuperadmin()['id'], $startsAt, $activate
+    );
+    if (!$r['ok']) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => $r['error']]);
+        exit;
     }
 
-    $updateSql = "
-        UPDATE tenants
-           SET subscription_ends_at = ?,
-               billing_cycle        = ?,
-               billing_amount_tzs   = ?,
-               next_billing_date    = ?,
-               payment_status       = 'current'
-               " . ($newStatus !== null ? ", status = 'active', activated_at = NOW()" : "") . "
-         WHERE id = ?
-    ";
-    $ctrl->prepare($updateSql)->execute([$endsAt, $billingCycle, $amountTzs, $endsAt, $tenantId]);
-
-    // 3. Audit log
-    $detail = number_format($amountTzs) . ' TZS for ' . $durationMonths . ' month(s); '
-            . 'runs ' . $startsAt . ' → ' . $endsAt
-            . ($newStatus !== null ? '; tenant re-activated' : '');
-    logTenantAdminAction($tenantId, (string)($tenant['subdomain'] ?? ''), 'payment_recorded', $detail);
-
-    $ctrl->commit();
-
     echo json_encode([
-        'success'  => true,
-        'message'  => 'Payment recorded. Subscription runs until ' . date('d M Y', strtotime($endsAt)) . '.',
-        'ends_at'  => $endsAt,
-        'activated' => $newStatus === 'active',
+        'success'   => true,
+        'message'   => 'Payment recorded. Subscription runs ' . date('d M Y', strtotime($r['starts_at']))
+                     . ' to ' . date('d M Y', strtotime($r['ends_at'])) . '.',
+        'ends_at'   => $r['ends_at'],
+        'activated' => $r['activated'],
     ]);
 
 } catch (Throwable $e) {
-    if (isset($ctrl) && $ctrl->inTransaction()) {
-        try { $ctrl->rollBack(); } catch (Throwable $_e) {}
-    }
     error_log('superadmin_record_payment: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error. Please try again.']);

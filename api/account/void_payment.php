@@ -8,6 +8,7 @@
 // invoice's paid/balance/status, and reverses the bank-register deposit — all in one
 // transaction.
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/vendor_bridge.php';   // paid subscription invoice → tenant access
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';      // assertScopeForRecord
 require_once __DIR__ . '/../../core/money_in_posting.php';   // reversePaymentReceived
@@ -93,6 +94,9 @@ try {
     }
 
     $pdo->commit();
+
+    // BJP's own install: never shortens a company's access by itself — alerts the superadmin.
+    vendorOnPaymentVoided($pdo, array_keys($invoiceIds), (string)$pay['payment_number']);
 
     logActivity($pdo, $uid, "Voided customer payment {$pay['payment_number']} (TZS " . number_format((float)$pay['amount'], 2) . ")");
     if (function_exists('logAudit')) {

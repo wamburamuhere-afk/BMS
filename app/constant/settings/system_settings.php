@@ -318,6 +318,20 @@ $projectsEnabled = function_exists('projectsModuleActive') ? projectsModuleActiv
                                 </div>
                             </div>
                         </a>
+                        <?php if (function_exists('bmsCurrentTenantId') && bmsCurrentTenantId() !== null): ?>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('my_subscription') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-primary-soft text-primary">
+                                    <i class="bi bi-credit-card-2-front"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold"><?= t('My Subscription') ?></h6>
+                                    <small class="text-muted"><?= t('Time left, renew, quotations and invoices from BJP') ?></small>
+                                </div>
+                            </div>
+                        </a>
+                        <?php endif; ?>
                         <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Business & Finance') ?></div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('payment_settings') ?>">

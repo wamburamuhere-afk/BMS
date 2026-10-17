@@ -23,11 +23,13 @@ $warehouses = $pdo->query(
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
 $currency  = get_setting('currency', 'TZS');
+// ?view=profit — the "Most Profitable Products" entry in the Reports menu: same report, sorted by profit.
+$profitView = ($_GET['view'] ?? '') === 'profit';
 ?>
 
 <div class="container-fluid py-4">
     <div class="print-header d-none d-print-block text-center mb-2">
-        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">PRODUCT PERFORMANCE REPORT</h2>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;"><?= $profitView ? 'MOST PROFITABLE PRODUCTS' : 'PRODUCT PERFORMANCE REPORT' ?></h2>
         <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
         <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
         <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
@@ -35,8 +37,8 @@ $currency  = get_setting('currency', 'TZS');
 
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
-            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-box me-2"></i>Product Analysis</h2>
-            <p class="text-muted mb-0">Best sellers, category performance and revenue contribution</p>
+            <h2 class="fw-bold text-primary mb-0"><i class="bi <?= $profitView ? 'bi-trophy' : 'bi-box' ?> me-2"></i><?= $profitView ? t('Most Profitable Products') : t('Product Analysis') ?></h2>
+            <p class="text-muted mb-0"><?= $profitView ? t('Which products and services earn you the most after their cost') : t('Best sellers, category performance and revenue contribution') ?></p>
         </div>
         <div class="col-md-6 text-end">
             <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()"><i class="bi bi-printer me-2"></i> Print</button>
@@ -68,13 +70,18 @@ $currency  = get_setting('currency', 'TZS');
                         <option value="product"><?= t('Products only') ?></option>
                         <option value="service"><?= t('Services only') ?></option>
                     </select></div>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= t('Sort by') ?></label>
+                    <select name="sort" id="f-sort" class="form-select" style="width:100%">
+                        <option value="revenue" <?= $profitView ? '' : 'selected' ?>><?= t('Revenue') ?></option>
+                        <option value="profit" <?= $profitView ? 'selected' : '' ?>><?= t('Profit') ?></option>
+                    </select></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
         </div>
     </div>
 
     <div class="row g-3 mb-4" id="summaryCards">
-        <?php foreach ([['Products Sold','stat-products'],['Total Revenue','stat-revenue'],['Units Sold','stat-units'],['Avg Price','stat-avg']] as $c): ?>
+        <?php foreach ([['Products Sold','stat-products'],['Total Revenue','stat-revenue'],['Gross Profit','stat-profit'],['Margin','stat-margin']] as $c): ?>
             <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
                 <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
                 <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
@@ -89,7 +96,7 @@ $currency  = get_setting('currency', 'TZS');
             <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>Revenue by Category</div>
             <div class="card-body"><div style="height:230px;"><canvas id="chartCat"></canvas></div></div></div></div>
         <div class="col-12 col-md-4"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
-            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-stack text-primary me-2"></i>Top by Units Sold</div>
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-trophy text-primary me-2"></i>Top by Profit</div>
             <div class="card-body"><div style="height:230px;"><canvas id="chartUnits"></canvas></div></div></div></div>
     </div>
 
@@ -100,11 +107,13 @@ $currency  = get_setting('currency', 'TZS');
                 <thead class="table-light"><tr>
                     <th class="ps-3"><?= t('S/No') ?></th><th><?= t('Code') ?></th><th><?= t('Product') ?></th><th><?= t('Category') ?></th>
                     <th class="text-end"><?= t('Orders') ?></th><th class="text-end"><?= t('Units Sold') ?></th>
-                    <th class="text-end"><?= t('Avg Price') ?></th><th class="pe-3 text-end"><?= t('Revenue') ?></th>
+                    <th class="text-end"><?= t('Avg Price') ?></th><th class="text-end"><?= t('Revenue') ?></th>
+                    <th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Profit') ?></th><th class="pe-3 text-end"><?= t('Margin') ?></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>
         </div></div>
+        <div class="card-footer bg-white small text-muted" id="profitNote"></div>
     </div>
 </div>
 
@@ -143,7 +152,7 @@ $(function () {
 
     const table = $('#prodTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
-        dom: 'rtip', columnDefs: [{ targets: [4, 5, 6, 7], className: 'text-end' }],
+        dom: 'rtip', columnDefs: [{ targets: [4, 5, 6, 7, 8, 9, 10], className: 'text-end' }],
         language: { emptyTable: 'No product sales found.', zeroRecords: 'No matching records.' }
     });
 
@@ -159,18 +168,24 @@ $(function () {
         cCat = new Chart(document.getElementById('chartCat'), {
             type: 'doughnut', data: { labels: charts.by_category.map(r=>r.label), datasets: [{ data: charts.by_category.map(r=>+r.value), backgroundColor: blues }] }, options: { ...baseOpts } });
         cUnits = new Chart(document.getElementById('chartUnits'), {
-            type: 'bar', data: { labels: charts.top_units.map(r=>r.name), datasets: [{ label:'Units', data: charts.top_units.map(r=>+r.value), backgroundColor: '#052c65' }] },
+            type: 'bar', data: { labels: charts.top_profit.map(r=>r.name), datasets: [{ label:'Profit', data: charts.top_profit.map(r=>+r.value), backgroundColor: '#052c65' }] },
             options: { ...baseOpts, plugins:{legend:{display:false}}, scales:{y:{ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}} } });
     }
 
     function loadReport() {
-        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '', warehouse_id: $('#f-warehouse').val() || '', item_type: $('#f-type').val() || '' };
+        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '', warehouse_id: $('#f-warehouse').val() || '', item_type: $('#f-type').val() || '', sort: $('#f-sort').val() || 'revenue' };
         $.getJSON(DATA_URL, params).done(function (res) {
             if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
             $('#stat-products').text(num(res.summary.products_sold));
             $('#stat-revenue').text(fmt(res.summary.total_revenue));
-            $('#stat-units').text(num(res.summary.total_units));
-            $('#stat-avg').text(fmt(res.summary.avg_price));
+            $('#stat-profit').text(fmt(res.summary.total_profit));
+            $('#stat-margin').text(res.summary.margin === null ? '—' : res.summary.margin + '%');
+            const L = res.ledger;
+            $('#profitNote').html(
+                '<i class="bi bi-info-circle text-primary me-1"></i>' + <?= json_encode(t('Cost uses the same basis as the books (products at cost price, POS batches at their cost). Services post no cost of goods; a service cost marked “est.” comes from its recorded materials.')) ?>
+                + (L ? '<br><i class="bi bi-journal-check text-primary me-1"></i>' + <?= json_encode(t('Cost of goods in this report')) ?> + ': <b>' + fmt(L.report_goods_cost) + '</b> · '
+                     + <?= json_encode(t('in the ledger')) ?> + ': <b>' + fmt(L.cogs) + '</b>'
+                     + (Math.abs(L.difference) > 0.01 ? ' · <span class="text-danger">' + <?= json_encode(t('difference')) ?> + ' ' + fmt(L.difference) + '</span>' : ' · <span class="text-primary">' + <?= json_encode(t('matches')) ?> + '</span>') : ''));
             renderCharts(res.charts);
             table.clear();
             res.rows.forEach((r, i) => table.row.add([
@@ -178,7 +193,10 @@ $(function () {
                 $('<span>').text((r.product_name ? caseFormatJs(r.product_name) : '') + (+r.deleted ? ' (deleted)' : '')).html()
                     + (+r.is_service ? ' <span class="badge" style="background:#cfe2ff;color:#084298">Service</span>' : ''),
                 $('<span>').text(r.category || 'Uncategorised').html(),
-                num(r.times_sold), num(r.qty_sold), fmt(r.avg_price), fmt(r.revenue)
+                num(r.times_sold), num(r.qty_sold), fmt(r.avg_price), fmt(r.revenue),
+                fmt(r.cost) + (r.cost_basis === 'estimate' ? ' <small class="text-muted">est.</small>' : ''),
+                '<span class="' + (+r.profit < 0 ? 'text-danger' : 'text-primary') + ' fw-bold">' + fmt(r.profit) + '</span>',
+                r.margin === null ? '—' : r.margin + '%'
             ]));
             table.draw();
         }).fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error loading the report.' }));
@@ -188,6 +206,7 @@ $(function () {
     $('#f-project').on('change', loadReport);
     $('#f-warehouse').on('change', loadReport);
     $('#f-type').on('change', loadReport);
+    $('#f-sort').on('change', loadReport);
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Product Analysis', 'Loaded product performance report');
 });

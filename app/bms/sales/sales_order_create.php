@@ -617,6 +617,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
 
 <?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
+<?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
 <script>
 const SOC_I18N = {
     warehouseChanged: <?= json_encode(wLabel('Warehouse Changed', 'Shop Changed')) ?>,
@@ -1011,6 +1012,13 @@ function addItemRow(product = null) {
     
     $('#itemsBody').append(html);
     if (product && product.description) $(`#item-row-${index} .item-description`).val(product.description);
+    if (product) {
+        BmsLineTerms.attach($(`#item-row-${index}`), product, {
+            savedTermId: product.price_term_id || null, savedTermLabel: product.price_term_label || '',
+            keepPrice: !!product.price_term_id,
+            onChange: () => { calculateItemTotal(index); calculateTotals(); }
+        });
+    }
     
     // Calculate initial total
     calculateItemTotal(index);
@@ -1193,6 +1201,8 @@ function selectProduct(productId) {
         row.find('.item-unit').val(product.unit || 'pcs');
         row.find('.item-price').val(product.selling_price || 0);
         selectTaxRate(row.find('.item-tax'), product.sales_tax_rate ?? product.tax_rate);
+        const lptIdx = currentItemIndex;
+        BmsLineTerms.attach(row, product, { onChange: () => { calculateItemTotal(lptIdx); calculateTotals(); } });
         
         $('#productSearchResults').hide();
         
@@ -1470,7 +1480,8 @@ function createSalesOrder(status = 'pending') {
             unit: $(this).find('.item-unit').val(),
             unit_price: $(this).find('.item-price').val(),
             tax_rate: $(this).find('.item-tax').val(),
-            discount_percent: $(this).find('.item-discount').val()
+            discount_percent: $(this).find('.item-discount').val(),
+            price_term_id: BmsLineTerms.value($(this))
         };
         
         if (item.product_name && item.quantity) {
@@ -1605,6 +1616,10 @@ function saveAsQuote() {
 }
 
 function validateForm(isDraft = false) {
+    if (BmsLineTerms.missing($('#itemsBody')).length) {
+        Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this document is priced by term. Choose its term before saving.')) ?> });
+        return false;
+    }
     // Check if at least one item is added
     if ($('[id^="item-row-"]').length === 0) {
         Swal.fire({

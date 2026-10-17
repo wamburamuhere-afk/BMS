@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/service_price_terms.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/sales_invoicing.php';   // assertSalesAmountsFit
 
@@ -305,11 +306,15 @@ try {
                 unit_price, tax_rate, discount_percent, line_total, description, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
+        // Optional price term (core/service_price_terms.php) — verified against the DB.
+        $term = sptResolveLineTerm($pdo, $item['product_id'] ?? null, $item['price_term_id'] ?? null,
+            (string)($item['description'] ?? ''), trim((string)($item['product_name'] ?? '')) ?: 'a line');
         $itemStmt->execute([
             $sales_order_id, $item['product_id'] ?: null, $item['product_name'], $item['sku'],
             $qty, $item['unit'] ?? 'pcs', $price, $tax_rate, $discount_percent, $line_total,
-            trim((string)($item['description'] ?? '')) ?: null
+            $term['description'] !== '' ? $term['description'] : null
         ]);
+        sptStampLine($pdo, 'sales_order_items', (int)$pdo->lastInsertId(), $term);
     }
 
     $pdo->commit();
