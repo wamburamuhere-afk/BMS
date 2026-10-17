@@ -160,6 +160,10 @@ $r = bjp('api/account/save_invoice.php', ['customer_id' => $cust, 'order_id' => 
         'order_item_id' => $soLine['order_item_id'] ?? 0, 'quantity' => 1, 'unit' => 'job', 'unit_price' => 45000, 'tax_rate' => 0,
         'discount_percent' => 0, 'description' => $soLine['description'] ?? '' ]]]);
 $inv = (int)$pdo->query("SELECT MAX(invoice_id) FROM invoices WHERE customer_id = $cust")->fetchColumn();
+// Invoices go pending → reviewed → approved (main, 2026-10-16); payment needs an approved invoice.
+bjp('api/account/review_invoice.php', ['invoice_id' => $inv]);
+$ap = bjp('api/account/approve_invoice.php', ['invoice_id' => $inv]);
+ok(!empty($ap['success']), 'BJP reviews and approves the invoice (Directors / CFO, role-based)');
 $invLine = $pdo->query("SELECT * FROM invoice_items WHERE invoice_id = $inv")->fetch(PDO::FETCH_ASSOC) ?: [];
 ok($inv > 0 && (int)$invLine['term_duration_value'] === 6, 'invoice raised from the sales order; the line inherits 6 Months');
 $docs = company($tid, ['action' => 'documents']);

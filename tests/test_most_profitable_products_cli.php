@@ -94,7 +94,11 @@ $r = req('api/account/save_invoice.php', ['customer_id' => $cust, 'invoice_date'
     'warehouse_id' => $wid, 'notes' => 'MPP-TEST', 'items' => [
         $line($gA, 'MPP-TEST Goods A', 10, 1000), $line($gB, 'MPP-TEST Goods B', 2, 5000),
         $line($sv, 'MPP-TEST Install', 1, 20000), $line($sv0, 'MPP-TEST Advice', 1, 8000)]], 'POST');
-ok(!empty($r['success']), 'invoice saved (posts revenue + cost of goods to the ledger)' . (empty($r['success']) ? ' — ' . ($r['message'] ?? '') : ''));
+$mppInv = (int)$pdo->query("SELECT MAX(invoice_id) FROM invoices WHERE notes = 'MPP-TEST'")->fetchColumn();
+// Invoices go pending → reviewed → approved (main, 2026-10-16); payment needs an approved invoice.
+req('api/account/review_invoice.php', ['invoice_id' => $mppInv], 'POST');
+$ap = req('api/account/approve_invoice.php', ['invoice_id' => $mppInv], 'POST');
+ok(!empty($r['success']) && !empty($ap['success']), 'invoice saved and approved (approval posts revenue + cost of goods to the ledger)' . (empty($ap['success']) ? ' — ' . ($ap['message'] ?? '') : ''));
 
 section('B1. cost, profit, margin per row');
 $after = $report('profit');

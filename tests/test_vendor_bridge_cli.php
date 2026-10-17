@@ -194,6 +194,9 @@ function makeInvoice(int $cust, array $lines, bool $vendor = true): array {
         'due_date' => date('Y-m-d', strtotime('+7 days')), 'currency' => 'TZS', 'warehouse_id' => $wid, 'notes' => 'VB-TEST', 'items' => $items], $vendor);
     $id = (int)($r['invoice_id'] ?? 0) ?: (int)$pdo->query("SELECT MAX(invoice_id) FROM invoices WHERE notes = 'VB-TEST' AND customer_id = $cust")->fetchColumn();
     $made['inv'][] = $id;
+    // Invoices go pending → reviewed → approved (main, 2026-10-16); payment needs an approved invoice.
+    call('api/account/review_invoice.php', ['invoice_id' => $id], $vendor);
+    call('api/account/approve_invoice.php', ['invoice_id' => $id], $vendor);
     $row = $pdo->query("SELECT invoice_id, invoice_number, grand_total, status FROM invoices WHERE invoice_id = $id")->fetch(PDO::FETCH_ASSOC);
     return $row ?: ['invoice_id' => 0, 'invoice_number' => '', 'grand_total' => 0];
 }

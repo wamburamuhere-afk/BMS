@@ -2,6 +2,8 @@
 
 ## 2026-10-16 — test(subscriptions) Phase 8: the whole story end to end
 
+- After merging `main` (invoices now go pending → reviewed → approved, ledger posting on approval): the payment suites (`test_vendor_bridge_cli`, `test_subscription_contracts_cli`, `test_most_profitable_products_cli`, the e2e suite) review and approve each invoice before paying it — exactly what BJP staff now do; the e2e suite gained that step (18). No change to the subscription code was needed: the bridge acts only on real money received.
+
 - `tests/test_customer_subscription_e2e_cli.php` (new, 17) — through the real endpoints: visit (no customer yet) → joined with the company's web address → Make real customer (linked) → the company's admin picks "6 Months" in My Subscription → approved quotation → BJP converts it to a sales order → invoice (line inherits the term) → payment → company trial → active until exactly 6 months after its trial's last day → contract for that period → BJP signs → customer signing link → signed by both; running everything again doubles nothing.
 - `core/vendor_link.php` — loads `tenant_resolver.php` itself (a pasted `https://x.bms…` web address was only normalised when another file had happened to load it; the CI run caught it).
 - `customer_subscription_plan.md` — every phase marked done, decisions D1/D3 recorded as changed, operator steps for go-live, and the list of test suites.

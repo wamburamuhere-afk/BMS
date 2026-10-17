@@ -154,7 +154,11 @@ $invoice = function (int $pid, int $termId, float $price) use ($cust, $wid, $pdo
         'currency' => 'TZS', 'warehouse_id' => $wid, 'notes' => 'SC-TEST', 'items' => [[
             'product_id' => $pid, 'product_name' => 'SC-TEST service', 'quantity' => 1, 'unit' => 'job', 'unit_price' => $price,
             'tax_rate' => 0, 'discount_percent' => 0, 'description' => '', 'price_term_id' => $termId]]]);
-    return (int)$pdo->query("SELECT MAX(invoice_id) FROM invoices WHERE notes = 'SC-TEST'")->fetchColumn();
+    $id = (int)$pdo->query("SELECT MAX(invoice_id) FROM invoices WHERE notes = 'SC-TEST'")->fetchColumn();
+    // Invoices go pending → reviewed → approved (main, 2026-10-16); payment needs an approved invoice.
+    call('api/account/review_invoice.php', ['invoice_id' => $id]);
+    call('api/account/approve_invoice.php', ['invoice_id' => $id]);
+    return $id;
 };
 $pay = fn(int $inv, float $amt) => call('api/account/record_payment.php', ['invoice_id' => $inv, 'amount' => $amt, 'payment_date' => date('Y-m-d'),
     'payment_method' => 'bank_transfer', 'status' => 'completed', 'received_into_account_id' => $bank]);

@@ -137,4 +137,6 @@ Extend `product_analysis` with cost, profit and margin, sorted by profit. Cost u
 
 ## Test suites (all wired into CI; CI runs the database-free part)
 
-`test_tenant_migration_health_cli` (11) · `test_subscription_payment_cli` (33) · `test_service_price_terms_cli` (47) · `test_document_line_terms_cli` (31) · `test_customer_visit_link_cli` (39) · `test_vendor_bridge_cli` (33) · `test_my_subscription_cli` (36) · `test_subscription_contracts_cli` (28) · `test_most_profitable_products_cli` (16) · `test_customer_subscription_e2e_cli` (17) — **291 checks, 0 failures**, no data left behind.
+`test_tenant_migration_health_cli` (11) · `test_subscription_payment_cli` (33) · `test_service_price_terms_cli` (47) · `test_document_line_terms_cli` (31) · `test_customer_visit_link_cli` (39) · `test_vendor_bridge_cli` (33) · `test_my_subscription_cli` (36) · `test_subscription_contracts_cli` (28) · `test_most_profitable_products_cli` (16) · `test_customer_subscription_e2e_cli` (18) — **292 checks, 0 failures**, no data left behind.
+
+**Note (merged with main 2026-10-16):** invoices now go pending → reviewed → approved (role-based); a BJP invoice must be approved before the customer's payment can be recorded. The bridge is unchanged — it still acts only on real money received.
