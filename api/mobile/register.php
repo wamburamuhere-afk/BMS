@@ -28,6 +28,9 @@
  *   company_postal_address  optional
  *   subdomain               optional  — auto-generated from company_name if omitted
  *   device_name             optional  — label stored on the issued Bearer token
+ *   plan_key, plan_term     optional  — from GET api/platform/public_offers.php
+ *                                       (e.g. "shop-basic", "1m"); missing = the
+ *                                       default public plan. Unknown/retired → 422.
  */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -107,6 +110,15 @@ if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
+// ── Plan (optional; missing = the default public plan) ───────────────────────
+$planChoice = registrationPlanChoice(trim((string)($body['plan_key'] ?? '')), trim((string)($body['plan_term'] ?? '')));
+if (!$planChoice['ok']) {
+    logRegistrationAttempt($ip, $phone, null, 'rejected', 'plan not available');
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => $planChoice['error']]);
+    exit;
+}
+
 // ── Rate limit ────────────────────────────────────────────────────────────────
 $throttleError = registrationThrottleCheck($ip);
 if ($throttleError) {
@@ -144,6 +156,13 @@ if ($dup->fetchColumn()) {
     logRegistrationAttempt($ip, $phone, $subdomain, 'rejected', 'duplicate phone');
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'An account with this phone number is already registered. Please log in instead.']);
+    exit;
+}
+// …and one per owner email, when one is given
+if ($email !== '' && registrationEmailTaken($email)) {
+    logRegistrationAttempt($ip, $phone, $subdomain, 'rejected', 'duplicate email');
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'An account with this email address is already registered. Please log in instead.']);
     exit;
 }
 
@@ -199,17 +218,19 @@ $tenantUrl = $scheme . '://' . $subdomain . '.' . $base . '/login';
 
 // ── Insert job ────────────────────────────────────────────────────────────────
 $jobId = bin2hex(random_bytes(32));
-$cpdo->prepare("
-    INSERT INTO registration_jobs
-        (job_id, status, company_name, subdomain, owner_phone, owner_pass_enc,
-         owner_first_name, owner_last_name, owner_email,
-         phys_address, post_address, device_name, ip_address, tenant_url)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-")->execute([
-    $jobId, 'pending', $company, $subdomain, $phone, $passEnc,
-    $firstName, $lastName, $email,
-    $physAddr, $postAddr, $deviceName, $ip, $tenantUrl,
-]);
+$jobCols = ['job_id', 'status', 'company_name', 'subdomain', 'owner_phone', 'owner_pass_enc',
+            'owner_first_name', 'owner_last_name', 'owner_email',
+            'phys_address', 'post_address', 'device_name', 'ip_address', 'tenant_url'];
+$jobVals = [$jobId, 'pending', $company, $subdomain, $phone, $passEnc,
+            $firstName, $lastName, $email,
+            $physAddr, $postAddr, $deviceName, $ip, $tenantUrl];
+// Keys only — the worker re-checks them. Guarded for an un-upgraded control DB.
+if ($planChoice['plan'] && controlColumnExists('registration_jobs', 'plan_key')) {
+    array_push($jobCols, 'plan_key', 'plan_term');
+    array_push($jobVals, $planChoice['plan']['plan_key'], $planChoice['term_key']);
+}
+$cpdo->prepare("INSERT INTO registration_jobs (" . implode(', ', $jobCols) . ")
+                VALUES (" . implode(',', array_fill(0, count($jobCols), '?')) . ")")->execute($jobVals);
 
 logRegistrationAttempt($ip, $phone, $subdomain, 'success', 'queued job_id=' . $jobId);
 

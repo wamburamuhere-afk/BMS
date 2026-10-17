@@ -782,11 +782,23 @@ try {
         // A paid downgrade waits for the end of the period already paid for (D5).
         'scheduled_plan_key' => "ADD COLUMN `scheduled_plan_key` VARCHAR(64) NULL AFTER `plan`",
         'scheduled_plan_at'  => "ADD COLUMN `scheduled_plan_at` DATE NULL AFTER `scheduled_plan_key`",
+        // The owner's real email (tenants.owner_email holds the login phone).
+        // Set by self-registration; one free trial per address (Phase 3).
+        'owner_contact_email' => "ADD COLUMN `owner_contact_email` VARCHAR(191) NULL AFTER `owner_email`",
     ] as $col => $clause) {
         if (!in_array($col, $tCols2, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
             say("  + tenants.{$col} added");
         }
+    }
+    $hasContactIdx = (int)$admin->query("
+        SELECT COUNT(*) FROM information_schema.statistics
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'tenants'
+          AND index_name = 'idx_tenants_contact_email'
+    ")->fetchColumn();
+    if (!$hasContactIdx) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` ADD KEY `idx_tenants_contact_email` (`owner_contact_email`)");
+        say('  + tenants.idx_tenants_contact_email added');
     }
 
     // Registration → "make this company a BJP customer" outbox (Phase 4).
@@ -906,6 +918,22 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
     ");
     say('  · table registration_jobs ready');
+
+    // The plan the app user picked (service_plans_plan.md Phase 3). Only keys —
+    // the worker re-checks them against the live catalogue before applying.
+    $rjCols = $admin->query("
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'registration_jobs'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ([
+        'plan_key'  => "ADD COLUMN `plan_key` VARCHAR(64) NULL AFTER `device_name`",
+        'plan_term' => "ADD COLUMN `plan_term` VARCHAR(8) NULL AFTER `plan_key`",
+    ] as $col => $clause) {
+        if (!in_array($col, $rjCols, true)) {
+            $admin->exec("ALTER TABLE `{$controlDb}`.`registration_jobs` {$clause}");
+            say("  + registration_jobs.{$col} added");
+        }
+    }
 
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("

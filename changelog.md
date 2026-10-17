@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-17 — feat(plans): a new company picks its plan at signup — live pricing popup, register picker, public offers API (service plans Phase 3)
+
+**Files:** `scripts/setup_control_db.php`, `core/tenant_registration.php`, `actions/register_tenant.php`, `api/mobile/register.php`, `api/platform/public_offers.php` (new), `cron/process_registration_jobs.php`, `login.php`, `register.php`, `tests/test_service_plans_registration_cli.php` (new), `changelog.md`
+
+- **Control DB (idempotent setup):** `registration_jobs.plan_key/plan_term`; `tenants.owner_contact_email` (+ index). `owner_email` actually holds the owner's phone, so the real address gets its own column.
+- **Login › "New company?" popup:** when Superadmin has public plans on a product shown at registration, the cards come from that live catalogue: term pills (1 month … 1 year), price and "≈ per month", shops/users, included lines, "Most popular" pre-selected. A plan without the chosen length is dimmed. "Continue" carries `plan` + `term` to register.php. With nothing on offer, the old fixed cards show exactly as before.
+- **Register page:** a "Your plan" picker (pre-selected from the popup, falls back to the default for an unknown key). Sends keys only.
+- **Server:** `registrationPlanChoice()` re-checks the keys against the live catalogue (private, retired, blank or forged plans and terms not offered are refused before any database is made). No key means the "Most popular" plan on its default term. `finishSelfRegistration()` is now shared by the web form and the mobile worker: provisioning switch, self-registration defaults, then the chosen plan (modules, users, shops), logged as `registration_plan`. Mobile signups no longer start with every module on.
+- **One trial per owner email:** web and mobile refuse an email already used by a live company (case-insensitive), as they already did for the phone.
+- **New `GET api/platform/public_offers.php`:** the same catalogue for the mobile app (no internal ids; 404 on a tenant's address; 60 s cache). `api/mobile/register.php` accepts optional `plan_key` / `plan_term` (unknown → 422) and stores them on the job; the worker re-checks them and falls back to the default plan if one was retired while queued.
+- Tests: new suite 78/78 (offers endpoint, choice rules, real web signup on a plan, refusals create nothing, real mobile job → worker → plan applied, both pages rendered with/without offers + inline JS parsed by node). Regressions: catalogue 101, BJP plans form 82, tenant provisioning 72. `test_tenant_registration_cli.php` has 7 failures that are identical on the Phase 2 commit (throttle count, phone now required in 6b/7, login render probe missing `roots.php`): pre-existing, untouched. Browser-checked: popup term/plan switching and Continue link, register picker.
+
 ## 2026-10-17 — feat(plans): plans on BJP's services — Basic/Pro tiers with prices per term, or mapped live to a Superadmin product (service plans Phase 2)
 
 **Files:** `migrations/tenant/2026_10_17_service_plans.php` (new), `core/service_plans.php` (new), `core/service_price_terms.php`, `core/platform_gateway.php`, `includes/service_price_terms_editor.php`, `includes/line_price_terms_js.php`, `assets/js/line_price_terms.js`, `app/bms/product/services.php`, `app/bms/product/service_view.php`, `api/create_nip_product.php`, `api/update_nip_product.php`, `api/account/get_service_price_terms.php`, `api/account/get_products.php`, `tests/test_service_plans_bjp_form_cli.php` (new), `changelog.md`

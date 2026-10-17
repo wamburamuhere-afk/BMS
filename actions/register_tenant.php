@@ -86,6 +86,8 @@ $result = registerTenant([
     'company_size'             => $_POST['company_size']  ?? '',
     'logo_tmp_path'            => $logoTmpPath,
     'logo_extension'           => $logoExtension,
+    'plan_key'                 => $_POST['plan_key']  ?? '',   // re-checked on the server
+    'plan_term'                => $_POST['plan_term'] ?? '',
     'website'                  => $_POST['website'] ?? '',   // honeypot
 ], $ip);
 
