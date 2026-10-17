@@ -62,18 +62,9 @@ try {
 } catch (Exception $e) {}
 
 // Fetch Payment Settings (bank details)
-$pay = [];
-try {
-    $stmtP = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('bank_name','account_name','account_number','swift_code','check_payable_to','mpesa_paybill','mpesa_account_no')");
-    $stmtP->execute();
-    while ($r = $stmtP->fetch(PDO::FETCH_ASSOC)) {
-        $pay[$r['setting_key']] = $r['setting_value'];
-    }
-} catch (Exception $e) {}
-$hasBankTransfer = !empty($pay['bank_name']) || !empty($pay['account_number']);
-$hasMobile       = !empty($pay['mpesa_paybill']);
-$hasCheque       = !empty($pay['check_payable_to']);
-$hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
+require_once ROOT_DIR . '/core/payment_accounts.php';
+$pa = getPaymentAccounts($pdo);
+$hasPayment = paymentAccountsHasAny($pa);
 
 ?>
 <!DOCTYPE html>
@@ -345,28 +336,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
     <!-- BANK DETAILS -->
     <div class="bank-details" style="margin-bottom: 25px;">
         <h3>Payment / Bank Details</h3>
-        <?php if ($hasBankTransfer): ?>
-        <div class="bank-section">
-            <h4><?= t('Bank Transfer') ?></h4>
-            <?php if (!empty($pay['bank_name'])): ?><p><strong>Bank:</strong> <?= htmlspecialchars($pay['bank_name']) ?></p><?php endif; ?>
-            <?php if (!empty($pay['account_name'])): ?><p><strong>Account Name:</strong> <?= htmlspecialchars($pay['account_name']) ?></p><?php endif; ?>
-            <?php if (!empty($pay['account_number'])): ?><p><strong>Account No:</strong> <?= htmlspecialchars($pay['account_number']) ?></p><?php endif; ?>
-            <?php if (!empty($pay['swift_code'])): ?><p><strong>Swift Code:</strong> <?= htmlspecialchars($pay['swift_code']) ?></p><?php endif; ?>
-        </div>
-        <?php endif; ?>
-        <?php if ($hasMobile): ?>
-        <div class="bank-section">
-            <h4><?= t('Mobile Money') ?></h4>
-            <?php if (!empty($pay['mpesa_paybill'])): ?><p><strong>Paybill / Till:</strong> <?= htmlspecialchars($pay['mpesa_paybill']) ?></p><?php endif; ?>
-            <?php if (!empty($pay['mpesa_account_no'])): ?><p><strong>Account No:</strong> <?= htmlspecialchars($pay['mpesa_account_no']) ?></p><?php endif; ?>
-        </div>
-        <?php endif; ?>
-        <?php if ($hasCheque): ?>
-        <div class="bank-section">
-            <h4><?= t('Cheque') ?></h4>
-            <p><strong>Payable To:</strong> <?= htmlspecialchars($pay['check_payable_to']) ?></p>
-        </div>
-        <?php endif; ?>
+        <?= renderPaymentAccountsBlock($pa, 'h4') ?>
     </div>
     <?php endif; ?>
 
