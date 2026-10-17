@@ -117,6 +117,47 @@ Verified: both new suites pass locally; the control-DB script applied the new co
 
 ---
 
+## 2026-10-16 — feat(invoices): cancel + send-back-to-pending buttons + progressive audit panel
+
+**Files:** `app/bms/invoice/invoice_view.php`, `api/account/revert_invoice_to_pending.php`, `includes/workflow_audit_panel.php`
+
+- **Cancel Invoice** button: shown for `pending`/`reviewed`/`approved`/`overdue`/`partial` statuses; gated by `canEdit('invoices')`; POSTs to `update_invoice_status.php`; blocked by API if completed payments exist
+- **Send Back to Pending** button: shown for `reviewed` or `approved`; calls new `revert_invoice_to_pending.php`; if approved, reverses GL revenue + COGS + VAT; clears `reviewed_by`/`approved_by` stamps and deletes `workflow_signatures` rows for those actions; blocks if completed payments exist
+- **Progressive audit panel** (`workflow_audit_panel.php`): `pending` → Created By only; `reviewed` → Created By + Reviewed By; `approved`+others → all three; backward-compatible (callers that don't set `_status` still see all three)
+
+## 2026-10-16 — feat(invoices): void payment button in invoice_view.php
+
+**File:** `app/bms/invoice/invoice_view.php`
+
+Added a Void button to each completed payment row in the payment history table:
+- `$inv_can_void_payment = canEdit('invoices')` gates button visibility
+- Actions column added to the payment table header (shown only when gated)
+- Running balance and payment total now count only `completed` payments (voided rows show strikethrough + "Voided" badge and are excluded from the totals)
+- `voidPayment(paymentId, ref)` JS function: Swal confirmation → POST to `api/account/void_payment.php` → reload on success
+- `void_payment.php` was fully built (June 2026) but had no UI surface — this completes that feature
+- After void, invoice status auto-reverts: paid→approved (no remaining completed payments), partial→approved (some remain)
+
+---
+
+## 2026-10-16 — feat(invoices): pending→reviewed→approved workflow with GL posting on approval
+
+**File:** `api/account/save_invoice.php`
+
+New invoices now enter the review/approval workflow instead of being auto-approved:
+- Default status on create changed from `approved` to `pending`
+- Removed auto-stamp of creator as both reviewer and approver
+- Removed immediate GL posting on create — GL now fires only on approval via `approve_invoice.php`
+- Created-by e-signature still captured on create; reviewed/approved signatures captured by their respective APIs (already built)
+- Existing approved invoices are untouched (GL entries intact, payments unaffected)
+
+## 2026-10-16 — fix(invoice_create): allow whole-number quantities for service items from SO
+
+**File:** `app/bms/invoice/invoice_create.php`
+
+Two bugs in the invoice line quantity `<input>`:
+1. `min="0.001"` + `step="0.01"` were misaligned — `(6 − 0.001) % 0.01 ≠ 0` so the browser rejected whole numbers like 6 and suggested 5.991 as the "nearest valid value". Fixed by changing `min` to `"0.01"`.
+2. Service/non-inventory items coming from a Sales Order were getting a `max` attribute set to the SO remaining quantity. Services have no stock cap, so the `max` is now skipped when `item.is_service === 1`.
+
 ## 2026-10-15 — fix(quotations): gate on quotations permission, not sales_orders
 
 **Quotation pages blocked even when role had Quotations VIEW granted** — every quotation page (`quotations.php`, `quotation_create/edit/view/form.php`) was calling `autoEnforcePermission('sales_orders')`, and the three write APIs (`save_quotation`, `delete_quotation`, `update_quotation_status`) were checking `canCreate/Edit/Delete('sales_orders')`. A role with only the Quotations row granted was blocked everywhere. `core/permissions.php` sub-page map also routed the five quotation sub-pages to `sales_orders`.
