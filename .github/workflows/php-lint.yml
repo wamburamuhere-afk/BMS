@@ -179,3 +179,4 @@ jobs:
           php tests/test_service_plans_billing_cli.php
           php tests/test_service_plans_billing_page_cli.php
           php tests/test_service_plans_pos_cli.php
+          php tests/test_service_plans_e2e_cli.php

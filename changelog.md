@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-18 — test(plans): service plans end to end + first payment keeps the trial left (service plans Phase 7)
+
+**Files:** `core/tenant_lifecycle_policy.php`, `tests/test_service_plans_e2e_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`
+
+- New end-to-end suite through the real paths: superadmin makes a Shop Mode plan → a visitor registers on it yearly (`registerTenant`, real tenant database) → the link-queue kick creates exactly one BJP customer → the company asks for a quote from Billing → BJP reviews + approves → invoices it (save → review → approve, posted) → records full payment → the company is active on the plan until 12 months after its trial, Billing shows the invoice paid, the invoice + payment entries balance, and a bridge re-run changes nothing. 33/33; tenant database, user and all rows removed afterwards.
+- Gap found and fixed: a self-registered company is created `active` (so the owner can sign in) with a `trial_ends_at`, and `applySubscriptionPayment()` only counted the trial left for status `trial` — so a company that paid early lost its remaining free days. The first payment (no `subscription_ends_at` yet) now starts after the trial too. Regressions: subscription payment 33, billing 81, customer subscription e2e 20, my subscription 40, vendor bridge 33.
+
 ## 2026-10-18 — feat(plans): system subscriptions stay out of POS (service plans Phase 6)
 
 **Files:** `core/service_plans.php`, `api/pos/simple_products.php`, `api/pos/process_sale.php`, `tests/test_service_plans_pos_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`
