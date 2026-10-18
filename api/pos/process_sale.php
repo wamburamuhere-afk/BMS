@@ -26,6 +26,7 @@ require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 require_once __DIR__ . '/../../core/pos_credit_limit.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
+require_once __DIR__ . '/../../core/service_plans.php';
 mobileBearerAuth();
 
 if (!isset($_SESSION['user_id'])) {
@@ -133,6 +134,10 @@ try {
     // Server-side receipt numbers use an atomic daily sequence (code_sequences table)
     // so concurrent sales never collide. Client-supplied numbers (offline POS) are
     // accepted as-is; idempotency is handled above via client_uuid.
+    // A platform subscription extends the company only through a paid invoice (service_plans_plan.md Phase 6).
+    if (is_array($items) && ($mapped = spPlatformMappedNames($pdo, array_column(array_filter($items, 'is_array'), 'product_id')))) {
+        throw new Exception('"' . reset($mapped) . '" is a system subscription. Sell this through an invoice so the company\'s subscription is extended.', 422);
+    }
     $receipt_number = $input['receipt_number'] ?? nextReceiptNumber($pdo);
     $split_details = $input['split_details'] ?? null;
 

@@ -317,6 +317,39 @@ if (!function_exists('spListSummary')) {
     }
 }
 
+/* ── Keep platform subscriptions out of POS (service_plans_plan.md Phase 6) ── */
+
+if (!function_exists('spPosExcludeSql')) {
+    /**
+     * A WHERE fragment that hides services sold as a platform product: a POS sale
+     * would never extend the company's subscription — only a paid invoice does.
+     * '' when the mapping does not exist on this install.
+     */
+    function spPosExcludeSql(PDO $pdo, string $alias = 'p'): string
+    {
+        if (!spMappingReady($pdo)) return '';
+        return " AND NOT EXISTS (SELECT 1 FROM vendor_subscription_services vss_pos
+                                  WHERE vss_pos.product_id = $alias.product_id AND vss_pos.platform_product_key IS NOT NULL)";
+    }
+}
+
+if (!function_exists('spPlatformMappedNames')) {
+    /** Of these product ids, the ones sold as a platform product: [product_id => product_name]. */
+    function spPlatformMappedNames(PDO $pdo, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids || !spMappingReady($pdo)) return [];
+        $in = implode(',', $ids);
+        $out = [];
+        foreach ($pdo->query("SELECT v.product_id, COALESCE(p.product_name, CONCAT('#', v.product_id)) AS product_name
+                                FROM vendor_subscription_services v LEFT JOIN products p ON p.product_id = v.product_id
+                               WHERE v.platform_product_key IS NOT NULL AND v.product_id IN ($in)") as $r) {
+            $out[(int)$r['product_id']] = (string)$r['product_name'];
+        }
+        return $out;
+    }
+}
+
 /* ── Platform products (BJP's own install only) ───────────────────────────── */
 
 if (!function_exists('spPlatformProducts')) {
