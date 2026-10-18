@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-18 — fix(ci): test_smart_products_cli skips when there is no config
+
+**Files:** `tests/test_smart_products_cli.php`, `changelog.md`
+
+- **The failure:** PHP Lint Check went red on PR #2500 and on the develop → main PR #2502. The suite crashed with `Failed opening required includes/config.php`, a file that is never committed. The live site was not affected.
+- **Fix:** with no `includes/config.php`, the suite prints `SKIP` and exits 0, the same way `test_service_plans_e2e_cli.php` handles it. When the config is there (locally), it still runs in full.
+
 ## 2026-10-18 — feat(plans): Smart POS / Smart BMS products, Billing → Subscription, no invented prices on login
 
 **Files:** `core/plans.php`, `core/platform_gateway.php`, `core/tenant_registration.php`, `core/tenant_quotas.php`, `actions/superadmin_plans.php`, `app/superadmin/plans.php`, `app/constant/settings/billing.php`, `app/constant/settings/my_subscription.php`, `header.php`, `roots.php`, `login.php`, `scripts/setup_control_db.php`, `tests/test_smart_products_cli.php` (new), `tests/test_service_plans_billing_page_cli.php`, `tests/test_service_plans_billing_cli.php`, `tests/test_my_subscription_cli.php`, `.github/workflows/php-lint.yml`, `changelog.md`

@@ -60,6 +60,8 @@ if (($argv[1] ?? '') === '--route') {
 }
 
 // ─── Runner ─────────────────────────────────────────────────────────────────
+// Needs a real control DB + tenant provisioning; CI has no includes/config.php.
+if (!is_file(__DIR__ . '/../includes/config.php')) { echo "SKIP: no includes/config.php (CI)\n"; exit(0); }
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../core/control_db.php';
 require_once __DIR__ . '/../core/tenant_crypto.php';
