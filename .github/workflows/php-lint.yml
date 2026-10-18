@@ -181,4 +181,5 @@ jobs:
           php tests/test_service_plans_pos_cli.php
           php tests/test_service_plans_e2e_cli.php
           php tests/test_plan_line_columns_fast_cli.php
+          php tests/test_smart_products_cli.php
           php tests/test_legacy_migration_mirrors_cli.php

@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-10-18 — feat(plans): Smart POS / Smart BMS products, Billing → Subscription, no invented prices on login
+
+**Files:** `core/plans.php`, `core/platform_gateway.php`, `core/tenant_registration.php`, `core/tenant_quotas.php`, `actions/superadmin_plans.php`, `app/superadmin/plans.php`, `app/constant/settings/billing.php`, `app/constant/settings/my_subscription.php`, `header.php`, `roots.php`, `login.php`, `scripts/setup_control_db.php`, `tests/test_smart_products_cli.php` (new), `tests/test_service_plans_billing_page_cli.php`, `tests/test_service_plans_billing_cli.php`, `tests/test_my_subscription_cli.php`, `.github/workflows/php-lint.yml`, `changelog.md`
+
+- Products renamed: "BMS Shop Mode" → **Smart POS**, "BMS Full" → **Smart BMS**. Seed updated. `setup_control_db.php` renames only rows still carrying the old name, so a name the operator chose is kept. The keys (`bms_shop` / `bms_full`) and their behaviour are unchanged.
+- A product now decides what its plans give a tenant (`platformProductProfile()`):
+  - **Smart POS:** the self-registration setup (Simple Mode on and locked, Shop wording, Supplier Access on); modules are the plan's ticks.
+  - **Smart BMS:** every default-on module is always included (`planDefaultOnFeatures()`, enforced on plan save and on apply); Simple Mode and Shop wording are off.
+  - `applyPlanToTenant()` sets the modes and logs them.
+- Superadmin → Plans:
+  - New Products section with a card per product and an Edit product modal (`save_product`: name, description, order, active, **On registration** switch). It warns when a product is shown on registration but nothing is on sale.
+  - Plans are grouped by product.
+  - In the plan form, Smart BMS's default modules are shown locked and each product's rules are explained.
+- Login: the hardcoded 10,000 / 25,000 / 45,000 / 85,000 cards are gone. With nothing on sale it shows "Pricing is being prepared" plus contact details. The real plan cards show a module count (and the product name when more than one product is offered). "Simple POS" branding → "Smart POS".
+- The company page "Billing" is now **Subscription** (`subscription` route; the old `billing` route still works). Its plan cards show the tagline and the module count. The module list is the same one registration shows and applying turns on (`planOfferShape()`, `pgPlanSummaries()`).
+- Tests: new `test_smart_products_cli.php`, plus updated wording in the billing / billing page / my subscription suites.
+
 ## 2026-10-18 — fix(plans): main-database mirror of the service plans migration
 
 **Files:** `migrations/2026_10_18_service_plans_legacy_db.php` (new), `tests/test_legacy_migration_mirrors_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`

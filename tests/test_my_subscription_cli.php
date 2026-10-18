@@ -209,4 +209,4 @@ $html = runPhp("\$_SERVER['REQUEST_METHOD'] = 'GET'; \$_SERVER['HTTP_HOST'] = 'l
     \$_SESSION['user_id'] = $uid; \$_SESSION['role_id'] = 1; \$_SESSION['is_admin'] = true; \$_SESSION['first_name'] = 'T'; \$_SESSION['last_name'] = 'A'; \$_SESSION['user_lang'] = 'en';
     ob_start(); include '$root/app/constant/settings/billing.php'; echo ob_get_clean();");
 ok(strpos($html, 'id="catalog"') !== false && strpos($html, 'id="tblInvoices"') !== false && strpos($html, 'Fatal error') === false, 'Billing page renders for a company admin');
-ok(strpos(file_get_contents("$root/app/constant/settings/my_subscription.php"), "getUrl('billing')") !== false, 'the old My Subscription link redirects to Billing');
+ok(strpos(file_get_contents("$root/app/constant/settings/my_subscription.php"), "getUrl('subscription')") !== false, 'the old My Subscription link redirects to Subscription');

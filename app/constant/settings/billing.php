@@ -14,7 +14,7 @@ if (!isAdmin()) {
 }
 $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
 
-$page_title = 'Billing';
+$page_title = 'Subscription';
 require_once __DIR__ . '/../../../header.php';
 $statCard = 'background:#e7f0ff;border:1px solid #b6ccfe !important;';
 ?>
@@ -27,7 +27,7 @@ $statCard = 'background:#e7f0ff;border:1px solid #b6ccfe !important;';
 </style>
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;">
-        <h4 class="mb-0"><i class="bi bi-credit-card-2-front text-primary me-2"></i><?= t('Billing') ?></h4>
+        <h4 class="mb-0"><i class="bi bi-credit-card-2-front text-primary me-2"></i><?= t('Subscription') ?></h4>
     </div>
 
 <?php if ($tenantId === null): ?>
@@ -122,6 +122,7 @@ $(function () {
         'scheduled' => t('Changes to %n on %d'), 'current' => t('Current'), 'popular' => t('Popular'),
         'period' => t('Period'), 'extras' => t('Extras'), 'perUnit' => t('each'), 'total' => t('Total'),
         'send' => t('Send request'), 'pickPeriod' => t('Choose a period first.'), 'noPlan' => t('No plan yet'),
+        'modules' => t('%d modules'),
     ]) ?>;
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const money = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -196,7 +197,9 @@ $(function () {
                 <div class="d-flex justify-content-between align-items-start"><span class="fw-bold">${esc(p.name)}</span>
                     <span>${p.is_popular ? `<span class="badge" style="background:#0d6efd;color:#fff;font-size:.6rem">${L.popular}</span>` : ''}
                     <span class="badge bl-cur d-none" style="background:#052c65;color:#fff;font-size:.6rem">${L.current}</span></span></div>
+                ${p.tagline ? `<div class="small fw-semibold text-primary">${esc(p.tagline)}</div>` : ''}
                 <div class="small text-muted">${L.users}: ${p.max_users === null ? L.unlimited : p.max_users} · ${L.shops}: ${p.max_shops === null ? L.unlimited : p.max_shops}</div>
+                ${(p.modules || []).length ? `<div class="small text-muted" title="${esc(p.modules.join(', '))}"><i class="bi bi-grid me-1 text-primary"></i>${esc(L.modules.replace('%d', p.modules.length))}</div>` : ''}
                 <div class="small mt-1">${items((p.items || []).slice(0, 4))}</div></div></div>`).join('')}</div>
             ${pk ? `<div class="small fw-bold text-muted mb-1">${L.period}</div><div class="row g-2 mb-3">${terms.map(t => `<div class="col-6 col-md-3"><button type="button" class="btn btn-outline-primary w-100 bl-term ${String(t.term_id) === sel[s.product_id].term ? 'sel' : ''}"
                 data-svc="${s.product_id}" data-term="${esc(String(t.term_id))}"><div class="fw-bold small">${esc(t.term_label.replace(/^.*?—\s*/, ''))}</div><div class="small">${money(t.price)} TZS</div></button></div>`).join('')}</div>` : ''}

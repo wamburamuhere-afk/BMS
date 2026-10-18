@@ -139,7 +139,7 @@ if (!function_exists('tenantShopLimitMessage')) {
     {
         $limit = tenantShopLimit();
         return 'Your plan allows ' . (int)$limit . ' active shop' . ($limit === 1 ? '' : 's')
-             . '. Deactivate a shop, or buy an extra shop or a bigger plan under Billing.';
+             . '. Deactivate a shop, or buy an extra shop or a bigger plan under Subscription.';
     }
 }
 

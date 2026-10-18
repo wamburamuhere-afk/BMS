@@ -118,16 +118,24 @@ if (!function_exists('pgPlanSummaries')) {
         try {
             require_once __DIR__ . '/plans.php';
             $cur = $tenant !== null && !empty($tenant['plan']) ? (string)$tenant['plan'] : '';
-            $st = getControlPdo()->prepare("SELECT id, plan_key, name, max_users, max_shops, max_storage_mb, is_popular FROM plans
+            $st = getControlPdo()->prepare("SELECT id, plan_key, name, tagline, product_key, max_users, max_shops, max_storage_mb, is_popular FROM plans
                                              WHERE product_key = ? AND is_active = 1 AND plan_key <> 'blank' AND (is_public = 1 OR plan_key = ?)
                                              ORDER BY tier_rank, sort_order, name");
             $st->execute([$productKey, $cur]);
+            $registry = bmsFeatureRegistry();
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $p) {
                 $items = getControlPdo()->prepare("SELECT label, value FROM plan_items WHERE plan_id = ? ORDER BY sort_order, id");
                 $items->execute([(int)$p['id']]);
-                $out[] = ['plan_key' => $p['plan_key'], 'name' => $p['name'], 'max_users' => $p['max_users'] !== null ? (int)$p['max_users'] : null,
+                // Same module list registration shows and applyPlanToTenant() turns on.
+                $modules = [];
+                foreach (planNormalizeFeaturesForProduct(planFeatureKeys((int)$p['id']), $p['product_key']) as $fk) {
+                    if (isset($registry[$fk])) $modules[] = (string)$registry[$fk]['label'];
+                }
+                sort($modules);
+                $out[] = ['plan_key' => $p['plan_key'], 'name' => $p['name'], 'tagline' => $p['tagline'] !== null ? (string)$p['tagline'] : null,
+                          'max_users' => $p['max_users'] !== null ? (int)$p['max_users'] : null,
                           'max_shops' => $p['max_shops'] !== null ? (int)$p['max_shops'] : null, 'is_popular' => (int)$p['is_popular'] === 1,
-                          'items' => $items->fetchAll(PDO::FETCH_ASSOC)];
+                          'modules' => $modules, 'items' => $items->fetchAll(PDO::FETCH_ASSOC)];
             }
         } catch (Throwable $e) {
             error_log('pgPlanSummaries: ' . $e->getMessage());
@@ -334,7 +342,7 @@ if (!function_exists('pgRequestQuote')) {
                                         notes, terms_conditions, status, is_quote, quote_valid_until, created_at)
                 VALUES (?, ?, CURDATE(), 0, 'TZS', '', ?, ?, ?, 0, 0, ?, ?, ?, '', 'pending', 1, DATE_ADD(CURDATE(), INTERVAL 14 DAY), NOW())
             ")->execute([$number, $cid, $ref, $price, $tax, $price + $tax, array_sum(array_column($lines, 0)),
-                'Requested by ' . $tenant['company_name'] . ' (' . $tenant['subdomain'] . ') through Billing.']);
+                'Requested by ' . $tenant['company_name'] . ' (' . $tenant['subdomain'] . ') through Subscription.']);
             $qid = (int)$pdo->lastInsertId();
             $ins = $pdo->prepare("INSERT INTO quotation_items (order_id, product_id, product_name, sku, quantity, unit, unit_price, tax_rate,
                                                               discount_percent, line_total, description, created_at)
@@ -359,7 +367,7 @@ if (!function_exists('pgRequestQuote')) {
                     'title' => 'Subscription request: ' . $tenant['company_name'],
                     'message' => $tenant['company_name'] . " ({$tenant['subdomain']}) chose {$term['term_label']}"
                         . ($extraLines ? ' + ' . implode(', ', array_map(fn($x) => "{$x['qty']} × {$x['name']}", $extraLines)) : '')
-                        . " — quotation $number, " . number_format($price + $tax) . ' TZS, waiting for review. Once approved they see it under Billing.',
+                        . " — quotation $number, " . number_format($price + $tax) . ' TZS, waiting for review. Once approved they see it under Subscription.',
                     'entity_type' => 'quotation', 'entity_id' => $qid, 'customer_id' => $cid,
                     'action_url' => (function_exists('getUrl') ? getUrl('quotation_view') : '') . '?id=' . $qid,
                     'dedupe_suffix' => (string)$qid,
@@ -371,6 +379,6 @@ if (!function_exists('pgRequestQuote')) {
 
         // No view link yet: the company sees the quotation once BJP approves it.
         return ['success' => true, 'quotation_number' => $number, 'total' => $price + $tax, 'term_label' => $term['term_label'], 'status' => 'waiting',
-                'message' => "Request sent for {$term['term_label']}. BJP will review it — the quotation appears under Billing as soon as it is approved."];
+                'message' => "Request sent for {$term['term_label']}. BJP will review it — the quotation appears under Subscription as soon as it is approved."];
     }
 }

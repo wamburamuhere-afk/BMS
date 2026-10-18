@@ -44,22 +44,15 @@ $tr = $pageLang === 'sw' ? [
     'modal_continue'    => 'Endelea Kujisajili',
     'lang_label'        => 'Lugha',
     'modal_tagline'     => 'Simamia Duka Lako kwa Urahisi na Ufanisi',
-    'modal_desc'        => '<strong>Simple POS</strong> ni mfumo wetu wa kisasa wa kusimamia mauzo ya duka lako. Fuatilia bidhaa, mauzo, na hali ya duka lako lote mahali pamoja — haraka, rahisi, na salama. Jiunga leo na maelfu ya wafanyabiashara wanaotumia mfumo huu kukua kila siku!',
+    'modal_desc'        => '<strong>Smart POS</strong> ni mfumo wetu wa kisasa wa kusimamia mauzo ya duka lako. Fuatilia bidhaa, mauzo, na hali ya duka lako lote mahali pamoja — haraka, rahisi, na salama. Jiunga leo na maelfu ya wafanyabiashara wanaotumia mfumo huu kukua kila siku!',
     'modal_trial_title' => 'Siku 14 Bure — Bila Malipo!',
     'modal_trial_body'  => 'Unapojisajili, utakuwa na siku <strong>14 za majaribio bure</strong>. Baada ya hapo, chagua mpango unaokufaa ili kuendelea kutumia mfumo.',
     'modal_plans'       => 'MIPANGO YA BEI',
-    'plan_1m'           => 'Mwezi 1',
-    'plan_3m'           => 'Miezi 3',
-    'plan_6m'           => 'Miezi 6',
-    'plan_1y'           => 'Mwaka 1',
-    'per_month'         => '/mwezi',
-    'save_17'           => 'Akiba 17%',
-    'save_25'           => 'Akiba 25%',
-    'save_29'           => 'Akiba 29%',
-    'popular'           => 'MAARUFU',
-    'best'              => 'BORA ZAIDI',
+    'pm_soon_title'     => 'Bei zinaandaliwa',
+    'pm_soon_body'      => 'Mipango yetu ya bei inasasishwa. Unaweza kujisajili sasa na kuanza majaribio ya bure — tutakujulisha bei pindi zikiwa tayari.',
+    'pm_modules'        => 'Moduli %d',
     'note_label'        => 'Kumbuka:',
-    'note_body'         => 'Mipango yote hapo juu ni kwa <strong>duka moja (1)</strong> na <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi, wasiliana nasi:',
+    'note_body'         => 'Kwa bei, maduka zaidi au watumiaji zaidi, wasiliana nasi:',
     'contact_us'        => 'wasiliana nasi',
     'pm_choose'         => 'CHAGUA MPANGO — MAJARIBIO YAKO YA BURE YANAANZA NAO',
     'pm_popular'        => 'MAARUFU ZAIDI',
@@ -95,22 +88,15 @@ $tr = $pageLang === 'sw' ? [
     'modal_continue'    => 'Continue to Register',
     'lang_label'        => 'Language',
     'modal_tagline'     => 'Manage Your Shop with Ease and Efficiency',
-    'modal_desc'        => '<strong>Simple POS</strong> is our modern system for managing your shop\'s sales. Track products, sales, and your shop\'s status all in one place — fast, easy, and secure. Join thousands of business owners growing with this system every day!',
+    'modal_desc'        => '<strong>Smart POS</strong> is our modern system for managing your shop\'s sales. Track products, sales, and your shop\'s status all in one place — fast, easy, and secure. Join thousands of business owners growing with this system every day!',
     'modal_trial_title' => '14 Days Free — No Payment Required!',
     'modal_trial_body'  => 'When you register, you get <strong>14 free trial days</strong>. After that, choose the plan that suits you to keep using the system.',
     'modal_plans'       => 'PRICING PLANS',
-    'plan_1m'           => '1 Month',
-    'plan_3m'           => '3 Months',
-    'plan_6m'           => '6 Months',
-    'plan_1y'           => '1 Year',
-    'per_month'         => '/month',
-    'save_17'           => 'Save 17%',
-    'save_25'           => 'Save 25%',
-    'save_29'           => 'Save 29%',
-    'popular'           => 'POPULAR',
-    'best'              => 'BEST VALUE',
+    'pm_soon_title'     => 'Pricing is being prepared',
+    'pm_soon_body'      => 'Our plans are being updated. You can register now and start your free trial — we will share pricing as soon as it is ready.',
+    'pm_modules'        => '%d modules',
     'note_label'        => 'Note:',
-    'note_body'         => 'All plans above are for <strong>one shop (1)</strong> and <strong>two users (2)</strong> only. For more shops or more users, contact us:',
+    'note_body'         => 'For pricing, more shops or more users, contact us:',
     'contact_us'        => 'contact us',
     'pm_choose'         => 'CHOOSE A PLAN — YOUR FREE TRIAL STARTS ON IT',
     'pm_popular'        => 'MOST POPULAR',
@@ -166,7 +152,12 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
     try {
         require_once __DIR__ . '/core/tenant_registration.php';
         if (selfRegistrationOpen()) {
-            foreach (listPublicOffers(null, true) as $__prod) foreach ($__prod['plans'] as $__p) $pmPlans[] = $__p;
+            $__offers = listPublicOffers(null, true);
+            foreach ($__offers as $__prod) foreach ($__prod['plans'] as $__p) {
+                // Product name on the card only when more than one product is offered.
+                $__p['_product'] = count($__offers) > 1 ? $__prod['name'] : null;
+                $pmPlans[] = $__p;
+            }
         }
     } catch (Throwable $__e) {
         error_log('login.php plan cards: ' . $__e->getMessage());
@@ -450,7 +441,7 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
           <div class="pm-name-group">
             <h5 class="fw-bold mb-0 pm-company-name" style="color:#2c3e50;"><?= htmlspecialchars($company_name) ?></h5>
             <span class="badge rounded-pill mt-1 pm-pos-badge" style="background:#e8f4fd;color:#2980b9;font-size:.75rem;font-weight:600;">
-              <i class="fas fa-store me-1"></i>Simple POS
+              <i class="fas fa-store me-1"></i>Smart POS
             </span>
           </div>
         </div>
@@ -506,6 +497,7 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
                       style="background:#1abc9c;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['pm_popular']) ?></span>
               <?php endif; ?>
               <i class="fas fa-check-circle text-primary position-absolute top-0 end-0 m-2 pm-check d-none"></i>
+              <?php if (!empty($p['_product'])): ?><div class="mt-1"><span class="badge rounded-pill" style="background:#cfe2ff;color:#084298;font-size:.65rem;"><?= htmlspecialchars($p['_product']) ?></span></div><?php endif; ?>
               <div class="fw-bold pm-card-name mt-1" style="color:#2c3e50;"><?= htmlspecialchars($p['name']) ?></div>
               <?php if ($p['tagline']): ?><div class="small text-muted"><?= htmlspecialchars($p['tagline']) ?></div><?php endif; ?>
               <div class="my-2 pm-card-price-wrap">
@@ -516,6 +508,9 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
               <ul class="list-unstyled small text-start mt-2 mb-0 mx-auto" style="max-width:220px;color:#555;">
                 <li><i class="fas fa-store me-2 text-primary"></i><?= htmlspecialchars($pmLimit($p['max_shops'], 'pm_shop_1', 'pm_shops', 'pm_shops_unl')) ?></li>
                 <li><i class="fas fa-user me-2 text-primary"></i><?= htmlspecialchars($pmLimit($p['max_users'], 'pm_user_1', 'pm_users', 'pm_users_unl')) ?></li>
+                <?php if ($p['modules']): ?>
+                  <li title="<?= htmlspecialchars(implode(', ', $p['modules'])) ?>"><i class="fas fa-th-large me-2 text-primary"></i><?= htmlspecialchars(sprintf($tr['pm_modules'], count($p['modules']))) ?></li>
+                <?php endif; ?>
                 <?php foreach ($p['items'] as $it): ?>
                   <li><i class="fas fa-check me-2 text-success"></i><?= htmlspecialchars($it['label'] . ($it['value'] !== null && $it['value'] !== '' ? ': ' . $it['value'] : '')) ?></li>
                 <?php endforeach; ?>
@@ -525,61 +520,12 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
           <?php endforeach; ?>
         </div>
         <?php else: ?>
+        <?php /* Nothing on sale yet: never invent prices — say so and point to contact. */ ?>
         <h6 class="text-center fw-semibold mb-3 pm-plans-label" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['modal_plans']) ?></h6>
-        <div class="row g-3 mb-3 pm-cards-row">
-
-          <div class="col-6 col-md-3">
-            <div class="pricing-card text-center p-3 h-100 rounded-3 border" style="border-color:#dee2e6!important;">
-              <div class="mb-2 pm-card-icon-wrap"><i class="fas fa-calendar-day pm-card-icon" style="font-size:1.6rem;color:#3498db;"></i></div>
-              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1m']) ?></div>
-              <div class="my-2 pm-card-price-wrap">
-                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">10,000</span>
-                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
-              </div>
-              <div class="pm-price-per" style="font-size:.75rem;color:#888;"><?= htmlspecialchars($tr['per_month']) ?></div>
-            </div>
-          </div>
-
-          <div class="col-6 col-md-3">
-            <div class="pricing-card text-center p-3 h-100 rounded-3 border" style="border-color:#dee2e6!important;">
-              <div class="mb-2 pm-card-icon-wrap"><i class="fas fa-calendar-week pm-card-icon" style="font-size:1.6rem;color:#9b59b6;"></i></div>
-              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_3m']) ?></div>
-              <div class="my-2 pm-card-price-wrap">
-                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">25,000</span>
-                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
-              </div>
-              <div class="badge rounded-pill pm-save-badge" style="background:#f0e6ff;color:#9b59b6;font-size:.7rem;"><?= htmlspecialchars($tr['save_17']) ?></div>
-            </div>
-          </div>
-
-          <div class="col-6 col-md-3">
-            <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative" style="border-color:#1abc9c!important;">
-              <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
-                    style="background:#1abc9c;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['popular']) ?></span>
-              <div class="mb-2 mt-1 pm-card-icon-wrap"><i class="fas fa-calendar-alt pm-card-icon" style="font-size:1.6rem;color:#1abc9c;"></i></div>
-              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_6m']) ?></div>
-              <div class="my-2 pm-card-price-wrap">
-                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">45,000</span>
-                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
-              </div>
-              <div class="badge rounded-pill pm-save-badge" style="background:#e6faf5;color:#1abc9c;font-size:.7rem;"><?= htmlspecialchars($tr['save_25']) ?></div>
-            </div>
-          </div>
-
-          <div class="col-6 col-md-3">
-            <div class="pricing-card text-center p-3 h-100 rounded-3 border position-relative" style="border-color:#f39c12!important;">
-              <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
-                    style="background:#f39c12;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['best']) ?></span>
-              <div class="mb-2 mt-1 pm-card-icon-wrap"><i class="fas fa-crown pm-card-icon" style="font-size:1.6rem;color:#f39c12;"></i></div>
-              <div class="fw-bold pm-card-name" style="color:#2c3e50;"><?= htmlspecialchars($tr['plan_1y']) ?></div>
-              <div class="my-2 pm-card-price-wrap">
-                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">85,000</span>
-                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
-              </div>
-              <div class="badge rounded-pill pm-save-badge" style="background:#fff8e6;color:#f39c12;font-size:.7rem;"><?= htmlspecialchars($tr['save_29']) ?></div>
-            </div>
-          </div>
-
+        <div class="text-center rounded-3 border p-4 mb-3 pm-soon" style="border-color:#b6ccfe!important;background:#f5f9ff;">
+          <i class="fas fa-tags mb-2 d-block" style="font-size:1.8rem;color:#0d6efd;"></i>
+          <div class="fw-bold mb-1" style="color:#2c3e50;"><?= htmlspecialchars($tr['pm_soon_title']) ?></div>
+          <div class="small text-muted mx-auto" style="max-width:420px;"><?= htmlspecialchars($tr['pm_soon_body']) ?></div>
         </div>
         <?php endif; // $pmPlans ?>
 
