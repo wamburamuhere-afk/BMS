@@ -650,16 +650,29 @@ if (!function_exists('sptEnsurePlanLineColumns')) {
             'addon_quota'   => "ADD COLUMN `addon_quota` VARCHAR(20) NULL DEFAULT NULL",
             'addon_units'   => "ADD COLUMN `addon_units` INT NULL DEFAULT NULL",
         ];
+        // One ALTER per table (not per column): each ALTER can rebuild the table,
+        // and 18 rebuilds per tenant DB pushed the deploy past its SSH timeout.
+        // INSTANT makes it a metadata-only change where MySQL supports it.
         foreach (array_keys(SPT_LINE_TABLES) as $t) {
             if (!$pdo->query("SHOW TABLES LIKE " . $pdo->quote($t))->fetch()) continue;
+            $missing = [];
             foreach ($cols as $c => $ddl) {
-                if ($pdo->query("SHOW COLUMNS FROM `$t` LIKE " . $pdo->quote($c))->fetch()) continue;
+                if (!$pdo->query("SHOW COLUMNS FROM `$t` LIKE " . $pdo->quote($c))->fetch()) $missing[$c] = $ddl;
+            }
+            if (!$missing) continue;
+            $sql = "ALTER TABLE `$t` " . implode(', ', $missing);
+            try {
                 try {
-                    $pdo->exec("ALTER TABLE `$t` $ddl");
-                    echo "  + $t.$c added\n";
+                    $pdo->exec("$sql, ALGORITHM=INSTANT");
                 } catch (PDOException $e) {
-                    if ((int)($e->errorInfo[1] ?? 0) !== 1060) throw $e;   // a concurrent run added it
+                    if ((int)($e->errorInfo[1] ?? 0) === 1060) throw $e;
+                    $pdo->exec($sql);                                    // INSTANT not supported here
                 }
+                echo "  + $t: " . implode(', ', array_keys($missing)) . " added\n";
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1060) throw $e;   // a concurrent run added one
+                sptEnsurePlanLineColumns($pdo);                          // add whatever is still missing
+                return;
             }
         }
     }
