@@ -7,7 +7,7 @@
  *
  * Proves:
  *   1. with no public plan on offer, everything behaves as before (no plan,
- *      fallback cards on login.php, no picker on register.php)
+ *      a "pricing is being prepared" box on login.php, no picker on register.php)
  *   2. api/platform/public_offers.php lists only sellable plans, no internal
  *      ids, and answers 404 on a tenant's own address
  *   3. registrationPlanChoice(): default, valid, forged, retired, private and
@@ -167,7 +167,8 @@ try {
         $j = json_decode(hit('GET', 'bms.local', 'api/platform/public_offers.php'), true);
         ok('endpoint answers success with an empty product list', ($j['success'] ?? null) === true && ($j['products'] ?? null) === []);
         $html = renderPage('login.php', 'bms.local');
-        ok('login.php shows the old static pricing cards', !str_contains($html, 'id="pmPlans"') && str_contains($html, 'pricingModal'));
+        ok('login.php shows "pricing is being prepared", never invented prices', !str_contains($html, 'id="pmPlans"') && str_contains($html, 'pricingModal')
+           && str_contains($html, 'pm-soon') && !str_contains($html, '85,000'));
         ok('login.php emits no plan-picker script', !str_contains($html, '#pmPlans .pm-plan'));
         $err = inlineJsError($html);
         ok('login.php inline JS parses (no offers)', $err === '', $err);

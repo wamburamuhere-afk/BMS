@@ -84,6 +84,23 @@ if ($action === 'create' || $action === 'update') {
     exit;
 }
 
+if ($action === 'save_product') {
+    $r = updatePlatformProduct((string)($_POST['product_key'] ?? ''), [
+        'name'                 => (string)($_POST['name'] ?? ''),
+        'description'          => (string)($_POST['description'] ?? ''),
+        'sort_order'           => (int)($_POST['sort_order'] ?? 0),
+        'show_on_registration' => (string)($_POST['show_on_registration'] ?? '') === '1',
+        'is_active'            => (string)($_POST['is_active'] ?? '') === '1',
+    ]);
+    if (!$r['ok']) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => $r['error']]);
+        exit;
+    }
+    echo json_encode(['success' => true, 'message' => 'Product saved.']);
+    exit;
+}
+
 if ($action === 'toggle_active') {
     $id     = (int)($_POST['id'] ?? 0);
     $active = (string)($_POST['active'] ?? '') === '1';

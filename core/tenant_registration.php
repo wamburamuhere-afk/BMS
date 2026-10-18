@@ -446,7 +446,8 @@ if (!function_exists('finishSelfRegistration')) {
         }
 
         // The chosen plan decides the modules and limits (after the defaults,
-        // so it wins). Simple/Shop Mode and supplier access stay as set above.
+        // so it wins). Its product then sets the modes (platformProductProfile()):
+        // Smart POS keeps the shop defaults above, Smart BMS turns them off.
         if ($choice && !empty($choice['plan'])) {
             $ar = applyPlanToTenant($tenantId, (int)$choice['plan']['id']);
             if (!$ar['ok']) {

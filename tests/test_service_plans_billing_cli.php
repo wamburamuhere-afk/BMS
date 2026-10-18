@@ -357,7 +357,7 @@ $room    = ['id' => $tid, 'max_shops' => $active + 1] + $atLimit;
 $whStatus = fn() => $pdo->query("SELECT status FROM warehouses WHERE warehouse_id = $wh")->fetchColumn();
 $c->exec("DELETE FROM tenant_addon_grants WHERE tenant_id = $tid");
 $r = call('ajax_toggle_warehouse_status.php', ['warehouse_id' => $wh, 'new_status' => 'active', 'csrf_token' => 'tok'], false, $atLimit);
-ok(empty($r['success']) && stripos($r['message'] ?? '', 'Billing') !== false && $whStatus() === 'inactive', 'web toggle at the limit refused: ' . ($r['message'] ?? ''));
+ok(empty($r['success']) && stripos($r['message'] ?? '', 'Subscription') !== false && $whStatus() === 'inactive', 'web toggle at the limit refused: ' . ($r['message'] ?? ''));
 $r = call('api/mobile/warehouses/update.php', ['warehouse_id' => $wh, 'warehouse_name' => 'SPB-TEST Shop', 'status' => 'active'], false, $atLimit);
 ok(empty($r['success']) && ($r['code'] ?? '') === 'shop_limit_reached' && $whStatus() === 'inactive', 'mobile update to active refused (shop_limit_reached)');
 $n = (int)$pdo->query("SELECT COUNT(*) FROM warehouses")->fetchColumn();

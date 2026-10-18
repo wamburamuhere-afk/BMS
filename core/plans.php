@@ -167,6 +167,108 @@ if (!function_exists('listPlatformProducts')) {
     }
 }
 
+if (!function_exists('getPlatformProduct')) {
+    function getPlatformProduct(string $productKey): ?array
+    {
+        if ($productKey === '' || !planCatalogReady()) return null;
+        $st = getControlPdo()->prepare("SELECT * FROM platform_products WHERE product_key = ? LIMIT 1");
+        $st->execute([$productKey]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+}
+
+if (!function_exists('updatePlatformProduct')) {
+    /**
+     * Superadmin edits a product's public face: name, description, whether its
+     * plans appear on the registration page, order, active. The product_key —
+     * and so what the product DOES (platformProductProfile()) — never changes.
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function updatePlatformProduct(string $productKey, array $in): array
+    {
+        $prod = getPlatformProduct($productKey);
+        if (!$prod) return ['ok' => false, 'error' => 'No such product.'];
+        $name = trim((string)($in['name'] ?? ''));
+        $desc = trim((string)($in['description'] ?? ''));
+        if ($name === '' || mb_strlen($name) > 100) return ['ok' => false, 'error' => 'Product name is required (100 characters at most).'];
+        if (mb_strlen($desc) > 255) return ['ok' => false, 'error' => 'Description is 255 characters at most.'];
+        $sort = max(0, min(9999, (int)($in['sort_order'] ?? $prod['sort_order'])));
+        $show = !empty($in['show_on_registration']) ? 1 : 0;
+        $act  = !empty($in['is_active']) ? 1 : 0;
+        getControlPdo()->prepare("UPDATE platform_products SET name = ?, description = ?, show_on_registration = ?, sort_order = ?, is_active = ?
+                                   WHERE product_key = ?")
+            ->execute([$name, $desc !== '' ? $desc : null, $show, $sort, $act, $productKey]);
+        logTenantAdminAction(null, null, 'product_update', "$name ($productKey): registration " . ($show ? 'shown' : 'hidden') . ', ' . ($act ? 'active' : 'inactive'));
+        return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('platformProductProfile')) {
+    /**
+     * What a product means for a tenant — fixed in code by product_key, so a
+     * rename never changes behaviour.
+     *   bms_shop (Smart POS): the plan's own module ticks; Simple Mode on and
+     *       locked, Shop wording on, Supplier Access on — the self-registration
+     *       starting point.
+     *   bms_full (Smart BMS): every module that is on by default for a new
+     *       company is always included; Simple Mode off (unlocked), Shop
+     *       wording off. Off-by-default extras stay the plan's choice.
+     * Null product (older plans) = nothing beyond the plan's own modules.
+     *
+     * @return array{forced_features:string[], simple_mode:?bool, simple_locked:bool, shop_mode:?bool, supplier_access:?bool}
+     */
+    function platformProductProfile(?string $productKey): array
+    {
+        $none = ['forced_features' => [], 'simple_mode' => null, 'simple_locked' => false, 'shop_mode' => null, 'supplier_access' => null];
+        if ($productKey === 'bms_shop') {
+            return ['forced_features' => [], 'simple_mode' => true, 'simple_locked' => true, 'shop_mode' => true, 'supplier_access' => true];
+        }
+        if ($productKey === 'bms_full') {
+            return ['forced_features' => planDefaultOnFeatures(), 'simple_mode' => false, 'simple_locked' => false, 'shop_mode' => false, 'supplier_access' => null];
+        }
+        return $none;
+    }
+}
+
+if (!function_exists('planDefaultOnFeatures')) {
+    /**
+     * Modules a brand-new company gets by default: the control catalogue's
+     * default_enabled (an operator's edits win), falling back to the code
+     * registry's own default. Unavailable (retired) modules never count.
+     */
+    function planDefaultOnFeatures(): array
+    {
+        $registry = bmsFeatureRegistry();
+        $rows = [];
+        try {
+            foreach (getControlPdo()->query("SELECT feature_key, is_available, default_enabled FROM features")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $rows[(string)$r['feature_key']] = $r;
+            }
+        } catch (Throwable $e) {
+            $rows = [];
+        }
+        $out = [];
+        foreach ($registry as $key => $def) {
+            if (isset($rows[$key])) {
+                if ((int)$rows[$key]['is_available'] === 1 && (int)$rows[$key]['default_enabled'] === 1) $out[] = $key;
+            } elseif (!empty($def['default'])) {
+                $out[] = $key;
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('planNormalizeFeaturesForProduct')) {
+    /** A plan's module list as its product requires it (Smart BMS always carries the default-on set). */
+    function planNormalizeFeaturesForProduct(array $features, ?string $productKey): array
+    {
+        $forced = platformProductProfile($productKey)['forced_features'];
+        return array_values(array_unique(array_merge($features, $forced)));
+    }
+}
+
 if (!function_exists('planTermMonths')) {
     /** A term's length in months: 6 month → 6, 1 year → 12. */
     function planTermMonths(int $value, string $unit): int
@@ -531,7 +633,9 @@ if (!function_exists('planOfferShape')) {
     {
         $registry = bmsFeatureRegistry();
         $modules = [];
-        foreach (planFeatureKeys((int)$plan['id']) as $fk) if (isset($registry[$fk])) $modules[] = (string)$registry[$fk]['label'];
+        // Same list applyPlanToTenant() turns on — what is shown is what is given.
+        $keys = planNormalizeFeaturesForProduct(planFeatureKeys((int)$plan['id']), $plan['product_key'] ?? null);
+        foreach ($keys as $fk) if (isset($registry[$fk])) $modules[] = (string)$registry[$fk]['label'];
         sort($modules);
 
         $prices = []; $idToTerm = [];
@@ -678,6 +782,7 @@ if (!function_exists('createPlan')) {
             // A): a plan checking 'sales' alone silently gains 'warehouses' too —
             // matches applyPlanToTenant()/setTenantFeatures() auto-including the
             // same way, so a plan can never itself represent a broken combination.
+            $features  = planNormalizeFeaturesForProduct($features, $cat['fields']['product_key'] ?? null);
             $features  = featureDependencyClosure($features);
             if ($features) {
                 $ins = $pdo->prepare("INSERT IGNORE INTO plan_features (plan_id, feature_key) VALUES (?,?)");
@@ -736,6 +841,8 @@ if (!function_exists('updatePlan')) {
             // A): a plan checking 'sales' alone silently gains 'warehouses' too —
             // matches applyPlanToTenant()/setTenantFeatures() auto-including the
             // same way, so a plan can never itself represent a broken combination.
+            $pkAfter   = ($cat && array_key_exists('product_key', $cat['fields'])) ? $cat['fields']['product_key'] : ($plan['product_key'] ?? null);
+            $features  = planNormalizeFeaturesForProduct($features, $pkAfter);
             $features  = featureDependencyClosure($features);
             $pdo->prepare("DELETE FROM plan_features WHERE plan_id = ?")->execute([$id]);
             if ($features) {
@@ -743,10 +850,7 @@ if (!function_exists('updatePlan')) {
                 foreach ($features as $fk) $ins->execute([$id, $fk]);
             }
 
-            if ($cat) {
-                $pkAfter = array_key_exists('product_key', $cat['fields']) ? $cat['fields']['product_key'] : ($plan['product_key'] ?? null);
-                planCatalogSave($pdo, $id, $cat, $pkAfter);
-            }
+            if ($cat) planCatalogSave($pdo, $id, $cat, $pkAfter);
             if ($ownTx) $pdo->commit();
         } catch (Throwable $e) {
             if ($ownTx && $pdo->inTransaction()) $pdo->rollBack();
@@ -806,7 +910,10 @@ if (!function_exists('applyPlanToTenant')) {
             return ['ok' => false, 'error' => 'This tenant has been deleted.', 'features_changed' => 0, 'quotas_changed' => false];
         }
 
-        $planFeatures = planFeatureKeys($planId);
+        // The product decides the rest (platformProductProfile()); applied here
+        // too so a plan saved before that rule still lands correctly.
+        $profile = platformProductProfile($plan['product_key'] ?? null);
+        $planFeatures = featureDependencyClosure(planNormalizeFeaturesForProduct(planFeatureKeys($planId), $plan['product_key'] ?? null));
         $desired = [];
         foreach (array_keys(bmsFeatureRegistry()) as $key) {
             $desired[$key] = in_array($key, $planFeatures, true);
@@ -832,9 +939,26 @@ if (!function_exists('applyPlanToTenant')) {
         // Whatever is applied now wins over a plan change that was waiting.
         planClearSchedule($tenantId);
 
+        // Modes — best-effort: the modules and limits above already stand, and
+        // a superadmin can set a mode by hand from the tenant panel.
+        $modeNotes = [];
+        if ($profile['simple_mode'] !== null) {
+            $r = setTenantPosSimpleMode($tenantId, $profile['simple_mode'], $profile['simple_locked']);
+            $modeNotes[] = 'Simple Mode ' . ($profile['simple_mode'] ? 'on' : 'off') . ($r['ok'] ? '' : ' (failed)');
+        }
+        if ($profile['shop_mode'] !== null) {
+            $r = setTenantShopMode($tenantId, $profile['shop_mode']);
+            $modeNotes[] = 'Shop wording ' . ($profile['shop_mode'] ? 'on' : 'off') . ($r['ok'] ? '' : ' (failed)');
+        }
+        if ($profile['supplier_access'] !== null) {
+            $r = setTenantSupplierAccess($tenantId, $profile['supplier_access'], false);
+            $modeNotes[] = 'Supplier Access ' . ($profile['supplier_access'] ? 'on' : 'off') . ($r['ok'] ? '' : ' (failed)');
+        }
+
         logTenantAdminAction($tenantId, $t['subdomain'], 'apply_plan',
             $plan['name'] . ' — ' . $fr['changed'] . ' feature change(s), quotas '
-            . ($qr['changed'] ? 'updated' : 'unchanged'));
+            . ($qr['changed'] ? 'updated' : 'unchanged')
+            . ($modeNotes ? '; ' . implode(', ', $modeNotes) : ''));
 
         return ['ok' => true, 'error' => null, 'features_changed' => $fr['changed'], 'quotas_changed' => $qr['changed']];
     }
