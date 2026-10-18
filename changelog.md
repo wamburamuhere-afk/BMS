@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-18 — fix(plans): main-database mirror of the service plans migration
+
+**Files:** `migrations/2026_10_18_service_plans_legacy_db.php` (new), `tests/test_legacy_migration_mirrors_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`
+
+- **The bug:** on the root install (BJP's books on bms and demo, which run on the main database), linking a service to a platform product failed with "Linking a service to a platform product is not available yet — the database update has not run".
+- **Why:** `migrations/tenant/2026_10_17_service_plans.php` only reached company databases. Its main-database mirror was missing, so the root never got:
+  - `service_plans`
+  - `service_plan_items`
+  - `service_price_terms.plan_id`
+  - `vendor_subscription_services.platform_product_key`
+- **Fix:** the mirror runs the same idempotent `spEnsureSchema()`. I checked it on a fresh database that had none of these: all four are added.
+- **New guard test:** every tenant migration from 2026-10-13 onwards must have a `_legacy_db` mirror, or state `legacy-mirror: not needed`. 14/14 pass, and the test runs in CI.
+
 ## 2026-10-18 — fix(deploy): tenant migrations no longer time out the deploy; deploy can be re-run without SSH
 
 **Files:** `core/service_price_terms.php`, `.github/workflows/deploy.yml`, `tests/test_plan_line_columns_fast_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`
