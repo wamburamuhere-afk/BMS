@@ -522,7 +522,7 @@ $company_logo = getSetting('company_logo', '');
                                     <tr>
                                         <td class="ps-4"><?= $i + 1 ?></td>
                                         <td class="fw-bold">
-                                            <?= safe_output($pt['term_label']) ?>
+                                            <?= safe_output($pt['display_label'] ?? $pt['term_label']) ?>
                                             <?php if ((int)$pt['is_default'] === 1): ?>
                                             <span class="badge rounded-pill ms-1" style="background:#0d6efd;color:#fff;"><?= t('Default') ?></span>
                                             <?php endif; ?>

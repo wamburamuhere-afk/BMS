@@ -80,6 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($project_id !== null && !userCan('project', (int)$project_id)) {
             $errors[] = "Access denied: that project is not in your assigned scope.";
         }
+        // The plan's shop limit (+ extra shops bought) — service_plans_plan.md Phase 5.
+        if ($status === 'active' && function_exists('tenantCanActivateShop') && !tenantCanActivateShop($pdo)) {
+            $errors[] = tenantShopLimitMessage();
+        }
 
         if (empty($errors)) {
             try {
@@ -268,6 +272,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($project_id !== null && !userCan('project', (int)$project_id)) {
             $errors[] = "Access denied: that project is not in your assigned scope.";
         }
+        if ($status === 'active' && function_exists('tenantCanActivateShop') && !tenantCanActivateShop($pdo, (int)$warehouse_id)) {
+            $errors[] = tenantShopLimitMessage();
+        }
         // Note: deliberately NOT also gating on userCan('warehouse', ...) here —
         // a legacy (not-yet-explicitly-assigned) user's derived warehouse list
         // only includes warehouses that already have transaction history, so a
@@ -378,6 +385,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ts_current_project !== false && $ts_current_project !== null
             && !userCan('project', (int)$ts_current_project)) {
             $_SESSION['error'] = [isShopLabel() ? 'Access denied: this shop belongs to a project not in your scope.' : 'Access denied: this warehouse belongs to a project not in your scope.'];
+            header("Location: warehouses.php");
+            exit();
+        }
+        if ($new_status === 'active' && function_exists('tenantCanActivateShop') && !tenantCanActivateShop($pdo, $warehouse_id)) {
+            $_SESSION['error'] = [tenantShopLimitMessage()];
             header("Location: warehouses.php");
             exit();
         }

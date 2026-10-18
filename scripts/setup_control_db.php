@@ -662,6 +662,192 @@ try {
         say('  + tenants index on vendor_customer_id added');
     }
 
+    // ── Service plans (service_plans_plan.md Phase 1) ───────────────────────
+    // What BJP sells: a platform PRODUCT (Shop Mode, full BMS) has public
+    // PLANS, each with PRICES per term, extra "what's included" lines, and
+    // ADD-ONS (extra shop / extra user) priced per unit per term. Superadmin
+    // is the master; BJP's own books only read these (D1). Prices are never
+    // hard-deleted — issued quotations/invoices snapshot them, and a retired
+    // price must keep resolving.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`platform_products` (
+            `product_key`          VARCHAR(32)  NOT NULL,
+            `name`                 VARCHAR(100) NOT NULL,
+            `description`          VARCHAR(255) NULL,
+            `show_on_registration` TINYINT(1)   NOT NULL DEFAULT 0,
+            `sort_order`           INT          NOT NULL DEFAULT 0,
+            `is_active`            TINYINT(1)   NOT NULL DEFAULT 1,
+            `created_at`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`product_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    // INSERT IGNORE: an operator's own edits (name, registration switch) are
+    // never overwritten. No plans are seeded — the owner types the real ones.
+    $admin->exec("
+        INSERT IGNORE INTO `{$controlDb}`.`platform_products`
+            (`product_key`, `name`, `description`, `show_on_registration`, `sort_order`)
+        VALUES ('bms_shop', 'BMS Shop Mode', 'Point of sale, stock and simple shop management.', 0, 1),
+               ('bms_full', 'BMS Full', 'The complete business management system.', 0, 2)
+    ");
+    say('  · table platform_products ready (bms_shop, bms_full)');
+
+    $plCols = $admin->query("
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'plans'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ([
+        'product_key' => "ADD COLUMN `product_key` VARCHAR(32) NULL AFTER `plan_key`",
+        'tagline'     => "ADD COLUMN `tagline` VARCHAR(150) NULL AFTER `name`",
+        'max_shops'   => "ADD COLUMN `max_shops` INT NULL AFTER `max_storage_mb`",
+        // Offered to the public (registration page, tenant Billing page).
+        'is_public'   => "ADD COLUMN `is_public` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_active`",
+        'is_popular'  => "ADD COLUMN `is_popular` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_public`",
+        // Higher = bigger plan. Decides upgrade (apply now) vs downgrade (at period end).
+        'tier_rank'   => "ADD COLUMN `tier_rank` INT NOT NULL DEFAULT 0 AFTER `is_popular`",
+    ] as $col => $clause) {
+        if (!in_array($col, $plCols, true)) {
+            $admin->exec("ALTER TABLE `{$controlDb}`.`plans` {$clause}");
+            say("  + plans.{$col} added");
+        }
+    }
+
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`plan_prices` (
+            `id`             INT AUTO_INCREMENT PRIMARY KEY,
+            `plan_id`        INT          NOT NULL,
+            `term_label`     VARCHAR(60)  NOT NULL,
+            `duration_value` SMALLINT     NOT NULL,
+            `duration_unit`  ENUM('month','year') NOT NULL,
+            `price_tzs`      INT UNSIGNED NOT NULL,
+            `is_default`     TINYINT(1)   NOT NULL DEFAULT 0,
+            `is_active`      TINYINT(1)   NOT NULL DEFAULT 1,
+            `sort_order`     INT          NOT NULL DEFAULT 0,
+            `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `uq_plan_price_term` (`plan_id`, `duration_value`, `duration_unit`),
+            KEY `idx_plan_prices_plan` (`plan_id`, `is_active`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table plan_prices ready');
+
+    // Extra "what's included" lines. Modules, users, shops and storage are
+    // generated from the enforced fields — never typed here twice.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`plan_items` (
+            `id`         INT AUTO_INCREMENT PRIMARY KEY,
+            `plan_id`    INT          NOT NULL,
+            `label`      VARCHAR(100) NOT NULL,
+            `value`      VARCHAR(100) NULL,
+            `sort_order` INT          NOT NULL DEFAULT 0,
+            KEY `idx_plan_items_plan` (`plan_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table plan_items ready');
+
+    // Add-ons raise ONE enforced limit by `units` per quantity bought.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`plan_addons` (
+            `id`         INT AUTO_INCREMENT PRIMARY KEY,
+            `plan_id`    INT          NOT NULL,
+            `addon_key`  VARCHAR(64)  NOT NULL,
+            `name`       VARCHAR(100) NOT NULL,
+            `quota`      ENUM('max_shops','max_users') NOT NULL,
+            `units`      INT          NOT NULL DEFAULT 1,
+            `is_active`  TINYINT(1)   NOT NULL DEFAULT 1,
+            `sort_order` INT          NOT NULL DEFAULT 0,
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `uq_plan_addon_key` (`plan_id`, `addon_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    // An add-on's price for one of the plan's terms — keyed to the plan
+    // price, so an add-on line always follows (and locks to) the plan's term.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`plan_addon_prices` (
+            `addon_id`      INT          NOT NULL,
+            `plan_price_id` INT          NOT NULL,
+            `price_tzs`     INT UNSIGNED NOT NULL,
+            PRIMARY KEY (`addon_id`, `plan_price_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · tables plan_addons, plan_addon_prices ready');
+
+    $tCols2 = $admin->query("
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'tenants'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ([
+        // NULL = unlimited, same convention as max_users.
+        'max_shops'          => "ADD COLUMN `max_shops` INT NULL AFTER `max_storage_mb`",
+        // A paid downgrade waits for the end of the period already paid for (D5).
+        'scheduled_plan_key' => "ADD COLUMN `scheduled_plan_key` VARCHAR(64) NULL AFTER `plan`",
+        'scheduled_plan_at'  => "ADD COLUMN `scheduled_plan_at` DATE NULL AFTER `scheduled_plan_key`",
+        // The owner's real email (tenants.owner_email holds the login phone).
+        // Set by self-registration; one free trial per address (Phase 3).
+        'owner_contact_email' => "ADD COLUMN `owner_contact_email` VARCHAR(191) NULL AFTER `owner_email`",
+    ] as $col => $clause) {
+        if (!in_array($col, $tCols2, true)) {
+            $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
+            say("  + tenants.{$col} added");
+        }
+    }
+    $hasContactIdx = (int)$admin->query("
+        SELECT COUNT(*) FROM information_schema.statistics
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'tenants'
+          AND index_name = 'idx_tenants_contact_email'
+    ")->fetchColumn();
+    if (!$hasContactIdx) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` ADD KEY `idx_tenants_contact_email` (`owner_contact_email`)");
+        say('  + tenants.idx_tenants_contact_email added');
+    }
+
+    // Registration → "make this company a BJP customer" outbox (Phase 4).
+    // One row per tenant: re-queuing can never create a second customer.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`vendor_link_queue` (
+            `id`         INT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`  INT          NOT NULL,
+            `state`      ENUM('pending','done','needs_review','failed') NOT NULL DEFAULT 'pending',
+            `attempts`   INT          NOT NULL DEFAULT 0,
+            `message`    VARCHAR(500) NULL,
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `uq_vlq_tenant` (`tenant_id`),
+            KEY `idx_vlq_state` (`state`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table vendor_link_queue ready');
+
+    // Extra shops/users bought as add-on lines on a paid BJP invoice (Phase 5).
+    // Effective limit = tenants.max_X + SUM(units) of the grants active today;
+    // a grant lasts the plan period it was bought with (starts_at..ends_at).
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_addon_grants` (
+            `id`         INT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`  INT          NOT NULL,
+            `quota`      ENUM('max_shops','max_users') NOT NULL,
+            `units`      INT          NOT NULL,
+            `starts_at`  DATE         NOT NULL,
+            `ends_at`    DATE         NOT NULL,
+            `source_ref` VARCHAR(64)  NULL,
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_tag_tenant` (`tenant_id`, `quota`, `ends_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table tenant_addon_grants ready');
+
+    // A phone/email-only match is confirmed by a person, never auto-linked (D4).
+    $vbaKind = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'vendor_bridge_alerts' AND COLUMN_NAME = 'kind'
+    ")->fetchColumn();
+    if ($vbaKind !== false && strpos((string)$vbaKind, 'possible_match') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`vendor_bridge_alerts`
+            MODIFY COLUMN `kind` ENUM('no_term','not_linked','many_tenants','apply_failed','payment_voided','possible_match') NOT NULL");
+        say('  · vendor_bridge_alerts.kind ENUM expanded (possible_match added)');
+    }
+
     // Backfill trial_ends_at for existing rows that pre-date the column.
     // Uses created_at + 14 days as a proxy — safe to re-run (WHERE IS NULL).
     $admin->exec("
@@ -750,6 +936,22 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
     ");
     say('  · table registration_jobs ready');
+
+    // The plan the app user picked (service_plans_plan.md Phase 3). Only keys —
+    // the worker re-checks them against the live catalogue before applying.
+    $rjCols = $admin->query("
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'registration_jobs'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ([
+        'plan_key'  => "ADD COLUMN `plan_key` VARCHAR(64) NULL AFTER `device_name`",
+        'plan_term' => "ADD COLUMN `plan_term` VARCHAR(8) NULL AFTER `plan_key`",
+    ] as $col => $clause) {
+        if (!in_array($col, $rjCols, true)) {
+            $admin->exec("ALTER TABLE `{$controlDb}`.`registration_jobs` {$clause}");
+            say("  + registration_jobs.{$col} added");
+        }
+    }
 
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("

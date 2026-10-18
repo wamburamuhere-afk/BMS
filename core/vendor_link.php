@@ -39,7 +39,8 @@ if (!function_exists('vlFindTenant')) {
     function vlFindTenant(?string $subdomain = null, ?int $id = null): ?array
     {
         $cols = "id, company_name, subdomain, status, owner_email, owner_phone, owner_first_name, owner_last_name, country"
-              . (vlLinkReady() ? ", vendor_customer_id" : ", NULL AS vendor_customer_id");
+              . (vlLinkReady() ? ", vendor_customer_id" : ", NULL AS vendor_customer_id")
+              . (controlColumnExists('tenants', 'owner_contact_email') ? ", owner_contact_email" : "");
         try {
             if ($id !== null) {
                 $st = getControlPdo()->prepare("SELECT $cols FROM tenants WHERE id = ? AND status <> 'deleted' LIMIT 1");
@@ -90,6 +91,7 @@ if (!function_exists('vlSetTenantCustomer')) {
         }
         tenantLifecycleLog($tenantId, (string)$t['subdomain'], $customerId ? 'vendor_customer_linked' : 'vendor_customer_unlinked',
             ($customerId ? 'BJP customer ' . ($label ?: "#$customerId") : 'link removed') . " — by $who", $who);
+        if ($customerId) vlLinkSettled($tenantId, $who);
         return ['ok' => true, 'error' => null];
     }
 }
@@ -136,7 +138,7 @@ if (!function_exists('vlCreateCustomer')) {
      * Create a customer the same way Customers → Add does: company-prefixed code,
      * §18 defaults, and the customer's ledger sub-account. Joins the caller's transaction.
      */
-    function vlCreateCustomer(PDO $pdo, array $in, int $userId): int
+    function vlCreateCustomer(PDO $pdo, array $in, ?int $userId): int
     {
         require_once __DIR__ . '/code_generator.php';
         require_once __DIR__ . '/actor_account.php';
@@ -169,5 +171,247 @@ if (!function_exists('vlCreateCustomer')) {
         $id = (int)$pdo->lastInsertId();
         ensureActorLedgerAccount($pdo, 'customer', $id, $name);
         return $id;
+    }
+}
+
+// ── One customer per company (service_plans_plan.md Phase 4) ─────────────────
+// vlEnsureCustomerForTenant() is the only place a customer is created FOR a
+// platform company: self-registration (through vendor_link_queue) and Customer
+// Visits both go through it, so a company can never end up with two.
+
+if (!function_exists('vlQueueReady')) {
+    function vlQueueReady(): bool
+    {
+        try { return (bool)getControlPdo()->query("SHOW TABLES LIKE 'vendor_link_queue'")->fetch(); } catch (Throwable $e) { return false; }
+    }
+}
+
+if (!function_exists('vlTenantAlertRef')) {
+    /** vendor_bridge_alerts.invoice_ref for alerts about a company rather than an invoice. */
+    function vlTenantAlertRef(int $tenantId): string
+    {
+        return 'tenant:' . $tenantId;
+    }
+}
+
+if (!function_exists('vlQueueTenantLink')) {
+    /** Registration → "make this company a BJP customer" (drained on BJP's install). Never throws. */
+    function vlQueueTenantLink(int $tenantId): bool
+    {
+        if ($tenantId <= 0 || !vlQueueReady()) return false;
+        try {
+            getControlPdo()->prepare("INSERT INTO vendor_link_queue (tenant_id) VALUES (?) ON DUPLICATE KEY UPDATE tenant_id = tenant_id")
+                ->execute([$tenantId]);
+            return true;
+        } catch (Throwable $e) {
+            error_log('vlQueueTenantLink: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('vlLinkSettled')) {
+    /** The company has its customer now: close its "possible match" alert and its queue row. Never throws. */
+    function vlLinkSettled(int $tenantId, string $by): void
+    {
+        try {
+            $c = getControlPdo();
+            if ((bool)$c->query("SHOW TABLES LIKE 'vendor_bridge_alerts'")->fetch()) {
+                $c->prepare("UPDATE vendor_bridge_alerts SET resolved_at = NOW(), resolved_by = ?
+                              WHERE kind = 'possible_match' AND tenant_id = ? AND resolved_at IS NULL")
+                  ->execute([mb_substr($by, 0, 191), $tenantId]);
+            }
+            if (vlQueueReady()) {
+                $c->prepare("UPDATE vendor_link_queue SET state = 'done', message = ? WHERE tenant_id = ? AND state <> 'done'")
+                  ->execute([mb_substr('linked — ' . $by, 0, 500), $tenantId]);
+            }
+        } catch (Throwable $e) {
+            error_log('vlLinkSettled: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('vlRaisePossibleMatch')) {
+    /** A person must decide (D4): one open alert per company, naming the look-alike customers. */
+    function vlRaisePossibleMatch(array $tenant, array $matches): void
+    {
+        try {
+            $c = getControlPdo();
+            $ref = vlTenantAlertRef((int)$tenant['id']);
+            $st = $c->prepare("SELECT id FROM vendor_bridge_alerts WHERE invoice_ref = ? AND kind = 'possible_match' AND resolved_at IS NULL LIMIT 1");
+            $st->execute([$ref]);
+            if ($st->fetchColumn()) return;
+            $names = implode(', ', array_map(fn($m) => trim($m['customer_code'] . ' — ' . $m['customer_name']), $matches));
+            $msg = "{$tenant['company_name']} ({$tenant['subdomain']}) registered with the same phone or email as: $names. "
+                 . "Link it to the right customer, or create a new one.";
+            $c->prepare("INSERT INTO vendor_bridge_alerts (tenant_id, customer_id, invoice_ref, kind, message) VALUES (?, ?, ?, 'possible_match', ?)")
+              ->execute([(int)$tenant['id'], (int)$matches[0]['customer_id'], $ref, mb_substr($msg, 0, 500)]);
+        } catch (Throwable $e) {
+            error_log('vlRaisePossibleMatch: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('vlTenantCustomerFields')) {
+    /** A new customer's details, taken from the company's own registration. */
+    function vlTenantCustomerFields(array $t): array
+    {
+        $owner = trim(($t['owner_first_name'] ?? '') . ' ' . ($t['owner_last_name'] ?? ''));
+        return [
+            'customer_name'  => (string)$t['company_name'],
+            'company_name'   => (string)$t['company_name'],
+            'contact_person' => $owner,
+            'phone'          => (string)($t['owner_phone'] ?? ''),
+            'email'          => vlTenantContactEmail($t),
+            'country'        => (string)($t['country'] ?? ''),
+            'notes'          => 'Registered on the platform — ' . $t['subdomain'],
+        ];
+    }
+}
+
+if (!function_exists('vlTenantContactEmail')) {
+    /** The owner's real email: owner_contact_email, else owner_email when it is one (it often holds the login phone). */
+    function vlTenantContactEmail(array $t): string
+    {
+        foreach (['owner_contact_email', 'owner_email'] as $k) {
+            $e = trim((string)($t[$k] ?? ''));
+            if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) return $e;
+        }
+        return '';
+    }
+}
+
+if (!function_exists('vlEnsureCustomerForTenant')) {
+    /**
+     * Make sure the company has exactly one BJP customer.
+     *   1. lock the company row (control DB, FOR UPDATE) — parallel calls queue here;
+     *   2. already linked to a live customer → return it, create nothing;
+     *   3. same phone/email as an older customer → create nothing, raise a
+     *      possible_match alert (unless $opts['force']: a person already decided);
+     *   4. else create the customer and link with a conditional UPDATE; if someone
+     *      linked meanwhile, the new customer is rolled back.
+     *
+     * $opts: force (bool), fields (customer fields, default from the registration),
+     *        user_id (?int, created_by), who (string, for the logs).
+     *
+     * @return array{state:string, message:string, customer_id:?int, customer_code:?string,
+     *               customer_name:?string, matches:array}
+     *         state: created | linked | needs_review | gone | retry
+     */
+    function vlEnsureCustomerForTenant(PDO $bjp, int $tenantId, string $origin, array $opts = []): array
+    {
+        $res = fn(string $state, string $msg, ?array $cu = null, array $matches = []) => [
+            'state' => $state, 'message' => $msg,
+            'customer_id' => $cu ? (int)$cu['customer_id'] : null,
+            'customer_code' => $cu['customer_code'] ?? null, 'customer_name' => $cu['customer_name'] ?? null,
+            'matches' => $matches,
+        ];
+        if (!vlLinkReady()) return $res('retry', 'the platform database has not been upgraded yet');
+        if ($bjp->inTransaction()) throw new LogicException('vlEnsureCustomerForTenant() manages its own transactions');
+
+        $live = function (int $cid) use ($bjp): ?array {
+            $s = $bjp->prepare("SELECT customer_id, customer_code, customer_name FROM customers WHERE customer_id = ? AND status <> 'deleted'");
+            $s->execute([$cid]);
+            return $s->fetch(PDO::FETCH_ASSOC) ?: null;
+        };
+        $who = (string)($opts['who'] ?? $origin);
+        $c = getControlPdo();
+        $newId = null;
+        try {
+            $c->beginTransaction();
+            $st = $c->prepare("SELECT * FROM tenants WHERE id = ? AND status <> 'deleted' FOR UPDATE");
+            $st->execute([$tenantId]);
+            $t = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$t) { $c->rollBack(); return $res('gone', 'company not found on the platform'); }
+
+            $old = $t['vendor_customer_id'] !== null ? (int)$t['vendor_customer_id'] : null;
+            if ($old && ($cu = $live($old))) {
+                $c->commit();
+                vlLinkSettled($tenantId, $who);
+                return $res('linked', 'already a customer', $cu);
+            }
+
+            if (empty($opts['force'])) {
+                $matches = vlCustomerMatches($bjp, (string)($t['owner_phone'] ?? ''), vlTenantContactEmail($t));
+                if ($matches) {
+                    $c->commit();
+                    vlRaisePossibleMatch($t, $matches);
+                    return $res('needs_review', 'looks like an existing customer — waiting for a person to decide', null, $matches);
+                }
+            }
+
+            $bjp->beginTransaction();
+            $newId = vlCreateCustomer($bjp, $opts['fields'] ?? vlTenantCustomerFields($t), $opts['user_id'] ?? null);
+            $cu = $live($newId);
+            $label = $cu['customer_code'] . ' — ' . $cu['customer_name'];
+            $u = controlColumnExists('tenants', 'vendor_customer_label')
+                ? $c->prepare("UPDATE tenants SET vendor_customer_id = ?, vendor_customer_label = ? WHERE id = ? AND vendor_customer_id <=> ?")
+                : null;
+            if ($u) $u->execute([$newId, mb_substr($label, 0, 255), $tenantId, $old]);
+            else {
+                $u = $c->prepare("UPDATE tenants SET vendor_customer_id = ? WHERE id = ? AND vendor_customer_id <=> ?");
+                $u->execute([$newId, $tenantId, $old]);
+            }
+            if ($u->rowCount() === 0) {
+                // Linked by someone else after our lock (a path that does not lock): theirs wins.
+                $bjp->rollBack(); $c->rollBack(); $newId = null;
+                $now = vlFindTenant(null, $tenantId);
+                $cu = !empty($now['vendor_customer_id']) ? $live((int)$now['vendor_customer_id']) : null;
+                return $cu ? $res('linked', 'already a customer', $cu) : $res('retry', 'the company changed while linking — try again');
+            }
+            $bjp->commit();
+            try {
+                $c->commit();
+            } catch (Throwable $e) {
+                // The customer exists but the link did not save: retire it so a retry cannot leave two.
+                $bjp->prepare("UPDATE customers SET status = 'deleted' WHERE customer_id = ?")->execute([$newId]);
+                throw $e;
+            }
+            tenantLifecycleLog($tenantId, (string)$t['subdomain'], 'vendor_customer_linked',
+                "BJP customer $label — created automatically ($origin) — by $who", $who);
+            vlLinkSettled($tenantId, $who);
+            return $res('created', "customer $label created", $cu);
+        } catch (Throwable $e) {
+            if ($bjp->inTransaction()) $bjp->rollBack();
+            if ($c->inTransaction()) $c->rollBack();
+            if ($e instanceof InvalidArgumentException) throw $e;   // bad form input: the caller shows it
+            error_log("vlEnsureCustomerForTenant($tenantId, $origin): " . $e->getMessage());
+            return $res('retry', mb_substr($e->getMessage(), 0, 300));
+        }
+    }
+}
+
+if (!function_exists('vlDrainLinkQueue')) {
+    /**
+     * BJP's install: turn queued registrations into customers. Safe to run as often
+     * as wanted, from anywhere (cron, background jobs, the registration beacon).
+     * @return array{processed:int, done:int, needs_review:int, pending:int, failed:int}
+     */
+    function vlDrainLinkQueue(PDO $bjp, int $limit = 20): array
+    {
+        $out = ['processed' => 0, 'done' => 0, 'needs_review' => 0, 'pending' => 0, 'failed' => 0];
+        require_once __DIR__ . '/vendor_context.php';
+        if (!isPlatformVendorContext() || !vlLinkReady() || !vlQueueReady()) return $out;
+        try {
+            $ids = getControlPdo()->query("SELECT tenant_id, attempts FROM vendor_link_queue WHERE state = 'pending' ORDER BY id LIMIT " . max(1, $limit))
+                                  ->fetchAll(PDO::FETCH_KEY_PAIR);
+        } catch (Throwable $e) {
+            error_log('vlDrainLinkQueue: ' . $e->getMessage());
+            return $out;
+        }
+        foreach ($ids as $tid => $attempts) {
+            $r = vlEnsureCustomerForTenant($bjp, (int)$tid, 'registration', ['who' => 'automatic (registration)']);
+            $state = ['created' => 'done', 'linked' => 'done', 'needs_review' => 'needs_review', 'gone' => 'failed'][$r['state']]
+                  ?? ((int)$attempts + 1 >= 10 ? 'failed' : 'pending');
+            try {
+                getControlPdo()->prepare("UPDATE vendor_link_queue SET state = ?, attempts = attempts + 1, message = ? WHERE tenant_id = ?")
+                    ->execute([$state, mb_substr($r['message'], 0, 500), (int)$tid]);
+            } catch (Throwable $e) {
+                error_log('vlDrainLinkQueue update: ' . $e->getMessage());
+            }
+            $out['processed']++;
+            $out[$state]++;
+        }
+        return $out;
     }
 }

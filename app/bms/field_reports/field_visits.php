@@ -408,7 +408,7 @@ $(function () {
         'addCompany' => t('Add company web address'), 'makeCustomer' => t('Make real customer'), 'viewCustomer' => t('View customer'),
         'subdomainQ' => t('Company web address'), 'subdomainHint' => t('The address they log in at, e.g. dukalajuma — leave blank if you do not know it yet.'),
         'subdomainReq' => t('Enter the company web address.'), 'save' => t('Save'), 'customerBadge' => t('Customer'),
-        'company' => t('Company on the platform'), 'linkedAlready' => t('This company is already linked to a customer:'),
+        'company' => t('Company on the platform'), 'linkedAlready' => t('Already a customer — %s'), 'linkVisit' => t('Link this visit'),
         'useThis' => t('Use this customer'), 'sameClient' => t('These existing customers have the same phone or email:'),
         'notReady' => t('The platform database has not been upgraded yet. Ask the administrator to run the platform setup.'),
     ]) ?>;
@@ -792,12 +792,12 @@ $(function () {
             $('#mkName').val(p.customer_name || ''); $('#mkContact').val(p.contact_person || ''); $('#mkPhone').val(p.phone || '');
             $('#mkEmail').val(p.email || ''); $('#mkTin').val(''); $('#mkBusiness').val(p.business || '');
             $('#mkAddress').val(p.address || ''); $('#mkPostal').val(p.postal_address || '');
-            const pick = c => `<div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1">
+            const pick = (c, label) => `<div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1">
                 <div><span class="fw-bold">${esc(c.customer_name)}</span> <small class="text-muted">${esc(c.customer_code || '')} ${c.phone ? '· ' + esc(c.phone) : ''} ${c.email ? '· ' + esc(c.email) : ''}</small></div>
-                <button type="button" class="btn btn-sm btn-outline-primary" data-mklink="${c.customer_id}">${L.useThis}</button></div>`;
+                <button type="button" class="btn btn-sm btn-outline-primary" data-mklink="${c.customer_id}">${label || L.useThis}</button></div>`;
             let html = '';
-            if (res.linked_customer) html = `<div class="small fw-bold mb-1">${L.linkedAlready}</div>` + pick(res.linked_customer);
-            else if ((res.matches || []).length) html = `<div class="small fw-bold mb-1">${L.sameClient}</div>` + res.matches.map(pick).join('');
+            if (res.linked_customer) html = `<div class="small fw-bold mb-1">${esc(L.linkedAlready.replace('%s', res.linked_customer.customer_code || ''))}</div>` + pick(res.linked_customer, L.linkVisit);
+            else if ((res.matches || []).length) html = `<div class="small fw-bold mb-1">${L.sameClient}</div>` + res.matches.map(c => pick(c)).join('');
             $('#mkExisting').html(html);
             // An already-linked company can only be linked to its customer, never given a second one.
             $('#mkCreateBtn').toggleClass('d-none', !!res.linked_customer || !res.can_create);

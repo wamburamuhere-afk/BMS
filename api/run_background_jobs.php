@@ -106,4 +106,18 @@ if (function_exists('getPlatformSetting') && function_exists('remindStalePending
     }
 }
 
+// BJP's own install only: newly registered companies → BJP customers
+// (service_plans_plan.md Phase 4). One indexed SELECT when nothing is queued.
+if (is_file(__DIR__ . '/../core/vendor_link.php')) {
+    require_once __DIR__ . '/../core/vendor_context.php';
+    if (isPlatformVendorContext()) {
+        try {
+            require_once __DIR__ . '/../core/vendor_link.php';
+            if (vlDrainLinkQueue($pdo, 10)['processed'] > 0) $ran[] = 'vendor_customer_links';
+        } catch (Throwable $e) {
+            error_log('run_background_jobs/vlDrainLinkQueue: ' . $e->getMessage());
+        }
+    }
+}
+
 echo json_encode(['ok' => true, 'ran' => $ran]);

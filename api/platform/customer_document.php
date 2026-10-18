@@ -53,6 +53,8 @@ if ($tok['type'] === 'quotation') {
 $h->execute([$tok['id']]);
 $doc = $h->fetch(PDO::FETCH_ASSOC);
 if (!$doc || (int)$doc['customer_id'] !== $tok['customer_id']) $deny('Not found', 404);
+// Not yet through BJP's own workflow → not the customer's to see (service_plans_plan.md D7).
+if (in_array((string)$doc['status'], ['draft', 'pending', 'reviewed'], true)) $deny('Not found', 404);
 $l->execute([$tok['id']]);
 $lines = $l->fetchAll(PDO::FETCH_ASSOC);
 

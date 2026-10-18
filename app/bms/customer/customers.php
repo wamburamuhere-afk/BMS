@@ -158,6 +158,68 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
         </div>
     </div>
 
+    <?php
+    // Platform root only: new companies that look like an existing customer (service_plans_plan.md Phase 4, D4).
+    require_once __DIR__ . '/../../../core/vendor_context.php';
+    if (isPlatformVendorContext()):
+    ?>
+    <div class="card shadow-sm mb-4 d-none d-print-none" id="platformMatchCard" style="border:1px solid #b6ccfe;">
+        <div class="card-header border-bottom" style="background:#e7f0ff;">
+            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-globe"></i> <?= t('Platform company') ?> — <?= t('is this an existing customer?') ?></h6>
+            <small class="text-muted"><?= t('These companies registered with the same phone or email as a customer you already have. Choose the right customer, or create a new one.') ?></small>
+        </div>
+        <div class="card-body" id="platformMatchBody"></div>
+    </div>
+    <script>
+    $(function () {
+        const URL_ = '<?= buildUrl('api/platform/platform_match_review.php') ?>', CSRF_ = <?= json_encode(csrf_token()) ?>;
+        const T = <?= json_encode([
+            'link' => t('Link'), 'create' => t('Create new customer'), 'registered' => t('Registered'),
+            'noMatch' => t('The look-alike customers are gone. Create a new customer for this company.'),
+            'linkQ' => t('Link this company to %s?'), 'createQ' => t('Create a new customer for this company?'),
+            'createTxt' => t('Only do this if it is a different client from the customers listed.'),
+            'yes' => t('Yes'), 'cancel' => t('Cancel'), 'error' => t('Error'),
+        ]) ?>;
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        function render(r) {
+            const items = r.items || [];
+            $('#platformMatchCard').toggleClass('d-none', !items.length);
+            $('#platformMatchBody').html(items.map(it => {
+                const t = it.tenant;
+                const matches = (it.matches || []).map(m => `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border rounded p-2 mb-1">
+                    <div><span class="fw-bold">${esc(m.customer_name)}</span> <small class="text-muted">${esc(m.customer_code || '')}${m.phone ? ' · ' + esc(m.phone) : ''}${m.email ? ' · ' + esc(m.email) : ''}</small></div>
+                    ${r.can_edit ? `<button type="button" class="btn btn-sm btn-outline-primary" data-pm-link="${it.alert_id}" data-cid="${m.customer_id}" data-code="${esc(m.customer_code || '')}"><i class="bi bi-link-45deg"></i> ${T.link}</button>` : ''}
+                </div>`).join('') || `<div class="small text-muted mb-1">${T.noMatch}</div>`;
+                return `<div class="border rounded p-2 p-md-3 mb-2">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                        <div><div class="fw-bold">${esc(t.company_name)} <span class="text-primary">· ${esc(t.subdomain)}</span></div>
+                        <small class="text-muted">${esc(t.owner)}${t.phone ? ' · ' + esc(t.phone) : ''}${t.email ? ' · ' + esc(t.email) : ''} · ${T.registered} ${esc(String(it.created_at || '').slice(0, 10))}</small></div>
+                        ${r.can_create ? `<button type="button" class="btn btn-sm btn-primary" data-pm-create="${it.alert_id}"><i class="bi bi-plus-circle"></i> ${T.create}</button>` : ''}
+                    </div>${matches}</div>`;
+            }).join(''));
+        }
+        const load = () => $.getJSON(URL_).done(r => { if (r.success) render(r); });
+        const post = data => $.ajax({ url: URL_, type: 'POST', dataType: 'json', data: Object.assign({ _csrf: CSRF_ }, data) })
+            .done(r => { load(); if (r.success) Swal.fire({ icon: 'success', title: r.message, timer: 2000, showConfirmButton: false });
+                         else Swal.fire({ icon: 'error', title: T.error, text: r.message }); })
+            .fail(x => { load(); Swal.fire({ icon: 'error', title: T.error, text: (x.responseJSON || {}).message || '' }); });
+        $(document).on('click', '[data-pm-link]', function () {
+            const d = $(this).data();
+            Swal.fire({ title: T.linkQ.replace('%s', d.code), icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd',
+                confirmButtonText: T.yes, cancelButtonText: T.cancel })
+                .then(x => { if (x.isConfirmed) post({ action: 'link', alert_id: d.pmLink, customer_id: d.cid }); });
+        });
+        $(document).on('click', '[data-pm-create]', function () {
+            const id = $(this).data('pmCreate');
+            Swal.fire({ title: T.createQ, text: T.createTxt, icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd',
+                confirmButtonText: T.yes, cancelButtonText: T.cancel })
+                .then(x => { if (x.isConfirmed) post({ action: 'create', alert_id: id }); });
+        });
+        load();
+    });
+    </script>
+    <?php endif; ?>
+
     <script>
         function resizeTextToFit() {
             const elements = document.querySelectorAll('.custom-stat-card h4.auto-resize');

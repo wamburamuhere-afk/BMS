@@ -32,6 +32,28 @@ if (in_array($r['status'] ?? '', ['found', 'unknown'], true)) {
 
 $closed  = selfRegistrationClosedReason();
 $baseDom = tenantBaseDomain();
+
+// The plans a company can start on (service_plans_plan.md Phase 3). The choice
+// from the login popup arrives as ?plan=&term=; anything unknown falls back to
+// the default. The server re-checks the keys on submit.
+$regPlans = [];
+if (!$closed) {
+    try {
+        foreach (listPublicOffers(null, true) as $__prod) foreach ($__prod['plans'] as $__p) $regPlans[] = $__p;
+    } catch (Throwable $__e) {
+        error_log('register.php plans: ' . $__e->getMessage());
+        $regPlans = [];
+    }
+}
+$regPick = '';
+if ($regPlans) {
+    $__d = registrationPlanChoice('', '');
+    $regPick = $__d['ok'] && $__d['plan'] ? $__d['plan']['plan_key'] . '|' . $__d['term_key'] : '';
+    $__want = (string)($_GET['plan'] ?? '') . '|' . (string)($_GET['term'] ?? '');
+    foreach ($regPlans as $__p) foreach ($__p['prices'] as $__pr) {
+        if ($__p['plan_key'] . '|' . $__pr['term_key'] === $__want) $regPick = $__want;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -119,6 +141,26 @@ $baseDom = tenantBaseDomain();
             <label for="website">Website</label>
             <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
         </div>
+
+        <?php if ($regPlans): ?>
+        <div class="mb-3 p-3 rounded-3" style="background:#f4f8ff;border:1px solid #b6ccfe;">
+            <label for="plan_choice" class="form-label fw-semibold mb-1"><i class="bi bi-stars text-primary me-1"></i>Your plan</label>
+            <select class="form-select" id="plan_choice" required>
+                <?php foreach ($regPlans as $p): ?>
+                <optgroup label="<?= htmlspecialchars($p['name'] . ($p['is_popular'] ? ' ★' : '')) ?>">
+                    <?php foreach ($p['prices'] as $pr): $v = $p['plan_key'] . '|' . $pr['term_key']; ?>
+                    <option value="<?= htmlspecialchars($v) ?>" <?= $v === $regPick ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($p['name'] . ' — ' . $pr['term_label'] . ' · ' . number_format($pr['price_tzs']) . ' TZS') ?>
+                    </option>
+                    <?php endforeach; ?>
+                </optgroup>
+                <?php endforeach; ?>
+            </select>
+            <input type="hidden" name="plan_key" id="plan_key">
+            <input type="hidden" name="plan_term" id="plan_term">
+            <div class="form-text">Your free trial starts on this plan today. You pay only when you decide to continue after the trial.</div>
+        </div>
+        <?php endif; ?>
 
         <div class="mb-3">
             <label for="company_name" class="form-label">Company name</label>
@@ -297,6 +339,15 @@ function checkSubdomain() {
         });
 }
 
+// Plan picker → the two keys the server re-checks.
+function syncPlan() {
+    const v = ($('#plan_choice').val() || '').split('|');
+    $('#plan_key').val(v[0] || '');
+    $('#plan_term').val(v[1] || '');
+}
+$('#plan_choice').on('change', syncPlan);
+syncPlan();
+
 // Logo preview: purely cosmetic, the file itself travels with the form.
 $('#company_logo').on('change', function () {
     const file = this.files && this.files[0];
@@ -331,6 +382,8 @@ $('#registerForm').on('submit', function (e) {
         timeout: 120000,                 // provisioning builds ~300 tables
         success: function (res) {
             if (res && res.success) {
+                // Fire-and-forget: BJP's books record the new company as a customer.
+                if (navigator.sendBeacon) navigator.sendBeacon('/api/platform/vendor_link_kick.php');
                 Swal.fire({
                     icon: 'success',
                     title: '<?= $pageLang === "sw" ? "Akaunti yako iko tayari! 🎉" : "Your account is ready! 🎉" ?>',

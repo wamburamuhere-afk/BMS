@@ -104,6 +104,18 @@ if ($tenant && $tenant['status'] !== 'deleted') {
             // registration's provisioning switch, never for an operator to
             // pick by hand (tenant_module_control_plan.md §5.1).
             $plans = array_values(array_filter(listPlans(true), fn($p) => $p['plan_key'] !== 'blank'));
+            // A paid downgrade whose date has come applies before the page shows the plan.
+            if (planApplyDueScheduled($id) > 0) $tenant = getTenant($id) ?? $tenant;
+            if (controlColumnExists('tenants', 'scheduled_plan_key')) {
+                $sch = getControlPdo()->prepare("SELECT scheduled_plan_key, scheduled_plan_at FROM tenants WHERE id = ?");
+                $sch->execute([$id]);
+                $sch = $sch->fetch(PDO::FETCH_ASSOC) ?: [];
+                if (!empty($sch['scheduled_plan_key'])) {
+                    $sp = getPlanByKey((string)$sch['scheduled_plan_key']);
+                    $scheduledPlan = ['name' => $sp ? $sp['name'] : $sch['scheduled_plan_key'], 'at' => $sch['scheduled_plan_at']];
+                }
+            }
+            $addonGrants = planAddonGrants($id);
             if (!empty($tenant['plan'])) {
                 $currentPlan = getPlanByKey((string)$tenant['plan']);
             }
@@ -594,6 +606,22 @@ if ($hasContext ?? false):
                             <span class="text-muted">(<?= safe_output($tenant['plan'], '') ?> — no longer exists or was set outside a plan)</span>
                         <?php endif; ?>
                     </p>
+                    <?php if (!empty($scheduledPlan)): ?>
+                    <p class="small mb-2"><i class="bi bi-calendar-event text-primary me-1"></i>
+                        Paid change to <strong><?= safe_output($scheduledPlan['name'], '') ?></strong> on
+                        <strong><?= safe_output(date('d M Y', strtotime((string)$scheduledPlan['at'])), '') ?></strong>
+                        <span class="text-muted">(end of the period already paid). Applying a plan below cancels it.</span></p>
+                    <?php endif; ?>
+                    <?php if (!empty($addonGrants)): ?>
+                    <p class="small mb-1 fw-semibold">Extras bought</p>
+                    <ul class="small mb-3 ps-3">
+                        <?php foreach ($addonGrants as $g): ?>
+                        <li>+<?= (int)$g['units'] ?> <?= $g['quota'] === 'max_shops' ? 'shop(s)' : 'user(s)' ?>,
+                            <?= safe_output(date('d M Y', strtotime((string)$g['starts_at'])), '') ?> – <?= safe_output(date('d M Y', strtotime((string)$g['ends_at'])), '') ?>
+                            <span class="text-muted">(<?= safe_output($g['source_ref'] ?? '', '—') ?>)</span></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                     <?php if (!$plans): ?>
                         <p class="text-muted small mb-0">No plans created yet — <a href="<?= saUrl('plans') ?>">create one</a> to apply it here.</p>
                     <?php else: ?>

@@ -99,15 +99,29 @@ $all_nip_services = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Services priced by term show "From <cheapest> · N terms" instead of one price.
 require_once ROOT_DIR . '/core/service_price_terms.php';
 require_once ROOT_DIR . '/core/vendor_context.php';
+require_once ROOT_DIR . '/core/service_plans.php';
 $svc_terms = sptSummary($pdo, array_column($all_nip_services, 'product_id'));
-$svc_price_html = function (array $svc) use ($svc_terms): string {
+$svc_plans = spListSummary($pdo, array_column($all_nip_services, 'product_id'));
+$svc_price_html = function (array $svc) use ($svc_terms, $svc_plans): string {
+    $pill = fn(string $txt) => ' <span class="badge rounded-pill ms-1" style="background:#e7f0ff;color:#0d6efd;border:1px solid #b6ccfe;font-weight:600;">' . $txt . '</span>';
+    $pl = $svc_plans[(int)$svc['product_id']] ?? null;
+    if ($pl && $pl['platform_key'] !== null) {
+        // Prices live in Superadmin; selling_price is kept in step with its cheapest one.
+        return t('From') . ' ' . format_currency($svc['selling_price']) . $pill(t('From Superadmin'));
+    }
     $t = $svc_terms[(int)$svc['product_id']] ?? null;
     if (!$t) return format_currency($svc['selling_price']);
-    return t('From') . ' ' . format_currency($t['min'])
-        . ' <span class="badge rounded-pill ms-1" style="background:#e7f0ff;color:#0d6efd;border:1px solid #b6ccfe;font-weight:600;">'
-        . (int)$t['count'] . ' ' . ($t['count'] === 1 ? t('term') : t('terms')) . '</span>';
+    if ($pl && $pl['plans'] > 0) {
+        return t('From') . ' ' . format_currency($t['min']) . $pill($pl['plans'] . ' ' . ($pl['plans'] === 1 ? t('plan') : t('plans')));
+    }
+    return t('From') . ' ' . format_currency($t['min']) . $pill((int)$t['count'] . ' ' . ($t['count'] === 1 ? t('term') : t('terms')));
 };
 $isVendor = isPlatformVendorContext();
+// "This service sells" (BJP's install, admins): link the service to a Superadmin platform product.
+$canMapPlatform = $isVendor && isAdmin();
+$platformProducts = $isVendor ? spPlatformProducts() : [];
+$platformPlans = [];
+foreach (array_keys($platformProducts) as $ppk) $platformPlans[$ppk] = spPlatformPlans($ppk);
 $contractTemplates = $isVendor
     ? $pdo->query("SELECT id, template_name FROM document_templates WHERE is_active = 1 AND content IS NOT NULL ORDER BY template_name")->fetchAll(PDO::FETCH_ASSOC)
     : [];
@@ -1637,10 +1651,17 @@ function sptSync(prefix) {
         hint.textContent = SPT_I18N.hint;
         sell.closest('.input-group').after(hint);
     }
-    if (rows.length) {
+    const planPrice = spDefaultPrice(prefix);   // plans / Superadmin plans, when the service has them
+    if (planPrice !== null) {
+        sell.value = planPrice;
+        sell.readOnly = true;
+        hint.textContent = spState(prefix).mapped ? SP_I18N.hint_platform : SP_I18N.hint_plans;
+        hint.classList.remove('d-none');
+    } else if (rows.length) {
         const def = rows.find(tr => tr.querySelector('.spt-default').checked) || rows[0];
         sell.value = parseFloat(def.querySelector('.spt-price').value) || 0;
         sell.readOnly = true;
+        hint.textContent = SPT_I18N.hint;
         hint.classList.remove('d-none');
     } else {
         sell.readOnly = false;
@@ -1649,11 +1670,9 @@ function sptSync(prefix) {
     if (prefix === 'svc') calcSvcMargin(); else calcSvcMarginEdit();
 }
 
-function sptCollect(prefix) {
+function sptRows(prefix) {
     const body = sptBody(prefix);
-    const field = document.getElementById(prefix + '_price_terms');
-    if (!body || !field) return;
-    field.value = JSON.stringify(Array.from(body.children).map(tr => ({
+    return body ? Array.from(body.children).map(tr => ({
         term_id: tr.dataset.termId ? parseInt(tr.dataset.termId, 10) : null,
         term_label: tr.querySelector('.spt-label').value.trim(),
         duration_value: tr.querySelector('.spt-value').value,
@@ -1661,7 +1680,36 @@ function sptCollect(prefix) {
         price: tr.querySelector('.spt-price').value,
         description: tr.querySelector('.spt-desc').value.trim(),
         is_default: tr.querySelector('.spt-default').checked ? 1 : 0,
-    })));
+    })) : [];
+}
+
+function sptCollect(prefix) {
+    const field = document.getElementById(prefix + '_price_terms');
+    if (!sptBody(prefix) || !field) return;
+    const st = spState(prefix);
+    const plansField = document.getElementById(prefix + '_service_plans');
+    if (st.mapped) {
+        // Superadmin's plans: nothing local is sent, and the service stays a subscription.
+        field.value = '';
+        if (plansField) plansField.disabled = true;
+        const sub = document.getElementById(prefix + '_is_subscription');
+        if (sub) sub.checked = true;
+        return;
+    }
+    field.value = JSON.stringify(sptRows(prefix));
+    if (plansField) {
+        // Sent only when the service has (or had) plans — a plain service saves exactly as before.
+        const send = st.plans.length > 0 || st.loadedPlans > 0;
+        plansField.disabled = !send;
+        plansField.value = send ? JSON.stringify(st.plans.map(p => ({
+            plan_id: p.plan_id, plan_name: (p.plan_name || '').trim(), tagline: (p.tagline || '').trim(),
+            is_popular: p.is_popular ? 1 : 0,
+            items: p.items.map(it => ({ label: (it.label || '').trim(), value: (it.value || '').trim() })),
+            terms: p.terms.map(t => ({ term_id: t.term_id || null, term_label: (t.term_label || '').trim(),
+                duration_value: t.duration_value, duration_unit: t.duration_unit, price: t.price,
+                description: (t.description || '').trim(), is_default: t.is_default ? 1 : 0 })),
+        }))) : '';
+    }
 }
 
 function sptReset(prefix) {
@@ -1672,6 +1720,11 @@ function sptReset(prefix) {
     if (sub) sub.checked = false;
     const tpl = document.getElementById(prefix + '_contract_template');
     if (tpl) $(tpl).val('').trigger('change');
+    spHide(prefix);
+    SP_STATE[prefix] = null;
+    const map = document.getElementById(prefix + '_platform_product');
+    if (map) $(map).val('').trigger('change');
+    spRenderBar(prefix);
     sptSync(prefix);
 }
 
@@ -1681,14 +1734,408 @@ function sptLoad(prefix, productId) {
         .then(r => r.json())
         .then(json => {
             if (!json.success) return;
-            (json.data || []).forEach(t => sptAddRow(prefix, t));
+            const st = spState(prefix);
+            st.plans = (json.plans || []).map(p => ({
+                plan_id: p.plan_id, plan_name: p.plan_name, tagline: p.tagline || '', is_popular: !!p.is_popular,
+                items: (p.items || []).map(it => ({ label: it.label, value: it.value || '' })),
+                terms: (p.terms || []).map(t => Object.assign({}, t)),
+            }));
+            st.loadedPlans = st.plans.length;
+            st.mapped = json.platform_product_key || null;
+            st.platformPlans = json.platform_plans || [];
+            // A plan's terms belong to the plan; only plain terms go in the flat table.
+            (json.data || []).filter(t => !t.plan_id).forEach(t => sptAddRow(prefix, t));
+            const map = document.getElementById(prefix + '_platform_product');
+            if (map) {
+                // A key no longer listed (product switched off) stays selected, so a save never unlinks it by accident.
+                if (st.mapped && !Array.from(map.options).some(o => o.value === st.mapped)) map.add(new Option(st.mapped, st.mapped));
+                $(map).val(st.mapped || '').trigger('change');
+            }
             const sub = document.getElementById(prefix + '_is_subscription');
             if (sub) sub.checked = !!json.is_subscription;
             const tpl = document.getElementById(prefix + '_contract_template');
             if (tpl) $(tpl).val(json.contract_template_id ? String(json.contract_template_id) : '').trigger('change');
+            spRenderBar(prefix);
+            sptSync(prefix);
         })
         .catch(() => {});
 }
+
+// ── Plans (optional) — core/service_plans.php ───────────────────────────────
+// A service is priced by plain terms OR by plans (each plan has its own terms);
+// on BJP's install it can instead sell a Superadmin platform product (read-only here).
+const SP_I18N = <?= json_encode([
+    'plan' => t('plan'), 'plans' => t('plans'), 'from' => t('from'), 'untitled' => t('New plan'), 'standard' => t('Standard'),
+    'add_plans' => t('Add plans'), 'add_hint' => t('For systems sold as Basic, Pro… per month or year.'),
+    'edit' => t('Edit plans'), 'view' => t('View plans'), 'from_sa' => t('From Superadmin'),
+    'no_platform' => t('Superadmin has no active plans with prices for this product yet.'),
+    'lock' => t('Managed in Superadmin → Plans. To change prices or what\'s included, edit the plan there; this list updates by itself.'),
+    'plan_name' => t('Plan name'), 'name_ph' => t('e.g. Starter'), 'tagline' => t('Short description'), 'tagline_ph' => t('Optional — e.g. For one shop'),
+    'popular' => t('Most popular'), 'prices' => t('Prices'), 'term' => t('Term'), 'length' => t('Length'), 'price' => t('Price'),
+    'default' => t('Default'), 'add_term' => t('Add term'), 'included' => t('What\'s included'), 'label_ph' => t('e.g. Users'),
+    'value_ph' => t('e.g. 2'), 'add_line' => t('Add line'), 'remove_plan' => t('Remove plan'), 'add_plan' => t('Plan'),
+    'cancel' => t('Cancel'), 'done' => t('Done'), 'close' => t('Close'), 'not_public' => t('Not public'),
+    'users' => t('Users'), 'shops' => t('Shops'), 'unlimited' => t('Unlimited'),
+    'move_title' => t('Move the terms into a plan?'),
+    'move_text' => t('This service already has price terms. They will become the prices of its first plan.'),
+    'move_ok' => t('Yes, move them'),
+    'map_title' => t('Sell the Superadmin plans instead?'),
+    'map_text' => t('This service\'s own plans and price terms will be removed when you save. Its prices will come from Superadmin.'),
+    'map_ok' => t('Yes, use Superadmin plans'),
+    'check' => t('Please check the plans'),
+    'e_name' => t('Every plan needs a name.'), 'e_dup' => t('Two plans have the same name.'),
+    'e_terms' => t('needs at least one price.'), 'e_term_name' => t('every price needs a term name.'),
+    'e_term_dup' => t('two prices have the same term name.'),
+    'e_len' => t('length must be a whole number from 1 to 1000.'), 'e_price' => t('every price must be 0 or more.'),
+    'e_item' => t('every included line needs a name.'),
+    'hint_plans' => t('Depends on plan and term — this is the default price.'),
+    'hint_platform' => t('Set by Superadmin — this is the default plan price.'),
+], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+const SP_PLATFORM = <?= json_encode($canMapPlatform ? $platformPlans : new stdClass(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+const SP_STATE = {};
+
+function spState(prefix) {
+    return SP_STATE[prefix] || (SP_STATE[prefix] = { plans: [], active: 0, loadedPlans: 0, mapped: null, platformPlans: [], snap: null });
+}
+function spEsc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;'); }
+function spMoney(v) { return Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+function spClone(o) { return JSON.parse(JSON.stringify(o)); }
+function spDrawer(prefix) { return document.getElementById(prefix + '_sp_drawer'); }
+function spNewTerm() { return { term_id: null, term_label: '', duration_value: 1, duration_unit: 'month', price: '', description: '', is_default: false }; }
+function spNewPlan(terms) {
+    return { plan_id: null, plan_name: terms ? SP_I18N.standard : '', tagline: '', is_popular: false, items: [],
+             terms: terms && terms.length ? terms : [spNewTerm()] };
+}
+
+// One default price across all plans; the first price when none is marked.
+function spEnsureDefault(st) {
+    const all = st.plans.flatMap(p => p.terms);
+    if (all.length && !all.some(t => t.is_default)) all[0].is_default = true;
+}
+
+// The price the selling-price box shows: the default price (same rule as spSyncSellingPrice()).
+function spDefaultPrice(prefix) {
+    const st = spState(prefix);
+    if (st.mapped) {
+        let def = null, min = null;
+        st.platformPlans.forEach(p => p.prices.forEach(pr => {
+            min = min === null ? pr.price_tzs : Math.min(min, pr.price_tzs);
+            if (def === null && pr.is_default) def = pr.price_tzs;
+        }));
+        return def !== null ? def : min;
+    }
+    const all = st.plans.flatMap(p => p.terms);
+    if (!all.length) return null;
+    const def = all.find(t => t.is_default) || all[0];
+    return parseFloat(def.price) || 0;
+}
+
+function spRenderBar(prefix) {
+    const bar = document.getElementById(prefix + '_sp_bar');
+    if (!bar) return;
+    const st = spState(prefix);
+    const pill = txt => `<span class="badge rounded-pill me-2" style="background:#e7f0ff;color:#0d6efd;border:1px solid #b6ccfe;font-weight:600;">${spEsc(txt)}</span>`;
+    const count = n => n + ' ' + (n === 1 ? SP_I18N.plan : SP_I18N.plans);
+    let html;
+    if (st.mapped) {
+        const pp = st.platformPlans;
+        let min = null;
+        pp.forEach(p => p.prices.forEach(pr => { min = min === null ? pr.price_tzs : Math.min(min, pr.price_tzs); }));
+        html = `<div class="small">${pill(SP_I18N.from_sa)}` + (pp.length
+                ? `<strong>${count(pp.length)}</strong> · ${spEsc(pp.map(p => p.name).join(', '))}` + (min !== null ? ` · ${spEsc(SP_I18N.from)} ${spMoney(min)}` : '')
+                : `<span class="text-muted">${spEsc(SP_I18N.no_platform)}</span>`) + `</div>
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="spOpen('${prefix}')"><i class="bi bi-eye me-1"></i>${spEsc(SP_I18N.view)}</button>`;
+    } else if (st.plans.length) {
+        const prices = st.plans.flatMap(p => p.terms).map(t => parseFloat(t.price)).filter(v => !isNaN(v));
+        html = `<div class="small"><i class="bi bi-layers text-primary me-1"></i><strong>${count(st.plans.length)}</strong> · ${spEsc(st.plans.map(p => p.plan_name || SP_I18N.untitled).join(', '))}`
+             + (prices.length ? ` · ${spEsc(SP_I18N.from)} ${spMoney(Math.min(...prices))}` : '') + `</div>
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="spOpen('${prefix}')"><i class="bi bi-pencil-square me-1"></i>${spEsc(SP_I18N.edit)}</button>`;
+    } else {
+        html = `<div class="small text-muted"><i class="bi bi-layers text-primary me-1"></i>${spEsc(SP_I18N.add_hint)}</div>
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="spOpen('${prefix}')"><i class="bi bi-plus-circle me-1"></i>${spEsc(SP_I18N.add_plans)}</button>`;
+    }
+    bar.innerHTML = html;
+    // Plans (or Superadmin's) replace the plain terms table.
+    const hideFlat = !!st.mapped || st.plans.length > 0;
+    const add = document.getElementById(prefix + '_spt_add');
+    if (add) add.classList.toggle('d-none', hideFlat);
+    const wrap = document.getElementById(prefix + '_spt_wrap');
+    if (wrap && hideFlat) wrap.classList.add('d-none');
+}
+
+function spOpen(prefix) {
+    const st = spState(prefix);
+    st.snap = { plans: spClone(st.plans), flat: st.mapped ? [] : sptRows(prefix) };
+    if (!st.mapped && !st.plans.length) {
+        const flat = st.snap.flat;
+        if (flat.length) {
+            Swal.fire({ icon: 'question', title: SP_I18N.move_title, text: SP_I18N.move_text, showCancelButton: true,
+                        confirmButtonText: SP_I18N.move_ok, cancelButtonText: SP_I18N.cancel, confirmButtonColor: '#0d6efd' })
+                .then(r => {
+                    if (!r.isConfirmed) return;
+                    // term_ids are kept, so the terms (and documents that used them) carry over.
+                    st.plans = [spNewPlan(flat.map(t => Object.assign({}, t, { is_default: !!t.is_default })))];
+                    sptBody(prefix).innerHTML = '';
+                    spShow(prefix);
+                });
+            return;
+        }
+        st.plans = [spNewPlan()];
+    }
+    spShow(prefix);
+}
+
+function spShow(prefix) {
+    const st = spState(prefix);
+    st.active = Math.min(st.active, Math.max(0, st.plans.length - 1));
+    spEnsureDefault(st);
+    spRenderDrawer(prefix);
+    bootstrap.Offcanvas.getOrCreateInstance(spDrawer(prefix)).show();
+}
+
+function spHide(prefix) {
+    const el = spDrawer(prefix);
+    if (!el) return;
+    const inst = bootstrap.Offcanvas.getInstance(el);
+    if (inst) inst.hide();
+}
+
+function spAfterChange(prefix) { spRenderBar(prefix); sptSync(prefix); }
+
+function spCancel(prefix) {
+    const st = spState(prefix);
+    if (st.snap && !st.mapped) {
+        st.plans = st.snap.plans;
+        if (st.snap.flat.length && !sptBody(prefix).children.length) st.snap.flat.forEach(t => sptAddRow(prefix, t));
+    }
+    st.snap = null;
+    spHide(prefix);
+    spAfterChange(prefix);
+}
+
+// The same checks as spParse(), so most mistakes are caught before Save.
+function spValidate(st) {
+    const names = {};
+    for (let i = 0; i < st.plans.length; i++) {
+        const p = st.plans[i], name = (p.plan_name || '').trim();
+        if (!name) return [i, SP_I18N.e_name];
+        if (names[name.toLowerCase()]) return [i, SP_I18N.e_dup];
+        names[name.toLowerCase()] = true;
+        const q = `"${name}": `;
+        if (!p.terms.length) return [i, `"${name}" ${SP_I18N.e_terms}`];
+        const tn = {};
+        for (const t of p.terms) {
+            const tl = (t.term_label || '').trim().toLowerCase();
+            if (!tl) return [i, q + SP_I18N.e_term_name];
+            if (tn[tl]) return [i, q + SP_I18N.e_term_dup];
+            tn[tl] = true;
+            const len = Number(t.duration_value);
+            if (!Number.isInteger(len) || len < 1 || len > 1000) return [i, q + SP_I18N.e_len];
+            if (t.price === '' || t.price === null || isNaN(parseFloat(t.price)) || parseFloat(t.price) < 0) return [i, q + SP_I18N.e_price];
+        }
+        if (p.items.some(it => !(it.label || '').trim() && (it.value || '').trim())) return [i, q + SP_I18N.e_item];
+    }
+    return null;
+}
+
+function spDone(prefix) {
+    const st = spState(prefix);
+    // Fully blank included lines are dropped (the server skips them too).
+    st.plans.forEach(p => { p.items = p.items.filter(it => (it.label || '').trim() || (it.value || '').trim()); });
+    const err = spValidate(st);
+    if (err) {
+        st.active = err[0];
+        spRenderDrawer(prefix);
+        Swal.fire({ icon: 'warning', title: SP_I18N.check, text: err[1], confirmButtonColor: '#0d6efd' });
+        return;
+    }
+    spEnsureDefault(st);
+    st.snap = null;
+    spHide(prefix);
+    spAfterChange(prefix);
+}
+
+function spRenderDrawer(prefix) {
+    const st = spState(prefix);
+    const body = document.getElementById(prefix + '_sp_body');
+    const foot = document.getElementById(prefix + '_sp_footer');
+    if (!body) return;
+    spBind(prefix, body);
+
+    if (st.mapped) {
+        const card = p => {
+            const limits = [`${SP_I18N.users}: ${p.max_users === null ? SP_I18N.unlimited : p.max_users}`,
+                            `${SP_I18N.shops}: ${p.max_shops === null ? SP_I18N.unlimited : p.max_shops}`];
+            return `<div class="border rounded-3 p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <h6 class="fw-bold mb-0">${spEsc(p.name)}</h6>
+                    <div>${p.is_popular ? `<span class="badge bg-primary">${spEsc(SP_I18N.popular)}</span>` : ''}
+                         ${p.is_public ? '' : `<span class="badge bg-secondary ms-1">${spEsc(SP_I18N.not_public)}</span>`}</div>
+                </div>
+                ${p.tagline ? `<div class="small text-muted mb-2">${spEsc(p.tagline)}</div>` : ''}
+                <table class="table table-sm small mb-2"><tbody>${p.prices.map(pr => `<tr><td>${spEsc(pr.term_label)}${pr.is_default ? ' <i class="bi bi-star-fill text-primary"></i>' : ''}</td>
+                    <td class="text-end fw-bold">${spMoney(pr.price_tzs)}</td></tr>`).join('')}</tbody></table>
+                <div class="small text-muted">${spEsc(limits.join(' · '))}</div>
+                ${p.items.length ? `<ul class="small mb-0 mt-1 ps-3">${p.items.map(it => `<li>${spEsc(it.label)}${it.value ? ': <strong>' + spEsc(it.value) + '</strong>' : ''}</li>`).join('')}</ul>` : ''}
+            </div>`;
+        };
+        body.innerHTML = `<div class="alert alert-primary small d-flex gap-2 align-items-start"><i class="bi bi-lock-fill mt-1"></i><div>${spEsc(SP_I18N.lock)}</div></div>`
+            + (st.platformPlans.length ? st.platformPlans.map(card).join('') : `<div class="text-muted small">${spEsc(SP_I18N.no_platform)}</div>`);
+        foot.innerHTML = `<button type="button" class="btn btn-secondary" onclick="spHide('${prefix}')">${spEsc(SP_I18N.close)}</button>`;
+        return;
+    }
+
+    const p = st.plans[st.active];
+    if (!p) { body.innerHTML = ''; foot.innerHTML = ''; return; }
+    const tabs = st.plans.map((pl, i) => `<li class="nav-item"><button type="button" class="nav-link text-nowrap ${i === st.active ? 'active fw-bold' : ''}" data-act="tab" data-i="${i}">
+            <span class="sp-tab-name">${spEsc(pl.plan_name || SP_I18N.untitled)}</span>${pl.is_popular ? ' <i class="bi bi-star-fill text-primary small"></i>' : ''}</button></li>`).join('')
+        + `<li class="nav-item"><button type="button" class="nav-link text-primary text-nowrap" data-act="add-plan"><i class="bi bi-plus-lg"></i> ${spEsc(SP_I18N.add_plan)}</button></li>`;
+    const unitOpts = sel => Object.entries(SPT_I18N.units).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${spEsc(v)}</option>`).join('');
+    const termRows = p.terms.map((t, ti) => `<tr>
+            <td><input type="text" class="form-control form-control-sm" maxlength="100" data-f="term_label" data-t="${ti}" value="${spEsc(t.term_label)}" placeholder="${spEsc(SPT_I18N.name_ph)}"></td>
+            <td><div class="input-group input-group-sm"><input type="number" class="form-control" min="1" max="1000" step="1" style="max-width:70px;" data-f="duration_value" data-t="${ti}" value="${spEsc(t.duration_value)}">
+                <select class="form-select" data-f="duration_unit" data-t="${ti}">${unitOpts(t.duration_unit)}</select></div></td>
+            <td><input type="number" class="form-control form-control-sm" min="0" step="0.01" data-f="price" data-t="${ti}" value="${spEsc(t.price)}"></td>
+            <td class="text-center"><input class="form-check-input" type="radio" name="${prefix}_sp_default" data-act="default" data-t="${ti}" ${t.is_default ? 'checked' : ''}></td>
+            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" data-act="del-term" data-t="${ti}" title="${spEsc(SPT_I18N.remove)}"><i class="bi bi-trash"></i></button></td></tr>`).join('');
+    const itemRows = p.items.map((it, ii) => `<tr>
+            <td><input type="text" class="form-control form-control-sm" maxlength="100" data-f="label" data-it="${ii}" value="${spEsc(it.label)}" placeholder="${spEsc(SP_I18N.label_ph)}"></td>
+            <td><input type="text" class="form-control form-control-sm" maxlength="100" data-f="value" data-it="${ii}" value="${spEsc(it.value)}" placeholder="${spEsc(SP_I18N.value_ph)}"></td>
+            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" data-act="del-item" data-it="${ii}"><i class="bi bi-trash"></i></button></td></tr>`).join('');
+
+    body.innerHTML = `<ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">${tabs}</ul>
+        <div class="row g-2 mb-3">
+            <div class="col-12"><label class="form-label small fw-bold">${spEsc(SP_I18N.plan_name)} <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" maxlength="100" data-f="plan_name" value="${spEsc(p.plan_name)}" placeholder="${spEsc(SP_I18N.name_ph)}"></div>
+            <div class="col-12"><label class="form-label small fw-bold">${spEsc(SP_I18N.tagline)}</label>
+                <input type="text" class="form-control" maxlength="255" data-f="tagline" value="${spEsc(p.tagline)}" placeholder="${spEsc(SP_I18N.tagline_ph)}"></div>
+            <div class="col-12"><div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="${prefix}_sp_popular" data-act="popular" ${p.is_popular ? 'checked' : ''}>
+                <label class="form-check-label small" for="${prefix}_sp_popular">${spEsc(SP_I18N.popular)}</label></div></div>
+        </div>
+        <h6 class="fw-bold small text-uppercase text-muted">${spEsc(SP_I18N.prices)}</h6>
+        <div class="table-responsive"><table class="table table-sm align-middle mb-1">
+            <thead class="table-light small"><tr><th style="min-width:120px;">${spEsc(SP_I18N.term)}</th><th style="min-width:150px;">${spEsc(SP_I18N.length)}</th>
+                <th style="min-width:110px;">${spEsc(SP_I18N.price)}</th><th class="text-center">${spEsc(SP_I18N.default)}</th><th></th></tr></thead>
+            <tbody>${termRows}</tbody></table></div>
+        <button type="button" class="btn btn-sm btn-outline-primary mb-3" data-act="add-term"><i class="bi bi-plus-circle me-1"></i>${spEsc(SP_I18N.add_term)}</button>
+        <h6 class="fw-bold small text-uppercase text-muted">${spEsc(SP_I18N.included)}</h6>
+        ${p.items.length ? `<table class="table table-sm align-middle mb-1"><tbody>${itemRows}</tbody></table>` : ''}
+        <button type="button" class="btn btn-sm btn-outline-primary mb-4" data-act="add-item"><i class="bi bi-plus-circle me-1"></i>${spEsc(SP_I18N.add_line)}</button>
+        <div class="border-top pt-3"><button type="button" class="btn btn-sm btn-outline-danger" data-act="del-plan"><i class="bi bi-trash me-1"></i>${spEsc(SP_I18N.remove_plan)}</button></div>`;
+    foot.innerHTML = `<button type="button" class="btn btn-secondary" onclick="spCancel('${prefix}')">${spEsc(SP_I18N.cancel)}</button>
+        <button type="button" class="btn btn-primary" onclick="spDone('${prefix}')"><i class="bi bi-check-lg me-1"></i>${spEsc(SP_I18N.done)}</button>`;
+}
+
+// Inputs write straight into the plan model; structural changes re-render.
+function spBind(prefix, body) {
+    if (body.dataset.bound) return;
+    body.dataset.bound = '1';
+    const cur = () => { const st = spState(prefix); return st.plans[st.active]; };
+    const onField = e => {
+        const el = e.target, f = el.dataset.f, p = cur();
+        if (!f || !p) return;
+        if (el.dataset.t !== undefined) {
+            p.terms[+el.dataset.t][f] = f === 'duration_value' ? (el.value === '' ? '' : Number(el.value)) : el.value;
+        } else if (el.dataset.it !== undefined) {
+            p.items[+el.dataset.it][f] = el.value;
+        } else {
+            p[f] = el.value;
+            if (f === 'plan_name') {
+                const tab = body.querySelector('.nav-link.active .sp-tab-name');
+                if (tab) tab.textContent = el.value || SP_I18N.untitled;
+            }
+        }
+    };
+    body.addEventListener('input', onField);
+    body.addEventListener('change', e => {
+        const el = e.target, st = spState(prefix), p = cur();
+        if (!p) return;
+        if (el.dataset.f) { onField(e); return; }
+        if (el.dataset.act === 'default') {
+            st.plans.forEach(pl => pl.terms.forEach(t => { t.is_default = false; }));
+            p.terms[+el.dataset.t].is_default = true;
+        } else if (el.dataset.act === 'popular') {
+            st.plans.forEach(pl => { pl.is_popular = false; });   // at most one "Most popular"
+            p.is_popular = el.checked;
+            spRenderDrawer(prefix);
+        }
+    });
+    body.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        const st = spState(prefix), p = cur(), act = btn.dataset.act;
+        if (act === 'tab') st.active = +btn.dataset.i;
+        else if (act === 'add-plan') { st.plans.push(spNewPlan()); st.active = st.plans.length - 1; }
+        else if (act === 'add-term') p.terms.push(spNewTerm());
+        else if (act === 'del-term') p.terms.splice(+btn.dataset.t, 1);
+        else if (act === 'add-item') p.items.push({ label: '', value: '' });
+        else if (act === 'del-item') p.items.splice(+btn.dataset.it, 1);
+        else if (act === 'del-plan') {
+            st.plans.splice(st.active, 1);
+            if (!st.plans.length) { spDone(prefix); return; }   // last plan gone: back to one price / plain terms
+            st.active = Math.max(0, st.active - 1);
+        } else return;
+        spEnsureDefault(st);
+        spRenderDrawer(prefix);
+        if (act === 'add-term' || act === 'add-item' || act === 'add-plan') {
+            const sel = act === 'add-plan' ? '[data-f="plan_name"]' : (act === 'add-term' ? '[data-f="term_label"]' : '[data-f="label"]');
+            const inputs = body.querySelectorAll(sel);
+            if (inputs.length) inputs[inputs.length - 1].focus();
+        }
+    });
+}
+
+// "This service sells" (BJP admins): Superadmin's plans replace the service's own.
+function spPlatformChanged(prefix) {
+    const sel = document.getElementById(prefix + '_platform_product');
+    if (!sel) return;
+    const st = spState(prefix);
+    const key = sel.value || null;
+    if (key === st.mapped) return;
+    const apply = () => {
+        st.mapped = key;
+        st.platformPlans = key ? (SP_PLATFORM[key] || []) : [];
+        if (key) {
+            st.plans = [];
+            sptBody(prefix).innerHTML = '';
+            const sub = document.getElementById(prefix + '_is_subscription');
+            if (sub) sub.checked = true;
+        }
+        spAfterChange(prefix);
+    };
+    if (key && !st.mapped && (st.plans.length || sptBody(prefix).children.length)) {
+        Swal.fire({ icon: 'warning', title: SP_I18N.map_title, text: SP_I18N.map_text, showCancelButton: true,
+                    confirmButtonText: SP_I18N.map_ok, cancelButtonText: SP_I18N.cancel, confirmButtonColor: '#0d6efd' })
+            .then(r => { if (r.isConfirmed) apply(); else $(sel).val(st.mapped || '').trigger('change'); });
+        return;
+    }
+    apply();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    ['svc', 'edit_svc'].forEach(prefix => {
+        const drawer = spDrawer(prefix);
+        if (!drawer) return;
+        // Escape inside the drawer cancels the drawer only, not the whole service modal.
+        drawer.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault(); e.stopPropagation();
+            if (spState(prefix).mapped) spHide(prefix); else spCancel(prefix);
+        });
+        const modal = drawer.closest('.modal');
+        if (modal) {
+            // Lift it out of the form's tab pane (a hidden pane would hide it) but keep it
+            // inside the modal, whose focus trap would otherwise block typing in it.
+            modal.appendChild(drawer);
+            modal.addEventListener('hide.bs.modal', () => spHide(prefix));
+        }
+        // A service selling a platform product is always a subscription.
+        const sub = document.getElementById(prefix + '_is_subscription');
+        if (sub) sub.addEventListener('click', e => { if (spState(prefix).mapped && !sub.checked) e.preventDefault(); });
+        spRenderBar(prefix);
+    });
+});
 
 function openAddSvcModal() {
     document.getElementById('addServiceForm').reset();

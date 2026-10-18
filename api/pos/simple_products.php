@@ -18,6 +18,7 @@ if (isset($_SESSION['user_lang'])) {
 
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
+require_once __DIR__ . '/../../core/service_plans.php';
 mobileBearerAuth();
 
 // Security: Check if user is authenticated
@@ -91,8 +92,10 @@ try {
                 p.variant_attributes,
                 (SELECT COUNT(*) FROM products vc WHERE vc.parent_product_id = p.product_id AND vc.status = 'active') as variant_count";
 
+    // A service sold as a platform subscription is invoiced, never sold at the till (service_plans_plan.md Phase 6).
+    $platformExclude = spPosExcludeSql($pdo);
     $buildSql = function (bool $withVariants) use (
-        $project_stock_subquery, $ps_warehouse_filter, $price_group_id, $parent_product_id, $variantSelectSql
+        $project_stock_subquery, $ps_warehouse_filter, $price_group_id, $parent_product_id, $variantSelectSql, $platformExclude
     ): string {
         $sql = "SELECT
                 p.product_id,
@@ -124,7 +127,7 @@ try {
             " LEFT JOIN product_promotions promo ON promo.product_id = p.product_id
                 AND promo.status = 'active'
                 AND promo.starts_at <= NOW() AND promo.ends_at >= NOW()" .
-            " WHERE p.status = 'active'";
+            " WHERE p.status = 'active'" . $platformExclude;
 
         // Phase 31 — a variant child never appears as its own top-level tile
         // (it's reached only through its parent's picker); requesting one

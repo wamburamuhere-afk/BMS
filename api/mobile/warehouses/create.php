@@ -55,6 +55,13 @@ $pos_mode       = in_array($_pm, ['retail','restaurant','hybrid'], true) ? $_pm 
 $_st            = $body['status'] ?? 'active';
 $status         = in_array($_st, ['active','inactive','maintenance'], true) ? $_st : 'active';
 
+// The plan's shop limit (+ extra shops bought) — service_plans_plan.md Phase 5.
+if ($status === 'active' && function_exists('tenantCanActivateShop') && !tenantCanActivateShop($pdo)) {
+    http_response_code(422);
+    echo json_encode(['success'=>false,'message'=>tenantShopLimitMessage(),'code'=>'shop_limit_reached']);
+    exit;
+}
+
 require_once __DIR__ . '/../../../core/code_generator.php';
 
 try {

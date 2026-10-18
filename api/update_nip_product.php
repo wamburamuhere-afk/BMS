@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/code_generator.php';
 require_once __DIR__ . '/../core/service_price_terms.php';
+require_once __DIR__ . '/../core/service_plans.php';
 require_once __DIR__ . '/../core/vendor_context.php';
 global $pdo;
 
@@ -49,6 +50,8 @@ try {
     if ($price_terms && !sptReady($pdo)) {
         throw new Exception('Price terms are not available yet — the database update has not run. Save without terms or try again shortly.');
     }
+    // Optional plans (each with its own terms). null = not sent (leave them as they are).
+    $service_plans = spParse($_POST['service_plans'] ?? null);
 
     $pdo->beginTransaction();
 
@@ -146,27 +149,12 @@ try {
         }
     }
 
-    // 3. Price terms. Whether or not this form sent them, a service that has
-    // terms keeps selling_price = its default term and min = its cheapest term.
-    if ($price_terms !== null && sptReady($pdo)) {
-        sptSave($pdo, $product_id, $price_terms, (int)$user_id);
-    }
-    $active_terms = sptForProduct($pdo, $product_id);
-    if ($active_terms) {
-        $def = $active_terms[0]['price']; $min = null;
-        foreach ($active_terms as $t) {
-            if ((int)$t['is_default'] === 1) $def = $t['price'];
-            $min = $min === null ? (float)$t['price'] : min($min, (float)$t['price']);
-        }
-        $pdo->prepare("UPDATE products SET selling_price = ?, min_selling_price = ? WHERE product_id = ?")
-            ->execute([$def, $min, $product_id]);
-    }
-    // The subscription flag exists only on the platform root, and only when the
-    // form rendered it (so an edit from elsewhere never clears it by omission).
-    if (isPlatformVendorContext() && !empty($_POST['subscription_flag_sent'])) {
-        vssSet($pdo, $product_id, !empty($_POST['is_subscription']), $active_terms, (int)$user_id);
-        if (!empty($_POST['is_subscription'])) vssSetContractTemplate($pdo, $product_id, (int)($_POST['contract_template_id'] ?? 0));
-    }
+    // 3. Price terms / plans / platform product (core/service_plans.php). Whether
+    // or not this form sent them, a priced service keeps selling_price = its
+    // default price and min = its cheapest. The subscription flag and the
+    // platform product exist only on the platform root, and only when the form
+    // rendered them (so an edit from elsewhere never clears them by omission).
+    spSaveFromForm($pdo, $product_id, $price_terms, $service_plans, $_POST, (int)$user_id, false);
 
     $pdo->commit();
 

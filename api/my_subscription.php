@@ -1,16 +1,19 @@
 <?php
 /**
- * api/my_subscription.php — "My Subscription" in a company's own system
- * (customer_subscription_plan.md Phase 5). Company admins only, tenant subdomains only.
+ * api/my_subscription.php — the company's "Billing" page (customer_subscription_plan.md Phase 5,
+ * service_plans_plan.md Phase 5b). Company admins only, tenant subdomains only.
  *
- *   GET  action=status     → this company's access period + payments (control DB, own row only)
- *   GET  action=catalog    → subscription periods BJP sells            (signed call to the platform root)
- *   GET  action=documents  → this company's quotations + invoices from BJP
- *   POST action=request    → product_id, term_id → an approved quotation at BJP
+ *   GET  action=status     → access period, current plan + limits + extras, payments (control DB, own row only)
+ *   GET  action=catalog    → plans / periods BJP sells                 (signed call to the platform root)
+ *   GET  action=documents  → this company's approved quotations + invoices from BJP, requests
+ *                            still waiting for BJP; marks them seen (the Billing badge)
+ *   GET  action=badge      → how many documents became visible since last seen (cached 10 min)
+ *   POST action=request    → product_id, term_id, extras{token: qty} → a pending quotation at BJP
  *   GET  action=contracts  → subscription contracts BJP has signed for this company
  *   POST action=contract_sign → contract_id → a one-time link to sign it
  *
  * The tenant id is always this server's own (bmsCurrentTenantId()), never from the request.
+ * $GLOBALS['__pl_transport'] (PHP code only, never request input) lets tests answer in-process.
  */
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/platform_link.php';
@@ -27,6 +30,57 @@ $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
 if ($tenantId === null) $out(['success' => false, 'message' => 'Not available on this installation.'], 404);
 
 $action = (string)($_REQUEST['action'] ?? '');
+
+/** The plan this company is on: name, what it includes, limits (+ extras bought), a waiting change. */
+function msPlanSummary(int $tenantId): ?array
+{
+    try {
+        $c = getControlPdo();
+        $cols = 'plan, max_users, max_shops' . (controlColumnExists('tenants', 'scheduled_plan_key') ? ', scheduled_plan_key, scheduled_plan_at' : ', NULL AS scheduled_plan_key, NULL AS scheduled_plan_at');
+        $st = $c->prepare("SELECT $cols FROM tenants WHERE id = ?");
+        $st->execute([$tenantId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t) return null;
+        $name = function (?string $key) use ($c) {
+            if ($key === null || $key === '') return null;
+            $s = $c->prepare("SELECT id, name FROM plans WHERE plan_key = ?");
+            $s->execute([$key]);
+            return $s->fetch(PDO::FETCH_ASSOC) ?: null;
+        };
+        $cur = $name($t['plan']);
+        $items = [];
+        if ($cur) {
+            $s = $c->prepare("SELECT label, value FROM plan_items WHERE plan_id = ? ORDER BY sort_order, id");
+            $s->execute([(int)$cur['id']]);
+            $items = $s->fetchAll(PDO::FETCH_ASSOC);
+        }
+        $extra = fn(string $q) => function_exists('tenantAddonUnits') ? tenantAddonUnits($tenantId, $q) : 0;
+        $next = $name($t['scheduled_plan_key']);
+        return [
+            'plan_key' => $t['plan'], 'name' => $cur['name'] ?? ($t['plan'] ? ucfirst((string)$t['plan']) : null), 'items' => $items,
+            'max_users' => $t['max_users'] !== null ? (int)$t['max_users'] : null, 'extra_users' => $extra('max_users'),
+            'max_shops' => $t['max_shops'] !== null ? (int)$t['max_shops'] : null, 'extra_shops' => $extra('max_shops'),
+            'scheduled' => $t['scheduled_plan_key'] ? ['plan_key' => $t['scheduled_plan_key'], 'name' => $next['name'] ?? $t['scheduled_plan_key'], 'at' => $t['scheduled_plan_at']] : null,
+        ];
+    } catch (Throwable $e) {
+        error_log('msPlanSummary: ' . $e->getMessage());
+        return null;
+    }
+}
+/** When the company last looked at its BJP documents (this company's own DB). */
+function msSeenAt(PDO $pdo): ?string
+{
+    try { $v = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'billing_seen_at'")->fetchColumn(); return $v !== false && $v !== '' ? (string)$v : null; }
+    catch (Throwable $e) { return null; }
+}
+function msCountNew(array $r, ?string $seen): int
+{
+    $n = 0;
+    foreach (['quotations', 'invoices'] as $k) foreach ($r[$k] ?? [] as $d) {
+        if (!empty($d['visible_at']) && ($seen === null || $d['visible_at'] > $seen)) $n++;
+    }
+    return $n;
+}
 $docUrl = function (?string $token): ?string {
     $root = plRootUrl();
     return ($token && $root) ? $root . '/api/platform/customer_document.php?t=' . rawurlencode($token) : null;
@@ -47,6 +101,7 @@ if ($action === 'status') {
             'tenant' => $t,
             'ends_at' => tenantAccessEndsAt($t + ['status' => $t['status']]),
             'days_left' => tenantDaysRemaining($t),
+            'plan' => msPlanSummary($tenantId),
             'payments' => $pay->fetchAll(PDO::FETCH_ASSOC)]);
     } catch (Throwable $e) {
         error_log('my_subscription status: ' . $e->getMessage());
@@ -55,25 +110,56 @@ if ($action === 'status') {
 }
 
 if ($action === 'catalog') {
-    $r = plCall($tenantId, 'catalog');
+    $r = plCall($tenantId, 'catalog', [], $GLOBALS['__pl_transport'] ?? null);
     $out($r, !empty($r['success']) ? 200 : 502);
 }
 
+$saveSeen = function (?string $at) use ($pdo) {
+    if ($at === null) return;
+    try {
+        $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, updated_at) VALUES ('billing_seen_at', ?, NOW())
+                       ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()")->execute([$at, $at]);
+    } catch (Throwable $e) { error_log('billing_seen_at: ' . $e->getMessage()); }
+    unset($_SESSION['billing_badge']);
+};
+
 if ($action === 'documents') {
-    $r = plCall($tenantId, 'documents');
+    $r = plCall($tenantId, 'documents', [], $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) {
+        $seen = msSeenAt($pdo);
         foreach (['quotations', 'invoices'] as $k) {
             foreach ($r[$k] ?? [] as $i => $d) {
                 $r[$k][$i]['view_url'] = $docUrl($d['view_token'] ?? null);
+                $r[$k][$i]['is_new'] = !empty($d['visible_at']) && $seen !== null && $d['visible_at'] > $seen;
                 unset($r[$k][$i]['view_token']);
             }
         }
+        // Opening Billing = the company has seen them; the header badge clears.
+        if (!empty($r['latest']) && ($seen === null || $r['latest'] > $seen)) $saveSeen((string)$r['latest']);
     }
     $out($r, !empty($r['success']) ? 200 : 502);
 }
 
+if ($action === 'badge') {
+    // At most one call to BJP per 10 minutes per session — the header asks after the page has loaded.
+    $cache = $_SESSION['billing_badge'] ?? null;
+    if (is_array($cache) && ($cache['at'] ?? 0) > time() - 600) $out(['success' => true, 'new' => (int)$cache['n']]);
+    $r = plCall($tenantId, 'documents', [], $GLOBALS['__pl_transport'] ?? null);
+    if (empty($r['success'])) $out(['success' => false, 'new' => 0], 200);
+    $seen = msSeenAt($pdo);
+    if ($seen === null) {
+        // First time: everything already there counts as seen (no badge for old history).
+        $saveSeen($r['latest'] ?? null);
+        $n = 0;
+    } else {
+        $n = msCountNew($r, $seen);
+    }
+    $_SESSION['billing_badge'] = ['at' => time(), 'n' => $n];
+    $out(['success' => true, 'new' => $n]);
+}
+
 if ($action === 'contracts') {
-    $r = plCall($tenantId, 'contracts');
+    $r = plCall($tenantId, 'contracts', [], $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) {
         foreach ($r['contracts'] ?? [] as $i => $c) {
             $r['contracts'][$i]['view_url'] = $docUrl($c['view_token'] ?? null);
@@ -86,7 +172,7 @@ if ($action === 'contracts') {
 if ($action === 'contract_sign') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') $out(['success' => false, 'message' => 'Method not allowed'], 405);
     csrf_check();
-    $r = plCall($tenantId, 'contract_sign_link', ['contract_id' => (int)($_POST['contract_id'] ?? 0)]);
+    $r = plCall($tenantId, 'contract_sign_link', ['contract_id' => (int)($_POST['contract_id'] ?? 0)], $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) logActivity($pdo, (int)$_SESSION['user_id'], 'Contract signing', 'Opened the BJP subscription contract for signing');
     $out($r, !empty($r['success']) ? 200 : 422);
 }
@@ -95,13 +181,22 @@ if ($action === 'request') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') $out(['success' => false, 'message' => 'Method not allowed'], 405);
     csrf_check();
     $pid = (int)($_POST['product_id'] ?? 0);
-    $tid = (int)($_POST['term_id'] ?? 0);
-    if ($pid <= 0 || $tid <= 0) $out(['success' => false, 'message' => 'Choose a subscription period.'], 422);
-    $r = plCall($tenantId, 'request_quote', ['product_id' => $pid, 'term_id' => $tid]);
+    // A local term id, or a plan token "p12" (BJP checks it against Superadmin's plans).
+    $rawTerm = trim((string)($_POST['term_id'] ?? ''));
+    $tid = preg_match('/^p\d+$/', $rawTerm) ? $rawTerm : (int)$rawTerm;
+    if ($pid <= 0 || (is_int($tid) && $tid <= 0)) $out(['success' => false, 'message' => 'Choose a subscription period.'], 422);
+    // Extras: {"a3-12": 2} — only well-formed tokens and whole numbers go on; BJP prices and checks them.
+    $extras = [];
+    $rawExtras = $_POST['extras'] ?? [];
+    if (is_string($rawExtras)) $rawExtras = json_decode($rawExtras, true) ?: [];
+    foreach (is_array($rawExtras) ? $rawExtras : [] as $tok => $qty) {
+        if (!preg_match('/^a\d+-\d+$/', (string)$tok) || !preg_match('/^\d{1,2}$/', (string)$qty)) $out(['success' => false, 'message' => 'Choose a whole number of extras (0 to 99).'], 422);
+        if ((int)$qty > 0) $extras[(string)$tok] = (int)$qty;
+    }
+    if ($extras && !is_string($tid)) $out(['success' => false, 'message' => 'Extras are sold only with a plan.'], 422);
+    $r = plCall($tenantId, 'request_quote', ['product_id' => $pid, 'term_id' => $tid] + ($extras ? ['extras' => $extras] : []), $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) {
-        $r['view_url'] = $docUrl($r['view_token'] ?? null);
-        unset($r['view_token']);
-        logActivity($pdo, (int)$_SESSION['user_id'], 'Subscription request', "Requested {$r['term_label']} — BJP quotation {$r['quotation_number']}");
+        logActivity($pdo, (int)$_SESSION['user_id'], 'Subscription request', "Requested {$r['term_label']} — BJP quotation {$r['quotation_number']} (waiting for BJP)");
     }
     $out($r, !empty($r['success']) ? 200 : 422);
 }

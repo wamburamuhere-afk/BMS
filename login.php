@@ -61,6 +61,17 @@ $tr = $pageLang === 'sw' ? [
     'note_label'        => 'Kumbuka:',
     'note_body'         => 'Mipango yote hapo juu ni kwa <strong>duka moja (1)</strong> na <strong>watumiaji wawili (2)</strong> tu. Kwa maduka zaidi au watumiaji zaidi, wasiliana nasi:',
     'contact_us'        => 'wasiliana nasi',
+    'pm_choose'         => 'CHAGUA MPANGO — MAJARIBIO YAKO YA BURE YANAANZA NAO',
+    'pm_popular'        => 'MAARUFU ZAIDI',
+    'pm_per_month'      => '≈ %s TZS /mwezi',
+    'pm_not_term'       => 'Haupo kwa muda huu',
+    'pm_shop_1'         => 'Duka 1',
+    'pm_shops'          => 'Maduka %d',
+    'pm_shops_unl'      => 'Maduka bila kikomo',
+    'pm_user_1'         => 'Mtumiaji 1',
+    'pm_users'          => 'Watumiaji %d',
+    'pm_users_unl'      => 'Watumiaji bila kikomo',
+    'pm_note'           => 'Unahitaji maduka au watumiaji zaidi? Wasiliana nasi:',
 ] : [
     'page_title'        => 'Login | Business Management System',
     'sign_in_prompt'    => 'Please sign in to continue',
@@ -101,6 +112,17 @@ $tr = $pageLang === 'sw' ? [
     'note_label'        => 'Note:',
     'note_body'         => 'All plans above are for <strong>one shop (1)</strong> and <strong>two users (2)</strong> only. For more shops or more users, contact us:',
     'contact_us'        => 'contact us',
+    'pm_choose'         => 'CHOOSE A PLAN — YOUR FREE TRIAL STARTS ON IT',
+    'pm_popular'        => 'MOST POPULAR',
+    'pm_per_month'      => '≈ %s TZS /month',
+    'pm_not_term'       => 'Not offered for this length',
+    'pm_shop_1'         => '1 shop',
+    'pm_shops'          => '%d shops',
+    'pm_shops_unl'      => 'Unlimited shops',
+    'pm_user_1'         => '1 user',
+    'pm_users'          => '%d users',
+    'pm_users_unl'      => 'Unlimited users',
+    'pm_note'           => 'Need more shops or users? Contact us:',
 ];
 
 // Get company branding and contact info from settings
@@ -135,6 +157,33 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
 
 // Append lang param to register URL
 $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '?') . 'lang=' . urlencode($pageLang);
+
+// Plan cards come from Superadmin's live catalogue (service_plans_plan.md
+// Phase 3) — the same list api/platform/public_offers.php serves the app.
+// Nothing on offer, or the control DB unreachable → the fixed cards, as before.
+$pmPlans = []; $pmTerms = []; $pmDefault = ['plan' => null, 'term' => null];
+if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
+    try {
+        require_once __DIR__ . '/core/tenant_registration.php';
+        if (selfRegistrationOpen()) {
+            foreach (listPublicOffers(null, true) as $__prod) foreach ($__prod['plans'] as $__p) $pmPlans[] = $__p;
+        }
+    } catch (Throwable $__e) {
+        error_log('login.php plan cards: ' . $__e->getMessage());
+        $pmPlans = [];
+    }
+    foreach ($pmPlans as $__p) {
+        foreach ($__p['prices'] as $__pr) {
+            if (!isset($pmTerms[$__pr['term_key']])) $pmTerms[$__pr['term_key']] = ['label' => $__pr['term_label'], 'months' => $__pr['months']];
+        }
+        if ($pmDefault['plan'] === null || ($__p['is_popular'] && !$pmDefault['popular'])) {
+            $__def = $__p['prices'][0];
+            foreach ($__p['prices'] as $__pr) if ($__pr['is_default']) { $__def = $__pr; break; }
+            $pmDefault = ['plan' => $__p['plan_key'], 'term' => $__def['term_key'], 'popular' => $__p['is_popular']];
+        }
+    }
+    uasort($pmTerms, fn($a, $b) => $a['months'] <=> $b['months']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= $pageLang ?>">
@@ -428,6 +477,54 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         </div>
 
         <!-- Pricing cards -->
+        <?php if ($pmPlans):
+            $pmCol = count($pmPlans) >= 3 ? 'col-md-4' : (count($pmPlans) === 2 ? 'col-md-6' : 'col-md-8');
+            $pmLimit = function (?int $n, string $one, string $many, string $unl) use ($tr): string {
+                if ($n === null) return $tr[$unl];
+                return $n === 1 ? $tr[$one] : sprintf($tr[$many], $n);
+            };
+        ?>
+        <h6 class="text-center fw-semibold mb-2 pm-plans-label" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['pm_choose']) ?></h6>
+        <?php if (count($pmTerms) > 1): ?>
+        <div class="d-flex justify-content-center mb-3">
+          <div class="btn-group btn-group-sm flex-wrap pm-terms" role="group" aria-label="<?= htmlspecialchars($tr['modal_plans']) ?>">
+            <?php foreach ($pmTerms as $tk => $tm): ?>
+              <input type="radio" class="btn-check" name="pm_term" id="pm_term_<?= htmlspecialchars($tk) ?>" value="<?= htmlspecialchars($tk) ?>" <?= $tk === $pmDefault['term'] ? 'checked' : '' ?>>
+              <label class="btn btn-outline-primary" for="pm_term_<?= htmlspecialchars($tk) ?>"><?= htmlspecialchars($tm['label']) ?></label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endif; ?>
+        <div class="row g-3 mb-3 pm-cards-row justify-content-center" id="pmPlans">
+          <?php foreach ($pmPlans as $p): ?>
+          <div class="col-12 <?= $pmCol ?>">
+            <div class="pricing-card pm-plan text-center p-3 h-100 rounded-3 border position-relative"
+                 data-plan="<?= htmlspecialchars($p['plan_key']) ?>" role="button" tabindex="0"
+                 style="cursor:pointer;<?= $p['is_popular'] ? 'border-color:#1abc9c!important;' : '' ?>">
+              <?php if ($p['is_popular']): ?>
+                <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
+                      style="background:#1abc9c;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['pm_popular']) ?></span>
+              <?php endif; ?>
+              <i class="fas fa-check-circle text-primary position-absolute top-0 end-0 m-2 pm-check d-none"></i>
+              <div class="fw-bold pm-card-name mt-1" style="color:#2c3e50;"><?= htmlspecialchars($p['name']) ?></div>
+              <?php if ($p['tagline']): ?><div class="small text-muted"><?= htmlspecialchars($p['tagline']) ?></div><?php endif; ?>
+              <div class="my-2 pm-card-price-wrap">
+                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">—</span>
+                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
+              </div>
+              <div class="pm-price-per" style="font-size:.75rem;color:#888;min-height:1.1em;"></div>
+              <ul class="list-unstyled small text-start mt-2 mb-0 mx-auto" style="max-width:220px;color:#555;">
+                <li><i class="fas fa-store me-2 text-primary"></i><?= htmlspecialchars($pmLimit($p['max_shops'], 'pm_shop_1', 'pm_shops', 'pm_shops_unl')) ?></li>
+                <li><i class="fas fa-user me-2 text-primary"></i><?= htmlspecialchars($pmLimit($p['max_users'], 'pm_user_1', 'pm_users', 'pm_users_unl')) ?></li>
+                <?php foreach ($p['items'] as $it): ?>
+                  <li><i class="fas fa-check me-2 text-success"></i><?= htmlspecialchars($it['label'] . ($it['value'] !== null && $it['value'] !== '' ? ': ' . $it['value'] : '')) ?></li>
+                <?php endforeach; ?>
+              </ul>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php else: ?>
         <h6 class="text-center fw-semibold mb-3 pm-plans-label" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['modal_plans']) ?></h6>
         <div class="row g-3 mb-3 pm-cards-row">
 
@@ -484,13 +581,14 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
           </div>
 
         </div>
+        <?php endif; // $pmPlans ?>
 
         <!-- Limitation note -->
         <div class="rounded-3 px-3 py-2 mb-1 d-flex align-items-start gap-2"
              style="background:#fff8e6;border:1px solid #ffe5a0;">
           <i class="fas fa-info-circle mt-1" style="color:#f39c12;flex-shrink:0;"></i>
           <small style="color:#7a5c00;line-height:1.6;">
-            <strong><?= htmlspecialchars($tr['note_label']) ?></strong> <?= $tr['note_body'] ?>
+            <strong><?= htmlspecialchars($tr['note_label']) ?></strong> <?= $pmPlans ? htmlspecialchars($tr['pm_note']) : $tr['note_body'] ?>
             <?php if ($company_email || $company_phone): ?>
               <span class="d-block mt-1">
                 <?php if ($company_email): ?>
@@ -515,7 +613,7 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         <button type="button" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">
           <?= htmlspecialchars($tr['modal_back']) ?>
         </button>
-        <a href="<?= htmlspecialchars($registerUrlWithLang) ?>"
+        <a href="<?= htmlspecialchars($registerUrlWithLang) ?>" id="pmContinue"
            class="btn flex-fill fw-semibold text-white"
            style="background:linear-gradient(135deg,#3498db,#2980b9);">
           <i class="fas fa-arrow-right me-1"></i> <?= htmlspecialchars($tr['modal_continue']) ?>
@@ -549,6 +647,62 @@ Swal.fire = function(...args) {
     }
     return originalSwalFire(...args);
 };
+
+<?php if ($pmPlans):
+    $pmData = [];
+    foreach ($pmPlans as $p) {
+        $pr = [];
+        foreach ($p['prices'] as $x) $pr[$x['term_key']] = ['price' => $x['price_tzs'], 'per_month' => $x['per_month'], 'months' => $x['months']];
+        $pmData[$p['plan_key']] = $pr;
+    }
+?>
+// Plan cards: pick a length and a plan; "Continue" carries both keys to
+// register.php, which (and the server) checks them again.
+(function () {
+    const PRICES  = <?= json_encode($pmData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const PER_MON = <?= json_encode($tr['pm_per_month'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const NOT_OFF = <?= json_encode($tr['pm_not_term'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const BASE    = <?= json_encode($registerUrlWithLang, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    let term = <?= json_encode($pmDefault['term']) ?>;
+    let plan = <?= json_encode($pmDefault['plan']) ?>;
+    const DEF_PLAN = plan;
+    const fmt = n => Number(n).toLocaleString('en-US');
+
+    function render() {
+        // The chosen plan lacks this length: the default plan if it has it, else the first that does.
+        if (!PRICES[plan] || !PRICES[plan][term]) {
+            plan = (PRICES[DEF_PLAN] && PRICES[DEF_PLAN][term]) ? DEF_PLAN
+                 : (Object.keys(PRICES).find(k => PRICES[k][term]) || plan);
+        }
+        document.querySelectorAll('#pmPlans .pm-plan').forEach(function (card) {
+            const p = (PRICES[card.dataset.plan] || {})[term];
+            const sel = card.dataset.plan === plan;
+            card.querySelector('.pm-price-num').textContent = p ? fmt(p.price) : '—';
+            card.querySelector('.pm-price-cur').classList.toggle('d-none', !p);
+            card.querySelector('.pm-price-per').textContent = p ? (p.months > 1 ? PER_MON.replace('%s', fmt(p.per_month)) : '') : NOT_OFF;
+            card.classList.toggle('opacity-50', !p);
+            card.classList.toggle('border-primary', sel);
+            card.classList.toggle('border-2', sel);
+            card.querySelector('.pm-check').classList.toggle('d-none', !sel);
+            card.setAttribute('aria-pressed', sel ? 'true' : 'false');
+        });
+        const a = document.getElementById('pmContinue');
+        if (a) a.href = BASE + '&plan=' + encodeURIComponent(plan) + '&term=' + encodeURIComponent(term);
+    }
+    function pick(card) {
+        if (!(PRICES[card.dataset.plan] || {})[term]) return;
+        plan = card.dataset.plan; render();
+    }
+    document.querySelectorAll('input[name="pm_term"]').forEach(function (r) {
+        r.addEventListener('change', function () { term = this.value; render(); });
+    });
+    document.querySelectorAll('#pmPlans .pm-plan').forEach(function (card) {
+        card.addEventListener('click', function () { pick(card); });
+        card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(card); } });
+    });
+    render();
+})();
+<?php endif; ?>
 
 function toggleLang() {
     const menu = document.getElementById('langMenu');

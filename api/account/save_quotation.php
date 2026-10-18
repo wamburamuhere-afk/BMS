@@ -215,7 +215,9 @@ try {
             $term['description'] !== '' ? $term['description'] : null,
         ]);
         sptStampLine($pdo, 'quotation_items', (int)$pdo->lastInsertId(), $term);
+        $resolvedLines[] = ['term' => $term, 'qty' => $qty, 'name' => trim((string)($item['product_name'] ?? '')) ?: 'a line'];
     }
+    sptAssertPlanLines($resolvedLines ?? []);   // one plan, qty 1, add-ons follow it
 
     $pdo->commit();
 
