@@ -13,7 +13,10 @@
  *
  *   BmsLineTerms.attach($row, product, {priceSel, descSel, onChange, savedTermId, keepPrice, selectName})
  *   BmsLineTerms.value($row)         → term id or ''
- *   BmsLineTerms.missing($container) → rows that have terms but none chosen
+ *   BmsLineTerms.missing($container) → Superadmin-plan rows with no plan/term chosen (these block Save)
+ *
+ * A service's own terms (an outside system invoiced by hand) never block Save: the
+ * term is a suggestion, the price stays editable, and an empty term only shows a hint.
  */
 (function (window, $) {
     'use strict';
@@ -57,6 +60,11 @@
             groups[t.group].append(o);
         });
         $box.append($sel);
+        const isPlatform = terms.some(t => t.kind === 'plan' || t.kind === 'addon');
+        const $hint = $('<div class="lpt-hint form-text text-warning d-none"></div>')
+            .text(window.BMS_LINE_TERMS_I18N && window.BMS_LINE_TERMS_I18N.no_term
+                  ? window.BMS_LINE_TERMS_I18N.no_term : 'No term chosen — the line is saved at the price typed.');
+        if (!isPlatform) $box.append($hint);
         const $anchor = $name.closest('.input-group').length ? $name.closest('.input-group') : $name;
         $anchor.after($box);
         $row.data('lptTerms', terms);
@@ -83,6 +91,7 @@
             const t = terms.find(x => String(x.term_id) === String(id));
             if (t && (fromUser || !opts.keepPrice)) $price.val(t.price);
             setDescription($desc, t ? (t.display_label || t.term_label) : (id ? (opts.savedTermLabel || '') : ''));
+            $hint.toggleClass('d-none', !!id);
             if (typeof opts.onChange === 'function') opts.onChange($row);
             if (fromUser && t && t.kind === 'plan') repointExtras($row, t.plan_price_id);
         };
@@ -150,7 +159,11 @@
             return $s.length ? ($s.val() || '') : '';
         },
         missing: function ($container) {
-            return $container.find('.item-term').filter(function () { return !$(this).val(); }).closest('tr');
+            return $container.find('.item-term').filter(function () {
+                if ($(this).val()) return false;
+                const terms = $(this).closest('tr').data('lptTerms') || [];
+                return terms.some(t => t.kind === 'plan' || t.kind === 'addon');
+            }).closest('tr');
         },
         stripTermLine: function (s) { return String(s || '').replace(TERM_RE, '').trim(); }
     };

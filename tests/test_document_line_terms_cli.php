@@ -205,6 +205,29 @@ $il2 = rowsOf('invoice_items', 'invoice_id', $inv2)[0] ?? [];
 ok(!empty($r['success']) && (int)($il2['price_term_id'] ?? 0) === $terms['1 Month'], 'invoice line stores the chosen term');
 ok((float)$pdo->query("SELECT grand_total FROM invoices WHERE invoice_id = $inv2")->fetchColumn() === 20000.0, 'totals unchanged by the term logic (2 × 10,000)');
 
+section('B6b. own terms never block (an outside system invoiced by hand)');
+// The service HAS terms, but none is chosen and the price is typed: both documents save as plain lines.
+$r = callApi('api/account/save_quotation.php', $qtPost([$line($svc, 'DLT-TEST Hosting', 33333, null, 'Agreed price')]));
+$qt2 = (int)$pdo->query("SELECT MAX(sales_order_id) FROM quotations WHERE reference = 'DLT-TEST'")->fetchColumn();
+if ($qt2 && $qt2 !== $qt) $made['qt'][] = $qt2;
+$q2 = rowsOf('quotation_items', 'order_id', $qt2)[0] ?? [];
+ok(!empty($r['success']) && $qt2 !== $qt && $q2 && $q2['price_term_id'] === null && (float)$q2['unit_price'] === 33333.0,
+   'quotation: termed service, no term, typed price → saved at that price' . (empty($r['success']) ? ' — ' . ($r['message'] ?? '') : ''));
+$r = callApi('api/account/save_invoice.php', $invPost([[
+    'product_id' => $svc, 'product_name' => 'DLT-TEST Hosting', 'quantity' => 1, 'unit' => 'job', 'unit_price' => 44444,
+    'tax_rate' => 0, 'discount_percent' => 0, 'description' => 'Agreed price', 'price_term_id' => '',
+]]));
+$inv3 = (int)$pdo->query("SELECT MAX(invoice_id) FROM invoices WHERE notes = 'DLT-TEST'")->fetchColumn();
+if ($inv3 && !in_array($inv3, $made['inv'], true)) $made['inv'][] = $inv3;
+$il3 = rowsOf('invoice_items', 'invoice_id', $inv3)[0] ?? [];
+ok(!empty($r['success']) && $il3 && $il3['price_term_id'] === null && (float)$il3['unit_price'] === 44444.0,
+   'invoice: termed service, no term, typed price → saved at that price' . (empty($r['success']) ? ' — ' . ($r['message'] ?? '') : ''));
+// The browser check: only Superadmin plan rows (kind plan/addon) block Save; own terms show a hint.
+ok(preg_match("/missing: function[\s\S]*?t\.kind === 'plan' \|\| t\.kind === 'addon'[\s\S]*?\.closest\('tr'\)/", $js) === 1,
+   'line_price_terms.js: missing() counts only Superadmin plan rows');
+ok(strpos($js, 'lpt-hint') !== false && strpos(file_get_contents("$root/includes/line_price_terms_js.php"), "'no_term'") !== false,
+   'an own-term line with no term shows a soft hint instead');
+
 section('B7. history is a snapshot');
 callApi('api/update_nip_product.php', $svcBase + ['product_id' => $svc, 'product_name' => 'DLT-TEST Hosting',
     'price_terms' => json_encode([
