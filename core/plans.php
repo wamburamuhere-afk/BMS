@@ -46,6 +46,9 @@ require_once __DIR__ . '/feature_registry.php';
 require_once __DIR__ . '/tenant_admin.php';
 require_once __DIR__ . '/tenant_lifecycle_policy.php';   // controlColumnExists
 
+// Smart POS modules — the same two applySelfRegistrationDefaults() leaves on.
+if (!defined('SMART_POS_MODULES')) define('SMART_POS_MODULES', ['pos', 'warehouses']);
+
 if (!function_exists('planTablesReady')) {
     /** Same pattern as featureTablesReady(): report "not set up here yet" distinctly from a real failure. */
     function planTablesReady(): bool
@@ -208,24 +211,25 @@ if (!function_exists('platformProductProfile')) {
     /**
      * What a product means for a tenant — fixed in code by product_key, so a
      * rename never changes behaviour.
-     *   bms_shop (Smart POS): the plan's own module ticks; Simple Mode on and
-     *       locked, Shop wording on, Supplier Access on — the self-registration
-     *       starting point.
+     * The product also fixes the modules, so a plan's own ticks never count:
+     *   bms_shop (Smart POS): Point of Sale + Warehouses — exactly what
+     *       self-registration gives; Simple Mode on and locked, Shop wording on,
+     *       Supplier Access on.
      *   bms_full (Smart BMS): every module that is on by default for a new
-     *       company is always included; Simple Mode off (unlocked), Shop
-     *       wording off. Off-by-default extras stay the plan's choice.
-     * Null product (older plans) = nothing beyond the plan's own modules.
+     *       company; Simple Mode off (unlocked), Shop wording off.
+     * Null product (internal plans) = fixed_features null: the plan's own ticks.
+     * Extra modules for one tenant go through that tenant's module grants.
      *
-     * @return array{forced_features:string[], simple_mode:?bool, simple_locked:bool, shop_mode:?bool, supplier_access:?bool}
+     * @return array{fixed_features:?string[], simple_mode:?bool, simple_locked:bool, shop_mode:?bool, supplier_access:?bool}
      */
     function platformProductProfile(?string $productKey): array
     {
-        $none = ['forced_features' => [], 'simple_mode' => null, 'simple_locked' => false, 'shop_mode' => null, 'supplier_access' => null];
+        $none = ['fixed_features' => null, 'simple_mode' => null, 'simple_locked' => false, 'shop_mode' => null, 'supplier_access' => null];
         if ($productKey === 'bms_shop') {
-            return ['forced_features' => [], 'simple_mode' => true, 'simple_locked' => true, 'shop_mode' => true, 'supplier_access' => true];
+            return ['fixed_features' => SMART_POS_MODULES, 'simple_mode' => true, 'simple_locked' => true, 'shop_mode' => true, 'supplier_access' => true];
         }
         if ($productKey === 'bms_full') {
-            return ['forced_features' => planDefaultOnFeatures(), 'simple_mode' => false, 'simple_locked' => false, 'shop_mode' => false, 'supplier_access' => null];
+            return ['fixed_features' => planDefaultOnFeatures(), 'simple_mode' => false, 'simple_locked' => false, 'shop_mode' => false, 'supplier_access' => null];
         }
         return $none;
     }
@@ -261,11 +265,11 @@ if (!function_exists('planDefaultOnFeatures')) {
 }
 
 if (!function_exists('planNormalizeFeaturesForProduct')) {
-    /** A plan's module list as its product requires it (Smart BMS always carries the default-on set). */
+    /** A plan's module list: its product's fixed set, or its own ticks when it has no product. */
     function planNormalizeFeaturesForProduct(array $features, ?string $productKey): array
     {
-        $forced = platformProductProfile($productKey)['forced_features'];
-        return array_values(array_unique(array_merge($features, $forced)));
+        $fixed = platformProductProfile($productKey)['fixed_features'];
+        return array_values(array_unique($fixed ?? $features));
     }
 }
 
