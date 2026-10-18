@@ -7,10 +7,11 @@
  */
 $p = $sptPrefix;
 ?>
-<div class="mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10" id="<?= $p ?>_spt_section">
+<!-- Hidden until a switch in the strip above (service_type_switches.php) turns it on. -->
+<div class="mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10 d-none" id="<?= $p ?>_spt_section">
     <input type="hidden" name="price_terms" id="<?= $p ?>_price_terms" value="">
     <input type="hidden" name="service_plans" id="<?= $p ?>_service_plans" value="">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2" id="<?= $p ?>_spt_head">
         <div>
             <h6 class="fw-bold mb-1"><i class="bi bi-calendar-range text-primary me-2"></i><?= t('Price by term') ?>
                 <span class="text-muted fw-normal small">(<?= t('optional') ?>)</span></h6>
@@ -43,7 +44,7 @@ $p = $sptPrefix;
 
     <?php if (!empty($isVendor)): ?>
     <?php if (!empty($canMapPlatform)): ?>
-    <div class="mt-3 pt-2 border-top">
+    <div class="mt-3 pt-2 border-top" id="<?= $p ?>_platform_wrap">
         <input type="hidden" name="platform_product_sent" value="1">
         <label class="form-label small fw-bold" for="<?= $p ?>_platform_product"><?= t('This service sells') ?> <span class="text-muted fw-normal">(<?= t('optional') ?>)</span></label>
         <select class="form-select form-select-sm select2-static" name="platform_product_key" id="<?= $p ?>_platform_product" onchange="spPlatformChanged('<?= $p ?>')">
@@ -55,7 +56,7 @@ $p = $sptPrefix;
         <div class="form-text"><?= t('Choose a platform product to sell its Superadmin plans. Its plans and prices then come from Superadmin → Plans and cannot be edited here.') ?></div>
     </div>
     <?php endif; ?>
-    <div class="form-check mt-3 pt-2 border-top">
+    <div class="form-check mt-3 pt-2 border-top" id="<?= $p ?>_sub_wrap">
         <input type="hidden" name="subscription_flag_sent" value="1">
         <input class="form-check-input" type="checkbox" name="is_subscription" value="1" id="<?= $p ?>_is_subscription">
         <label class="form-check-label small" for="<?= $p ?>_is_subscription">
@@ -63,7 +64,7 @@ $p = $sptPrefix;
             <?= t('when an invoice for it is fully paid, the customer\'s company gets the term\'s months added automatically. Terms must be in months or years.') ?>
         </label>
     </div>
-    <div class="mt-2">
+    <div class="mt-2" id="<?= $p ?>_contract_wrap">
         <label class="form-label small fw-bold" for="<?= $p ?>_contract_template"><?= t('Contract template') ?> <span class="text-muted fw-normal">(<?= t('optional') ?>)</span></label>
         <select class="form-select form-select-sm select2-static" name="contract_template_id" id="<?= $p ?>_contract_template">
             <option value=""><?= t('No contract') ?></option>

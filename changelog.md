@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-18 — feat(services): "Sold in plans?" switches on the service form; own terms never block a document
+
+**Files:** `includes/service_type_switches.php` (new), `includes/service_price_terms_editor.php`, `app/bms/product/services.php`, `assets/js/line_price_terms.js`, `includes/line_price_terms_js.php`, `tests/test_service_type_switches_cli.php` (new), `tests/test_service_price_terms_cli.php`, `tests/test_document_line_terms_cli.php`, `changelog.md`
+
+- **Service form (Tab 2):** looks exactly as before by default. A thin dashed strip "Sold in plans?" holds two switches, both off:
+  - **BMS plan from Superadmin** (vendor only): pick the platform product. Its Superadmin plans show read-only, subscription is forced on, and you can pick a contract. Warehouse and materials are hidden.
+  - **Other system, own plans** (or **Own plans and terms** for a tenant): plans and price terms you edit yourself, plus a contract. Materials are hidden. No auto-extension.
+  - Only one switch can be on at a time. Turning off a switch that holds data asks first, and its plans or link are removed on save. Edit opens with the switch the service was saved with. A service linked to Superadmin opens locked ("Linked to Superadmin").
+  - An old own-plan service that was already a subscription keeps its subscription checkbox visible, so a save never changes it silently.
+- **Quotation / Sales Order / Invoice:** a service's own terms no longer block Save. The term is a suggestion and the price stays editable. An empty term only shows a soft hint ("No term chosen — the line is saved at the price typed."). Only Superadmin-plan lines still need a plan or term (`BmsLineTerms.missing()`). The server already accepted lines with no term.
+- **Tests:** switches 27/27 (new; includes a real create/update of an own-plan service), price terms 47/47, document line terms 35/35 (new B6b: a quotation and an invoice with no term save at the typed price), BJP form 82/82. Not browser-tested (the Chrome extension was not connected).
+
 ## 2026-10-18 — feat(plans): the product fixes a plan's modules; plan form scrolls
 
 **Files:** `core/plans.php`, `app/superadmin/plans.php`, `tests/test_smart_products_cli.php`, `changelog.md`
