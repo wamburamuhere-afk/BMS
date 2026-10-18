@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-18 — fix(deploy): tenant migrations no longer time out the deploy; deploy can be re-run without SSH
+
+**Files:** `core/service_price_terms.php`, `.github/workflows/deploy.yml`, `tests/test_plan_line_columns_fast_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`
+
+- The production deploy for #2496 hit appleboy's default 10-minute SSH limit during `core/tenant_migration_runner.php` on bms. Because of that, Apache was never reloaded and demo was never deployed. The cause was `sptEnsurePlanLineColumns()`, which ran a separate `ALTER TABLE` per column: 18 table rebuilds per tenant database, about 18s each on BJP's own database. It now adds all of a table's missing columns in one `ALTER … ALGORITHM=INSTANT`, and falls back to a plain ALTER where INSTANT isn't supported. The result is 3 ALTERs per tenant taking 0.12s locally, still idempotent.
+- `deploy.yml`:
+  - `command_timeout: 30m`.
+  - A `workflow_dispatch` trigger, so the deploy can be re-run from GitHub → Actions → "Run workflow" to finish a half-done deploy without SSH.
+  - An extra non-fatal `systemctl reload apache2` per host right after its main migrations, so fresh code is served even if tenant migrations stall.
+  - `script_stop: true` unchanged.
+- Tests: new suite 13/13, which runs the real function on a throwaway copy of the three line tables and then drops it. Regressions: service plans e2e 33, document line terms 31.
+
 ## 2026-10-18 — test(plans): service plans end to end + first payment keeps the trial left (service plans Phase 7)
 
 **Files:** `core/tenant_lifecycle_policy.php`, `tests/test_service_plans_e2e_cli.php` (new), `.github/workflows/php-lint.yml`, `changelog.md`
