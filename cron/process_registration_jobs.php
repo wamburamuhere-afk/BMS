@@ -21,6 +21,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/control_db.php';
 require_once __DIR__ . '/../core/tenant_crypto.php';
 require_once __DIR__ . '/../core/tenant_provisioner.php';
+require_once __DIR__ . '/../core/tenant_registration.php';   // finishSelfRegistration()
 
 @set_time_limit(300);
 @ignore_user_abort(true);
@@ -113,6 +114,25 @@ try {
 } catch (Throwable $e) {
     procRegFail($cpdo, $job['job_id'], $e->getMessage());
     exit(1);
+}
+
+// ── Same start as the web form: provisioning switch, defaults, plan ──────────
+// The stored plan is re-checked now; if it was retired while queued, the
+// company starts on the default public plan instead of failing.
+try {
+    $choice = registrationPlanChoice((string)($job['plan_key'] ?? ''), (string)($job['plan_term'] ?? ''));
+    if (!$choice['ok']) $choice = registrationPlanChoice('', '');
+    finishSelfRegistration($tenantId, $choice['ok'] ? $choice : null, (string)$job['owner_email']);
+} catch (Throwable $e) {
+    error_log('process_registration_jobs: finishSelfRegistration failed for tenant ' . $tenantId . ': ' . $e->getMessage());
+}
+// On BJP's install (BMS_VENDOR_CONTEXT=1) the new company becomes a customer now;
+// elsewhere vendor_bridge_retry / background jobs on the root pick it up.
+try {
+    global $pdo;
+    if ($pdo instanceof PDO) vlDrainLinkQueue($pdo, 5);
+} catch (Throwable $e) {
+    error_log('process_registration_jobs: vlDrainLinkQueue: ' . $e->getMessage());
 }
 
 // ── Issue a Bearer token into the new tenant DB ───────────────────────────────

@@ -369,7 +369,9 @@ if (!function_exists('applySubscriptionPayment')) {
             $today = date('Y-m-d');
             $base  = $startsAt ?? $today;
             $governing = [$t['subscription_ends_at'] ?? null];
-            if ($status === 'trial') $governing[] = $t['trial_ends_at'] ?? null;
+            // A self-registered company starts 'active' (so the owner can sign in) on
+            // its trial; until its first payment that trial is still its clock.
+            if ($status === 'trial' || empty($t['subscription_ends_at'])) $governing[] = $t['trial_ends_at'] ?? null;
             foreach ($governing as $d) {
                 if (!empty($d)) {
                     $d = substr((string)$d, 0, 10);

@@ -29,6 +29,11 @@ if ($warehouse_id <= 0 || empty($new_status)) {
     exit();
 }
 
+if ($new_status === 'active' && function_exists('tenantCanActivateShop') && !tenantCanActivateShop($pdo, $warehouse_id)) {
+    echo json_encode(['success' => false, 'message' => tenantShopLimitMessage()]);
+    exit();
+}
+
 try {
     $query = "UPDATE warehouses SET status = ?, updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?";
     $stmt = $pdo->prepare($query);

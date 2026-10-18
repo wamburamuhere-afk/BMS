@@ -14,7 +14,6 @@
 function settingsAdminNavGroups(): array
 {
     $projectsEnabled = function_exists('projectsModuleActive') ? projectsModuleActive() : true;
-    $hasTenant = function_exists('bmsCurrentTenantId') && bmsCurrentTenantId() !== null;
     $feature = fn(string $f) => !function_exists('tenantFeatureEnabled') || tenantFeatureEnabled($f);
 
     $groups = [
@@ -31,7 +30,7 @@ function settingsAdminNavGroups(): array
         ]],
         [t('Plan & Modules'), array_values(array_filter([
             ['key' => 'available_modules', 'icon' => 'bi-grid', 'tone' => 'primary', 'title' => t('Available Modules'), 'sub' => t('What your plan includes, request more')],
-            $hasTenant ? ['key' => 'my_subscription', 'icon' => 'bi-credit-card-2-front', 'tone' => 'primary', 'title' => t('My Subscription'), 'sub' => t('Time left, renew, quotations and invoices from BJP')] : null,
+            // My Subscription moved out of here 2026-10-17 → top-level "Billing" (service_plans_plan.md D8/D10).
         ]))],
         [t('Business & Finance'), [
             ['key' => 'payment_settings', 'icon' => 'bi-credit-card', 'tone' => 'success', 'title' => t('Payments'),        'sub' => t('Bank & gateway details')],

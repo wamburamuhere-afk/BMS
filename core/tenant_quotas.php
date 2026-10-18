@@ -31,7 +31,12 @@
  * `bmsCurrentTenant()` for free the moment they exist in the schema.
  *
  * Public API:
- *   tenantUserLimit(): ?int
+ *   tenantUserLimit(): ?int          (plan limit + add-on grants)
+ *   tenantShopLimit(): ?int          (plan limit + add-on grants)
+ *   tenantAddonUnits(int $tenantId, string $quota): int
+ *   tenantActiveShopCount(PDO $pdo): int
+ *   tenantWithinShopLimit(PDO $pdo): bool
+ *   tenantCanActivateShop(PDO $pdo, int $warehouseId = 0): bool
  *   tenantStorageLimitMb(): ?int
  *   tenantStorageLimitBytes(): ?int
  *   tenantActiveUserCount(PDO $pdo): int
@@ -44,15 +49,97 @@ require_once __DIR__ . '/tenant_bootstrap.php';
 require_once __DIR__ . '/control_db.php';
 require_once __DIR__ . '/tenant_crypto.php';
 
+if (!function_exists('tenantAddonUnits')) {
+    /**
+     * Extra shops/users this tenant bought as add-ons and still has today
+     * (control `tenant_addon_grants`, service_plans_plan.md Phase 5). Fails open
+     * to 0 — a missing table or a control-DB hiccup never blocks the base limit.
+     */
+    function tenantAddonUnits(int $tenantId, string $quota): int
+    {
+        static $cache = [];
+        $k = $tenantId . ':' . $quota;
+        if (array_key_exists($k, $cache)) return $cache[$k];
+        try {
+            $st = getControlPdo()->prepare("SELECT COALESCE(SUM(units), 0) FROM tenant_addon_grants
+                                             WHERE tenant_id = ? AND quota = ? AND starts_at <= CURDATE() AND ends_at >= CURDATE()");
+            $st->execute([$tenantId, $quota]);
+            return $cache[$k] = max(0, (int)$st->fetchColumn());
+        } catch (Throwable $e) {
+            return $cache[$k] = 0;
+        }
+    }
+}
+
+if (!function_exists('tenantQuotaLimit')) {
+    /** The plan's limit (tenants.max_users / max_shops) + active add-ons, or null = unlimited. */
+    function tenantQuotaLimit(string $quota): ?int
+    {
+        $t = bmsCurrentTenant();
+        if ($t === null || !array_key_exists($quota, $t) || $t[$quota] === null) {
+            return null;
+        }
+        return (int)$t[$quota] + (isset($t['id']) ? tenantAddonUnits((int)$t['id'], $quota) : 0);
+    }
+}
+
 if (!function_exists('tenantUserLimit')) {
     /** Max ACTIVE staff accounts this tenant may have, or null = unlimited. */
     function tenantUserLimit(): ?int
     {
-        $t = bmsCurrentTenant();
-        if ($t === null || !array_key_exists('max_users', $t) || $t['max_users'] === null) {
-            return null;
+        return tenantQuotaLimit('max_users');
+    }
+}
+
+if (!function_exists('tenantShopLimit')) {
+    /** Max ACTIVE shops (warehouses) this tenant may have, or null = unlimited. */
+    function tenantShopLimit(): ?int
+    {
+        return tenantQuotaLimit('max_shops');
+    }
+}
+
+if (!function_exists('tenantActiveShopCount')) {
+    function tenantActiveShopCount(PDO $pdo): int
+    {
+        return (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status = 'active'")->fetchColumn();
+    }
+}
+
+if (!function_exists('tenantWithinShopLimit')) {
+    /** Is there room for one more ACTIVE shop right now? Unlimited = always true. */
+    function tenantWithinShopLimit(PDO $pdo): bool
+    {
+        $limit = tenantShopLimit();
+        if ($limit === null) return true;
+        return tenantActiveShopCount($pdo) < $limit;
+    }
+}
+
+if (!function_exists('tenantCanActivateShop')) {
+    /**
+     * May this shop become (or be created) active? A shop that is already
+     * active never counts against itself, so editing it always saves.
+     * $warehouseId = 0 for a new shop.
+     */
+    function tenantCanActivateShop(PDO $pdo, int $warehouseId = 0): bool
+    {
+        if (tenantShopLimit() === null) return true;
+        if ($warehouseId > 0) {
+            $st = $pdo->prepare("SELECT status FROM warehouses WHERE warehouse_id = ?");
+            $st->execute([$warehouseId]);
+            if ($st->fetchColumn() === 'active') return true;
         }
-        return (int)$t['max_users'];
+        return tenantWithinShopLimit($pdo);
+    }
+}
+
+if (!function_exists('tenantShopLimitMessage')) {
+    function tenantShopLimitMessage(): string
+    {
+        $limit = tenantShopLimit();
+        return 'Your plan allows ' . (int)$limit . ' active shop' . ($limit === 1 ? '' : 's')
+             . '. Deactivate a shop, or buy an extra shop or a bigger plan under Billing.';
     }
 }
 

@@ -281,7 +281,9 @@ try {
         $row[] = $l['line_total'];
         $itemStmt->execute($row);
         sptStampLine($pdo, 'invoice_items', (int)$pdo->lastInsertId(), $term);
+        $resolvedLines[] = ['term' => $term, 'qty' => $l['qty'], 'name' => trim((string)($item['product_name'] ?? '')) ?: 'a line'];
     }
+    sptAssertPlanLines($resolvedLines ?? []);   // one plan, qty 1, add-ons follow it
 
     soRefreshInvoicedQuantities($pdo, array_merge($priorSoIds, $touchedSoIds, $order_id ? [(int)$order_id] : []));
 

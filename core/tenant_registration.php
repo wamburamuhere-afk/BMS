@@ -30,6 +30,7 @@ require_once __DIR__ . '/tenant_resolver.php';
 require_once __DIR__ . '/tenant_provisioner.php';
 require_once __DIR__ . '/platform_settings.php';
 require_once __DIR__ . '/plans.php';
+require_once __DIR__ . '/vendor_link.php';   // vlQueueTenantLink()
 
 /**
  * Throttle policy.
@@ -176,6 +177,7 @@ if (!function_exists('registerTenant')) {
      * @param array  $in  company_name, subdomain, owner_email, owner_password,
      *                    owner_first_name, owner_last_name, company_physical_address,
      *                    company_postal_address, logo_tmp_path, logo_extension,
+     *                    plan_key + plan_term (optional, see registrationPlanChoice()),
      *                    website (honeypot)
      * @return array{ok:bool, error:?string, tenant_id:?int, subdomain:?string, login_url:?string}
      */
@@ -271,6 +273,18 @@ if (!function_exists('registerTenant')) {
         if (!filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
             return $fail('Please enter a valid email address.', 'rejected', $phone, $sub);
         }
+        // One free trial per owner email too, not only per phone.
+        if (registrationEmailTaken($ownerEmail)) {
+            return $fail('An account with this email address is already registered. Please log in instead.',
+                'rejected', $phone, $sub);
+        }
+
+        // The plan the visitor picked — checked against the live catalogue
+        // before any database is created (the browser only sends keys).
+        $choice = registrationPlanChoice((string)($in['plan_key'] ?? ''), (string)($in['plan_term'] ?? ''));
+        if (!$choice['ok']) {
+            return $fail($choice['error'], 'rejected', $phone, $sub);
+        }
 
         $r = provisionTenant($company, $sub, $phone, $pw, [
             'status'            => 'active',      // so the owner can sign in immediately
@@ -304,32 +318,7 @@ if (!function_exists('registerTenant')) {
             return ['ok' => false, 'error' => $public, 'tenant_id' => null, 'subdomain' => null, 'login_url' => null];
         }
 
-        // tenant_module_control_plan.md §5.1 — the platform-wide switch for
-        // the UNATTENDED path only (nobody at the platform in the loop yet).
-        // Default 'all' is today's exact behaviour: everything on, byte-
-        // identical, nothing further happens here. A failure to apply the
-        // 'blank' plan is never fatal to registration itself — the owner can
-        // already sign in — it just means "everything on" stands, same as if
-        // the switch were 'all'; logged so it can be finished manually.
-        if (getPlatformSetting('tenant_default_provisioning', 'all') === 'none') {
-            $blank = getPlanByKey('blank');
-            if ($blank) {
-                $ar = applyPlanToTenant((int)$r['tenant_id'], (int)$blank['id']);
-                if (!$ar['ok']) {
-                    error_log('registerTenant: blank-plan apply failed for tenant ' . $r['tenant_id'] . ': ' . $ar['error']);
-                }
-            } else {
-                error_log('registerTenant: provisioning switch is "none" but the reserved "blank" plan is missing — run scripts/setup_control_db.php');
-            }
-        }
-
-        // Apply self-registration defaults: Simple Mode ON + only POS/Warehouses.
-        // Best-effort — logged but never fatal to registration itself.
-        try {
-            applySelfRegistrationDefaults((int)$r['tenant_id']);
-        } catch (Throwable $_defaultsE) {
-            error_log('applySelfRegistrationDefaults threw: ' . $_defaultsE->getMessage());
-        }
+        finishSelfRegistration((int)$r['tenant_id'], $choice, $ownerEmail);
 
         logRegistrationAttempt($ip, $phone, $sub, 'success', null, $r['tenant_id']);
 
@@ -346,6 +335,145 @@ if (!function_exists('registerTenant')) {
             'subdomain' => $sub,
             'login_url' => tenantLoginUrl($sub),
         ];
+    }
+}
+
+if (!function_exists('registrationEmailTaken')) {
+    /** True when a live company already registered with this owner email. */
+    function registrationEmailTaken(string $email): bool
+    {
+        $email = trim($email);
+        if ($email === '') return false;
+        try {
+            if (!controlColumnExists('tenants', 'owner_contact_email')) return false;
+            $st = getControlPdo()->prepare(
+                "SELECT COUNT(*) FROM tenants WHERE LOWER(owner_contact_email) = LOWER(?) AND status != 'deleted'");
+            $st->execute([$email]);
+            return (int)$st->fetchColumn() > 0;
+        } catch (Throwable $e) {
+            error_log('registrationEmailTaken: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('registrationPlanChoice')) {
+    /**
+     * The plan a new company starts its trial on (service_plans_plan.md Phase 3).
+     *
+     * Only plans that are active, public and belong to a product shown on
+     * registration can be chosen. With no such plan at all, registration works
+     * exactly as before (ok, no plan). A missing key picks the default: the
+     * "Most popular" plan, else the first; a missing term picks its default.
+     *
+     * @return array{ok:bool, error:?string, plan:?array, term_key:?string}
+     */
+    function registrationPlanChoice(string $planKey, string $termKey): array
+    {
+        $planKey = trim($planKey); $termKey = trim($termKey);
+        $none = ['ok' => true, 'error' => null, 'plan' => null, 'term_key' => null];
+        $gone = ['ok' => false, 'error' => 'The plan you chose is no longer available. Please choose again.',
+                 'plan' => null, 'term_key' => null];
+        try {
+            $offers = listPublicOffers(null, true);
+        } catch (Throwable $e) {
+            error_log('registrationPlanChoice: ' . $e->getMessage());
+            $offers = [];
+        }
+        $plans = [];
+        foreach ($offers as $prod) foreach ($prod['plans'] as $p) $plans[] = $p;
+        if (!$plans) return $planKey === '' ? $none : $gone;
+
+        if ($planKey === '') {
+            $pick = null;
+            foreach ($plans as $p) if ($p['is_popular']) { $pick = $p; break; }
+            $pick = $pick ?? $plans[0];
+            $termKey = '';
+        } else {
+            $pick = null;
+            foreach ($plans as $p) if ($p['plan_key'] === $planKey) { $pick = $p; break; }
+            if (!$pick) return $gone;
+        }
+
+        $term = null;
+        foreach ($pick['prices'] as $pr) {
+            if ($termKey !== '' ? $pr['term_key'] === $termKey : $pr['is_default']) { $term = $pr; break; }
+        }
+        if (!$term && $termKey === '') $term = $pick['prices'][0];
+        if (!$term) return $gone;
+
+        $row = getPlanByKey($pick['plan_key']);
+        if (!$row || !(int)$row['is_active']) return $gone;
+        return ['ok' => true, 'error' => null, 'plan' => $row, 'term_key' => $term['term_key']];
+    }
+}
+
+if (!function_exists('finishSelfRegistration')) {
+    /**
+     * Everything that happens to a freshly provisioned self-registered company,
+     * shared by the web form and the mobile app worker so both start the same.
+     * Best-effort throughout: the owner can already sign in, so a failure here is
+     * logged for a superadmin to finish, never fatal.
+     *
+     * @param array|null $choice  registrationPlanChoice() result, or null
+     */
+    function finishSelfRegistration(int $tenantId, ?array $choice, string $contactEmail): void
+    {
+        // tenant_module_control_plan.md §5.1 — the platform-wide switch for
+        // the UNATTENDED path only (nobody at the platform in the loop yet).
+        // Default 'all' is today's exact behaviour: everything on, byte-
+        // identical, nothing further happens here. A failure to apply the
+        // 'blank' plan is never fatal to registration itself — the owner can
+        // already sign in — it just means "everything on" stands, same as if
+        // the switch were 'all'; logged so it can be finished manually.
+        if (getPlatformSetting('tenant_default_provisioning', 'all') === 'none') {
+            $blank = getPlanByKey('blank');
+            if ($blank) {
+                $ar = applyPlanToTenant($tenantId, (int)$blank['id']);
+                if (!$ar['ok']) {
+                    error_log('finishSelfRegistration: blank-plan apply failed for tenant ' . $tenantId . ': ' . $ar['error']);
+                }
+            } else {
+                error_log('finishSelfRegistration: provisioning switch is "none" but the reserved "blank" plan is missing — run scripts/setup_control_db.php');
+            }
+        }
+
+        // Apply self-registration defaults: Simple Mode ON + only POS/Warehouses.
+        try {
+            applySelfRegistrationDefaults($tenantId);
+        } catch (Throwable $_defaultsE) {
+            error_log('applySelfRegistrationDefaults threw: ' . $_defaultsE->getMessage());
+        }
+
+        // The chosen plan decides the modules and limits (after the defaults,
+        // so it wins). Simple/Shop Mode and supplier access stay as set above.
+        if ($choice && !empty($choice['plan'])) {
+            $ar = applyPlanToTenant($tenantId, (int)$choice['plan']['id']);
+            if (!$ar['ok']) {
+                error_log('finishSelfRegistration: plan "' . $choice['plan']['plan_key'] . '" apply failed for tenant '
+                    . $tenantId . ': ' . $ar['error']);
+            } else {
+                logTenantAdminAction($tenantId, null, 'registration_plan',
+                    'Signed up on ' . $choice['plan']['name'] . ' (' . $choice['plan']['plan_key'] . ', term ' . $choice['term_key'] . ')');
+            }
+        }
+
+        $contactEmail = trim($contactEmail);
+        if ($contactEmail !== '') {
+            try {
+                if (controlColumnExists('tenants', 'owner_contact_email')) {
+                    getControlPdo()->prepare("UPDATE tenants SET owner_contact_email = ? WHERE id = ?")
+                        ->execute([mb_substr($contactEmail, 0, 191), $tenantId]);
+                }
+            } catch (Throwable $e) {
+                error_log('finishSelfRegistration: contact email not saved for tenant ' . $tenantId . ': ' . $e->getMessage());
+            }
+        }
+
+        // One BJP customer for the new company (service_plans_plan.md Phase 4, D3).
+        // Queued here; BJP's own install creates it (vlDrainLinkQueue), since only
+        // it can see BJP's books.
+        vlQueueTenantLink($tenantId);
     }
 }
 
