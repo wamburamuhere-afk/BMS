@@ -80,6 +80,41 @@ try {
 }
 $productNames = [];
 foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
+
+// Per product: how many plans, how many a customer can actually buy (active +
+// public + priced) — a product shown on registration with none of those
+// leaves the registration page on its "contact us" state.
+$productStats = [];
+foreach ($products as $pr) $productStats[$pr['product_key']] = ['plans' => 0, 'sellable' => 0];
+foreach ($plans as $p) {
+    $k = $p['product_key'] ?? null;
+    if ($k === null || !isset($productStats[$k])) continue;
+    $productStats[$k]['plans']++;
+    if ($p['is_active'] && !empty($p['is_public']) && $p['_prices']) $productStats[$k]['sellable']++;
+}
+$fullForced = $catalog ? planDefaultOnFeatures() : [];
+$productProfileText = [
+    'bms_shop' => 'Simple Mode on (locked), Shop wording, Supplier Access on — the self-registration setup. Modules = the plan\'s ticks.',
+    'bms_full' => 'Every default module always included; Simple Mode and Shop wording off. Extra modules = the plan\'s ticks.',
+];
+// Plans grouped under their product (internal plans last).
+$planGroups = [];
+foreach ($products as $pr) $planGroups[$pr['product_key']] = [];
+$planGroups[''] = [];
+foreach ($plans as $p) {
+    $k = $p['product_key'] ?? '';
+    if (!isset($planGroups[$k])) $planGroups[$k] = [];
+    $planGroups[$k][] = $p;
+}
+$planGroups = array_filter($planGroups);
+$productData = [];
+foreach ($products as $pr) {
+    $productData[$pr['product_key']] = [
+        'product_key' => $pr['product_key'], 'name' => $pr['name'], 'description' => $pr['description'],
+        'sort_order' => (int)$pr['sort_order'], 'show_on_registration' => (int)$pr['show_on_registration'],
+        'is_active' => (int)$pr['is_active'],
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,6 +141,11 @@ foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
     .price-list li { display: flex; justify-content: space-between; border-bottom: 1px dashed #e9ecef; padding: 2px 0; }
     .mini-table td, .mini-table th { padding: .3rem; vertical-align: middle; }
     .mini-table input, .mini-table select { min-width: 70px; }
+    .product-card { border: 1px solid #b6ccfe; border-radius: 10px; background: #fff; }
+    .product-card .pc-head { background: #e7f0ff; border-bottom: 1px solid #b6ccfe; border-radius: 10px 10px 0 0; }
+    .product-card.inactive { opacity: .65; }
+    .group-title { font-weight: 600; color: #052c65; border-bottom: 2px solid #b6ccfe; padding-bottom: 4px; }
+    .plan-feature:disabled + label { color: #084298; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -139,6 +179,41 @@ foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
             Selling plans (prices, add-ons, public offers) needs one more setup step on this server:
             <code>php scripts/setup_control_db.php</code></div>
     <?php endif; ?>
+    <?php if ($catalog && $products): ?>
+    <div class="group-title mb-2"><i class="bi bi-grid-1x2 me-1"></i> Products</div>
+    <p class="text-muted small mb-2">A product decides what a tenant on its plans gets (modes and default modules). Its plans appear on the
+        registration page only when <strong>On registration</strong> is set and at least one plan is public, active and priced.</p>
+    <div class="row g-3 mb-4">
+        <?php foreach ($products as $pr): $k = $pr['product_key']; $st = $productStats[$k] ?? ['plans' => 0, 'sellable' => 0]; ?>
+        <div class="col-12 col-lg-6">
+            <div class="product-card h-100 <?= $pr['is_active'] ? '' : 'inactive' ?>">
+                <div class="pc-head px-3 py-2 d-flex justify-content-between align-items-center gap-2">
+                    <span class="fw-semibold text-truncate"><i class="bi bi-<?= $k === 'bms_shop' ? 'shop' : 'building' ?> text-primary me-1"></i><?= safe_output($pr['name'], '') ?></span>
+                    <span class="d-flex gap-1 flex-shrink-0">
+                        <span class="badge <?= (int)$pr['show_on_registration'] ? 'badge-public' : 'badge-hidden' ?>"><?= (int)$pr['show_on_registration'] ? 'On registration' : 'Not on registration' ?></span>
+                        <?php if (!$pr['is_active']): ?><span class="badge bg-secondary">Inactive</span><?php endif; ?>
+                    </span>
+                </div>
+                <div class="p-3">
+                    <div class="small text-muted mb-2"><?= safe_output($pr['description'] ?? '', 'No description.') ?></div>
+                    <?php if (isset($productProfileText[$k])): ?>
+                    <div class="small mb-2"><i class="bi bi-gear me-1 text-primary"></i><?= safe_output($productProfileText[$k], '') ?></div>
+                    <?php endif; ?>
+                    <div class="small mb-2"><i class="bi bi-box-seam me-1 text-primary"></i><?= (int)$st['plans'] ?> plan<?= $st['plans'] === 1 ? '' : 's' ?>,
+                        <?= (int)$st['sellable'] ?> on sale (public, active, priced)</div>
+                    <?php if ((int)$pr['show_on_registration'] && $pr['is_active'] && !$st['sellable']): ?>
+                    <div class="alert alert-warning py-1 px-2 small mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Shown on registration but nothing is on sale — customers see "contact us".</div>
+                    <?php endif; ?>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="openProduct('<?= safe_output($k, '') ?>')"><i class="bi bi-pencil me-1"></i> Edit product</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="openCreate('<?= safe_output($k, '') ?>')" data-bs-toggle="modal" data-bs-target="#planModal"><i class="bi bi-plus-circle me-1"></i> Plan</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
     <?php if (!$plans): ?>
         <div class="text-center text-muted py-5">
             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
@@ -154,10 +229,13 @@ foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
         Applying a plan to a tenant sets its modules and quotas in one click — using the same
         <a href="<?= saUrl('features') ?>">Modules</a> switches and usage limits you can already edit per
         tenant. A tenant stays fully, independently editable afterward; nothing here is a hard link.
-        A <strong>public</strong> plan with prices is what customers can buy (registration, Billing, BJP's invoices).
+        A <strong>public</strong> plan with prices is what customers can buy (registration, Subscription, BJP's invoices).
     </p>
-    <div class="row g-3">
-        <?php foreach ($plans as $p): $nMods = count($p['_features']); ?>
+    <?php foreach ($planGroups as $gKey => $gPlans): ?>
+    <div class="group-title mb-2 mt-2"><i class="bi bi-<?= $gKey === '' ? 'lock' : 'tags' ?> me-1"></i>
+        <?= $gKey === '' ? 'Internal plans (not sold)' : safe_output(($productNames[$gKey] ?? $gKey) . ' plans', '') ?></div>
+    <div class="row g-3 mb-3">
+        <?php foreach ($gPlans as $p): $nMods = count($p['_features']); ?>
         <div class="col-12 col-md-6 col-xl-4">
             <div class="card plan-card detail-card h-100 <?= $p['is_active'] ? '' : 'retired' ?>">
                 <div class="card-header d-flex justify-content-between align-items-center gap-2">
@@ -218,9 +296,55 @@ foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
         </div>
         <?php endforeach; ?>
     </div>
+    <?php endforeach; ?>
     <?php endif; ?>
     <?php endif; ?>
 </div>
+
+<?php if ($catalog && $products): ?>
+<!-- Edit product modal -->
+<div class="modal fade" id="productModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-grid-1x2 me-1"></i> Edit product</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="productForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" id="pp_key">
+                    <div id="product-message" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label">Product name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="pp_name" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" id="pp_desc" maxlength="255">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Sort order</label>
+                        <input type="number" class="form-control" id="pp_sort" min="0" max="9999">
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="pp_show">
+                        <label class="form-check-label" for="pp_show">On registration — its public plans are offered to new customers</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pp_active">
+                        <label class="form-check-label" for="pp_active">Active</label>
+                    </div>
+                    <div class="form-text mt-2">The name is display only — what the product does for a tenant is fixed and does not change with it.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Add/Edit modal -->
 <div class="modal fade" id="planModal" tabindex="-1">
@@ -297,6 +421,7 @@ foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
 
                         <div class="col-12">
                             <label class="form-label">Included modules</label>
+                            <div id="productNote" class="alert alert-primary py-1 px-2 small mb-2 d-none"></div>
                             <div class="feature-pick p-2">
                                 <div class="row row-cols-2 row-cols-md-3">
                                     <?php foreach ($availableFeatures as $f): ?>
@@ -372,7 +497,63 @@ foreach ($products as $pr) $productNames[$pr['product_key']] = $pr['name'];
 const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const CATALOG = <?= $catalog ? 'true' : 'false' ?>;
 const PLANS = <?= json_encode((object)$planData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const PRODUCTS = <?= json_encode((object)$productData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const FULL_FORCED = <?= json_encode(array_values($fullForced), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
+
+// Smart BMS always carries every default module (the server enforces it too);
+// show that here so the form never pretends otherwise.
+function applyProductRules() {
+    const pk = CATALOG ? ($('#f_product').val() || '') : '';
+    $('.plan-feature').each(function () {
+        const forced = pk === 'bms_full' && FULL_FORCED.indexOf(this.value) !== -1;
+        if (forced) $(this).prop('checked', true);
+        $(this).prop('disabled', forced);
+    });
+    const note = $('#productNote');
+    if (pk === 'bms_full') {
+        note.html('<i class="bi bi-lock me-1"></i>' + esc((PRODUCTS[pk] || {}).name || 'This product') + ' always includes every default module (locked below). Tick any extra modules. Simple Mode and Shop wording are turned off for its tenants.').removeClass('d-none');
+    } else if (pk === 'bms_shop') {
+        note.html('<i class="bi bi-shop me-1"></i>' + esc((PRODUCTS[pk] || {}).name || 'This product') + ' tenants get Simple Mode (locked), Shop wording and Supplier Access — the same setup as self-registration. Modules are exactly the ticks below.').removeClass('d-none');
+    } else {
+        note.addClass('d-none').html('');
+    }
+}
+$(document).on('change', '#f_product', applyProductRules);
+
+function openProduct(key) {
+    const p = PRODUCTS[key];
+    if (!p) return;
+    $('#pp_key').val(p.product_key);
+    $('#pp_name').val(p.name);
+    $('#pp_desc').val(p.description || '');
+    $('#pp_sort').val(p.sort_order || 0);
+    $('#pp_show').prop('checked', !!p.show_on_registration);
+    $('#pp_active').prop('checked', !!p.is_active);
+    $('#product-message').html('');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('productModal')).show();
+}
+$('#productForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]'), orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    $.ajax({ url: '/actions/superadmin_plans.php', method: 'POST', dataType: 'json', data: {
+        _csrf: SA_CSRF_TOKEN, action: 'save_product', product_key: $('#pp_key').val(),
+        name: $('#pp_name').val(), description: $('#pp_desc').val(), sort_order: $('#pp_sort').val(),
+        show_on_registration: $('#pp_show').is(':checked') ? '1' : '0', is_active: $('#pp_active').is(':checked') ? '1' : '0',
+    }}).done(function (res) {
+        if (res && res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+            Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 1600, showConfirmButton: false }).then(() => location.reload());
+        } else {
+            $('#product-message').html('<div class="alert alert-danger py-2 mb-0">' + esc((res && res.message) || 'Could not save.') + '</div>');
+        }
+    }).fail(function (xhr) {
+        let msg = 'Could not save.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        $('#product-message').html('<div class="alert alert-danger py-2 mb-0">' + esc(msg) + '</div>');
+    }).always(function () { btn.prop('disabled', false).html(orig); });
+});
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function termKey(v, u) { return parseInt(v, 10) + (u === 'year' ? 'y' : 'm'); }
@@ -470,14 +651,15 @@ function addAddonRow(a) {
 function resetForm() {
     $('#planForm')[0].reset();
     $('#f_id').val('');
-    $('.plan-feature').prop('checked', false);
+    $('.plan-feature').prop('checked', false).prop('disabled', false);
     $('#plan-message').html('');
     $('#priceRows, #itemRows, #addonRows').empty();
     if (CATALOG) { $('#f_product').val('').trigger('change'); renderAddonHead(); }
 }
 
-function openCreate() {
+function openCreate(productKey) {
     resetForm();
+    if (CATALOG && productKey) $('#f_product').val(productKey).trigger('change');
     $('#planModalTitle').html('<i class="bi bi-box-seam me-1"></i> New plan');
 }
 
@@ -493,7 +675,7 @@ function openEdit(id) {
     $('#f_sort').val(p.sort_order || 0);
     (p.feature_keys || []).forEach(function (k) { $('#pf_' + k).prop('checked', true); });
     if (CATALOG) {
-        $('#f_product').val(p.product_key || '').trigger('change');
+        $('#f_product').val(p.product_key || '').trigger('change');   // runs applyProductRules
         $('#f_tagline').val(p.tagline || '');
         $('#f_shops').val(p.max_shops !== null ? p.max_shops : '');
         $('#f_tier').val(p.tier_rank || 0);

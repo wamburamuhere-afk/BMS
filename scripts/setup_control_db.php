@@ -687,9 +687,13 @@ try {
     $admin->exec("
         INSERT IGNORE INTO `{$controlDb}`.`platform_products`
             (`product_key`, `name`, `description`, `show_on_registration`, `sort_order`)
-        VALUES ('bms_shop', 'BMS Shop Mode', 'Point of sale, stock and simple shop management.', 0, 1),
-               ('bms_full', 'BMS Full', 'The complete business management system.', 0, 2)
+        VALUES ('bms_shop', 'Smart POS', 'Point of sale, stock and simple shop management.', 0, 1),
+               ('bms_full', 'Smart BMS', 'The complete business management system.', 0, 2)
     ");
+    // 2026-10-18 rename — only rows still carrying the original seed name, so a
+    // name the operator typed is never overwritten. Re-running is a no-op.
+    $admin->exec("UPDATE `{$controlDb}`.`platform_products` SET `name` = 'Smart POS' WHERE `product_key` = 'bms_shop' AND `name` = 'BMS Shop Mode'");
+    $admin->exec("UPDATE `{$controlDb}`.`platform_products` SET `name` = 'Smart BMS' WHERE `product_key` = 'bms_full' AND `name` = 'BMS Full'");
     say('  · table platform_products ready (bms_shop, bms_full)');
 
     $plCols = $admin->query("

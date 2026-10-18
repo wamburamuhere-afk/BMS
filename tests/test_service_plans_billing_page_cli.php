@@ -33,13 +33,16 @@ register_shutdown_function(function () {
 section('A. wiring');
 $src = fn($f) => file_get_contents("$root/$f");
 $hdr = $src('header.php');
-$bPos = strpos($hdr, "getUrl('billing')"); $sPos = strpos($hdr, 'id="adminDropdown"');
-ok($bPos !== false && $sPos !== false && $bPos < $sPos, 'header: Billing is a top-level item before the Settings menu');
+$bPos = strpos($hdr, "getUrl('subscription')"); $sPos = strpos($hdr, 'id="adminDropdown"');
+ok($bPos !== false && $sPos !== false && $bPos < $sPos, 'header: Subscription is a top-level item before the Settings menu');
+ok(strpos($hdr, "t('Billing')") === false && substr_count($hdr, "t('Subscription')") >= 2, 'header: the item is called Subscription (top menu + phone menu)');
 ok(strpos($hdr, "\$_billing_visible = isAdmin() && function_exists('bmsCurrentTenantId') && bmsCurrentTenantId() !== null") !== false, 'header: Billing only for admins on a company subdomain');
 ok(substr_count($hdr, 'bms-billing-badge') >= 3 && strpos($hdr, "api/my_subscription.php') ?>?action=badge") !== false, 'header: badge in the top menu + phone menu, filled after load');
 ok(strpos($src('includes/settings_admin_nav.php'), "'my_subscription'") === false, 'Settings → Admin no longer lists My Subscription');
-ok(strpos($src('roots.php'), "'billing' => SETTINGS_DIR . '/billing.php'") !== false, 'route billing');
-ok(strpos($src('app/constant/settings/my_subscription.php'), "getUrl('billing')") !== false, 'old My Subscription redirects to Billing');
+ok(strpos($src('roots.php'), "'subscription' => SETTINGS_DIR . '/billing.php'") !== false, 'route subscription');
+ok(strpos($src('roots.php'), "'billing' => SETTINGS_DIR . '/billing.php'") !== false, 'old route billing still opens the page');
+ok(strpos($src('app/constant/settings/my_subscription.php'), "getUrl('subscription')") !== false, 'old My Subscription redirects to Subscription');
+ok(strpos($src('app/constant/settings/billing.php'), "\$page_title = 'Subscription';") !== false, 'page title is Subscription');
 ok(strpos($src('app/constant/settings/billing.php'), 'settingsAdminShellOpen') === false, 'Billing stands on its own (not inside the Settings shell)');
 ok(strpos($src('api/platform/customer_document.php'), "['draft', 'pending', 'reviewed']") !== false, 'customer copy refuses documents BJP has not approved');
 
@@ -230,7 +233,7 @@ ok(($q['status'] ?? '') === 'pending' && $q['approved_at'] === null && $q['refer
 ok(count($qi) === 2 && (int)$qi[0]['quantity'] === 1 && (int)$qi[0]['plan_price_id'] === (int)$P1y['id'] && $qi[0]['plan_addon_id'] === null
    && (int)$qi[1]['quantity'] === 2 && (int)$qi[1]['plan_addon_id'] === (int)$Pshop['id'] && (int)$qi[1]['plan_price_id'] === (int)$P1y['id'],
    'lines: the plan (qty 1) + the extra (qty 2), both stamped with plan + term');
-ok(strpos((string)$q['notes'], 'through Billing') !== false && strpos((string)$q['notes'], 'review') === false, 'notes the customer will see carry no staff instructions');
+ok(strpos((string)$q['notes'], 'through Subscription') !== false && strpos((string)$q['notes'], 'review') === false, 'notes the customer will see carry no staff instructions');
 $firstQ = (int)($q['sales_order_id'] ?? 0);
 
 section('B3. a wrong request is refused, nothing written');

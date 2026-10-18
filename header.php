@@ -1504,7 +1504,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         ?>
                         <?php if ($_billing_visible): ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('billing') ?>"><i class="bi bi-credit-card-2-front"></i> <?= t('Billing') ?>
+                            <a class="nav-link" href="<?= getUrl('subscription') ?>"><i class="bi bi-credit-card-2-front"></i> <?= t('Subscription') ?>
                                 <span class="badge rounded-pill d-none bms-billing-badge" style="background:#0d6efd;color:#fff">0</span></a>
                         </li>
                         <?php endif; ?>
@@ -1709,7 +1709,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             <?php endif; ?>
             <?php if (!empty($_billing_visible)): ?>
             <div class="list-group list-group-flush">
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('billing') ?>"><i class="bi bi-credit-card-2-front"></i><?= t('Billing') ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('subscription') ?>"><i class="bi bi-credit-card-2-front"></i><?= t('Subscription') ?>
                     <span class="badge rounded-pill d-none bms-billing-badge ms-1" style="background:#0d6efd;color:#fff">0</span></a>
             </div>
             <?php endif; ?>
