@@ -6,7 +6,8 @@
  *
  * Proves:
  *   1. platformProductProfile(): fixed by product_key (bms_shop / bms_full / none)
- *   2. a Smart BMS plan always stores every default-on module; Smart POS keeps its ticks
+ *   2. a product fixes its plan's modules (Smart POS = POS + Warehouses, Smart BMS =
+ *      every default-on module); only internal plans keep their ticks
  *   3. updatePlatformProduct(): validation + the registration switch
  *   4. actions/superadmin_plans.php save_product — guard + positive control
  *   5. setup_control_db.php renames the old product names (criteria-based, idempotent)
@@ -137,37 +138,42 @@ section('1. platformProductProfile()');
 $shop = platformProductProfile('bms_shop');
 ok('Smart POS: Simple Mode on + locked', $shop['simple_mode'] === true && $shop['simple_locked'] === true);
 ok('Smart POS: Shop wording on, Supplier Access on', $shop['shop_mode'] === true && $shop['supplier_access'] === true);
-ok('Smart POS: forces no modules (plan ticks rule)', $shop['forced_features'] === []);
+ok('Smart POS: fixed modules = Point of Sale + Warehouses (self-registration)', $shop['fixed_features'] === ['pos', 'warehouses']);
 $full = platformProductProfile('bms_full');
 $defaults = planDefaultOnFeatures();
 ok('Smart BMS: Simple Mode off, Shop wording off', $full['simple_mode'] === false && $full['shop_mode'] === false);
 ok('Smart BMS: Supplier Access left alone', $full['supplier_access'] === null);
-ok('Smart BMS: forces every default-on module', $defaults !== [] && $full['forced_features'] === $defaults, implode(',', $full['forced_features']));
+ok('Smart BMS: fixed modules = every default-on module', $defaults !== [] && $full['fixed_features'] === $defaults, implode(',', $full['fixed_features']));
 $none = platformProductProfile(null);
-ok('no product: changes nothing', $none['simple_mode'] === null && $none['shop_mode'] === null && $none['forced_features'] === []);
-ok('unknown product key: changes nothing', platformProductProfile('nope')['forced_features'] === []);
+ok('no product: changes nothing (ticks rule)', $none['simple_mode'] === null && $none['shop_mode'] === null && $none['fixed_features'] === null);
+ok('unknown product key: changes nothing', platformProductProfile('nope')['fixed_features'] === null);
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('2. Plan module list follows its product');
-$r = createPlan(['name' => 'Smart BMS Test Plan', 'max_users' => 5, 'feature_keys' => ['pos'],
+$sorted = function (array $a) { sort($a); return $a; };
+$r = createPlan(['name' => 'Smart BMS Test Plan', 'max_users' => 5, 'feature_keys' => ['field_reports'],
                  'product_key' => 'bms_full', 'is_public' => 0, 'tier_rank' => 5]);
 ok('Smart BMS plan created', $r['ok'] === true, (string)($r['error'] ?? ''));
 $fullPlanId = (int)$r['id']; $createdPlanIds[] = $fullPlanId;
 $keys = planFeatureKeys($fullPlanId);
-ok('…it stores every default-on module', count(array_diff($defaults, $keys)) === 0, 'missing: ' . implode(',', array_diff($defaults, $keys)));
-ok('…and keeps its own extra tick', in_array('pos', $keys, true));
+ok('…it stores exactly every default-on module', $sorted($keys) === $sorted(featureDependencyClosure($defaults)), implode(',', $keys));
+ok('…a stray tick is ignored', !in_array('field_reports', $keys, true));
 
-$ur = updatePlan($fullPlanId, ['name' => 'Smart BMS Test Plan', 'max_users' => 5, 'feature_keys' => ['pos'],
+$ur = updatePlan($fullPlanId, ['name' => 'Smart BMS Test Plan', 'max_users' => 5, 'feature_keys' => [],
                                'product_key' => 'bms_full', 'is_public' => 0, 'tier_rank' => 5]);
-ok('an update that unticks defaults…', $ur['ok'] === true, (string)($ur['error'] ?? ''));
-ok('…still keeps them all (server enforces)', count(array_diff($defaults, planFeatureKeys($fullPlanId))) === 0);
+ok('an update with no ticks…', $ur['ok'] === true, (string)($ur['error'] ?? ''));
+ok('…still keeps every default module (server decides)', count(array_diff($defaults, planFeatureKeys($fullPlanId))) === 0);
 
-$r = createPlan(['name' => 'Smart POS Test Plan', 'max_users' => 2, 'feature_keys' => ['pos'],
+$r = createPlan(['name' => 'Smart POS Test Plan', 'max_users' => 2, 'feature_keys' => ['hr', 'finance'],
                  'product_key' => 'bms_shop', 'is_public' => 0, 'tier_rank' => 1]);
 ok('Smart POS plan created', $r['ok'] === true, (string)($r['error'] ?? ''));
 $shopPlanId = (int)$r['id']; $createdPlanIds[] = $shopPlanId;
-$sk = planFeatureKeys($shopPlanId); sort($sk);
-ok('…it stores exactly its ticks (pos + its dependency warehouses)', $sk === ['pos', 'warehouses'], implode(',', $sk));
+ok('…it stores exactly Point of Sale + Warehouses, whatever was ticked', $sorted(planFeatureKeys($shopPlanId)) === ['pos', 'warehouses'], implode(',', planFeatureKeys($shopPlanId)));
+
+$r = createPlan(['name' => 'Internal Test Plan', 'max_users' => 2, 'feature_keys' => ['hr'], 'is_public' => 0]);
+ok('internal plan (no product) created', $r['ok'] === true, (string)($r['error'] ?? ''));
+$createdPlanIds[] = (int)$r['id'];
+ok('…it keeps its own ticks', planFeatureKeys((int)$r['id']) === ['hr'], implode(',', planFeatureKeys((int)$r['id'])));
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('3. updatePlatformProduct()');
@@ -237,6 +243,10 @@ ok('…Simple Mode on', tenantSetting($tenantId, 'pos_simple_mode') === '1');
 ok('…Simple Mode locked', simpleLocked($tenantId) === 1);
 ok('…Shop wording on', tenantSetting($tenantId, 'shop_mode') === '1');
 ok('…Supplier Access on', tenantSetting($tenantId, 'pos_supplier_access') === '1');
+$on = [];
+foreach (tenantFeatureMatrix($tenantId) as $f) if ($f['effective']) $on[] = $f['key'];
+sort($on);
+ok('…only Point of Sale + Warehouses on (same as self-registration)', $on === ['pos', 'warehouses'], implode(',', $on));
 
 $ar = applyPlanToTenant($tenantId, $fullPlanId);
 ok('apply Smart BMS plan', $ar['ok'] === true, (string)($ar['error'] ?? ''));
@@ -266,6 +276,9 @@ $html = route(SA_HOST, '/plans');
 ok('plans.php renders the Products section', str_contains($html, 'Edit product') && str_contains($html, 'id="productModal"'), substr($html, 0, 300));
 ok('…plans grouped by product', str_contains($html, 'Smart POS plans') || str_contains($html, 'Smart BMS plans') || str_contains($html, 'My Own Name plans'));
 ok('…no "Billing" wording left', !str_contains($html, 'Billing'));
+ok('…plan form has the read-only product modules box', str_contains($html, 'id="productModules"') && str_contains($html, 'id="moduleTicks"'));
+ok('…each product\'s fixed modules handed to the form', (bool)preg_match('/const PRODUCT_MODULES = \{[^;]*"bms_shop":\["Point of Sale","Warehouses"\]/', $html), substr((string)strstr($html, 'const PRODUCT_MODULES'), 0, 200));
+ok('…scrollable dialog fix for the wrapping form', str_contains($html, '.modal-dialog-scrollable .modal-content > form'));
 $login = (string)file_get_contents(__DIR__ . '/../login.php');
 foreach (['10,000', '25,000', '45,000', '85,000'] as $n) ok("login.php has no invented price $n", !str_contains($login, ">$n<"));
 ok('login.php has the "pricing is being prepared" state', str_contains($login, "pm_soon_title"));
