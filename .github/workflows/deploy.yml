@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  # "Run workflow" button on the Actions tab: re-deploys main (finishes any
+  # half-done deploy — tenant migrations, demo host, Apache reload) without SSH.
+  workflow_dispatch:
 
 jobs:
   # ── JOB 1: TEST ─────────────────────────────────────────────────────────────
@@ -199,6 +202,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
+          # Default is 10m. Two hosts × main migrations × every tenant DB can
+          # outgrow that (2026-10-18: timed out mid tenant-migrations on bms,
+          # so Apache was never reloaded and demo never deployed).
+          command_timeout: 30m
           # NOTE: appleboy/ssh-action with `script_stop: true` joins every YAML newline
           # with `;` before passing the script to bash. Multi-line bash constructs
           # (array literals, multi-line `for` loops, heredocs) get shredded by that
@@ -278,6 +285,9 @@ jobs:
           # in-flight requests and spawns fresh workers with the new code, so no
           # active connection is dropped. Both hosts share one Apache instance on
           # this server, so this runs once, outside the per-host loop, not twice.
+          # An extra reload also runs per host right after its main migrations,
+          # so fresh code is served even if a later, slower step (tenant
+          # migrations) stalls or times out (2026-10-18 incident).
           # Never allowed to fail the deploy: a stale-opcache window is a
           # transient staleness issue, not a correctness break, and must not be
           # able to veto a release the same way tenant migrations must not.
@@ -285,7 +295,7 @@ jobs:
             set -e
             HOSTS="bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz"
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
-            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; sudo systemctl reload apache2 || echo "⚠️  Apache reload failed on $h"; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
             sudo systemctl reload apache2 || echo "⚠️  Apache reload failed — some workers may keep serving pre-deploy PHP (stale opcache) until the next manual reload or worker recycle. Run: sudo systemctl reload apache2"
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
