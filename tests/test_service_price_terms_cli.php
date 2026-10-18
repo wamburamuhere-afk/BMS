@@ -195,7 +195,8 @@ ok(strpos($html, 'Fatal error') === false && strpos($html, 'Warning:') === false
 
 save_setting('pos_simple_mode', '1'); save_setting('pos_advanced_product', '0');
 $html = render('app/bms/product/services.php', ['search' => 'SPT-TEST']);
-ok(strpos($html, '_spt_section') === false, 'Simple POS short form: no price-term editor at all (unchanged)');
+ok(strpos($html, 'id="svc_spt_section"') === false && strpos($html, 'id="edit_svc_spt_section"') === false
+   && strpos($html, '_type_strip"') === false, 'Simple POS short form: no price-term editor and no plan switches (unchanged)');
 save_setting('pos_simple_mode', '0');
 
 $html = render('app/bms/product/service_view.php', ['id' => (string)$pid]);

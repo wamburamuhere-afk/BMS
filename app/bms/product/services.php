@@ -708,6 +708,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                     <!-- ── STEP 2: PRICING & BOM ──────────────────────────────── -->
                     <div id="svc_add_step2" style="<?= $simpleServiceForm ? '' : 'display:none;' ?>">
+                        <?php if (!$simpleServiceForm) { $sptPrefix = 'svc'; include ROOT_DIR . '/includes/service_type_switches.php'; } ?>
 
                         <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
                             <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
@@ -911,6 +912,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                     <!-- ── STEP 2: PRICING & BOM ──────────────────────────────── -->
                     <div id="svc_edit_step2" style="<?= $simpleServiceForm ? '' : 'display:none;' ?>">
+                        <?php if (!$simpleServiceForm) { $sptPrefix = 'edit_svc'; include ROOT_DIR . '/includes/service_type_switches.php'; } ?>
 
                         <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
                             <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
@@ -1726,6 +1728,7 @@ function sptReset(prefix) {
     if (map) $(map).val('').trigger('change');
     spRenderBar(prefix);
     sptSync(prefix);
+    svcTypeApply(prefix);
 }
 
 function sptLoad(prefix, productId) {
@@ -1755,8 +1758,14 @@ function sptLoad(prefix, productId) {
             if (sub) sub.checked = !!json.is_subscription;
             const tpl = document.getElementById(prefix + '_contract_template');
             if (tpl) $(tpl).val(json.contract_template_id ? String(json.contract_template_id) : '').trigger('change');
+            // Open with the switch the service was saved with; a Superadmin link opens locked.
+            const own = st.plans.length || sptBody(prefix).children.length || json.is_subscription || json.contract_template_id;
+            st.mode = st.mapped ? 'sa' : (own ? 'own' : null);
+            st.locked = !!st.mapped;
+            st.legacySub = !!json.is_subscription && !st.mapped;   // older own-plan subscription: leave the choice visible
             spRenderBar(prefix);
             sptSync(prefix);
+            svcTypeApply(prefix);
         })
         .catch(() => {});
 }
@@ -1783,6 +1792,10 @@ const SP_I18N = <?= json_encode([
     'map_text' => t('This service\'s own plans and price terms will be removed when you save. Its prices will come from Superadmin.'),
     'map_ok' => t('Yes, use Superadmin plans'),
     'check' => t('Please check the plans'),
+    'off_title' => t('Remove these plans?'),
+    'off_sa' => t('The link to the Superadmin plans will be removed when you save.'),
+    'off_own' => t('This service\'s plans and price terms will be removed when you save.'),
+    'off_ok' => t('Yes, remove'),
     'e_name' => t('Every plan needs a name.'), 'e_dup' => t('Two plans have the same name.'),
     'e_terms' => t('needs at least one price.'), 'e_term_name' => t('every price needs a term name.'),
     'e_term_dup' => t('two prices have the same term name.'),
@@ -1795,7 +1808,8 @@ const SP_PLATFORM = <?= json_encode($canMapPlatform ? $platformPlans : new stdCl
 const SP_STATE = {};
 
 function spState(prefix) {
-    return SP_STATE[prefix] || (SP_STATE[prefix] = { plans: [], active: 0, loadedPlans: 0, mapped: null, platformPlans: [], snap: null });
+    return SP_STATE[prefix] || (SP_STATE[prefix] = { plans: [], active: 0, loadedPlans: 0, mapped: null, platformPlans: [], snap: null,
+                                                     mode: null, locked: false, legacySub: false });
 }
 function spEsc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;'); }
 function spMoney(v) { return Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
@@ -1900,7 +1914,75 @@ function spHide(prefix) {
     if (inst) inst.hide();
 }
 
-function spAfterChange(prefix) { spRenderBar(prefix); sptSync(prefix); }
+function spAfterChange(prefix) { spRenderBar(prefix); sptSync(prefix); svcTypeApply(prefix); }
+
+// ── Service type strip (includes/service_type_switches.php) ─────────────────
+// Both off: the form is exactly as before. 'sa' = Superadmin plans, 'own' = plans/terms typed here.
+function svcTypeApply(prefix) {
+    const el = id => document.getElementById(prefix + id);
+    const sec = el('_spt_section');
+    if (!sec) return;
+    const st = spState(prefix), mode = st.mode;
+    const show = (node, on) => { if (node) node.classList.toggle('d-none', !on); };
+    show(sec, !!mode);
+    const sa = el('_type_sa'), own = el('_type_own');
+    if (sa) sa.checked = mode === 'sa';
+    if (own) own.checked = mode === 'own';
+    const locked = mode === 'sa' && !!st.mapped && st.locked;
+    [sa, own].forEach(s => { if (s) s.disabled = locked; });
+    show(el('_type_lock'), locked);
+    show(el('_spt_head'), mode === 'own');
+    show(el('_sp_bar'), mode === 'own' || !!st.mapped);
+    show(el('_platform_wrap'), mode === 'sa');
+    const sub = el('_is_subscription');
+    if (sub) {
+        // Superadmin plans always extend the tenant; an outside system is invoiced by hand.
+        if (mode === 'sa') sub.checked = true;
+        else if (!st.legacySub) sub.checked = false;
+        show(el('_sub_wrap'), mode === 'sa' || (mode === 'own' && st.legacySub));
+    }
+    show(el('_contract_wrap'), !!mode);
+    // Materials don't apply to a plan-sold service, nor a warehouse to a Superadmin plan.
+    const comp = document.getElementById(prefix === 'svc' ? 'svcComponentTable' : 'editSvcComponentTable');
+    if (comp) comp.closest('.table-responsive').classList.toggle('d-none', !!mode);
+    const wh = el('_warehouse_id');
+    if (wh && wh.tagName === 'SELECT') show(wh.closest('[class*="col-md-"]'), mode !== 'sa');
+}
+
+function svcTypeSwitch(prefix, kind, input) {
+    const st = spState(prefix), from = st.mode, want = input.checked ? kind : null;
+    if (want === from) return;
+    const has = from === 'sa' ? !!st.mapped
+              : from === 'own' ? (st.plans.length > 0 || sptBody(prefix).children.length > 0) : false;
+    const go = () => {
+        if (from) svcTypeClear(prefix, from);
+        st.mode = want;
+        spAfterChange(prefix);
+    };
+    if (!has) { go(); return; }
+    Swal.fire({ icon: 'warning', title: SP_I18N.off_title, text: from === 'sa' ? SP_I18N.off_sa : SP_I18N.off_own,
+                showCancelButton: true, confirmButtonText: SP_I18N.off_ok, cancelButtonText: SP_I18N.cancel, confirmButtonColor: '#0d6efd' })
+        .then(r => { if (r.isConfirmed) go(); else svcTypeApply(prefix); });
+}
+
+// Leaving a mode removes what it held (sent on Save, so a saved service is cleaned too).
+function svcTypeClear(prefix, mode) {
+    const st = spState(prefix);
+    spHide(prefix);
+    if (mode === 'sa') {
+        st.mapped = null; st.platformPlans = []; st.locked = false;
+        const map = document.getElementById(prefix + '_platform_product');
+        if (map) $(map).val('').trigger('change');
+    } else {
+        st.plans = [];
+        sptBody(prefix).innerHTML = '';
+    }
+    st.legacySub = false;
+    const sub = document.getElementById(prefix + '_is_subscription');
+    if (sub) sub.checked = false;
+    const tpl = document.getElementById(prefix + '_contract_template');
+    if (tpl) $(tpl).val('').trigger('change');
+}
 
 function spCancel(prefix) {
     const st = spState(prefix);
@@ -2095,6 +2177,7 @@ function spPlatformChanged(prefix) {
     if (key === st.mapped) return;
     const apply = () => {
         st.mapped = key;
+        if (!key) st.locked = false;   // unlinked here: the switches work again
         st.platformPlans = key ? (SP_PLATFORM[key] || []) : [];
         if (key) {
             st.plans = [];
@@ -2134,6 +2217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sub = document.getElementById(prefix + '_is_subscription');
         if (sub) sub.addEventListener('click', e => { if (spState(prefix).mapped && !sub.checked) e.preventDefault(); });
         spRenderBar(prefix);
+        svcTypeApply(prefix);
     });
 });
 
