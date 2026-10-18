@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-18 — feat(plans): the product fixes a plan's modules; plan form scrolls
+
+**Files:** `core/plans.php`, `app/superadmin/plans.php`, `tests/test_smart_products_cli.php`, `changelog.md`
+
+- **Modules come from the product, not from ticks** (`platformProductProfile()['fixed_features']`, applied by `planNormalizeFeaturesForProduct()` on plan save, on apply, in the public offer and on the plan cards):
+  - **Smart POS** (`bms_shop`): Point of Sale + Warehouses only (`SMART_POS_MODULES`), exactly what self-registration leaves on.
+  - **Smart BMS** (`bms_full`): every default-on module (`planDefaultOnFeatures()`). Extra ticks no longer count.
+  - **Internal plans** (no product) and any other product keep their own ticks, as before.
+  - Extra modules for one customer are granted on that tenant, not through a plan.
+- **Plan form (Superadmin → Plans):** for Smart POS / Smart BMS, the module tick grid is hidden. A read-only box lists the modules the product includes. The grid shows only for internal plans.
+- **Scroll fix:** the plan modal did not scroll, because a `<form>` sat between `.modal-content` and `.modal-body` and broke Bootstrap's scrollable dialog. That form is now the flex column, so the body scrolls and the header and footer stay fixed.
+- **Effect on live data:** an existing Smart POS / Smart BMS plan applies its product's module set the next time it is applied. Stored ticks are rewritten the next time the plan is saved. Tenants already on a plan keep their current modules until a plan is applied again.
+- Tests: `test_smart_products_cli.php` 60/60. It covers the fixed sets, stray ticks being ignored, internal plans keeping their ticks, a Smart POS apply leaving only POS + Warehouses on, and the form markup and scroll CSS.
+
 ## 2026-10-18 — fix(ci): test_smart_products_cli skips when there is no config
 
 **Files:** `tests/test_smart_products_cli.php`, `changelog.md`

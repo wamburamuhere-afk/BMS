@@ -43,7 +43,8 @@ try {
 
         foreach ($plans as &$p) {
             $pid = (int)$p['id'];
-            $p['_features'] = planFeatureKeys($pid);
+            // What applying gives: a product's fixed modules, else the plan's ticks.
+            $p['_features'] = planNormalizeFeaturesForProduct(planFeatureKeys($pid), $p['product_key'] ?? null);
             $p['_prices']   = $catalog ? planPrices($pid, true) : [];
             $idToTerm = [];
             foreach ($p['_prices'] as $pr) $idToTerm[(int)$pr['id']] = $pr['term_key'];
@@ -92,10 +93,20 @@ foreach ($plans as $p) {
     $productStats[$k]['plans']++;
     if ($p['is_active'] && !empty($p['is_public']) && $p['_prices']) $productStats[$k]['sellable']++;
 }
-$fullForced = $catalog ? planDefaultOnFeatures() : [];
+// Each product's fixed modules, as labels — the plan form shows these instead of ticks.
+$featureLabels = [];
+foreach ($availableFeatures as $f) $featureLabels[$f['feature_key']] = $f['label'];
+$productModules = [];
+if ($catalog) {
+    foreach ($products as $pr) {
+        $fixed = platformProductProfile($pr['product_key'])['fixed_features'];
+        if ($fixed === null) continue;
+        $productModules[$pr['product_key']] = array_values(array_map(fn($k) => (string)($featureLabels[$k] ?? $k), $fixed));
+    }
+}
 $productProfileText = [
-    'bms_shop' => 'Simple Mode on (locked), Shop wording, Supplier Access on — the self-registration setup. Modules = the plan\'s ticks.',
-    'bms_full' => 'Every default module always included; Simple Mode and Shop wording off. Extra modules = the plan\'s ticks.',
+    'bms_shop' => 'Point of Sale + Warehouses, Simple Mode on (locked), Shop wording, Supplier Access on — the self-registration setup.',
+    'bms_full' => 'Every default module; Simple Mode and Shop wording off.',
 ];
 // Plans grouped under their product (internal plans last).
 $planGroups = [];
@@ -145,7 +156,12 @@ foreach ($products as $pr) {
     .product-card .pc-head { background: #e7f0ff; border-bottom: 1px solid #b6ccfe; border-radius: 10px 10px 0 0; }
     .product-card.inactive { opacity: .65; }
     .group-title { font-weight: 600; color: #052c65; border-bottom: 2px solid #b6ccfe; padding-bottom: 4px; }
-    .plan-feature:disabled + label { color: #084298; font-weight: 600; }
+    /* A <form> between .modal-content and .modal-body breaks Bootstrap's scrollable
+       dialog; make the form the flex column so only the body scrolls. */
+    .modal-dialog-scrollable .modal-content > form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .product-modules { background: #e7f0ff; border: 1px solid #b6ccfe; border-radius: 8px; }
+    .product-modules .mod-chip { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #b6ccfe; color: #084298;
+        border-radius: 999px; padding: 2px 10px; font-size: .8rem; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -421,7 +437,8 @@ foreach ($products as $pr) {
 
                         <div class="col-12">
                             <label class="form-label">Included modules</label>
-                            <div id="productNote" class="alert alert-primary py-1 px-2 small mb-2 d-none"></div>
+                            <div id="productModules" class="product-modules p-2 d-none"></div>
+                            <div id="moduleTicks">
                             <div class="feature-pick p-2">
                                 <div class="row row-cols-2 row-cols-md-3">
                                     <?php foreach ($availableFeatures as $f): ?>
@@ -435,6 +452,7 @@ foreach ($products as $pr) {
                                 </div>
                             </div>
                             <div class="form-text">Applying this plan turns these modules ON for a tenant and everything else OFF.</div>
+                            </div>
                         </div>
 
                         <?php if ($catalog): ?>
@@ -498,25 +516,31 @@ const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const CATALOG = <?= $catalog ? 'true' : 'false' ?>;
 const PLANS = <?= json_encode((object)$planData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 const PRODUCTS = <?= json_encode((object)$productData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-const FULL_FORCED = <?= json_encode(array_values($fullForced), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const PRODUCT_MODULES = <?= json_encode((object)$productModules, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
-// Smart BMS always carries every default module (the server enforces it too);
-// show that here so the form never pretends otherwise.
+// A sold product fixes its modules (the server applies the same list), so the
+// ticks are only for internal plans; a product shows its list read-only.
+const PRODUCT_MODE_TEXT = {
+    bms_shop: 'Same setup as self-registration: Simple Mode (locked), Shop wording and Supplier Access.',
+    bms_full: 'Simple Mode and Shop wording are off for its tenants.',
+};
 function applyProductRules() {
     const pk = CATALOG ? ($('#f_product').val() || '') : '';
-    $('.plan-feature').each(function () {
-        const forced = pk === 'bms_full' && FULL_FORCED.indexOf(this.value) !== -1;
-        if (forced) $(this).prop('checked', true);
-        $(this).prop('disabled', forced);
-    });
-    const note = $('#productNote');
-    if (pk === 'bms_full') {
-        note.html('<i class="bi bi-lock me-1"></i>' + esc((PRODUCTS[pk] || {}).name || 'This product') + ' always includes every default module (locked below). Tick any extra modules. Simple Mode and Shop wording are turned off for its tenants.').removeClass('d-none');
-    } else if (pk === 'bms_shop') {
-        note.html('<i class="bi bi-shop me-1"></i>' + esc((PRODUCTS[pk] || {}).name || 'This product') + ' tenants get Simple Mode (locked), Shop wording and Supplier Access — the same setup as self-registration. Modules are exactly the ticks below.').removeClass('d-none');
+    const mods = PRODUCT_MODULES[pk];
+    const box = $('#productModules');
+    if (mods) {
+        const name = esc((PRODUCTS[pk] || {}).name || 'This product');
+        box.html('<div class="small fw-semibold mb-2" style="color:#052c65"><i class="bi bi-lock me-1"></i>' + name
+                 + ' always includes these modules — no ticks needed.</div>'
+                 + '<div class="d-flex flex-wrap gap-1 mb-2">'
+                 + mods.map(m => '<span class="mod-chip"><i class="bi bi-check2"></i>' + esc(m) + '</span>').join('') + '</div>'
+                 + '<div class="small text-muted">' + esc(PRODUCT_MODE_TEXT[pk] || '')
+                 + ' Extra modules for one customer are granted on that tenant.</div>').removeClass('d-none');
+        $('#moduleTicks').addClass('d-none');
     } else {
-        note.addClass('d-none').html('');
+        box.addClass('d-none').html('');
+        $('#moduleTicks').removeClass('d-none');
     }
 }
 $(document).on('change', '#f_product', applyProductRules);
@@ -651,7 +675,7 @@ function addAddonRow(a) {
 function resetForm() {
     $('#planForm')[0].reset();
     $('#f_id').val('');
-    $('.plan-feature').prop('checked', false).prop('disabled', false);
+    $('.plan-feature').prop('checked', false);
     $('#plan-message').html('');
     $('#priceRows, #itemRows, #addonRows').empty();
     if (CATALOG) { $('#f_product').val('').trigger('change'); renderAddonHead(); }
