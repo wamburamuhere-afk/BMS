@@ -142,8 +142,10 @@ ok((int)$t['vendor_customer_id'] === $cid && strpos((string)$t['vendor_customer_
 ok((int)$c->query("SELECT COUNT(*) FROM tenant_admin_log WHERE tenant_id = $t1 AND action = 'vendor_customer_linked'")->fetchColumn() === 1, 'link written to the tenant audit log');
 
 $r = call('api/field_reports/make_customer.php', ['visit_id' => $v1, 'mode' => 'create', 'customer_name' => 'VLINK-TEST Duplicate']);
-ok(empty($r['success']) && (int)$pdo->query("SELECT COUNT(*) FROM customers WHERE customer_name = 'VLINK-TEST Duplicate'")->fetchColumn() === 0,
-   'a company already linked cannot get a second customer');
+ok(!empty($r['success']) && !empty($r['already']) && (int)($r['customer_id'] ?? 0) === $cid
+   && (int)$pdo->query("SELECT COUNT(*) FROM customers WHERE customer_name = 'VLINK-TEST Duplicate'")->fetchColumn() === 0,
+   'a company already linked gets no second customer — the visit links to the existing one');
+ok((int)$c->query("SELECT COUNT(*) FROM tenant_admin_log WHERE tenant_id = $t1 AND action = 'vendor_customer_linked'")->fetchColumn() === 1, '…and no second link log row');
 $r = call('api/field_reports/make_customer.php', ['visit_id' => $v1], 'GET');
 ok((int)($r['linked_customer']['customer_id'] ?? 0) === $cid, 'preview now offers the linked customer');
 ok(count(array_filter($r['matches'] ?? [], fn($m) => (int)$m['customer_id'] === $cid)) === 1, 'and finds it by phone as a match');

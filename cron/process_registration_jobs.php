@@ -126,6 +126,14 @@ try {
 } catch (Throwable $e) {
     error_log('process_registration_jobs: finishSelfRegistration failed for tenant ' . $tenantId . ': ' . $e->getMessage());
 }
+// On BJP's install (BMS_VENDOR_CONTEXT=1) the new company becomes a customer now;
+// elsewhere vendor_bridge_retry / background jobs on the root pick it up.
+try {
+    global $pdo;
+    if ($pdo instanceof PDO) vlDrainLinkQueue($pdo, 5);
+} catch (Throwable $e) {
+    error_log('process_registration_jobs: vlDrainLinkQueue: ' . $e->getMessage());
+}
 
 // ── Issue a Bearer token into the new tenant DB ───────────────────────────────
 $token    = null;

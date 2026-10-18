@@ -419,6 +419,7 @@ try {
           FROM vendor_bridge_alerts a
           LEFT JOIN tenants t ON t.id = a.tenant_id
          WHERE a.resolved_at IS NULL
+           AND a.kind <> 'possible_match'   -- decided by BJP staff on the Customers page, not here
          ORDER BY a.created_at DESC
          LIMIT 50
     ")->fetchAll();

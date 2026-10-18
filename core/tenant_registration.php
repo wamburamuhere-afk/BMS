@@ -30,6 +30,7 @@ require_once __DIR__ . '/tenant_resolver.php';
 require_once __DIR__ . '/tenant_provisioner.php';
 require_once __DIR__ . '/platform_settings.php';
 require_once __DIR__ . '/plans.php';
+require_once __DIR__ . '/vendor_link.php';   // vlQueueTenantLink()
 
 /**
  * Throttle policy.
@@ -468,6 +469,11 @@ if (!function_exists('finishSelfRegistration')) {
                 error_log('finishSelfRegistration: contact email not saved for tenant ' . $tenantId . ': ' . $e->getMessage());
             }
         }
+
+        // One BJP customer for the new company (service_plans_plan.md Phase 4, D3).
+        // Queued here; BJP's own install creates it (vlDrainLinkQueue), since only
+        // it can see BJP's books.
+        vlQueueTenantLink($tenantId);
     }
 }
 

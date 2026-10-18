@@ -382,6 +382,8 @@ $('#registerForm').on('submit', function (e) {
         timeout: 120000,                 // provisioning builds ~300 tables
         success: function (res) {
             if (res && res.success) {
+                // Fire-and-forget: BJP's books record the new company as a customer.
+                if (navigator.sendBeacon) navigator.sendBeacon('/api/platform/vendor_link_kick.php');
                 Swal.fire({
                     icon: 'success',
                     title: '<?= $pageLang === "sw" ? "Akaunti yako iko tayari! 🎉" : "Your account is ready! 🎉" ?>',

@@ -65,31 +65,47 @@ try {
         if (!$c) frJson(['success' => false, 'message' => t('Customer not found')], 404);
     } elseif ($mode === 'create') {
         if (!canCreate('customers')) frJson(['success' => false, 'message' => t('Permission denied')], 403);
-        if (!empty($tenant['vendor_customer_id']) && $customerRow((int)$tenant['vendor_customer_id'])) {
-            frJson(['success' => false, 'message' => t('This company is already linked to a customer. Link the visit to that customer instead.')], 409);
+        // The one place a platform company's customer is created (service_plans_plan.md
+        // Phase 4): locked per company, so two clicks or two staff can never make two.
+        // The person already saw the look-alike customers in the preview, hence force.
+        $r = vlEnsureCustomerForTenant($pdo, (int)$tenant['id'], 'customer visit #' . $id, [
+            'force'   => true,
+            'user_id' => $me,
+            'who'     => $who,
+            'fields'  => [
+                'customer_name'  => $_POST['customer_name'] ?? '',
+                'company_name'   => $_POST['customer_name'] ?? '',
+                'contact_person' => $_POST['contact_person'] ?? '',
+                'phone'          => $_POST['phone'] ?? '',
+                'email'          => $_POST['email'] ?? '',
+                'address'        => $_POST['address'] ?? '',
+                'postal_address' => $_POST['postal_address'] ?? '',
+                'tin_number'     => $_POST['tin_number'] ?? '',
+                'business'       => $_POST['business'] ?? '',
+                'notes'          => 'From Customer Visit #' . $id . ' — ' . $tenant['subdomain'],
+            ],
+        ]);
+        if (!in_array($r['state'], ['created', 'linked'], true)) {
+            error_log("field_reports/make_customer: visit $id: {$r['state']} — {$r['message']}");
+            frJson(['success' => false, 'message' => t('Server error')], 500);
         }
-        $pdo->beginTransaction();
-        $cid = vlCreateCustomer($pdo, [
-            'customer_name'  => $_POST['customer_name'] ?? '',
-            'company_name'   => $_POST['customer_name'] ?? '',
-            'contact_person' => $_POST['contact_person'] ?? '',
-            'phone'          => $_POST['phone'] ?? '',
-            'email'          => $_POST['email'] ?? '',
-            'address'        => $_POST['address'] ?? '',
-            'postal_address' => $_POST['postal_address'] ?? '',
-            'tin_number'     => $_POST['tin_number'] ?? '',
-            'business'       => $_POST['business'] ?? '',
-            'notes'          => 'From Customer Visit #' . $id . ' — ' . $tenant['subdomain'],
-        ], $me);
-        $pdo->commit();
+        $cid = (int)$r['customer_id'];
         $c = $customerRow($cid);
+        if ($r['state'] === 'linked') {
+            // Already a customer: link the visit only, never a second customer.
+            $pdo->prepare("UPDATE field_visits SET customer_id = ?, updated_by = ? WHERE visit_id = ?")->execute([$cid, $me, $id]);
+            frJson(['success' => true, 'customer_id' => $cid, 'customer_code' => $c['customer_code'], 'already' => true,
+                    'message' => sprintf(t('Already a customer — %s. The visit is linked to it.'), $c['customer_code'])]);
+        }
         logActivity($pdo, $me, 'Create customer', "Customer {$c['customer_code']} created from Customer Visit #$id ({$tenant['subdomain']})");
     } else {
         frJson(['success' => false, 'message' => t('Choose whether to create a new customer or link an existing one.')], 422);
     }
 
-    $r = vlSetTenantCustomer((int)$tenant['id'], $cid, $who, $c['customer_code'] . ' — ' . $c['customer_name']);
-    if (!$r['ok']) frJson(['success' => false, 'message' => $r['error']], 409);
+    if ($mode === 'link') {   // 'create' linked the company itself, under its lock
+        $r = vlSetTenantCustomer((int)$tenant['id'], $cid, $who, $c['customer_code'] . ' — ' . $c['customer_name']);
+        if (!$r['ok']) frJson(['success' => false, 'message' => $r['error']], 409);
+    }
     $pdo->prepare("UPDATE field_visits SET customer_id = ?, updated_by = ? WHERE visit_id = ?")->execute([$cid, $me, $id]);
     vendorRequeueCustomer($pdo, $cid);   // paid invoices that were waiting for this link apply now
     logAudit($pdo, $me, 'vendor_customer_linked', [
