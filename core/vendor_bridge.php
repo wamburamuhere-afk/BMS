@@ -119,7 +119,10 @@ if (!function_exists('vbSubscriptionLines')) {
         $termCols = sptLineColumnsReady($pdo, 'invoice_items')
             ? 'ii.term_duration_value, ii.term_duration_unit, ii.price_term_label'
             : 'NULL AS term_duration_value, NULL AS term_duration_unit, NULL AS price_term_label';
-        $st = $pdo->prepare("SELECT ii.invoice_item_id, ii.product_name, ii.quantity, ii.line_total, $termCols
+        $planCols = sptPlanLineColumnsReady($pdo, 'invoice_items')
+            ? 'ii.plan_key, ii.plan_name, ii.plan_price_id, ii.plan_addon_id, ii.addon_quota, ii.addon_units'
+            : 'NULL AS plan_key, NULL AS plan_name, NULL AS plan_price_id, NULL AS plan_addon_id, NULL AS addon_quota, NULL AS addon_units';
+        $st = $pdo->prepare("SELECT ii.invoice_item_id, ii.product_name, ii.quantity, ii.line_total, $termCols, $planCols
                                FROM invoice_items ii
                                JOIN vendor_subscription_services vss ON vss.product_id = ii.product_id
                               WHERE ii.invoice_id = ?");
@@ -155,7 +158,9 @@ if (!function_exists('vbProcessInvoice')) {
             $ref = (string)$inv['invoice_number'];
             $cid = (int)$inv['customer_id'];
 
-            $months = 0; $amount = 0.0;
+            // Plan line (sets the plan, qty 1), its extras (more shops/users for the
+            // same period — no months of their own), and plain subscription lines.
+            $months = 0; $amount = 0.0; $planKey = null; $planName = null; $extras = [];
             foreach ($lines as $l) {
                 $m = ($l['term_duration_value'] !== null && $l['term_duration_unit'] !== null)
                     ? sptMonths((int)$l['term_duration_value'], (string)$l['term_duration_unit']) : null;
@@ -164,8 +169,24 @@ if (!function_exists('vbProcessInvoice')) {
                     vbAlert(null, $cid, $ref, 'no_term', "Invoice $ref is paid, but \"{$l['product_name']}\" has no month/year term (or a fractional quantity), so the months could not be worked out. Extend the company by hand.");
                     return ['state' => 'alerted', 'message' => 'subscription line without a usable term'];
                 }
-                $months += (int)round($qty) * $m;
                 $amount += (float)$l['line_total'];
+                if (!empty($l['plan_addon_id'])) {
+                    $q = (string)$l['addon_quota'];
+                    $extras[$q] = ($extras[$q] ?? 0) + (int)round($qty) * max(0, (int)$l['addon_units']);
+                    continue;
+                }
+                if (!empty($l['plan_key'])) {
+                    if ($planKey !== null && $planKey !== $l['plan_key']) {
+                        vbAlert(null, $cid, $ref, 'no_term', "Invoice $ref is paid, but it sells two different plans. Set the company's plan by hand.");
+                        return ['state' => 'alerted', 'message' => 'two plans on one invoice'];
+                    }
+                    $planKey = (string)$l['plan_key']; $planName = (string)$l['plan_name'];
+                }
+                $months += (int)round($qty) * $m;
+            }
+            if ($months < 1) {
+                vbAlert(null, $cid, $ref, 'no_term', "Invoice $ref is paid, but it has extras only and no plan or period line, so the months could not be worked out. Extend the company by hand.");
+                return ['state' => 'alerted', 'message' => 'no period line'];
             }
 
             if (!vlLinkReady()) return ['state' => 'retry', 'message' => 'control database not upgraded yet'];
@@ -181,17 +202,56 @@ if (!function_exists('vbProcessInvoice')) {
             }
 
             $t = $tenants[0];
-            $r = applySubscriptionPayment((int)$t['id'], $months, (int)round($amount), 'vendor_invoice', $ref,
-                "BJP invoice $ref — paid in full", null);
+            $tid = (int)$t['id'];
+            // Months, plan and extras commit together: a crash in between can never
+            // leave the period paid but the plan (or its extras) missing.
+            $ctrl = getControlPdo();
+            $ctrl->beginTransaction();
+            try {
+                $r = applySubscriptionPayment($tid, $months, (int)round($amount), 'vendor_invoice', $ref,
+                    "BJP invoice $ref — paid in full", null);
+                if (!$r['ok'] || $r['duplicate']) {
+                    $ctrl->rollBack();
+                } else {
+                    $planNote = null;
+                    $grantStart = date('Y-m-d');
+                    if ($planKey !== null) {
+                        require_once __DIR__ . '/plans.php';
+                        $pr = planApplyPaid($tid, $planKey, (string)$r['starts_at']);
+                        if ($pr['ok']) {
+                            $grantStart = (string)$pr['grant_start'];
+                            $planNote = $pr['action'] === 'scheduled' ? "; changes to $planName on $grantStart"
+                                      : ($pr['action'] === 'applied' ? "; plan now $planName" : '');
+                        } else {
+                            // The months are paid for — keep them, and ask a person to set the plan.
+                            vbAlert($tid, $cid, $ref, 'apply_failed', "Invoice $ref extended {$t['subdomain']}, but the plan \"$planName\" could not be applied: {$pr['error']}. Set the plan by hand.");
+                            $planNote = '; plan NOT applied';
+                        }
+                    }
+                    if ($extras) {
+                        require_once __DIR__ . '/plans.php';
+                        foreach ($extras as $quota => $units) {
+                            planGrantAddon($tid, (string)$quota, (int)$units, $grantStart, (string)$r['ends_at'], $ref);
+                            tenantLifecycleLog($tid, (string)$t['subdomain'], 'addon_granted',
+                                "+$units " . ($quota === 'max_shops' ? 'shop(s)' : 'user(s)') . " from $grantStart to {$r['ends_at']} ($ref)", 'BJP invoice bridge');
+                        }
+                    }
+                    $ctrl->commit();
+                    $r['plan_note'] = $planNote;
+                }
+            } catch (Throwable $e) {
+                if ($ctrl->inTransaction()) $ctrl->rollBack();
+                throw $e;
+            }
             if (!$r['ok']) {
-                vbAlert((int)$t['id'], $cid, $ref, 'apply_failed', "Invoice $ref is paid but could not extend {$t['subdomain']}: {$r['error']}");
+                vbAlert($tid, $cid, $ref, 'apply_failed', "Invoice $ref is paid but could not extend {$t['subdomain']}: {$r['error']}");
                 return ['state' => 'alerted', 'message' => (string)$r['error']];
             }
-            vbResolveAlerts($ref, 'applied');
+            if (($r['plan_note'] ?? null) !== '; plan NOT applied') vbResolveAlerts($ref, 'applied');
             // Phase 6: the subscription agreement for this payment (only if the service has a contract template).
             require_once __DIR__ . '/subscription_contracts.php';
             scCreateForInvoice($pdo, $invoiceId, $t, $r['starts_at'] ?? null, $r['ends_at'] ?? null);
-            return ['state' => 'done', 'message' => $r['duplicate'] ? 'already applied' : "extended {$t['subdomain']} by $months month(s) to {$r['ends_at']}",
+            return ['state' => 'done', 'message' => $r['duplicate'] ? 'already applied' : "extended {$t['subdomain']} by $months month(s) to {$r['ends_at']}" . ($r['plan_note'] ?? ''),
                     'tenant_id' => (int)$t['id'], 'months' => $months, 'ends_at' => (string)$r['ends_at']];
         } catch (Throwable $e) {
             error_log("vbProcessInvoice($invoiceId): " . $e->getMessage());

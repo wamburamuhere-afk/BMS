@@ -1498,7 +1498,16 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         // no longer delegable via Roles & Permissions.
                         // Tax (tax_settings) removed from the menu 2026-10-02: no code reads its
                         // values — VAT comes from each product's tax rate, TIN from company_tin.
+                        // Billing (service_plans_plan.md D10): top level, before Settings, company admins
+                        // on their own subdomain only — never on the platform root.
+                        $_billing_visible = isAdmin() && function_exists('bmsCurrentTenantId') && bmsCurrentTenantId() !== null;
                         ?>
+                        <?php if ($_billing_visible): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('billing') ?>"><i class="bi bi-credit-card-2-front"></i> <?= t('Billing') ?>
+                                <span class="badge rounded-pill d-none bms-billing-badge" style="background:#0d6efd;color:#fff">0</span></a>
+                        </li>
+                        <?php endif; ?>
                         <?php if ($_set_sys_visible): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -1698,6 +1707,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Customer Visits') ?></a><?php endif; ?>
             </div>
             <?php endif; ?>
+            <?php if (!empty($_billing_visible)): ?>
+            <div class="list-group list-group-flush">
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('billing') ?>"><i class="bi bi-credit-card-2-front"></i><?= t('Billing') ?>
+                    <span class="badge rounded-pill d-none bms-billing-badge ms-1" style="background:#0d6efd;color:#fff">0</span></a>
+            </div>
+            <?php endif; ?>
             <?php if ($_set_sys_visible): ?>
             <div class="bn-group"><?= t('Settings') ?></div>
             <div class="list-group list-group-flush">
@@ -1782,6 +1797,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     })();
     </script>
     <?php endif; // posSimpleModeEnabled() bottom bar ?>
+
+    <?php if (!empty($_billing_visible)): ?>
+    <script>
+    // Billing badge: new quotations / invoices from BJP — asked once the page has loaded (cached 10 min server-side).
+    window.addEventListener('load', function () {
+        if (!window.fetch) return;
+        fetch('<?= buildUrl('api/my_subscription.php') ?>?action=badge', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                var n = r && r.success ? parseInt(r.new, 10) || 0 : 0;
+                document.querySelectorAll('.bms-billing-badge').forEach(function (b) { b.textContent = n; b.classList.toggle('d-none', n < 1); });
+            }).catch(function () {});
+    });
+    </script>
+    <?php endif; ?>
 
     <script>
     /* Runs synchronously — header is in the DOM, body content not yet rendered */

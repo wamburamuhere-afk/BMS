@@ -42,6 +42,11 @@ try {
         $sets[] = 'pos_mode = ?'; $params[] = $body['pos_mode'];
     }
     if (in_array($body['status'] ?? '', ['active','inactive'], true)) {
+        if ($body['status'] === 'active' && function_exists('tenantCanActivateShop') && !tenantCanActivateShop($pdo, $warehouse_id)) {
+            http_response_code(422);
+            echo json_encode(['success'=>false,'message'=>tenantShopLimitMessage(),'code'=>'shop_limit_reached']);
+            exit;
+        }
         $sets[] = 'status = ?'; $params[] = $body['status'];
     }
 

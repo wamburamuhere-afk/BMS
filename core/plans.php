@@ -829,11 +829,173 @@ if (!function_exists('applyPlanToTenant')) {
             getControlPdo()->prepare("UPDATE tenants SET max_shops = ? WHERE id = ?")
                 ->execute([$plan['max_shops'] !== null ? (int)$plan['max_shops'] : null, $tenantId]);
         }
+        // Whatever is applied now wins over a plan change that was waiting.
+        planClearSchedule($tenantId);
 
         logTenantAdminAction($tenantId, $t['subdomain'], 'apply_plan',
             $plan['name'] . ' — ' . $fr['changed'] . ' feature change(s), quotas '
             . ($qr['changed'] ? 'updated' : 'unchanged'));
 
         return ['ok' => true, 'error' => null, 'features_changed' => $fr['changed'], 'quotas_changed' => $qr['changed']];
+    }
+}
+
+// ── A paid plan (BJP invoice bridge, service_plans_plan.md Phase 5, D5) ──────
+
+if (!function_exists('planWeight')) {
+    /** Upgrade vs downgrade: tier_rank first, then the default price per month. */
+    function planWeight(array $plan): array
+    {
+        $perMonth = null;
+        foreach (planPrices((int)$plan['id'], true) as $p) {
+            $pm = (int)$p['price_tzs'] / max(1, (int)$p['months']);
+            if ((int)$p['is_default'] === 1) { $perMonth = $pm; break; }
+            $perMonth = $perMonth === null ? $pm : min($perMonth, $pm);
+        }
+        return [(int)($plan['tier_rank'] ?? 0), (float)($perMonth ?? 0)];
+    }
+}
+
+if (!function_exists('planClearSchedule')) {
+    function planClearSchedule(int $tenantId): void
+    {
+        if (!controlColumnExists('tenants', 'scheduled_plan_key')) return;
+        getControlPdo()->prepare("UPDATE tenants SET scheduled_plan_key = NULL, scheduled_plan_at = NULL WHERE id = ?")->execute([$tenantId]);
+    }
+}
+
+if (!function_exists('planApplyPaid')) {
+    /**
+     * A fully paid invoice sold $planKey for the period starting $periodStart.
+     *   same plan            → extend only (superadmin's custom grants stay)
+     *   no plan / higher     → apply now
+     *   lower or equal tier  → wait for $periodStart (the end of what is paid now)
+     * Runs inside the caller's control transaction (the tenant row is locked).
+     *
+     * @return array{ok:bool, error:?string, action:?string, grant_start:?string}
+     */
+    function planApplyPaid(int $tenantId, string $planKey, string $periodStart, string $actor = 'BJP invoice bridge'): array
+    {
+        $res = ['ok' => false, 'error' => null, 'action' => null, 'grant_start' => date('Y-m-d')];
+        $today = date('Y-m-d');
+        $new = getPlanByKey($planKey);
+        if (!$new || $planKey === 'blank') { $res['error'] = "Plan \"$planKey\" no longer exists."; return $res; }
+        $hasSched = controlColumnExists('tenants', 'scheduled_plan_key');
+        $st = getControlPdo()->prepare("SELECT subdomain, plan" . ($hasSched ? ", scheduled_plan_key, scheduled_plan_at" : "")
+                                     . " FROM tenants WHERE id = ? LIMIT 1");
+        $st->execute([$tenantId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t) { $res['error'] = 'Tenant not found.'; return $res; }
+        $sub = (string)$t['subdomain'];
+        $current = (string)($t['plan'] ?? '');
+
+        if ($current === $planKey) {
+            planClearSchedule($tenantId);
+            tenantLifecycleLog($tenantId, $sub, 'plan_renewed', "{$new['name']} renewed — modules and limits left as they are", $actor);
+            return ['ok' => true, 'error' => null, 'action' => 'extended', 'grant_start' => $today];
+        }
+
+        $cur = ($current !== '' && $current !== 'blank') ? getPlanByKey($current) : null;
+        $upgrade = $cur === null || planWeight($new) > planWeight($cur);
+        if ($upgrade || $periodStart <= $today) {
+            $a = applyPlanToTenant($tenantId, (int)$new['id']);
+            if (!$a['ok']) { $res['error'] = (string)$a['error']; return $res; }
+            planClearSchedule($tenantId);
+            tenantLifecycleLog($tenantId, $sub, $upgrade ? 'plan_upgraded' : 'plan_changed',
+                ($cur ? $cur['name'] : 'No plan') . " → {$new['name']} (paid)", $actor);
+            return ['ok' => true, 'error' => null, 'action' => 'applied', 'grant_start' => $today];
+        }
+
+        if (!(int)$new['is_active']) { $res['error'] = 'This plan is retired and can no longer be applied.'; return $res; }
+        if (!$hasSched) {
+            $res['error'] = 'The control database has not been upgraded for scheduled plan changes (run scripts/setup_control_db.php).';
+            return $res;
+        }
+        // Paying the same lower plan twice must not push the change further out.
+        $at = $periodStart;
+        if ((string)($t['scheduled_plan_key'] ?? '') === $planKey && !empty($t['scheduled_plan_at']) && $t['scheduled_plan_at'] < $at) {
+            $at = (string)$t['scheduled_plan_at'];
+        }
+        getControlPdo()->prepare("UPDATE tenants SET scheduled_plan_key = ?, scheduled_plan_at = ? WHERE id = ?")
+            ->execute([$planKey, $at, $tenantId]);
+        tenantLifecycleLog($tenantId, $sub, 'plan_change_scheduled', "{$cur['name']} → {$new['name']} on $at (end of the period already paid)", $actor);
+        return ['ok' => true, 'error' => null, 'action' => 'scheduled', 'grant_start' => $at];
+    }
+}
+
+if (!function_exists('planGrantAddon')) {
+    /**
+     * Extra shops/users bought with a plan period. The newest purchase for a
+     * quota replaces older ones from its start date (it already counts every
+     * extra the company wants), so a renewal never adds up twice.
+     */
+    function planGrantAddon(int $tenantId, string $quota, int $units, string $startsAt, string $endsAt, ?string $sourceRef): void
+    {
+        if ($units <= 0 || !in_array($quota, ['max_shops', 'max_users'], true) || $endsAt < $startsAt) return;
+        $c = getControlPdo();
+        $c->prepare("UPDATE tenant_addon_grants SET ends_at = DATE_SUB(?, INTERVAL 1 DAY)
+                      WHERE tenant_id = ? AND quota = ? AND ends_at >= ?")
+          ->execute([$startsAt, $tenantId, $quota, $startsAt]);
+        $c->prepare("INSERT INTO tenant_addon_grants (tenant_id, quota, units, starts_at, ends_at, source_ref) VALUES (?, ?, ?, ?, ?, ?)")
+          ->execute([$tenantId, $quota, $units, $startsAt, $endsAt, $sourceRef !== null ? mb_substr($sourceRef, 0, 64) : null]);
+    }
+}
+
+if (!function_exists('planAddonGrants')) {
+    /** A tenant's add-on grants that are active now or start later (for display). */
+    function planAddonGrants(int $tenantId): array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT quota, units, starts_at, ends_at, source_ref FROM tenant_addon_grants
+                                             WHERE tenant_id = ? AND ends_at >= CURDATE() AND ends_at >= starts_at
+                                             ORDER BY starts_at, id");
+            $st->execute([$tenantId]);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+}
+
+if (!function_exists('planApplyDueScheduled')) {
+    /**
+     * Apply paid downgrades whose date has come (one tenant, or all when null).
+     * Called by api/cron/vendor_bridge_retry.php and lazily when superadmin
+     * opens a tenant. Never throws. @return int how many were applied
+     */
+    function planApplyDueScheduled(?int $tenantId = null): int
+    {
+        if (!controlColumnExists('tenants', 'scheduled_plan_key')) return 0;
+        $n = 0;
+        try {
+            $c = getControlPdo();
+            $sql = "SELECT id FROM tenants WHERE scheduled_plan_key IS NOT NULL AND scheduled_plan_at <= CURDATE() AND status <> 'deleted'";
+            $st = $c->prepare($sql . ($tenantId !== null ? " AND id = ?" : ""));
+            $st->execute($tenantId !== null ? [$tenantId] : []);
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
+                $id = (int)$id;
+                try {
+                    $c->beginTransaction();
+                    $lk = $c->prepare("SELECT subdomain, plan, scheduled_plan_key, scheduled_plan_at FROM tenants WHERE id = ? FOR UPDATE");
+                    $lk->execute([$id]);
+                    $t = $lk->fetch(PDO::FETCH_ASSOC);
+                    if (!$t || $t['scheduled_plan_key'] === null || $t['scheduled_plan_at'] > date('Y-m-d')) { $c->commit(); continue; }
+                    $plan = getPlanByKey((string)$t['scheduled_plan_key']);
+                    $a = $plan ? applyPlanToTenant($id, (int)$plan['id']) : ['ok' => false, 'error' => 'plan no longer exists'];
+                    planClearSchedule($id);
+                    tenantLifecycleLog($id, (string)$t['subdomain'], $a['ok'] ? 'plan_downgrade_applied' : 'plan_downgrade_failed',
+                        $a['ok'] ? "{$t['plan']} → {$t['scheduled_plan_key']} (scheduled for {$t['scheduled_plan_at']})"
+                                 : "Could not change to {$t['scheduled_plan_key']}: {$a['error']} — set the plan by hand", 'system');
+                    $c->commit();
+                    if ($a['ok']) $n++;
+                } catch (Throwable $e) {
+                    if ($c->inTransaction()) $c->rollBack();
+                    error_log("planApplyDueScheduled($id): " . $e->getMessage());
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('planApplyDueScheduled: ' . $e->getMessage());
+        }
+        return $n;
     }
 }

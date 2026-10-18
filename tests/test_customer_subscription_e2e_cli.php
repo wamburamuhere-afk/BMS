@@ -148,7 +148,15 @@ ok(count($terms) === 3, 'the company sees the 3 periods with BJP prices');
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $svc, 'term_id' => $terms['6 Months']]);
 $qtNum = (string)($r['quotation_number'] ?? '');
 $qt = $pdo->query("SELECT * FROM quotations WHERE order_number = " . $pdo->quote($qtNum))->fetch(PDO::FETCH_ASSOC) ?: [];
-ok(!empty($r['success']) && ($qt['status'] ?? '') === 'approved' && (float)$qt['grand_total'] === 45000.0, "approved quotation $qtNum for 45,000 — no approval wait");
+// service_plans_plan.md D7: the request is a pending quotation the company cannot see until BJP approves it.
+ok(!empty($r['success']) && ($qt['status'] ?? '') === 'pending' && (float)$qt['grand_total'] === 45000.0, "pending quotation $qtNum for 45,000 — waiting for BJP");
+$docs = company($tid, ['action' => 'documents']);
+ok(count($docs['quotations'] ?? []) === 0 && count($docs['requests'] ?? []) === 1, 'the company sees only "waiting for BJP", not the quotation');
+$rv = bjp('api/account/review_quotation.php', ['quotation_id' => (int)$qt['sales_order_id'], 'id' => (int)$qt['sales_order_id']]);
+$ap = bjp('api/account/approve_quotation.php', ['quotation_id' => (int)$qt['sales_order_id'], 'id' => (int)$qt['sales_order_id']]);
+$docs = company($tid, ['action' => 'documents']);
+ok(!empty($rv['success']) && !empty($ap['success']) && ($docs['quotations'][0]['status'] ?? '') === 'approved' && count($docs['requests'] ?? []) === 0,
+   'BJP reviews + approves it (real endpoints) → the company sees the approved quotation');
 
 echo "\n── 3. BJP: quotation → sales order → invoice → payment ──\n";
 $r = bjp('api/account/convert_quote_to_order.php', ['quotation_id' => (int)$qt['sales_order_id'], 'id' => (int)$qt['sales_order_id']]);

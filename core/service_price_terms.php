@@ -219,6 +219,23 @@ if (!function_exists('vssPlatformProduct')) {
     }
 }
 
+if (!function_exists('vssPlatformProductsFor')) {
+    /** @return array<int,string> product id => platform product key, for those of $ids that are mapped */
+    function vssPlatformProductsFor(PDO $pdo, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids || !sptReady($pdo)) return [];
+        try {
+            $rows = $pdo->query("SELECT product_id, platform_product_key FROM vendor_subscription_services
+                                  WHERE platform_product_key IS NOT NULL AND platform_product_key <> ''
+                                    AND product_id IN (" . implode(',', $ids) . ")")->fetchAll(PDO::FETCH_KEY_PAIR);
+            return array_map('strval', $rows);
+        } catch (Throwable $e) {
+            return [];   // column not there yet
+        }
+    }
+}
+
 if (!function_exists('sptAssertNotMapped')) {
     /** Server-side lock: a service mapped to a platform product never takes local prices. */
     function sptAssertNotMapped(PDO $pdo, int $productId): void
@@ -475,7 +492,11 @@ if (!function_exists('sptResolveLineTerm')) {
     function sptResolveLineTerm(PDO $pdo, $productId, $termId, ?string $description, string $lineName = 'a line'): array
     {
         $none = ['price_term_id' => null, 'price_term_label' => null, 'term_duration_value' => null,
-                 'term_duration_unit' => null, 'description' => trim((string)$description)];
+                 'term_duration_unit' => null, 'description' => trim((string)$description)] + SPT_PLAN_LINE_NONE;
+        // A platform plan price ("p12") or add-on ("a3-12") — read from the control DB.
+        if (sptParseLineToken($termId) !== null) {
+            return sptResolvePlanToken($pdo, (int)$productId, sptParseLineToken($termId), $description, $lineName);
+        }
         $termId = (int)$termId;
         if ($termId <= 0 || !sptReady($pdo)) return $none;
 
@@ -499,7 +520,161 @@ if (!function_exists('sptResolveLineTerm')) {
             'term_duration_value' => (int)$t['duration_value'],
             'term_duration_unit'  => $t['duration_unit'],
             'description'         => ($desc !== '' ? $desc . "\n" : '') . 'Term: ' . $label,
+        ] + SPT_PLAN_LINE_NONE;
+    }
+}
+
+/* ── Platform plans on document lines (service_plans_plan.md Phase 5, D9) ──────
+ * A service mapped to a platform product sells the superadmin's plans. Its line
+ * "term" is a token: "p{plan_price_id}" for the plan, "a{addon_id}-{plan_price_id}"
+ * for an add-on locked to that plan's term. price_term_id stays NULL (it points
+ * at BJP's local terms); the plan snapshot goes in the plan_* columns. */
+
+if (!defined('SPT_PLAN_LINE_NONE')) {
+    define('SPT_PLAN_LINE_NONE', ['plan_key' => null, 'plan_name' => null, 'plan_price_id' => null,
+                                  'plan_addon_id' => null, 'addon_quota' => null, 'addon_units' => null]);
+}
+
+if (!function_exists('sptParseLineToken')) {
+    /** @return array{kind:string, plan_price_id:int, addon_id:?int}|null */
+    function sptParseLineToken($v): ?array
+    {
+        if (!is_string($v)) return null;
+        $v = trim($v);
+        if (preg_match('/^p([1-9]\d{0,9})$/', $v, $m)) return ['kind' => 'plan', 'plan_price_id' => (int)$m[1], 'addon_id' => null];
+        if (preg_match('/^a([1-9]\d{0,9})-([1-9]\d{0,9})$/', $v, $m)) return ['kind' => 'addon', 'plan_price_id' => (int)$m[2], 'addon_id' => (int)$m[1]];
+        return null;
+    }
+}
+
+if (!function_exists('sptLineToken')) {
+    /** The token a saved line was resolved from (null = a local term or no term). */
+    function sptLineToken(array $line): ?string
+    {
+        $pp = (int)($line['plan_price_id'] ?? 0);
+        if ($pp <= 0) return null;
+        $a = (int)($line['plan_addon_id'] ?? 0);
+        return $a > 0 ? "a{$a}-{$pp}" : "p{$pp}";
+    }
+}
+
+if (!function_exists('sptResolvePlanToken')) {
+    /**
+     * Resolve a plan/add-on token against the CONTROL DB. The line's service must
+     * be mapped to the plan's platform product. A retired price still resolves,
+     * so an older document can be re-saved.
+     *
+     * @throws InvalidArgumentException
+     */
+    function sptResolvePlanToken(PDO $pdo, int $productId, array $tok, ?string $description, string $lineName): array
+    {
+        $bad = "The plan chosen for $lineName does not belong to that service. Choose the plan again.";
+        $productKey = vssPlatformProduct($pdo, $productId);
+        if ($productKey === null) throw new InvalidArgumentException($bad);
+        require_once __DIR__ . '/plans.php';
+        $pp = planPriceById($tok['plan_price_id']);
+        if (!$pp || (string)$pp['product_key'] !== $productKey) throw new InvalidArgumentException($bad);
+
+        $planLabel = sptDisplayLabel((string)$pp['plan_name'], (string)$pp['term_label']);
+        $out = [
+            'price_term_id'       => null,
+            'price_term_label'    => $planLabel,
+            'term_duration_value' => (int)$pp['duration_value'],
+            'term_duration_unit'  => (string)$pp['duration_unit'],
+            'plan_key'            => (string)$pp['plan_key'],
+            'plan_name'           => mb_substr((string)$pp['plan_name'], 0, 100),
+            'plan_price_id'       => (int)$pp['id'],
+        ] + SPT_PLAN_LINE_NONE;
+
+        if ($tok['kind'] === 'addon') {
+            $st = getControlPdo()->prepare("SELECT a.id, a.plan_id, a.name, a.quota, a.units FROM plan_addons a
+                                              JOIN plan_addon_prices ap ON ap.addon_id = a.id AND ap.plan_price_id = ?
+                                             WHERE a.id = ?");
+            $st->execute([(int)$pp['id'], $tok['addon_id']]);
+            $a = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$a || (int)$a['plan_id'] !== (int)$pp['plan_id']) {
+                throw new InvalidArgumentException("The extra chosen for $lineName is not sold with that plan and term. Choose it again.");
+            }
+            $out['price_term_label'] = sptDisplayLabel((string)$a['name'], $planLabel);
+            $out['plan_addon_id']    = (int)$a['id'];
+            $out['addon_quota']      = (string)$a['quota'];
+            $out['addon_units']      = (int)$a['units'];
+        }
+        $desc = sptStripTermLine($description);
+        $out['description'] = ($desc !== '' ? $desc . "\n" : '') . 'Term: ' . $out['price_term_label'];
+        return $out;
+    }
+}
+
+if (!function_exists('sptAssertPlanLines')) {
+    /**
+     * Whole-document rules for plan lines, checked after every line is resolved:
+     * one plan per document, plan qty 1 (a longer period is a longer term), and
+     * every add-on sits next to its own plan line with a whole, positive qty.
+     *
+     * @param array<int, array{term:array, qty:float|int|string, name:string}> $lines
+     * @throws InvalidArgumentException
+     */
+    function sptAssertPlanLines(array $lines): void
+    {
+        $planPrice = null;
+        foreach ($lines as $l) {
+            $t = $l['term'];
+            if (empty($t['plan_price_id']) || !empty($t['plan_addon_id'])) continue;
+            if ($planPrice !== null) throw new InvalidArgumentException('A document can sell only one plan. Remove the second plan line.');
+            if ((float)$l['qty'] != 1.0) {
+                throw new InvalidArgumentException("The plan line \"{$l['name']}\" must have quantity 1 — for a longer period choose a longer term instead.");
+            }
+            $planPrice = (int)$t['plan_price_id'];
+        }
+        foreach ($lines as $l) {
+            $t = $l['term'];
+            if (empty($t['plan_addon_id'])) continue;
+            if ($planPrice === null || (int)$t['plan_price_id'] !== $planPrice) {
+                throw new InvalidArgumentException("The extra \"{$l['name']}\" must be sold with its plan on the same document and the same term.");
+            }
+            $q = (float)$l['qty'];
+            if ($q < 1 || floor($q) != $q) throw new InvalidArgumentException("The quantity of \"{$l['name']}\" must be a whole number (1, 2, 3…).");
+        }
+    }
+}
+
+if (!function_exists('sptEnsurePlanLineColumns')) {
+    function sptEnsurePlanLineColumns(PDO $pdo): void
+    {
+        $cols = [
+            'plan_key'      => "ADD COLUMN `plan_key` VARCHAR(64) NULL DEFAULT NULL",
+            'plan_name'     => "ADD COLUMN `plan_name` VARCHAR(100) NULL DEFAULT NULL",
+            'plan_price_id' => "ADD COLUMN `plan_price_id` INT UNSIGNED NULL DEFAULT NULL",
+            'plan_addon_id' => "ADD COLUMN `plan_addon_id` INT UNSIGNED NULL DEFAULT NULL",
+            'addon_quota'   => "ADD COLUMN `addon_quota` VARCHAR(20) NULL DEFAULT NULL",
+            'addon_units'   => "ADD COLUMN `addon_units` INT NULL DEFAULT NULL",
         ];
+        foreach (array_keys(SPT_LINE_TABLES) as $t) {
+            if (!$pdo->query("SHOW TABLES LIKE " . $pdo->quote($t))->fetch()) continue;
+            foreach ($cols as $c => $ddl) {
+                if ($pdo->query("SHOW COLUMNS FROM `$t` LIKE " . $pdo->quote($c))->fetch()) continue;
+                try {
+                    $pdo->exec("ALTER TABLE `$t` $ddl");
+                    echo "  + $t.$c added\n";
+                } catch (PDOException $e) {
+                    if ((int)($e->errorInfo[1] ?? 0) !== 1060) throw $e;   // a concurrent run added it
+                }
+            }
+        }
+    }
+}
+
+if (!function_exists('sptPlanLineColumnsReady')) {
+    function sptPlanLineColumnsReady(PDO $pdo, string $table): bool
+    {
+        static $ready = [];
+        if (!empty($ready[$table])) return true;
+        try {
+            return $ready[$table] = (bool)$pdo->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "` LIKE 'addon_units'")->fetch();
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 }
 
@@ -507,24 +682,42 @@ if (!function_exists('sptStampLine')) {
     /** Write the resolved term onto a just-inserted line (no-op without a term or before the migration). */
     function sptStampLine(PDO $pdo, string $table, int $lineId, array $resolved): void
     {
-        if ($lineId <= 0 || empty($resolved['price_term_id']) || !isset(SPT_LINE_TABLES[$table])) return;
+        if ($lineId <= 0 || !isset(SPT_LINE_TABLES[$table])) return;
+        $isPlan = !empty($resolved['plan_price_id']);
+        if (empty($resolved['price_term_id']) && !$isPlan) return;
         if (!sptLineColumnsReady($pdo, $table)) return;
+        if ($isPlan && !sptPlanLineColumnsReady($pdo, $table)) {
+            throw new RuntimeException('Plan lines need the latest database update. Ask the administrator to run the migrations.');
+        }
         $pk = SPT_LINE_TABLES[$table];
-        $pdo->prepare("UPDATE `$table` SET price_term_id = ?, price_term_label = ?, term_duration_value = ?, term_duration_unit = ?
-                        WHERE `$pk` = ?")
-            ->execute([$resolved['price_term_id'], $resolved['price_term_label'], $resolved['term_duration_value'],
-                       $resolved['term_duration_unit'], $lineId]);
+        $sql = "UPDATE `$table` SET price_term_id = ?, price_term_label = ?, term_duration_value = ?, term_duration_unit = ?";
+        $args = [$resolved['price_term_id'], $resolved['price_term_label'], $resolved['term_duration_value'], $resolved['term_duration_unit']];
+        if ($isPlan) {
+            $sql .= ", plan_key = ?, plan_name = ?, plan_price_id = ?, plan_addon_id = ?, addon_quota = ?, addon_units = ?";
+            array_push($args, $resolved['plan_key'], $resolved['plan_name'], $resolved['plan_price_id'],
+                       $resolved['plan_addon_id'], $resolved['addon_quota'], $resolved['addon_units']);
+        }
+        $args[] = $lineId;
+        $pdo->prepare("$sql WHERE `$pk` = ?")->execute($args);
     }
 }
 
 if (!function_exists('sptTermOfSalesOrderLine')) {
-    /** The term recorded on a sales-order line — an invoice raised from it inherits it. */
-    function sptTermOfSalesOrderLine(PDO $pdo, int $orderItemId): ?int
+    /**
+     * The term recorded on a sales-order line — an invoice raised from it inherits
+     * it. A local term comes back as its id, a platform plan line as its token.
+     *
+     * @return int|string|null
+     */
+    function sptTermOfSalesOrderLine(PDO $pdo, int $orderItemId)
     {
         if ($orderItemId <= 0 || !sptLineColumnsReady($pdo, 'sales_order_items')) return null;
-        $st = $pdo->prepare("SELECT price_term_id FROM sales_order_items WHERE order_item_id = ?");
+        $plans = sptPlanLineColumnsReady($pdo, 'sales_order_items');
+        $st = $pdo->prepare("SELECT price_term_id" . ($plans ? ", plan_price_id, plan_addon_id" : "") . " FROM sales_order_items WHERE order_item_id = ?");
         $st->execute([$orderItemId]);
-        $v = $st->fetchColumn();
-        return $v ? (int)$v : null;
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) return null;
+        if ($plans && ($tok = sptLineToken($r)) !== null) return $tok;
+        return !empty($r['price_term_id']) ? (int)$r['price_term_id'] : null;
     }
 }

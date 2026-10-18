@@ -345,6 +345,18 @@ if (!function_exists('bmsConnectPdo')) {
             }
         }
 
+        // A paid downgrade whose date has come (service_plans_plan.md Phase 5, D5).
+        // The cron does the same sweep for companies that never visit.
+        if (!empty($tenant['scheduled_plan_key']) && !empty($tenant['scheduled_plan_at'])
+            && (string)$tenant['scheduled_plan_at'] <= date('Y-m-d')) {
+            try {
+                require_once __DIR__ . '/plans.php';
+                planApplyDueScheduled((int)$tenant['id']);
+            } catch (Throwable $_e) {
+                error_log('scheduled plan change failed for tenant ' . ($tenant['id'] ?? '?') . ': ' . $_e->getMessage());
+            }
+        }
+
         // ── Cross-tenant session guard ───────────────────────────────────────
         // A session cookie carrying another tenant's id must never be honoured
         // here. ternant.md put this in header.php; it lives here instead because

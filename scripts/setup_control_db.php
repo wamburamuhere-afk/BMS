@@ -818,6 +818,24 @@ try {
     ");
     say('  · table vendor_link_queue ready');
 
+    // Extra shops/users bought as add-on lines on a paid BJP invoice (Phase 5).
+    // Effective limit = tenants.max_X + SUM(units) of the grants active today;
+    // a grant lasts the plan period it was bought with (starts_at..ends_at).
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_addon_grants` (
+            `id`         INT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`  INT          NOT NULL,
+            `quota`      ENUM('max_shops','max_users') NOT NULL,
+            `units`      INT          NOT NULL,
+            `starts_at`  DATE         NOT NULL,
+            `ends_at`    DATE         NOT NULL,
+            `source_ref` VARCHAR(64)  NULL,
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_tag_tenant` (`tenant_id`, `quota`, `ends_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table tenant_addon_grants ready');
+
     // A phone/email-only match is confirmed by a person, never auto-linked (D4).
     $vbaKind = $admin->query("
         SELECT COLUMN_TYPE FROM information_schema.COLUMNS

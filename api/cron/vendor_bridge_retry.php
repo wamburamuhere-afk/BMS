@@ -46,4 +46,7 @@ set_time_limit(120);
 global $pdo;
 // Newly registered companies first, so a paid invoice can find its customer.
 $links = vlDrainLinkQueue($pdo);
-echo json_encode(['ok' => true] + vendorBridgeRetry($pdo) + ['customer_links' => $links]);
+// Paid downgrades whose date has come, for companies that have not visited since.
+require_once __DIR__ . '/../../core/plans.php';
+$planChanges = planApplyDueScheduled(null);
+echo json_encode(['ok' => true] + vendorBridgeRetry($pdo) + ['customer_links' => $links, 'scheduled_plan_changes' => $planChanges]);

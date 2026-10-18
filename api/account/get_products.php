@@ -108,6 +108,21 @@ try {
     }
     unset($p);
 
+    // A service that sells a Superadmin plan (BMS Shop Mode…) offers its plans and
+    // extras as the line's "term", read live from the control DB (Phase 5, D9).
+    $mapped = vssPlatformProductsFor($pdo, array_column(array_filter($products, fn($r) => (int)$r['is_service'] === 1), 'product_id'));
+    if ($mapped) {
+        require_once __DIR__ . '/../../core/service_plans.php';
+        foreach ($products as &$p) {
+            $key = $mapped[(int)$p['product_id']] ?? null;
+            if ($key === null) continue;
+            $p['platform_product_key'] = $key;
+            $p['price_terms'] = spPlatformLineOptions($key);
+            $p['has_price_terms'] = (bool)$p['price_terms'];
+        }
+        unset($p);
+    }
+
     echo json_encode(['success' => true, 'data' => $products]);
 
 } catch (PDOException $e) {

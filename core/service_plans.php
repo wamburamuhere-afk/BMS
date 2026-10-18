@@ -365,6 +365,69 @@ if (!function_exists('spPlatformPlans')) {
     }
 }
 
+if (!function_exists('spPlatformLineOptions')) {
+    /**
+     * The "term" choices a document line for a mapped service offers (Phase 5, D9):
+     * one option per active plan price ("Pro — 1 year", token p{id}) and one per
+     * active add-on price ("Extra shop — Pro — 1 year", token a{addon}-{price}).
+     * Same keys line_price_terms.js already reads (term_id, display_label, price,
+     * is_default), plus group/kind/plan_price_id/addon_key for grouping and
+     * locking add-ons to their plan's term.
+     *
+     * @param bool        $publicOnly  the company's self-service catalogue: public plans only…
+     * @param string|null $alsoPlanKey …plus the plan the company is on now, so it can renew it
+     */
+    function spPlatformLineOptions(string $productKey, bool $publicOnly = false, ?string $alsoPlanKey = null): array
+    {
+        if ($productKey === '') return [];
+        try {
+            require_once __DIR__ . '/plans.php';
+            if (!planCatalogReady()) return [];
+            $st = getControlPdo()->prepare("SELECT * FROM plans WHERE product_key = ? AND is_active = 1 AND plan_key <> 'blank'
+                                             ORDER BY tier_rank, sort_order, name");
+            $st->execute([$productKey]);
+            $plans = []; $addons = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $plan) {
+                if ($publicOnly && (int)$plan['is_public'] !== 1 && (string)$plan['plan_key'] !== (string)$alsoPlanKey) continue;
+                $prices = planPrices((int)$plan['id'], true);
+                $planAddons = planAddons((int)$plan['id'], true);
+                foreach ($prices as $pp) {
+                    $label = sptDisplayLabel((string)$plan['name'], (string)$pp['term_label']);
+                    $plans[] = [
+                        'term_id' => 'p' . (int)$pp['id'], 'kind' => 'plan', 'group' => (string)$plan['name'],
+                        'display_label' => $label, 'term_label' => (string)$pp['term_label'],
+                        'price' => (float)$pp['price_tzs'], 'is_default' => (int)$pp['is_default'] === 1,
+                        'months' => (int)$pp['months'], 'plan_key' => (string)$plan['plan_key'],
+                        'plan_name' => (string)$plan['name'], 'plan_price_id' => (int)$pp['id'],
+                        'description' => null,
+                    ];
+                    foreach ($planAddons as $a) {
+                        if (!isset($a['prices'][(int)$pp['id']])) continue;
+                        $addons[] = [
+                            'term_id' => 'a' . (int)$a['id'] . '-' . (int)$pp['id'], 'kind' => 'addon',
+                            'group' => (string)$plan['name'] . ' — extras',
+                            'display_label' => sptDisplayLabel((string)$a['name'], $label), 'term_label' => (string)$pp['term_label'],
+                            'price' => (float)$a['prices'][(int)$pp['id']], 'is_default' => false,
+                            'months' => (int)$pp['months'], 'plan_key' => (string)$plan['plan_key'],
+                            'plan_name' => (string)$plan['name'], 'plan_price_id' => (int)$pp['id'],
+                            'addon_key' => (string)$a['addon_key'], 'addon_name' => (string)$a['name'],
+                            'quota' => (string)$a['quota'], 'units' => (int)$a['units'], 'description' => null,
+                        ];
+                    }
+                }
+            }
+            // Only the first plan's default is the line default; plans first, extras after.
+            $seen = false;
+            foreach ($plans as &$o) { if ($o['is_default'] && !$seen) { $seen = true; } else { $o['is_default'] = false; } }
+            unset($o);
+            return array_merge($plans, $addons);
+        } catch (Throwable $e) {
+            error_log('spPlatformLineOptions: ' . $e->getMessage());
+            return [];
+        }
+    }
+}
+
 if (!function_exists('spPlatformPriceSummary')) {
     /** selling_price / min_selling_price for a mapped service: the first plan's default price and the cheapest price. */
     function spPlatformPriceSummary(array $platformPlans): array

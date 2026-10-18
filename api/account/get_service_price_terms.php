@@ -69,6 +69,8 @@ try {
         // A mapped service: its plans are Superadmin's, read live and shown read-only.
         'platform_product_key' => $platformKey,
         'platform_plans'  => $platformKey !== null ? spPlatformPlans($platformKey) : [],
+        // What a document line offers (line_price_terms.js): local terms, or a mapped service's plans + extras.
+        'line_terms'      => $platformKey !== null ? spPlatformLineOptions($platformKey) : $terms,
     ]);
 } catch (Throwable $e) {
     error_log('get_service_price_terms: ' . $e->getMessage());
