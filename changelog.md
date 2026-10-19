@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-10-19 — fix(e-signatures): uploaded signatures lose their paper background
+
+**Files:** `core/signature_cleaner.php` (new), `api/document/upload_signature.php`, `app/constant/document/e_signatures.php`, `migrations/tenant/2026_10_19_clean_uploaded_signatures.php` (new), `migrations/2026_10_19_clean_uploaded_signatures_legacy_db.php` (new), `tests/test_signature_cleaner_cli.php` (new), `changelog.md`
+
+- **Why:** an uploaded signature (a photo or scan) kept its grey or cream paper and shadows. That showed as a coloured box on every procurement and sales document that prints the signer's signature (via `includes/workflow_signature_row.php`) and in the e-signature wizard. Drawn signatures were already fine.
+- **Smart cleaning (`core/signature_cleaner.php`, GD only):** the paper level is measured locally (block percentiles, smoothly upscaled), so uneven phone light and shadows disappear. Pixels clearly darker than the paper become ink with soft edges; the rest becomes transparent. The result looks white on a white page and leaves no box on coloured bands.
+  - Ink keeps its own colour (blue stays blue), and a pale pencil signature is kept.
+  - Specks are dropped, the empty margin is trimmed, large photos are shrunk (≤800 px), and JPEG photos are turned upright.
+  - It refuses, with a clear reason, a dark photo, blank paper, or an image that is not a signature (a poster or logo). A poster is detected by several colour families, photo-like gradients, pale artwork or page-like density; two or more signs are needed.
+- **New uploads:** `upload_signature.php` stores the cleaned image, always as a PNG. A refused image saves nothing. If a server has no GD, it falls back to the old behaviour.
+- **Existing uploads:** a per-tenant migration plus a legacy-DB mirror clean every stored *uploaded* signature.
+  - The original is kept as `<name>.orig.<ext>`.
+  - A JPEG becomes a PNG, and both `user_signatures.file_path` and `workflow_signatures.sig_path` are repointed, so documents already created show the clean signature.
+  - Idempotent: anything with a backup is skipped.
+  - Non-signature images are left as they are and listed.
+  - Drawn and typed signatures are not touched. PDFs already e-signed keep their embedded image (hash-locked).
+- **Tests:** new `test_signature_cleaner_cli` 27/27:
+  - cleaner on samples (grey paper + shadow, cream paper with blue ink, transparent PNG, pencil);
+  - refusals (dark photo, blank paper, poster, junk file);
+  - migration helper (JPEG→PNG, rows repointed, originals kept, drawn untouched, poster left, second run changes nothing);
+  - a **real multipart upload over HTTP** (`php -S`): cleaned PNG stored, poster refused, nothing saved.
+  - Still green: esignatures 56, wizard 145, integrity 26. `test_quota_enforcement_cli` fails only on 3 mobile API files and a missing provisioning key, both pre-existing; `upload_signature.php` passes its guard check.
+
 ## 2026-10-19 — fix(field-visits): accurate GPS, coordinates shown, GPS compulsory
 
 **Files:** `app/bms/field_reports/field_visits.php`, `api/field_reports/save.php`, `lang/sw.php`, `tests/test_field_reports_cli.php`, `changelog.md`

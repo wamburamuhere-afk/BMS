@@ -74,16 +74,38 @@ try {
         );
     }
 
-    // 4. Sanitised, non-guessable filename
-    $safeExt  = ($ext === 'jpeg') ? 'jpg' : $ext;
+    // 4. Sanitised, non-guessable filename. A cleaned signature is always a
+    //    transparent PNG (paper removed, ink kept — core/signature_cleaner.php),
+    //    so it sits on any document like a drawn signature.
+    require_once ROOT_DIR . '/core/signature_cleaner.php';
+    $clean    = sigCleanerSupported();
+    $safeExt  = $clean ? 'png' : (($ext === 'jpeg') ? 'jpg' : $ext);
     $filename = 'sig_' . bin2hex(random_bytes(16)) . '.' . $safeExt;
     $filepath = $userDir . '/' . $filename;
     // Leading slash kept to match save_drawn_signature.php and existing signature rows
     $dbPath   = '/uploads/signatures/' . $userId . '/' . $filename;
 
-    assertUploadWithinQuota($pdo, (int)$file['size']);
-    if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+    if (!is_uploaded_file($file['tmp_name'])) {
         throw new Exception('Failed to store the uploaded signature.');
+    }
+    if ($clean) {
+        // A photo that is not a signature (or dark paper) is refused with the reason.
+        if (!sigCleanSignature($file['tmp_name'], $filepath, $cleanError)) {
+            throw new Exception($cleanError);
+        }
+        try {
+            assertUploadWithinQuota($pdo, (int)filesize($filepath));
+        } catch (Exception $e) {
+            @unlink($filepath);
+            throw $e;
+        }
+    } else {
+        // No GD on this server: store the image as uploaded (previous behaviour).
+        error_log('upload_signature.php: GD missing — signature stored without cleaning');
+        assertUploadWithinQuota($pdo, (int)$file['size']);
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            throw new Exception('Failed to store the uploaded signature.');
+        }
     }
 
     $stmt = $pdo->prepare("
