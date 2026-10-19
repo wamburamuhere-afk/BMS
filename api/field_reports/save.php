@@ -68,6 +68,9 @@ $lat = ($lat === '' || $lat === null) ? null : (is_numeric($lat) && $lat >= -90 
 $lng = ($lng === '' || $lng === null) ? null : (is_numeric($lng) && $lng >= -180 && $lng <= 180 ? (float)$lng : false);
 $acc = ($acc === '' || $acc === null) ? null : (is_numeric($acc) && $acc >= 0 ? (int)round((float)$acc) : null);
 if ($lat === false || $lng === false || ($lat === null) !== ($lng === null)) $errors['location'] = t('The GPS position is not valid. Capture it again or clear it.');
+// GPS is compulsory (product owner, 2026-10-19) for a new visit and for one that already
+// has a position; an older visit saved without GPS can still be edited from anywhere.
+elseif ($lat === null && (!$existing || $existing['latitude'] !== null) && !isset($errors['location'])) $errors['location'] = t('Tap GPS to capture your location before saving.');
 
 if ($errors) frJson(['success' => false, 'message' => reset($errors), 'errors' => $errors], 422);
 

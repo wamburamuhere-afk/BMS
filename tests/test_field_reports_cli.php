@@ -73,6 +73,8 @@ function visit(array $over = []): array
         'client_name' => "Client $tag", 'client_phone' => '0712 345 678', 'business_type' => 'retail',
         'gave_business_card' => '1', 'gave_trial_link' => '1', 'gave_training' => '0',
         'interest' => 'interested', 'notes' => "Note $tag",
+        // GPS is compulsory on a new visit (2026-10-19).
+        'latitude' => '-6.816120', 'longitude' => '39.280340', 'gps_accuracy_m' => '18',
     ];
 }
 function save(int $uid, bool $admin, array $data): array { return call('api/field_reports/save.php', $uid, $admin, 'POST', $data); }
@@ -236,11 +238,31 @@ try {
     [$c, , $j] = save($A, false, visit(['latitude' => '-6.81612', 'longitude' => '39.28034', 'gps_accuracy_m' => '12.4', 'client_name' => "GPS $tag", 'client_phone' => '0688111222']));
     $gpsId = (int)($j['visit_id'] ?? 0); $created[] = $gpsId;
     $g = $pdo->query("SELECT latitude, longitude, gps_accuracy_m, phone_normalized FROM field_visits WHERE visit_id = $gpsId")->fetch(PDO::FETCH_ASSOC);
-    ok($c === 200 && abs($g['latitude'] + 6.81612) < 1e-5 && (int)$g['gps_accuracy_m'] === 12, 'optional GPS saved with accuracy');
+    ok($c === 200 && abs($g['latitude'] + 6.81612) < 1e-5 && (int)$g['gps_accuracy_m'] === 12, 'GPS saved with its accuracy');
     ok($g['phone_normalized'] === '255688111222', 'phone normalised 0688… → 255688…');
-    [$c] = save($A, false, visit(['client_name' => "NoGPS $tag", 'client_phone' => '0655111222', 'business_type' => 'other', 'business_other' => 'Bodaboda spares']));
-    ok($c === 200, 'visit without GPS and with "other" business saves');
-    $created[] = (int)$pdo->query("SELECT MAX(visit_id) FROM field_visits WHERE client_name = " . $pdo->quote("NoGPS $tag"))->fetchColumn();
+    // GPS is compulsory (2026-10-19): a new visit without a position is refused.
+    [$c, , $j] = save($A, false, visit(['client_name' => "NoGPS $tag", 'client_phone' => '0655111222', 'latitude' => '', 'longitude' => '', 'gps_accuracy_m' => '']));
+    ok($c === 422 && isset($j['errors']['location']), 'new visit WITHOUT GPS is refused → 422 on location');
+    ok((int)$pdo->query("SELECT COUNT(*) FROM field_visits WHERE client_name = " . $pdo->quote("NoGPS $tag"))->fetchColumn() === 0, '…and nothing was saved');
+    [$c, , $j] = save($A, false, visit(['client_name' => "NoGPS $tag", 'client_phone' => '0655111222', 'business_type' => 'other', 'business_other' => 'Bodaboda spares']));
+    ok($c === 200, 'visit with GPS and with "other" business saves');
+    $noGpsId = (int)($j['visit_id'] ?? 0); $created[] = $noGpsId;
+    // A weak fix (±850 m) is only warned about in the form — it still saves, with its accuracy.
+    [$c, , $j] = save($A, false, visit(['client_name' => "Weak $tag", 'client_phone' => '0655111333', 'latitude' => '-6.80000', 'longitude' => '39.27000', 'gps_accuracy_m' => '850.6']));
+    $weakId = (int)($j['visit_id'] ?? 0); $created[] = $weakId;
+    $w = $pdo->query("SELECT gps_accuracy_m FROM field_visits WHERE visit_id = $weakId")->fetch(PDO::FETCH_ASSOC);
+    ok($c === 200 && (int)($w['gps_accuracy_m'] ?? 0) === 851, 'weak GPS (±851 m) saves — warning only, not blocked');
+    // Editing a visit that HAS a position cannot remove it…
+    [$c, , $j] = save($A, false, visit(['visit_id' => $noGpsId, 'client_name' => "NoGPS $tag", 'client_phone' => '0655111222', 'business_type' => 'other', 'business_other' => 'Bodaboda spares', 'latitude' => '', 'longitude' => '', 'gps_accuracy_m' => '']));
+    ok($c === 422 && isset($j['errors']['location']), 'editing a GPS visit cannot clear its position → 422');
+    // …but an older visit saved before GPS was compulsory stays editable without one.
+    $pdo->exec("UPDATE field_visits SET latitude = NULL, longitude = NULL, gps_accuracy_m = NULL WHERE visit_id = $noGpsId");
+    [$c] = save($A, false, visit(['visit_id' => $noGpsId, 'client_name' => "NoGPS $tag", 'client_phone' => '0655111222', 'business_type' => 'other', 'business_other' => 'Bodaboda spares', 'notes' => "Edited $tag", 'latitude' => '', 'longitude' => '', 'gps_accuracy_m' => '']));
+    ok($c === 200 && $pdo->query("SELECT notes FROM field_visits WHERE visit_id = $noGpsId")->fetchColumn() === "Edited $tag", 'older visit without GPS can still be edited without one');
+    // The list returns the exact coordinates the page prints (not just an icon flag).
+    [, , $j] = call('api/field_reports/list.php', $A, false, 'GET', ['date_from' => $day1, 'date_to' => $day1]);
+    $lr = null; foreach (($j['rows'] ?? []) as $x) if ((int)$x['visit_id'] === $gpsId) $lr = $x;
+    ok($lr && abs($lr['latitude'] + 6.81612) < 1e-6 && abs($lr['longitude'] - 39.28034) < 1e-6 && $lr['gps_accuracy_m'] === 12, 'list returns lat/lng/accuracy for display (' . ($lr ? $lr['latitude'] . ', ' . $lr['longitude'] : '?') . ')');
     [$c] = call('api/field_reports/save.php', $A, false, 'GET', visit());
     ok($c === 405, "save via GET → 405 (got $c)");
     [$c] = call('api/field_reports/save.php', $A, false, 'POST', visit(['_csrf' => 'wrong']));

@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-10-19 — fix(field-visits): accurate GPS, coordinates shown, GPS compulsory
+
+**Files:** `app/bms/field_reports/field_visits.php`, `api/field_reports/save.php`, `lang/sw.php`, `tests/test_field_reports_cli.php`, `changelog.md`
+
+- **Why:** staff reported that GPS did not catch the real position. The page kept the phone's *first* fix, which is usually a rough Wi-Fi or cell guess (±500 m–2 km). It also accepted a cached position up to 1 minute old, so the previous shop's spot could be reused.
+- **Better fix:** the GPS button now watches for up to 20 s with `watchPosition`. It keeps the most accurate fix and stops early at ±30 m. It uses `maximumAge: 0`, so it never reuses a cached position. While it runs, the form shows "±X m, improving accuracy…".
+  - A weak fix (over ±100 m) is still only a warning, as the product owner chose. It saves with its accuracy.
+  - A very rough fix (over ±1 km) also tells the user to turn on "Precise location" for the browser.
+- **Coordinates shown:** the form shows the captured `lat, lng`. The visits list and phone cards now show the coordinates and `±m` (linked to Google Maps), not just an icon. Visits with no position show "No GPS".
+- **GPS compulsory:**
+  - A new visit cannot be saved without GPS. Both the page and `save.php` refuse it (422 on `location`).
+  - Saving while GPS is still searching asks the user to wait.
+  - Editing a visit that has a position cannot remove it.
+  - Older visits saved before this change can still be edited without one.
+- **Tests:** `test_field_reports_cli` 279/279. New checks: no GPS refused, weak GPS saved with a warning only, a GPS visit cannot be cleared on edit, an older visit without GPS stays editable, and the list returns the exact coordinates.
+  - Browser-tested on the rendered page with simulated phone fixes. Readings of ±1500 m → ±120 m → ±22 m stopped at ±22 m and ignored the later reading. A rough-only fix showed the "Precise location" tip. Denied permission showed the turn-on message. Save was blocked without GPS and while searching. Closing the form stopped the search. The list showed `-6.816120, 39.280340 ±22 m`, and "No GPS" for a visit without a position.
+
 ## 2026-10-18 — feat(subscription): company requests wait at BJP; staff create the quotation
 
 **Files:** `core/subscription_requests.php` (new), `core/platform_gateway.php`, `api/platform/subscription_requests.php` (new), `app/bms/sales/quotations/quotations.php`, `app/bms/sales/quotations/quotation_form.php`, `api/account/save_quotation.php`, `api/my_subscription.php`, `app/constant/settings/billing.php`, `migrations/tenant/2026_10_18_subscription_requests.php` (new), `migrations/2026_10_18_subscription_requests_legacy_db.php` (new), `tests/helpers/subscription_request_quote.php` (new), `tests/test_subscription_requests_cli.php` (new), `tests/test_my_subscription_cli.php`, `tests/test_service_plans_billing_cli.php`, `tests/test_service_plans_billing_page_cli.php`, `tests/test_customer_subscription_e2e_cli.php`, `tests/test_service_plans_e2e_cli.php`, `changelog.md`
