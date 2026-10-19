@@ -392,9 +392,12 @@ $(function () {
         'yesSubmit' => t('Yes, Submit'), 'submitted' => t('Report for %date% submitted at %time% — %n% visits.'),
         'changedAfter' => t('Updated after it was submitted — submit again to refresh.'), 'notSubmitted' => t('The report for %date% has not been submitted yet.'),
         'gpsGetting' => t('Getting your location...'), 'gpsNo' => t('This device or browser cannot share location.'),
-        'gpsDenied' => t('Location was not allowed or not found. You can still type the place.'),
+        'gpsDenied' => t('Location was not allowed or not found. Turn on location for this browser and tap GPS again.'),
         'gpsOk' => t('Location confirmed (±%m% m)'), 'gpsWeak' => t('Location found but not precise (±%m% m) — move outside and try again.'),
-        'gpsHint' => t('Tap GPS to confirm where you are.'), 'nearby' => t('Near: %place%'), 'useNearby' => t('Use “%place%”'),
+        'gpsHint' => t('Tap GPS to confirm where you are.'), 'gpsHintReq' => t('GPS is required — tap GPS to capture where you are.'),
+        'gpsImproving' => t('improving accuracy...'), 'gpsRough' => t('Very rough position — turn on "Precise location" for this browser in the phone settings.'),
+        'gpsRequired' => t('Tap GPS to capture your location before saving.'), 'gpsWait' => t('GPS is still finding your location — wait a moment.'),
+        'noGps' => t('No GPS'),'nearby' => t('Near: %place%'), 'useNearby' => t('Use “%place%”'),
         'dupOwn' => t('You already visited this number on %date% (%name%).'), 'dupAdmin' => t('Already visited on %date% by %staff% (%name%).'),
         'known' => t('Known client — this will be visit no. %n%. Details filled in.'),
         'scopeAll' => t('All staff'), 'scopeMe' => t('Your visits'), 'staff' => t('Staff'), 'date' => t('Date'),
@@ -423,8 +426,11 @@ $(function () {
     const interestBadge = r => r.interest ? `<span class="badge bg-${interestColors[r.interest]}${r.interest === 'thinking' ? ' text-dark' : ''}">${esc(r.interest_label)}</span>` : '<span class="text-muted">—</span>';
     const followTxt = r => !r.follow_up_date ? '<span class="text-muted">—</span>'
         : `${dmy(r.follow_up_date)}${r.follow_up_done ? ' <i class="bi bi-check-circle-fill text-success" title="' + esc(L.followedUp) + '"></i>' : ''}`;
+    // 6 decimals ≈ 0.1 m — the coordinates themselves, not just an icon.
+    const fmtCoords = (lat, lng) => Number(lat).toFixed(6) + ', ' + Number(lng).toFixed(6);
     const gpsMark = r => r.latitude !== null
-        ? ` <a href="https://maps.google.com/?q=${r.latitude},${r.longitude}" target="_blank" rel="noopener" title="${esc(r.gps_verified ? L.gpsConfirmed : 'GPS')}"><i class="bi ${r.gps_verified ? 'bi-geo-alt-fill text-success' : 'bi-pin-map text-primary'}"></i></a>` : '';
+        ? `<div class="small text-nowrap"><a href="https://maps.google.com/?q=${r.latitude},${r.longitude}" target="_blank" rel="noopener" class="text-decoration-none" title="${esc(r.gps_verified ? L.gpsConfirmed : 'GPS')}"><i class="bi ${r.gps_verified ? 'bi-geo-alt-fill text-success' : 'bi-pin-map text-warning'}"></i> ${fmtCoords(r.latitude, r.longitude)}</a>${r.gps_accuracy_m !== null ? ` <span class="text-muted">±${r.gps_accuracy_m} m</span>` : ''}</div>`
+        : `<div class="small text-muted"><i class="bi bi-slash-circle"></i> ${esc(L.noGps)}</div>`;
     const servicesTxt = r => (r.services || []).length ? (r.services || []).map(s => esc(s.name)).join(', ') : '<span class="text-muted">—</span>';
     const servicesBadges = r => (r.services || []).map(s => `<span class="fr-badge fr-svc">${esc(s.name)}</span>`).join(' ');
     let rows = [], follows = [];
@@ -605,14 +611,29 @@ $(function () {
 
     // ── Record / edit ──────────────────────────────────────────────────
     let nearbyPlace = null;
-    function setGps(lat, lng, acc) {
+    let gpsRequired = true;   // a new visit, or one that already has a position (save.php enforces the same)
+    function setGps(lat, lng, acc, improving) {
         $('#vLat').val(lat ?? ''); $('#vLng').val(lng ?? ''); $('#vAcc').val(acc ?? '');
         const on = lat !== null && lat !== undefined && lat !== '';
         const precise = on && (acc === null || acc === undefined || acc === '' || Number(acc) <= 100);
-        $('#gpsInfo').html(!on ? esc(L.gpsHint)
-            : `<span class="${precise ? 'text-success' : 'text-warning'}"><i class="bi ${precise ? 'bi-geo-alt-fill' : 'bi-exclamation-triangle'}"></i> ${esc((precise ? L.gpsOk : L.gpsWeak).replace('%m%', acc ? Math.round(acc) : '—'))}</span>`);
+        $('#gpsInfo').html(!on ? esc(gpsRequired ? L.gpsHintReq : L.gpsHint)
+            : `<span class="${precise ? 'text-success' : 'text-warning'}"><i class="bi ${precise ? 'bi-geo-alt-fill' : 'bi-exclamation-triangle'}"></i> ${esc((precise ? L.gpsOk : L.gpsWeak).replace('%m%', acc ? Math.round(acc) : '—'))}${improving ? ' — ' + esc(L.gpsImproving) : ''}</span>`
+              + `<br><span class="font-monospace text-body">${fmtCoords(lat, lng)}</span>`
+              + (!improving && Number(acc) > 1000 ? `<br><span class="text-danger">${esc(L.gpsRough)}</span>` : ''));
         $('#btnGpsClear').toggleClass('d-none', !on);
+        $('#btnGps').removeClass('btn-outline-danger').addClass('btn-outline-primary');
         if (!on) { nearbyPlace = null; $('#btnUseNearby').addClass('d-none'); }
+    }
+    // A phone's first fix is usually a rough Wi-Fi/cell guess; GPS sharpens it over the next
+    // seconds. Watch for up to 20 s, keep the most accurate fix, stop early at ±30 m.
+    // maximumAge 0: never reuse a cached position (e.g. the previous shop's).
+    const GPS_GOOD_M = 30, GPS_MAX_MS = 20000;
+    let gpsWatch = null, gpsTimer = null;
+    const gpsBtnHtml = $('#btnGps').html();
+    function stopGps() {
+        if (gpsWatch !== null) navigator.geolocation.clearWatch(gpsWatch);
+        clearTimeout(gpsTimer); gpsWatch = null; gpsTimer = null;
+        $('#btnGps').prop('disabled', false).html(gpsBtnHtml);
     }
     function showNearby(place) {
         nearbyPlace = place;
@@ -636,6 +657,7 @@ $(function () {
     function resetForm(keep) {
         const keepLoc = $('#vLocation').val(), keepLat = $('#vLat').val(), keepLng = $('#vLng').val(), keepAcc = $('#vAcc').val();
         const keepOpen = !$('#vWhenFields').hasClass('d-none'), keepDate = $('#vDate').val();
+        stopGps(); gpsRequired = true;
         $('#visitForm')[0].reset();
         $('#vId').val(''); $('#vBusiness').val('').trigger('change'); $('#vServices').val(null).trigger('change');
         $('#phoneWarn').addClass('d-none').empty(); $('#vOtherWrap').addClass('d-none');
@@ -663,13 +685,28 @@ $(function () {
     $('#vBusiness').on('change', function () { $('#vOtherWrap').toggleClass('d-none', $(this).val() !== 'other'); });
     $('#btnGps').on('click', function () {
         if (!navigator.geolocation) { $('#gpsInfo').text(L.gpsNo); return; }
+        stopGps();
+        let best = null, done = false;
         $('#gpsInfo').text(L.gpsGetting);
-        navigator.geolocation.getCurrentPosition(p => {
-            setGps(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
-            $.getJSON(API + 'nearby.php', { lat: p.coords.latitude, lng: p.coords.longitude }, res => showNearby(res && res.success ? res.place : null));
-        }, () => { setGps(null); $('#gpsInfo').text(L.gpsDenied); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> <span class="d-none d-sm-inline">GPS</span>');
+        const finish = () => {
+            if (done) return;
+            done = true; stopGps();
+            if (!best) { setGps(null); $('#gpsInfo').text(L.gpsDenied); return; }
+            setGps(best.lat, best.lng, best.acc);
+            $.getJSON(API + 'nearby.php', { lat: best.lat, lng: best.lng }, res => showNearby(res && res.success ? res.place : null));
+        };
+        gpsWatch = navigator.geolocation.watchPosition(p => {
+            if (done) return;
+            if (!best || p.coords.accuracy < best.acc) {
+                best = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+                setGps(best.lat, best.lng, best.acc, true);
+            }
+            if (best.acc <= GPS_GOOD_M) finish();
+        }, finish, { enableHighAccuracy: true, timeout: GPS_MAX_MS, maximumAge: 0 });
+        gpsTimer = setTimeout(finish, GPS_MAX_MS);
     });
-    $('#btnGpsClear').on('click', () => setGps(null));
+    $('#btnGpsClear').on('click', () => { stopGps(); setGps(null); });
     // Interest: a radio you can un-tap.
     $('.fr-interest').on('mousedown touchstart', function () { $(this).data('was', this.checked); })
         .on('click', function () { if ($(this).data('was')) { this.checked = false; $(this).data('was', false); } });
@@ -705,6 +742,13 @@ $(function () {
     $('#visitForm [type=submit]').on('click', function () { again = $(this).data('again') === 1; });
     $('#visitForm').on('submit', function (e) {
         e.preventDefault();
+        if (gpsWatch !== null) { Swal.fire({ icon: 'info', title: L.gpsWait, timer: 1800, showConfirmButton: false }); return; }
+        if (gpsRequired && !$('#vLat').val()) {
+            $('#btnGps').removeClass('btn-outline-primary').addClass('btn-outline-danger');
+            $('#gpsInfo').html(`<span class="text-danger"><i class="bi bi-exclamation-circle"></i> ${esc(L.gpsRequired)}</span>`);
+            Swal.fire({ icon: 'warning', title: L.error, text: L.gpsRequired });
+            return;
+        }
         // Still "now"? Take the server's now at the moment of saving.
         if ($('#vWhenFields').hasClass('d-none') && !$('#vId').val()) { const n = serverNow(); $('#vDate').val(n.date); $('#vTime').val(n.time); }
         const btn = $(this).find('[type=submit]'), orig = btn.map((i, b) => $(b).html()).get();
@@ -743,6 +787,7 @@ $(function () {
             $('#vCard').prop('checked', !!r.gave_business_card); $('#vTrial').prop('checked', !!r.gave_trial_link); $('#vTraining').prop('checked', !!r.gave_training);
             $('.fr-interest').prop('checked', false); if (r.interest) $(`#vInt_${r.interest}`).prop('checked', true);
             $('#vFollowUp').val(r.follow_up_date || '').attr('min', r.visit_date);
+            gpsRequired = r.latitude !== null;   // an older visit saved without GPS stays editable
             $('#vNotes').val(r.notes); setGps(r.latitude, r.longitude, r.gps_accuracy_m);   // the stored accuracy, re-saved unchanged
             // Set before showing: Select2 (initialised on first show) reads the current value.
             $('#vBusiness').val(r.business_type).trigger('change');
@@ -769,7 +814,7 @@ $(function () {
         if ($(this).data('fact') === 'done') post('followup_done.php', { visit_id: id, done: 1 });
         else openNew(f.client_phone);
     });
-    $('#visitModal').on('hidden.bs.modal', () => $('#vFollowUp').attr('min', TODAY));
+    $('#visitModal').on('hidden.bs.modal', () => { stopGps(); $('#vFollowUp').attr('min', TODAY); });
 
     // Resolves with the typed address ('' when optional and left blank) or null when cancelled.
     function askSubdomain(required) {
