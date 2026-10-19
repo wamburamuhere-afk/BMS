@@ -42,6 +42,24 @@ if ($is_edit) {
     $existing_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Create from a company's subscription request (Quotations → Requests from systems; platform root only).
+// The form fills in from it; the quotation is saved by — and created by — the user here.
+$sub_request = null;
+$sub_request_linked = 0;   // the customer the company is linked to now (0 = not linked yet)
+if (!$is_edit && isset($_GET['request'])) {
+    require_once ROOT_DIR . '/core/vendor_context.php';
+    require_once ROOT_DIR . '/core/vendor_link.php';
+    require_once ROOT_DIR . '/core/subscription_requests.php';
+    if (isPlatformVendorContext()) $sub_request = srGet($pdo, (int)$_GET['request']);
+    if (!$sub_request || $sub_request['status'] !== 'pending') {
+        header("Location: " . getUrl('quotations') . "?requests=1&error=" . urlencode('That request was already handled or no longer exists.'));
+        exit();
+    }
+    $sr_tenant = vlFindTenant(null, $sub_request['tenant_id']);
+    $sub_request_linked = (int)($sr_tenant['vendor_customer_id'] ?? 0);
+    if ($sub_request_linked > 0) $customer_id = $sub_request_linked;
+}
+
 $customer = null;
 if ($customer_id > 0) {
     $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ? AND status != 'inactive'");
@@ -159,7 +177,27 @@ includeHeader();
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
 
+            <?php if ($sub_request): ?>
+            <div class="alert border-0 d-flex flex-wrap align-items-center gap-2 mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
+                <i class="bi bi-inbox fs-5 text-primary"></i>
+                <div class="flex-grow-1 small">
+                    <strong><?= t('From request') ?> <?= safe_output($sub_request['request_number']) ?>:</strong>
+                    <?= safe_output($sub_request['company_name']) ?> · <?= safe_output($sub_request['subdomain']) ?>
+                    <?php if (!empty($sub_request['phone'])): ?> · <i class="bi bi-telephone text-primary"></i> <?= safe_output($sub_request['phone']) ?><?php endif; ?>
+                    <?php if (!empty($sub_request['email'])): ?> · <?= safe_output($sub_request['email']) ?><?php endif; ?>
+                    <span class="d-block text-muted"><?= $sub_request_linked > 0
+                        ? t('The customer this company is linked to is selected. Once approved, the company sees the quotation on its Subscription page.')
+                        : t('This company is not linked to a customer yet. Choose its customer — you will be asked to link them when you save.') ?></span>
+                </div>
+                <a href="<?= getUrl('quotations') ?>?requests=1" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i><?= t('Back to requests') ?></a>
+            </div>
+            <?php endif; ?>
+
             <form id="quotationForm">
+                <?php if ($sub_request): ?>
+                <input type="hidden" name="subscription_request_id" value="<?= (int)$sub_request['id'] ?>">
+                <input type="hidden" name="link_tenant" id="link_tenant" value="0">
+                <?php endif; ?>
                 <!-- Basic Information -->
                 <div class="row mb-4">
                     <div class="col-md-4 mb-3">
@@ -292,7 +330,7 @@ includeHeader();
                     <div class="col-md-3 mb-3">
                         <label for="reference" class="form-label">Customer Reference</label>
                         <input type="text" class="form-control" id="reference" name="reference"
-                               value="<?= $quotation ? safe_output($quotation['reference']) : '' ?>"
+                               value="<?= $quotation ? safe_output($quotation['reference']) : ($sub_request ? safe_output('Request ' . $sub_request['request_number'] . ' (' . $sub_request['subdomain'] . ')') : '') ?>"
                                placeholder="Customer enquiry / reference">
                     </div>
 
@@ -509,11 +547,23 @@ let taxRates = [
 ];
 const QUOTATION_IS_EDIT = <?= $is_edit ? 'true' : 'false' ?>;
 const QUOTATION_STATUS  = '<?= $is_edit ? ($quotation['status'] ?? 'draft') : 'pending' ?>';
+const SR_ASK_LINK = <?= $sub_request && $sub_request_linked <= 0 ? 'true' : 'false' ?>;
+const SR_COMPANY  = <?= json_encode($sub_request ? $sub_request['company_name'] . ' (' . $sub_request['subdomain'] . ')' : '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
 $(document).ready(function() {
     logReportAction('View Quotation Form', 'User opened the quotation <?= $is_edit ? 'edit' : 'create' ?> page');
 
-    <?php if (!$is_edit): ?>
+    <?php if ($sub_request): ?>
+    // A subscription is a service: no warehouse, no stock.
+    $('#is_service_order').prop('checked', true);
+    toggleServiceOrderMode();
+    // Lines priced by BJP when the company asked; plan lines keep their plan + term.
+    loadQuoteItems(<?= json_encode(array_map(fn($l) => [
+        'product_id' => $l['product_id'], 'product_name' => $l['name'], 'sku' => '', 'quantity' => $l['qty'], 'unit' => $l['unit'],
+        'unit_price' => $l['unit_price'], 'tax_rate' => $l['tax_rate'], 'discount_percent' => 0, 'description' => $l['description'],
+        'price_term_id' => $l['token'], 'price_term_label' => $l['term_label'],
+    ], $sub_request['lines']), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>);
+    <?php elseif (!$is_edit): ?>
     addItemRow();
     <?php endif; ?>
 
@@ -1008,9 +1058,24 @@ function collectItems() {
     return items;
 }
 
-function saveQuotation(status, unlinkedConfirmed = false) {
+function saveQuotation(status, unlinkedConfirmed = false, linkAnswered = false) {
     if (!validateForm(status === 'draft')) { return; }
     if (!unlinkedConfirmed) { bmsConfirmUnlinkedLines(() => saveQuotation(status, true)); return; }
+    // From a request by a company not linked yet: offer to link it to the customer chosen.
+    if (SR_ASK_LINK && !linkAnswered) {
+        Swal.fire({
+            icon: 'question', title: <?= json_encode(t('Link this company to this customer?')) ?>,
+            html: `<b>${escapeHtml(SR_COMPANY)}</b> → <b>${escapeHtml($('#customer_id option:selected').text().trim())}</b><br><small class="text-muted">${escapeHtml(<?= json_encode(t('Linked, the company sees this quotation on its Subscription page once approved, and its paid invoices extend its subscription.')) ?>)}</small>`,
+            showDenyButton: true, showCancelButton: true,
+            confirmButtonText: <?= json_encode(t('Yes, link')) ?>, denyButtonText: <?= json_encode(t('No, just save')) ?>, cancelButtonText: <?= json_encode(t('Cancel')) ?>,
+            confirmButtonColor: '#0d6efd', denyButtonColor: '#6c757d'
+        }).then(x => {
+            if (x.isDismissed) return;
+            $('#link_tenant').val(x.isConfirmed ? '1' : '0');
+            saveQuotation(status, true, true);
+        });
+        return;
+    }
 
     const formData = new FormData($('#quotationForm')[0]);
     formData.append('status', status);

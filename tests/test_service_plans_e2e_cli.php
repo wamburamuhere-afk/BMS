@@ -105,6 +105,7 @@ $cleanup = function () use ($pdo, $c, &$planIds, &$PROD, $tidTables, $IP) {
         if ($r['ledger_account_id']) $pdo->exec("DELETE FROM accounts WHERE account_id = " . (int)$r['ledger_account_id']);
         $pdo->exec("DELETE FROM customers WHERE customer_id = " . (int)$r['customer_id']);
     }
+    try { $pdo->exec("DELETE FROM subscription_requests WHERE subdomain LIKE 'spetest%'"); } catch (Throwable $e) {}
     $admin = getProvisioningPdo();
     foreach ($c->query("SELECT id FROM tenants WHERE subdomain LIKE 'spetest%'")->fetchAll(PDO::FETCH_COLUMN) as $tid) {
         $tid = (int)$tid;
@@ -229,9 +230,14 @@ section('B4. Billing: the company asks for its yearly plan; BJP approves the quo
 $s = companyApi($tid, ['action' => 'status']);
 ok(!empty($s['success']) && ($s['plan']['plan_key'] ?? '') === $plan['plan_key'], 'Billing shows the plan the company is on' . $msg($s));
 $r = companyApi($tid, ['action' => 'request', 'product_id' => $sys, 'term_id' => "p{$Y['id']}"], 'POST');
-$q = $pdo->query("SELECT * FROM quotations WHERE customer_id = $cust ORDER BY sales_order_id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: [];
+$reqNo = (string)$pdo->query("SELECT request_number FROM subscription_requests WHERE tenant_id = $tid AND status = 'pending' ORDER BY id DESC LIMIT 1")->fetchColumn();
+ok(!empty($r['success']) && (float)($r['total'] ?? 0) === 200000.0 && $reqNo !== '' && ($r['request_number'] ?? '') === $reqNo, "request $reqNo priced at 200,000, waiting for BJP" . $msg($r));
+// BJP staff open it from Quotations → the prefilled form → save.
+require_once "$root/tests/helpers/subscription_request_quote.php";
+$sq = srTestQuote(fn($f, $p) => call($f, $p), $pdo, $reqNo, $cust);
+$q = $sq['quotation'];
 $qid = (int)($q['sales_order_id'] ?? 0);
-ok(!empty($r['success']) && (float)($r['total'] ?? 0) === 200000.0 && ($q['status'] ?? '') === 'pending', 'request priced at 200,000, a pending quotation for BJP' . $msg($r));
+ok(($q['status'] ?? '') === 'pending' && (int)($q['created_by'] ?? 0) === $uid && ($sq['request']['status'] ?? '') === 'quoted', 'staff save it → a pending quotation, created by them' . $msg($sq['response']));
 $d = companyApi($tid, ['action' => 'documents']);
 ok(count($d['quotations'] ?? []) === 0 && count($d['requests'] ?? []) === 1, 'not shown to the company until approved (D7)');
 call('api/account/review_quotation.php', ['quotation_id' => $qid, 'id' => $qid]);

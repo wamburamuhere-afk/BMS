@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-10-18 — feat(subscription): company requests wait at BJP; staff create the quotation
+
+**Files:** `core/subscription_requests.php` (new), `core/platform_gateway.php`, `api/platform/subscription_requests.php` (new), `app/bms/sales/quotations/quotations.php`, `app/bms/sales/quotations/quotation_form.php`, `api/account/save_quotation.php`, `api/my_subscription.php`, `app/constant/settings/billing.php`, `migrations/tenant/2026_10_18_subscription_requests.php` (new), `migrations/2026_10_18_subscription_requests_legacy_db.php` (new), `tests/helpers/subscription_request_quote.php` (new), `tests/test_subscription_requests_cli.php` (new), `tests/test_my_subscription_cli.php`, `tests/test_service_plans_billing_cli.php`, `tests/test_service_plans_billing_page_cli.php`, `tests/test_customer_subscription_e2e_cli.php`, `tests/test_service_plans_e2e_cli.php`, `changelog.md`
+
+- **Why:** when a company asked from its Subscription page, the gateway made the quotation by itself. Nobody was its creator, so "Created by" was empty.
+- **Now a request, not a quotation:**
+  - The gateway stores the request in the new `subscription_requests` table (`SR-NNNN`) with the company, web address, phone, email, linked customer (if any) and BJP-priced lines (plan and term tokens kept).
+  - A newer request from the same company replaces its pending one.
+  - Companies that are not linked yet can ask too.
+- **Staff are told in-app:** the `subscription.request_received` notification goes to roles that can create quotations and opens Quotations → Requests. Email goes out only if BJP turns it on in the notification rules. The migration only updates the event's text and page while they are still the original seeded wording.
+- **Quotations page (platform root only):** a **Requests from systems (N)** button opens a panel with a DataTable and mobile cards: company, web address, phone, what was asked, total, date. The gear menu has **Create quotation** and **Decline** (the reason is required and the company sees it).
+- **Create quotation:** `quotation_create?request=ID` opens the form prefilled with the linked customer, the lines with their terms and prices, and the reference `Request SR-xxxx (subdomain)`. A "From request" strip shows who asked.
+  - The staff member saves it, so they are its creator, and the request becomes *quoted* (once only; a request that was already handled goes back to the list).
+  - If the company is not linked, staff choose the customer and get the question **"Link this company to this customer?"**. Linking needs customer-edit rights and is logged.
+- **Company side:** the company sees "Waiting for BJP" until the quotation is approved, then the quotation itself. A declined request shows "Declined by BJP" with the reason. Old self-service quotations that were made automatically are left as they are.
+- **Tests:** new `test_subscription_requests_cli` 43/43 (gateway, notification, API guards and decline, Quotations panel, prefilled form, real save through `save_quotation.php`, link on save, waiting until approved). The 5 subscription suites were moved to the new flow: my_subscription 45/45, plans billing 82/82, billing page 66/66, customer e2e 21/21, plans e2e 34/34. Also still green: quotations 130, document line terms 35, price terms 47, service switches 27. `test_pos_simple_mode_cli` has 7 failures in reports and dashboard files this change does not touch. Not browser-tested.
+
 ## 2026-10-18 — feat(services): "Sold in plans?" switches on the service form; own terms never block a document
 
 **Files:** `includes/service_type_switches.php` (new), `includes/service_price_terms_editor.php`, `app/bms/product/services.php`, `assets/js/line_price_terms.js`, `includes/line_price_terms_js.php`, `tests/test_service_type_switches_cli.php` (new), `tests/test_service_price_terms_cli.php`, `tests/test_document_line_terms_cli.php`, `changelog.md`

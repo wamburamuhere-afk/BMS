@@ -196,7 +196,7 @@ if ($action === 'request') {
     if ($extras && !is_string($tid)) $out(['success' => false, 'message' => 'Extras are sold only with a plan.'], 422);
     $r = plCall($tenantId, 'request_quote', ['product_id' => $pid, 'term_id' => $tid] + ($extras ? ['extras' => $extras] : []), $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) {
-        logActivity($pdo, (int)$_SESSION['user_id'], 'Subscription request', "Requested {$r['term_label']} — BJP quotation {$r['quotation_number']} (waiting for BJP)");
+        logActivity($pdo, (int)$_SESSION['user_id'], 'Subscription request', "Requested {$r['term_label']} — BJP request " . ($r['request_number'] ?? $r['quotation_number'] ?? '') . ' (waiting for BJP)');
     }
     $out($r, !empty($r['success']) ? 200 : 422);
 }
