@@ -92,6 +92,7 @@ $cleanup = function () use ($pdo, $c, &$planIds, &$PROD, $seenBefore) {
     foreach (['tenant_addon_grants', 'tenant_payments', 'tenant_admin_log', 'vendor_bridge_alerts', 'tenant_features'] as $tb) {
         try { $c->exec("DELETE FROM $tb WHERE tenant_id IN ($t)"); } catch (Throwable $e) {}
     }
+    try { $pdo->exec("DELETE FROM subscription_requests WHERE subdomain LIKE 'spptest%'"); } catch (Throwable $e) {}
     $c->exec("DELETE FROM tenants WHERE subdomain LIKE 'spptest%'");
     foreach ($planIds as $id) {
         $id = (int)$id;
@@ -225,19 +226,27 @@ ok($hs && !isset($hs['plans']) && count($hs['terms']) === 1, 'a period-priced se
 
 // ── B2. A request with extras ──────────────────────────────────────────────
 section('B2. request Pro 1 year + 2 extra shops');
+require_once "$root/tests/helpers/subscription_request_quote.php";
+$qBefore = $qCount($cust);
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $sys, 'term_id' => $tP1y, 'extras' => [$xP1y => 2]]);
-$q = $pdo->query("SELECT * FROM quotations WHERE order_number = " . $pdo->quote((string)($r['quotation_number'] ?? '')))->fetch(PDO::FETCH_ASSOC) ?: [];
-$qi = $q ? $pdo->query("SELECT * FROM quotation_items WHERE order_id = " . (int)$q['sales_order_id'] . " ORDER BY order_item_id")->fetchAll(PDO::FETCH_ASSOC) : [];
 ok(!empty($r['success']) && ($r['status'] ?? '') === 'waiting' && !isset($r['view_token']) && (float)$r['total'] === 420000.0, 'priced at BJP: 300,000 + 2 × 60,000 = 420,000; waiting, no link');
-ok(($q['status'] ?? '') === 'pending' && $q['approved_at'] === null && $q['reference'] === "SELF-SERVICE T$tid" && (float)$q['grand_total'] === 420000.0, 'a PENDING quotation for BJP to review');
+$req = srTestRequest($pdo, (string)($r['request_number'] ?? ''));
+ok($req && $req['status'] === 'pending' && (float)$req['total'] === 420000.0 && count($req['lines']) === 2 && $qCount($cust) === $qBefore,
+   'a PENDING request for BJP — no quotation written yet');
+$s = srTestQuote(fn($f, $p) => call($f, $p), $pdo, (string)($r['request_number'] ?? ''), $cust);
+$q = $s['quotation'];
+$qi = $q ? $pdo->query("SELECT * FROM quotation_items WHERE order_id = " . (int)$q['sales_order_id'] . " ORDER BY order_item_id")->fetchAll(PDO::FETCH_ASSOC) : [];
+ok(($q['status'] ?? '') === 'pending' && $q['approved_at'] === null && (int)$q['created_by'] === $uid && strpos((string)$q['reference'], (string)$r['request_number']) !== false
+   && (float)$q['grand_total'] === 420000.0, 'staff save it → a PENDING quotation, created by them, referencing the request');
 ok(count($qi) === 2 && (int)$qi[0]['quantity'] === 1 && (int)$qi[0]['plan_price_id'] === (int)$P1y['id'] && $qi[0]['plan_addon_id'] === null
    && (int)$qi[1]['quantity'] === 2 && (int)$qi[1]['plan_addon_id'] === (int)$Pshop['id'] && (int)$qi[1]['plan_price_id'] === (int)$P1y['id'],
    'lines: the plan (qty 1) + the extra (qty 2), both stamped with plan + term');
-ok(strpos((string)$q['notes'], 'through Subscription') !== false && strpos((string)$q['notes'], 'review') === false, 'notes the customer will see carry no staff instructions');
 $firstQ = (int)($q['sales_order_id'] ?? 0);
 
 section('B3. a wrong request is refused, nothing written');
 $n = $qCount($cust);
+$nReq = fn() => (int)$pdo->query("SELECT COUNT(*) FROM subscription_requests WHERE tenant_id = $tid")->fetchColumn();
+$nr = $nReq();
 $bad = [
     'an extra of another period'  => [$tP1y, [$xP1m => 1], 'not sold with the plan'],
     'an extra of another plan'    => [$tP1y, [$xB1y => 1], 'not sold with the plan'],
@@ -253,7 +262,7 @@ foreach ($bad as $label => [$term, $extras, $want]) {
 }
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $hosting, 'term_id' => $hTerm, 'extras' => [$xP1y => 1]]);
 ok(empty($r['success']) && stripos((string)$r['message'], 'only with a plan') !== false, 'extras on a period-priced service → refused');
-ok($qCount($cust) === $n && $pdo->query("SELECT status FROM quotations WHERE sales_order_id = $firstQ")->fetchColumn() === 'pending', 'no quotation written; the open request untouched');
+ok($qCount($cust) === $n && $nReq() === $nr && (srTestRequest($pdo, (string)$req['request_number'])['status'] ?? '') === 'quoted', 'no quotation or request written; the handled request untouched');
 
 // ── B4. What the company sees — quotations ─────────────────────────────────
 section('B4. quotations: shown only once BJP approves (D7)');
@@ -280,15 +289,16 @@ ok(count($dq['lines'] ?? []) === 2 && strpos((string)$dq['lines'][0]['term'], 'P
 $html = $view('quotation', $firstQ);
 ok(strpos($html, $qNum) !== false && strpos($html, 'Extra shop') !== false, 'customer copy opens once approved');
 // A new request replaces the approved one → that one stays visible as "Replaced".
+// A new request does not touch the approved quotation; it waits until BJP quotes it.
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $sys, 'term_id' => $tB1y]);
 $d = company($tid, ['action' => 'documents']);
-ok(!empty($r['success']) && count($d['quotations']) === 1 && $d['quotations'][0]['status'] === 'cancelled' && count($d['requests']) === 1 && $d['requests'][0]['number'] === $r['quotation_number'],
-   'a new request: the approved one shows as replaced, the new one waits');
-// A pending request replaced before approval never appears.
+ok(!empty($r['success']) && count($d['quotations']) === 1 && $d['quotations'][0]['status'] === 'approved' && count($d['requests']) === 1 && $d['requests'][0]['number'] === $r['request_number'],
+   'a new request: the approved quotation stays, the new request waits');
+// A pending request replaced before BJP handles it never appears.
 $r2 = company($tid, ['action' => 'request_quote', 'product_id' => $sys, 'term_id' => $tB1y]);
 $d = company($tid, ['action' => 'documents']);
-ok(count($d['quotations']) === 1 && count($d['requests']) === 1 && $d['requests'][0]['number'] === $r2['quotation_number']
-   && !in_array($r['quotation_number'], array_column($d['quotations'], 'number'), true), 'a request replaced while still pending is never shown');
+ok(count($d['quotations']) === 1 && count($d['requests']) === 1 && $d['requests'][0]['number'] === $r2['request_number']
+   && (srTestRequest($pdo, (string)$r['request_number'])['status'] ?? '') === 'replaced', 'a request replaced while still pending is never shown');
 
 // ── B5. Invoices ───────────────────────────────────────────────────────────
 section('B5. invoices: shown only once approved (D7)');

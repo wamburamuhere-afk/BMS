@@ -19,6 +19,13 @@ $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 // Attention mode — dashboard "Expiring Quotations" deep-link (?attention=1).
 $attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
 
+// Subscription requests from companies (platform root only) — "Requests from systems".
+require_once ROOT_DIR . '/core/vendor_context.php';
+require_once ROOT_DIR . '/core/subscription_requests.php';
+$sr_enabled = isPlatformVendorContext() && srReady($pdo);
+$sr_count   = $sr_enabled ? srPendingCount($pdo) : 0;
+$sr_open    = $sr_enabled && (($_GET['requests'] ?? '') === '1');
+
 // Build query for quotations
 $query = "
     SELECT 
@@ -223,6 +230,13 @@ $can_approve = canApprove('sales_orders');
                     <p class="text-muted mb-0">Manage customer quotations and estimates</p>
                 </div>
                 <div class="d-flex gap-2">
+                    <?php if ($sr_enabled): ?>
+                    <button type="button" class="btn btn-sm shadow-sm <?= $sr_count > 0 ? 'btn-outline-primary' : 'btn-outline-secondary' ?>" id="srToggle"
+                            data-bs-toggle="collapse" data-bs-target="#srPanel" aria-expanded="<?= $sr_open ? 'true' : 'false' ?>">
+                        <i class="bi bi-inbox me-1"></i> <?= t('Requests from systems') ?>
+                        <span class="badge rounded-pill <?= $sr_count > 0 ? 'bg-primary' : 'bg-secondary' ?> ms-1" id="srCount"><?= $sr_count ?></span>
+                    </button>
+                    <?php endif; ?>
                     <a href="<?= getUrl('quotation_create') ?>" class="btn btn-primary btn-sm shadow-sm">
                         <i class="bi bi-plus-circle me-1"></i> New Quotation
                     </a>
@@ -233,6 +247,23 @@ $can_approve = canApprove('sales_orders');
 
     <!-- Scrollable Content Wrapper -->
     <div>
+    <?php if ($sr_enabled): ?>
+    <!-- Subscription requests sent by companies from their Subscription page (platform root only). -->
+    <div class="collapse <?= $sr_open ? 'show' : '' ?> mb-4 d-print-none" id="srPanel">
+        <div class="card border-0 shadow-sm" style="border:1px solid #b6ccfe !important;">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-inbox me-2"></i><?= t('Requests from systems') ?></h6>
+                <small class="text-muted"><?= t('A company chose a plan on its Subscription page. Create the quotation — it fills in from the request.') ?></small>
+            </div>
+            <div class="card-body p-2">
+                <div class="d-none d-md-block"><table id="srTable" class="table table-hover align-middle w-100" data-bms-cards="off">
+                    <thead class="table-light"><tr><th>S/NO</th><th><?= t('Request') ?></th><th><?= t('Company') ?></th><th><?= t('Phone') ?></th><th><?= t('Asked for') ?></th><th class="text-end"><?= t('Total') ?></th><th><?= t('Date') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
+                    <tbody></tbody></table></div>
+                <div class="d-md-none row g-2" id="srCards"></div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php if ($attention): ?>
     <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
         <i class="bi bi-funnel-fill fs-5 text-warning"></i>
@@ -792,5 +823,76 @@ function exportExcel() {
     logReportAction('Exported Quotations', 'User exported quotations list to CSV');
 }
 </script>
+
+<?php if ($sr_enabled): ?>
+<script>
+$(function () {
+    const SR_API = <?= json_encode(buildUrl('api/platform/subscription_requests.php')) ?>, SR_CSRF = <?= json_encode(csrf_token()) ?>;
+    const SR_CREATE = <?= json_encode(getUrl('quotation_create')) ?>;
+    const SL = <?= json_encode([
+        'none' => t('No requests waiting.'), 'create' => t('Create quotation'), 'decline' => t('Decline'),
+        'linked' => t('Customer'), 'notLinked' => t('Not linked to a customer yet'),
+        'declineQ' => t('Decline this request?'), 'reason' => t('Reason (the company sees it)'), 'reasonReq' => t('Give the company a reason.'),
+        'yesDecline' => t('Yes, decline'), 'cancel' => t('Cancel'), 'done' => t('Done'), 'error' => t('Error'),
+    ]) ?>;
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const money = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const dmy = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
+    const asked = r => (r.lines || []).map(l => esc(l.name) + (Number(l.qty) !== 1 ? ` × ${Number(l.qty)}` : '') + (l.term ? ` <span class="text-primary">(${esc(l.term)})</span>` : '')).join('<br>');
+    const who = r => `<div class="fw-semibold">${esc(r.company)}</div><div class="small text-muted">${esc(r.subdomain)}</div>
+        <div class="small">${r.customer ? `<i class="bi bi-person-check text-primary me-1"></i>${esc(r.customer)}` : `<span class="text-muted">${SL.notLinked}</span>`}</div>`;
+    let canCreate = false;
+    const gear = r => {
+        if (!canCreate) return '';
+        return `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill me-1"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                <li><a class="dropdown-item py-2 rounded" href="${SR_CREATE}?request=${r.id}"><i class="bi bi-file-earmark-plus text-primary me-2"></i>${SL.create}</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button type="button" class="dropdown-item py-2 rounded text-danger sr-decline" data-id="${r.id}"><i class="bi bi-x-circle text-danger me-2"></i>${SL.decline}</button></li>
+            </ul></div>`;
+    };
+    const srTable = $('#srTable').DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtip',
+        language: { emptyTable: SL.none, zeroRecords: SL.none }, columnDefs: [{ targets: [0, 7], orderable: false }] });
+
+    function loadRequests() {
+        $.getJSON(SR_API).done(r => {
+            if (!r.success) return;
+            canCreate = !!r.can_create;
+            const list = r.requests || [];
+            $('#srCount').text(list.length).toggleClass('bg-primary', list.length > 0).toggleClass('bg-secondary', !list.length);
+            srTable.clear().rows.add(list.map((x, i) => [i + 1, `<span class="fw-bold">${esc(x.number)}</span>`, who(x),
+                x.phone ? `<a href="tel:${esc(x.phone)}">${esc(x.phone)}</a>` : '—', `<div class="small">${asked(x)}</div>`,
+                money(x.total), dmy(x.date), gear(x)])).draw();
+            $('#srCards').html(list.length ? list.map(x => `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+                <div class="d-flex justify-content-between"><span class="fw-bold">${esc(x.number)}</span><small class="text-muted">${dmy(x.date)}</small></div>
+                ${who(x)}${x.phone ? `<div class="small"><i class="bi bi-telephone text-primary me-1"></i><a href="tel:${esc(x.phone)}">${esc(x.phone)}</a></div>` : ''}
+                <div class="small mt-1">${asked(x)}</div><div class="fw-bold text-primary mt-1">${money(x.total)} TZS</div></div>
+                ${canCreate ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                    <a class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px;font-size:0.72rem" href="${SR_CREATE}?request=${x.id}" title="${esc(SL.create)}"><i class="bi bi-file-earmark-plus"></i></a>
+                    <button type="button" class="btn btn-sm btn-outline-danger sr-decline" style="flex:1;padding:3px 4px;font-size:0.72rem" data-id="${x.id}" title="${esc(SL.decline)}"><i class="bi bi-x-circle"></i></button>
+                </div></div>` : ''}</div></div>`).join('') : `<div class="col-12 text-center py-4 text-muted">${SL.none}</div>`);
+        });
+    }
+    $('#srPanel').on('shown.bs.collapse', () => srTable.columns.adjust());
+    $(document).on('click', '.sr-decline', function () {
+        const id = $(this).data('id');
+        Swal.fire({ title: SL.declineQ, input: 'textarea', inputLabel: SL.reason, icon: 'warning', showCancelButton: true,
+            confirmButtonText: SL.yesDecline, cancelButtonText: SL.cancel, confirmButtonColor: '#dc3545',
+            inputValidator: v => (!v || !v.trim()) ? SL.reasonReq : undefined })
+        .then(x => {
+            if (!x.isConfirmed) return;
+            $.ajax({ url: SR_API, type: 'POST', dataType: 'json', data: { action: 'decline', id: id, reason: x.value, _csrf: SR_CSRF } })
+                .done(r => {
+                    loadRequests();
+                    if (r.success) Swal.fire({ icon: 'success', title: SL.done, text: r.message, timer: 2500, showConfirmButton: false });
+                    else Swal.fire({ icon: 'error', title: SL.error, text: r.message });
+                })
+                .fail(x => Swal.fire({ icon: 'error', title: SL.error, text: (x.responseJSON || {}).message || 'Something went wrong.' }));
+        });
+    });
+    loadRequests();
+});
+</script>
+<?php endif; ?>
 
 <?php includeFooter(); ?>

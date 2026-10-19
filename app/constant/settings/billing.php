@@ -110,10 +110,10 @@ $(function () {
         'trial' => t('Trial'), 'active' => t('Active'), 'suspended' => t('Suspended'), 'noExpiry' => t('No expiry'),
         'choose' => t('Choose'), 'confirmQ' => t('Send this request?'), 'confirmTxt' => t('BJP will review a quotation of %s for %p.'),
         'yes' => t('Yes, send'), 'cancel' => t('Cancel'), 'view' => t('View'), 'error' => t('Error'), 'none' => t('Nothing yet.'),
-        'notLinked' => t('Your company is not yet linked to a customer account at BJP. Contact BJP to set it up — then your quotations and invoices appear here.'),
+        'notLinked' => t('Your company is not yet linked to a customer account at BJP. You can still send a request — BJP sets up the link when preparing your quotation, then your quotations and invoices appear here.'),
         'unreachable' => t('BJP could not be reached right now. Please try again later.'),
         'paid' => t('Paid'), 'partial' => t('Partly paid'), 'unpaid' => t('Unpaid'), 'approved' => t('Approved'), 'accepted' => t('Accepted'), 'cancelled' => t('Replaced'),
-        'waiting' => t('Waiting for BJP'), 'new' => t('New'),
+        'waiting' => t('Waiting for BJP'), 'declined' => t('Declined by BJP'), 'new' => t('New'),
         'auto' => t('BJP invoice'), 'manual' => t('Recorded by BJP'), 'months' => t('months'),
         'noServices' => t('BJP has not published subscription periods yet.'),
         'sign' => t('Sign'), 'awaiting_customer' => t('Waiting for your signature'), 'signed' => t('Signed'),
@@ -129,7 +129,7 @@ $(function () {
     const dmy = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
     const badge = (st) => {
         const map = { paid: ['#052c65', '#fff'], approved: ['#0d6efd', '#fff'], accepted: ['#052c65', '#fff'], partial: ['#cfe2ff', '#084298'],
-                      unpaid: ['#e9ecef', '#495057'], cancelled: ['#6c757d', '#fff'], waiting: ['#bfdbfe', '#1e3a8a'] };
+                      unpaid: ['#e9ecef', '#495057'], cancelled: ['#6c757d', '#fff'], waiting: ['#bfdbfe', '#1e3a8a'], declined: ['#6c757d', '#fff'] };
         const [bg, fg] = map[st] || ['#e9ecef', '#495057'];
         return `<span class="badge" style="background:${bg};color:${fg}">${esc(L[st] || st)}</span>`;
     };
@@ -264,7 +264,7 @@ $(function () {
                 .done(r => {
                     if (r.success) {
                         loadDocs();
-                        Swal.fire({ icon: 'success', title: r.quotation_number, text: r.message, confirmButtonColor: '#0d6efd' });
+                        Swal.fire({ icon: 'success', title: r.request_number || r.quotation_number, text: r.message, confirmButtonColor: '#0d6efd' });
                     } else Swal.fire({ icon: 'error', title: L.error, text: r.message });
                 })
                 .fail(x => Swal.fire({ icon: 'error', title: L.error, text: (x.responseJSON || {}).message || L.unreachable }))
@@ -281,8 +281,9 @@ $(function () {
             const inv = r.invoices || [], qt = r.quotations || [], wait = r.requests || [];
             $('#waitCard').toggleClass('d-none', !wait.length);
             $('#waitList').html(wait.map(w => `<div class="col-12 col-md-6"><div class="border rounded p-2 h-100">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${esc(w.number)}</span>${badge('waiting')}</div>
-                <div class="small">${dmy(w.date)} · ${money(w.total)} TZS</div><div class="bl-lines">${lines(w)}</div></div></div>`).join(''));
+                <div class="d-flex justify-content-between"><span class="fw-bold">${esc(w.number)}</span>${badge(w.status === 'declined' ? 'declined' : 'waiting')}</div>
+                <div class="small">${dmy(w.date)} · ${money(w.total)} TZS</div><div class="bl-lines">${lines(w)}</div>
+                ${w.status === 'declined' && w.reason ? `<div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i>${esc(w.reason)}</div>` : ''}</div></div>`).join(''));
             const nInv = inv.filter(d => d.is_new).length, nQt = qt.filter(d => d.is_new).length;
             $('#newInv').text(nInv).toggleClass('d-none', !nInv); $('#newQt').text(nQt).toggleClass('d-none', !nQt);
             $('.bms-billing-badge').addClass('d-none');   // seen now

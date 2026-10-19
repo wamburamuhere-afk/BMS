@@ -84,6 +84,7 @@ $cleanup = function () use ($pdo, $c) {
     $t = $in($c->query("SELECT id FROM tenants WHERE subdomain LIKE 'e2etest%'")->fetchAll(PDO::FETCH_COLUMN));
     $c->exec("DELETE FROM tenant_payments WHERE tenant_id IN ($t)");
     $c->exec("DELETE FROM tenant_admin_log WHERE tenant_id IN ($t)");
+    try { $pdo->exec("DELETE FROM subscription_requests WHERE subdomain LIKE 'e2etest%'"); } catch (Throwable $e) {}
     $c->exec("DELETE FROM tenants WHERE subdomain LIKE 'e2etest%'");
 };
 $cleanup();
@@ -146,12 +147,19 @@ $terms = [];
 foreach ($cat['services'] ?? [] as $s) if ($s['product_id'] === $svc) foreach ($s['terms'] as $t) $terms[$t['term_label']] = $t['term_id'];
 ok(count($terms) === 3, 'the company sees the 3 periods with BJP prices');
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $svc, 'term_id' => $terms['6 Months']]);
-$qtNum = (string)($r['quotation_number'] ?? '');
-$qt = $pdo->query("SELECT * FROM quotations WHERE order_number = " . $pdo->quote($qtNum))->fetch(PDO::FETCH_ASSOC) ?: [];
-// service_plans_plan.md D7: the request is a pending quotation the company cannot see until BJP approves it.
-ok(!empty($r['success']) && ($qt['status'] ?? '') === 'pending' && (float)$qt['grand_total'] === 45000.0, "pending quotation $qtNum for 45,000 — waiting for BJP");
 $docs = company($tid, ['action' => 'documents']);
-ok(count($docs['quotations'] ?? []) === 0 && count($docs['requests'] ?? []) === 1, 'the company sees only "waiting for BJP", not the quotation');
+ok(!empty($r['success']) && (float)$r['total'] === 45000.0 && count($docs['quotations'] ?? []) === 0 && count($docs['requests'] ?? []) === 1,
+   'request ' . ($r['request_number'] ?? '?') . ' for 45,000 — the company sees "waiting for BJP"');
+// BJP staff open the request from Quotations and save the prefilled quotation (they are its creator).
+require_once "$root/tests/helpers/subscription_request_quote.php";
+$s = srTestQuote(fn($f, $p) => bjp($f, $p), $pdo, (string)($r['request_number'] ?? ''), $cust);
+$qt = $s['quotation'];
+$qtNum = (string)($qt['order_number'] ?? '');
+// service_plans_plan.md D7: a pending quotation the company cannot see until BJP approves it.
+ok(($qt['status'] ?? '') === 'pending' && (float)$qt['grand_total'] === 45000.0 && (int)$qt['created_by'] === $uid && ($s['request']['status'] ?? '') === 'quoted',
+   "BJP saves pending quotation $qtNum for 45,000 from the request (created by staff)");
+$docs = company($tid, ['action' => 'documents']);
+ok(count($docs['quotations'] ?? []) === 0 && count($docs['requests'] ?? []) === 1, 'the company still sees only "waiting for BJP", not the quotation');
 $rv = bjp('api/account/review_quotation.php', ['quotation_id' => (int)$qt['sales_order_id'], 'id' => (int)$qt['sales_order_id']]);
 $ap = bjp('api/account/approve_quotation.php', ['quotation_id' => (int)$qt['sales_order_id'], 'id' => (int)$qt['sales_order_id']]);
 $docs = company($tid, ['action' => 'documents']);
