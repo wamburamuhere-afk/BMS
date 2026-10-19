@@ -219,7 +219,49 @@ try {
     }
     sptAssertPlanLines($resolvedLines ?? []);   // one plan, qty 1, add-ons follow it
 
+    // Made from a company's subscription request (Quotations → Requests from systems):
+    // the request is marked quoted in the same transaction, so it is used once only.
+    $srLink = null;
+    $srId = !$is_update ? (int)($_POST['subscription_request_id'] ?? 0) : 0;
+    if ($srId > 0) {
+        require_once __DIR__ . '/../../core/vendor_context.php';
+        require_once __DIR__ . '/../../core/subscription_requests.php';
+        if (!isPlatformVendorContext()) throw new Exception('Subscription requests are handled only at BJP.');
+        $sr = srGet($pdo, $srId);
+        if (!$sr || !srMarkQuoted($pdo, $srId, (int)$quotation_id, (int)$_SESSION['user_id'])) {
+            throw new Exception('That request was already handled. Open Quotations → Requests from systems again.');
+        }
+        if (!empty($_POST['link_tenant'])) $srLink = $sr;
+    }
+
     $pdo->commit();
+
+    // Link the requesting company to the customer chosen (control DB, after the commit).
+    $linkNote = '';
+    if ($srLink !== null) {
+        require_once __DIR__ . '/../../core/vendor_link.php';
+        require_once __DIR__ . '/../../core/vendor_bridge.php';
+        $t = vlFindTenant(null, (int)$srLink['tenant_id']);
+        if (!canEdit('customers')) {
+            $linkNote = ' The company was not linked: you need permission to edit customers.';
+        } elseif ($t && (int)($t['vendor_customer_id'] ?? 0) <= 0) {
+            $c = $pdo->prepare("SELECT customer_id, customer_code, customer_name FROM customers WHERE customer_id = ?");
+            $c->execute([(int)$customer_id]);
+            $c = $c->fetch(PDO::FETCH_ASSOC);
+            $me  = (int)$_SESSION['user_id'];
+            $who = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: ('user #' . $me);
+            $r = $c ? vlSetTenantCustomer((int)$t['id'], (int)$c['customer_id'], $who, $c['customer_code'] . ' — ' . $c['customer_name']) : ['ok' => false, 'error' => 'Customer not found.'];
+            if ($r['ok']) {
+                logActivity($pdo, $me, 'Link platform company', "{$c['customer_code']} now pays for {$t['subdomain']} (from request {$srLink['request_number']})");
+                vendorRequeueCustomer($pdo, (int)$c['customer_id']);
+                logAudit($pdo, $me, 'vendor_customer_linked', ['entity_type' => 'customer', 'entity_id' => (int)$c['customer_id'],
+                    'new_values' => ['tenant_id' => (int)$t['id'], 'subdomain' => $t['subdomain'], 'request' => $srLink['request_number']]]);
+                $linkNote = " {$t['subdomain']} is now linked to this customer.";
+            } else {
+                $linkNote = ' The company could not be linked: ' . $r['error'];
+            }
+        }
+    }
 
     $log_number  = $order_number ?? '';
     if ($is_update && $log_number === '') {
@@ -235,7 +277,7 @@ try {
 
     echo json_encode([
         'success'      => true,
-        'message'      => 'Quotation saved successfully',
+        'message'      => 'Quotation saved successfully.' . ($srId > 0 ? " Request {$sr['request_number']} is now quoted." : '') . $linkNote,
         'quotation_id' => $quotation_id,
         'order_number' => $log_number,
     ]);

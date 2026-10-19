@@ -83,6 +83,7 @@ $cleanup = function () use ($pdo, $c) {
         $c->exec("DELETE FROM tenant_payments WHERE tenant_id IN ($in)");
         $c->exec("DELETE FROM tenant_admin_log WHERE tenant_id IN ($in)");
     }
+    try { $pdo->exec("DELETE FROM subscription_requests WHERE subdomain LIKE 'mstest%'"); } catch (Throwable $e) {}
     $c->exec("DELETE FROM tenants WHERE subdomain LIKE 'mstest%'");
 };
 $cleanup();
@@ -160,42 +161,57 @@ $svc = array_values(array_filter($r['services'] ?? [], fn($s) => $s['product_id'
 ok($r['code'] === 200 && $svc && count($svc['terms']) === 2 && $svc['terms'][1]['months'] === 12 && (float)$svc['terms'][0]['price'] === 10000.0,
    'subscription periods with months and catalogue prices');
 
-section('B3. request a period → a pending quotation BJP reviews (service_plans_plan.md D7)');
+section('B3. request a period → a REQUEST at BJP; staff save the quotation (no auto-quotation)');
+require_once "$root/tests/helpers/subscription_request_quote.php";
+$qBefore = (int)$pdo->query("SELECT COUNT(*) FROM quotations WHERE customer_id = $cust")->fetchColumn();
 $r = gateway($t1, ['action' => 'request_quote', 'product_id' => $sub, 'term_id' => $terms['1 Year']]);
-ok(!empty($r['success']) && (float)$r['total'] === 85000.0, 'quotation ' . ($r['quotation_number'] ?? '?') . ' for 85,000');
-$q = $pdo->query("SELECT * FROM quotations WHERE order_number = " . $pdo->quote((string)($r['quotation_number'] ?? ''))) ->fetch(PDO::FETCH_ASSOC) ?: [];
-$qi = $q ? $pdo->query("SELECT * FROM quotation_items WHERE order_id = " . (int)$q['sales_order_id'])->fetch(PDO::FETCH_ASSOC) : [];
-ok(($q['status'] ?? '') === 'pending' && $q['approved_at'] === null && (int)$q['customer_id'] === $cust && $q['reference'] === "SELF-SERVICE T$t1", 'pending (not approved), for the linked customer, marked self-service');
-ok(($r['status'] ?? '') === 'waiting' && !isset($r['view_token']), 'the company is told it waits for BJP — no link to an unapproved document');
-ok((int)($qi['price_term_id'] ?? 0) === $terms['1 Year'] && (int)$qi['term_duration_value'] === 1 && $qi['term_duration_unit'] === 'year'
-   && strpos((string)$qi['description'], 'Term: 1 Year') !== false, 'line carries the term (so the paid invoice will extend by 12 months)');
-$first = $q['order_number'] ?? '';
+ok(!empty($r['success']) && (float)$r['total'] === 85000.0 && preg_match('/^SR-\d{4,}$/', (string)($r['request_number'] ?? '')), 'request ' . ($r['request_number'] ?? '?') . ' for 85,000');
+$req1 = srTestRequest($pdo, (string)($r['request_number'] ?? ''));
+ok((int)$pdo->query("SELECT COUNT(*) FROM quotations WHERE customer_id = $cust")->fetchColumn() === $qBefore, 'no quotation is created by the request itself');
+ok($req1 && $req1['status'] === 'pending' && $req1['tenant_id'] === $t1 && $req1['customer_id'] === $cust && $req1['subdomain'] === 'mstest1'
+   && $req1['email'] === 'mstest1@example.com', 'stored pending, with the company, its web address, contact and linked customer');
+ok(($r['status'] ?? '') === 'waiting' && !isset($r['view_token']), 'the company is told it waits for BJP — no link to anything');
+ok($req1 && count($req1['lines']) === 1 && $req1['lines'][0]['token'] === (string)$terms['1 Year'] && (float)$req1['lines'][0]['unit_price'] === 85000.0
+   && strpos((string)$req1['lines'][0]['description'], 'Term: 1 Year') !== false, 'the line is priced by BJP and carries the term');
 $r2 = gateway($t1, ['action' => 'request_quote', 'product_id' => $sub, 'term_id' => $terms['1 Month']]);
-$old = $pdo->query("SELECT status FROM quotations WHERE order_number = " . $pdo->quote($first))->fetchColumn();
-ok(!empty($r2['success']) && $old === 'cancelled', 'a second request replaces the open one (one open request per company)');
+ok(!empty($r2['success']) && srGet($pdo, $req1['id'] ?? 0)['status'] === 'replaced', 'a second request replaces the pending one (one pending request per company)');
 ok(empty(gateway($t1, ['action' => 'request_quote', 'product_id' => $sub, 'term_id' => 999999])['success']), 'an unknown period is refused');
-ok(empty(gateway($t2, ['action' => 'request_quote', 'product_id' => $sub, 'term_id' => $terms['1 Month']])['success']), 'an unlinked company is told to contact BJP');
+$r3 = gateway($t2, ['action' => 'request_quote', 'product_id' => $sub, 'term_id' => $terms['1 Month']]);
+$req3 = srTestRequest($pdo, (string)($r3['request_number'] ?? ''));
+ok(!empty($r3['success']) && $req3 && $req3['customer_id'] === null, 'an unlinked company can still send a request (BJP picks the customer)');
 
 section('B4. documents + customer copy');
 $r = gateway($t1, ['action' => 'documents']);
-ok(!empty($r['success']) && count($r['quotations']) === 0 && count($r['requests']) === 1 && $r['requests'][0]['number'] === $r2['quotation_number']
-   && !isset($r['requests'][0]['view_token']), 'before approval: no quotation shown, the open request listed as waiting (the replaced one nowhere)');
-$qid = (int)$pdo->query("SELECT sales_order_id FROM quotations WHERE order_number = " . $pdo->quote((string)$r2['quotation_number']))->fetchColumn();
+ok(!empty($r['success']) && count($r['quotations']) === 0 && count($r['requests']) === 1 && $r['requests'][0]['number'] === $r2['request_number']
+   && $r['requests'][0]['status'] === 'waiting' && !isset($r['requests'][0]['view_token']), 'before a quotation: the pending request listed as waiting (the replaced one nowhere)');
+$rt2 = gateway($t2, ['action' => 'documents']);
+ok($rt2['linked'] === false && count($rt2['requests']) === 1 && count($rt2['quotations']) === 0, 'an unlinked company sees its own request waiting, no documents');
+$apiAdmin = fn(string $f, array $p) => api($f, $p);
+$s = srTestQuote($apiAdmin, $pdo, (string)$r2['request_number'], $cust);
+$q = $s['quotation'];
+ok(!empty($s['response']['success']) && ($q['status'] ?? '') === 'pending' && (int)$q['created_by'] === $uid && (int)$q['customer_id'] === $cust,
+   'staff save the quotation from the request: pending, created by them — ' . ($s['response']['message'] ?? ''));
+ok(($s['request']['status'] ?? '') === 'quoted' && $s['request']['quotation_id'] === (int)($q['sales_order_id'] ?? 0) && $s['request']['handled_by'] == $uid, 'the request is marked quoted, with the quotation and who did it');
+$again = srTestQuote($apiAdmin, $pdo, (string)$r2['request_number'], $cust);
+ok(empty($again['response']['success']), 'a request is turned into a quotation once only');
+$qid = (int)($q['sales_order_id'] ?? 0);
+$qnum = (string)($q['order_number'] ?? '');
+$r = gateway($t1, ['action' => 'documents']);
+ok(count($r['quotations']) === 0 && count($r['requests']) === 1 && $r['requests'][0]['status'] === 'waiting', 'quotation not approved yet → still "waiting for BJP"');
 $view = function (string $token, bool $vendor = true) use ($root) {
     return runPhp("\$_SERVER['REQUEST_METHOD'] = 'GET'; \$_SERVER['HTTP_HOST'] = 'localhost'; require '$root/roots.php'; " . ENV_KEY . ($vendor ? ENV_VENDOR : '') . "
         \$_GET = ['t' => " . var_export($token, true) . "]; ob_start(); include '$root/api/platform/customer_document.php'; echo ob_get_clean();");
 };
-ok(strpos($view((string)plDocToken('quotation', $qid, $cust)), (string)$r2['quotation_number']) === false, 'even a valid link cannot open a pending quotation');
+ok($qnum !== '' && strpos($view((string)plDocToken('quotation', $qid, $cust)), $qnum) === false, 'even a valid link cannot open a pending quotation');
 $pdo->exec("UPDATE quotations SET status = 'approved', approved_at = NOW() WHERE sales_order_id = $qid");   // BJP approves it
 $r = gateway($t1, ['action' => 'documents']);
 ok(!empty($r['success']) && count($r['quotations']) === 1 && !empty($r['quotations'][0]['view_token']) && $r['quotations'][0]['status'] === 'approved'
    && count($r['requests']) === 0, "once approved: this company's quotation, with a view link; no longer waiting");
-ok(gateway($t2, ['action' => 'documents'])['linked'] === false, 'an unlinked company sees nothing from BJP');
-$html = $view($r['quotations'][0]['view_token']);
-ok(strpos($html, (string)$r2['quotation_number']) !== false && strpos($html, 'QUOTATION') !== false && strpos($html, 'Term: 1 Month') !== false, 'customer copy shows the quotation with its term');
-ok(strpos($view((string)plDocToken('quotation', $qid, $cust + 1)), (string)$r2['quotation_number']) === false, "a token for another customer cannot open it");
+$html = $view((string)($r['quotations'][0]['view_token'] ?? ''));
+ok(strpos($html, $qnum) !== false && strpos($html, 'QUOTATION') !== false && strpos($html, 'Term: 1 Month') !== false, 'customer copy shows the quotation with its term');
+ok(strpos($view((string)plDocToken('quotation', $qid, $cust + 1)), $qnum) === false, "a token for another customer cannot open it");
 ok(strpos($view((string)plDocToken('quotation', $qid, $cust, -5)), 'expired') !== false, 'an expired link says so');
-ok(strpos($view($r['quotations'][0]['view_token'], false), (string)$r2['quotation_number']) === false, 'customer copies are served only by the platform root');
+ok(strpos($view((string)($r['quotations'][0]['view_token'] ?? ''), false), $qnum) === false, 'customer copies are served only by the platform root');
 
 section('B5. company side');
 $asTenant = fn(int $tid) => "\$GLOBALS['__bms_tenant'] = ['id' => $tid];";

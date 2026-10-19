@@ -109,6 +109,7 @@ $cleanup = function () use ($pdo, $c, &$planIds, &$PROD) {
     foreach (['tenant_addon_grants', 'tenant_payments', 'tenant_admin_log', 'vendor_bridge_alerts', 'tenant_features'] as $tb) {
         try { $c->exec("DELETE FROM $tb WHERE tenant_id IN ($t)"); } catch (Throwable $e) {}
     }
+    try { $pdo->exec("DELETE FROM subscription_requests WHERE subdomain LIKE 'spbtest%'"); } catch (Throwable $e) {}
     $c->exec("DELETE FROM tenants WHERE subdomain LIKE 'spbtest%'");
     foreach ($planIds as $id) {
         $id = (int)$id;
@@ -386,11 +387,15 @@ $opts = [];
 foreach ($cat['services'] ?? [] as $s) if ((int)$s['product_id'] === $sys) foreach ($s['terms'] as $o) $opts[(string)$o['term_id']] = $o;
 ok(isset($opts["p{$P1y['id']}"], $opts["p{$B1y['id']}"]) && !isset($opts["p{$H1y['id']}"]), 'catalog lists the public plans as tokens, not the private one');
 ok((int)($opts["p{$P1y['id']}"]['price'] ?? 0) === 300000 && ($opts["p{$P1y['id']}"]['plan_key'] ?? '') === $pro['plan_key'], 'price and plan come from the control DB');
+require_once "$root/tests/helpers/subscription_request_quote.php";
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $sys, 'term_id' => "p{$P1y['id']}"]);
-$q = $pdo->query("SELECT * FROM quotations WHERE order_number = " . $pdo->quote((string)($r['quotation_number'] ?? '')))->fetch(PDO::FETCH_ASSOC) ?: [];
+$req = srTestRequest($pdo, (string)($r['request_number'] ?? ''));
+ok(!empty($r['success']) && $req && (float)$req['total'] === 300000.0 && $req['lines'][0]['token'] === "p{$P1y['id']}", 'request for Pro yearly → a request whose line carries the plan token' . $msg($r));
+$s = srTestQuote(fn($f, $p) => call($f, $p), $pdo, (string)($r['request_number'] ?? ''), $cust);
+$q = $s['quotation'];
 $ql = $q ? $pdo->query("SELECT * FROM quotation_items WHERE order_id = " . (int)$q['sales_order_id'])->fetch(PDO::FETCH_ASSOC) : [];
-ok(!empty($r['success']) && (float)($q['grand_total'] ?? 0) === 300000.0 && (int)($ql['plan_price_id'] ?? 0) === (int)$P1y['id'] && ($ql['plan_key'] ?? '') === $pro['plan_key'],
-   'request for Pro yearly → a quotation whose line carries the plan' . $msg($r));
+ok(!empty($s['response']['success']) && (float)($q['grand_total'] ?? 0) === 300000.0 && (int)($ql['plan_price_id'] ?? 0) === (int)$P1y['id'] && ($ql['plan_key'] ?? '') === $pro['plan_key'],
+   'staff save it → a quotation whose line carries the plan' . $msg($s['response']));
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $sys, 'term_id' => "p{$H1y['id']}"]);
 ok(empty($r['success']), 'a private plan token is refused');
 $r = company($tid, ['action' => 'request_quote', 'product_id' => $sys, 'term_id' => "a{$Pshop['id']}-{$P1y['id']}"]);

@@ -7,8 +7,10 @@
  *   catalog        → the subscription services and their terms (prices from BJP's books)
  *   documents      → this company's quotations and invoices, with customer-copy links —
  *                    only once BJP's own workflow has APPROVED them (service_plans_plan.md D7)
- *   request_quote  → a PENDING quotation for the chosen term (+ extras), catalogue price;
- *                    BJP reviews and approves it as usual. One open request per company.
+ *   request_quote  → a REQUEST for the chosen term (+ extras), catalogue price
+ *                    (core/subscription_requests.php). A BJP staff member turns it into a
+ *                    quotation from Quotations, which is then reviewed and approved as usual.
+ *                    One pending request per company.
  *
  * The company is identified only by the signed tenant id, and only the customer
  * linked to it (tenants.vendor_customer_id) is ever read.
@@ -18,6 +20,7 @@ require_once __DIR__ . '/vendor_context.php';
 require_once __DIR__ . '/vendor_link.php';
 require_once __DIR__ . '/service_price_terms.php';
 require_once __DIR__ . '/subscription_contracts.php';
+require_once __DIR__ . '/subscription_requests.php';
 
 if (!function_exists('pgHandle')) {
     /** @param array $headers X-Platform-Tenant / -Ts / -Sig @return array{0:int,1:array} [http code, body] */
@@ -35,17 +38,15 @@ if (!function_exists('pgHandle')) {
 
         switch ((string)($req['action'] ?? '')) {
             case 'catalog':   return [200, pgCatalog($pdo, $tenant) + ['linked' => $cid > 0]];
-            case 'documents': return [200, $cid > 0 ? pgDocuments($pdo, $cid, (int)$tenant['id']) : ['success' => true, 'linked' => false, 'quotations' => [], 'invoices' => [], 'requests' => [], 'latest' => null]];
+            case 'documents': return [200, $cid > 0 ? pgDocuments($pdo, $cid, (int)$tenant['id'])
+                                  : ['success' => true, 'linked' => false, 'quotations' => [], 'invoices' => [], 'requests' => srForTenant($pdo, (int)$tenant['id']), 'latest' => null]];
             case 'contracts':
                 return [200, $cid > 0 ? pgContracts($pdo, $cid) : ['success' => true, 'linked' => false, 'contracts' => []]];
             case 'contract_sign_link':
                 if ($cid <= 0) return [200, ['success' => false, 'message' => 'Your company is not linked to a customer account at BJP yet.']];
                 return [200, pgContractSignLink($pdo, $tenant, $cid, (int)($req['contract_id'] ?? 0))];
             case 'request_quote':
-                if ($cid <= 0) {
-                    return [200, ['success' => false, 'linked' => false,
-                        'message' => 'Your company is not yet linked to a customer account at BJP. Please contact BJP so they can set it up.']];
-                }
+                // A company not linked to a customer yet may still ask: BJP picks (and links) the customer when quoting.
                 // term_id: a local term id, or a plan token "p12" (validated against the control DB).
                 $termReq = $req['term_id'] ?? 0;
                 $termReq = is_string($termReq) && sptParseLineToken($termReq) !== null ? $termReq : (int)$termReq;
@@ -149,8 +150,8 @@ if (!function_exists('pgDocuments')) {
      * The company sees a document only once BJP's workflow has finished with it (D7):
      * a quotation once approved (converted → "accepted"), an invoice once approved
      * (unpaid / partial / paid). Cancelled ones only if they had been approved (= shown
-     * before). Draft / pending / reviewed are never shown. Its own self-service requests
-     * still waiting for BJP come back as `requests` (no link, no document).
+     * before). Draft / pending / reviewed are never shown. Its own requests still waiting
+     * for BJP (or declined lately) come back as `requests` (no link, no document).
      * `latest` = when the newest visible document became visible (the Billing badge).
      */
     function pgDocuments(PDO $pdo, int $cid, ?int $tenantId = null): array
@@ -191,6 +192,8 @@ if (!function_exists('pgDocuments')) {
 
         $requests = [];
         if ($tenantId !== null) {
+            $requests = srForTenant($pdo, $tenantId);
+            // Older requests were saved straight as quotations (reference SELF-SERVICE T{id}).
             $rq = $pdo->prepare("SELECT sales_order_id AS id, order_number AS number, order_date AS date, grand_total AS total FROM quotations
                                   WHERE customer_id = ? AND reference = ? AND status IN ('draft','pending','reviewed')
                                   ORDER BY sales_order_id DESC LIMIT 10");
@@ -306,15 +309,13 @@ if (!function_exists('pgRequestQuote')) {
             if (!$term || sptMonths((int)$term['duration_value'], (string)$term['duration_unit']) === null) return $fail('That period is not available.');
         }
 
-        require_once __DIR__ . '/code_generator.php';
-        $ref = 'SELF-SERVICE T' . (int)$tenant['id'];
         $taxRate = (float)$svc['tax_rate'];
-        // Every line priced on the server: [qty, unit price, resolved term, name]
+        // Every line priced on the server: [qty, unit price, resolved term, name, token]
         $lines = [];
         try {
-            $lines[] = [1, round((float)$term['price'], 2), sptResolveLineTerm($pdo, $productId, $termId, (string)($svc['description'] ?? ''), (string)$svc['product_name']), (string)$svc['product_name']];
+            $lines[] = [1, round((float)$term['price'], 2), sptResolveLineTerm($pdo, $productId, $termId, (string)($svc['description'] ?? ''), (string)$svc['product_name']), (string)$svc['product_name'], (string)$termId];
             foreach ($extraLines as $x) {
-                $lines[] = [$x['qty'], round($x['price'], 2), sptResolveLineTerm($pdo, $productId, $x['token'], '', $x['name']), $x['name']];
+                $lines[] = [$x['qty'], round($x['price'], 2), sptResolveLineTerm($pdo, $productId, $x['token'], '', $x['name']), $x['name'], $x['token']];
             }
             sptAssertPlanLines(array_map(fn($l) => ['term' => $l[2], 'qty' => $l[0], 'name' => $l[3]], $lines));
         } catch (InvalidArgumentException $e) {
@@ -323,43 +324,21 @@ if (!function_exists('pgRequestQuote')) {
         $price = 0.0; $tax = 0.0;
         foreach ($lines as [$qty, $unit]) { $net = round($qty * $unit, 2); $price += $net; $tax += round($net * $taxRate / 100, 2); }
 
+        // A REQUEST, not a quotation: BJP staff open it from Quotations and save the quotation themselves.
+        $stored = array_map(fn($l) => [
+            'product_id' => $productId, 'name' => $l[3], 'qty' => $l[0], 'unit_price' => $l[1], 'tax_rate' => $taxRate,
+            'unit' => $svc['unit'] ?: 'job', 'token' => $l[4], 'term_label' => $l[2]['price_term_label'], 'description' => $l[2]['description'],
+        ], $lines);
         try {
-            $pdo->beginTransaction();
-            // One open request per company: an earlier one not yet turned into an order is replaced
-            // (still waiting for BJP, or approved and not yet ordered).
-            $old = $pdo->prepare("SELECT sales_order_id, order_number FROM quotations
-                                   WHERE customer_id = ? AND reference = ? AND status IN ('draft','pending','reviewed','approved') AND converted_to_so_id IS NULL");
-            $old->execute([$cid, $ref]);
-            foreach ($old->fetchAll(PDO::FETCH_ASSOC) as $o) {
-                $pdo->prepare("UPDATE quotations SET status = 'cancelled', updated_at = NOW() WHERE sales_order_id = ?")->execute([$o['sales_order_id']]);
-            }
-
-            $number = nextCode($pdo, 'QT');
-            // PENDING: BJP's normal review → approve workflow decides; the company sees it once approved (D7).
-            $pdo->prepare("
-                INSERT INTO quotations (order_number, customer_id, order_date, salesperson_id, currency, payment_terms, reference,
-                                        subtotal, tax_amount, discount_amount, shipping_cost, grand_total, total_ordered,
-                                        notes, terms_conditions, status, is_quote, quote_valid_until, created_at)
-                VALUES (?, ?, CURDATE(), 0, 'TZS', '', ?, ?, ?, 0, 0, ?, ?, ?, '', 'pending', 1, DATE_ADD(CURDATE(), INTERVAL 14 DAY), NOW())
-            ")->execute([$number, $cid, $ref, $price, $tax, $price + $tax, array_sum(array_column($lines, 0)),
-                'Requested by ' . $tenant['company_name'] . ' (' . $tenant['subdomain'] . ') through Subscription.']);
-            $qid = (int)$pdo->lastInsertId();
-            $ins = $pdo->prepare("INSERT INTO quotation_items (order_id, product_id, product_name, sku, quantity, unit, unit_price, tax_rate,
-                                                              discount_percent, line_total, description, created_at)
-                                  VALUES (?, ?, ?, '', ?, ?, ?, ?, 0, ?, ?, NOW())");
-            foreach ($lines as [$qty, $unit, $resolved, $name]) {
-                $net = round($qty * $unit, 2);
-                $ins->execute([$qid, $productId, $name, $qty, $svc['unit'] ?: 'job', $unit, $taxRate, $net + round($net * $taxRate / 100, 2), $resolved['description']]);
-                sptStampLine($pdo, 'quotation_items', (int)$pdo->lastInsertId(), $resolved);
-            }
-            $pdo->commit();
+            if (!srReady($pdo)) return $fail('Requests are not set up at BJP yet. Please try again later.');
+            $req = srCreate($pdo, $tenant, $productId, (string)$termId, (string)$term['term_label'],
+                            array_filter(array_map('intval', $extras)), $stored, $price, $tax);
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
             error_log('pgRequestQuote: ' . $e->getMessage());
-            return $fail('Could not create the quotation. Please try again.');
+            return $fail('Could not send the request. Please try again.');
         }
 
-        // Tell BJP's sales/billing staff (those who can create invoices).
+        // Tell BJP's sales staff (those who can create quotations); email only if BJP turned it on.
         try {
             require_once __DIR__ . '/notify.php';
             if (function_exists('dispatchEvent')) {
@@ -367,18 +346,17 @@ if (!function_exists('pgRequestQuote')) {
                     'title' => 'Subscription request: ' . $tenant['company_name'],
                     'message' => $tenant['company_name'] . " ({$tenant['subdomain']}) chose {$term['term_label']}"
                         . ($extraLines ? ' + ' . implode(', ', array_map(fn($x) => "{$x['qty']} × {$x['name']}", $extraLines)) : '')
-                        . " — quotation $number, " . number_format($price + $tax) . ' TZS, waiting for review. Once approved they see it under Subscription.',
-                    'entity_type' => 'quotation', 'entity_id' => $qid, 'customer_id' => $cid,
-                    'action_url' => (function_exists('getUrl') ? getUrl('quotation_view') : '') . '?id=' . $qid,
-                    'dedupe_suffix' => (string)$qid,
+                        . " — request {$req['number']}, " . number_format($price + $tax) . ' TZS. Open Quotations → Requests from systems to prepare the quotation.',
+                    'entity_type' => 'subscription_request', 'entity_id' => $req['id'], 'customer_id' => $cid > 0 ? $cid : null,
+                    'action_url' => (function_exists('getUrl') ? getUrl('quotations') : '') . '?requests=1',
+                    'dedupe_suffix' => (string)$req['id'],
                 ]);
             }
         } catch (Throwable $e) {
             error_log('pgRequestQuote notify: ' . $e->getMessage());
         }
 
-        // No view link yet: the company sees the quotation once BJP approves it.
-        return ['success' => true, 'quotation_number' => $number, 'total' => $price + $tax, 'term_label' => $term['term_label'], 'status' => 'waiting',
-                'message' => "Request sent for {$term['term_label']}. BJP will review it — the quotation appears under Subscription as soon as it is approved."];
+        return ['success' => true, 'request_number' => $req['number'], 'total' => $price + $tax, 'term_label' => $term['term_label'], 'status' => 'waiting',
+                'message' => "Request sent for {$term['term_label']}. BJP will prepare your quotation — it appears under Subscription as soon as it is approved."];
     }
 }
