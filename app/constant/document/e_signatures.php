@@ -240,6 +240,7 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                                accept=".png,.jpg,.jpeg" required>
                         <div class="form-text">
                             Upload a clear image of your signature. Supported formats: PNG, JPG. Max size: 2&nbsp;MB.
+                            The paper background is removed automatically, so only the ink appears on documents.
                         </div>
                     </div>
                     <div class="alert alert-info">
