@@ -44,8 +44,8 @@ try {
         throw new Exception("Order/Quotation not found");
     }
 
-    if ($order['is_quote'] != 1 && $order['status'] !== 'draft') {
-        throw new Exception("Only draft orders can be deleted. Quotations can be deleted at any time.");
+    if ($order['is_quote'] != 1 && !in_array($order['status'], ['draft', 'pending'], true)) {
+        throw new Exception("Only pending or draft orders can be deleted. Quotations can be deleted at any time.");
     }
 
     $pdo->beginTransaction();
