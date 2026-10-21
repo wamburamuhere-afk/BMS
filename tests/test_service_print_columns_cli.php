@@ -6,8 +6,10 @@
  * A document created with the "Service" switch on holds only service lines
  * (the item picker then lists is_service = 1 products only). Its print drops
  * the Product Code column and splits Item / Description into Service Name +
- * Description, the description coming from the service as defined in
- * services.php (products.description), falling back to the line's own text.
+ * Description. The description is the line's own text — what the user wrote
+ * (or kept) on the document, with its Term — falling back to the service as
+ * defined in services.php (products.description) when the line has none
+ * (2026-10-21: the line's text used to lose to the registered one).
  * Any document with a product line prints exactly as before.
  *
  * Also checks the Sales menu now lists Invoices after POS (same link and
@@ -141,7 +143,8 @@ function makeDoc(string $type, string $case, array $lines): int {
 $docs = [];
 foreach (array_keys($cfg) as $type) {
     $docs[$type] = [
-        'service' => makeDoc($type, 'S', [[$svcId, "$tag Installation Service", 'line text not used'], [$svc2Id, "$tag Bare Service", 'Fallback line description']]),
+        'service' => makeDoc($type, 'S', [[$svcId, "$tag Installation Service", 'Written on this document'], [$svc2Id, "$tag Bare Service", 'Fallback line description'],
+                                          [$svcId, "$tag Installation Service", '']]),
         'product' => makeDoc($type, 'P', [[$gdsId, "$tag Cement Bag", 'goods line note']]),
         'mixed'   => makeDoc($type, 'M', [[$svcId, "$tag Installation Service", ''], [$gdsId, "$tag Cement Bag", '']]),
     ];
@@ -177,9 +180,9 @@ foreach ($templates as $type => $files) {
         check(str_contains($html, '>Service Name</th>'), 'service doc: has a Service Name column');
         check(!str_contains($html, '>Product Code</th>') && !str_contains($html, '>Code</th>') && !str_contains($html, 'Item / Description'), 'service doc: no Product Code, no Item / Description');
         check(str_contains($html, '>Description</th>'), 'service doc: has a Description column');
-        check(str_contains($html, $escDesc), 'service doc: description is the one defined in services.php, HTML-escaped');
-        check(!str_contains($html, 'line text not used'), 'service doc: registered description wins over the line text');
-        check(str_contains($html, 'Fallback line description'), 'service doc: a service with no registered description falls back to the line text');
+        check(str_contains($html, 'Written on this document'), 'service doc: the line\'s own description prints (what the user wrote on the document)');
+        check(str_contains($html, 'Fallback line description'), 'service doc: a service with no registered description prints the line text');
+        check(str_contains($html, $escDesc), 'service doc: a line with no text of its own prints the description defined in services.php, HTML-escaped');
         check(substr_count($html, 'overflow-wrap:anywhere;word-break:break-word;') >= 4, 'service doc: name and description cells wrap inside their box');
         check(str_contains($html, '200,000.00'), 'service doc: qty / price / total columns still print');
 

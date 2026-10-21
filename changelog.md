@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-10-21 — feat(sales): service lines that stay services, editable description, discount as % or a fixed amount
+
+**Files:** `core/sales_line_discount.php` (new), `assets/js/sales_line_extras.js` (new), `includes/sales_line_extras_js.php` (new), `migrations/tenant/2026_10_21_sales_line_discount_type.php` (new), `migrations/2026_10_21_sales_line_discount_type_legacy_db.php` (new), `api/account/save_quotation.php`, `api/account/save_sales_order.php`, `api/account/save_invoice.php`, `core/sales_invoicing.php`, `app/bms/sales/quotations/quotation_form.php`, `app/bms/sales/sales_order_create.php`, `app/bms/sales/sales_order_edit.php`, `app/bms/invoice/invoice_create.php`, `app/bms/invoice/invoice_edit.php`, the 12 print designs (`print_quotation*.php`, `print_sales_order*.php`, `invoice_print*.php`), `app/constant/settings/system_settings.php`, `api/account/get_service_sales_report.php`, `app/bms/product/service_view.php`, `lang/sw.php`, `tests/test_sales_line_discount_cli.php` (new), `tests/test_service_print_columns_cli.php`, `changelog.md`
+
+- **Why:** a quotation created as a service reopened in Edit as a product document (SKU, Unit and Warehouse came back). The line description could not be seen or changed, and the print ignored it. A customer's "10,000 off" could only be typed as a percentage (19.46%), which never lands on the exact figure.
+- **Edit stays a service:** Quotation and Sales Order edit reopen in Service mode when the document has no warehouse and no stock product on it.
+  - Sales Order edit no longer asks for a warehouse on a service order.
+  - In Service mode, SKU and Unit are hidden (header and rows together; the old code hid row cells only, so columns were misaligned). Qty, Tax, Discount and Total stay visible.
+- **Description:** on service lines it is a visible, editable box, filled from the service. The "Term: 6 Months" line is kept in sync when the term changes, and the user's own text stays. All 12 prints now print the line's own description first, falling back to the service's registered one. A term-priced line prints its quantity without the unit (never "1 Months").
+- **Discount as % or a fixed amount:**
+  - Every line on Quotation, Sales Order and Invoice (create and edit) has a %/TZS switch.
+  - `salesLineMath()` computes every line on the server; the browser's figures are never trusted. A fixed amount is stored exactly in `discount_amount` with `discount_type`, and VAT is charged after the discount. A discount above the line, or a negative one, is refused and the whole document rolls back.
+  - Quote → order copies the type and amount.
+  - Order → invoice always charges the **order's** agreed discount (`soLineDiscountFor()`). A fixed amount is shared by quantity, and the last invoice takes exactly what is left, so the invoices add up to the order's discount to the cent.
+  - The form uses the same rule and PHP-identical rounding, so screen = saved = ledger.
+- **System Settings › General › Sales Discount:** sets the default type (% or fixed amount) and whether a user may switch per line. Saved documents keep their own type.
+- **Fixes found on the way:**
+  - Invoice edit had no discount column, and dropped the line description and the sales-order link on save. A discounted invoice lost its discount when edited.
+  - On edit, a saved VAT rate "18.00" did not match the option "18", so the Tax box was blank and the VAT was lost on save (Quotation, Sales Order edit).
+  - With "Apply Tax" / "Apply Order Discount" switched off, the screen showed no tax or discount but the server still charged them. The form now sends what it shows, and typing a discount switches "Apply Order Discount" on.
+  - The service report and the service page computed a quote's net from the rounded %; they now use the stored amount.
+- **Migration:** `discount_type` (+ `discount_amount` where missing) on `quotation_items`, `sales_order_items` and `invoice_items`. Older lines get their amount from their percentage. Idempotent.
+- **Tests:** new `test_sales_line_discount_cli` 80/80 (maths, wiring, real save endpoints, edit pages, all 12 prints, quote → order → invoice, ledger Dr 884,000 = Cr 884,000, an order billed in 3 invoices adding to exactly 10,000, settings). `test_service_print_columns_cli` was updated to the new rule (line description first) and passes 244/244. Still green: line terms 35, quotations 130, invoice revenue posting 19, invoice three-approval 67, invoice COGS 12, invoice prints 12, sales-order three-approval 105, sales-order prints 27, service plans/subscriptions (billing 82, BJP form 82, e2e 34, requests 43, payment 33, contracts 28, my subscription 45, customer subscription 21). Checked in Chrome on rendered edit pages and the print.
+- **Not changed (noted):** sales returns (`api/sales/create_return.php`) refund at the order's unit price without the line discount. This is pre-existing and outside this change.
+
 ## 2026-10-19 — fix(e-signatures): uploaded signatures lose their paper background
 
 **Files:** `core/signature_cleaner.php` (new), `api/document/upload_signature.php`, `app/constant/document/e_signatures.php`, `migrations/tenant/2026_10_19_clean_uploaded_signatures.php` (new), `migrations/2026_10_19_clean_uploaded_signatures_legacy_db.php` (new), `tests/test_signature_cleaner_cli.php` (new), `changelog.md`

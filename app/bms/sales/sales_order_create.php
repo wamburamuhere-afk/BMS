@@ -45,12 +45,22 @@ if ($sales_order_id > 0) {
             $project_id = $sales_order['project_id'];
             
             // Get items
-            $stmt = $pdo->prepare("SELECT * FROM sales_order_items WHERE order_id = ?");
+            $stmt = $pdo->prepare("SELECT soi.*, COALESCE(p.is_service, 0) AS is_service
+                                     FROM sales_order_items soi LEFT JOIN products p ON p.product_id = soi.product_id
+                                    WHERE soi.order_id = ? ORDER BY soi.order_item_id");
             $stmt->execute([$sales_order_id]);
             $existing_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     } catch (Exception $e) {}
 }
+
+// Saved lines: what the discount box shows (an amount or a %) — core/sales_line_discount.php.
+require_once ROOT_DIR . '/core/sales_line_discount.php';
+foreach ($existing_items as &$ei) { $ei['discount_value'] = salesDiscountValueOf($ei); }
+unset($ei);
+// Created as a service order (no warehouse, no stock product on it): it reopens in Service mode.
+$is_service_doc = $sales_order && empty($sales_order['warehouse_id']) && $existing_items
+    && !array_filter($existing_items, fn($r) => !empty($r['product_id']) && (int)$r['is_service'] !== 1);
 
 // Get customer details
 $customer = null;
@@ -70,10 +80,14 @@ if ($quote_id > 0 && !$sales_order) { // Only load quote if not editing an exist
     
     if ($quote) {
         // Get quote items
-        $stmt = $pdo->prepare("SELECT * FROM sales_order_items WHERE order_id = ?");
+        $stmt = $pdo->prepare("SELECT soi.*, COALESCE(p.is_service, 0) AS is_service
+                                 FROM sales_order_items soi LEFT JOIN products p ON p.product_id = soi.product_id
+                                WHERE soi.order_id = ? ORDER BY soi.order_item_id");
         $stmt->execute([$quote_id]);
         $quote_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        foreach ($quote_items as &$qi) { $qi['discount_value'] = salesDiscountValueOf($qi); }
+        unset($qi);
         // If customer not provided, get from quote
         if (!$customer && $quote['customer_id']) {
             $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ?");
@@ -214,7 +228,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
         <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center">
             <h5 class="mb-0 text-dark"><i class="bi bi-file-text"></i> <?= $is_quote ? 'Quotation Details' : 'Order Details' ?></h5>
             <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="is_service_order" name="is_service_order" onchange="toggleServiceOrderMode()">
+                <input class="form-check-input" type="checkbox" id="is_service_order" name="is_service_order" onchange="toggleServiceOrderMode()" <?= $is_service_doc ? 'checked' : '' ?>>
                 <label class="form-check-label fw-bold text-primary" for="is_service_order">
                     <i class="bi bi-box-seam me-1"></i> Service Order (Non-Inventory)
                 </label>
@@ -407,12 +421,12 @@ $is_quote = isset($_GET['quote']) ? true : false;
                                     <tr>
                                         <th width="5%">S/NO</th>
                                         <th width="30%" id="col-product">Product/Item <span class="text-dark">*</span></th>
-                                        <th width="10%" id="col-sku" class="inv-col">SKU</th>
-                                        <th width="10%" id="col-qty" class="inv-col">Quantity <span class="text-dark">*</span></th>
-                                        <th width="10%" id="col-unit" class="inv-col">Unit</th>
+                                        <th width="10%" id="col-sku" class="inv-col svc-hide">SKU</th>
+                                        <th width="10%" id="col-qty">Quantity <span class="text-dark">*</span></th>
+                                        <th width="10%" id="col-unit" class="inv-col svc-hide">Unit</th>
                                         <th width="15%" id="col-price" class="price-col-header">Unit Price <span class="text-dark">*</span></th>
-                                        <th width="10%" id="col-tax" class="inv-col">Tax Rate</th>
-                                        <th width="10%" id="col-discount" class="inv-col">Discount %</th>
+                                        <th width="10%" id="col-tax">Tax Rate</th>
+                                        <th width="12%" id="col-discount">Discount</th>
                                         <th width="10%" id="col-total" class="item-total-col">Total</th>
                                         <th width="5%"></th>
                                     </tr>
@@ -618,6 +632,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
 <?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
+<?php require ROOT_DIR . '/includes/sales_line_extras_js.php'; ?>
 <script>
 const SOC_I18N = {
     warehouseChanged: <?= json_encode(wLabel('Warehouse Changed', 'Shop Changed')) ?>,
@@ -715,11 +730,17 @@ $(document).ready(function() {
     });
     
     // Calculate totals when quantities or prices change
-    $(document).on('input', '.item-quantity, .item-price, .item-tax, .item-discount', function() {
+    $(document).on('input change', '.item-quantity, .item-price, .item-tax, .item-discount, .item-discount-type', function() {
+        // Typing a discount turns "Apply Order Discount" on, so what is shown is what is saved.
+        if ($(this).hasClass('item-discount') && parseFloat($(this).val()) > 0) $('#apply_discount').prop('checked', true);
         const index = $(this).closest('tr').data('index');
         calculateItemTotal(index);
         calculateTotals();
     });
+    <?php if ($is_service_doc): ?>
+    toggleServiceOrderMode();
+    calculateTotals();
+    <?php endif; ?>
 
     // Re-load product cache when warehouse changes
     $('#warehouse_id').on('change', function() {
@@ -956,20 +977,21 @@ function addItemRow(product = null) {
                 <input type="hidden" class="item-product-id" 
                        name="items[${index}][product_id]" 
                        value="${product ? product.product_id : ''}">
-                <input type="hidden" class="item-description" name="items[${index}][description]">
+                <textarea class="form-control item-description mt-1 d-none" name="items[${index}][description]" rows="3"
+                          placeholder="Description — printed on the order"></textarea>
             </td>
-            <td class="inv-col">
-                <input type="text" class="form-control item-sku" 
-                       name="items[${index}][sku]" 
+            <td class="inv-col svc-hide">
+                <input type="text" class="form-control item-sku"
+                       name="items[${index}][sku]"
                        placeholder="SKU" readonly
                        value="${product ? product.sku || '' : ''}">
             </td>
-            <td class="inv-col">
-                <input type="number" class="form-control item-quantity" 
+            <td>
+                <input type="number" class="form-control item-quantity"  
                        name="items[${index}][quantity]" 
                        min="0.001" step="0.001" value="${product ? (product.quantity || 1) : 1}" required>
             </td>
-            <td class="inv-col">
+            <td class="inv-col svc-hide">
                 <input type="text" class="form-control item-unit" name="items[${index}][unit]"
                        value="${product ? (product.unit || 'pcs') : 'pcs'}" readonly>
             </td>
@@ -981,7 +1003,7 @@ function addItemRow(product = null) {
                            min="0" step="0.01" value="${product ? (product.unit_price || product.selling_price || 0) : 0}" required>
                 </div>
             </td>
-            <td class="inv-col">
+            <td>
                 <select class="form-select item-tax" name="items[${index}][tax_rate]">
                     ${taxRates.map(rate => `
                         <option value="${rate.rate_percentage}" ${product && product.tax_rate == rate.rate_percentage ? 'selected' : ''}>
@@ -990,11 +1012,11 @@ function addItemRow(product = null) {
                     `).join('')}
                 </select>
             </td>
-            <td class="inv-col">
-                <div class="input-group">
-                    <input type="number" class="form-control item-discount" 
-                           name="items[${index}][discount_percent]" 
-                           min="0" max="100" step="0.01" value="${product ? (product.discount_percent || 0) : 0}">
+            <td>
+                <div class="input-group flex-nowrap">
+                    <input type="number" class="form-control item-discount"
+                           name="items[${index}][discount_percent]"
+                           min="0" max="100" step="0.01" value="${product ? (product.discount_value ?? product.discount_percent ?? 0) : 0}">
                     <span class="input-group-text">%</span>
                 </div>
             </td>
@@ -1011,7 +1033,11 @@ function addItemRow(product = null) {
     `;
     
     $('#itemsBody').append(html);
+    // Discount as % or a fixed amount (System Settings default; a saved line keeps its own).
+    BmsLineDiscount.enhance($(`#item-row-${index}`), { type: product ? product.discount_type : null });
     if (product && product.description) $(`#item-row-${index} .item-description`).val(product.description);
+    if (product) BmsLineDesc.show($(`#item-row-${index}`), parseInt(product.is_service || 0, 10) === 1);
+    if (product && product.tax_rate != null) selectTaxRate($(`#item-row-${index} .item-tax`), product.tax_rate);
     if (product) {
         BmsLineTerms.attach($(`#item-row-${index}`), product, {
             savedTermId: product.price_term_id || null, savedTermLabel: product.price_term_label || '',
@@ -1028,12 +1054,6 @@ function addItemRow(product = null) {
     // Enable/disable based on warehouse
     toggleProductInputs($('#warehouse_id').val());
     
-    // Apply service mode visibility if active
-    if ($('#is_service_order').is(':checked')) {
-        $(`#item-row-${index} .inv-col`).hide();
-        $(`#item-row-${index} .item-total-col`).hide();
-    }
-    
     return index;
 }
 
@@ -1045,6 +1065,8 @@ function updateSerialNumbers() {
 
 function toggleServiceOrderMode() {
     const isService = $('#is_service_order').is(':checked');
+    // Service mode: no SKU / Unit columns (header and rows together).
+    $('#itemsTable').toggleClass('svc-mode', isService);
     if (isService) {
         $('#warehouse_container').hide();
         $('#warehouse_id').prop('required', false).val('');
@@ -1197,6 +1219,7 @@ function selectProduct(productId) {
         row.find('.item-name').val(product.product_name);
         row.find('.item-product-id').val(product.product_id);
         row.find('.item-description').val(product.description || '');
+        BmsLineDesc.show(row, parseInt(product.is_service || 0, 10) === 1);
         row.find('.item-sku').val(product.sku || '');
         row.find('.item-unit').val(product.unit || 'pcs');
         row.find('.item-price').val(product.selling_price || 0);
@@ -1218,11 +1241,11 @@ function calculateItemTotal(index) {
     const row = $(`#item-row-${index}`);
     const quantity = parseFloat(row.find('.item-quantity').val()) || 0;
     const price = parseFloat(row.find('.item-price').val()) || 0;
-    const taxRate = parseFloat(row.find('.item-tax').val()) || 0;
-    const discountPercent = parseFloat(row.find('.item-discount').val()) || 0;
-    
+    // The line shows what will be saved: Apply Tax / Apply Order Discount switch them off.
+    const taxRate = $('#apply_tax').is(':checked') ? (parseFloat(row.find('.item-tax').val()) || 0) : 0;
+
     const subtotal = quantity * price;
-    const discountAmount = subtotal * (discountPercent / 100);
+    const discountAmount = $('#apply_discount').is(':checked') ? BmsLineDiscount.amount(row, subtotal) : 0;
     const taxableAmount = subtotal - discountAmount;
     const taxAmount = taxableAmount * (taxRate / 100);
     const total = taxableAmount + taxAmount;
@@ -1243,10 +1266,10 @@ function calculateTotals() {
         const quantity = parseFloat($(this).find('.item-quantity').val()) || 0;
         const price = parseFloat($(this).find('.item-price').val()) || 0;
         const taxRate = applyTax ? parseFloat($(this).find('.item-tax').val()) || 0 : 0;
-        const discountPercent = applyDiscount ? parseFloat($(this).find('.item-discount').val()) || 0 : 0;
-        
+
         const itemSubtotal = quantity * price;
-        const itemDiscount = itemSubtotal * (discountPercent / 100);
+        const itemDiscount = applyDiscount ? BmsLineDiscount.amount($(this), itemSubtotal) : 0;
+        calculateItemTotal($(this).data('index'));
         const taxableAmount = itemSubtotal - itemDiscount;
         const itemTax = taxableAmount * (taxRate / 100);
         
@@ -1479,10 +1502,13 @@ function createSalesOrder(status = 'pending') {
             quantity: $(this).find('.item-quantity').val(),
             unit: $(this).find('.item-unit').val(),
             unit_price: $(this).find('.item-price').val(),
-            tax_rate: $(this).find('.item-tax').val(),
-            discount_percent: $(this).find('.item-discount').val(),
+            // What the summary shows is what is saved: Apply Tax / Apply Order Discount off = none.
+            tax_rate: $('#apply_tax').is(':checked') ? $(this).find('.item-tax').val() : 0,
             price_term_id: BmsLineTerms.value($(this))
         };
+        Object.assign(item, $('#apply_discount').is(':checked')
+            ? BmsLineDiscount.payload($(this))
+            : { discount_type: 'percent', discount_value: 0, discount_percent: 0 });
         
         if (item.product_name && item.quantity) {
             items.push(item);
@@ -1620,6 +1646,15 @@ function validateForm(isDraft = false) {
         Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this document is priced by term. Choose its term before saving.')) ?> });
         return false;
     }
+    let overDiscount = '';
+    $('[id^="item-row-"]').each(function () {
+        const gross = (parseFloat($(this).find('.item-quantity').val()) || 0) * (parseFloat($(this).find('.item-price').val()) || 0);
+        if (!overDiscount && BmsLineDiscount.overLimit($(this), gross)) overDiscount = $(this).find('.item-name').val() || 'a line';
+    });
+    if (overDiscount) {
+        Swal.fire({ icon: 'warning', title: 'Discount too large', text: `The discount on "${overDiscount}" is more than the line amount.` });
+        return false;
+    }
     // Check if at least one item is added
     if ($('[id^="item-row-"]').length === 0) {
         Swal.fire({
@@ -1685,6 +1720,7 @@ function validateForm(isDraft = false) {
     font-weight: 600;
     font-size: 0.9rem;
 }
+#itemsTable.svc-mode .svc-hide { display: none; }
 
 #itemsTable input, #itemsTable select {
     font-size: 0.85rem;
