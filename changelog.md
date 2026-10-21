@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-10-21 — fix(quotations): allow re-convert to SO when previous SO was cancelled
+
+**Files:** `api/account/convert_quote_to_order.php`, `changelog.md`
+
+- **Why:** if a quotation was converted to a Sales Order and that SO was then cancelled, the quotation showed no "Convert to Order" button and the API refused re-conversion. The user had no way forward.
+- **Fix:** `convert_quote_to_order.php` now checks the status of the existing SO. If it is cancelled (or no longer exists), the conversion proceeds and `converted_to_so_id` is updated to the new SO. If the existing SO is still active, the original block remains.
+
+## 2026-10-21 — feat(quotations): Send Back to Pending + View Sales Order link when already converted
+
+**Files:** `api/account/revert_quotation_to_pending.php` (new), `app/bms/sales/quotations/quotation_view.php`, `changelog.md`
+
+- **Send Back to Pending on quotations:** Admin can now revert a Reviewed, Approved or Cancelled quotation back to Pending. Clears `reviewed_by/reviewed_at/approved_by/approved_at` and deletes `workflow_signatures` rows (entity_type=`quotation`) so the audit panel starts clean.
+- **View Sales Order link:** when a quotation has already been converted to a Sales Order and that SO still exists (and is not cancelled), the button area shows "View Sales Order #XXX" instead of hiding everything. This lets the user navigate directly to the existing SO rather than being left with no action available.
+- **Re-convert allowed:** if the linked SO was subsequently cancelled, the "Convert to Order" button reappears so the user can generate a fresh SO.
+
 ## 2026-10-21 — feat(sales-orders): Send Back to Pending for reviewed / approved / cancelled orders
 
 **Files:** `api/account/revert_sales_order_to_pending.php` (new), `app/bms/sales/sales_order_view.php`, `changelog.md`

@@ -45,7 +45,13 @@ try {
         throw new Exception("Only an approved quotation can be converted to a sales order.");
     }
     if (!empty($quote['converted_to_so_id'])) {
-        throw new Exception("This quotation has already been converted to a sales order.");
+        // Allow re-conversion only if the previously created SO was cancelled.
+        $prevStatus = $pdo->prepare("SELECT status FROM sales_orders WHERE sales_order_id = ?");
+        $prevStatus->execute([$quote['converted_to_so_id']]);
+        $prev = $prevStatus->fetchColumn();
+        if ($prev !== false && $prev !== 'cancelled') {
+            throw new Exception("This quotation has already been converted to Sales Order #{$quote['converted_to_so_id']}. Cancel that order first if you want to convert again.");
+        }
     }
 
     // Fetch the quotation items.
