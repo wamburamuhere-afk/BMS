@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-21 — fix(invoice-print): tighten spacing so default template fits one page
+
+**Files:** `app/bms/invoice/invoice_print.php`
+
+- Reduced vertical spacing (header margin, details-grid margin, box padding, table/totals/notes margins) by ~70px total — enough to compensate for the extra lines the invoice has vs the quotation (Due Date always present, company_name in Bill To).
+- Added address de-duplication to Bill To box (same guard as `print_quotation.php`): if postal_address is already contained in address, the postal line is suppressed to avoid printing the same location twice.
+- No content removed; other invoice templates (onyx, summit, wave) unchanged.
+
 ## 2026-10-21 — fix(sales-orders): fix type column and non-admin visibility
 
 **Files:** `api/account/get_sales_orders.php`
