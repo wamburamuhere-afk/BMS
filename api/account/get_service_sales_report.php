@@ -167,7 +167,7 @@ try {
         if ($customer_id !== null) { $qWhere[] = "q.customer_id = ?"; $qParams[] = $customer_id; }
         if ($category_id !== null) { $qWhere[] = "p.category_id = ?"; $qParams[] = $category_id; }
         $qs = $pdo->prepare("SELECT qi.product_id, COUNT(DISTINCT q.sales_order_id) AS quotes,
-                                    SUM(qi.quantity * qi.unit_price * (1 - COALESCE(qi.discount_percent, 0) / 100)) AS quoted,
+                                    SUM(qi.quantity * qi.unit_price - COALESCE(qi.discount_amount, 0)) AS quoted,
                                     COUNT(DISTINCT CASE WHEN q.converted_to_so_id IS NOT NULL THEN q.sales_order_id END) AS converted
                                FROM quotation_items qi
                                JOIN quotations q ON q.sales_order_id = qi.order_id

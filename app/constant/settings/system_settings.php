@@ -42,6 +42,10 @@ if ($_POST) {
                 // on read, so this is defense in depth, not the only guard).
                 'text_display_case' => in_array($_POST['text_display_case'] ?? '', ['as_typed', 'sentence', 'lower', 'upper', 'title', 'toggle'], true)
                     ? $_POST['text_display_case'] : 'title',
+                // Sales documents (Quotation / Sales Order / Invoice): how a line discount is entered
+                // by default, and whether one line may switch — core/sales_line_discount.php.
+                'sales_discount_type'         => ($_POST['sales_discount_type'] ?? '') === 'amount' ? 'amount' : 'percent',
+                'sales_discount_allow_switch' => isset($_POST['sales_discount_allow_switch']) ? '1' : '0',
             ];
             
             // Handle Logo Upload
@@ -382,6 +386,34 @@ if ($_POST) {
                                             <div class="col-md-7">
                                                 <div class="small text-muted mb-1"><?= t('Preview:') ?></div>
                                                 <div class="p-2 px-3 bg-light rounded border fw-bold" id="text_case_preview_box">John Doe Supplies</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sales discount (2026-10-21): Quotation / Sales Order / Invoice lines — % or a fixed amount. -->
+                        <div class="row g-4 mt-1">
+                            <div class="col-12">
+                                <div class="card info-card">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-2 text-dark text-uppercase small letter-spacing-1"><?= t('Sales Discount') ?></h6>
+                                        <p class="text-muted small mb-3"><?= t('How a line discount is entered on Quotations, Sales Orders and Invoices. A fixed amount is charged exactly as typed (e.g. 10,000 off), on the document, its print and the ledger. Documents already saved keep their own discounts.') ?></p>
+                                        <?php $sales_disc_type = get_setting('sales_discount_type', 'percent') === 'amount' ? 'amount' : 'percent'; ?>
+                                        <div class="row g-3 align-items-center">
+                                            <div class="col-md-5">
+                                                <label for="sales_discount_type" class="form-label small fw-bold"><?= t('Default discount type') ?></label>
+                                                <select class="form-select" id="sales_discount_type" name="sales_discount_type">
+                                                    <option value="percent" <?= $sales_disc_type === 'percent' ? 'selected' : '' ?>><?= t('Percentage (%)') ?></option>
+                                                    <option value="amount" <?= $sales_disc_type === 'amount' ? 'selected' : '' ?>><?= t('Fixed amount') ?></option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <div class="form-check form-switch mt-md-4">
+                                                    <input class="form-check-input" type="checkbox" id="sales_discount_allow_switch" name="sales_discount_allow_switch" value="1" <?= get_setting('sales_discount_allow_switch', '1') !== '0' ? 'checked' : '' ?>>
+                                                    <label class="form-check-label" for="sales_discount_allow_switch"><?= t('Allow switching between % and amount on each line') ?></label>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

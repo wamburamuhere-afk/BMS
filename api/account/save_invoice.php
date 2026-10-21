@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../core/vat.php';
 require_once __DIR__ . '/../../core/workflow.php';          // workflowActorSnapshot / CaptureSignature
 require_once __DIR__ . '/../../core/revenue_posting.php';   // postInvoiceRevenue / postInvoiceCOGS
 require_once __DIR__ . '/../../core/sales_invoicing.php';   // sales-order remaining-quantity guard
+require_once __DIR__ . '/../../core/sales_line_discount.php';  // salesLineMath — % or fixed-amount line discount
 
 header('Content-Type: application/json');
 error_reporting(E_ERROR | E_PARSE);
@@ -124,26 +125,21 @@ try {
     $lines = [];
 
     foreach ($items as $key => $item) {
-        $qty = floatval($item['quantity']);
-        $price = floatval($item['unit_price']);
-        $tax_rate = floatval($item['tax_rate'] ?? 0);
-        $discount_percent = min(max(floatval($item['discount_percent'] ?? 0), 0), 100);
-
-        $line_subtotal = $qty * $price;
-        $line_discount = round($line_subtotal * ($discount_percent / 100), 2);
-        $line_tax = ($line_subtotal - $line_discount) * ($tax_rate / 100);
-        $line_total = $line_subtotal - $line_discount + $line_tax;
-
+        // Discount as % or a fixed amount — core/sales_line_discount.php.
         $name = trim((string)($item['product_name'] ?? '')) ?: 'Line ' . ((int)$key + 1);
+        // A line raised from a sales-order line keeps that line's agreed discount.
+        $soDisc = soLineDiscountFor($pdo, (int)($item['order_item_id'] ?? 0), (float)($item['quantity'] ?? 0), (int)$invoice_id);
+        $m = salesLineMath($soDisc !== null ? array_merge($item, $soDisc) : $item, $name);
+
         assertSalesAmountsFit([
-            "Unit price of $name" => $price,
-            "Line total of $name" => $line_total,
+            "Unit price of $name" => $m['price'],
+            "Line total of $name" => $m['line_total'],
         ]);
 
-        $subtotal += $line_subtotal;
-        $line_discount_total += $line_discount;
-        $tax_total += $line_tax;
-        $lines[$key] = compact('qty', 'price', 'tax_rate', 'discount_percent', 'line_discount', 'line_tax', 'line_total');
+        $subtotal += $m['line_subtotal'];
+        $line_discount_total += $m['line_discount'];
+        $tax_total += $m['line_tax'];
+        $lines[$key] = $m;
     }
 
     $discount = floatval($discount) + $line_discount_total;
@@ -280,7 +276,9 @@ try {
         }
         $row[] = $l['line_total'];
         $itemStmt->execute($row);
-        sptStampLine($pdo, 'invoice_items', (int)$pdo->lastInsertId(), $term);
+        $lineId = (int)$pdo->lastInsertId();
+        sptStampLine($pdo, 'invoice_items', $lineId, $term);
+        salesStampLineDiscount($pdo, 'invoice_items', 'invoice_item_id', $lineId, $l);
         $resolvedLines[] = ['term' => $term, 'qty' => $l['qty'], 'name' => trim((string)($item['product_name'] ?? '')) ?: 'a line'];
     }
     sptAssertPlanLines($resolvedLines ?? []);   // one plan, qty 1, add-ons follow it

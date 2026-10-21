@@ -155,7 +155,7 @@ if ($showDocSales) {
         $ir2->execute([$product_id]);
         $svc_inv_recent = $ir2->fetchAll(PDO::FETCH_ASSOC);
         $oq = $pdo->prepare("SELECT q.sales_order_id, q.order_number, q.order_date, q.status, c.customer_name,
-                                    qi.quantity * qi.unit_price * (1 - COALESCE(qi.discount_percent, 0) / 100) AS net
+                                    qi.quantity * qi.unit_price - COALESCE(qi.discount_amount, 0) AS net
                                FROM quotation_items qi JOIN quotations q ON q.sales_order_id = qi.order_id
                                LEFT JOIN customers c ON c.customer_id = q.customer_id
                               WHERE qi.product_id = ? AND q.status IN ('draft','pending','reviewed','approved') AND q.converted_to_so_id IS NULL"
