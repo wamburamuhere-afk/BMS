@@ -245,7 +245,7 @@ $startingPlans = planTablesReady()
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="form-label">Amount (TZS)</label>
-                                <input type="number" class="form-control" name="billing_amount_tzs" min="0" step="1000" placeholder="0">
+                                <input type="number" class="form-control" name="billing_amount_tzs" min="0" step="1" placeholder="0">
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="form-label">Payment Status</label>
