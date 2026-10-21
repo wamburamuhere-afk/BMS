@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-10-21 — fix(sales-orders): allow deleting pending orders
+
+**Files:** `api/account/delete_sales_order.php`, `changelog.md`
+
+- Changed the delete guard from `status = 'draft'` to `status IN ('draft','pending')` since the system never creates orders in `draft` status — all new orders start at `pending`.
+
 ## 2026-10-21 — fix(quotations): allow re-convert to SO when previous SO was cancelled
 
 **Files:** `api/account/convert_quote_to_order.php`, `changelog.md`
