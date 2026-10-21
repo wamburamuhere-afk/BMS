@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-21 — fix(invoice-print): fix P.O. Box double-prefix on onyx/summit/wave templates
+
+**Files:** `app/bms/invoice/invoice_print_onyx.php`, `app/bms/invoice/invoice_print_summit.php`, `app/bms/invoice/invoice_print_wave.php`
+
+- Applied same smart-prefix fix as default template: use `preg_match('/^\s*p\.?\s*o\.?\s*box/i')` to detect if value already starts with "P.O. Box" before prepending it, preventing "P.O. Box P.O.Box 15005" double-prefix.
+- Applied same address de-duplication: if `postal_address` is already contained within `address`, suppress the postal line.
+- No layout/spacing changes; all three templates still fit on one page.
+
 ## 2026-10-21 — fix(invoice-print): tighten spacing so default template fits one page
 
 **Files:** `app/bms/invoice/invoice_print.php`

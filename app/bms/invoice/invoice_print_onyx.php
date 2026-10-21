@@ -79,7 +79,14 @@ try {
 
 $currency = $invoice['currency'] ?? 'TZS';
 
-$comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
+$inv_postal  = trim($invoice['c_postal_address'] ?? '');
+$inv_address = trim($invoice['c_address'] ?? '');
+if ($inv_postal !== '' && $inv_address !== ''
+    && stripos($inv_address, $inv_postal) !== false) {
+    $inv_postal = '';
+}
+
+$comp =['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
 try {
     $stmtC = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'company_%'");
     $stmtC->execute();
@@ -267,8 +274,8 @@ $accent = getSetting('print_template_color_inv_onyx', '#1c1c1c');
             <h3>Bill To</h3>
             <p><strong><?= caseFormat($invoice['customer_name']) ?></strong></p>
             <?php if (!empty($invoice['company_name'])): ?><p><?= caseFormat($invoice['company_name']) ?></p><?php endif; ?>
-            <?php if (!empty($invoice['c_postal_address'])): ?><p>P.O. Box <?= htmlspecialchars($invoice['c_postal_address']) ?></p><?php endif; ?>
-            <?php if (!empty($invoice['c_address'])): ?><p><?= htmlspecialchars($invoice['c_address']) ?></p><?php endif; ?>
+            <?php if (!empty($inv_postal)): ?><p><?= preg_match('/^\s*p\.?\s*o\.?\s*box/i', $inv_postal) ? htmlspecialchars($inv_postal) : 'P.O. Box ' . htmlspecialchars($inv_postal) ?></p><?php endif; ?>
+            <?php if (!empty($inv_address)): ?><p><?= htmlspecialchars($inv_address) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_phone'])): ?><p><?= htmlspecialchars($invoice['c_phone']) ?></p><?php endif; ?>
             <?php if (!empty($invoice['c_email'])): ?><p><?= htmlspecialchars($invoice['c_email']) ?></p><?php endif; ?>
             <?php
