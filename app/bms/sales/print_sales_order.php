@@ -140,7 +140,7 @@ try {
             font-size: 12px;
             color: #1a252f;
             line-height: 1.5;
-            padding: 20px 20px 0 20px;
+            padding: 0 20px 0 20px;
             background: #fff;
         }
 
@@ -149,8 +149,8 @@ try {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 28px;
-            padding-bottom: 18px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
             border-bottom: 3px solid #3498db;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
@@ -161,7 +161,7 @@ try {
             font-size: 22px;
             font-weight: 800;
             text-transform: uppercase;
-            margin: 0 0 10px 0;
+            margin: 0 0 6px 0;
             letter-spacing: 0.5px;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
@@ -178,7 +178,7 @@ try {
             object-fit: contain;
         }
         .company-addr-info p {
-            margin: 2px 0;
+            margin: 1px 0;
             color: #1a252f;
             font-size: 11px;
             font-weight: 500;
@@ -190,12 +190,12 @@ try {
             background: #3498db;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
-            padding: 16px 22px;
+            padding: 10px 22px;
             border-radius: 8px;
             min-width: 220px;
         }
         .doc-title-box h2 {
-            margin: 0 0 10px 0;
+            margin: 0 0 6px 0;
             color: #fff;
             font-size: 16px;
             font-weight: 700;
@@ -205,7 +205,7 @@ try {
             -webkit-print-color-adjust: exact;
         }
         .doc-title-box p {
-            margin: 4px 0;
+            margin: 2px 0;
             font-size: 12px;
             color: #fff;
             print-color-adjust: exact;
