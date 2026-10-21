@@ -35,9 +35,26 @@ if (!in_array($invoice['status'], ['draft', 'pending', 'sent', 'partial', 'paid'
 includeHeader();
 
 // Fetch Invoice Items
-$stmtItems = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
+$stmtItems = $pdo->prepare("SELECT ii.*, COALESCE(p.is_service, 0) AS is_service
+                              FROM invoice_items ii LEFT JOIN products p ON p.product_id = ii.product_id
+                             WHERE ii.invoice_id = ? ORDER BY ii.invoice_item_id");
 $stmtItems->execute([$invoice_id]);
 $invoiceItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+// Each line keeps its discount (% or a fixed amount) and, for a sales-order line, the order's
+// discount still open on it — core/sales_line_discount.php, core/sales_invoicing.php.
+require_once ROOT_DIR . '/core/sales_line_discount.php';
+require_once ROOT_DIR . '/core/sales_invoicing.php';
+foreach ($invoiceItems as &$ii) {
+    $ii['discount_value'] = salesDiscountValueOf($ii);
+    if (!empty($ii['order_item_id'])) {
+        $so = soLineDiscountFor($pdo, (int)$ii['order_item_id'], INF, (int)$invoice_id);
+        if ($so && $so['discount_type'] === 'amount') {
+            $ii['so_disc_left'] = $so['discount_value'];
+            $ii['so_open_qty']  = $so['open_qty'];
+        }
+    }
+}
+unset($ii);
 
 // Get customers for dropdown
 // Get customers for dropdown
@@ -205,9 +222,10 @@ $warehouses = warehousesForSelect($pdo);
                                 <thead class="bg-light small fw-bold text-muted">
                                     <tr>
                                         <th width="35%" class="ps-3">Product/Item</th>
-                                        <th width="15%">Quantity</th>
-                                        <th width="10%">Unit</th>
+                                        <th width="12%">Quantity</th>
+                                        <th width="8%">Unit</th>
                                         <th width="15%">Unit Price</th>
+                                        <th width="12%">Discount</th>
                                         <th width="10%">Tax</th>
                                         <th width="10%" class="text-end">Total</th>
                                         <th width="5%" class="text-center"></th>
@@ -241,6 +259,10 @@ $warehouses = warehousesForSelect($pdo);
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>Subtotal:</span>
                                     <span id="subtotal" class="fw-bold">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Discount:</span>
+                                    <span id="discount-total" class="fw-bold text-danger">0.00</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>VAT (18%):</span>
@@ -294,6 +316,7 @@ $warehouses = warehousesForSelect($pdo);
 
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
+<?php require ROOT_DIR . '/includes/sales_line_extras_js.php'; ?>
 <script>
 let itemCount = 0;
 let productsCache = [];
@@ -341,8 +364,14 @@ $(document).ready(function() {
     });
 });
 
+function escAttr(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
 function addItemRow(item = null) {
     const idx = itemCount++;
+    const fromOrder = !!(item && item.order_item_id);
+    const lock = fromOrder ? 'readonly' : '';
     const html = `
         <tr id="item-row-${idx}">
             <td class="ps-3">
@@ -353,10 +382,14 @@ function addItemRow(item = null) {
                            onclick="openProductSearch(${idx}, this.value)"
                            autocomplete="off">
                     <input type="hidden" class="item-product-id" name="items[${idx}][product_id]" value="${item ? item.product_id : ''}">
+                    <input type="hidden" class="item-order-item-id" name="items[${idx}][order_item_id]" value="${fromOrder ? item.order_item_id : ''}">
                     <button type="button" class="btn btn-outline-secondary" onclick="openProductSearch(${idx})">
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
+                ${fromOrder ? `<div class="form-text small text-primary"><i class="bi bi-link-45deg"></i> From sales order</div>` : ''}
+                <textarea class="form-control form-control-sm item-description mt-1 d-none" name="items[${idx}][description]" rows="3"
+                          placeholder="Description — printed on the invoice">${item ? escAttr(item.description) : ''}</textarea>
             </td>
             <td>
                 <input type="number" class="form-control form-control-sm item-qty" name="items[${idx}][quantity]" 
@@ -367,8 +400,12 @@ function addItemRow(item = null) {
                        value="${item ? item.unit : 'pcs'}" readonly>
             </td>
             <td>
-                <input type="number" class="form-control form-control-sm item-price" name="items[${idx}][unit_price]" 
-                       value="${item ? item.unit_price : 0}" step="0.01" required onchange="calculateTotals()">
+                <input type="number" class="form-control form-control-sm item-price" name="items[${idx}][unit_price]"
+                       value="${item ? item.unit_price : 0}" step="0.01" required ${lock} onchange="calculateTotals()">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm item-discount" name="items[${idx}][discount_percent]"
+                       value="${item ? (parseFloat(item.discount_value ?? item.discount_percent) || 0) : 0}" step="0.01" min="0" max="100" ${lock} oninput="calculateTotals()" onchange="calculateTotals()">
             </td>
             <td>
                 <select class="form-select form-select-sm item-tax" name="items[${idx}][tax_rate]" onchange="calculateTotals()">
@@ -383,6 +420,15 @@ function addItemRow(item = null) {
         </tr>
     `;
     $('#itemsBody').append(html);
+    const $newRow = $(`#item-row-${idx}`);
+    // Discount as % or a fixed amount (a saved line keeps its own; a sales-order line keeps the order's).
+    BmsLineDiscount.enhance($newRow, { type: item ? item.discount_type : null,
+        typeName: `items[${idx}][discount_type]`, valueName: `items[${idx}][discount_value]` });
+    $newRow.find('.item-discount-type').on('change', () => calculateTotals());
+    if (item && item.so_disc_left != null) {
+        $newRow.data('soDiscLeft', parseFloat(item.so_disc_left) || 0).data('soOpenQty', parseFloat(item.so_open_qty) || 0);
+    }
+    BmsLineDesc.show($newRow, !!(item && parseInt(item.is_service || 0, 10) === 1));
     if (item) {
         BmsLineTerms.attach($(`#item-row-${idx}`), item, {
             savedTermId: item.price_term_id || null, savedTermLabel: item.price_term_label || '',
@@ -399,32 +445,56 @@ function removeItemRow(idx) {
     }
 }
 
+// A sales-order line's fixed discount on the quantity billed — the same rule as
+// soLineDiscountFor() in core/sales_invoicing.php: all that is open, or its share.
+function soDiscountShare($row, qty) {
+    const left = $row.data('soDiscLeft'), open = $row.data('soOpenQty');
+    if (left === undefined) return null;
+    if (qty >= open - 0.0005) return left;
+    return open > 0 ? BmsLineDiscount.round2(left * qty / open) : 0;
+}
+
+// Same arithmetic as api/account/save_invoice.php: VAT on the line after discount.
 function calculateTotals() {
     let subtotal = 0;
+    let discountTotal = 0;
     let taxTotal = 0;
-    
+
     $('#itemsBody tr').each(function() {
         const qty = parseFloat($(this).find('.item-qty').val()) || 0;
         const price = parseFloat($(this).find('.item-price').val()) || 0;
         const taxRate = parseFloat($(this).find('.item-tax').val()) || 0;
-        
-        const lineTotal = qty * price;
-        const lineTax = lineTotal * (taxRate / 100);
-        
-        subtotal += lineTotal;
+
+        const gross = qty * price;
+        const disc = soDiscountShare($(this), qty) ?? BmsLineDiscount.amount($(this), gross);
+        const lineTax = (gross - disc) * (taxRate / 100);
+
+        subtotal += gross;
+        discountTotal += disc;
         taxTotal += lineTax;
-        
-        $(this).find('.item-total').text(lineTotal.toFixed(2));
+
+        $(this).find('.item-total').text((gross - disc + lineTax).toFixed(2));
     });
-    
+
     $('#subtotal').text(subtotal.toFixed(2));
+    $('#discount-total').text(discountTotal.toFixed(2));
     $('#tax-total').text(taxTotal.toFixed(2));
-    $('#grand-total').text((subtotal + taxTotal).toFixed(2));
+    $('#grand-total').text((subtotal - discountTotal + taxTotal).toFixed(2));
 }
 
 function saveInvoice(status) {
     if (BmsLineTerms.missing($('#itemsBody')).length) {
         Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this invoice is priced by term. Choose its term before saving.')) ?> });
+        return;
+    }
+    let overDiscount = '';
+    $('#itemsBody tr').each(function () {
+        if ($(this).data('soDiscLeft') !== undefined) return;   // the order's own discount
+        const gross = (parseFloat($(this).find('.item-qty').val()) || 0) * (parseFloat($(this).find('.item-price').val()) || 0);
+        if (!overDiscount && BmsLineDiscount.overLimit($(this), gross)) overDiscount = $(this).find('.item-name').val() || 'a line';
+    });
+    if (overDiscount) {
+        Swal.fire({ icon: 'warning', title: 'Discount too large', text: `The discount on "${overDiscount}" is more than the line amount.` });
         return;
     }
     const data = $('#invoiceForm').serialize() + '&status=' + status;
@@ -531,6 +601,14 @@ function selectProduct(id) {
         
         row.find('.item-price').val(price.toFixed(2));
         row.find('.item-tax').val(parseInt(p.tax_rate) || 0);
+        row.find('.item-description').val(p.description || '');
+        BmsLineDesc.show(row, parseInt(p.is_service || 0, 10) === 1);
+        // A different product is no longer the sales-order line: unlink it and free its price / discount.
+        row.find('.item-order-item-id').val('');
+        row.removeData('soDiscLeft').removeData('soOpenQty');
+        row.find('.item-price, .item-discount').prop('readonly', false);
+        if ((window.BMS_SALES_DISCOUNT || {}).allowSwitch !== false) row.find('.item-discount-type').removeClass('pe-none bg-light').removeAttr('tabindex');
+        row.find('.form-text.text-primary').remove();
         BmsLineTerms.attach(row, p, { selectName: `items[${currentItemIndex}][price_term_id]`, onChange: () => calculateTotals() });
         
         $('#productSearchResults').hide();

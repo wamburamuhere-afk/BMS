@@ -464,7 +464,7 @@ function generate_invoice_number() {
                                         <th width="15%" class="inv-col">Quantity</th>
                                         <th width="10%" class="inv-col">Unit</th>
                                         <th width="25%" class="price-col-header">Unit Price</th>
-                                        <th width="8%">Disc %</th>
+                                        <th width="12%">Discount</th>
                                         <th width="10%" class="inv-col">Tax</th>
                                         <th width="10%" class="text-end item-total-col">Total</th>
                                         <th width="5%" class="text-center"></th>
@@ -553,6 +553,7 @@ function generate_invoice_number() {
 <?php require_once ROOT_DIR . '/includes/sales_unlinked_lines_js.php'; ?>
 <script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <?php require ROOT_DIR . '/includes/line_price_terms_js.php'; ?>
+<?php require ROOT_DIR . '/includes/sales_line_extras_js.php'; ?>
 <script>
 let itemCount = 0;
 $(document).ready(function() {
@@ -660,12 +661,13 @@ function addItemRow(item = null) {
                            autocomplete="off">
                     <input type="hidden" class="item-product-id" name="items[${idx}][product_id]" value="${item && item.product_id ? item.product_id : ''}">
                     <input type="hidden" class="item-order-item-id" name="items[${idx}][order_item_id]" value="${fromOrder ? item.order_item_id : ''}">
-                    <input type="hidden" class="item-description" name="items[${idx}][description]" value="${item ? escAttr(item.description) : ''}">
                     ${fromOrder ? '' : `<button type="button" class="btn btn-outline-secondary" onclick="openProductSearch(${idx})">
                         <i class="bi bi-search"></i>
                     </button>`}
                 </div>
                 ${fromOrder ? `<div class="form-text small text-primary"><i class="bi bi-link-45deg"></i> From sales order${remaining !== null ? ` — ${remaining} left to invoice` : ''}</div>` : ''}
+                <textarea class="form-control form-control-sm item-description mt-1 d-none" name="items[${idx}][description]" rows="3"
+                          placeholder="Description — printed on the invoice">${item ? escAttr(item.description) : ''}</textarea>
             </td>
             <td class="inv-col">
                 <input type="number" class="form-control form-control-sm item-qty" name="items[${idx}][quantity]"
@@ -681,7 +683,7 @@ function addItemRow(item = null) {
             </td>
             <td>
                 <input type="number" class="form-control form-control-sm item-discount" name="items[${idx}][discount_percent]"
-                       value="${item && item.discount_percent ? parseFloat(item.discount_percent) : 0}" step="0.01" min="0" max="100" ${lock} onchange="calculateTotals()">
+                       value="${item ? (parseFloat(item.discount_value ?? item.discount_percent) || 0) : 0}" step="0.01" min="0" max="100" ${lock} oninput="calculateTotals()" onchange="calculateTotals()">
             </td>
             <td class="inv-col">
                 <select class="form-select form-select-sm item-tax" name="items[${idx}][tax_rate]" onchange="calculateTotals()" ${fromOrder ? 'style="pointer-events:none;background-color:#e9ecef" tabindex="-1"' : ''}>
@@ -695,6 +697,16 @@ function addItemRow(item = null) {
         </tr>
     `;
     $('#itemsBody').append(html);
+    const $newRow = $(`#item-row-${idx}`);
+    // Discount as % or a fixed amount (System Settings default; a sales-order line keeps the order's).
+    BmsLineDiscount.enhance($newRow, { type: item ? item.discount_type : null,
+        typeName: `items[${idx}][discount_type]`, valueName: `items[${idx}][discount_value]` });
+    $newRow.find('.item-discount-type').on('change', () => calculateTotals());
+    if (fromOrder && item.discount_type === 'amount') {
+        // The order's fixed discount still open on this line, shared by the quantity billed (soDiscountShare).
+        $newRow.data('soDiscLeft', parseFloat(item.discount_value) || 0).data('soOpenQty', parseFloat(item.quantity) || 0);
+    }
+    BmsLineDesc.show($newRow, !!(item && parseInt(item.is_service || 0, 10) === 1));
     setTaxSelect($(`#item-row-${idx} .item-tax`), item ? (item.sales_tax_rate ?? item.tax_rate) : 0);
     // A line raised from a sales order inherits that line's term on the server (price is locked here).
     if (item && !fromOrder) {
@@ -716,6 +728,15 @@ function removeItemRow(idx) {
     }
 }
 
+// A sales-order line's fixed discount on the quantity billed — the same rule as
+// soLineDiscountFor() in core/sales_invoicing.php: all that is open, or its share.
+function soDiscountShare($row, qty) {
+    const left = $row.data('soDiscLeft'), open = $row.data('soOpenQty');
+    if (left === undefined) return null;
+    if (qty >= open - 0.0005) return left;
+    return open > 0 ? BmsLineDiscount.round2(left * qty / open) : 0;
+}
+
 // Same arithmetic as api/account/save_invoice.php: VAT on the line after discount.
 function calculateTotals() {
     let subtotal = 0;
@@ -726,10 +747,9 @@ function calculateTotals() {
         const qty = parseFloat($(this).find('.item-qty').val()) || 0;
         const price = parseFloat($(this).find('.item-price').val()) || 0;
         const taxRate = parseFloat($(this).find('.item-tax').val()) || 0;
-        const discPct = Math.min(Math.max(parseFloat($(this).find('.item-discount').val()) || 0, 0), 100);
 
         const gross = qty * price;
-        const disc = Math.round(gross * discPct) / 100;
+        const disc = soDiscountShare($(this), qty) ?? BmsLineDiscount.amount($(this), gross);
         const lineTax = (gross - disc) * (taxRate / 100);
 
         subtotal += gross;
@@ -748,6 +768,16 @@ function calculateTotals() {
 function saveInvoice(status) {
     if (BmsLineTerms.missing($('#itemsBody')).length) {
         Swal.fire({ icon: 'warning', title: <?= json_encode(t('Choose a term')) ?>, text: <?= json_encode(t('A service on this invoice is priced by term. Choose its term before saving.')) ?> });
+        return;
+    }
+    let overDiscount = '';
+    $('#itemsBody tr').each(function () {
+        if ($(this).data('soDiscLeft') !== undefined) return;   // the order's own discount
+        const gross = (parseFloat($(this).find('.item-qty').val()) || 0) * (parseFloat($(this).find('.item-price').val()) || 0);
+        if (!overDiscount && BmsLineDiscount.overLimit($(this), gross)) overDiscount = $(this).find('.item-name').val() || 'a line';
+    });
+    if (overDiscount) {
+        Swal.fire({ icon: 'warning', title: 'Discount too large', text: `The discount on "${overDiscount}" is more than the line amount.` });
         return;
     }
     const data = $('#invoiceForm').serialize() + '&status=' + status;
@@ -871,6 +901,7 @@ function selectProduct(id) {
         
         row.find('.item-price').val(price.toFixed(2));
         row.find('.item-description').val(p.description || '');
+        BmsLineDesc.show(row, parseInt(p.is_service || 0, 10) === 1);
         row.find('.item-order-item-id').val('');
         setTaxSelect(row.find('.item-tax'), p.sales_tax_rate ?? p.tax_rate);
         BmsLineTerms.attach(row, p, { selectName: `items[${currentItemIndex}][price_term_id]`, onChange: () => calculateTotals() });
@@ -1001,6 +1032,8 @@ $(document).ready(function() {
         'unit_price'         => floatval($i['unit_price'] ?? 0),
         'tax_rate'           => floatval($i['tax_rate'] ?? 0),
         'discount_percent'   => floatval($i['discount_percent'] ?? 0),
+        'discount_type'      => $i['discount_type'] ?? 'percent',
+        'discount_value'     => floatval($i['discount_value'] ?? ($i['discount_percent'] ?? 0)),
         'is_service'         => intval($i['is_service'] ?? 0),
     ], $order_items)) ?>;
     soItems.forEach(function(item) { addItemRow(item); });

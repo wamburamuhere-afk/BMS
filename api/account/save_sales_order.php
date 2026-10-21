@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/service_price_terms.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/sales_invoicing.php';   // assertSalesAmountsFit
+require_once __DIR__ . '/../../core/sales_line_discount.php';
 
 header('Content-Type: application/json');
 
@@ -141,33 +142,26 @@ try {
     $tax_total = 0;
     $total_ordered = 0;
     
-    foreach ($items as $item) {
-        $qty = floatval($item['quantity'] ?? 1);
-        $price = floatval($item['unit_price'] ?? 0);
-        $tax_rate = floatval($item['tax_rate'] ?? 0);
-        $discount_percent = floatval($item['discount_percent'] ?? 0);
-        
-        $line_subtotal = $qty * $price;
-        $discount_amount = $line_subtotal * ($discount_percent / 100);
-        $taxable_amount = $line_subtotal - $discount_amount;
-        $line_tax = $taxable_amount * ($tax_rate / 100);
-        
-        $subtotal += $line_subtotal; // Subtotal before discount
-        $tax_total += $line_tax;
-        $total_ordered += $qty;
-
+    // Discount as % or a fixed amount — core/sales_line_discount.php.
+    $discount_amount_total = 0;
+    $lines = [];
+    foreach ($items as $key => $item) {
         $line_name = trim((string)($item['product_name'] ?? '')) ?: 'an item';
+        $m = salesLineMath($item + ['quantity' => 1], $line_name);
+
+        $subtotal += $m['line_subtotal']; // Subtotal before discount
+        $discount_amount_total += $m['line_discount'];
+        $tax_total += $m['line_tax'];
+        $total_ordered += $m['qty'];
+        $lines[$key] = $m;
+
         assertSalesAmountsFit([
-            "Unit price of $line_name" => $price,
-            "Line total of $line_name" => $taxable_amount + $line_tax,
+            "Unit price of $line_name" => $m['price'],
+            "Line total of $line_name" => $m['line_total'],
         ]);
     }
     
     $shipping_cost = floatval($_POST['shipping_cost'] ?? 0);
-    $discount_amount_total = array_reduce($items, function($carry, $item) {
-        $line_subtotal = floatval($item['quantity'] ?? 0) * floatval($item['unit_price'] ?? 0);
-        return $carry + ($line_subtotal * (floatval($item['discount_percent'] ?? 0) / 100));
-    }, 0);
     
     $grand_total = ($subtotal - $discount_amount_total) + $tax_total + $shipping_cost;
     assertSalesAmountsFit(['Subtotal' => $subtotal, 'Grand total' => $grand_total]);
@@ -288,17 +282,8 @@ try {
     }
 
     // Insert Items
-    foreach ($items as $item) {
-        $qty = floatval($item['quantity'] ?? 1);
-        $price = floatval($item['unit_price'] ?? 0);
-        $tax_rate = floatval($item['tax_rate'] ?? 0);
-        $discount_percent = floatval($item['discount_percent'] ?? 0);
-        
-        $line_subtotal = $qty * $price;
-        $discount_amount = $line_subtotal * ($discount_percent / 100);
-        $taxable_amount = $line_subtotal - $discount_amount;
-        $line_tax = $taxable_amount * ($tax_rate / 100);
-        $line_total = $taxable_amount + $line_tax;
+    foreach ($items as $key => $item) {
+        $m = $lines[$key];
 
         $itemStmt = $pdo->prepare("
             INSERT INTO sales_order_items (
@@ -311,11 +296,13 @@ try {
             (string)($item['description'] ?? ''), trim((string)($item['product_name'] ?? '')) ?: 'a line');
         $itemStmt->execute([
             $sales_order_id, $item['product_id'] ?: null, $item['product_name'], $item['sku'],
-            $qty, $item['unit'] ?? 'pcs', $price, $tax_rate, $discount_percent, $line_total,
+            $m['qty'], $item['unit'] ?? 'pcs', $m['price'], $m['tax_rate'], $m['discount_percent'], $m['line_total'],
             $term['description'] !== '' ? $term['description'] : null
         ]);
-        sptStampLine($pdo, 'sales_order_items', (int)$pdo->lastInsertId(), $term);
-        $resolvedLines[] = ['term' => $term, 'qty' => $qty, 'name' => trim((string)($item['product_name'] ?? '')) ?: 'a line'];
+        $lineId = (int)$pdo->lastInsertId();
+        sptStampLine($pdo, 'sales_order_items', $lineId, $term);
+        salesStampLineDiscount($pdo, 'sales_order_items', 'order_item_id', $lineId, $m);
+        $resolvedLines[] = ['term' => $term, 'qty' => $m['qty'], 'name' => trim((string)($item['product_name'] ?? '')) ?: 'a line'];
     }
     sptAssertPlanLines($resolvedLines ?? []);   // one plan, qty 1, add-ons follow it
 

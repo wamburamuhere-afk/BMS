@@ -336,12 +336,12 @@ $accent = getSetting('print_template_color_inv_summit', '#12b5c9');
             foreach ($items as $i => $item):
                 $lineTotal = floatval($item['quantity']) * floatval($item['unit_price']);
                 $subtotal += $lineTotal;
-                $unit = !empty($item['unit']) ? ' ' . htmlspecialchars($item['unit']) : '';
+                $unit = !empty($item['unit']) && empty($item['price_term_label']) ? ' ' . htmlspecialchars($item['unit']) : '';
             ?>
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
                 <?php if ($svcLayout):
-                    $svcDesc = trim((string)($item['svc_description'] ?? '')) !== '' ? (string)$item['svc_description'] : (string)($item['description'] ?? ''); ?>
+                    $svcDesc = trim((string)($item['description'] ?? '')) !== '' ? (string)$item['description'] : (string)($item['svc_description'] ?? ''); ?>
                 <td style="overflow-wrap:anywhere;word-break:break-word;"><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? '', 'Unknown Service') ?></td>
                 <td style="overflow-wrap:anywhere;word-break:break-word;white-space:pre-line;"><?= htmlspecialchars(trim($svcDesc), ENT_QUOTES, 'UTF-8') ?></td>
                 <?php else: ?>

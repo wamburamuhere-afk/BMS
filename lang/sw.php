@@ -5440,5 +5440,11 @@ return [
     'Remove this account?' => 'Ondoa akaunti hii?',
     // Settings › Admin side drawer
     'All settings' => 'Mipangilio yote',
+    // System Settings › Sales Discount
+    'Sales Discount' => 'Punguzo la Mauzo',
+    'How a line discount is entered on Quotations, Sales Orders and Invoices. A fixed amount is charged exactly as typed (e.g. 10,000 off), on the document, its print and the ledger. Documents already saved keep their own discounts.' => 'Jinsi punguzo la kila mstari linavyowekwa kwenye Nukuu, Oda za Mauzo na Ankara. Kiasi maalum kinatozwa kama kilivyoandikwa (mfano punguzo la 10,000) kwenye hati, chapisho lake na leja. Hati zilizokwisha hifadhiwa zinabaki na punguzo lake.',
+    'Default discount type' => 'Aina ya punguzo ya kawaida',
+    'Fixed amount' => 'Kiasi maalum',
+    'Allow switching between % and amount on each line' => 'Ruhusu kubadilisha kati ya % na kiasi kwenye kila mstari',
 
 ];
