@@ -1144,7 +1144,7 @@ if ($hasContext ?? false):
                         <div class="col-sm-6 col-md-3">
                             <label class="form-label fw-semibold small">Amount (TZS)</label>
                             <input type="number" name="billing_amount_tzs" class="form-control form-control-sm"
-                                   min="0" step="1000"
+                                   min="0" step="1"
                                    value="<?= (int)($tenant['billing_amount_tzs'] ?? 0) ?: '' ?>">
                         </div>
                         <div class="col-sm-6 col-md-3">
@@ -1193,7 +1193,7 @@ if ($hasContext ?? false):
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Amount Paid (TZS) <span class="text-danger">*</span></label>
-                            <input type="number" name="amount_tzs" class="form-control" min="1" step="1000" required
+                            <input type="number" name="amount_tzs" class="form-control" min="1" step="1" required
                                    placeholder="e.g. 50000">
                         </div>
 

@@ -36,6 +36,14 @@
 - **Tests:** `test_print_css_standard_cli` 109/109, invoice prints 12, sales-order prints 27, service print columns 244, quotations 130.
 - **Note:** `i_e_print.md` (§2 body padding, header padding, title-box padding) still lists the old values for these three Default designs.
 
+## 2026-10-21 — fix(superadmin): Record Payment refused round amounts like 10,000
+
+**Files:** `app/superadmin/tenant_view.php`, `app/superadmin/tenant_new.php`, `tests/test_superadmin_amount_step_cli.php` (new), `changelog.md`
+
+- **Why:** the Record Payment amount had `min="1" step="1000"`, so the browser accepted only 1, 1001, 2001 … and refused 10,000 ("the two nearest valid values are 9001 and 10001"). The two billing-amount fields (`min="0" step="1000"`) refused anything that was not a whole thousand (e.g. 149,500).
+- **Fix:** all three are `step="1"`, so any whole amount is accepted. The server already stores whole shillings (`(int)`), so a decimal is still refused by the browser instead of being silently cut.
+- **Tests:** new `test_superadmin_amount_step_cli` 10/10 (static).
+
 ## 2026-10-19 — fix(e-signatures): uploaded signatures lose their paper background
 
 **Files:** `core/signature_cleaner.php` (new), `api/document/upload_signature.php`, `app/constant/document/e_signatures.php`, `migrations/tenant/2026_10_19_clean_uploaded_signatures.php` (new), `migrations/2026_10_19_clean_uploaded_signatures_legacy_db.php` (new), `tests/test_signature_cleaner_cli.php` (new), `changelog.md`
