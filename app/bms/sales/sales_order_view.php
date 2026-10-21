@@ -183,6 +183,11 @@ require_once 'header.php';
                 <i class="bi bi-x-circle"></i> Cancel Order
             </button>
             <?php endif; ?>
+            <?php if ($so_is_admin && in_array($order['status'], ['reviewed','approved','cancelled'], true)): ?>
+            <button type="button" class="btn btn-outline-warning" onclick="revertSalesOrderToPending()">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Send Back to Pending
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -201,7 +206,8 @@ require_once 'header.php';
     <?php
     $show_review  = ($order['status'] === 'pending') && $so_can_review;
     $show_approve = ($order['status'] === 'reviewed') && $so_can_approve;
-    if ($show_review || $show_approve):
+    $show_revert  = $so_is_admin && in_array($order['status'], ['reviewed','approved','cancelled'], true);
+    if ($show_review || $show_approve || $show_revert):
     ?>
     <div class="d-flex gap-2 mb-4">
         <?php if ($show_review): ?>
@@ -212,6 +218,11 @@ require_once 'header.php';
         <?php if ($show_approve): ?>
             <button type="button" class="btn btn-success" onclick="approveThisOrder()">
                 <i class="bi bi-check-circle me-1"></i> Approve Order
+            </button>
+        <?php endif; ?>
+        <?php if ($show_revert): ?>
+            <button type="button" class="btn btn-outline-warning" onclick="revertSalesOrderToPending()">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Send Back to Pending
             </button>
         <?php endif; ?>
     </div>
@@ -645,6 +656,34 @@ function approveThisOrder() {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });
             }
         }, 'json');
+    });
+}
+
+function revertSalesOrderToPending() {
+    Swal.fire({
+        title: 'Send Back to Pending?',
+        text: 'The review and approval stamps will be removed. The order will return to Pending and can be reviewed again by the correct user.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ffc107',
+        confirmButtonText: 'Yes, Send Back',
+        cancelButtonText: 'No, Keep It'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => { Swal.showLoading(); } });
+        $.post('<?= buildUrl('api/account/revert_sales_order_to_pending.php') ?>',
+            { sales_order_id: SO_ID, _csrf: CSRF_TOKEN },
+            function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Sent Back!', text: res.message, timer: 2000, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            }, 'json'
+        ).fail(function() {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server communication failed.' });
+        });
     });
 }
 </script>
