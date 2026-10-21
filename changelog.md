@@ -25,6 +25,17 @@
 - **Tests:** new `test_sales_line_discount_cli` 80/80 (maths, wiring, real save endpoints, edit pages, all 12 prints, quote → order → invoice, ledger Dr 884,000 = Cr 884,000, an order billed in 3 invoices adding to exactly 10,000, settings). `test_service_print_columns_cli` was updated to the new rule (line description first) and passes 244/244. Still green: line terms 35, quotations 130, invoice revenue posting 19, invoice three-approval 67, invoice COGS 12, invoice prints 12, sales-order three-approval 105, sales-order prints 27, service plans/subscriptions (billing 82, BJP form 82, e2e 34, requests 43, payment 33, contracts 28, my subscription 45, customer subscription 21). Checked in Chrome on rendered edit pages and the print.
 - **Not changed (noted):** sales returns (`api/sales/create_return.php`) refund at the order's unit price without the line discount. This is pre-existing and outside this change.
 
+## 2026-10-21 — fix(print): Default header of Quotation, Sales Order and Invoice uses less space
+
+**Files:** `app/bms/sales/quotations/print_quotation.php`, `app/bms/sales/print_sales_order.php`, `app/bms/invoice/invoice_print.php`, `changelog.md`
+
+- **Why:** the Default design's header took about 262 px (69 mm) before the first table, against about 183 px in Noir, so a small document often spilled onto a second page.
+- **Change (spacing only; no text, order or layout changed):** body top padding 20 → 0 px; header gap below 28 → 14 px and padding below 18 → 10 px; company name gap 10 → 6 px and address-line gap 2 → 1 px; blue box padding 16 → 10 px, gap under its title 10 → 6 px and between its lines 4 → 2 px. Identical in all three files.
+- **Not changed:** the canonical `@page { margin: 10mm 8mm 16mm 8mm; }` (i_e_print.md §1, enforced by `test_print_css_standard_cli`), the six address lines, the other 9 designs, and everything from the customer boxes downwards.
+- **Result (measured in Chrome at A4 print width, BJP-style header with 6 address lines):** header 176 → 157 px and about 262 → 209 px before the first table (about 53 px / 14 mm saved), the same on all three documents.
+- **Tests:** `test_print_css_standard_cli` 109/109, invoice prints 12, sales-order prints 27, service print columns 244, quotations 130.
+- **Note:** `i_e_print.md` (§2 body padding, header padding, title-box padding) still lists the old values for these three Default designs.
+
 ## 2026-10-19 — fix(e-signatures): uploaded signatures lose their paper background
 
 **Files:** `core/signature_cleaner.php` (new), `api/document/upload_signature.php`, `app/constant/document/e_signatures.php`, `migrations/tenant/2026_10_19_clean_uploaded_signatures.php` (new), `migrations/2026_10_19_clean_uploaded_signatures_legacy_db.php` (new), `tests/test_signature_cleaner_cli.php` (new), `changelog.md`
