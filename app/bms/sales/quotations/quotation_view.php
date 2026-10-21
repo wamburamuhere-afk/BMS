@@ -85,7 +85,19 @@ if (!function_exists('quote_status_color')) {
 $status        = $quote['status'] ?: 'pending';
 $can_review    = canReview('sales_orders');
 $can_approve   = canApprove('sales_orders');
+$is_admin_q    = isAdmin();
 $is_converted  = !empty($quote['converted_to_so_id']);
+
+// Fetch the linked SO (if any) so we can show "View Sales Order" and determine
+// whether the Convert button should reappear (SO was cancelled).
+$linked_so = null;
+if ($is_converted) {
+    $soChk = $pdo->prepare("SELECT sales_order_id, order_number, status FROM sales_orders WHERE sales_order_id = ? LIMIT 1");
+    $soChk->execute([$quote['converted_to_so_id']]);
+    $linked_so = $soChk->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+// Allow re-conversion only if the linked SO no longer exists or was cancelled.
+$can_reconvert = $is_converted && ($linked_so === null || $linked_so['status'] === 'cancelled');
 
 $creator_label  = trim($quote['creator_name']  ?? '') ?: ($quote['creator_username']  ?? 'Unknown');
 $reviewer_label = trim($quote['reviewer_name'] ?? '') ?: ($quote['reviewer_username'] ?? '');
@@ -130,10 +142,23 @@ includeHeader();
             <button type="button" class="btn btn-success" onclick="convertToOrder(<?= $quote['sales_order_id'] ?>)">
                 <i class="bi bi-check-circle"></i> Convert to Order
             </button>
+            <?php elseif ($status === 'approved' && $can_reconvert): ?>
+            <button type="button" class="btn btn-success" onclick="convertToOrder(<?= $quote['sales_order_id'] ?>)">
+                <i class="bi bi-check-circle"></i> Convert to Order
+            </button>
+            <?php elseif ($is_converted && $linked_so): ?>
+            <a href="<?= getUrl('sales_order_view') ?>?id=<?= $linked_so['sales_order_id'] ?>" class="btn btn-outline-success">
+                <i class="bi bi-box-arrow-up-right me-1"></i> View Sales Order #<?= safe_output($linked_so['order_number']) ?>
+            </a>
             <?php endif; ?>
             <?php if (!in_array($status, ['approved','cancelled'])): ?>
             <button type="button" class="btn btn-outline-danger" onclick="declineQuotation(<?= $quote['sales_order_id'] ?>)">
                 <i class="bi bi-x-octagon"></i> Decline
+            </button>
+            <?php endif; ?>
+            <?php if ($is_admin_q && in_array($status, ['reviewed','approved','cancelled'], true)): ?>
+            <button type="button" class="btn btn-outline-warning" onclick="revertQuotationToPending()">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Send Back to Pending
             </button>
             <?php endif; ?>
             <div class="btn-group shadow-sm">
@@ -502,6 +527,34 @@ function convertToOrder(id) {
                 Swal.fire('Error', 'Communication with server failed', 'error');
             });
         }
+    });
+}
+
+function revertQuotationToPending() {
+    Swal.fire({
+        title: 'Send Back to Pending?',
+        text: 'The review and approval stamps will be removed. The quotation will return to Pending and can be reviewed again by the correct user.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ffc107',
+        confirmButtonText: 'Yes, Send Back',
+        cancelButtonText: 'No, Keep It'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => { Swal.showLoading(); } });
+        $.post('<?= buildUrl('api/account/revert_quotation_to_pending.php') ?>',
+            { quotation_id: <?= $quote['sales_order_id'] ?>, _csrf: CSRF_TOKEN },
+            function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Sent Back!', text: res.message, timer: 2000, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            }, 'json'
+        ).fail(function() {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server communication failed.' });
+        });
     });
 }
 </script>
