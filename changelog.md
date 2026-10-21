@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-21 — fix(sales-orders): fix type column and non-admin visibility
+
+**Files:** `api/account/get_sales_orders.php`
+
+- **Type column**: `order_type` now checks whether any item links to an inventory-tracked product (`products.is_service=0` + `track_inventory=1`) instead of relying solely on `warehouse_id IS NOT NULL`. A service quotation can carry a `warehouse_id` for project context; the old logic incorrectly labelled all such SOs as "Inventory".
+- **Non-admin visibility**: warehouse scope (`scopeFilterSqlNullable('warehouse','so')`) is now only applied when the user has an explicit warehouse grant (`warehouse_explicit = true`). Sales-only users have an empty project-derived warehouse list (they never touch POs/GRNs), so the old unconditional filter resolved to `AND so.warehouse_id IS NULL` and hid their own warehouse-assigned orders after an admin edit. Same guard already used by `warehousesForSelect()`.
+
 ## 2026-10-21 — fix(sales-orders): allow deleting pending orders
 
 **Files:** `api/account/delete_sales_order.php`, `changelog.md`

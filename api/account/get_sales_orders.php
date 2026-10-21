@@ -112,9 +112,16 @@ try {
     // when their warehouse grant legitimately covers the row. Found
     // 2026-07-17: a warehouse-only user's own newly-created order was
     // invisible in this list because of it.
-    // Phase 6 (pos_upgrade_plan.md) — warehouse scope, redundant-but-harmless
-    // when $warehouse_filter was already validated above.
-    $scopeSO = scopeFilterSqlNullable('project', 'so') . scopeFilterSqlNullable('warehouse', 'so');
+    // Phase 6 (pos_upgrade_plan.md) — warehouse scope applied only when the
+    // user has been explicitly configured via the warehouse-grant UI. Sales-only
+    // users have an empty project-derived warehouse list (they never touch POs/
+    // GRNs/deliveries), so applying it unconditionally resolves to
+    // "AND so.warehouse_id IS NULL" and hides their own warehouse-assigned orders.
+    // Same guard as warehousesForSelect() in warehouse_scope.php.
+    $scopeSO = scopeFilterSqlNullable('project', 'so');
+    if (!empty($_SESSION['scope']['warehouse_explicit'])) {
+        $scopeSO .= scopeFilterSqlNullable('warehouse', 'so');
+    }
 
     // 1. Get Total Count (scope-aware, orders only)
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE is_quote = 0 " . scopeFilterSqlNullable('project'));
@@ -208,7 +215,14 @@ try {
                 ELSE 'pending'
             END as display_status,
             CASE
-                WHEN so.warehouse_id IS NOT NULL THEN 'Inventory'
+                WHEN so.warehouse_id IS NOT NULL
+                     AND EXISTS (
+                         SELECT 1 FROM sales_order_items _soi
+                         JOIN products _p ON _p.product_id = _soi.product_id
+                         WHERE _soi.order_id = so.sales_order_id
+                           AND COALESCE(_p.is_service, 0) = 0
+                           AND COALESCE(_p.track_inventory, 1) = 1
+                     ) THEN 'Inventory'
                 ELSE 'Non-Inventory'
             END as order_type
         FROM sales_orders so
