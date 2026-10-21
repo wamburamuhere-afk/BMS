@@ -151,7 +151,11 @@ want($view, 'Quotation Details',     'view: titled "Quotation Details"',       '
 want($view, "getUrl('quotations')",  'view: "Back to List" returns to the quotations list', 'view: Back to List does not target the quotations list');
 want($view, "getUrl('print_quotation')", 'view: Print uses the print_quotation route', 'view: Print does not use print_quotation');
 want($view, "getUrl('quotation_edit')",  'view: Edit uses the quotation_edit route',   'view: Edit does not use quotation_edit');
-wantAbsent($view, 'FROM sales_orders',   'view: never reads the sales_orders table', 'view: still reads sales_orders');
+// quotation_view.php legitimately reads sales_orders once: to fetch the
+// linked SO's status when converted_to_so_id is set, so the Convert button
+// reappears if that SO was cancelled. The main quotation data still comes
+// from the quotations table — guard that instead.
+want($view, 'FROM quotations',  'view: main query reads the quotations table', 'view: main query does not read quotations');
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('8. print_quotation.php — dedicated print-out');
