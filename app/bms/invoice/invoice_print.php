@@ -81,6 +81,14 @@ try {
 
 $currency = $invoice['currency'] ?? 'TZS';
 
+// De-duplicate postal_address vs address (same guard as print_quotation.php)
+$inv_postal  = trim($invoice['c_postal_address'] ?? '');
+$inv_address = trim($invoice['c_address'] ?? '');
+if ($inv_postal !== '' && $inv_address !== ''
+    && stripos($inv_address, $inv_postal) !== false) {
+    $inv_postal = '';
+}
+
 // Company Settings
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
 try {
@@ -153,8 +161,8 @@ $wf = [
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 14px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border-bottom: 3px solid #3498db;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
@@ -221,13 +229,13 @@ $wf = [
         .details-grid {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 24px;
+            margin-bottom: 14px;
             gap: 14px;
         }
         .box {
             width: 48%;
             background: #f4f6f8;
-            padding: 14px 16px;
+            padding: 10px 14px;
             border-radius: 6px;
             border-left: 4px solid #3498db;
             print-color-adjust: exact;
@@ -249,7 +257,7 @@ $wf = [
         .box strong { color: #1a252f; font-weight: 600; }
 
         /* ── ITEMS TABLE ── */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
         th {
             background: #34495e;
             color: #fff;
@@ -289,7 +297,7 @@ $wf = [
             justify-content: space-between;
             align-items: flex-start;
             gap: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
         }
         .bank-details {
             flex: 1;
@@ -365,7 +373,7 @@ $wf = [
         }
 
         /* ── NOTES ── */
-        .notes-section { clear: both; padding-top: 22px; margin-top: 14px; }
+        .notes-section { clear: both; padding-top: 12px; margin-top: 8px; }
         .notes-section > div {
             background: #f4f6f8;
             padding: 12px 14px;
@@ -459,11 +467,11 @@ $wf = [
             <?php if (!empty($invoice['company_name'])): ?>
             <p><?= caseFormat($invoice['company_name']) ?></p>
             <?php endif; ?>
-            <?php if (!empty($invoice['c_postal_address'])): ?>
-            <p>P.O. Box <?= htmlspecialchars($invoice['c_postal_address']) ?></p>
+            <?php if (!empty($inv_postal)): ?>
+            <p><?= preg_match('/^\s*p\.?\s*o\.?\s*box/i', $inv_postal) ? htmlspecialchars($inv_postal) : 'P.O. Box ' . htmlspecialchars($inv_postal) ?></p>
             <?php endif; ?>
-            <?php if (!empty($invoice['c_address'])): ?>
-            <p><?= htmlspecialchars($invoice['c_address']) ?></p>
+            <?php if (!empty($inv_address)): ?>
+            <p><?= htmlspecialchars($inv_address) ?></p>
             <?php endif; ?>
             <?php if (!empty($invoice['c_phone'])): ?>
             <p><?= htmlspecialchars($invoice['c_phone']) ?></p>
