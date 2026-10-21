@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-21 — fix(quotations): allow re-convert to SO when previous SO was cancelled
+
+**Files:** `api/account/convert_quote_to_order.php`, `changelog.md`
+
+- **Why:** if a quotation was converted to a Sales Order and that SO was then cancelled, the quotation showed no "Convert to Order" button and the API refused re-conversion. The user had no way forward.
+- **Fix:** `convert_quote_to_order.php` now checks the status of the existing SO. If it is cancelled (or no longer exists), the conversion proceeds and `converted_to_so_id` is updated to the new SO. If the existing SO is still active, the original block remains.
+
 ## 2026-10-21 — feat(quotations): Send Back to Pending + View Sales Order link when already converted
 
 **Files:** `api/account/revert_quotation_to_pending.php` (new), `app/bms/sales/quotations/quotation_view.php`, `changelog.md`
