@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-21 — feat(sales-orders): Send Back to Pending for reviewed / approved / cancelled orders
+
+**Files:** `api/account/revert_sales_order_to_pending.php` (new), `app/bms/sales/sales_order_view.php`, `changelog.md`
+
+- **Why:** a sales order marked as Reviewed by the wrong user had no way to go back to Pending to be re-reviewed, and the wrong reviewer's signature stayed in the audit panel.
+- **What it does:** an Admin can click "Send Back to Pending" on any Reviewed, Approved or Cancelled order. The status resets to `pending`, both workflow stamps (`reviewed_by*`, `approved_by*`) are cleared, and the review/approved `workflow_signatures` rows are deleted so the audit panel starts clean. The Created By signature is never touched.
+- **No GL impact:** sales orders do not post to the ledger, so no reversal is needed (unlike invoices which have `revert_invoice_to_pending.php`).
+- **Where the button appears:** in the top action bar and in the workflow action bar, visible to Admins only when status is `reviewed`, `approved` or `cancelled`.
+
 ## 2026-10-21 — feat(sales): service lines that stay services, editable description, discount as % or a fixed amount
 
 **Files:** `core/sales_line_discount.php` (new), `assets/js/sales_line_extras.js` (new), `includes/sales_line_extras_js.php` (new), `migrations/tenant/2026_10_21_sales_line_discount_type.php` (new), `migrations/2026_10_21_sales_line_discount_type_legacy_db.php` (new), `api/account/save_quotation.php`, `api/account/save_sales_order.php`, `api/account/save_invoice.php`, `core/sales_invoicing.php`, `app/bms/sales/quotations/quotation_form.php`, `app/bms/sales/sales_order_create.php`, `app/bms/sales/sales_order_edit.php`, `app/bms/invoice/invoice_create.php`, `app/bms/invoice/invoice_edit.php`, the 12 print designs (`print_quotation*.php`, `print_sales_order*.php`, `invoice_print*.php`), `app/constant/settings/system_settings.php`, `api/account/get_service_sales_report.php`, `app/bms/product/service_view.php`, `lang/sw.php`, `tests/test_sales_line_discount_cli.php` (new), `tests/test_service_print_columns_cli.php`, `changelog.md`
