@@ -5447,4 +5447,35 @@ return [
     'Fixed amount' => 'Kiasi maalum',
     'Allow switching between % and amount on each line' => 'Ruhusu kubadilisha kati ya % na kiasi kwenye kila mstari',
 
+    // ------------------------------------------------------------------
+    // Shared chrome: navbar + footer (header.php / footer.php)
+    // ------------------------------------------------------------------
+    'Subscription' => 'Usajili',
+    'Most Profitable Products' => 'Bidhaa Zenye Faida Zaidi',
+    '© %s Business Management System. All Rights Reserved.' => '© %s Mfumo wa Usimamizi wa Biashara. Haki Zote Zimehifadhiwa.',
+
+    // ------------------------------------------------------------------
+    // POS Workspace: Sales History table — status & payment-method labels
+    // (pos_dashboard.php statusBadge() / payBadge()). Reuses existing keys
+    // above where one already exists for that English string; only genuinely
+    // new strings are added here.
+    // ------------------------------------------------------------------
+    'Partially Refunded' => 'Imerejeshwa Kiasi',
+    'Refunded' => 'Imerejeshwa',
+
+    // ------------------------------------------------------------------
+    // Products > Create (advanced/full form) — matching keys/wording
+    // product_edit.php's equivalent form already uses, plus a few new ones
+    // specific to the Create page.
+    // ------------------------------------------------------------------
+    'Create New Product' => 'Tengeneza Bidhaa Mpya',
+    'Fill in the details below to add a new item to your inventory' => 'Jaza maelezo hapa chini kuongeza kipengele kipya kwenye akiba yako',
+    'Minimum Selling Price' => 'Bei ya Chini ya Kuuza',
+    'Auto-Safe Limit' => 'Kiwango cha Usalama Kiotomatiki',
+    'This is a virtual service' => 'Hii ni huduma ya kidijitali',
+    'No physical stock' => 'Hakuna akiba ya kimwili',
+    'Enable Tax calculation for this item' => 'Wezesha hesabu ya kodi kwa kitu hiki',
+    'Save Draft' => 'Hifadhi Rasimu',
+    'Finalize & Create' => 'Kamilisha na Tengeneza',
+
 ];

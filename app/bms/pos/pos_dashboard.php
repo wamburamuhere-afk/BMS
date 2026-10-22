@@ -758,6 +758,22 @@ const T = {
     showingXofY: <?= json_encode(t('Showing _START_–_END_ of _TOTAL_')) ?>,
     due: <?= json_encode(t('due')) ?>,
     paid: <?= json_encode(t('paid')) ?>,
+    statusLabels: {
+        completed: <?= json_encode(t('Completed')) ?>,
+        paid: <?= json_encode(t('Paid')) ?>,
+        partial: <?= json_encode(t('Partial')) ?>,
+        pending: <?= json_encode(t('Pending')) ?>,
+        partially_refunded: <?= json_encode(t('Partially Refunded')) ?>,
+        refunded: <?= json_encode(t('Refunded')) ?>,
+        voided: <?= json_encode(t('Voided')) ?>,
+        cancelled: <?= json_encode(t('Cancelled')) ?>
+    },
+    payMethodLabels: {
+        cash: <?= json_encode(t('Cash')) ?>,
+        mobile_money: <?= json_encode(t('Mobile Money')) ?>,
+        bank_transfer: <?= json_encode(t('Bank Transfer')) ?>,
+        card: <?= json_encode(t('Card')) ?>
+    },
     salesHistoryReportTitle: <?= json_encode(wLabel('POS Sales History Report', 'Sales History Report')) ?>,
     periodLabel: <?= json_encode(t('Period:')) ?>,
     printedByLabel: <?= json_encode(t('Printed by:')) ?>,
@@ -808,7 +824,8 @@ function statusBadge(s) {
         voided: ['#dc3545','#fff'], cancelled: ['#6c757d','#fff']
     };
     const [bg, fg] = map[s] || ['#e9ecef','#495057'];
-    return `<span class="badge" style="background:${bg};color:${fg};padding:4px 9px;border-radius:20px;font-size:.72rem;">${safeOutput(s)}</span>`;
+    const label = T.statusLabels[s] || safeOutput(s);
+    return `<span class="badge" style="background:${bg};color:${fg};padding:4px 9px;border-radius:20px;font-size:.72rem;">${label}</span>`;
 }
 
 // ══════════════════════ PERIOD FILTER ══════════════════════
@@ -915,7 +932,7 @@ function initDashboardTables() {
 
 function payBadge(row) {
     if (row.is_return_sale) return '';
-    let html = safeOutput(row.payment_method || '—');
+    let html = T.payMethodLabels[row.payment_method] || safeOutput(row.payment_method || '—');
     if (row.balance_due > 0.01) {
         html += ` <span class="badge" style="background:#cfe2ff;color:#084298;padding:3px 7px;border-radius:20px;font-size:.66rem;">${T.due} ${money(row.balance_due)}</span>`;
     } else if (row.payment_status === 'paid') {
@@ -986,7 +1003,7 @@ function initHistoryTable() {
             { data: 'sale_status',    render: d => statusBadge(d) },
             { data: null,             className: 'text-end', orderable: false, render: (d,t,r) => actionMenu(r) }
         ],
-        language: { emptyTable: T.noSalesFoundPeriod, zeroRecords: T.noMatchingRecords },
+        language: { emptyTable: T.noSalesFoundPeriod, zeroRecords: T.noMatchingRecords, info: T.showingXofY, infoEmpty: '', paginate: { previous:'‹', next:'›' } },
         drawCallback: function () { renderCards(this.api().rows({ page:'current' }).data().toArray()); }
     });
 
