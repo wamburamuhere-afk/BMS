@@ -5477,5 +5477,8 @@ return [
     'Enable Tax calculation for this item' => 'Wezesha hesabu ya kodi kwa kitu hiki',
     'Save Draft' => 'Hifadhi Rasimu',
     'Finalize & Create' => 'Kamilisha na Tengeneza',
+    'Tracking' => 'Ufuatiliaji',
+    'Save Product' => 'Hifadhi Bidhaa',
+    'e.g. Royco Soup Cubes' => 'mfano Royco Soup Cubes',
 
 ];
