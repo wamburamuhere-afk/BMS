@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-22 — fix(i18n): Swahili translation gaps on POS Workspace, footer and Product Create
+
+**Files:** `footer.php`, `lang/sw.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/product/product_create.php`
+
+- **Footer (every page):** both the on-screen copyright line and the print-footer "Powered by BJP Technologies" line were hardcoded plain strings, never passed through `t()` — now wrapped, so they translate under Swahili.
+- **lang/sw.php:** added missing entries for `Subscription` and `Most Profitable Products` (code already called `t()` correctly; the catalog just lacked the key), plus `Partially Refunded` / `Refunded` and the handful of new Product-Create strings below.
+- **POS Workspace → Sales History table (`pos_dashboard.php`):**
+  - `statusBadge()` / `payBadge()` rendered the raw DB enum (`completed`, `cash`, `partially_refunded`, …) via `safeOutput()` only, bypassing translation entirely — now routed through new `T.statusLabels` / `T.payMethodLabels` maps.
+  - The table's `language:` config was missing `info`/`paginate` (unlike the other two tables on the same page), so "Showing X to Y of Z entries / Previous / Next" always rendered in DataTables' English default — added, matching the existing pattern.
+- **Product Create (`product_create.php`):** the "Advanced" tabbed form (General Info / Pricing & Profit / Inventory & Stock / Advanced Details) and its three modals (Scan Barcode, Quick Add Category, Quick Add Brand) were entirely hardcoded English — including the page header "Create New Product" / "Fill in the details below…" the user reported. Wrapped every label, placeholder, button and option in `t()`, reusing the exact wording `product_edit.php`'s equivalent (already-translated) form uses wherever possible, so almost no new catalog entries were needed.
+
 ## 2026-10-21 — fix(invoice-print): fix P.O. Box double-prefix on onyx/summit/wave templates
 
 **Files:** `app/bms/invoice/invoice_print_onyx.php`, `app/bms/invoice/invoice_print_summit.php`, `app/bms/invoice/invoice_print_wave.php`
