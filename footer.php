@@ -4,7 +4,7 @@ echo '<footer>';
 echo '</div>'; // Close container
 
 echo '<footer class="text-center py-3 text-muted d-print-none">';
-echo '<p>© '.date('Y').' Business Management System. All Rights Reserved.</p>';
+echo '<p>' . sprintf(t('© %s Business Management System. All Rights Reserved.'), date('Y')) . '</p>';
 echo '</footer>';
 
 // ── Global Print Footer ──────────────────────────────────────────
@@ -21,7 +21,7 @@ echo '
         This document was <strong>Printed </strong> by <strong>' . $_print_username . ' - ' . $_print_role . '</strong> on ' . $_print_date . '
     </span>
     <span class="bpf-line2">
-        Powered by BJP Technologies &copy; ' . $_print_year . ', All Rights Reserved.
+        ' . sprintf(t('Powered by BJP Technologies © %d, All Rights Reserved.'), $_print_year) . '
     </span>
 </div>';
 
