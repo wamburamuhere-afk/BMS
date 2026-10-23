@@ -357,6 +357,14 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_
 $langUrl = function (string $l) use ($pickProduct, $pickPlan, $pickTerm): string {
     return '?' . http_build_query(array_filter(['product' => $pickProduct, 'plan' => $pickPlan, 'term' => $pickTerm, 'lang' => $l]));
 };
+$langSwitcher = function () use ($sw, $langUrl): string {
+    $globe = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19M12 2.5c2.6 2.8 3.9 6 3.9 9.5s-1.3 6.7-3.9 9.5c-2.6-2.8-3.9-6-3.9-9.5s1.3-6.7 3.9-9.5z"/></svg>';
+    $chev  = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+    $item  = fn(string $l, string $flag, string $name) => '<a href="' . htmlspecialchars($langUrl($l)) . '" class="' . (($l === 'sw') === $sw ? 'active' : '') . '"><span>' . $flag . '</span> ' . $name
+        . (($l === 'sw') === $sw ? '<span class="tick">✓</span>' : '') . '</a>';
+    return '<div class="lang-switcher"><button type="button" class="lang-btn" aria-haspopup="true">' . $globe . ($sw ? 'SW' : 'EN') . $chev . '</button>'
+        . '<div class="lang-menu">' . $item('en', '🇬🇧', 'English') . $item('sw', '🇹🇿', 'Kiswahili') . '</div></div>';
+};
 $icons = [
     'pos' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.5 12h12L22 7H6"/></svg>',
     'bms' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
@@ -417,9 +425,21 @@ $icons = [
     .mob-bars span.on { background: #fff; }
     /* Main */
     .main { flex: 1; min-width: 0; padding: 26px 56px 40px; }
-    .topbar { display: flex; justify-content: flex-end; align-items: center; gap: 18px; font-size: 14px; color: var(--muted); margin-bottom: 18px; }
-    .lang a { font-size: 13px; font-weight: 700; color: var(--blue); border: 1px solid #c7d6f7; border-radius: 20px; padding: 6px 12px; text-decoration: none; }
-    .lang a.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .topbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 18px; }
+    .lang-switcher { position: relative; }
+    .lang-btn { background: #fff; border: 1px solid #dee2e6; border-radius: 20px; padding: 6px 14px; font-family: inherit; font-size: 13px; font-weight: 700; color: #334155; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.07); transition: border-color .15s, color .15s; }
+    .lang-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .lang-btn svg { width: 15px; height: 15px; }
+    .lang-btn .chev { width: 11px; height: 11px; }
+    .lang-menu { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; min-width: 160px; box-shadow: 0 6px 20px rgba(0,0,0,.12); overflow: hidden; z-index: 50; display: none; }
+    .lang-menu.open { display: block; }
+    .lang-menu a { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 14px; color: #1e293b; text-decoration: none; }
+    .lang-menu a:hover { background: #f4f8ff; color: var(--blue); }
+    .lang-menu a.active { font-weight: 700; color: var(--blue); }
+    .lang-menu a .tick { margin-left: auto; color: var(--blue); font-size: 12px; }
+    .signin-line { text-align: center; font-size: 15px; color: var(--muted); margin: 28px auto 0; padding-top: 20px; border-top: 1px solid var(--line); max-width: 920px; }
+    .signin-line a { color: var(--blue); font-weight: 700; text-decoration: none; }
+    .signin-line a:hover { text-decoration: underline; }
     .wrap { max-width: 920px; margin: 0 auto; }
     .wrap.narrow { max-width: 700px; }
     .card-x { background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 34px rgba(15,23,42,.06); padding: 30px 38px; }
@@ -539,13 +559,13 @@ $icons = [
             <div id="asideList"></div>
             <div class="etc d-none-i" id="asideEtc"><?= htmlspecialchars($T['etc']) ?></div>
         </div>
-        <div class="aside-foot">© <?= date('Y') ?> BJP Technologies Co. Ltd</div>
+        <div class="aside-foot">© <?= date('Y') ?> BJP Technologies (T) Ltd</div>
     </aside>
 
     <div class="mobhead" id="mobhead">
         <div class="d-flex justify-content-between align-items-center">
             <div class="brand"><div class="brand-ico" id="mBrandIco"></div><span id="mBrandName"></span></div>
-            <a href="<?= htmlspecialchars($langUrl($sw ? 'en' : 'sw')) ?>" style="font-size:12px;font-weight:700;color:var(--blue-dark);background:#fff;border-radius:20px;padding:8px 12px;text-decoration:none"><?= $sw ? 'EN' : 'SW' ?></a>
+            <?= $langSwitcher() ?>
         </div>
         <div class="mob-plan d-none-i" id="mobPlan">
             <span><strong id="mobPlanLine"></strong><br><span id="mobPlanPrice"></span></span>
@@ -558,13 +578,7 @@ $icons = [
     </div>
 
     <main class="main">
-        <div class="topbar">
-            <span class="lang">
-                <a href="<?= htmlspecialchars($langUrl('en')) ?>" class="<?= $sw ? '' : 'on' ?>">English</a>
-                <a href="<?= htmlspecialchars($langUrl('sw')) ?>" class="<?= $sw ? 'on' : '' ?>">Kiswahili</a>
-            </span>
-            <span><?= htmlspecialchars($T['have_account']) ?> <a href="/login" class="fw-bold text-decoration-none" style="color:var(--blue)"><?= htmlspecialchars($T['sign_in']) ?></a></span>
-        </div>
+        <div class="topbar"><?= $langSwitcher() ?></div>
 
 <?php if ($closed): ?>
         <div class="wrap narrow"><div class="card-x text-center"><?= safe_output($closed, '') ?></div></div>
@@ -768,6 +782,7 @@ $icons = [
             </div>
         </section>
 <?php endif; ?>
+        <p class="signin-line" id="signinLine"><?= htmlspecialchars($T['have_account']) ?> <a href="/login"><?= htmlspecialchars($T['sign_in']) ?></a></p>
     </main>
 </div>
 
@@ -900,18 +915,23 @@ $icons = [
         syncUrl();
         window.scrollTo(0, 0);
     }
+    // The address bar stays a clean /register; only the language links carry the picks so a switch keeps them.
     function syncUrl() {
-        const q = new URLSearchParams(location.search);
-        if (S.product) q.set('product', S.product); else q.delete('product');
-        if (S.plan) q.set('plan', S.plan); else q.delete('plan');
-        if (S.term) q.set('term', S.term); else q.delete('term');
-        history.replaceState(null, '', '?' + q.toString());
-        document.querySelectorAll('.lang a, .mobhead a[href^="?"]').forEach(a => {
+        if (location.search) history.replaceState(null, '', location.pathname);
+        document.querySelectorAll('.lang-menu a').forEach(a => {
             const u = new URLSearchParams(a.getAttribute('href').slice(1));
-            ['product', 'plan', 'term'].forEach(k => q.has(k) ? u.set(k, q.get(k)) : u.delete(k));
+            [['product', S.product], ['plan', S.plan], ['term', S.term]].forEach(([k, v]) => v ? u.set(k, v) : u.delete(k));
             a.setAttribute('href', '?' + u.toString());
         });
+        $('#signinLine').toggleClass('d-none-i', ['creating', 'done', 'pending'].includes(S.screen));
     }
+    $(document).on('click', '.lang-btn', function (e) {
+        e.stopPropagation();
+        const m = $(this).next('.lang-menu');
+        $('.lang-menu').not(m).removeClass('open');
+        m.toggleClass('open');
+    });
+    $(document).on('click', () => $('.lang-menu').removeClass('open'));
 
     function renderProducts() {
         $('#productCards').html(PRODUCTS.map(p => {
