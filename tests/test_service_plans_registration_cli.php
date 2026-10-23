@@ -167,14 +167,12 @@ try {
         $j = json_decode(hit('GET', 'bms.local', 'api/platform/public_offers.php'), true);
         ok('endpoint answers success with an empty product list', ($j['success'] ?? null) === true && ($j['products'] ?? null) === []);
         $html = renderPage('login.php', 'bms.local');
-        ok('login.php shows "pricing is being prepared", never invented prices', !str_contains($html, 'id="pmPlans"') && str_contains($html, 'pricingModal')
-           && str_contains($html, 'pm-soon') && !str_contains($html, '85,000'));
-        ok('login.php emits no plan-picker script', !str_contains($html, '#pmPlans .pm-plan'));
+        ok('login.php has no pricing popup and invents no prices', !str_contains($html, 'pricingModal') && !str_contains($html, '85,000'));
         $err = inlineJsError($html);
         ok('login.php inline JS parses (no offers)', $err === '', $err);
         $html = renderPage('register.php', 'bms.local');
         ok('register.php renders the form', str_contains($html, 'id="company_name"'), substr(strip_tags($html), 0, 300));
-        ok('register.php shows no plan picker', !str_contains($html, 'id="plan_choice"'));
+        ok('register.php carries no products (product + plan steps skipped)', str_contains($html, 'const PRODUCTS = [];'));
         $err = inlineJsError($html);
         ok('register.php inline JS parses (no offers)', $err === '', $err);
     }
@@ -359,25 +357,24 @@ try {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    section('7. login.php pricing popup + register.php picker render the live plans');
+    // 2026-10-23: the login pricing popup is gone — "Register here" goes straight
+    // to register.php, whose Product → Plan steps render the live catalogue.
+    section('7. login.php links to register.php; register.php renders the live plans');
     $html = renderPage('login.php', 'bms.local');
-    ok('popup lists the live plans', str_contains($html, 'id="pmPlans"') && str_contains($html, 'data-plan="' . $BASIC . '"')
-       && str_contains($html, 'data-plan="' . $PRO . '"'));
-    ok('popup never lists private/retired plans', !str_contains($html, $HID) && !str_contains($html, $RET));
-    ok('tagline is HTML-escaped', str_contains($html, 'Owner&#039;s &lt;first&gt; shop') && !str_contains($html, '<first>'));
-    ok('term pills offered (1m, 6m, 1y)', substr_count($html, 'class="btn-check" name="pm_term"') === 3, (string)substr_count($html, 'class="btn-check" name="pm_term"'));
-    ok('Continue button present', str_contains($html, 'id="pmContinue"'));
+    ok('login has no pricing popup any more', !str_contains($html, 'id="pricingModal"'));
+    ok('"Register here" links straight to register.php', (bool)preg_match('#New company\?\s*<a href="register\.php\?lang=#', $html));
     $err = inlineJsError($html);
-    ok('login.php inline JS parses (with plans)', $err === '', $err);
+    ok('login.php inline JS parses', $err === '', $err);
 
     $html = renderPage('register.php', 'bms.local', ['plan' => $BASIC, 'term' => '1y']);
-    ok('register.php shows the plan picker', str_contains($html, 'id="plan_choice"'));
-    ok('?plan=&term= pre-selects that option', (bool)preg_match('#value="' . preg_quote($BASIC, '#') . '\|1y"\s+selected#', $html));
-    ok('hidden plan_key/plan_term inputs present', str_contains($html, 'name="plan_key"') && str_contains($html, 'name="plan_term"'));
-    ok('picker never lists private/retired plans', !str_contains($html, $HID) && !str_contains($html, $RET));
+    ok('register.php carries the live plans', str_contains($html, '"key":"' . $BASIC . '"') && str_contains($html, '"key":"' . $PRO . '"'));
+    ok('?plan=&term= pre-selects that plan and term', str_contains($html, 'plan: "' . $BASIC . '"') && str_contains($html, 'term: "1y"'));
+    ok('hidden product_key/plan_key/plan_term inputs present', str_contains($html, 'name="product_key"')
+       && str_contains($html, 'name="plan_key"') && str_contains($html, 'name="plan_term"'));
+    ok('register.php never lists private/retired plans', !str_contains($html, $HID) && !str_contains($html, $RET));
+    ok('tagline is escaped in the page data', !str_contains($html, '<first>'));
     $html = renderPage('register.php', 'bms.local', ['plan' => $HID, 'term' => '1m']);
-    ok('a forged ?plan= falls back to the default selection',
-       (bool)preg_match('#value="' . preg_quote($expect['plan_key'], '#') . '\|' . preg_quote((string)$d['term_key'], '#') . '"\s+selected#', $html));
+    ok('a forged ?plan= falls back to the default selection', str_contains($html, 'plan: ""') && !str_contains($html, $HID));
     $err = inlineJsError($html);
     ok('register.php inline JS parses (with plans)', $err === '', $err);
 

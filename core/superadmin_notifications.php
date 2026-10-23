@@ -19,7 +19,7 @@ if (!function_exists('insertSaNotification')) {
      */
     function insertSaNotification(int $tenantId, string $type, string $tenantName, string $subdomain): void
     {
-        $allowed = ['trial_expired', 'subscription_expired', 'trial_grace_started', 'subscription_grace_started'];
+        $allowed = ['trial_expired', 'subscription_expired', 'trial_grace_started', 'subscription_grace_started', 'bms_request'];
         if (!in_array($type, $allowed, true)) return;
         try {
             $ctrl = getControlPdo();
@@ -37,12 +37,14 @@ if (!function_exists('insertSaNotification')) {
                 'subscription_expired'        => 'Subscription expired',
                 'trial_grace_started'         => 'Trial grace period started',
                 'subscription_grace_started'  => 'Subscription grace period started',
+                'bms_request'                 => 'Smart BMS request awaiting approval',
             ];
             $typeBodies = [
                 'trial_expired'               => 'free trial has expired. Awaiting your action.',
                 'subscription_expired'        => 'subscription has expired. Awaiting your action.',
                 'trial_grace_started'         => 'free trial ended. Grace period is active — reactivate before it closes.',
                 'subscription_grace_started'  => 'subscription ended. Grace period is active — record a payment before it closes.',
+                'bms_request'                 => 'registered for Smart BMS. Open the company to Approve or Decline.',
             ];
             $label = $typeLabels[$type];
             $title = $label . ' — ' . $tenantName;

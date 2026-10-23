@@ -446,7 +446,29 @@ if ($hasContext ?? false):
                         <i class="bi bi-trash me-1"></i> Delete permanently
                     </button>
                 <?php else: ?>
-                    <?php if ($tenant['status'] === 'suspended'): ?>
+                    <?php if ($tenant['status'] === 'suspended' && ($tenant['suspension_reason'] ?? '') === 'awaiting_approval'): ?>
+                        <div class="alert alert-primary py-2 mb-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-hourglass-split fs-5"></i>
+                            <div><strong>Smart BMS — awaiting your approval</strong>
+                                <?= !empty($tenant['created_at']) ? '<br><small class="text-muted">Registered ' . date('d M Y H:i', strtotime($tenant['created_at'])) . '</small>' : '' ?>
+                            </div>
+                        </div>
+                        <p class="small text-muted">The company is fully set up but locked. Approve to open it — the free trial starts today. Decline to offer the owner Smart POS instead (they get an email link).</p>
+                        <button class="btn btn-primary w-100 mb-2" onclick="doApproveBms()">
+                            <i class="bi bi-check-circle me-1"></i> Approve Smart BMS
+                        </button>
+                        <button class="btn btn-outline-secondary w-100 mb-2" onclick="doDeclineBms()">
+                            <i class="bi bi-x-circle me-1"></i> Decline (offer Smart POS)
+                        </button>
+                    <?php elseif ($tenant['status'] === 'suspended' && ($tenant['suspension_reason'] ?? '') === 'approval_declined'): ?>
+                        <div class="alert alert-secondary py-2 mb-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-x-circle fs-5"></i>
+                            <div><strong>Smart BMS declined</strong><br><small class="text-muted">The owner was emailed a link to continue with Smart POS.</small></div>
+                        </div>
+                        <button class="btn btn-outline-primary w-100 mb-2" onclick="doApproveBms()">
+                            <i class="bi bi-check-circle me-1"></i> Approve Smart BMS after all
+                        </button>
+                    <?php elseif ($tenant['status'] === 'suspended'): ?>
                         <p class="small text-muted">Suspended tenants are locked out of their system, but no data has been deleted.</p>
                         <?php
                         $suspReason = $tenant['suspension_reason'] ?? null;
@@ -2309,6 +2331,22 @@ function doSuspend() {
         icon: 'warning', input: 'text', inputPlaceholder: 'Reason (optional)',
         showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Suspend'
     }).then(r => { if (r.isConfirmed) postAction({ action: 'suspend', reason: r.value || '' }, 'Suspended'); });
+}
+
+function doApproveBms() {
+    Swal.fire({
+        title: 'Approve Smart BMS?', text: 'The company opens now, its free trial starts today, and the owner is emailed.',
+        icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Approve'
+    }).then(r => { if (r.isConfirmed) postAction({ action: 'approve_bms' }, 'Approved'); });
+}
+
+function doDeclineBms() {
+    Swal.fire({
+        title: 'Decline Smart BMS?',
+        text: 'The company stays locked. The owner is emailed a link to continue with Smart POS instead.',
+        icon: 'warning', input: 'text', inputPlaceholder: 'Reason shown to the owner (optional)',
+        showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Decline'
+    }).then(r => { if (r.isConfirmed) postAction({ action: 'decline_bms', reason: r.value || '' }, 'Declined'); });
 }
 
 function doActivate() {

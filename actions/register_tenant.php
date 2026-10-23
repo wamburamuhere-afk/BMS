@@ -68,12 +68,21 @@ if (isset($_FILES['company_logo']) && $_FILES['company_logo']['error'] !== UPLOA
     $logoExtension = $ext;
 }
 
+if (empty($_POST['accept_terms'])) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Please accept the Terms of Service and Privacy Policy.']);
+    exit;
+}
+
 $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
 
 $result = registerTenant([
     'company_name'             => $_POST['company_name'] ?? '',
     'subdomain'                => $_POST['subdomain'] ?? '',
+    'owner_username'           => $_POST['owner_username'] ?? '',
     'owner_phone'              => $_POST['owner_phone'] ?? '',
+    'business_type'            => $_POST['business_type'] ?? '',
+    'product_key'              => $_POST['product_key'] ?? '',
     'owner_email'              => $_POST['owner_email'] ?? '',
     'owner_password'           => $_POST['owner_password'] ?? '',
     'owner_password_confirm'   => $_POST['owner_password_confirm'] ?? '',
@@ -102,4 +111,6 @@ echo json_encode([
     'message'   => 'Your account is ready.',
     'subdomain' => $result['subdomain'],
     'login_url' => $result['login_url'],
+    'username'  => $result['username'] ?? '',
+    'pending_approval' => !empty($result['pending_approval']),
 ]);

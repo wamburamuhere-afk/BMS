@@ -281,7 +281,8 @@ if (!function_exists('seedTenantCompanyProfile')) {
         // supply at registration time — same keys company_profile.php reads.
         foreach (['phone' => 'company_phone', 'email' => 'company_email',
                   'address' => 'company_address', 'website' => 'company_website',
-                  'tin' => 'company_tin', 'vrn' => 'company_vrn'] as $optKey => $settingKey) {
+                  'tin' => 'company_tin', 'vrn' => 'company_vrn',
+                  'company_type' => 'company_type'] as $optKey => $settingKey) {
             if (($extra[$optKey] ?? '') !== '') {
                 $values[$settingKey] = $extra[$optKey];
             }
@@ -652,6 +653,8 @@ if (!function_exists('provisionTenant')) {
                     'postal_address'   => $opts['postal_address'] ?? '',
                     'phone'            => $opts['phone'] ?? '',
                     'email'            => $opts['email'] ?? '',
+                    'address'          => $opts['physical_address'] ?? '',
+                    'company_type'     => $opts['company_type'] ?? '',
                     'logo_tmp_path'    => $opts['logo_tmp_path'] ?? null,
                     'logo_extension'   => $opts['logo_extension'] ?? null,
                 ]);

@@ -264,6 +264,7 @@ try {
             'company_name'     => 'Blank Mode Test Ltd',
             'subdomain'        => $subNone,
             'owner_email'      => "owner@$subNone.test",
+            'owner_phone'      => '2558' . random_int(10000000, 99999999),
             'owner_password'   => $pw,
         ], '198.51.100.160');
     });
@@ -298,7 +299,8 @@ try {
     $dup = withTenancy(function () use ($sub) {
         return registerTenant([
             'company_name' => 'Impostor Ltd', 'subdomain' => $sub,
-            'owner_email' => 'attacker@example.test', 'owner_password' => 'Password1',
+            'owner_email' => 'attacker@example.test', 'owner_phone' => '2559' . random_int(10000000, 99999999),
+            'owner_password' => 'Password1',
         ], '198.51.100.151');
     });
     ok($dup['ok'] === false, 'duplicate subdomain refused');
@@ -339,12 +341,14 @@ try {
             . "foreach (['TENANT_MODE','TENANT_BASE_DOMAIN'] as \$k) { \$v = getenv(\$k); \$want[\$k] = (\$v === false) ? null : \$v; }\n"
             . "require_once " . var_export("$root/includes/config.php", true) . ";\n"
             . "foreach (\$want as \$k => \$v) { if (\$v === null) { putenv(\$k); } else { putenv(\"\$k=\$v\"); } }\n"
+            . "require_once " . var_export("$root/roots.php", true) . ";   // getUrl(), as the router provides\n"
             . "ob_start(); require " . var_export("$root/login.php", true) . "; echo ob_get_clean();\n");
         foreach ($env as $k => $v) putenv("$k=$v");
         $out = (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($probe) . ' 2>&1');
         foreach ($env as $k => $v) putenv($k);
         @unlink($probe);
-        return preg_match('/New company\?\s*<a href="([^"]*)"/', $out, $m) ? html_entity_decode($m[1]) : null;
+        // The link carries ?lang=; compare the path only.
+        return preg_match('/New company\?\s*<a href="([^"]*)"/', $out, $m) ? strtok(html_entity_decode($m[1]), '?') : null;
     };
 
     ok($renderLogin('anything.example.com') === 'register.php',
@@ -353,15 +357,10 @@ try {
     $link = withTenancy(fn() => $renderLogin('bms.local', ['TENANT_MODE' => 'on', 'TENANT_BASE_DOMAIN' => 'bms.local']));
     ok($link === 'register.php', 'multi-tenancy on, viewed on the ROOT domain: still a plain relative link');
 
-    // The critical case: viewed from the TENANT'S OWN subdomain, a bare
-    // relative link would resolve to that tenant's own host and 404 (register.php
-    // refuses to render for an existing tenant by design) — it must instead be
-    // an absolute link back to the root domain.
+    // A tenant's OWN subdomain shows no register link at all: its visitors are
+    // that company's staff, and register.php 404s on a tenant host by design.
     $tenantLink = withTenancy(fn() => $renderLogin("$sub.bms.local", ['TENANT_MODE' => 'on', 'TENANT_BASE_DOMAIN' => 'bms.local']));
-    ok($tenantLink === 'http://bms.local/register.php',
-        "viewed from the tenant's OWN subdomain: absolute link to the root domain ($tenantLink)");
-    ok($tenantLink !== 'register.php',
-        'and specifically NOT the bare relative link, which would 404 on this host');
+    ok($tenantLink === null, "viewed from the tenant's OWN subdomain: no register link (" . var_export($tenantLink, true) . ')');
 
 } catch (Throwable $e) {
     $fail++;
