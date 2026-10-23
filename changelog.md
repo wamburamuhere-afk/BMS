@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-23 — fix(register): login-style language menu, clean URL, sign-in line below, footer name
+
+**Files:** `register.php`
+
+- Language switcher is now the same globe + "EN ▾" dropdown as the login page (desktop top-right and phone header); the old English/Kiswahili pills are gone
+- The address bar stays `/register` through all four steps — product/plan/term are no longer written into the URL; only the language links carry them so switching language keeps the choice
+- "Already have an account? Sign in" moved from the top bar to a centred line below the form (hidden on the setting-up / done / pending screens)
+- Side-panel footer now reads "© 2026 BJP Technologies (T) Ltd"
+
+---
+
 ## 2026-10-23 — fix(register): left panel now grows full page height on desktop — all "What you get" content visible
 
 **Files:** `register.php`
