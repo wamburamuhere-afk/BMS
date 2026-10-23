@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-23 — feat(register): redesigned company signup — product + plan steps, owner username, Smart BMS approval
+
+**Files:** `register.php`, `login.php`, `continue-smart-pos.php` (new), `actions/register_tenant.php`, `actions/superadmin_tenant_action.php`, `app/superadmin/tenant_view.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`, `core/tenant_bootstrap.php`, `core/superadmin_notifications.php`, `scripts/setup_control_db.php`, `tests/test_register_redesign_cli.php` (new), `tests/test_tenant_registration_cli.php`, `tests/test_service_plans_registration_cli.php`
+
+- **register.php rewritten (approved "Design A"):** blue side panel (product name, headline, chosen plan, animated example dashboard, "What you get … etc."), and four steps — Product → Plan → Shop/Company → Admin account — then a "Setting up…" screen and an "Account ready" screen with the web address, username and a Sign-in button. Full English/Swahili. Products and plans come live from Superadmin (`listPublicOffers`): one product skips the product step, none skips both (company starts on the Smart POS defaults, as before). Every benefit line per product was checked against what that product really turns on. Business type is now typed by hand; currency is not asked.
+- **Owner username:** the owner now chooses a login username (starts with a letter, 3–50 chars). It becomes `users.username`; the phone stays in `users.phone`. Callers that send no username (mobile app, older code) keep the phone as the username exactly as before. **Existing companies are untouched.**
+- **Smart BMS needs approval:** a Smart BMS signup is fully built but held as `suspended` / `awaiting_approval` (its login page says it is waiting). Superadmins get an email and a bell notification; the company page shows **Approve Smart BMS** (opens it, trial starts that day, owner emailed) or **Decline (offer Smart POS)** (owner emailed a signed link to `continue-smart-pos.php`, which turns the same company into a Smart POS trial, once). Smart POS stays instant.
+- **Server checks added:** the chosen plan must belong to the chosen product; Terms must be accepted; a forged `?plan=` falls back to the default.
+- **login.php:** "Register here" now goes straight to `register.php` (the pricing popup is removed); `?u=` pre-fills the username after signup.
+- **Control DB:** `tenants.suspension_reason` gains `awaiting_approval`, `approval_declined`; `superadmin_notifications.type` gains `bms_request` (idempotent, `setup_control_db.php`). Business type and physical address are now also saved to the new company's settings.
+- **Tests:** new `test_register_redesign_cli.php` (42 checks, real provisioning). Updated the two older registration suites for the new login/register pages and fixed their harness (missing phone, missing `getUrl()`).
+
 ## 2026-10-22 — fix(i18n): Swahili translation gaps on POS Workspace, footer and Product Create
 
 **Files:** `footer.php`, `lang/sw.php`, `app/bms/pos/pos_dashboard.php`, `app/bms/product/product_create.php`

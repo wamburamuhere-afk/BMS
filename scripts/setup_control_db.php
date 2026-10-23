@@ -892,6 +892,29 @@ try {
         say("  · tenants.status ENUM expanded (archived added)");
     }
 
+    // Smart BMS signups wait for a superadmin: suspended + awaiting_approval,
+    // and approval_declined once refused (idempotent; existing values kept).
+    $srType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'tenants' AND COLUMN_NAME = 'suspension_reason'
+    ")->fetchColumn();
+    if ($srType !== false && strpos((string)$srType, 'awaiting_approval') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`tenants`
+            MODIFY COLUMN `suspension_reason` ENUM('trial_expired','subscription_expired','manual','awaiting_approval','approval_declined') NULL");
+        say("  · tenants.suspension_reason ENUM expanded (awaiting_approval, approval_declined added)");
+    }
+    $snType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'superadmin_notifications' AND COLUMN_NAME = 'type'
+    ")->fetchColumn();
+    if ($snType !== false && strpos((string)$snType, 'bms_request') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`superadmin_notifications`
+            MODIFY COLUMN `type` ENUM('trial_expired','subscription_expired','trial_grace_started','subscription_grace_started','bms_request') NOT NULL");
+        say('  · superadmin_notifications.type ENUM expanded (bms_request added)');
+    }
+
     // Expand billing_cycle ENUM to include quarterly and biannual (idempotent check).
     $bcType = $admin->query("
         SELECT COLUMN_TYPE FROM information_schema.COLUMNS
