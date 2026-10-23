@@ -144,37 +144,6 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
 // Append lang param to register URL
 $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '?') . 'lang=' . urlencode($pageLang);
 
-// Plan cards come from Superadmin's live catalogue (service_plans_plan.md
-// Phase 3) — the same list api/platform/public_offers.php serves the app.
-// Nothing on offer, or the control DB unreachable → the fixed cards, as before.
-$pmPlans = []; $pmTerms = []; $pmDefault = ['plan' => null, 'term' => null];
-if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
-    try {
-        require_once __DIR__ . '/core/tenant_registration.php';
-        if (selfRegistrationOpen()) {
-            $__offers = listPublicOffers(null, true);
-            foreach ($__offers as $__prod) foreach ($__prod['plans'] as $__p) {
-                // Product name on the card only when more than one product is offered.
-                $__p['_product'] = count($__offers) > 1 ? $__prod['name'] : null;
-                $pmPlans[] = $__p;
-            }
-        }
-    } catch (Throwable $__e) {
-        error_log('login.php plan cards: ' . $__e->getMessage());
-        $pmPlans = [];
-    }
-    foreach ($pmPlans as $__p) {
-        foreach ($__p['prices'] as $__pr) {
-            if (!isset($pmTerms[$__pr['term_key']])) $pmTerms[$__pr['term_key']] = ['label' => $__pr['term_label'], 'months' => $__pr['months']];
-        }
-        if ($pmDefault['plan'] === null || ($__p['is_popular'] && !$pmDefault['popular'])) {
-            $__def = $__p['prices'][0];
-            foreach ($__p['prices'] as $__pr) if ($__pr['is_default']) { $__def = $__pr; break; }
-            $pmDefault = ['plan' => $__p['plan_key'], 'term' => $__def['term_key'], 'popular' => $__p['is_popular']];
-        }
-    }
-    uasort($pmTerms, fn($a, $b) => $a['months'] <=> $b['months']);
-}
 ?>
 <!DOCTYPE html>
 <html lang="<?= $pageLang ?>">
@@ -272,9 +241,6 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
         .lang-menu a:hover { background: #f4f8ff; color: var(--primary-color); }
         .lang-menu a.active { font-weight: 700; color: var(--primary-color); }
 
-        /* Pricing modal */
-        .pricing-card { transition: all .2s; }
-        .pricing-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.10); }
 
         /* ── Mobile: login card ── */
         @media (max-width: 575.98px) {
@@ -283,55 +249,6 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
             .company-logo, .logo-placeholder { width: 54px !important; height: 54px !important; }
             .logo-placeholder i { font-size: 1.5rem !important; }
             .company-name { font-size: .95rem !important; }
-        }
-
-        /* ── Mobile: pricing modal ── */
-        @media (max-width: 575.98px) {
-            /* Tighter modal margins so more content is visible */
-            #pricingModal .modal-dialog { margin: .3rem !important; }
-            #pricingModal .modal-content { border-radius: 12px !important; }
-
-            /* Header: logo + name in a compact horizontal row */
-            #pricingModal .modal-header { padding: .7rem .85rem 0 !important; }
-            #pricingModal .pm-header-inner { flex-direction: row !important; align-items: center !important; gap: .6rem; text-align: left !important; }
-            #pricingModal .pm-logo { width: 42px !important; height: 42px !important; margin-bottom: 0 !important; border-radius: 8px !important; flex-shrink: 0; }
-            #pricingModal .pm-logo-placeholder { width: 42px !important; height: 42px !important; min-width: 42px; margin-bottom: 0 !important; border-radius: 10px !important; flex-shrink: 0; }
-            #pricingModal .pm-logo-placeholder i { font-size: 1.2rem !important; }
-            #pricingModal .pm-name-group { text-align: left !important; }
-            #pricingModal .pm-company-name { font-size: .8rem !important; line-height: 1.25 !important; }
-            #pricingModal .pm-pos-badge { font-size: .6rem !important; margin-top: .12rem !important; display: inline-block; }
-
-            /* Body: tighter padding */
-            #pricingModal .modal-body { padding: .55rem .85rem .4rem !important; }
-
-            /* Welcome description: compact */
-            #pricingModal .pm-welcome { margin-bottom: .5rem !important; padding-left: 0 !important; padding-right: 0 !important; }
-            #pricingModal .pm-welcome h6 { font-size: .8rem !important; margin-bottom: .15rem !important; }
-            #pricingModal .pm-welcome p { font-size: .74rem !important; line-height: 1.45 !important; }
-
-            /* Free-trial banner: compact */
-            #pricingModal .pm-trial { padding: .5rem .8rem !important; margin-bottom: .55rem !important; }
-            #pricingModal .pm-trial-title { font-size: .86rem !important; margin-bottom: .12rem !important; }
-            #pricingModal .pm-trial-body { font-size: .73rem !important; }
-
-            /* Plans section heading */
-            #pricingModal .pm-plans-label { font-size: .73rem !important; margin-bottom: .4rem !important; }
-            #pricingModal .pm-cards-row { --bs-gutter-x: .45rem; --bs-gutter-y: .55rem; margin-bottom: .5rem !important; }
-
-            /* Pricing cards: smaller everything */
-            #pricingModal .pricing-card { padding: .4rem .28rem !important; }
-            #pricingModal .pm-card-icon { font-size: 1.1rem !important; }
-            #pricingModal .pm-card-icon-wrap { margin-bottom: .2rem !important; }
-            #pricingModal .pm-card-name { font-size: .68rem !important; }
-            #pricingModal .pm-card-price-wrap { margin-top: .2rem !important; margin-bottom: .2rem !important; }
-            #pricingModal .pm-price-num { font-size: .97rem !important; font-weight: 800 !important; }
-            #pricingModal .pm-price-cur { font-size: .58rem !important; }
-            #pricingModal .pm-price-per { font-size: .58rem !important; }
-            #pricingModal .pm-save-badge { font-size: .52rem !important; padding: .12em .4em !important; }
-
-            /* Footer buttons: smaller */
-            #pricingModal .modal-footer { padding: .4rem .85rem .75rem !important; }
-            #pricingModal .modal-footer .btn { padding: .4rem .55rem !important; font-size: .78rem !important; }
         }
     </style>
 </head>
@@ -375,7 +292,8 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
                 <label for="username" class="form-label"><?= htmlspecialchars($tr['username']) ?></label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="fas fa-user"></i></span>
-                    <input type="text" class="form-control" id="username" name="username"
+                    <input type="text" class="form-control" id="username" name="username" autocomplete="username"
+                           value="<?= htmlspecialchars(substr((string)($_GET['u'] ?? ''), 0, 50)) ?>"
                            placeholder="<?= htmlspecialchars($tr['username_ph']) ?>" required>
                 </div>
             </div>
@@ -408,7 +326,7 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
             <div class="divider"><span class="divider-text">OR</span></div>
 
             <p class="text-center mb-0"><?= htmlspecialchars($tr['new_company']) ?>
-                <a href="#" data-bs-toggle="modal" data-bs-target="#pricingModal"
+                <a href="<?= htmlspecialchars($registerUrlWithLang) ?>"
                    style="color:var(--primary-color);"><?= htmlspecialchars($tr['register_here']) ?></a>
             </p>
             <?php endif; ?>
@@ -422,154 +340,6 @@ if (!$isSubdomain && is_file(__DIR__ . '/core/tenant_registration.php')) {
     </div>
 </div>
 
-<?php if (!$isSubdomain): ?>
-<!-- Pricing / Offer Modal -->
-<div class="modal fade" id="pricingModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
-
-      <div class="modal-header border-0 pb-0 pt-4 px-4">
-        <div class="d-flex flex-column align-items-center w-100 text-center pm-header-inner">
-          <?php if ($company_logo): ?>
-            <img src="<?= htmlspecialchars($company_logo) ?>" alt="<?= htmlspecialchars($company_name) ?>"
-                 class="pm-logo" style="width:64px;height:64px;object-fit:contain;border-radius:10px;margin-bottom:.75rem;">
-          <?php else: ?>
-            <div class="pm-logo-placeholder" style="width:64px;height:64px;background:linear-gradient(135deg,#3498db,#2980b9);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:.75rem;box-shadow:0 4px 14px rgba(52,152,219,.35);">
-              <i class="fas fa-building text-white fs-3"></i>
-            </div>
-          <?php endif; ?>
-          <div class="pm-name-group">
-            <h5 class="fw-bold mb-0 pm-company-name" style="color:#2c3e50;"><?= htmlspecialchars($company_name) ?></h5>
-            <span class="badge rounded-pill mt-1 pm-pos-badge" style="background:#e8f4fd;color:#2980b9;font-size:.75rem;font-weight:600;">
-              <i class="fas fa-store me-1"></i>Smart POS
-            </span>
-          </div>
-        </div>
-        <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="modal-body px-4 pt-3 pb-2">
-
-        <!-- Welcome description -->
-        <div class="text-center mb-4 px-2 pm-welcome">
-          <h6 class="fw-bold mb-2" style="color:#2c3e50;font-size:1rem;">
-            🛒 <?= htmlspecialchars($tr['modal_tagline']) ?>
-          </h6>
-          <p class="text-muted mb-0" style="font-size:.88rem;line-height:1.65;">
-            <?= $tr['modal_desc'] ?>
-          </p>
-        </div>
-
-        <!-- Free-trial banner -->
-        <div class="text-center rounded-3 py-3 px-3 mb-4 pm-trial"
-             style="background:linear-gradient(135deg,#1abc9c,#16a085);color:#fff;">
-          <div class="fw-bold pm-trial-title mb-1"><i class="fas fa-gift me-2"></i><?= htmlspecialchars($tr['modal_trial_title']) ?></div>
-          <div class="pm-trial-body" style="font-size:.9rem;opacity:.92;"><?= $tr['modal_trial_body'] ?></div>
-        </div>
-
-        <!-- Pricing cards -->
-        <?php if ($pmPlans):
-            $pmCol = count($pmPlans) >= 3 ? 'col-md-4' : (count($pmPlans) === 2 ? 'col-md-6' : 'col-md-8');
-            $pmLimit = function (?int $n, string $one, string $many, string $unl) use ($tr): string {
-                if ($n === null) return $tr[$unl];
-                return $n === 1 ? $tr[$one] : sprintf($tr[$many], $n);
-            };
-        ?>
-        <h6 class="text-center fw-semibold mb-2 pm-plans-label" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['pm_choose']) ?></h6>
-        <?php if (count($pmTerms) > 1): ?>
-        <div class="d-flex justify-content-center mb-3">
-          <div class="btn-group btn-group-sm flex-wrap pm-terms" role="group" aria-label="<?= htmlspecialchars($tr['modal_plans']) ?>">
-            <?php foreach ($pmTerms as $tk => $tm): ?>
-              <input type="radio" class="btn-check" name="pm_term" id="pm_term_<?= htmlspecialchars($tk) ?>" value="<?= htmlspecialchars($tk) ?>" <?= $tk === $pmDefault['term'] ? 'checked' : '' ?>>
-              <label class="btn btn-outline-primary" for="pm_term_<?= htmlspecialchars($tk) ?>"><?= htmlspecialchars($tm['label']) ?></label>
-            <?php endforeach; ?>
-          </div>
-        </div>
-        <?php endif; ?>
-        <div class="row g-3 mb-3 pm-cards-row justify-content-center" id="pmPlans">
-          <?php foreach ($pmPlans as $p): ?>
-          <div class="col-12 <?= $pmCol ?>">
-            <div class="pricing-card pm-plan text-center p-3 h-100 rounded-3 border position-relative"
-                 data-plan="<?= htmlspecialchars($p['plan_key']) ?>" role="button" tabindex="0"
-                 style="cursor:pointer;<?= $p['is_popular'] ? 'border-color:#1abc9c!important;' : '' ?>">
-              <?php if ($p['is_popular']): ?>
-                <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill"
-                      style="background:#1abc9c;font-size:.65rem;white-space:nowrap;"><?= htmlspecialchars($tr['pm_popular']) ?></span>
-              <?php endif; ?>
-              <i class="fas fa-check-circle text-primary position-absolute top-0 end-0 m-2 pm-check d-none"></i>
-              <?php if (!empty($p['_product'])): ?><div class="mt-1"><span class="badge rounded-pill" style="background:#cfe2ff;color:#084298;font-size:.65rem;"><?= htmlspecialchars($p['_product']) ?></span></div><?php endif; ?>
-              <div class="fw-bold pm-card-name mt-1" style="color:#2c3e50;"><?= htmlspecialchars($p['name']) ?></div>
-              <?php if ($p['tagline']): ?><div class="small text-muted"><?= htmlspecialchars($p['tagline']) ?></div><?php endif; ?>
-              <div class="my-2 pm-card-price-wrap">
-                <span class="pm-price-num" style="font-size:1.4rem;font-weight:800;color:#2c3e50;">—</span>
-                <span class="pm-price-cur" style="font-size:.75rem;color:#888;"> TZS</span>
-              </div>
-              <div class="pm-price-per" style="font-size:.75rem;color:#888;min-height:1.1em;"></div>
-              <ul class="list-unstyled small text-start mt-2 mb-0 mx-auto" style="max-width:220px;color:#555;">
-                <li><i class="fas fa-store me-2 text-primary"></i><?= htmlspecialchars($pmLimit($p['max_shops'], 'pm_shop_1', 'pm_shops', 'pm_shops_unl')) ?></li>
-                <li><i class="fas fa-user me-2 text-primary"></i><?= htmlspecialchars($pmLimit($p['max_users'], 'pm_user_1', 'pm_users', 'pm_users_unl')) ?></li>
-                <?php if ($p['modules']): ?>
-                  <li title="<?= htmlspecialchars(implode(', ', $p['modules'])) ?>"><i class="fas fa-th-large me-2 text-primary"></i><?= htmlspecialchars(sprintf($tr['pm_modules'], count($p['modules']))) ?></li>
-                <?php endif; ?>
-                <?php foreach ($p['items'] as $it): ?>
-                  <li><i class="fas fa-check me-2 text-success"></i><?= htmlspecialchars($it['label'] . ($it['value'] !== null && $it['value'] !== '' ? ': ' . $it['value'] : '')) ?></li>
-                <?php endforeach; ?>
-              </ul>
-            </div>
-          </div>
-          <?php endforeach; ?>
-        </div>
-        <?php else: ?>
-        <?php /* Nothing on sale yet: never invent prices — say so and point to contact. */ ?>
-        <h6 class="text-center fw-semibold mb-3 pm-plans-label" style="color:#555;letter-spacing:.3px;"><?= htmlspecialchars($tr['modal_plans']) ?></h6>
-        <div class="text-center rounded-3 border p-4 mb-3 pm-soon" style="border-color:#b6ccfe!important;background:#f5f9ff;">
-          <i class="fas fa-tags mb-2 d-block" style="font-size:1.8rem;color:#0d6efd;"></i>
-          <div class="fw-bold mb-1" style="color:#2c3e50;"><?= htmlspecialchars($tr['pm_soon_title']) ?></div>
-          <div class="small text-muted mx-auto" style="max-width:420px;"><?= htmlspecialchars($tr['pm_soon_body']) ?></div>
-        </div>
-        <?php endif; // $pmPlans ?>
-
-        <!-- Limitation note -->
-        <div class="rounded-3 px-3 py-2 mb-1 d-flex align-items-start gap-2"
-             style="background:#fff8e6;border:1px solid #ffe5a0;">
-          <i class="fas fa-info-circle mt-1" style="color:#f39c12;flex-shrink:0;"></i>
-          <small style="color:#7a5c00;line-height:1.6;">
-            <strong><?= htmlspecialchars($tr['note_label']) ?></strong> <?= $pmPlans ? htmlspecialchars($tr['pm_note']) : $tr['note_body'] ?>
-            <?php if ($company_email || $company_phone): ?>
-              <span class="d-block mt-1">
-                <?php if ($company_email): ?>
-                  <i class="fas fa-envelope me-1"></i>
-                  <a href="mailto:<?= htmlspecialchars($company_email) ?>"
-                     style="color:#7a5c00;font-weight:600;"><?= htmlspecialchars($company_email) ?></a>
-                  <?php if ($company_phone): ?>&nbsp;&nbsp;<?php endif; ?>
-                <?php endif; ?>
-                <?php if ($company_phone): ?>
-                  <i class="fas fa-phone me-1"></i>
-                  <a href="tel:<?= htmlspecialchars($company_phone) ?>"
-                     style="color:#7a5c00;font-weight:600;"><?= htmlspecialchars($company_phone) ?></a>
-                <?php endif; ?>
-              </span>
-            <?php endif; ?>
-          </small>
-        </div>
-
-      </div>
-
-      <div class="modal-footer border-0 px-4 pb-4 pt-2 d-flex gap-2">
-        <button type="button" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">
-          <?= htmlspecialchars($tr['modal_back']) ?>
-        </button>
-        <a href="<?= htmlspecialchars($registerUrlWithLang) ?>" id="pmContinue"
-           class="btn flex-fill fw-semibold text-white"
-           style="background:linear-gradient(135deg,#3498db,#2980b9);">
-          <i class="fas fa-arrow-right me-1"></i> <?= htmlspecialchars($tr['modal_continue']) ?>
-        </a>
-      </div>
-
-    </div>
-  </div>
-</div>
-<?php endif; // !$isSubdomain — modal ?>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -594,61 +364,6 @@ Swal.fire = function(...args) {
     return originalSwalFire(...args);
 };
 
-<?php if ($pmPlans):
-    $pmData = [];
-    foreach ($pmPlans as $p) {
-        $pr = [];
-        foreach ($p['prices'] as $x) $pr[$x['term_key']] = ['price' => $x['price_tzs'], 'per_month' => $x['per_month'], 'months' => $x['months']];
-        $pmData[$p['plan_key']] = $pr;
-    }
-?>
-// Plan cards: pick a length and a plan; "Continue" carries both keys to
-// register.php, which (and the server) checks them again.
-(function () {
-    const PRICES  = <?= json_encode($pmData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
-    const PER_MON = <?= json_encode($tr['pm_per_month'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
-    const NOT_OFF = <?= json_encode($tr['pm_not_term'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
-    const BASE    = <?= json_encode($registerUrlWithLang, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
-    let term = <?= json_encode($pmDefault['term']) ?>;
-    let plan = <?= json_encode($pmDefault['plan']) ?>;
-    const DEF_PLAN = plan;
-    const fmt = n => Number(n).toLocaleString('en-US');
-
-    function render() {
-        // The chosen plan lacks this length: the default plan if it has it, else the first that does.
-        if (!PRICES[plan] || !PRICES[plan][term]) {
-            plan = (PRICES[DEF_PLAN] && PRICES[DEF_PLAN][term]) ? DEF_PLAN
-                 : (Object.keys(PRICES).find(k => PRICES[k][term]) || plan);
-        }
-        document.querySelectorAll('#pmPlans .pm-plan').forEach(function (card) {
-            const p = (PRICES[card.dataset.plan] || {})[term];
-            const sel = card.dataset.plan === plan;
-            card.querySelector('.pm-price-num').textContent = p ? fmt(p.price) : '—';
-            card.querySelector('.pm-price-cur').classList.toggle('d-none', !p);
-            card.querySelector('.pm-price-per').textContent = p ? (p.months > 1 ? PER_MON.replace('%s', fmt(p.per_month)) : '') : NOT_OFF;
-            card.classList.toggle('opacity-50', !p);
-            card.classList.toggle('border-primary', sel);
-            card.classList.toggle('border-2', sel);
-            card.querySelector('.pm-check').classList.toggle('d-none', !sel);
-            card.setAttribute('aria-pressed', sel ? 'true' : 'false');
-        });
-        const a = document.getElementById('pmContinue');
-        if (a) a.href = BASE + '&plan=' + encodeURIComponent(plan) + '&term=' + encodeURIComponent(term);
-    }
-    function pick(card) {
-        if (!(PRICES[card.dataset.plan] || {})[term]) return;
-        plan = card.dataset.plan; render();
-    }
-    document.querySelectorAll('input[name="pm_term"]').forEach(function (r) {
-        r.addEventListener('change', function () { term = this.value; render(); });
-    });
-    document.querySelectorAll('#pmPlans .pm-plan').forEach(function (card) {
-        card.addEventListener('click', function () { pick(card); });
-        card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(card); } });
-    });
-    render();
-})();
-<?php endif; ?>
 
 function toggleLang() {
     const menu = document.getElementById('langMenu');

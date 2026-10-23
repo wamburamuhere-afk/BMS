@@ -52,6 +52,18 @@ switch ($action) {
         $okMsg = 'Tenant reactivated.';
         break;
 
+    case 'approve_bms':
+        require_once __DIR__ . '/../core/tenant_registration.php';
+        $r = approveBmsTenant($tenantId);
+        $okMsg = 'Smart BMS approved. The company is open and the owner has been emailed.';
+        break;
+
+    case 'decline_bms':
+        require_once __DIR__ . '/../core/tenant_registration.php';
+        $r = declineBmsTenant($tenantId, trim((string)($_POST['reason'] ?? '')));
+        $okMsg = 'Declined. The owner has been emailed a link to continue with Smart POS.';
+        break;
+
     case 'archive':
         // Nothing is destroyed — but it does end service for a real company
         // today, so it carries the same typed confirmation as delete.

@@ -222,6 +222,15 @@ if (!function_exists('registerTenant')) {
         if (!preg_match('/^\+?[0-9]{7,15}$/', $phone)) {
             return $fail('Please enter a valid phone number (digits only, 7–15 characters).', 'rejected', $phone ?: null, $sub);
         }
+        // Login username, chosen on the web form. Callers that send none (mobile
+        // app, older tests) keep the phone number as the username, as before.
+        $username = trim((string)($in['owner_username'] ?? ''));
+        if ($username === '') {
+            $username = $phone;
+        } elseif (!preg_match('/^[A-Za-z][A-Za-z0-9._-]{2,49}$/', $username)) {
+            return $fail('Username must start with a letter and use only letters, numbers, dots, hyphens or underscores (3–50 characters).',
+                'rejected', $phone, $sub);
+        }
         // .claude/security.md §20 — 8+ chars, at least one letter and one digit.
         if (strlen($pw) < 8 || !preg_match('/[A-Za-z]/', $pw) || !preg_match('/\d/', $pw)) {
             return $fail('Password must be at least 8 characters and include a letter and a number.',
@@ -286,7 +295,18 @@ if (!function_exists('registerTenant')) {
             return $fail($choice['error'], 'rejected', $phone, $sub);
         }
 
-        $r = provisionTenant($company, $sub, $phone, $pw, [
+        // The plan must belong to the product the visitor picked, so a hand-edited
+        // link cannot start a Smart BMS trial on a Smart POS plan or the reverse.
+        $productKey = trim((string)($in['product_key'] ?? ''));
+        if ($productKey !== '' && !empty($choice['plan'])
+            && (string)($choice['plan']['product_key'] ?? '') !== $productKey) {
+            return $fail('The plan you chose does not belong to that product. Please choose again.', 'rejected', $phone, $sub);
+        }
+        // Smart BMS is not self-service: the company is built now but stays locked
+        // until a superadmin approves it (approveBmsTenant()). Smart POS is instant.
+        $needsApproval = (string)($choice['plan']['product_key'] ?? '') === 'bms_full';
+
+        $r = provisionTenant($company, $sub, $username, $pw, [
             'status'            => 'active',      // so the owner can sign in immediately
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
@@ -303,7 +323,8 @@ if (!function_exists('registerTenant')) {
             'email'             => $ownerEmail,
             'logo_tmp_path'       => $in['logo_tmp_path'] ?? null,
             'logo_extension'      => $in['logo_extension'] ?? null,
-            'skip_welcome_email'  => !empty($in['skip_welcome_email']),
+            'company_type'        => mb_substr(trim((string)($in['business_type'] ?? '')), 0, 60),
+            'skip_welcome_email'  => !empty($in['skip_welcome_email']) || $needsApproval,
         ]);
 
         if (!$r['ok']) {
@@ -319,12 +340,16 @@ if (!function_exists('registerTenant')) {
         }
 
         finishSelfRegistration((int)$r['tenant_id'], $choice, $ownerEmail);
+        if ($needsApproval) {
+            holdTenantForApproval((int)$r['tenant_id']);
+        }
 
         logRegistrationAttempt($ip, $phone, $sub, 'success', null, $r['tenant_id']);
 
         // Notify all superadmins by email — best-effort, never fatal.
         try {
-            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $phone, $company);
+            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $ownerEmail, $company,
+                $needsApproval ? (string)($choice['plan']['name'] ?? '') : null);
         } catch (Throwable $_notifyE) {
             error_log('notifySuperadminsOfNewRegistration threw: ' . $_notifyE->getMessage());
         }
@@ -334,6 +359,8 @@ if (!function_exists('registerTenant')) {
             'tenant_id' => $r['tenant_id'],
             'subdomain' => $sub,
             'login_url' => tenantLoginUrl($sub),
+            'username'  => $username,
+            'pending_approval' => $needsApproval,
         ];
     }
 }
@@ -543,10 +570,16 @@ if (!function_exists('notifySuperadminsOfNewRegistration')) {
      * Same pattern as notifySuperadminsOfModuleRequest() in core/module_requests.php.
      */
     function notifySuperadminsOfNewRegistration(
-        int $tenantId, string $subdomain, string $ownerEmail, string $companyName
+        int $tenantId, string $subdomain, string $ownerEmail, string $companyName, ?string $bmsPlan = null
     ): void {
         require_once __DIR__ . '/platform_settings.php';
         require_once __DIR__ . '/mailer.php';
+
+        // The panel bell first — it does not depend on SMTP being configured.
+        if ($bmsPlan !== null) {
+            require_once __DIR__ . '/superadmin_notifications.php';
+            insertSaNotification($tenantId, 'bms_request', $companyName, $subdomain);
+        }
 
         $mailer = platformMailerOpts();
         if (!$mailer['configured']) return;   // SMTP not set up yet — silently skip
@@ -556,16 +589,31 @@ if (!function_exists('notifySuperadminsOfNewRegistration')) {
         $safeSub     = htmlspecialchars($subdomain,    ENT_QUOTES, 'UTF-8');
         $ts          = date('Y-m-d H:i:s T');
 
-        $subject = "New company registered: {$companyName}";
-        $body    = "<p>A new company has registered on the platform.</p>"
-                 . "<ul>"
-                 . "<li><strong>Company:</strong> {$safeCompany}</li>"
-                 . "<li><strong>Subdomain:</strong> {$safeSub}</li>"
-                 . "<li><strong>Owner email:</strong> {$safeEmail}</li>"
-                 . "<li><strong>Tenant ID:</strong> {$tenantId}</li>"
-                 . "<li><strong>Registered at:</strong> {$ts}</li>"
-                 . "</ul>"
-                 . "<p>View details in the platform admin panel under <strong>Companies</strong>.</p>";
+        if ($bmsPlan !== null) {
+            $safePlan = htmlspecialchars($bmsPlan, ENT_QUOTES, 'UTF-8');
+            $panel    = 'https://' . superadminHostForLinks() . '/tenants/view?id=' . $tenantId;
+            $subject  = "Smart BMS request awaiting your approval: {$companyName}";
+            $body     = "<p><strong>{$safeCompany}</strong> registered for <strong>Smart BMS</strong> and is waiting for your approval.</p>"
+                      . "<ul>"
+                      . "<li><strong>Plan:</strong> {$safePlan}</li>"
+                      . "<li><strong>Subdomain:</strong> {$safeSub}</li>"
+                      . "<li><strong>Owner email:</strong> {$safeEmail}</li>"
+                      . "<li><strong>Tenant ID:</strong> {$tenantId}</li>"
+                      . "<li><strong>Registered at:</strong> {$ts}</li>"
+                      . "</ul>"
+                      . "<p>The account is locked until you approve it. <a href=\"" . htmlspecialchars($panel, ENT_QUOTES, 'UTF-8') . "\">Open it in the admin panel</a> to Approve or Decline.</p>";
+        } else {
+            $subject = "New company registered: {$companyName}";
+            $body    = "<p>A new company has registered on the platform.</p>"
+                     . "<ul>"
+                     . "<li><strong>Company:</strong> {$safeCompany}</li>"
+                     . "<li><strong>Subdomain:</strong> {$safeSub}</li>"
+                     . "<li><strong>Owner email:</strong> {$safeEmail}</li>"
+                     . "<li><strong>Tenant ID:</strong> {$tenantId}</li>"
+                     . "<li><strong>Registered at:</strong> {$ts}</li>"
+                     . "</ul>"
+                     . "<p>View details in the platform admin panel under <strong>Companies</strong>.</p>";
+        }
 
         try {
             $emails = getControlPdo()->query("SELECT email FROM superadmins")->fetchAll(PDO::FETCH_COLUMN);
@@ -575,6 +623,175 @@ if (!function_exists('notifySuperadminsOfNewRegistration')) {
         } catch (Throwable $e) {
             error_log('notifySuperadminsOfNewRegistration: ' . $e->getMessage());
         }
+    }
+}
+
+// ─── Smart BMS approval ──────────────────────────────────────────────────────
+// A Smart BMS signup is provisioned like any other, then parked as
+// status='suspended' + suspension_reason='awaiting_approval' so tenant_bootstrap
+// locks it with its own message. A superadmin approves (trial starts that day)
+// or declines (reason='approval_declined'); a declined owner gets an emailed
+// link that turns the same company into a Smart POS trial instead.
+
+if (!function_exists('superadminHostForLinks')) {
+    function superadminHostForLinks(): string
+    {
+        $label = strtolower(trim((string)getenv('SUPERADMIN_SUBDOMAIN'))) ?: 'superadmin';
+        return $label . '.' . (tenantBaseDomain() ?? '');
+    }
+}
+
+if (!function_exists('holdTenantForApproval')) {
+    function holdTenantForApproval(int $tenantId): void
+    {
+        $pdo = getControlPdo();
+        try {
+            $pdo->prepare("UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='awaiting_approval' WHERE id=?")
+                ->execute([$tenantId]);
+        } catch (Throwable $e) {
+            // suspension_reason not yet expanded on this host (setup_control_db.php
+            // not run) — the company must still never open unapproved.
+            error_log('holdTenantForApproval: ' . $e->getMessage());
+            $pdo->prepare("UPDATE tenants SET status='suspended', suspended_at=NOW(), suspension_reason='manual' WHERE id=?")
+                ->execute([$tenantId]);
+        }
+        logTenantAdminAction($tenantId, null, 'bms_awaiting_approval', 'Smart BMS signup held for superadmin approval');
+    }
+}
+
+if (!function_exists('tenantApprovalState')) {
+    /** 'awaiting' | 'declined' | null for a tenants row. */
+    function tenantApprovalState(array $t): ?string
+    {
+        if (($t['status'] ?? '') !== 'suspended') return null;
+        $r = (string)($t['suspension_reason'] ?? '');
+        return $r === 'awaiting_approval' ? 'awaiting' : ($r === 'approval_declined' ? 'declined' : null);
+    }
+}
+
+if (!function_exists('bmsDeclineToken')) {
+    function bmsDeclineToken(int $tenantId, string $subdomain): string
+    {
+        require_once __DIR__ . '/tenant_crypto.php';
+        $key = hash_hmac('sha256', 'bms-decline-switch-to-pos', tenantCredKeyRaw());
+        return hash_hmac('sha256', $tenantId . '|' . $subdomain, $key);
+    }
+}
+
+if (!function_exists('emailTenantOwner')) {
+    /** Best-effort email to the owner's real address. */
+    function emailTenantOwner(array $t, string $subject, string $body): void
+    {
+        require_once __DIR__ . '/mailer.php';
+        try {
+            if (!isset($t['owner_contact_email']) && controlColumnExists('tenants', 'owner_contact_email')) {
+                $st = getControlPdo()->prepare("SELECT owner_contact_email FROM tenants WHERE id = ?");
+                $st->execute([(int)$t['id']]);
+                $t['owner_contact_email'] = (string)$st->fetchColumn();
+            }
+            $to = vlTenantContactEmail($t);
+            $mailer = platformMailerOpts();
+            if ($to === '' || !$mailer['configured']) return;
+            sendEmail($to, $subject, $body, $mailer['opts']);
+        } catch (Throwable $e) {
+            error_log('emailTenantOwner: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('startTenantTrialNow')) {
+    function startTenantTrialNow(int $tenantId): void
+    {
+        require_once __DIR__ . '/tenant_lifecycle_policy.php';
+        getControlPdo()->prepare("
+            UPDATE tenants
+               SET status='active', suspended_at=NULL, suspension_reason=NULL, grace_until=NULL,
+                   trial_ends_at = DATE_ADD(NOW(), INTERVAL ? DAY), activated_at = NOW()
+             WHERE id = ?
+        ")->execute([tenantDefaultTrialDays(), $tenantId]);
+    }
+}
+
+if (!function_exists('approveBmsTenant')) {
+    /** @return array{ok:bool, error:?string} */
+    function approveBmsTenant(int $tenantId): array
+    {
+        $t = getTenant($tenantId);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.'];
+        if (tenantApprovalState($t) === null) {
+            return ['ok' => false, 'error' => 'This company is not waiting for approval.'];
+        }
+        startTenantTrialNow($tenantId);
+        logTenantAdminAction($tenantId, $t['subdomain'], 'approve_bms', 'Smart BMS approved; trial starts today');
+
+        $login = htmlspecialchars(tenantLoginUrl($t['subdomain']), ENT_QUOTES, 'UTF-8');
+        $user  = htmlspecialchars((string)$t['owner_email'], ENT_QUOTES, 'UTF-8');
+        emailTenantOwner($t, 'Your Smart BMS account is approved',
+            '<p>Good news — your Smart BMS account for <strong>' . htmlspecialchars($t['company_name'], ENT_QUOTES, 'UTF-8') . '</strong> has been approved.</p>'
+            . '<p>Your free trial starts today.</p>'
+            . '<ul><li><strong>Sign in at:</strong> <a href="' . $login . '">' . $login . '</a></li>'
+            . '<li><strong>Username:</strong> ' . $user . '</li></ul>'
+            . '<p>Use the password you chose when you registered.</p>');
+        return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('declineBmsTenant')) {
+    /** @return array{ok:bool, error:?string} */
+    function declineBmsTenant(int $tenantId, string $reason = ''): array
+    {
+        $t = getTenant($tenantId);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.'];
+        if (tenantApprovalState($t) !== 'awaiting') {
+            return ['ok' => false, 'error' => 'This company is not waiting for approval.'];
+        }
+        getControlPdo()->prepare("UPDATE tenants SET suspension_reason='approval_declined' WHERE id=?")->execute([$tenantId]);
+        logTenantAdminAction($tenantId, $t['subdomain'], 'decline_bms', $reason !== '' ? $reason : null);
+
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $link = $scheme . '://' . (tenantBaseDomain() ?? '') . '/continue-smart-pos.php?id=' . $tenantId
+              . '&t=' . bmsDeclineToken($tenantId, $t['subdomain']);
+        $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+        emailTenantOwner($t, 'About your Smart BMS request',
+            '<p>Thank you for registering <strong>' . htmlspecialchars($t['company_name'], ENT_QUOTES, 'UTF-8') . '</strong>.</p>'
+            . '<p>We are not able to approve Smart BMS for your company at this time.'
+            . ($reason !== '' ? ' Reason: ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '.' : '') . '</p>'
+            . '<p>You can start right away with <strong>Smart POS</strong> instead — selling, stock, credit sales, expenses and reports — free for the first days of your trial:</p>'
+            . '<p><a href="' . $safeLink . '">Continue with Smart POS</a></p>');
+        return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('continueDeclinedAsPos')) {
+    /**
+     * The declined owner's emailed link: same company, same username and
+     * password, now a Smart POS trial starting today.
+     *
+     * @return array{ok:bool, error:?string, login_url:?string, username:?string, company:?string}
+     */
+    function continueDeclinedAsPos(int $tenantId, string $token): array
+    {
+        $fail = fn(string $m) => ['ok' => false, 'error' => $m, 'login_url' => null, 'username' => null, 'company' => null];
+        $t = getTenant($tenantId);
+        if (!$t || !hash_equals(bmsDeclineToken($tenantId, (string)$t['subdomain']), $token)) {
+            return $fail('This link is not valid.');
+        }
+        if (tenantApprovalState($t) !== 'declined') {
+            return $fail('This link has already been used or is no longer valid. Try signing in.');
+        }
+
+        applySelfRegistrationDefaults($tenantId);
+        $plan = getControlPdo()->query("SELECT id FROM plans WHERE product_key = 'bms_shop' AND is_active = 1
+                                        ORDER BY is_popular DESC, tier_rank, sort_order LIMIT 1")->fetchColumn();
+        if ($plan) {
+            $ar = applyPlanToTenant($tenantId, (int)$plan);
+            if (!$ar['ok']) error_log('continueDeclinedAsPos: plan apply failed for tenant ' . $tenantId . ': ' . $ar['error']);
+        }
+        startTenantTrialNow($tenantId);
+        logTenantAdminAction($tenantId, $t['subdomain'], 'switch_to_pos', 'Declined Smart BMS owner continued with Smart POS');
+
+        return ['ok' => true, 'error' => null, 'login_url' => tenantLoginUrl($t['subdomain']),
+                'username' => (string)$t['owner_email'], 'company' => (string)$t['company_name']];
     }
 }
 

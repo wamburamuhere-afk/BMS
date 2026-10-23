@@ -190,6 +190,14 @@ if (!function_exists('bmsConnectPdo')) {
         $tenant = $r['tenant'];
         $status = (string)($tenant['status'] ?? '');
 
+        if ($status === 'suspended' && ($tenant['suspension_reason'] ?? '') === 'awaiting_approval') {
+            bmsTenantHalt(403, 'Awaiting approval',
+                'Your Smart BMS account has been created and is waiting for approval by BJP Technologies. We will email you as soon as it is approved.');
+        }
+        if ($status === 'suspended' && ($tenant['suspension_reason'] ?? '') === 'approval_declined') {
+            bmsTenantHalt(403, 'Request not approved',
+                'Your Smart BMS request was not approved. Check your email for the link to continue with Smart POS instead.');
+        }
         if ($status === 'suspended') {
             // Scoped to this tenant alone — every other tenant is unaffected.
             bmsTenantHalt(403, 'Account suspended',
