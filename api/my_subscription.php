@@ -18,6 +18,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/platform_link.php';
 require_once __DIR__ . '/../core/tenant_lifecycle_policy.php';
+require_once __DIR__ . '/../core/plans.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
@@ -36,28 +37,38 @@ function msPlanSummary(int $tenantId): ?array
 {
     try {
         $c = getControlPdo();
-        $cols = 'plan, max_users, max_shops' . (controlColumnExists('tenants', 'scheduled_plan_key') ? ', scheduled_plan_key, scheduled_plan_at' : ', NULL AS scheduled_plan_key, NULL AS scheduled_plan_at');
+        $cols = 'plan, max_users, max_shops'
+              . (controlColumnExists('tenants', 'max_storage_mb') ? ', max_storage_mb' : ', NULL AS max_storage_mb')
+              . (controlColumnExists('tenants', 'scheduled_plan_key') ? ', scheduled_plan_key, scheduled_plan_at' : ', NULL AS scheduled_plan_key, NULL AS scheduled_plan_at');
         $st = $c->prepare("SELECT $cols FROM tenants WHERE id = ?");
         $st->execute([$tenantId]);
         $t = $st->fetch(PDO::FETCH_ASSOC);
         if (!$t) return null;
         $name = function (?string $key) use ($c) {
             if ($key === null || $key === '') return null;
-            $s = $c->prepare("SELECT id, name FROM plans WHERE plan_key = ?");
+            $s = $c->prepare("SELECT * FROM plans WHERE plan_key = ?");
             $s->execute([$key]);
             return $s->fetch(PDO::FETCH_ASSOC) ?: null;
         };
         $cur = $name($t['plan']);
-        $items = [];
+        $items = []; $modules = []; $product = null;
         if ($cur) {
             $s = $c->prepare("SELECT label, value FROM plan_items WHERE plan_id = ? ORDER BY sort_order, id");
             $s->execute([(int)$cur['id']]);
             $items = $s->fetchAll(PDO::FETCH_ASSOC);
+            if (function_exists('planOfferShape') && !empty($cur['product_key'])) {
+                try { $modules = planOfferShape($cur)['modules']; } catch (Throwable $e) { $modules = []; }
+                $p = $c->prepare("SELECT name FROM platform_products WHERE product_key = ?");
+                $p->execute([$cur['product_key']]);
+                $product = $p->fetchColumn() ?: null;
+            }
         }
         $extra = fn(string $q) => function_exists('tenantAddonUnits') ? tenantAddonUnits($tenantId, $q) : 0;
         $next = $name($t['scheduled_plan_key']);
         return [
             'plan_key' => $t['plan'], 'name' => $cur['name'] ?? ($t['plan'] ? ucfirst((string)$t['plan']) : null), 'items' => $items,
+            'product' => $product, 'tagline' => $cur['tagline'] ?? null, 'description' => $cur['description'] ?? null, 'modules' => $modules,
+            'max_storage_mb' => $t['max_storage_mb'] !== null ? (int)$t['max_storage_mb'] : null,
             'max_users' => $t['max_users'] !== null ? (int)$t['max_users'] : null, 'extra_users' => $extra('max_users'),
             'max_shops' => $t['max_shops'] !== null ? (int)$t['max_shops'] : null, 'extra_shops' => $extra('max_shops'),
             'scheduled' => $t['scheduled_plan_key'] ? ['plan_key' => $t['scheduled_plan_key'], 'name' => $next['name'] ?? $t['scheduled_plan_key'], 'at' => $t['scheduled_plan_at']] : null,
@@ -66,6 +77,36 @@ function msPlanSummary(int $tenantId): ?array
         error_log('msPlanSummary: ' . $e->getMessage());
         return null;
     }
+}
+/**
+ * The running period, in the words the page uses: kind = trial | paid | grace | no_end,
+ * when it started (trial: sign-up; paid: the payment that set the current end date) and its length.
+ */
+function msPeriod(array $t, ?string $endsAt, ?int $daysLeft, array $payments): array
+{
+    $status = (string)$t['status'];
+    if ($endsAt === null) return ['kind' => 'no_end', 'starts_at' => null, 'total_days' => null, 'used_days' => null];
+    $kind = $daysLeft !== null && $daysLeft < 0 ? 'grace' : ($status === 'trial' ? 'trial' : 'paid');
+    $start = null;
+    if ($status === 'trial') {
+        $start = !empty($t['created_at']) ? substr((string)$t['created_at'], 0, 10) : null;
+    } else {
+        $end = substr($endsAt, 0, 10);
+        foreach ($payments as $p) if (substr((string)$p['ends_at'], 0, 10) === $end) { $start = substr((string)$p['starts_at'], 0, 10); break; }
+        if ($start === null && $payments) $start = substr((string)$payments[0]['starts_at'], 0, 10);
+    }
+    $total = $used = null;
+    if ($start !== null) {
+        $s = strtotime($start); $e = strtotime(substr($endsAt, 0, 10));
+        if ($s !== false && $e !== false && $e > $s) {
+            $total = (int)round(($e - $s) / 86400);
+            $used = max(0, min($total, (int)round((strtotime('today') - $s) / 86400)));
+        } else {
+            $start = null;
+        }
+    }
+    return ['kind' => $kind, 'starts_at' => $start, 'total_days' => $total, 'used_days' => $used,
+            'grace_until' => $kind === 'grace' && !empty($t['grace_until']) ? substr((string)$t['grace_until'], 0, 10) : null];
 }
 /** When the company last looked at its BJP documents (this company's own DB). */
 function msSeenAt(PDO $pdo): ?string
@@ -89,7 +130,7 @@ $docUrl = function (?string $token): ?string {
 if ($action === 'status') {
     try {
         $st = getControlPdo()->prepare("SELECT company_name, subdomain, status, plan, trial_ends_at, subscription_ends_at,
-                                               grace_until, billing_cycle, payment_status FROM tenants WHERE id = ?");
+                                               grace_until, billing_cycle, payment_status, created_at FROM tenants WHERE id = ?");
         $st->execute([$tenantId]);
         $t = $st->fetch(PDO::FETCH_ASSOC);
         if (!$t) $out(['success' => false, 'message' => 'Company not found.'], 404);
@@ -97,12 +138,16 @@ if ($action === 'status') {
             (controlColumnExists('tenant_payments', 'source_ref') ? ", source, source_ref" : ", 'manual' AS source, NULL AS source_ref") .
             " FROM tenant_payments WHERE tenant_id = ? ORDER BY recorded_at DESC LIMIT 24");
         $pay->execute([$tenantId]);
+        $payments = $pay->fetchAll(PDO::FETCH_ASSOC);
+        $endsAt = tenantAccessEndsAt($t);
+        $daysLeft = tenantDaysRemaining($t);
         $out(['success' => true,
             'tenant' => $t,
-            'ends_at' => tenantAccessEndsAt($t + ['status' => $t['status']]),
-            'days_left' => tenantDaysRemaining($t),
+            'ends_at' => $endsAt,
+            'days_left' => $daysLeft,
+            'period' => msPeriod($t, $endsAt, $daysLeft, $payments),
             'plan' => msPlanSummary($tenantId),
-            'payments' => $pay->fetchAll(PDO::FETCH_ASSOC)]);
+            'payments' => $payments]);
     } catch (Throwable $e) {
         error_log('my_subscription status: ' . $e->getMessage());
         $out(['success' => false, 'message' => 'Could not load your subscription right now.'], 500);

@@ -176,7 +176,7 @@ $rb = $mk(['name' => "Basic $tag", 'max_users' => 2, 'max_storage_mb' => 500, 'f
                  ['duration_value' => 1, 'duration_unit' => 'year', 'price_tzs' => 150000, 'is_default' => 1]],
     'addons' => [['name' => 'Extra shop', 'quota' => 'max_shops', 'units' => 1, 'prices' => ['1m' => 5000, '1y' => 40000]]]]);
 $rp = $mk(['name' => "Pro $tag", 'max_users' => 5, 'max_storage_mb' => 2000, 'feature_keys' => ['warehouses', 'pos', 'pos_advanced'], 'max_shops' => 3, 'tier_rank' => 20, 'is_public' => true,
-    'is_popular' => true, 'items' => [['label' => 'Point of sale', 'value' => ''], ['label' => 'Shops', 'value' => '3']],
+    'is_popular' => true, 'items' => [['label' => 'Point of sale', 'value' => ''], ['label' => 'Priority support', 'value' => '']],
     'prices' => [['duration_value' => 1, 'duration_unit' => 'month', 'price_tzs' => 30000, 'is_default' => 0],
                  ['duration_value' => 1, 'duration_unit' => 'year', 'price_tzs' => 300000, 'is_default' => 1]],
     'addons' => [['name' => 'Extra shop', 'quota' => 'max_shops', 'units' => 1, 'prices' => ['1m' => 8000, '1y' => 60000]]]]);
@@ -394,7 +394,8 @@ $page = function (string $file, bool $tenant, bool $admin = true) use ($root, $u
         ob_start(); include '$root/$file'; echo ob_get_clean();");
 };
 $html = $page('app/constant/settings/billing.php', true);
-ok(strpos($html, 'id="catalog"') !== false && strpos($html, 'id="curPlanBody"') !== false && strpos($html, 'id="waitCard"') !== false
+ok(strpos($html, 'id="catalog"') !== false && strpos($html, 'id="viewPlan"') !== false && strpos($html, 'id="sbDays"') !== false
+   && strpos($html, 'id="viewDetails"') !== false && strpos($html, 'id="waitList"') !== false
    && strpos($html, 'id="tblInvoices"') !== false && strpos($html, 'Fatal error') === false && strpos($html, 'Warning:') === false, 'Billing renders: plan, renew, waiting, documents');
 ok(strpos($html, 'bms-billing-badge') !== false && strpos($html, '?action=badge') !== false, 'the menu shows Billing (+ badge) for a company admin');
 $root0 = $page('app/constant/settings/billing.php', false);
