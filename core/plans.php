@@ -483,7 +483,11 @@ if (!function_exists('planCatalogNormalize')) {
                 if ($label === '' && $value === '') continue;
                 if ($label === '') return $fail('Each included line needs a name.');
                 if (mb_strlen($label) > 100 || mb_strlen($value) > 100) return $fail('An included line can be up to 100 characters.');
-                $items[] = ['label' => $label, 'value' => $value !== '' ? $value : null];
+                // Users, shops, storage and modules come from the Limits/Modules fields; a typed copy shows them twice.
+                if (preg_match('/^(users?|shops?|storage|modules?|watumiaji|mtumiaji|maduka|duka|hifadhi|moduli)\b/iu', $label)) {
+                    return $fail('"' . $label . '" is already shown from the Limits and Modules fields above. Remove this line so customers see it once.');
+                }
+                $items[] =['label' => $label, 'value' => $value !== '' ? $value : null];
             }
             if (count($items) > 30) return $fail('A plan can list up to 30 included lines.');
             $out['items'] = $items;

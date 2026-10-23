@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-23 — feat(subscription): redesigned Subscription page (split hero), 7/3/1-day reminders for trial and paid plans, plan lines listed once
+
+**Files:** `app/constant/settings/billing.php`, `api/my_subscription.php`, `core/subscription_reminders.php` (new), `api/cron/trial_reminders.php`, `core/plans.php`, `lang/sw.php`, `tests/test_subscription_redesign_cli.php` (new), `tests/test_service_plans_billing_page_cli.php`, `tests/test_service_plans_bjp_form_cli.php`
+
+- **Subscription page, approved design "A · Split hero":** the front page now shows only the company's plan — product, name, status, what it includes (users, shops, storage, modules), and a blue panel with the days left, a progress bar of the period, start/end dates and last payment. The panel says whether it is a free trial, a paid subscription, past its end date (with the date data is kept until) or has no end date. A banner shows in the last 7 days and after the end date. "Needs your attention" shows invoices to pay, contracts to sign and requests waiting for BJP. On a phone the days panel comes first.
+- **Billing details** (button on the front page): tabs Plans (renew / change → request to BJP, the current plan and its default period pre-picked), Invoices, Quotations, Payments, Contracts (view + sign), Requests. Invoices, quotations and payments stay read-only; payments are still recorded by BJP. Empty tabs show one short line instead of an empty table. Status badges follow the blue-scale UI rule. Numeric columns right-aligned.
+- **Full Swahili:** 85 strings of the page that showed in English on a Swahili screen are now translated.
+- **API** `action=status` adds `period` (kind, starts_at, total/used days, grace_until) and the plan's product, tagline, description, storage and modules.
+- **Reminder emails** (`api/cron/trial_reminders.php`, same URL and CRON_SECRET): now for trials **and paid plans**, 7, 3 and 1 day before and on the last day (was trial only, 7/3/0). Sent to the owner's real email (`owner_contact_email`; `owner_email` often holds the login phone, so many reminders never arrived). Each email links to the company's Subscription page. Sent once per step per period (a renewal starts a fresh set); a failed send is retried on the next run.
+- **Users/shops shown twice:** Superadmin › Plans now refuses an included line named Users, Shops, Storage or Modules (or Watumiaji/Maduka) — those come from the Limits and Modules fields. Existing plans with such lines must have them removed (the save says so).
+
+---
+
 ## 2026-10-23 — fix(register): login-style language menu, clean URL, sign-in line below, footer name
 
 **Files:** `register.php`
