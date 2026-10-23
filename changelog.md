@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-23 — fix(register): left panel now grows full page height on desktop — all "What you get" content visible
+
+**Files:** `register.php`
+
+- Removed `position: sticky; height: 100vh; overflow: hidden` from `.aside` — left panel no longer cuts off content at viewport edge
+- Changed to `min-height: 100vh; position: relative` — panel stretches to match form height; decorative circles stay positioned correctly
+
+---
+
 ## 2026-10-23 — feat(register): redesigned company signup — product + plan steps, owner username, Smart BMS approval
 
 **Files:** `register.php`, `login.php`, `continue-smart-pos.php` (new), `actions/register_tenant.php`, `actions/superadmin_tenant_action.php`, `app/superadmin/tenant_view.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`, `core/tenant_bootstrap.php`, `core/superadmin_notifications.php`, `scripts/setup_control_db.php`, `tests/test_register_redesign_cli.php` (new), `tests/test_tenant_registration_cli.php`, `tests/test_service_plans_registration_cli.php`

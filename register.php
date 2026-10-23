@@ -377,7 +377,7 @@ $icons = [
     body { margin: 0; background: #fff; color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
     .shell { display: flex; min-height: 100vh; }
     /* Left panel */
-    .aside { width: 460px; flex-shrink: 0; background: var(--blue-dark); color: #fff; padding: 40px 48px 30px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+    .aside { width: 460px; flex-shrink: 0; background: var(--blue-dark); color: #fff; padding: 40px 48px 30px; display: flex; flex-direction: column; gap: 20px; min-height: 100vh; position: relative; }
     .aside::before { content: ''; position: absolute; width: 460px; height: 460px; border-radius: 50%; border: 70px solid rgba(255,255,255,.05); top: -200px; right: -230px; }
     .aside::after { content: ''; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: rgba(255,255,255,.04); bottom: -130px; left: -120px; }
     .aside > * { position: relative; z-index: 1; }
