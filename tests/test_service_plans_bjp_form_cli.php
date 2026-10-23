@@ -220,7 +220,7 @@ $PROD = $tag . '_prod';
 $c->prepare("INSERT INTO platform_products (product_key, name, show_on_registration, sort_order, is_active) VALUES (?,?,1,0,1)")->execute([$PROD, "Test Shop $tag"]);
 $cp = createPlan(['name' => "Shop Basic $tag", 'max_users' => 2, 'max_storage_mb' => 500, 'feature_keys' => ['pos'], 'product_key' => $PROD,
     'max_shops' => 1, 'tier_rank' => 10, 'is_public' => true, 'is_popular' => false,
-    'items' => [['label' => 'Shops', 'value' => '1']],
+    'items' => [['label' => 'Receipts by SMS', 'value' => '']],
     'prices' => [['duration_value' => 1, 'duration_unit' => 'month', 'price_tzs' => 15000, 'is_default' => 0],
                  ['duration_value' => 1, 'duration_unit' => 'year',  'price_tzs' => 150000, 'is_default' => 1]]]);
 $GLOBALS['TEST_CLEANUPS'][] = function () use ($c, $cp, $PROD) {
