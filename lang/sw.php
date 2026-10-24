@@ -5570,5 +5570,6 @@ return [
     'No payments recorded yet.' => 'Bado hakuna malipo yaliyorekodiwa.',
     'No contracts yet.' => 'Bado hakuna mikataba.',
     'No requests yet. Choose a plan under Plans to send one.' => 'Bado hakuna maombi. Chagua mpango chini ya Mipango ili kutuma ombi.',
+    'WhatsApp' => 'WhatsApp',
 
 ];

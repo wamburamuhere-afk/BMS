@@ -3,6 +3,7 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/support.php';
 
 // Phase 5d — gate help page (key seeded in 2026_05_24_phase5d_loans_seed.php)
 autoEnforcePermission('help');
@@ -459,24 +460,43 @@ $company_name = get_setting('company_name', 'Business Management System');
                 </div>
             </div>
 
-            <!-- Contact Support -->
+            <?php
+            // BJP's contact details come from Superadmin › Support (control DB), shown to company admins only.
+            $__sup = isAdmin() ? supportSettings() : [];
+            $__sup_tel = static fn(string $n): string => preg_replace('/[^0-9+]/', '', $n);
+            $__sup_has = !empty($__sup) && ($__sup['support_email'] !== '' || $__sup['support_phone'] !== '' || $__sup['support_whatsapp'] !== '');
+            ?>
+            <?php if ($__sup_has): ?>
             <div class="card border-0 shadow-sm rounded-4 mb-4 bg-light">
                 <div class="card-body p-4 text-center">
-                    <div class="bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
-                        <i class="bi bi-headset text-info" style="font-size: 1.5rem;"></i>
+                    <div class="bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
+                        <i class="bi bi-headset text-primary" style="font-size: 1.5rem;"></i>
                     </div>
                     <h5 class="fw-bold"><?= t('Need More Help?') ?></h5>
                     <p class="text-muted small mb-3"><?= t('Contact our support team for assistance with technical issues or questions.') ?></p>
                     <div class="d-grid gap-2">
-                        <a href="mailto:support@<?= strtolower(str_replace(' ', '', $company_name)) ?>.com" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-envelope me-1"></i> <?= t('Email Support') ?>
+                        <?php if ($__sup['support_email'] !== ''): ?>
+                        <a href="mailto:<?= safe_output($__sup['support_email'], '') ?>" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-envelope me-1"></i> <?= safe_output($__sup['support_email'], '') ?>
                         </a>
-                        <a href="tel:+255000000000" class="btn btn-outline-success btn-sm">
-                            <i class="bi bi-telephone me-1"></i> <?= t('Call Support') ?>
+                        <?php endif; ?>
+                        <?php if ($__sup['support_phone'] !== ''): ?>
+                        <a href="tel:<?= safe_output($__sup_tel($__sup['support_phone']), '') ?>" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-telephone me-1"></i> <?= safe_output($__sup['support_phone'], '') ?>
                         </a>
+                        <?php endif; ?>
+                        <?php if ($__sup['support_whatsapp'] !== ''): ?>
+                        <a href="https://wa.me/<?= safe_output(ltrim($__sup_tel($__sup['support_whatsapp']), '+'), '') ?>" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-whatsapp me-1"></i> <?= t('WhatsApp') ?>
+                        </a>
+                        <?php endif; ?>
                     </div>
+                    <?php if ($__sup['support_hours'] !== ''): ?>
+                    <div class="small text-muted mt-2"><i class="bi bi-clock me-1"></i><?= safe_output($__sup['support_hours'], '') ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
 
             <!-- System Info -->
             <div class="card border-0 shadow-sm rounded-4">

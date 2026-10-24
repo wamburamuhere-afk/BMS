@@ -127,6 +127,7 @@ if (!function_exists('renderSuperadminHeader')) {
                                 </a>
                             </li>
                             <?php
+                            $navItem('support',   saUrl('support'),  'bi-headset',      'Support');
                             $navItem('settings',  saUrl('settings'), 'bi-gear-wide-connected', 'Settings');
                             ?>
                             <li class="nav-item ms-lg-2 my-1">
