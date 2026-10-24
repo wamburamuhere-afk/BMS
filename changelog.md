@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 6 (notifications, overdue reminders, auto-close)
+
+**Files:** `core/support_notify.php` (new), `api/support_requests.php`, `actions/superadmin_support_inbox.php`, `api/run_background_jobs.php`, `core/support.php`, `tests/test_support_center_phase6_cli.php` (new), `tests/test_support_center_phase4_cli.php`, `tests/test_support_center_phase5_cli.php`, `support_center_plan.md`
+
+- **Inside the company:** a staff member's request notifies the company admins (in BMS and by email); the admin's answer notifies the staff member; further replies go back and forth the same way. These emails use the company's own mail settings.
+- **To BJP:** a new or forwarded request, and every company reply, emails the assigned agent (or the recipients in Support › Settings, or every superadmin). The Support menu's red count shows what needs a reply. The person who asked gets an automatic "we received your request" email with the reference (text set in Support › Settings).
+- **From BJP:** a reply, "resolved" or "closed" tells the person who asked, in their BMS and by email from "<platform> Support", with a link to their own BMS address. Staff see "Support", never "BJP". Internal notes never notify anyone.
+- **Overdue reminders:** if a request's first reply is overdue (business hours, targets from Support › Settings), BJP is emailed once.
+- **Auto-close:** requests resolved more than N days ago (Support › Settings, default 5) with no reply are closed, with a note in the conversation and a notification to the person who asked.
+- Both jobs run from the existing background runner, at most every 10 minutes across the whole platform.
+- **Fast and safe:** the person sending a request or reply gets their answer immediately; emails go out after the response is closed. A mail problem never breaks the action. Email subjects cannot carry extra mail headers, bodies are escaped, links use the company's own address from configuration (no domain written in code).
+- **Tests never send real email:** they capture it to a file, and a guard fails if any support test could reach real mail.
+- **Test:** `tests/test_support_center_phase6_cli.php` — 44 checks (every event's recipients and channel, staff wording, header-injection and escaping, auto-reply, assigned-agent routing, reminders exactly once, auto-close, the real endpoint answering before notifying, the background runner's throttle).
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 5 (BJP support inbox in the superadmin)
 
 **Files:** `core/support_inbox.php` (new), `app/superadmin/support.php`, `app/superadmin/support_request.php` (new), `actions/superadmin_support_inbox.php` (new), `actions/superadmin_support_attachment.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `core/support.php`, `tests/test_support_center_phase5_cli.php` (new), `support_center_plan.md`

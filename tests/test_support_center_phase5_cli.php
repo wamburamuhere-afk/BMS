@@ -13,6 +13,8 @@ if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 $root = dirname(__DIR__);
 
 if (($argv[1] ?? '') === '--endpoint') {
+    // Never send real email from a test: capture it to a throwaway file.
+    define('SUPPORT_MAIL_CAPTURE_FILE', tempnam(sys_get_temp_dir(), 'mail'));
     $file = (string)$argv[2];
     $post = json_decode((string)base64_decode((string)$argv[3]), true) ?: [];
     $_SERVER['REQUEST_METHOD'] = (string)($argv[4] ?? 'POST');
@@ -51,6 +53,7 @@ if (($argv[1] ?? '') === '--route') {
 }
 
 define('SUPPORT_TEST_UPLOADS', true);
+define('SUPPORT_MAIL_CAPTURE_FILE', tempnam(sys_get_temp_dir(), 'mail'));
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../core/control_db.php';
 require_once __DIR__ . '/../core/support_inbox.php';
@@ -74,6 +77,7 @@ function endpoint(string $file, array $post, array $o = []): array {
     $raw = implode("\n", $out);
     if (str_contains($raw, 'Fatal error') || str_contains($raw, 'Parse error')) $raw = 'WORKER_CRASHED: ' . $raw;
     $j = json_decode($raw, true);
+    if (!is_array($j) && ($s = strpos($raw, '{')) !== false && ($e = strpos($raw, '}', $s)) !== false) $j = json_decode(substr($raw, $s, $e - $s + 1), true);
     return ['raw' => $raw, 'json' => is_array($j) ? $j : null];
 }
 function refused(array $r, string $expect = ''): bool { if (str_contains($r['raw'], 'WORKER_CRASHED') || str_contains($r['raw'], '"success":true')) return false; return $expect === '' || str_contains($r['raw'], $expect); }

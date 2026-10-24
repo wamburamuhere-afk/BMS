@@ -95,6 +95,23 @@ if (function_exists('get_setting') && get_setting('notif_digest_enabled', '0') =
 // system_settings) — a per-tenant throttle would fire this once per tenant
 // per day, e-mailing superadmins duplicate reminders for the exact same
 // stale requests.
+// Help & Support (support_center_plan.md, Phase 6) — PLATFORM-wide like the module-request
+// reminder below: overdue first-reply reminders to BJP and auto-closing resolved requests.
+// Throttled to once per 10 minutes through the control DB, so many active companies do not
+// each run it.
+if (function_exists('getPlatformSetting') && is_file(__DIR__ . '/../core/support_notify.php')
+    && (time() - (int)getPlatformSetting('support_jobs_last_ts', '0')) >= 600) {
+    try {
+        setPlatformSetting('support_jobs_last_ts', (string)time());
+        require_once __DIR__ . '/../core/support_notify.php';
+        supportRunSlaReminders();
+        supportRunAutoClose();
+        $ran[] = 'support_jobs';
+    } catch (Throwable $e) {
+        error_log('run_background_jobs support_jobs: ' . $e->getMessage());
+    }
+}
+
 if (function_exists('getPlatformSetting') && function_exists('remindStalePendingRequests')
     && getPlatformSetting('module_request_reminder_last_run') !== date('Y-m-d')) {
     try {

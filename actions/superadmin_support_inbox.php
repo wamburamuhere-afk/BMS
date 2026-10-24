@@ -8,6 +8,7 @@
  */
 require_once __DIR__ . '/../core/tenant_admin.php';
 require_once __DIR__ . '/../core/support_inbox.php';
+require_once __DIR__ . '/../core/support_notify.php';
 require_once __DIR__ . '/../helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -34,9 +35,16 @@ try {
             $up = supportValidateUploads($_FILES['attachments'] ?? null);
             if (!$up['ok']) si_out(422, ['success' => false, 'message' => $up['error']]);
             $internal = (string)($_POST['internal'] ?? '0') === '1';
-            $r = supportInboxReply($id, $agent, (string)($_POST['body'] ?? ''), $internal, $up['files'], (string)($_POST['after'] ?? 'waiting_on_customer'));
-            if ($r['ok']) logTenantAdminAction(null, null, 'support_reply', ($internal ? 'Internal note on' : 'Replied to') . " support request #{$id}");
-            $res($r, $internal ? 'Note saved.' : 'Reply sent.');
+            $after = (string)($_POST['after'] ?? 'waiting_on_customer');
+            $body = trim((string)($_POST['body'] ?? ''));
+            $r = supportInboxReply($id, $agent, $body, $internal, $up['files'], $after);
+            if (!$r['ok']) $res($r, '');
+            logTenantAdminAction(null, null, 'support_reply', ($internal ? 'Internal note on' : 'Replied to') . " support request #{$id}");
+            if ($internal) si_out(200, ['success' => true, 'message' => 'Note saved.']);
+            // Internal notes never notify the company; public replies do (after the response is sent).
+            supportRespondThenRun(['success' => true, 'message' => 'Reply sent.'],
+                fn() => supportOnAgentUpdate($id, 'reply', ($body !== '' ? $body : '(attachment)')
+                    . ($after === 'resolved' ? "\n\n(Marked as resolved.)" : '')));
         }
         case 'assign': {
             $aid = ctype_digit((string)($_POST['agent_id'] ?? '')) ? (int)$_POST['agent_id'] : null;
@@ -45,9 +53,15 @@ try {
             $res($r, 'Assignment saved.');
         }
         case 'set_status': {
-            $r = supportInboxSetStatus($id, (string)($_POST['status'] ?? ''), $agent);
-            if ($r['ok']) logTenantAdminAction(null, null, 'support_status', "Support request #{$id} → " . (string)$_POST['status']);
-            $res($r, 'Status saved.');
+            $status = (string)($_POST['status'] ?? '');
+            $before = supportInboxGet($id);
+            $r = supportInboxSetStatus($id, $status, $agent);
+            if (!$r['ok']) $res($r, '');
+            logTenantAdminAction(null, null, 'support_status', "Support request #{$id} → {$status}");
+            if ($before && $before['status'] !== $status && in_array($status, ['resolved', 'closed'], true)) {
+                supportRespondThenRun(['success' => true, 'message' => 'Status saved.'], fn() => supportOnAgentUpdate($id, $status));
+            }
+            si_out(200, ['success' => true, 'message' => 'Status saved.']);
         }
         case 'set_priority': {
             $r = supportInboxSetPriority($id, (string)($_POST['priority'] ?? ''));

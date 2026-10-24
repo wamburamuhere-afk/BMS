@@ -10,6 +10,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/support_requests.php';
 require_once __DIR__ . '/../core/support_articles.php';
+require_once __DIR__ . '/../core/support_notify.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -41,8 +42,9 @@ try {
             ]);
             if (!$r['ok']) $fail($r);
             logActivity($pdo, $u['user_id'], 'support_request_create', "Sent support request {$r['ref']}");
-            $out(200, ['success' => true, 'id' => $r['id'], 'ref' => $r['ref'], 'url' => getUrl('help') . '?request=' . $r['id'],
-                       'message' => t('Request sent.')]);
+            $body = trim((string)($_POST['body'] ?? ''));
+            supportRespondThenRun(['success' => true, 'id' => $r['id'], 'ref' => $r['ref'], 'url' => getUrl('help') . '?request=' . $r['id'],
+                       'message' => t('Request sent.')], fn() => supportOnCreated((int)$r['id'], $body));
         }
         case 'list': {
             $scope = ($_POST['scope'] ?? '') === 'all' ? 'all' : 'mine';
@@ -59,7 +61,9 @@ try {
             $r = supportRequestReply($id, $u, (string)($_POST['body'] ?? ''), $up['files']);
             if (!$r['ok']) $fail($r);
             logActivity($pdo, $u['user_id'], 'support_request_reply', "Replied on support request #{$id}");
-            $out(200, ['success' => true, 'message' => t('Reply sent.')]);
+            $body = trim((string)($_POST['body'] ?? ''));
+            supportRespondThenRun(['success' => true, 'message' => t('Reply sent.')],
+                fn() => supportOnTenantReply($id, (int)$u['user_id'], (string)$u['name'], $body !== '' ? $body : '(attachment)'));
         }
         case 'resolve': {
             $r = supportRequestResolve($id, $u);
@@ -77,7 +81,7 @@ try {
             $r = supportRequestForward($id, $u, (string)($_POST['note'] ?? ''));
             if (!$r['ok']) $fail($r);
             logActivity($pdo, $u['user_id'], 'support_request_forward', "Forwarded support request #{$id} as {$r['ref']}");
-            $out(200, ['success' => true, 'ref' => $r['ref'], 'message' => t('Forwarded to the support team.')]);
+            supportRespondThenRun(['success' => true, 'ref' => $r['ref'], 'message' => t('Forwarded to the support team.')], fn() => supportOnForwarded($id));
         }
         default:
             $out(400, ['success' => false, 'message' => 'Unknown action']);

@@ -15,6 +15,8 @@ if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 $root = dirname(__DIR__);
 
 if (($argv[1] ?? '') === 'worker') {
+    // Never send real email from a test: capture it to a throwaway file.
+    define('SUPPORT_MAIL_CAPTURE_FILE', tempnam(sys_get_temp_dir(), 'mail'));
     $cfg = json_decode(file_get_contents($argv[3]), true);
     if (session_status() === PHP_SESSION_NONE) session_start();
     foreach (($cfg['session'] ?? []) as $k => $v) $_SESSION[$k] = $v;
@@ -39,6 +41,7 @@ if (($argv[1] ?? '') === 'page') {
 }
 
 define('SUPPORT_TEST_UPLOADS', true);
+define('SUPPORT_MAIL_CAPTURE_FILE', tempnam(sys_get_temp_dir(), 'mail'));
 require_once "$root/roots.php";
 require_once "$root/core/support_requests.php";
 global $pdo;

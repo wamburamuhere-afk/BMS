@@ -94,6 +94,14 @@ if (!function_exists('supportEnsureSchema')) {
         foreach ($ddl as $sql) {
             $pdo->exec($sql);
         }
+        // Guarded column additions (idempotent) for tables created by an earlier version.
+        $add = ['support_tickets' => ['sla_reminded_at' => 'ADD COLUMN `sla_reminded_at` DATETIME NULL AFTER `first_response_at`']];
+        foreach ($add as $table => $cols) {
+            $have = $pdo->query("SELECT column_name FROM information_schema.columns WHERE table_schema = " . $pdo->quote($db) . " AND table_name = " . $pdo->quote($table))->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($cols as $col => $clause) {
+                if (!in_array($col, $have, true)) $pdo->exec("ALTER TABLE {$q($table)} {$clause}");
+            }
+        }
         return array_keys($ddl);
     }
 }
