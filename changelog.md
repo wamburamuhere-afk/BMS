@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-24 — security(servers): PHP critical RCE patch (CVE-2026-109618 / CVE-2026-109619) and web-exposure hardening on both production servers
+
+**Files:** `changelog.md` (server-side changes only — no application code changed)
+
+- **PHP patched on the Ubuntu production server:** PHP 8.3 upgraded to **8.3.36** and PHP 8.2 to **8.2.35** (the 21 Oct 2026 security releases), including the Apache module and both PHP-FPM services. Apache and PHP-FPM restarted so no worker kept the old PHP in memory; the server was then rebooted onto the pending kernel. All services came back on their own and the sites were verified up.
+- **PHP patched on the AlmaLinux production server:** PHP upgraded from 8.3.32 to **8.3.36** from the AlmaLinux AppStream repository; PHP-FPM restarted and nginx reloaded. The containerised app on that server was confirmed to already run the patched PHP 8.4.27.
+- **Intrusion check on both servers:** no PHP files planted in upload folders, no PHP crash entries in the web server logs, no unknown cron jobs, SSH keys or logins, and on the LMS sites `git status` showed no modified or foreign code files.
+- **LMS config backups no longer downloadable:** old `includes/config.php.bak-*` copies on the LMS and demo LMS sites were publicly downloadable. They were moved out of the web root to a root-only folder. All access logs (compressed ones included) were checked: only generic bot guesses were seen, none requested the real files, and none got a 200.
+- **`.git` folder no longer downloadable on the Apache server:** the BMS `.htaccess` rule only blocks *files* starting with `.git`, not the `.git/` *folder*, so `.git/config` and the rest of the repository could be fetched. Added a server-wide Apache config that answers 404 for any `/.git`, `/.svn` or `/.hg` path on every site on that server; it lives in Apache's own config, so deploys cannot undo it. Verified 404 on BMS and demo, with both homepages still loading. The committed BMS code never contained `includes/config.php`, so no database password was in the repository.
+- **Database dumps checked on the nginx server:** the `.sql` dumps and schema files under the LMS sites already return 404 from the internet.
+
+---
+
 ## 2026-10-23 — feat(subscription): redesigned Subscription page (split hero), 7/3/1-day reminders for trial and paid plans, plan lines listed once
 
 **Files:** `app/constant/settings/billing.php`, `api/my_subscription.php`, `core/subscription_reminders.php` (new), `api/cron/trial_reminders.php`, `core/plans.php`, `lang/sw.php`, `tests/test_subscription_redesign_cli.php` (new), `tests/test_service_plans_billing_page_cli.php`, `tests/test_service_plans_bjp_form_cli.php`
