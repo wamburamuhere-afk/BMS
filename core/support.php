@@ -73,6 +73,7 @@ if (!function_exists('supportEnsureSchema')) {
             'support_canned_replies' => "CREATE TABLE IF NOT EXISTS {$q('support_canned_replies')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(191) NOT NULL, body TEXT NOT NULL, created_by INT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) {$opt}",
             'support_notices' => "CREATE TABLE IF NOT EXISTS {$q('support_notices')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,

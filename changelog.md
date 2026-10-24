@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 5 (BJP support inbox in the superadmin)
+
+**Files:** `core/support_inbox.php` (new), `app/superadmin/support.php`, `app/superadmin/support_request.php` (new), `actions/superadmin_support_inbox.php` (new), `actions/superadmin_support_attachment.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `core/support.php`, `tests/test_support_center_phase5_cli.php` (new), `support_center_plan.md`
+
+- **Superadmin › Support › Inbox** (now the first tab): every request sent to BJP, from every company — and only those. A staff member's question to their own company admin never appears here unless the admin forwards it. Views: Needs a reply, Open, Waiting on company, Resolved, Closed, All; filters by company, product, priority, who it is assigned to, and search (reference, subject, company, or the original HLP number). Unanswered and overdue requests come first. Cards show how many need a reply, how many first replies are overdue, the average first-reply time and the rating over the last 30 days. The Support menu item shows a red count.
+- **Request page:** the whole conversation including internal notes (marked "BJP only"), reply to the company or write an internal note, insert a saved reply, attach files, and choose what happens after sending (wait for the company, keep in progress, or resolve). Change status, priority and who it is assigned to. A side panel shows who asked (name, role, email, the page they were on, browser) and the company (product, plan, end date, Simple Mode, and whether they see "Sell / Shop" or "POS / Warehouse", so the answer uses their words) with their recent requests.
+- **Saved replies** tab: add, edit and retire common answers.
+- **Reply targets** count business hours only (Monday–Friday, 08:00–17:00 EAT) using the targets in Support › Settings.
+- **Safe by design:** superadmin host and session only, CSRF on every change, every change written to the platform activity log; internal notes and their files are never shown to a company; files of requests that never reached BJP cannot be downloaded by agents.
+- **Test:** `tests/test_support_center_phase5_cli.php` — 79 checks (business-hours maths incl. nights and weekends, inbox isolation, sorting, filters and search safety, reply / note / status / assign / priority, attachments both ways, saved replies, guards, escaped pages, JavaScript syntax).
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 4 (send a request, follow it, staff → admin → BJP)
 
 **Files:** `core/support_requests.php` (new), `api/support_requests.php` (new), `api/support_attachment.php` (new), `core/support.php`, `includes/help_panel.php`, `app/constant/settings/help.php`, `lang/sw.php`, `tests/test_support_center_phase4_cli.php` (new), `tests/test_support_center_phase3_cli.php`, `support_center_plan.md`

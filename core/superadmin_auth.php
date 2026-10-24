@@ -420,6 +420,7 @@ if (!function_exists('superadminRouteMap')) {
             'module-requests' => $d . 'module_requests.php',
             'support'      => $d . 'support.php',
             'support/article' => $d . 'support_article.php',
+            'support/request' => $d . 'support_request.php',
             'tenants'      => $d . 'tenants.php',
             'tenants/new'  => $d . 'tenant_new.php',
             'tenants/view' => $d . 'tenant_view.php',

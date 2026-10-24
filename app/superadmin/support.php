@@ -7,11 +7,12 @@
 require_once __DIR__ . '/../../core/tenant_admin.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../core/support_articles.php';
+require_once __DIR__ . '/../../core/support_inbox.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
 $me  = currentSuperadmin();
-$tab = in_array($_GET['tab'] ?? '', ['articles', 'categories', 'settings'], true) ? $_GET['tab'] : 'articles';
+$tab = in_array($_GET['tab'] ?? '', ['inbox', 'articles', 'categories', 'replies', 'settings'], true) ? $_GET['tab'] : 'inbox';
 $h   = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
 $s = supportSettings();
@@ -26,6 +27,26 @@ $articles = $tab === 'articles' ? supportArticleList(['status' => $fStatus, 'cat
 $counts = getControlPdo()->query("SELECT status, COUNT(*) n FROM support_articles GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
 $helpRow = getControlPdo()->query("SELECT COALESCE(SUM(helpful_yes),0) y, COALESCE(SUM(helpful_no),0) n FROM support_articles WHERE status='published'")->fetch(PDO::FETCH_ASSOC);
 $helpPct = ($helpRow['y'] + $helpRow['n']) > 0 ? round(100 * $helpRow['y'] / ($helpRow['y'] + $helpRow['n'])) . '%' : '—';
+// Inbox (Phase 5)
+$iView = in_array($_GET['view'] ?? '', ['needs_reply', 'open', 'waiting', 'resolved', 'closed', 'all'], true) ? $_GET['view'] : 'needs_reply';
+$iTenant = ctype_digit((string)($_GET['tenant'] ?? '')) ? (string)$_GET['tenant'] : '';
+$iPrio = isset(SUPPORT_PRIORITIES[$_GET['priority'] ?? '']) ? (string)$_GET['priority'] : '';
+$iAssigned = in_array($_GET['assigned'] ?? '', ['me', 'none'], true) ? (string)$_GET['assigned'] : '';
+$iProduct = preg_match('/^[a-z0-9_]{1,40}$/', (string)($_GET['product'] ?? '')) ? (string)$_GET['product'] : '';
+$iQ = mb_substr(trim((string)($_GET['iq'] ?? '')), 0, 100);
+$inbox = $tab === 'inbox' ? supportInboxList(['view' => $iView, 'tenant_id' => $iTenant, 'priority' => $iPrio, 'assigned' => $iAssigned, 'product' => $iProduct, 'q' => $iQ], (int)$me['id']) : [];
+$stats = $tab === 'inbox' ? supportInboxStats() : [];
+$tenantsForFilter = $tab === 'inbox' ? getControlPdo()->query("SELECT DISTINCT tn.id, tn.company_name FROM support_tickets t JOIN tenants tn ON tn.id = t.tenant_id WHERE t.audience = 'bjp' ORDER BY tn.company_name")->fetchAll(PDO::FETCH_ASSOC) : [];
+$products = $tab === 'inbox' ? getControlPdo()->query('SELECT product_key, name FROM platform_products ORDER BY sort_order')->fetchAll(PDO::FETCH_KEY_PAIR) : [];
+$canned = $tab === 'replies' ? supportCannedList(false) : [];
+$reqStatus = function (string $st) use ($h): string {
+    $map = ['open' => ['#cfe2ff', '#084298', 'Open'], 'in_progress' => ['#bfdbfe', '#1e3a8a', 'In progress'], 'waiting_on_customer' => ['#e9ecef', '#495057', 'Waiting on company'],
+            'resolved' => ['#052c65', '#fff', 'Resolved'], 'closed' => ['#6c757d', '#fff', 'Closed']];
+    [$bg, $fg, $lbl] = $map[$st] ?? ['#e9ecef', '#495057', $st];
+    return '<span class="badge rounded-pill" style="background:' . $bg . ';color:' . $fg . '">' . $h($lbl) . '</span>';
+};
+$prioBadge = fn(string $p) => '<span class="small' . ($p === 'urgent' || $p === 'high' ? ' text-danger fw-semibold' : ' text-muted') . '">' . $h(SUPPORT_PRIORITIES[$p] ?? $p) . '</span>';
+
 $statusBadge = function (string $st) use ($h): string {
     $map = ['published' => ['#0d6efd', '#fff', 'Published'], 'draft' => ['#e9ecef', '#495057', 'Draft'], 'archived' => ['#6c757d', '#fff', 'Archived']];
     [$bg, $fg, $lbl] = $map[$st] ?? ['#e9ecef', '#495057', $st];
@@ -67,16 +88,108 @@ $statusBadge = function (string $st) use ($h): string {
         <a href="<?= $h(saUrl('support/article')) ?>" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> New article</a>
         <?php elseif ($tab === 'categories'): ?>
         <button type="button" class="btn btn-primary" id="btnAddCat"><i class="bi bi-plus-circle me-1"></i> Add category</button>
+        <?php elseif ($tab === 'replies'): ?>
+        <button type="button" class="btn btn-primary" id="btnAddCanned"><i class="bi bi-plus-circle me-1"></i> Add saved reply</button>
         <?php endif; ?>
     </div>
 
     <ul class="nav nav-tabs mb-3">
-        <?php foreach (['articles' => ['bi-journal-text', 'Articles'], 'categories' => ['bi-tags', 'Categories'], 'settings' => ['bi-sliders', 'Settings']] as $k => [$ic, $lbl]): ?>
-        <li class="nav-item"><a class="nav-link<?= $tab === $k ? ' active' : '' ?>" href="<?= $h(saUrl('support?tab=' . $k)) ?>"><i class="bi <?= $ic ?> me-1"></i><?= $lbl ?></a></li>
+        <?php $needs = supportInboxNeedsReplyCount();
+        foreach (['inbox' => ['bi-inbox', 'Inbox'], 'articles' => ['bi-journal-text', 'Articles'], 'categories' => ['bi-tags', 'Categories'], 'replies' => ['bi-chat-square-text', 'Saved replies'], 'settings' => ['bi-sliders', 'Settings']] as $k => [$ic, $lbl]): ?>
+        <li class="nav-item"><a class="nav-link<?= $tab === $k ? ' active' : '' ?>" href="<?= $h(saUrl('support?tab=' . $k)) ?>"><i class="bi <?= $ic ?> me-1"></i><?= $lbl ?><?php if ($k === 'inbox' && $needs > 0): ?> <span class="badge rounded-pill bg-danger"><?= $needs ?></span><?php endif; ?></a></li>
         <?php endforeach; ?>
     </ul>
 
-<?php if ($tab === 'articles'): ?>
+<?php if ($tab === 'inbox'): ?>
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="stat"><b><?= (int)$stats['needs_reply'] ?></b><span class="small text-muted">Need a reply</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><b class="<?= $stats['overdue'] ? 'text-danger' : '' ?>"><?= (int)$stats['overdue'] ?></b><span class="small text-muted">First reply overdue</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><b><?= $stats['avg_first_hours'] === null ? '—' : $h($stats['avg_first_hours'] . 'h') ?></b><span class="small text-muted">Avg first reply (30 days)</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><b><?= $stats['rating'] === null ? '—' : $h($stats['rating'] . ' / 5') ?></b><span class="small text-muted">Rating (<?= (int)$stats['ratings'] ?> in 30 days)</span></div></div>
+    </div>
+
+    <form class="row g-2 mb-3" method="get" action="<?= $h(saUrl('support')) ?>">
+        <input type="hidden" name="tab" value="inbox">
+        <div class="col-12 col-md-3"><input type="search" class="form-control" name="iq" value="<?= $h($iQ) ?>" placeholder="Ref, subject or company" aria-label="Search requests"></div>
+        <div class="col-6 col-md-2"><select class="form-select" name="view" aria-label="Show">
+            <?php foreach (['needs_reply' => 'Needs a reply', 'open' => 'Open / in progress', 'waiting' => 'Waiting on company', 'resolved' => 'Resolved', 'closed' => 'Closed', 'all' => 'All'] as $k => $l): ?>
+            <option value="<?= $k ?>"<?= $iView === $k ? ' selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
+        <div class="col-6 col-md-2"><select class="form-select select2-static" name="tenant" aria-label="Company"><option value="">All companies</option>
+            <?php foreach ($tenantsForFilter as $tn): ?><option value="<?= (int)$tn['id'] ?>"<?= $iTenant === (string)$tn['id'] ? ' selected' : '' ?>><?= $h($tn['company_name']) ?></option><?php endforeach; ?></select></div>
+        <div class="col-4 col-md-1"><select class="form-select" name="product" aria-label="Product"><option value="">Product</option>
+            <?php foreach ($products as $pk => $pn): ?><option value="<?= $h($pk) ?>"<?= $iProduct === $pk ? ' selected' : '' ?>><?= $h($pn) ?></option><?php endforeach; ?></select></div>
+        <div class="col-4 col-md-1"><select class="form-select" name="priority" aria-label="Priority"><option value="">Priority</option>
+            <?php foreach (SUPPORT_PRIORITIES as $k => $l): ?><option value="<?= $k ?>"<?= $iPrio === $k ? ' selected' : '' ?>><?= $h(ucfirst($k)) ?></option><?php endforeach; ?></select></div>
+        <div class="col-4 col-md-1"><select class="form-select" name="assigned" aria-label="Assigned"><option value="">Anyone</option>
+            <option value="me"<?= $iAssigned === 'me' ? ' selected' : '' ?>>Me</option><option value="none"<?= $iAssigned === 'none' ? ' selected' : '' ?>>Unassigned</option></select></div>
+        <div class="col-12 col-md-2 d-grid"><button class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i>Filter</button></div>
+    </form>
+
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-dark"><tr><th>Ref</th><th>Company</th><th>Subject</th><th>From</th><th>Priority</th><th>Status</th><th>First reply</th><th>Assigned</th><th>Last activity</th></tr></thead>
+        <tbody>
+        <?php if (!$inbox): ?><tr><td colspan="9" class="text-center text-muted py-4">Nothing here.</td></tr><?php endif; ?>
+        <?php foreach ($inbox as $r): $sla = $r['sla']; ?>
+            <tr>
+                <td class="font-monospace small"><a class="text-decoration-none" href="<?= $h(saUrl('support/request?id=' . (int)$r['id'])) ?>"><?= $h($r['ref_no']) ?></a>
+                    <?php if ($r['forwarded_from']): ?><div class="text-muted" style="font-size:.7rem">from <?= $h($r['forwarded_from']) ?></div><?php endif; ?></td>
+                <td><?= $h($r['company_name'] ?? ('#' . $r['tenant_id'])) ?><div class="small text-muted"><?= $h($products[$r['product_key']] ?? '') ?></div></td>
+                <td><a class="text-decoration-none fw-semibold" href="<?= $h(saUrl('support/request?id=' . (int)$r['id'])) ?>"><?= $h($r['subject']) ?></a></td>
+                <td class="small"><?= $h($r['user_name']) ?><div class="text-muted"><?= $h($r['user_role'] ?? '') ?></div></td>
+                <td><?= $prioBadge($r['priority']) ?></td>
+                <td><?= $reqStatus($r['status']) ?></td>
+                <td class="small <?= $sla['overdue'] ? 'text-danger fw-semibold' : ($sla['answered'] && !$sla['met'] ? 'text-warning' : 'text-muted') ?>"><?= $h($r['sla_label']) ?></td>
+                <td class="small"><?= $h($r['assignee_name'] ?? '—') ?></td>
+                <td class="small text-muted"><?= $h(date('d M H:i', strtotime((string)$r['last_activity_at']))) ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <p class="small text-muted">Only requests sent by company admins, or forwarded to BJP by them, appear here. Reply targets count business hours (Mon–Fri 08:00–17:00 EAT).</p>
+
+<?php elseif ($tab === 'replies'): ?>
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-dark"><tr><th>Name</th><th>Text</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        <?php if (!$canned): ?><tr><td colspan="4" class="text-center text-muted py-4">No saved replies yet.</td></tr><?php endif; ?>
+        <?php foreach ($canned as $cr): ?>
+            <tr>
+                <td class="fw-semibold"><?= $h($cr['title']) ?></td>
+                <td class="small text-muted" style="max-width:520px;white-space:pre-wrap"><?= $h(mb_strimwidth((string)$cr['body'], 0, 220, '…')) ?></td>
+                <td><?= $cr['is_active'] ? '<span class="badge rounded-pill" style="background:#0d6efd">In use</span>' : '<span class="badge rounded-pill" style="background:#6c757d">Retired</span>' ?></td>
+                <td class="text-end">
+                    <div class="dropdown d-flex justify-content-end">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions"><i class="bi bi-gear-fill me-1"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                            <li><button class="dropdown-item py-2 rounded js-edit-canned" data-id="<?= (int)$cr['id'] ?>" data-title="<?= $h($cr['title']) ?>" data-body="<?= $h($cr['body']) ?>"><i class="bi bi-pencil text-primary me-2"></i> Edit</button></li>
+                            <li><button class="dropdown-item py-2 rounded js-canned-active" data-id="<?= (int)$cr['id'] ?>" data-active="<?= $cr['is_active'] ? '0' : '1' ?>"><i class="bi <?= $cr['is_active'] ? 'bi-archive' : 'bi-arrow-counterclockwise' ?> text-primary me-2"></i> <?= $cr['is_active'] ? 'Retire' : 'Use again' ?></button></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <div class="modal fade" id="cannedModal" tabindex="-1" aria-labelledby="cannedTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-primary text-white"><h5 class="modal-title" id="cannedTitle"><i class="bi bi-chat-square-text me-1"></i> Saved reply</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <form id="cannedForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="save_canned"><input type="hidden" name="id" id="canned_id">
+                    <div class="mb-3"><label class="form-label" for="canned_title">Name <span class="text-danger">*</span></label><input class="form-control" id="canned_title" name="title" maxlength="191" required></div>
+                    <div class="mb-0"><label class="form-label" for="canned_body">Reply text <span class="text-danger">*</span></label><textarea class="form-control" id="canned_body" name="body" rows="7" maxlength="5000" required></textarea></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save</button></div>
+            </form>
+        </div></div>
+    </div>
+
+<?php elseif ($tab === 'articles'): ?>
     <div class="row g-2 mb-3">
         <div class="col-6 col-md-3"><div class="stat"><b><?= (int)($counts['published'] ?? 0) ?></b><span class="small text-muted">Published</span></div></div>
         <div class="col-6 col-md-3"><div class="stat"><b><?= (int)($counts['draft'] ?? 0) ?></b><span class="small text-muted">Drafts to review</span></div></div>
@@ -357,6 +470,20 @@ $('#catForm').on('submit', function (e) {
         if (res && res.success) catModal.hide();
         done(res, true);
     });
+});
+const INBOX_URL = '/actions/superadmin_support_inbox.php';
+const cannedModal = document.getElementById('cannedModal') ? new bootstrap.Modal(document.getElementById('cannedModal')) : null;
+$('#btnAddCanned').on('click', function () { $('#cannedForm')[0].reset(); $('#canned_id').val(''); cannedModal.show(); });
+$('.js-edit-canned').on('click', function () {
+    const d = $(this).data();
+    $('#canned_id').val(d.id); $('#canned_title').val(d.title); $('#canned_body').val(d.body); cannedModal.show();
+});
+$('#cannedForm').on('submit', function (e) {
+    e.preventDefault();
+    saPost(INBOX_URL, $(this).serializeArray(), $(this).find('[type="submit"]')).done(function (res) { if (res && res.success) cannedModal.hide(); done(res, true); });
+});
+$('.js-canned-active').on('click', function () {
+    saPost(INBOX_URL, [{ name: 'action', value: 'set_canned_active' }, { name: 'id', value: $(this).data('id') }, { name: 'active', value: $(this).data('active') }]).done(function (res) { done(res, true); });
 });
 $('.js-cat-active').on('click', function () {
     saPost(ART_URL, [{ name: 'action', value: 'set_category_active' }, { name: 'id', value: $(this).data('id') }, { name: 'active', value: $(this).data('active') }]).done(function (res) { done(res, true); });
