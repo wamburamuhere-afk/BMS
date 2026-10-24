@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 1 (support tables, superadmin Support settings, real contact details on the Help page)
+
+**Files:** `core/support.php` (new), `scripts/setup_control_db.php`, `app/superadmin/support.php` (new), `actions/superadmin_support_settings.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `app/constant/settings/help.php`, `lang/sw.php`, `tests/test_support_center_phase1_cli.php` (new), `support_center_plan.md` (new)
+
+- **Plan:** `support_center_plan.md` — one ? Help button, page-aware help that follows each company's product (Smart POS / Smart BMS), wording (Shop / Warehouse) and the user's role, staff requests to their admin and admin requests to BJP, one BJP inbox. Section 0 records the real menus verified on the live demo shop and in `header.php`.
+- **Support tables in the control database:** categories, articles, requests, request messages (with internal notes), attachments, saved replies, notices and the search log. Created by `scripts/setup_control_db.php`, which already runs on every deploy; running it again changes nothing.
+- **Superadmin › Support (new menu item):** BJP sets the support email, phone, WhatsApp, office hours, login-page help text, who receives new requests, the auto-reply, first-reply targets per priority (business hours), when resolved requests close, and the attachment size limit. Saved in the control database only; tenants cannot read or change them. Every field is validated; a rejected save changes nothing.
+- **Help page contact card fixed:** the Email button used an address made from the tenant's own company name (it emailed the company itself) and the Call button dialled a placeholder number. It now shows BJP's real email, phone, WhatsApp and office hours from Superadmin › Support, only to company admins, and is hidden when nothing is set.
+- **Test:** `tests/test_support_center_phase1_cli.php` — 62 checks (schema idempotent, validation, save guards: no session / GET / wrong CSRF / tenant host / unknown action, page renders through the real router, help card).
+
+---
+
 ## 2026-10-24 — security(servers): PHP critical RCE patch (CVE-2026-109618 / CVE-2026-109619) and web-exposure hardening on both production servers
 
 **Files:** `changelog.md` (server-side changes only — no application code changed)
