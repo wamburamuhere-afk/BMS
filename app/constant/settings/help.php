@@ -3,471 +3,161 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
-require_once __DIR__ . '/../../../core/support.php';
+require_once __DIR__ . '/../../../core/support_articles.php';
 
-// Phase 5d — gate help page (key seeded in 2026_05_24_phase5d_loans_seed.php)
+// Help & Support is open to every signed-in user (canView('help'), support_center_plan.md D8).
 autoEnforcePermission('help');
 
 require_once __DIR__ . '/../../../header.php';
 
-$company_name = get_setting('company_name', 'Business Management System');
+$h    = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+$ctx  = helpRuntimeContext();
+$lang = function_exists('currentLanguage') && currentLanguage() === 'sw' ? 'sw' : 'en';
+$all  = supportTenantList($ctx, $lang);
+$q     = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
+$topic = ctype_digit((string)($_GET['topic'] ?? '')) ? (int)$_GET['topic'] : 0;
+$artId = ctype_digit((string)($_GET['article'] ?? '')) ? (int)$_GET['article'] : 0;
+
+$article = $artId ? supportTenantArticle($artId, $ctx, $lang) : null;
+if ($article) supportArticleCountView($artId);
+$results = $q !== '' ? supportTenantSearch($q, $ctx, $lang) : [];
+if ($q !== '') supportLogSearch($q, count($results));
+$note = $q !== '' ? supportSearchNote($q, $ctx) : '';
+
+$topics = [];
+foreach ($all as $a) {
+    if (!$a['category_id']) continue;
+    $topics[$a['category_id']] ??= ['id' => $a['category_id'], 'name' => $a['category'], 'icon' => $a['category_icon'], 'sort' => $a['category_sort'], 'n' => 0];
+    $topics[$a['category_id']]['n']++;
+}
+usort($topics, fn($x, $y) => [$x['sort'], $x['name']] <=> [$y['sort'], $y['name']]);
+$topicName = '';
+foreach ($topics as $tp) if ($tp['id'] === $topic) $topicName = $tp['name'];
+$faq = array_values(array_filter($all, fn($a) => $a['is_faq']));
+$popular = array_slice($all, 0, 6);
+
+$helpUrl = getUrl('help');
+$link = fn(array $qs) => $h($helpUrl . '?' . http_build_query($qs));
+$artItem = function (array $a) use ($h, $link): string {
+    return '<a class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2" href="' . $link(['article' => $a['id']]) . '">'
+        . '<span class="help-ic"><i class="bi ' . ($a['has_video'] ? 'bi-play-circle' : 'bi-file-text') . '"></i></span>'
+        . '<span class="flex-grow-1"><span class="d-block fw-semibold">' . $h($a['title']) . '</span>'
+        . ($a['category'] !== '' ? '<small class="text-muted">' . $h($a['category']) . '</small>' : '') . '</span>'
+        . '<i class="bi bi-chevron-right text-muted"></i></a>';
+};
+
+$__sup = isAdmin() ? supportSettings() : [];
+$__sup_tel = static fn(string $n): string => preg_replace('/[^0-9+]/', '', $n);
+$__sup_has = !empty($__sup) && ($__sup['support_email'] !== '' || $__sup['support_phone'] !== '' || $__sup['support_whatsapp'] !== '');
 ?>
 
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-12 mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="mb-0"><i class="bi bi-question-circle"></i> <?= t('Help Center') ?></h2>
-                    <p class="text-muted"><?= t('Find answers, guides, and support resources') ?></p>
-                </div>
-            </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 mb-3">
+        <div>
+            <h4 class="mb-0"><i class="bi bi-question-circle text-primary me-1"></i><?= t('Help & Support') ?></h4>
+            <div class="text-muted small"><?= t('Learn how to do anything in the system, step by step.') ?></div>
         </div>
     </div>
 
-    <!-- Quick Search -->
-    <div class="row mb-4">
-        <div class="col-lg-8 mx-auto">
-            <div class="card border-0 shadow-sm rounded-4 bg-primary bg-gradient text-white">
-                <div class="card-body p-5 text-center">
-                    <h3 class="fw-bold mb-2"><?= t('How can we help you?') ?></h3>
-                    <p class="opacity-75 mb-4"><?= t('Search our knowledge base for quick answers') ?></p>
-                    <div class="input-group input-group-lg">
-                        <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" class="form-control border-0" id="helpSearch" placeholder="<?= t('Type your question here...') ?>" autocomplete="off">
+    <div class="row g-4">
+        <div class="col-12 <?= $__sup_has ? 'col-lg-8' : '' ?>">
+            <form method="get" action="<?= $h($helpUrl) ?>" class="mb-3" role="search">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="search" class="form-control" name="q" value="<?= $h($q) ?>" maxlength="100" placeholder="<?= $h(t('Search help')) ?>" aria-label="<?= $h(t('Search help')) ?>">
+                    <button class="btn btn-primary" type="submit"><?= t('Search') ?></button>
+                </div>
+            </form>
+
+<?php if ($artId): ?>
+            <a href="<?= $h($helpUrl) ?>" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i><?= t('All help') ?></a>
+    <?php if (!$article): ?>
+            <div class="alert alert-light border mt-2"><?= t('This help article is not available.') ?></div>
+    <?php else: ?>
+            <div class="card border-0 shadow-sm mt-2">
+                <div class="card-body p-4 help-art">
+                    <?php if ($article['category'] !== ''): ?><div class="text-muted small mb-1"><?= $h($article['category']) ?></div><?php endif; ?>
+                    <h5 class="fw-bold mb-3"><?= $h($article['title']) ?></h5>
+                    <div><?= $article['html'] /* built by supportRenderBody() from escaped text only */ ?></div>
+                    <div class="d-flex flex-wrap gap-2 my-3">
+                        <?php if ($article['take']): ?>
+                        <a class="btn btn-sm btn-outline-primary" href="<?= $h($article['take']['url']) ?>"><?= t('Take me there') ?> → <?= $h($article['take']['label']) ?></a>
+                        <?php endif; ?>
+                        <?php if ($article['video_url'] !== ''): ?>
+                        <a class="btn btn-sm btn-outline-primary" href="<?= $h($article['video_url']) ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-play-circle me-1"></i><?= t('Watch the video') ?></a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 small text-muted border-top pt-3" id="helpFeedback">
+                        <?php if (isset($_SESSION['support_voted'][$artId])): ?>
+                            <?= t('Thanks for your feedback.') ?>
+                        <?php else: ?>
+                            <span><?= t('Was this helpful?') ?></span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-vote" data-v="1" aria-label="<?= $h(t('Yes')) ?>"><i class="bi bi-hand-thumbs-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-vote" data-v="0" aria-label="<?= $h(t('No')) ?>"><i class="bi bi-hand-thumbs-down"></i></button>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+    <?php endif; ?>
 
-    <!-- Quick Links -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <a href="#getting-started" class="text-decoration-none">
-                <div class="card border-0 shadow-sm rounded-4 h-100 help-card">
-                    <div class="card-body p-4 text-center">
-                        <div class="bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
-                            <i class="bi bi-rocket-takeoff text-primary" style="font-size: 1.5rem;"></i>
-                        </div>
-                        <h6 class="fw-bold text-dark"><?= t('Getting Started') ?></h6>
-                        <p class="text-muted small mb-0"><?= t('Learn the basics of the system') ?></p>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-3 mb-3">
-            <a href="#sales" class="text-decoration-none">
-                <div class="card border-0 shadow-sm rounded-4 h-100 help-card">
-                    <div class="card-body p-4 text-center">
-                        <div class="bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
-                            <i class="bi bi-cart-check text-success" style="font-size: 1.5rem;"></i>
-                        </div>
-                        <h6 class="fw-bold text-dark"><?= t('Sales & Orders') ?></h6>
-                        <p class="text-muted small mb-0"><?= t('Manage sales and invoicing') ?></p>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-3 mb-3">
-            <a href="#finance" class="text-decoration-none">
-                <div class="card border-0 shadow-sm rounded-4 h-100 help-card">
-                    <div class="card-body p-4 text-center">
-                        <div class="bg-warning bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
-                            <i class="bi bi-cash-coin text-warning" style="font-size: 1.5rem;"></i>
-                        </div>
-                        <h6 class="fw-bold text-dark"><?= t('Finance') ?></h6>
-                        <p class="text-muted small mb-0"><?= t('Accounting and reports') ?></p>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-3 mb-3">
-            <a href="#admin" class="text-decoration-none">
-                <div class="card border-0 shadow-sm rounded-4 h-100 help-card">
-                    <div class="card-body p-4 text-center">
-                        <div class="bg-danger bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
-                            <i class="bi bi-shield-lock text-danger" style="font-size: 1.5rem;"></i>
-                        </div>
-                        <h6 class="fw-bold text-dark"><?= t('Administration') ?></h6>
-                        <p class="text-muted small mb-0"><?= t('Users, roles, and settings') ?></p>
-                    </div>
-                </div>
-            </a>
-        </div>
-    </div>
+<?php elseif ($q !== ''): ?>
+            <?php if ($note !== ''): ?><div class="alert alert-light border py-2 small"><?= $h($note) ?></div><?php endif; ?>
+            <h6 class="text-muted text-uppercase small fw-bold"><?= count($results) ?> <?= t('results') ?></h6>
+            <?php if ($results): ?>
+            <div class="list-group shadow-sm"><?php foreach ($results as $a) echo $artItem($a); ?></div>
+            <?php else: ?>
+            <div class="border rounded p-4 text-center text-muted">
+                <div class="fw-semibold text-body"><?= t('No articles found.') ?></div>
+                <div class="small"><?= t('Try other words. Searches with no answer help us write new articles.') ?></div>
+            </div>
+            <?php endif; ?>
 
-    <!-- FAQ Sections -->
-    <div class="row">
-        <div class="col-lg-8">
+<?php elseif ($topic): ?>
+            <a href="<?= $h($helpUrl) ?>" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i><?= t('All help') ?></a>
+            <h5 class="fw-bold mt-2"><?= $h($topicName !== '' ? $topicName : t('Topic')) ?></h5>
+            <?php $inTopic = array_values(array_filter($all, fn($a) => $a['category_id'] === $topic)); ?>
+            <?php if ($inTopic): ?>
+            <div class="list-group shadow-sm"><?php foreach ($inTopic as $a) echo $artItem($a); ?></div>
+            <?php else: ?>
+            <div class="border rounded p-4 text-center text-muted"><?= t('No articles found.') ?></div>
+            <?php endif; ?>
 
-            <!-- Getting Started -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4" id="getting-started">
-                <div class="card-header bg-white border-0 p-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-rocket-takeoff me-2 text-primary"></i><?= t('Getting Started') ?></h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="accordion accordion-flush" id="accordionGettingStarted">
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#gs1">
-                                    <?= t('How do I log in to the system?') ?>
-                                </button>
-                            </h2>
-                            <div id="gs1" class="accordion-collapse collapse" data-bs-parent="#accordionGettingStarted">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<p>Enter your <strong>username</strong> and <strong>password</strong> on the login page.</p>
-                                    <p>Forgotten your password? If you are an <strong>administrator</strong>, use <strong>Forgot password?</strong> on the login page — a reset link is emailed to the address on your account. If you are a <strong>staff member</strong>, ask your company administrator to set a new password for you in <strong>Settings &rsaquo; Users</strong>.</p>
-                                    <p>After logging in, you\'ll be taken to the <strong>Dashboard</strong> which shows an overview of your business metrics.</p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#gs2">
-                                    <?= t('How do I navigate the system?') ?>
-                                </button>
-                            </h2>
-                            <div id="gs2" class="accordion-collapse collapse" data-bs-parent="#accordionGettingStarted">
-                                <div class="accordion-body text-muted">
-                                    <?= wLabel('<p>The main navigation bar at the top contains all modules:</p>
-                                    <ul>
-                                        <li><strong>Dashboard</strong> – Overview of business performance</li>
-                                        <li><strong>Finance</strong> – Accounts, transactions, expenses</li>
-                                        <li><strong>Sales</strong> – Products, customers, orders, invoices, POS</li>
-                                        <li><strong>Operations</strong> – Employees, payroll, assets</li>
-                                        <li><strong>Reports</strong> – Financial and business reports</li>
-                                        <li><strong>Admin</strong> – User management and system settings</li>
-                                    </ul>
-                                    <p>Click your <strong>profile icon</strong> (top-right) to access personal settings, change password, or log out.</p>', '<p>The main navigation bar at the top contains all modules:</p>
-                                    <ul>
-                                        <li><strong>Dashboard</strong> – Overview of business performance</li>
-                                        <li><strong>Finance</strong> – Accounts, transactions, expenses</li>
-                                        <li><strong>Sales</strong> – Products, customers, orders, invoices, Sell</li>
-                                        <li><strong>Operations</strong> – Employees, payroll, assets</li>
-                                        <li><strong>Reports</strong> – Financial and business reports</li>
-                                        <li><strong>Admin</strong> – User management and system settings</li>
-                                    </ul>
-                                    <p>Click your <strong>profile icon</strong> (top-right) to access personal settings, change password, or log out.</p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#gs3">
-                                    <?= t('How do I change my password?') ?>
-                                </button>
-                            </h2>
-                            <div id="gs3" class="accordion-collapse collapse" data-bs-parent="#accordionGettingStarted">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Click your <strong>username</strong> in the top-right corner</li>
-                                        <li>Select <strong>"Settings"</strong> from the dropdown</li>
-                                        <li>Go to the <strong>"Security"</strong> tab</li>
-                                        <li>Enter your current password, then your new password twice</li>
-                                        <li>Click <strong>"Update Password"</strong></li>
-                                    </ol>') ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<?php elseif (!$all): ?>
+            <div class="border rounded p-5 text-center text-muted">
+                <i class="bi bi-journal-text d-block mb-2" style="font-size:2rem"></i>
+                <?= t('Help articles are being prepared. Please check back soon.') ?>
             </div>
 
-            <!-- Sales & Orders -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4" id="sales">
-                <div class="card-header bg-white border-0 p-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-cart-check me-2 text-success"></i><?= t('Sales & Orders') ?></h5>
+<?php else: ?>
+            <?php if ($topics): ?>
+            <h6 class="text-muted text-uppercase small fw-bold"><?= t('Topics') ?></h6>
+            <div class="row g-2 mb-4">
+                <?php foreach ($topics as $tp): ?>
+                <div class="col-6 col-md-4 col-xl-3">
+                    <a class="card border h-100 text-decoration-none help-topic" href="<?= $link(['topic' => $tp['id']]) ?>">
+                        <div class="card-body p-3">
+                            <span class="help-ic mb-2"><i class="bi bi-<?= $h($tp['icon']) ?>"></i></span>
+                            <div class="fw-semibold text-body"><?= $h($tp['name']) ?></div>
+                            <small class="text-muted"><?= (int)$tp['n'] ?> <?= t('articles') ?></small>
+                        </div>
+                    </a>
                 </div>
-                <div class="card-body p-0">
-                    <div class="accordion accordion-flush" id="accordionSales">
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s1">
-                                    <?= t('How do I create a new sales order?') ?>
-                                </button>
-                            </h2>
-                            <div id="s1" class="accordion-collapse collapse" data-bs-parent="#accordionSales">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Sales → Orders</strong></li>
-                                        <li>Click <strong>"New Order"</strong></li>
-                                        <li>Select a customer and add products</li>
-                                        <li>Review quantities and pricing</li>
-                                        <li>Click <strong>"Save Order"</strong></li>
-                                    </ol>
-                                    <p>You can later convert an order into an invoice from the order details page.</p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s2">
-                                    <?= t('How do I generate an invoice?') ?>
-                                </button>
-                            </h2>
-                            <div id="s2" class="accordion-collapse collapse" data-bs-parent="#accordionSales">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Sales → Invoices</strong></li>
-                                        <li>Click <strong>"Create Invoice"</strong> OR open an existing order and click <strong>"Generate Invoice"</strong></li>
-                                        <li>Fill in invoice details and line items</li>
-                                        <li>Click <strong>"Save"</strong></li>
-                                        <li>Use the <strong>"Print"</strong> button to print or save as PDF</li>
-                                    </ol>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s3">
-                                    <?= wLabel('How do I use the POS (Point of Sale)?', 'How do I sell?') ?>
-                                </button>
-                            </h2>
-                            <div id="s3" class="accordion-collapse collapse" data-bs-parent="#accordionSales">
-                                <div class="accordion-body text-muted">
-                                    <?= wLabel('<ol>
-                                        <li>Go to <strong>Sales → POS</strong></li>
-                                        <li>Start a new <strong>shift</strong> by entering the opening balance</li>
-                                        <li>Search or browse products and click to add them to the cart</li>
-                                        <li>Adjust quantities as needed</li>
-                                        <li>Click <strong>"Pay"</strong> and select payment method (Cash, M-Pesa, Card)</li>
-                                        <li>Complete the transaction and print the receipt</li>
-                                    </ol>', '<ol>
-                                        <li>Tap <strong>Sell</strong> in the menu</li>
-                                        <li>Start a new <strong>shift</strong> by entering the opening balance</li>
-                                        <li>Search or browse products and click to add them to the cart</li>
-                                        <li>Adjust quantities as needed</li>
-                                        <li>Click <strong>"Pay"</strong> and select payment method (Cash, M-Pesa, Card)</li>
-                                        <li>Complete the transaction and print the receipt</li>
-                                    </ol>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s4">
-                                    <?= t('How do I add a new product?') ?>
-                                </button>
-                            </h2>
-                            <div id="s4" class="accordion-collapse collapse" data-bs-parent="#accordionSales">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Sales → Products</strong></li>
-                                        <li>Click <strong>"Add Product"</strong></li>
-                                        <li>Fill in product details: name, SKU, price, category, stock quantity</li>
-                                        <li>Upload a product image (optional)</li>
-                                        <li>Click <strong>"Save"</strong></li>
-                                    </ol>') ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php endforeach; ?>
             </div>
-
-            <!-- Finance -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4" id="finance">
-                <div class="card-header bg-white border-0 p-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-cash-coin me-2 text-warning"></i><?= t('Finance & Accounting') ?></h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="accordion accordion-flush" id="accordionFinance">
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#f1">
-                                    <?= t('How do I record an expense?') ?>
-                                </button>
-                            </h2>
-                            <div id="f1" class="accordion-collapse collapse" data-bs-parent="#accordionFinance">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Finance → Expenses</strong></li>
-                                        <li>Click <strong>"Add Expense"</strong></li>
-                                        <li>Select expense category, enter amount, date, and description</li>
-                                        <li>Attach receipt (optional)</li>
-                                        <li>Click <strong>"Save"</strong></li>
-                                    </ol>
-                                    <p>Expenses are automatically reflected in your financial reports.</p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#f2">
-                                    <?= t('How do I view financial reports?') ?>
-                                </button>
-                            </h2>
-                            <div id="f2" class="accordion-collapse collapse" data-bs-parent="#accordionFinance">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<p>Go to <strong>Reports</strong> in the navigation menu. Available reports include:</p>
-                                    <ul>
-                                        <li><strong>Income Statement</strong> – Revenue vs expenses for a period</li>
-                                        <li><strong>Balance Sheet</strong> – Assets, liabilities, and equity</li>
-                                        <li><strong>Cash Flow</strong> – Money in and out</li>
-                                        <li><strong>Trial Balance</strong> – Account balances summary</li>
-                                        <li><strong>General Ledger</strong> – Detailed transaction history</li>
-                                    </ul>
-                                    <p>Most reports allow you to filter by <strong>date range</strong> and export to <strong>PDF or Excel</strong>.</p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#f3">
-                                    <?= t('How do I record a journal entry?') ?>
-                                </button>
-                            </h2>
-                            <div id="f3" class="accordion-collapse collapse" data-bs-parent="#accordionFinance">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Finance → Journal Entries</strong></li>
-                                        <li>Click <strong>"New Entry"</strong></li>
-                                        <li>Add debit and credit lines — totals must balance</li>
-                                        <li>Add description and reference number</li>
-                                        <li>Click <strong>"Save"</strong></li>
-                                    </ol>') ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Administration -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4" id="admin">
-                <div class="card-header bg-white border-0 p-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-shield-lock me-2 text-danger"></i><?= t('Administration') ?></h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="accordion accordion-flush" id="accordionAdmin">
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a1">
-                                    <?= t('How do I add a new user?') ?>
-                                </button>
-                            </h2>
-                            <div id="a1" class="accordion-collapse collapse" data-bs-parent="#accordionAdmin">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Admin → Users</strong></li>
-                                        <li>Click <strong>"Add New User"</strong></li>
-                                        <li>Fill in username, full name, email, and password</li>
-                                        <li>Assign a role (Admin, Manager, User, etc.)</li>
-                                        <li>Click <strong>"Create User"</strong></li>
-                                    </ol>
-                                    <p class="mb-0"><em>Note: Only administrators can add or manage users.</em></p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a2">
-                                    <?= t('How do I backup the database?') ?>
-                                </button>
-                            </h2>
-                            <div id="a2" class="accordion-collapse collapse" data-bs-parent="#accordionAdmin">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Admin → Backup</strong></li>
-                                        <li>Click <strong>"Generate Backup"</strong> to create a new backup</li>
-                                        <li>Download the backup file for safe keeping</li>
-                                        <li>To restore, upload a <code>.sql</code> file and click <strong>"Upload & Restore"</strong></li>
-                                    </ol>') ?>
-                                    <div class="alert alert-warning small mb-0 mt-2">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        <?= t('<strong>Warning:</strong> Restoring a backup will overwrite all current data. Always create a fresh backup before restoring.') ?>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a3">
-                                    <?= t('How do I update company information?') ?>
-                                </button>
-                            </h2>
-                            <div id="a3" class="accordion-collapse collapse" data-bs-parent="#accordionAdmin">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Admin → Company Profile</strong></li>
-                                        <li>Update your company name, email, phone, address, and website</li>
-                                        <li>Upload your company logo</li>
-                                        <li>Click <strong>"Save"</strong></li>
-                                    </ol>
-                                    <p class="mb-0">These details will appear on invoices, receipts, and reports.</p>') ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion-item faq-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a4">
-                                    <?= t('How do I configure tax settings?') ?>
-                                </button>
-                            </h2>
-                            <div id="a4" class="accordion-collapse collapse" data-bs-parent="#accordionAdmin">
-                                <div class="accordion-body text-muted">
-                                    <?= t('<ol>
-                                        <li>Go to <strong>Admin → Tax</strong></li>
-                                        <li>Set the tax name (e.g., VAT, GST)</li>
-                                        <li>Enter the default tax rate (%)</li>
-                                        <li>Choose pricing method (Tax Exclusive or Inclusive)</li>
-                                        <li>Click <strong>"Save Settings"</strong></li>
-                                    </ol>') ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <?php endif; ?>
+            <?php if ($faq): ?>
+            <h6 class="text-muted text-uppercase small fw-bold"><?= t('Frequently asked') ?></h6>
+            <div class="list-group shadow-sm mb-4"><?php foreach ($faq as $a) echo $artItem($a); ?></div>
+            <?php endif; ?>
+            <h6 class="text-muted text-uppercase small fw-bold"><?= t('Popular') ?></h6>
+            <div class="list-group shadow-sm"><?php foreach ($popular as $a) echo $artItem($a); ?></div>
+<?php endif; ?>
         </div>
 
-        <!-- Sidebar -->
-        <div class="col-lg-4">
-
-            <!-- Keyboard Shortcuts -->
-            <div class="card border-0 shadow-sm rounded-4 mb-4">
-                <div class="card-header bg-white border-0 p-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-keyboard me-2 text-secondary"></i><?= t('Keyboard Shortcuts') ?></h5>
-                </div>
-                <div class="card-body p-4 pt-0">
-                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="small"><?= t('Dashboard') ?></span>
-                        <span><kbd>Alt</kbd> + <kbd>D</kbd></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="small"><?= t('New Order') ?></span>
-                        <span><kbd>Alt</kbd> + <kbd>N</kbd></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="small"><?= htmlspecialchars(wLabel('POS', 'Sell')) ?></span>
-                        <span><kbd>Alt</kbd> + <kbd>P</kbd></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center py-2">
-                        <span class="small"><?= t('Search') ?></span>
-                        <span><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
-                    </div>
-                </div>
-            </div>
-
-            <?php
-            // BJP's contact details come from Superadmin › Support (control DB), shown to company admins only.
-            $__sup = isAdmin() ? supportSettings() : [];
-            $__sup_tel = static fn(string $n): string => preg_replace('/[^0-9+]/', '', $n);
-            $__sup_has = !empty($__sup) && ($__sup['support_email'] !== '' || $__sup['support_phone'] !== '' || $__sup['support_whatsapp'] !== '');
-            ?>
-            <?php if ($__sup_has): ?>
-            <div class="card border-0 shadow-sm rounded-4 mb-4 bg-light">
+        <?php if ($__sup_has): ?>
+        <div class="col-12 col-lg-4">
+            <!-- BJP's contact details come from Superadmin › Support (control DB), shown to company admins only. -->
+            <div class="card border-0 shadow-sm rounded-4 bg-light">
                 <div class="card-body p-4 text-center">
                     <div class="bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px;">
                         <i class="bi bi-headset text-primary" style="font-size: 1.5rem;"></i>
@@ -496,99 +186,34 @@ $company_name = get_setting('company_name', 'Business Management System');
                     <?php endif; ?>
                 </div>
             </div>
-            <?php endif; ?>
-
-            <!-- System Info -->
-            <div class="card border-0 shadow-sm rounded-4">
-                <div class="card-header bg-white border-0 p-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-info-circle me-2 text-primary"></i><?= t('System Info') ?></h5>
-                </div>
-                <div class="card-body p-4 pt-0 small">
-                    <div class="d-flex justify-content-between py-2 border-bottom">
-                        <span class="text-muted"><?= t('System') ?></span>
-                        <span class="fw-bold">BMS</span>
-                    </div>
-                    <div class="d-flex justify-content-between py-2 border-bottom">
-                        <span class="text-muted"><?= t('Version') ?></span>
-                        <span class="fw-bold">1.0.0</span>
-                    </div>
-                    <div class="d-flex justify-content-between py-2 border-bottom">
-                        <span class="text-muted"><?= t('PHP Version') ?></span>
-                        <span class="fw-bold"><?= phpversion() ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between py-2">
-                        <span class="text-muted"><?= t('Server') ?></span>
-                        <span class="fw-bold"><?= php_uname('s') ?></span>
-                    </div>
-                </div>
-            </div>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
 <style>
-.help-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    cursor: pointer;
-}
-.help-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.12) !important;
-}
-
-.accordion-button:not(.collapsed) {
-    background-color: rgba(13, 110, 253, 0.05);
-    color: #0d6efd;
-    font-weight: 600;
-}
-
-.accordion-button:focus {
-    box-shadow: none;
-}
-
-.faq-item {
-    border-left: 3px solid transparent;
-    transition: border-color 0.2s ease;
-}
-
-.faq-item:has(.accordion-button:not(.collapsed)) {
-    border-left-color: #0d6efd;
-}
-
-kbd {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    color: #333;
-    font-size: 0.8rem;
-    padding: 2px 6px;
-}
+.help-ic { width: 30px; height: 30px; border-radius: 8px; background: #e7f0ff; color: #0d6efd; display: inline-grid; place-items: center; flex: 0 0 auto; }
+.help-topic:hover { border-color: #9ec5fe !important; }
+.help-art ol, .help-art ul { padding-left: 1.3rem; }
+.help-art li { margin-bottom: 4px; }
+.help-art .help-path { background: #e7f0ff; color: #084298; border-radius: 4px; padding: 0 5px; font-weight: 600; }
+.help-art .help-tip { background: rgba(13,110,253,.06); border-left: 3px solid #0d6efd; padding: 8px 10px; border-radius: 4px; margin: 8px 0; }
 </style>
 
+<?php if ($article && !isset($_SESSION['support_voted'][$artId])): ?>
 <script>
-$(document).ready(function() {
-    // Search functionality
-    $('#helpSearch').on('input', function() {
-        const query = $(this).val().toLowerCase().trim();
-
-        if (query.length === 0) {
-            $('.faq-item').show();
-            $('.accordion-collapse').removeClass('show');
-            return;
-        }
-
-        $('.faq-item').each(function() {
-            const text = $(this).text().toLowerCase();
-            if (text.includes(query)) {
-                $(this).show();
-                $(this).find('.accordion-collapse').addClass('show');
-            } else {
-                $(this).hide();
-            }
-        });
+document.querySelectorAll('.js-vote').forEach(function (b) {
+    b.addEventListener('click', function () {
+        const box = document.getElementById('helpFeedback');
+        fetch(<?= json_encode(buildUrl('api/support_help.php'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'X-CSRF-Token': CSRF_TOKEN, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ action: 'feedback', id: <?= (int)$artId ?>, helpful: b.dataset.v })
+        }).finally(function () { box.textContent = <?= json_encode(t('Thanks for your feedback.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>; });
     });
 });
 </script>
+<?php endif; ?>
 
 <?php
 require_once __DIR__ . '/../../../footer.php';

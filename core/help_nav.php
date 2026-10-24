@@ -220,7 +220,8 @@ if (!function_exists('helpNavMenu')) {
 
         $m[] = ['type' => 'account', 'label' => 'Your name (top right)', 'items' => [
             ['my_hr', fn() => false, 'My HR', false],
-            ['my_settings', fn() => true, 'My Profile & Settings', false],
+            // The link shows for everyone but the page is permission-gated (my_settings).
+            ['my_settings', 'my_settings', 'My Profile & Settings', false],
             ['help', fn() => true, 'Help', false],
         ]];
         return $m;
@@ -367,6 +368,55 @@ if (!function_exists('helpNavCatalog')) {
             }
         }
         return $out;
+    }
+}
+
+if (!function_exists('helpNavRoute')) {
+    /** The route (for getUrl) and optional query that opens a help key's page. */
+    function helpNavRoute(string $helpKey): array
+    {
+        $map = [
+            'restock' => ['pos', 'restock=1'], 'dn' => ['delivery_notes', 'type=outbound'], 'lpo' => ['lpos', ''],
+            'crm_dashboard' => ['crm/dashboard', ''], 'crm_leads' => ['crm/leads', ''], 'crm_pipeline' => ['crm/pipeline', ''],
+            'crm_pipeline_stages' => ['crm/pipeline_stages', ''], 'employee_lifecycle' => ['hr_actions', ''],
+            'document_library' => ['library', ''], 'document_templates' => ['templates', ''], 'field_visits' => ['field_reports', ''],
+            'product_analysis' => ['product_analysis', ''],
+        ];
+        return $map[$helpKey] ?? [$helpKey, ''];
+    }
+}
+
+if (!function_exists('helpNavUrl')) {
+    /** URL that opens the page behind $helpKey, or null when getUrl() is unavailable. */
+    function helpNavUrl(string $helpKey): ?string
+    {
+        if (!function_exists('getUrl')) return null;
+        [$route, $qs] = helpNavRoute($helpKey);
+        $u = (string)getUrl($route);
+        return $qs !== '' ? $u . (str_contains($u, '?') ? '&' : '?') . $qs : $u;
+    }
+}
+
+if (!function_exists('helpCurrentPageKey')) {
+    /** Which help key the current request is on (matches the path the way the phone bottom bar does). */
+    function helpCurrentPageKey(?string $requestUri = null): ?string
+    {
+        if (!function_exists('getUrl')) return null;
+        $uri = $requestUri ?? (string)($_SERVER['REQUEST_URI'] ?? '/');
+        $path = rtrim((string)parse_url($uri, PHP_URL_PATH), '/');
+        parse_str((string)parse_url($uri, PHP_URL_QUERY), $q);
+        if ($path === '') return null;
+        $best = null; $bestLen = 0;
+        foreach (array_keys(helpNavCatalog()) as $k) {
+            [$route, $qs] = helpNavRoute($k);
+            $p = rtrim((string)parse_url((string)getUrl($route), PHP_URL_PATH), '/');
+            if ($p === '' || $p === '/') continue;
+            if ($path !== $p && !str_starts_with($path, $p . '/')) continue;
+            if ($qs !== '') { parse_str($qs, $need); if (array_diff_assoc($need, $q)) continue; }
+            $len = strlen($p) + ($qs !== '' ? 1 : 0);
+            if ($len > $bestLen) { $best = $k; $bestLen = $len; }
+        }
+        return $best;
     }
 }
 

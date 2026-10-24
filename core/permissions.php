@@ -97,7 +97,13 @@ function canView($pageKey)
     if (isAdmin()) {
         return true;
     }
-    
+
+    // Help & Support is open to every signed-in user (support_center_plan.md D8):
+    // its content is filtered per user, so there is nothing to grant or deny.
+    if ($pageKey === 'help' && !empty($_SESSION['user_id'])) {
+        return true;
+    }
+
     return $_SESSION['permissions'][$pageKey]['view'] ?? false;
 }
 

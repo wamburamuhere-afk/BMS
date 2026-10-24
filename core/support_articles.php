@@ -125,13 +125,17 @@ if (!function_exists('supportArticleLocalized')) {
 }
 
 if (!function_exists('supportArticleVisible')) {
-    /** Untagged = general (everyone). Tagged = at least one page this user can open. */
+    /**
+     * Untagged = general (everyone). Tagged = at least one of its pages is reachable from
+     * THIS user's own menu (module + role + how the menu is laid out for this company), so
+     * every "Open …" step in the article matches something the reader can actually click.
+     */
     function supportArticleVisible(array $a, array $ctx): bool
     {
         $keys = is_array($a['page_keys'] ?? null) ? $a['page_keys'] : (json_decode((string)($a['page_keys'] ?? ''), true) ?: []);
         if (!$keys) return true;
         foreach ($keys as $k) {
-            if (helpKeyAllowed((string)$k, $ctx)) return true;
+            if (helpNavPath((string)$k, $ctx) !== null) return true;
         }
         return false;
     }
@@ -325,6 +329,216 @@ if (!function_exists('supportArticleList')) {
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$r) $r['page_keys'] = json_decode((string)$r['page_keys'], true) ?: [];
         return $rows;
+    }
+}
+
+// ── Tenant side (published + visible only) ───────────────────────────────────
+
+const SUPPORT_SYNONYMS = [
+    ['warehouse', 'warehouses', 'shop', 'shops', 'store', 'stores', 'branch', 'ghala', 'maghala', 'duka', 'maduka'],
+    ['sell', 'sale', 'sales', 'pos', 'checkout', 'uza', 'mauzo'],
+    ['invoice', 'invoices', 'bill', 'ankara'],
+    ['refund', 'return', 'returns', 'rudisha'],
+    ['salary', 'salaries', 'payroll', 'wage', 'mshahara'],
+    ['credit', 'debt', 'madeni', 'deni', 'account'],
+    ['expense', 'expenses', 'cost', 'matumizi', 'gharama'],
+    ['user', 'users', 'staff', 'mtumiaji', 'watumiaji'],
+    ['password', 'nenosiri', 'login'],
+    ['product', 'products', 'item', 'items', 'bidhaa'],
+    ['customer', 'customers', 'client', 'mteja', 'wateja'],
+    ['supplier', 'suppliers', 'vendor', 'msambazaji'],
+];
+
+if (!function_exists('supportPublishedArticles')) {
+    /** Published articles whose category is shown (or none). Cached per request. */
+    function supportPublishedArticles(): array
+    {
+        if (isset($GLOBALS['__support_published'])) return $GLOBALS['__support_published'];
+        $rows = [];
+        try {
+            $rows = getControlPdo()->query("
+                SELECT a.*, c.name_en AS cat_en, c.name_sw AS cat_sw, c.icon AS cat_icon, c.sort_order AS cat_sort
+                FROM support_articles a LEFT JOIN support_categories c ON c.id = a.category_id
+                WHERE a.status = 'published' AND (a.category_id IS NULL OR c.is_active = 1)
+                ORDER BY a.views DESC, a.id")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('supportPublishedArticles: ' . $e->getMessage());
+        }
+        foreach ($rows as &$r) $r['page_keys'] = json_decode((string)$r['page_keys'], true) ?: [];
+        return $GLOBALS['__support_published'] = $rows;
+    }
+}
+
+if (!function_exists('supportTenantList')) {
+    /** Everything this user may read, localized, as plain-text titles (escape when printing). */
+    function supportTenantList(array $ctx, string $lang): array
+    {
+        $out = [];
+        foreach (supportPublishedArticles() as $a) {
+            if (!supportArticleVisible($a, $ctx)) continue;
+            $loc = supportArticleLocalized($a, $lang, !empty($ctx['simple']));
+            $cat = $a['category_id'] ? (($lang === 'sw' && trim((string)$a['cat_sw']) !== '') ? $a['cat_sw'] : $a['cat_en']) : '';
+            $out[] = [
+                'id' => (int)$a['id'], 'title' => supportTitleText($loc['title'], $ctx),
+                'category' => $cat !== '' ? supportTitleText($cat, $ctx) : '', 'category_id' => $a['category_id'] ? (int)$a['category_id'] : null,
+                'category_icon' => $a['cat_icon'] ?? 'book', 'category_sort' => (int)($a['cat_sort'] ?? 999),
+                'page_keys' => $a['page_keys'], 'is_faq' => (bool)$a['is_faq'], 'has_video' => trim((string)$a['video_url']) !== '',
+                'views' => (int)$a['views'], '_body' => supportTitleText($loc['body'], $ctx),
+            ];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('supportSearchTerms')) {
+    /** Query → list of synonym groups (each word becomes the set of words it can match). */
+    function supportSearchTerms(string $q): array
+    {
+        $q = mb_strtolower(mb_substr($q, 0, 100));
+        $words = preg_split('/[^\p{L}\p{N}]+/u', $q, -1, PREG_SPLIT_NO_EMPTY);
+        $stop = ['how', 'do', 'i', 'to', 'the', 'a', 'an', 'my', 'in', 'on', 'of', 'for', 'is', 'can', 'what', 'where', 'and', 'jinsi', 'ya', 'kwa', 'na', 'la', 'wa', 'ku'];
+        $groups = [];
+        foreach (array_slice($words, 0, 8) as $w) {
+            if (mb_strlen($w) < 2 || in_array($w, $stop, true)) continue;
+            $g = [$w];
+            foreach (SUPPORT_SYNONYMS as $set) if (in_array($w, $set, true)) { $g = $set; break; }
+            $groups[] = $g;
+        }
+        return $groups;
+    }
+}
+
+if (!function_exists('supportTenantSearch')) {
+    /** Visible articles matching every term group, best first (title hits weigh more). */
+    function supportTenantSearch(string $q, array $ctx, string $lang): array
+    {
+        $groups = supportSearchTerms($q);
+        if (!$groups) return [];
+        $hits = [];
+        foreach (supportTenantList($ctx, $lang) as $a) {
+            $title = mb_strtolower($a['title']);
+            $hay = $title . ' ' . mb_strtolower($a['category'] . ' ' . $a['_body']);
+            $score = 0;
+            foreach ($groups as $g) {
+                $in = false;
+                foreach ($g as $w) {
+                    if (str_contains($hay, $w)) { $in = true; $score += str_contains($title, $w) ? 3 : 1; break; }
+                }
+                if (!$in) continue 2;
+            }
+            $a['_score'] = $score;
+            $hits[] = $a;
+        }
+        usort($hits, fn($x, $y) => [$y['_score'], $y['views']] <=> [$x['_score'], $x['views']]);
+        return array_slice($hits, 0, 20);
+    }
+}
+
+if (!function_exists('supportSearchNote')) {
+    /** "This company calls them shops" style hint when the reader used the other wording. */
+    function supportSearchNote(string $q, array $ctx): string
+    {
+        $l = mb_strtolower($q);
+        $t = $ctx['t'] ?? fn($x) => $x;
+        if (!empty($ctx['shop']) && preg_match('/warehouse|ghala/u', $l)) return $t('In this system warehouses are called shops.');
+        if (empty($ctx['shop']) && preg_match('/\bshops?\b|duka/u', $l)) return $t('In this system shops are managed as warehouses.');
+        return '';
+    }
+}
+
+if (!function_exists('supportTenantArticle')) {
+    /** One published article this user may read, rendered. Null when hidden or missing. */
+    function supportTenantArticle(int $id, array $ctx, string $lang, ?string $currentKey = null): ?array
+    {
+        foreach (supportPublishedArticles() as $a) {
+            if ((int)$a['id'] !== $id) continue;
+            if (!supportArticleVisible($a, $ctx)) return null;
+            $loc = supportArticleLocalized($a, $lang, !empty($ctx['simple']));
+            $take = null;
+            foreach ($a['page_keys'] as $k) {
+                if ($k === $currentKey) continue;
+                $path = helpNavPath($k, $ctx);
+                $url = $path !== null ? helpNavUrl($k) : null;
+                if ($url !== null && $path !== null) { $take = ['url' => $url, 'label' => $path]; break; }
+            }
+            $cat = $a['category_id'] ? (($lang === 'sw' && trim((string)$a['cat_sw']) !== '') ? $a['cat_sw'] : $a['cat_en']) : '';
+            return [
+                'id' => (int)$a['id'],
+                'title' => supportTitleText($loc['title'], $ctx),
+                'category' => $cat !== '' ? supportTitleText($cat, $ctx) : '',
+                'html' => supportRenderBody($loc['body'], $ctx),
+                'video_url' => supportValidVideoUrl((string)$a['video_url']) ? (string)$a['video_url'] : '',
+                'take' => $take,
+                'updated' => (string)($a['updated_at'] ?? $a['created_at']),
+            ];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('supportArticleCountView')) {
+    /** +1 view, once per article per session. */
+    function supportArticleCountView(int $id): bool
+    {
+        $seen = $_SESSION['support_viewed'] ?? [];
+        if (!empty($seen[$id])) return false;
+        try {
+            getControlPdo()->prepare("UPDATE support_articles SET views = views + 1 WHERE id = ? AND status = 'published'")->execute([$id]);
+        } catch (Throwable $e) { error_log('supportArticleCountView: ' . $e->getMessage()); return false; }
+        $seen[$id] = 1;
+        $_SESSION['support_viewed'] = array_slice($seen, -200, null, true);
+        return true;
+    }
+}
+
+if (!function_exists('supportArticleVote')) {
+    /** Helpful yes/no, once per article per session. Returns false when already voted. */
+    function supportArticleVote(int $id, bool $helpful): bool
+    {
+        $voted = $_SESSION['support_voted'] ?? [];
+        if (isset($voted[$id])) return false;
+        $col = $helpful ? 'helpful_yes' : 'helpful_no';
+        getControlPdo()->prepare("UPDATE support_articles SET {$col} = {$col} + 1 WHERE id = ? AND status = 'published'")->execute([$id]);
+        $voted[$id] = $helpful ? 1 : 0;
+        $_SESSION['support_voted'] = array_slice($voted, -200, null, true);
+        return true;
+    }
+}
+
+if (!function_exists('supportTenantProductKey')) {
+    /** The signed-in company's product (bms_shop / bms_full / …) or null. */
+    function supportTenantProductKey(): ?string
+    {
+        $tid = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
+        if (!$tid) return null;
+        try {
+            $st = getControlPdo()->prepare('SELECT p.product_key FROM tenants t JOIN plans p ON p.plan_key = t.plan WHERE t.id = ?');
+            $st->execute([$tid]);
+            $k = $st->fetchColumn();
+            return $k !== false ? (string)$k : null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+}
+
+if (!function_exists('supportLogSearch')) {
+    /** Remember a finished search (zero-result ones tell BJP what to write). Once per query per 10 minutes per session. */
+    function supportLogSearch(string $q, int $results): bool
+    {
+        $norm = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $q)));
+        if (mb_strlen($norm) < 2) return false;
+        $norm = mb_substr($norm, 0, 255);
+        $recent = array_filter($_SESSION['support_searched'] ?? [], fn($t) => $t > time() - 600);
+        if (isset($recent[$norm])) return false;
+        try {
+            $tid = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
+            getControlPdo()->prepare('INSERT INTO support_search_log (tenant_id, query, results_count, product_key) VALUES (?, ?, ?, ?)')
+                ->execute([$tid, $norm, $results, supportTenantProductKey()]);
+        } catch (Throwable $e) { error_log('supportLogSearch: ' . $e->getMessage()); return false; }
+        $recent[$norm] = time();
+        $_SESSION['support_searched'] = array_slice($recent, -50, null, true);
+        return true;
     }
 }
 

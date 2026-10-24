@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 3 (? Help button and panel in every company's header; Help page rebuilt)
+
+**Files:** `includes/help_panel.php` (new), `api/support_help.php` (new), `header.php`, `app/constant/settings/help.php`, `core/permissions.php`, `core/help_nav.php`, `core/support_articles.php`, `migrations/tenant/2026_10_24_help_self_service.php` (new), `schema/tenant_seed_defaults.sql`, `lang/sw.php`, `tests/test_support_center_phase3_cli.php` (new), `support_center_plan.md`
+
+- **? Help button:** desktop beside the EN pill; on a Smart POS phone in the top bar beside EN and ☰ (the bottom bar is unchanged); on a Smart BMS phone beside ☰. It opens a Help panel from the right (full screen on phones): help for the page you are on, popular articles, search, and articles read inside the panel with "Take me there" and "Was this helpful?". Nothing is loaded until the panel is opened.
+- **Search understands the company's words:** warehouse / shop / store / ghala / duka (and refund/return, credit/madeni, …) find the same articles, and the panel says "In this system warehouses are called shops" when the reader used the other word. Searches are recorded (once per 10 minutes) so BJP can see what people looked for and did not find.
+- **Help & Support page rebuilt:** the old static page offered invoicing and Finance help even to shops that have neither. It now shows search, topics, frequently asked and popular articles — only articles whose pages the reader can open from their own menu, in their company's wording — and article pages with "Take me there". BJP's contact card stays for company admins.
+- **Help was closed to most roles (fixed):** the `help` permission was only granted to Managing Director and Secretary, so Staff, Accountant, CFO and others were refused when they clicked Help. Help is now open to every signed-in user (its content is filtered per user); the useless switch is hidden from Roles & Permissions (tenant migration + new-company seed).
+- **Safe by design:** the panel API needs a signed-in user, POST and the CSRF token; titles are sent as plain text and inserted as text; article bodies are escaped before formatting; an article for a page the user cannot reach cannot be opened by id or found by search. View and vote counters count once per person per session.
+- **Full Swahili** for all new text.
+- **Test:** `tests/test_support_center_phase3_cli.php` — 93 checks (permission rule, migration, page detection, visibility per product/role/status/category, synonyms, counters, API guards and behaviour, XSS, header + page rendering, panel JavaScript syntax).
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 2 (help articles written once, shown in each company's own words)
 
 **Files:** `core/help_nav.php` (new), `core/support_articles.php` (new), `core/support.php`, `scripts/setup_control_db.php`, `app/superadmin/support.php`, `app/superadmin/support_article.php` (new), `actions/superadmin_support_articles.php` (new), `core/superadmin_auth.php`, `tests/test_support_center_phase2_cli.php` (new), `tests/test_support_center_phase1_cli.php`, `support_center_plan.md`

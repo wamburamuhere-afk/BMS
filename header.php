@@ -941,12 +941,15 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         <!-- BOTTOM NAVIGATION BAR -->
         <nav class="navbar navbar-expand-lg navbar-dark bottom-header">
             <div class="container-fluid px-4">
-                <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <?php require_once __DIR__ . '/includes/help_panel.php'; ?>
+                <?php if (!posSimpleModeEnabled()) helpPanelButton('mobile', 'ms-auto me-2 d-lg-none'); ?>
+                <button class="navbar-toggler<?= posSimpleModeEnabled() ? ' ms-auto' : '' ?>" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <?php if (posSimpleModeEnabled()): ?>
                 <!-- Simple POS mobile: Language + ☰ (opens the left side menu). Desktop: hidden. -->
                 <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
+                    <?php helpPanelButton('mobile'); ?>
                     <button type="button" class="btn btn-outline-light"
                         onclick="event.stopPropagation();bmsToggleLang();"
                         title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>"
@@ -1529,6 +1532,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
                     <!-- User Account (right side of bottom nav — matches Vikundi) -->
                     <ul class="navbar-nav align-items-center flex-row">
+                        <li class="nav-item me-1 d-none d-lg-flex align-items-center"><?php helpPanelButton('desktop'); ?></li>
                         <!-- Language toggle pill — switches between EN and SW instantly -->
                         <li class="nav-item me-1">
                             <button class="btn btn-sm btn-outline-light" onclick="bmsToggleLang()" title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>" style="font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:700;letter-spacing:0.5px;line-height:1.6;">
@@ -1565,6 +1569,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         </nav><!-- /.bottom-header -->
 
     </div><!-- /.header-wrapper -->
+    <?php helpPanelRender(); ?>
 
     <?php if (posSimpleModeEnabled()): ?>
     <?php
