@@ -116,6 +116,25 @@ if (!function_exists('bmsTenantHalt')) {
         }
         $t = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $m = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+        // Blocked (403) companies can still reach support: BJP's contacts from Superadmin › Support › Settings.
+        $help = '';
+        if ($httpCode === 403 && is_file(__DIR__ . '/support.php')) {
+            try {
+                require_once __DIR__ . '/support.php';
+                $s = supportSettings();
+                $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+                $rows = [];
+                if ($s['support_email'] !== '') $rows[] = 'Email: <a href="mailto:' . $e($s['support_email']) . '">' . $e($s['support_email']) . '</a>';
+                if ($s['support_phone'] !== '') $rows[] = 'Phone: <a href="tel:' . $e(preg_replace('/[^0-9+]/', '', $s['support_phone'])) . '">' . $e($s['support_phone']) . '</a>';
+                if ($s['support_whatsapp'] !== '') $rows[] = 'WhatsApp: <a href="https://wa.me/' . $e(ltrim(preg_replace('/[^0-9+]/', '', $s['support_whatsapp']), '+')) . '" rel="noopener">' . $e($s['support_whatsapp']) . '</a>';
+                if ($rows) {
+                    $help = '<div class="help"><strong>Need help?</strong><br>' . implode('<br>', $rows)
+                          . ($s['support_hours'] !== '' ? '<br><span class="muted">' . $e($s['support_hours']) . '</span>' : '') . '</div>';
+                }
+            } catch (Throwable $ex) {
+                $help = '';
+            }
+        }
         echo <<<HTML
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -129,12 +148,14 @@ if (!function_exists('bmsTenantHalt')) {
        padding:32px 36px;box-shadow:0 1px 3px rgba(16,24,40,.06)}
  h1{margin:0 0 12px;font-size:20px;font-weight:600}
  p{margin:0;color:#525a6b}
+ .help{margin-top:18px;padding-top:14px;border-top:1px solid #e3e6ec;font-size:14px;color:#525a6b}
+ .help a{color:#0b5ed7}.help .muted{color:#8a93a3}
  @media(prefers-color-scheme:dark){
    body{background:#14161a;color:#e7e9ee}
    .card{background:#1c1f26;border-color:#2c313b;box-shadow:none}
-   p{color:#a4acbb}}
+   p,.help{color:#a4acbb}.help{border-color:#2c313b}.help a{color:#8ab8ff}}
 </style></head>
-<body><div class="card"><h1>{$t}</h1><p>{$m}</p></div></body></html>
+<body><div class="card"><h1>{$t}</h1><p>{$m}</p>{$help}</div></body></html>
 HTML;
         exit;
     }

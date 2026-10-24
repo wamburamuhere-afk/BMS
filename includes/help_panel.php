@@ -113,6 +113,13 @@ if (!function_exists('helpPanelRender')) {
             <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
             <input type="search" class="form-control" id="bhQ" placeholder="<?= htmlspecialchars($s['search'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($s['search'], ENT_QUOTES, 'UTF-8') ?>" maxlength="100" autocomplete="off">
         </div>
+        <?php if (function_exists('canView') && canView('ai_assistant') && function_exists('aiConfigured') && aiConfigured()): ?>
+        <a class="d-flex align-items-center gap-2 border rounded p-2 my-2 text-decoration-none" id="bhAskAi" style="background:#f5f9ff;border-color:#cfe2ff!important" href="<?= htmlspecialchars(getUrl('ai_assistant'), ENT_QUOTES, 'UTF-8') ?>">
+            <span class="bh-ic" style="border-radius:50%;background:#0d6efd;color:#fff"><i class="bi bi-stars"></i></span>
+            <span><span class="bh-t text-body"><?= htmlspecialchars(t('Ask BMS'), ENT_QUOTES, 'UTF-8') ?> <span class="badge bg-primary-subtle text-primary" style="font-size:.6rem">AI</span></span>
+            <span class="bh-c"><?= htmlspecialchars(t('Ask in your own words. Answers cover only what you can open.'), ENT_QUOTES, 'UTF-8') ?></span></span>
+        </a>
+        <?php endif; ?>
         <div id="bhView" aria-live="polite"></div>
         <form id="bhForm" class="d-none" enctype="multipart/form-data" autocomplete="off" novalidate>
             <input type="hidden" name="action" value="create">
@@ -167,6 +174,7 @@ if (!function_exists('helpPanelRender')) {
     function mode(m) {
         const isForm = m === 'form';
         document.getElementById('bhSearchWrap').classList.toggle('d-none', m !== 'home');
+        const ai = document.getElementById('bhAskAi'); if (ai) ai.classList.toggle('d-none', m !== 'home');
         view.classList.toggle('d-none', isForm);
         form.classList.toggle('d-none', !isForm);
         foot.classList.toggle('d-none', isForm);
@@ -298,6 +306,14 @@ if (!function_exists('helpPanelRender')) {
     q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); clearTimeout(logTimer); search(true); } });
     panel.addEventListener('show.bs.offcanvas', function () { if (!loaded) home(); });
     panel.addEventListener('shown.bs.offcanvas', function () { if (window.innerWidth >= 576 && !q.closest('.d-none')) q.focus(); });
+    // Notice banners (core/support_notices.php): dismiss for this user.
+    document.querySelectorAll('.bms-notice-x').forEach(function (b) {
+        b.addEventListener('click', function () {
+            const box = b.closest('.bms-notice'); if (!box) return;
+            box.remove();
+            post({ action: 'dismiss_notice', id: box.dataset.notice });
+        });
+    });
     // Used by the Help & Support page's "New request" button.
     window.bmsHelp = {
         contact: function (prefill) { loaded = true; bootstrap.Offcanvas.getOrCreateInstance(panel).show(); contact(prefill); }

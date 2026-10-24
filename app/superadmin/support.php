@@ -8,11 +8,18 @@ require_once __DIR__ . '/../../core/tenant_admin.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../core/support_articles.php';
 require_once __DIR__ . '/../../core/support_inbox.php';
+require_once __DIR__ . '/../../core/support_notices.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
 $me  = currentSuperadmin();
-$tab = in_array($_GET['tab'] ?? '', ['inbox', 'articles', 'categories', 'replies', 'settings'], true) ? $_GET['tab'] : 'inbox';
+$tab = in_array($_GET['tab'] ?? '', ['inbox', 'articles', 'categories', 'replies', 'notices', 'settings'], true) ? $_GET['tab'] : 'inbox';
+$notices = $tab === 'notices' ? supportNoticeList() : [];
+$noticeTargets = $tab === 'notices' ? [
+    'product' => getControlPdo()->query('SELECT product_key, name FROM platform_products ORDER BY sort_order')->fetchAll(PDO::FETCH_KEY_PAIR),
+    'plan' => getControlPdo()->query('SELECT plan_key, name FROM plans ORDER BY name')->fetchAll(PDO::FETCH_KEY_PAIR),
+    'tenant' => getControlPdo()->query("SELECT id, company_name FROM tenants WHERE status <> 'deleted' ORDER BY company_name")->fetchAll(PDO::FETCH_KEY_PAIR),
+] : [];
 $h   = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
 $s = supportSettings();
@@ -90,12 +97,14 @@ $statusBadge = function (string $st) use ($h): string {
         <button type="button" class="btn btn-primary" id="btnAddCat"><i class="bi bi-plus-circle me-1"></i> Add category</button>
         <?php elseif ($tab === 'replies'): ?>
         <button type="button" class="btn btn-primary" id="btnAddCanned"><i class="bi bi-plus-circle me-1"></i> Add saved reply</button>
+        <?php elseif ($tab === 'notices'): ?>
+        <button type="button" class="btn btn-primary" id="btnAddNotice"><i class="bi bi-plus-circle me-1"></i> New notice</button>
         <?php endif; ?>
     </div>
 
     <ul class="nav nav-tabs mb-3">
         <?php $needs = supportInboxNeedsReplyCount();
-        foreach (['inbox' => ['bi-inbox', 'Inbox'], 'articles' => ['bi-journal-text', 'Articles'], 'categories' => ['bi-tags', 'Categories'], 'replies' => ['bi-chat-square-text', 'Saved replies'], 'settings' => ['bi-sliders', 'Settings']] as $k => [$ic, $lbl]): ?>
+        foreach (['inbox' => ['bi-inbox', 'Inbox'], 'articles' => ['bi-journal-text', 'Articles'], 'categories' => ['bi-tags', 'Categories'], 'replies' => ['bi-chat-square-text', 'Saved replies'], 'notices' => ['bi-megaphone', 'Notices'], 'settings' => ['bi-sliders', 'Settings']] as $k => [$ic, $lbl]): ?>
         <li class="nav-item"><a class="nav-link<?= $tab === $k ? ' active' : '' ?>" href="<?= $h(saUrl('support?tab=' . $k)) ?>"><i class="bi <?= $ic ?> me-1"></i><?= $lbl ?><?php if ($k === 'inbox' && $needs > 0): ?> <span class="badge rounded-pill bg-danger"><?= $needs ?></span><?php endif; ?></a></li>
         <?php endforeach; ?>
     </ul>
@@ -183,6 +192,69 @@ $statusBadge = function (string $st) use ($h): string {
                     <input type="hidden" name="action" value="save_canned"><input type="hidden" name="id" id="canned_id">
                     <div class="mb-3"><label class="form-label" for="canned_title">Name <span class="text-danger">*</span></label><input class="form-control" id="canned_title" name="title" maxlength="191" required></div>
                     <div class="mb-0"><label class="form-label" for="canned_body">Reply text <span class="text-danger">*</span></label><textarea class="form-control" id="canned_body" name="body" rows="7" maxlength="5000" required></textarea></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save</button></div>
+            </form>
+        </div></div>
+    </div>
+
+<?php elseif ($tab === 'notices'): ?>
+    <p class="small text-muted">A banner at the top of every page for the companies you choose, between the start and end time. Each person can close it for themselves.</p>
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-dark"><tr><th>Notice</th><th>Level</th><th>Who sees it</th><th>From</th><th>Until</th><th>State</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        <?php if (!$notices): ?><tr><td colspan="7" class="text-center text-muted py-4">No notices yet.</td></tr><?php endif; ?>
+        <?php foreach ($notices as $n):
+            $who = $n['target'] === 'all' ? 'All companies' : (SUPPORT_NOTICE_TARGETS[$n['target']] . ': ' . ($noticeTargets[$n['target']][$n['target_value']] ?? $n['target_value']));
+            $stateBadge = ['live' => '<span class="badge rounded-pill" style="background:#0d6efd">Live</span>', 'scheduled' => '<span class="badge rounded-pill" style="background:#cfe2ff;color:#084298">Scheduled</span>', 'ended' => '<span class="badge rounded-pill" style="background:#6c757d">Ended</span>'][$n['state']]; ?>
+            <tr>
+                <td><div class="fw-semibold"><?= $h($n['title']) ?></div><div class="small text-muted"><?= $h(mb_strimwidth((string)$n['body'], 0, 120, '…')) ?></div></td>
+                <td class="small"><?= $h(SUPPORT_NOTICE_LEVELS[$n['level']] ?? $n['level']) ?></td>
+                <td class="small"><?= $h($who) ?></td>
+                <td class="small"><?= $h(date('d M Y H:i', strtotime((string)$n['starts_at']))) ?></td>
+                <td class="small"><?= $n['ends_at'] ? $h(date('d M Y H:i', strtotime((string)$n['ends_at']))) : '—' ?></td>
+                <td><?= $stateBadge ?></td>
+                <td class="text-end">
+                    <div class="dropdown d-flex justify-content-end">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions"><i class="bi bi-gear-fill me-1"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                            <li><button class="dropdown-item py-2 rounded js-edit-notice" data-n="<?= $h(json_encode(['id' => (int)$n['id'], 'title' => $n['title'], 'body' => $n['body'], 'level' => $n['level'], 'target' => $n['target'], 'target_value' => $n['target_value'], 'starts_at' => substr(str_replace(' ', 'T', (string)$n['starts_at']), 0, 16), 'ends_at' => $n['ends_at'] ? substr(str_replace(' ', 'T', (string)$n['ends_at']), 0, 16) : ''])) ?>"><i class="bi bi-pencil text-primary me-2"></i> Edit</button></li>
+                            <?php if ($n['state'] !== 'ended'): ?>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item py-2 rounded text-danger js-end-notice" data-id="<?= (int)$n['id'] ?>"><i class="bi bi-stop-circle text-danger me-2"></i> End now</button></li>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <div class="modal fade" id="noticeModal" tabindex="-1" aria-labelledby="noticeTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-primary text-white"><h5 class="modal-title" id="noticeTitle"><i class="bi bi-megaphone me-1"></i> Notice</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <form id="noticeForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="save_notice"><input type="hidden" name="id" id="n_id">
+                    <div class="mb-3"><label class="form-label" for="n_title">Title <span class="text-danger">*</span></label><input class="form-control" id="n_title" name="title" maxlength="191" required></div>
+                    <div class="mb-3"><label class="form-label" for="n_body">Message <span class="text-danger">*</span></label><textarea class="form-control" id="n_body" name="body" rows="3" maxlength="1000" required></textarea></div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4"><label class="form-label" for="n_level">Level</label><select class="form-select" id="n_level" name="level"><?php foreach (SUPPORT_NOTICE_LEVELS as $k => $l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-4"><label class="form-label" for="n_target">Who sees it</label><select class="form-select" id="n_target" name="target"><?php foreach (SUPPORT_NOTICE_TARGETS as $k => $l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-4"><label class="form-label" for="n_value">Which one</label>
+                            <select class="form-select" id="n_value" name="target_value"><option value="">—</option>
+                                <?php foreach (['product' => 'Products', 'plan' => 'Plans', 'tenant' => 'Companies'] as $tk => $tl): ?>
+                                <optgroup label="<?= $tl ?>" data-target="<?= $tk ?>"><?php foreach ($noticeTargets[$tk] ?? [] as $vk => $vn): ?><option value="<?= $h($vk) ?>" data-target="<?= $tk ?>"><?= $h($vn) ?></option><?php endforeach; ?></optgroup>
+                                <?php endforeach; ?>
+                            </select></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6"><label class="form-label" for="n_start">Starts (EAT) <span class="text-danger">*</span></label><input type="datetime-local" class="form-control" id="n_start" name="starts_at" required></div>
+                        <div class="col-md-6"><label class="form-label" for="n_end">Ends (EAT, optional)</label><input type="datetime-local" class="form-control" id="n_end" name="ends_at"></div>
+                    </div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save</button></div>
             </form>
@@ -484,6 +556,31 @@ $('#cannedForm').on('submit', function (e) {
 });
 $('.js-canned-active').on('click', function () {
     saPost(INBOX_URL, [{ name: 'action', value: 'set_canned_active' }, { name: 'id', value: $(this).data('id') }, { name: 'active', value: $(this).data('active') }]).done(function (res) { done(res, true); });
+});
+const noticeModal = document.getElementById('noticeModal') ? new bootstrap.Modal(document.getElementById('noticeModal')) : null;
+function noticeTargetSync() {
+    const t = $('#n_target').val();
+    $('#n_value').prop('disabled', t === 'all');
+    $('#n_value optgroup').each(function () { $(this).toggle($(this).data('target') === t); });
+    const cur = $('#n_value option:selected');
+    if (t === 'all' || (cur.length && cur.data('target') && cur.data('target') !== t)) $('#n_value').val('');
+}
+$('#n_target').on('change', noticeTargetSync);
+function nowLocal() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
+$('#btnAddNotice').on('click', function () { $('#noticeForm')[0].reset(); $('#n_id').val(''); $('#n_start').val(nowLocal()); noticeTargetSync(); noticeModal.show(); });
+$('.js-edit-notice').on('click', function () {
+    const n = $(this).data('n');
+    $('#n_id').val(n.id); $('#n_title').val(n.title); $('#n_body').val(n.body); $('#n_level').val(n.level); $('#n_target').val(n.target);
+    noticeTargetSync(); $('#n_value').val(n.target_value || ''); $('#n_start').val(n.starts_at); $('#n_end').val(n.ends_at); noticeModal.show();
+});
+$('#noticeForm').on('submit', function (e) {
+    e.preventDefault();
+    saPost(INBOX_URL, $(this).serializeArray(), $(this).find('[type="submit"]')).done(function (res) { if (res && res.success) noticeModal.hide(); done(res, true); });
+});
+$('.js-end-notice').on('click', function () {
+    const id = $(this).data('id');
+    Swal.fire({ title: 'End this notice now?', text: 'Companies stop seeing it immediately.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'End now' })
+        .then(function (r) { if (r.isConfirmed) saPost(INBOX_URL, [{ name: 'action', value: 'end_notice' }, { name: 'id', value: id }]).done(function (res) { done(res, true); }); });
 });
 $('.js-cat-active').on('click', function () {
     saPost(ART_URL, [{ name: 'action', value: 'set_category_active' }, { name: 'id', value: $(this).data('id') }, { name: 'active', value: $(this).data('active') }]).done(function (res) { done(res, true); });

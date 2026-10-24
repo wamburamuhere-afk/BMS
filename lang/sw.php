@@ -5672,5 +5672,8 @@ return [
     'In progress' => 'Linashughulikiwa',
     'Normal' => 'Kawaida',
     'High' => 'Juu',
+    // Help & Support Center (support_center_plan.md, Phase 7)
+    'Ask in your own words. Answers cover only what you can open.' => 'Uliza kwa maneno yako. Majibu yanahusu tu unachoweza kufungua.',
+    'Dismiss' => 'Funga',
 
 ];

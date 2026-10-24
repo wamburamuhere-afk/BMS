@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 7 (notices, login help, blocked-account contacts, AI limited per user) + end-to-end test
+
+**Files:** `core/support_notices.php` (new), `core/support.php`, `header.php`, `includes/help_panel.php`, `api/support_help.php`, `app/superadmin/support.php`, `actions/superadmin_support_inbox.php`, `login.php`, `core/tenant_bootstrap.php`, `core/ai_insights.php`, `lang/sw.php`, `tests/test_support_center_phase7_cli.php` (new), `tests/test_support_center_phase1_cli.php`, `support_center_plan.md`
+
+- **Notices from BJP:** Superadmin › Support › Notices — information, maintenance or incident messages for all companies, one product, one plan or one company, with a start and optional end time. They show as a banner at the top of every page in those companies; each person can close it for themselves. "End now" stops it everywhere without deleting it.
+- **Login page:** the "Help" link at the bottom did nothing. It now opens "Need help signing in?": staff are told to ask their company admin, admins to use Forgot password, plus BJP's own text and contact details from Support › Settings (English and Swahili).
+- **Blocked companies can still reach support:** the pages shown to a suspended company, one past its grace period, or one awaiting approval now list BJP's email, phone, WhatsApp and office hours.
+- **AI assistant respects each person's access:** every figure the assistant can look up now needs one of its pages (sales, payroll, …). The assistant is only offered what that person may open, and anything else is refused by the code itself. "How do I…" answers now come from the published help articles in the company's own words (Shop vs Warehouse, Sell vs Sales › POS). The Help panel links to Ask BMS when AI is switched on and allowed.
+- **End-to-end test** of the whole journey through the real endpoints: a staff member asks, the admin answers, the staff member replies, the admin forwards it to BJP, BJP writes an internal note and replies, the staff member replies, BJP resolves it, the staff member rates it 5 stars and it closes — with the right notifications at every step, the internal note never visible to the company, and the request invisible to anyone else.
+- **Test:** `tests/test_support_center_phase7_cli.php` — 71 checks. All seven support suites together: 607 checks.
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 6 (notifications, overdue reminders, auto-close)
 
 **Files:** `core/support_notify.php` (new), `api/support_requests.php`, `actions/superadmin_support_inbox.php`, `api/run_background_jobs.php`, `core/support.php`, `tests/test_support_center_phase6_cli.php` (new), `tests/test_support_center_phase4_cli.php`, `tests/test_support_center_phase5_cli.php`, `support_center_plan.md`

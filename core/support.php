@@ -84,6 +84,10 @@ if (!function_exists('supportEnsureSchema')) {
                 starts_at DATETIME NOT NULL, ends_at DATETIME NULL,
                 created_by INT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY idx_window (starts_at, ends_at)) {$opt}",
+            'support_notice_dismissals' => "CREATE TABLE IF NOT EXISTS {$q('support_notice_dismissals')} (
+                notice_id INT NOT NULL, tenant_id INT NOT NULL, user_id INT NOT NULL,
+                dismissed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (notice_id, tenant_id, user_id)) {$opt}",
             'support_search_log' => "CREATE TABLE IF NOT EXISTS {$q('support_search_log')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 tenant_id INT NULL, query VARCHAR(255) NOT NULL, results_count INT NOT NULL DEFAULT 0,

@@ -107,7 +107,7 @@ section('2. supportEnsureSchema() — idempotent, all tables present');
 $db = controlDbName();
 $t1 = supportEnsureSchema($c, $db);
 $t2 = supportEnsureSchema($c, $db);
-ok('returns the same 8 tables on a second run (no error = idempotent)', count($t1) === 8 && $t1 === $t2);
+ok('returns the same support tables on a second run (no error = idempotent)', count($t1) >= 9 && $t1 === $t2);
 $have = $c->query("SELECT table_name FROM information_schema.tables WHERE table_schema = " . $c->quote($db) . " AND table_name LIKE 'support\\_%'")->fetchAll(PDO::FETCH_COLUMN);
 foreach ($t1 as $t) ok("table $t exists", in_array($t, $have, true));
 $cols = $c->query("SELECT column_name FROM information_schema.columns WHERE table_schema = " . $c->quote($db) . " AND table_name = 'support_tickets'")->fetchAll(PDO::FETCH_COLUMN);

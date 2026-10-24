@@ -79,6 +79,21 @@ try {
             logTenantAdminAction(null, null, 'support_canned', "Saved reply #{$id} " . ($active ? 'in use' : 'retired'));
             si_out(200, ['success' => true, 'message' => $active ? 'Saved reply in use again.' : 'Saved reply retired.']);
         }
+        case 'save_notice': {
+            require_once __DIR__ . '/../core/support_notices.php';
+            $r = supportValidateNotice($_POST, getControlPdo());
+            if (!$r['ok']) si_out(422, ['success' => false, 'message' => reset($r['errors']), 'errors' => $r['errors']]);
+            if ($id) { $chk = getControlPdo()->prepare('SELECT 1 FROM support_notices WHERE id = ?'); $chk->execute([$id]); if (!$chk->fetchColumn()) si_out(404, ['success' => false, 'message' => 'That notice no longer exists.']); }
+            $nid = supportNoticeSave($r['values'], $id ?: null, $agent['id']);
+            logTenantAdminAction(null, null, 'support_notice', ($id ? 'Updated' : 'Created') . " platform notice #{$nid}");
+            si_out(200, ['success' => true, 'id' => $nid, 'message' => 'Notice saved.']);
+        }
+        case 'end_notice': {
+            require_once __DIR__ . '/../core/support_notices.php';
+            if (!$id || !supportNoticeEnd($id)) si_out(404, ['success' => false, 'message' => 'That notice no longer exists.']);
+            logTenantAdminAction(null, null, 'support_notice', "Ended platform notice #{$id}");
+            si_out(200, ['success' => true, 'message' => 'Notice ended.']);
+        }
         default:
             si_out(400, ['success' => false, 'message' => 'Unknown action.']);
     }

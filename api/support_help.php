@@ -69,6 +69,16 @@ try {
             echo json_encode(['success' => true, 'counted' => $counted, 'message' => t('Thanks for your feedback.')]);
             break;
         }
+        case 'dismiss_notice': {
+            require_once __DIR__ . '/../core/support_notices.php';
+            require_once __DIR__ . '/../core/support_requests.php';
+            $nid = ctype_digit((string)($_POST['id'] ?? '')) ? (int)$_POST['id'] : 0;
+            $ok = supportDismissNotice($nid, supportTenantId(), (int)$_SESSION['user_id']);
+            if ($ok) logActivity($pdo, (int)$_SESSION['user_id'], 'notice_dismiss', "Dismissed platform notice #{$nid}");
+            if (!$ok) http_response_code(404);
+            echo json_encode(['success' => $ok]);
+            break;
+        }
         default:
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Unknown action']);

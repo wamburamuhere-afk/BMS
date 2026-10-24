@@ -1570,6 +1570,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
     </div><!-- /.header-wrapper -->
     <?php helpPanelRender(); ?>
+    <?php require_once __DIR__ . '/core/support_notices.php'; echo supportNoticeBanner(); ?>
 
     <?php if (posSimpleModeEnabled()): ?>
     <?php
