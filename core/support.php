@@ -29,7 +29,7 @@ if (!function_exists('supportEnsureSchema')) {
                 simple_body_en MEDIUMTEXT NULL, simple_body_sw MEDIUMTEXT NULL,
                 video_url VARCHAR(500) NULL, is_faq TINYINT(1) NOT NULL DEFAULT 0,
                 page_keys JSON NULL,
-                status ENUM('draft','published') NOT NULL DEFAULT 'draft',
+                status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
                 views INT NOT NULL DEFAULT 0, helpful_yes INT NOT NULL DEFAULT 0, helpful_no INT NOT NULL DEFAULT 0,
                 updated_by INT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

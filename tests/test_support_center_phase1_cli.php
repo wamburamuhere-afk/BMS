@@ -34,7 +34,8 @@ if (($argv[1] ?? '') === '--route') {
     $_SERVER['HTTP_HOST']      = (string)$argv[2];
     $_SERVER['REQUEST_URI']    = (string)$argv[3];
     $_SERVER['REQUEST_METHOD'] = 'GET';
-    $_SERVER['QUERY_STRING']   = '';
+    $_SERVER['QUERY_STRING']   = (string)parse_url((string)$argv[3], PHP_URL_QUERY);
+    parse_str($_SERVER['QUERY_STRING'], $_GET);
     require_once __DIR__ . '/../roots.php';
     require_once __DIR__ . '/../core/superadmin_auth.php';
     superadminSessionReady();
@@ -169,7 +170,7 @@ ok('  ...and nothing was overwritten by the rejected save', supportSettings()['s
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('6. Superadmin Support page renders through the real router');
-$html = route(SA_HOST, '/support');
+$html = route(SA_HOST, '/support?tab=settings');
 ok('renders with no PHP fatal', !str_contains($html, 'Fatal error') && !str_contains($html, 'Uncaught'), substr($html, 0, 300));
 ok('page heading present', str_contains($html, 'Contact details') && str_contains($html, 'First-reply targets'));
 ok('Support nav item marked active', (bool)preg_match('~nav-link active[^>]*>\s*<i class="bi bi-headset~', $html));

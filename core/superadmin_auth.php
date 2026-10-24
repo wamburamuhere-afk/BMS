@@ -419,6 +419,7 @@ if (!function_exists('superadminRouteMap')) {
             'broadcast'    => $d . 'broadcast.php',
             'module-requests' => $d . 'module_requests.php',
             'support'      => $d . 'support.php',
+            'support/article' => $d . 'support_article.php',
             'tenants'      => $d . 'tenants.php',
             'tenants/new'  => $d . 'tenant_new.php',
             'tenants/view' => $d . 'tenant_view.php',

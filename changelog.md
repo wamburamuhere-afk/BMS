@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 2 (help articles written once, shown in each company's own words)
+
+**Files:** `core/help_nav.php` (new), `core/support_articles.php` (new), `core/support.php`, `scripts/setup_control_db.php`, `app/superadmin/support.php`, `app/superadmin/support_article.php` (new), `actions/superadmin_support_articles.php` (new), `core/superadmin_auth.php`, `tests/test_support_center_phase2_cli.php` (new), `tests/test_support_center_phase1_cli.php`, `support_center_plan.md`
+
+- **Superadmin › Support now has three tabs:** Articles (search, filter, stat cards, publish / move to drafts / archive), Categories (add, edit, hide) and Settings (Phase 1).
+- **Article editor:** English and Swahili title and steps, optional shorter steps for Simple Mode shops, category, the pages the article is about, optional YouTube/Vimeo/Loom link (https only), "show in Frequently asked". A live preview shows exactly what a Smart POS or Smart BMS admin or staff member will see, and warns when that user would not see the article at all.
+- **One article, each company's own words:** steps write page links as `{nav:pos}` and wording as `{shop}`. A Smart POS shop reads "Sell" and "Shop › Shops"; a Smart BMS company reads "Sales › POS" and "Inventory › Warehouses". The paths come from a mirror of the real header menu (same collapse rules, Simple Mode, Shop wording, permissions); a test fails if the header gets a menu page the mirror does not know.
+- **Who sees an article:** only users who can open at least one of its pages (module and role, the same check the menu uses). Articles with no pages are general help for everyone.
+- **Safe by design:** article text is plain text with a tiny format (numbered steps, bullets, Tip:, bold). Everything is escaped before formatting, so no HTML, script or link can ever reach a company's screen. Video links are limited to https YouTube/Vimeo/Loom. Articles are archived, never deleted.
+- **Starter content:** 8 categories and 16 how-to articles (selling, credit sales, returns, products, receiving stock, shops, customers, suppliers, expenses, reports, users), written against the real button labels, inserted once **as drafts** for BJP to review and publish. Tenants see nothing until an article is published.
+- **Test:** `tests/test_support_center_phase2_cli.php` — 153 checks, including the menu paths seen on the live demo shop, 11 XSS payloads, validation, publish/archive, visibility per product and role, action guards, and the pages rendering through the real router.
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 1 (support tables, superadmin Support settings, real contact details on the Help page)
 
 **Files:** `core/support.php` (new), `scripts/setup_control_db.php`, `app/superadmin/support.php` (new), `actions/superadmin_support_settings.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `app/constant/settings/help.php`, `lang/sw.php`, `tests/test_support_center_phase1_cli.php` (new), `support_center_plan.md` (new)

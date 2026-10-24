@@ -1011,6 +1011,10 @@ try {
     foreach (supportEnsureSchema($admin, $controlDb) as $t) {
         say("  · table {$t} ready");
     }
+    // Starter categories + draft articles, only into empty tables (BJP reviews and publishes).
+    require_once __DIR__ . '/../core/support_articles.php';
+    [$sc, $sa] = supportSeedDefaults($admin, $controlDb);
+    if ($sc || $sa) say("  + support starter content: {$sc} categories, {$sa} draft articles");
 } catch (PDOException $e) {
     die_with('Creating the control tables failed: ' . $e->getMessage());
 }
