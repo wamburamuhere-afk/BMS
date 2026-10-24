@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 4 (send a request, follow it, staff → admin → BJP)
+
+**Files:** `core/support_requests.php` (new), `api/support_requests.php` (new), `api/support_attachment.php` (new), `core/support.php`, `includes/help_panel.php`, `app/constant/settings/help.php`, `lang/sw.php`, `tests/test_support_center_phase4_cli.php` (new), `tests/test_support_center_phase3_cli.php`, `support_center_plan.md`
+
+- **Contact support:** one button for everyone, in the Help panel and on the Help & Support page, and under every article ("Still need help?"). The form asks for a subject, type, urgency and description, and takes up to 3 screenshots or PDFs. The page, article, product, plan, name, role and browser are added automatically.
+- **Who it reaches:** a staff member's request goes to their own company admin (HLP-2026-NNNN); an admin's request goes to BJP Support (SUP-2026-NNNN). An admin can forward a staff request to BJP with one click — same conversation, new SUP number, the staff member can still follow it. Staff never see the words "BJP" or "admin".
+- **My requests:** list (admins can switch between Mine and All company) and a conversation page: reply with files, Mark as resolved, a reply on a resolved request reopens it, rate 1–5 stars to close. A red dot on ? and a count on My requests show when something is waiting for you.
+- **Safe by design:** a request is visible only to the person who sent it and their company admins — never to other staff, never to another company. Attachments are checked by their real content (JPG/PNG/PDF only; a renamed PHP or HTML file is refused), stored under random names in a folder the web server will not serve, and downloaded only through a checked endpoint. BJP internal notes and their files never reach the company. At most 10 new requests per person per hour. Every action is written to the activity log.
+- **Full Swahili** for all new text.
+- **Test:** `tests/test_support_center_phase4_cli.php` — 104 checks (validation, disguised and oversized files, routing, isolation across staff and companies, the whole status flow, forwarding, internal-note isolation, path tampering, the download endpoint, API guards, escaped pages, JavaScript syntax).
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 3 (? Help button and panel in every company's header; Help page rebuilt)
 
 **Files:** `includes/help_panel.php` (new), `api/support_help.php` (new), `header.php`, `app/constant/settings/help.php`, `core/permissions.php`, `core/help_nav.php`, `core/support_articles.php`, `migrations/tenant/2026_10_24_help_self_service.php` (new), `schema/tenant_seed_defaults.sql`, `lang/sw.php`, `tests/test_support_center_phase3_cli.php` (new), `support_center_plan.md`

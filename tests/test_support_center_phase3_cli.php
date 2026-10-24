@@ -260,7 +260,7 @@ foreach ($sm[1] as $js) if (str_contains($js, 'bmsHelpPanel')) $panelJs = $js;
 $tmp = tempnam(sys_get_temp_dir(), 'js') . '.js'; file_put_contents($tmp, $panelJs);
 $o = []; exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $o, $rc); @unlink($tmp);
 ok('panel script is valid JavaScript', $panelJs !== '' && $rc === 0, implode(' ', $o));
-ok('panel inserts titles as text, never as HTML', str_contains($panelJs, 'textContent') && substr_count($panelJs, 'innerHTML') === 1);
+ok('panel inserts titles as text; the only innerHTML from data is the escaped article body', str_contains($panelJs, 'textContent') && substr_count($panelJs, 'innerHTML') - substr_count($panelJs, 'btn.innerHTML') === 1 && str_contains($panelJs, 'body.innerHTML = a.html'));
 $hs = page($ADMIN, (string)getUrl('help') . '?q=warehouse', ['q' => 'warehouse']);
 ok('page search renders', noErr($hs) && str_contains($hs, 'results'));
 $ha = page($ADMIN, (string)getUrl('help') . '?article=' . $xssId, ['article' => (string)$xssId]);

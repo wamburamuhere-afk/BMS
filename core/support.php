@@ -38,6 +38,7 @@ if (!function_exists('supportEnsureSchema')) {
             'support_tickets' => "CREATE TABLE IF NOT EXISTS {$q('support_tickets')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 ref_no VARCHAR(20) NOT NULL,
+                audience ENUM('company','bjp') NOT NULL DEFAULT 'bjp',
                 tenant_id INT NOT NULL, tenant_user_id INT NOT NULL,
                 user_name VARCHAR(191) NOT NULL, user_email VARCHAR(191) NULL, user_role VARCHAR(100) NULL,
                 subject VARCHAR(255) NOT NULL, category VARCHAR(60) NOT NULL DEFAULT 'other',
@@ -52,7 +53,8 @@ if (!function_exists('supportEnsureSchema')) {
                 last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY uq_ref (ref_no),
-                KEY idx_tenant_status (tenant_id, status), KEY idx_status_activity (status, last_activity_at)) {$opt}",
+                KEY idx_tenant_status (tenant_id, status), KEY idx_tenant_user (tenant_id, tenant_user_id),
+                KEY idx_audience_status (audience, status, last_activity_at)) {$opt}",
             'support_ticket_messages' => "CREATE TABLE IF NOT EXISTS {$q('support_ticket_messages')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 ticket_id INT NOT NULL,
@@ -63,11 +65,11 @@ if (!function_exists('supportEnsureSchema')) {
                 KEY idx_ticket (ticket_id, created_at)) {$opt}",
             'support_attachments' => "CREATE TABLE IF NOT EXISTS {$q('support_attachments')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                message_id INT NOT NULL,
+                ticket_id INT NOT NULL, message_id INT NOT NULL, tenant_id INT NOT NULL,
                 stored_path VARCHAR(500) NOT NULL, original_name VARCHAR(255) NOT NULL,
                 mime VARCHAR(100) NOT NULL, size_bytes INT NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                KEY idx_message (message_id)) {$opt}",
+                KEY idx_message (message_id), KEY idx_ticket (ticket_id)) {$opt}",
             'support_canned_replies' => "CREATE TABLE IF NOT EXISTS {$q('support_canned_replies')} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(191) NOT NULL, body TEXT NOT NULL, created_by INT NULL,
