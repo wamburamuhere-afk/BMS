@@ -307,7 +307,11 @@ if (!function_exists('registerTenant')) {
         $needsApproval = (string)($choice['plan']['product_key'] ?? '') === 'bms_full';
 
         $r = provisionTenant($company, $sub, $username, $pw, [
-            'status'            => 'active',      // so the owner can sign in immediately
+            // A self-registered company starts on its free trial (trial_ends_at is set
+            // by provisionTenant()). 'trial' signs in exactly like 'active', but it is
+            // the status the expiry clock reads — 'active' with no paid-until date
+            // never ran out and showed "No end date" on the Subscription page.
+            'status'            => 'trial',
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
             'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
             'owner_phone'       => $phone,
@@ -703,10 +707,12 @@ if (!function_exists('startTenantTrialNow')) {
     function startTenantTrialNow(int $tenantId): void
     {
         require_once __DIR__ . '/tenant_lifecycle_policy.php';
+        // 'trial', not 'active': see registerTenant(). The trial counts from now.
+        $start = controlColumnExists('tenants', 'trial_starts_at') ? ', trial_starts_at = NOW()' : '';
         getControlPdo()->prepare("
             UPDATE tenants
-               SET status='active', suspended_at=NULL, suspension_reason=NULL, grace_until=NULL,
-                   trial_ends_at = DATE_ADD(NOW(), INTERVAL ? DAY), activated_at = NOW()
+               SET status='trial', suspended_at=NULL, suspension_reason=NULL, grace_until=NULL,
+                   trial_ends_at = DATE_ADD(NOW(), INTERVAL ? DAY), activated_at = NOW() $start
              WHERE id = ?
         ")->execute([tenantDefaultTrialDays(), $tenantId]);
     }

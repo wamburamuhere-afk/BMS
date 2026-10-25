@@ -608,6 +608,9 @@ try {
         // Trial lifecycle
         'trial_ends_at'      => "ADD COLUMN `trial_ends_at` DATETIME NULL AFTER `suspended_at`",
         'trial_extended_by'  => "ADD COLUMN `trial_extended_by` INT NULL AFTER `trial_ends_at`",
+        // When the free trial began, when an operator set it (setTenantTrial()) or a
+        // Smart BMS approval started it; NULL = it began when the account was created.
+        'trial_starts_at'    => "ADD COLUMN `trial_starts_at` DATETIME NULL AFTER `trial_extended_by`",
         // Owner contact — mirrored from the tenant DB so superadmin never has to open it
         'owner_first_name'   => "ADD COLUMN `owner_first_name` VARCHAR(100) NULL AFTER `owner_email`",
         'owner_last_name'    => "ADD COLUMN `owner_last_name` VARCHAR(100) NULL AFTER `owner_first_name`",
