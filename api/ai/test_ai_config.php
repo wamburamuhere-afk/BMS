@@ -14,7 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_
 csrf_check();
 
 if (!aiConfigured()) {
-    echo json_encode(['success' => false, 'message' => 'Enable the assistant and set a model + API key first, then save before testing.']);
+    $__aiMode = aiTenantAiMode();
+    $__msg = $__aiMode['source'] === 'platform' ? 'AI has not been switched on by your service provider yet.'
+           : ($__aiMode['source'] === 'off' ? 'AI is not included for your company. Please contact support.'
+           : 'Enable the assistant and set a model + API key first, then save before testing.');
+    echo json_encode(['success' => false, 'message' => $__msg]);
     exit;
 }
 

@@ -31,6 +31,8 @@ if (!aiConfigured()) {
 }
 $cap = aiCapInfo();
 if ($cap['exceeded']) {
+    // On the service provider's key the company can't raise the limit itself (platform_ai_plan.md).
+    if (($cap['source'] ?? 'own') === 'platform') { echo json_encode(['success' => false, 'message' => aiT("This month's AI limit has been reached. Please contact support.")]); exit; }
     echo json_encode(['success' => false, 'message' => 'Monthly AI cost cap reached ($' . number_format($cap['cap'], 2) . '). Adjust it in AI Settings.']); exit;
 }
 if (aiRateLimited(6)) {
