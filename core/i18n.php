@@ -100,6 +100,23 @@ function supportedLanguages()
     return SUPPORTED_LANGUAGES;
 }
 
+/**
+ * Organization-wide language, or null when each user picks their own.
+ *
+ * Set in System Settings > General ("Language Mode"). Default is per-user, so
+ * nothing changes until an admin switches it to "organization".
+ *
+ * @return string|null 'en'|'sw' when forced for everyone, else null
+ */
+function orgLanguage()
+{
+    if (!function_exists('get_setting') || get_setting('language_mode', 'user') !== 'organization') {
+        return null;
+    }
+    $lang = get_setting('org_language', 'en');
+    return in_array($lang, SUPPORTED_LANGUAGES, true) ? $lang : 'en';
+}
+
 // Default to English until header.php resolves the logged-in user's saved
 // preference and calls loadLanguage() explicitly.
 loadLanguage('en');
