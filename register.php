@@ -117,9 +117,36 @@ $T = $sw ? [
     'chk_match'      => 'Password zinafanana',
     'terms'          => 'Nakubali <u>Masharti ya Huduma</u> na <u>Sera ya Faragha</u>',
     'create'         => 'Fungua akaunti yangu',
-    'err_company'    => 'Tafadhali andika jina na anwani sahihi ya mtandao.',
-    'err_admin'      => 'Tafadhali jaza kila sehemu yenye *, timiza masharti yote ya password na ukubali Masharti.',
     'err_generic'    => 'Usajili umeshindikana. Tafadhali jaribu tena.',
+    'err_fix'        => 'Tafadhali rekebisha sehemu %d zilizowekwa alama nyekundu hapa chini.',
+    'f_name'         => 'Andika jina la kampuni (angalau herufi 2).',
+    'f_sub_wait'     => 'Subiri tumalize kukagua anwani hii ya mtandao, kisha bonyeza Endelea tena.',
+    'f_sub_taken'    => 'Anwani hii ya mtandao imeshachukuliwa. Chagua nyingine.',
+    'f_first'        => 'Andika jina lako la kwanza.',
+    'f_last'         => 'Andika jina lako la mwisho.',
+    'f_user_empty'   => 'Andika username utakayotumia kuingia, mf. jane.mwangi',
+    'f_user_space'   => 'Username haiwezi kuwa na nafasi. Tumia nukta badala yake, mf. jane.mwangi',
+    'f_user_at'      => 'Username si email. Usitumie @ — mf. jane.mwangi',
+    'f_user_start'   => 'Username lazima ianze na herufi, si namba au alama. Mf. jane2026',
+    'f_user_short'   => 'Username ni fupi mno — angalau herufi 3.',
+    'f_user_chars'   => 'Username inaweza kuwa na herufi, namba, nukta (.), kistari (-) au underscore (_) tu.',
+    'f_phone_empty'  => 'Andika namba yako ya simu, mf. 0712 345 678',
+    'f_phone_chars'  => 'Simu: tumia namba tu (na + mwanzoni ukipenda), mf. 0712 345 678 au +255 712 345 678',
+    'f_phone_len'    => 'Simu: inahitaji namba 7 hadi 15. Uliyoandika ina namba %d.',
+    'f_phone_taken'  => 'Namba hii ya simu tayari ina akaunti. Ingia badala yake, au tumia namba nyingine.',
+    'f_email_empty'  => 'Andika email yako — ndiyo njia pekee ya kurudisha password ukisahau.',
+    'f_email'        => 'Email haijakamilika — inapaswa kuwa kama jane@gmail.com',
+    'f_email_taken'  => 'Email hii tayari ina akaunti. Ingia badala yake, au tumia email nyingine.',
+    'f_pw_empty'     => 'Chagua password.',
+    'f_pw_need'      => 'Password bado inahitaji: %s.',
+    'f_pw_len'       => 'herufi 8 au zaidi',
+    'f_pw_letter'    => 'angalau herufi moja',
+    'f_pw_num'       => 'angalau namba moja',
+    'f_pw2_empty'    => 'Andika password tena hapa kuithibitisha.',
+    'f_pw2'          => 'Password mbili hazifanani. Ziandike tena zifanane.',
+    'f_terms'        => 'Weka tiki kukubali Masharti ya Huduma na Sera ya Faragha.',
+    'pw_show'        => 'Onyesha password',
+    'pw_hide'        => 'Ficha password',
     'creating_h'     => 'Tunaandaa akaunti yako ya %s…',
     'creating_sub'   => 'Inachukua sekunde chache. Tafadhali usifunge ukurasa huu.',
     'c1'             => 'Tunatengeneza database yako binafsi',
@@ -211,9 +238,36 @@ $T = $sw ? [
     'chk_match'      => 'Passwords match',
     'terms'          => 'I agree to the <u>Terms of Service</u> and <u>Privacy Policy</u>',
     'create'         => 'Create my account',
-    'err_company'    => 'Please enter the name and a valid, available web address.',
-    'err_admin'      => 'Please complete every field marked *, meet all password rules and accept the Terms.',
     'err_generic'    => 'Registration failed. Please try again.',
+    'err_fix'        => 'Please fix the %d field(s) marked in red below.',
+    'f_name'         => 'Enter the company name (at least 2 characters).',
+    'f_sub_wait'     => 'Please wait while we check this web address, then press Continue again.',
+    'f_sub_taken'    => 'That web address is already taken. Please choose another.',
+    'f_first'        => 'Enter your first name.',
+    'f_last'         => 'Enter your last name.',
+    'f_user_empty'   => 'Enter the username you will sign in with, e.g. jane.mwangi',
+    'f_user_space'   => 'A username cannot contain spaces. Use a dot instead, e.g. jane.mwangi',
+    'f_user_at'      => 'The username is not your email. Leave out the @ — e.g. jane.mwangi',
+    'f_user_start'   => 'The username must start with a letter, not a number or symbol. E.g. jane2026',
+    'f_user_short'   => 'The username is too short — use at least 3 characters.',
+    'f_user_chars'   => 'The username can only contain letters, numbers, dots (.), hyphens (-) or underscores (_).',
+    'f_phone_empty'  => 'Enter your phone number, e.g. 0712 345 678',
+    'f_phone_chars'  => 'Phone: use numbers only (with an optional + at the start), e.g. 0712 345 678 or +255 712 345 678',
+    'f_phone_len'    => 'Phone: needs 7 to 15 digits. The number you typed has %d.',
+    'f_phone_taken'  => 'This phone number already has an account. Sign in instead, or use another number.',
+    'f_email_empty'  => 'Enter your email — it is the only way to reset your password if you forget it.',
+    'f_email'        => 'The email address looks incomplete — it should look like jane@gmail.com',
+    'f_email_taken'  => 'This email address already has an account. Sign in instead, or use another email.',
+    'f_pw_empty'     => 'Choose a password.',
+    'f_pw_need'      => 'Your password still needs: %s.',
+    'f_pw_len'       => 'at least 8 characters',
+    'f_pw_letter'    => 'at least one letter',
+    'f_pw_num'       => 'at least one number',
+    'f_pw2_empty'    => 'Type the password again here to confirm it.',
+    'f_pw2'          => 'The two passwords do not match. Type them again so they are the same.',
+    'f_terms'        => 'Tick the box to accept the Terms of Service and Privacy Policy.',
+    'pw_show'        => 'Show password',
+    'pw_hide'        => 'Hide password',
     'creating_h'     => 'Setting up your %s account…',
     'creating_sub'   => "This takes a few seconds. Please don't close this page.",
     'c1'             => 'Creating your private database',
@@ -354,6 +408,13 @@ if (!in_array($pickProduct, array_column($products, 'key'), true)) $pickProduct 
 if (count($products) === 1) $pickProduct = $products[0]['key'];
 
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE;
+// Eye button inside a password box: shows / hides what was typed.
+$pwEye = static fn(string $for): string =>
+    '<button type="button" class="pw-eye" data-pw="' . $for . '" aria-controls="' . $for . '" aria-pressed="false"'
+    . ' aria-label="' . htmlspecialchars($T['pw_show']) . '" title="' . htmlspecialchars($T['pw_show']) . '">'
+    . '<svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+    . '<svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>'
+    . '</button>';
 $langUrl = function (string $l) use ($pickProduct, $pickPlan, $pickTerm): string {
     return '?' . http_build_query(array_filter(['product' => $pickProduct, 'plan' => $pickPlan, 'term' => $pickTerm, 'lang' => $l]));
 };
@@ -468,6 +529,20 @@ $icons = [
     .btn-line:hover { background: var(--tint); color: var(--blue); }
     .note { background: var(--tint); border: 1px solid #dbe5fb; border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #1e3a8a; }
     .err { border: 1px solid var(--blue); background: var(--tint); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; }
+    /* Field errors: the exact problem, under the field it belongs to */
+    .err.bad { border-color: #fca5a5; background: #fef2f2; color: #991b1b; font-weight: 600; }
+    .form-control.is-bad, .form-select.is-bad { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
+    .ferr { font-size: 13px; font-weight: 600; color: #b91c1c; margin-top: 6px; line-height: 1.4; }
+    label.is-bad > span { color: #b91c1c; }
+    label.is-bad > input[type=checkbox] { outline: 2px solid #dc2626; outline-offset: 2px; }
+    /* Show / hide password */
+    .pw-wrap { position: relative; }
+    .pw-wrap .form-control { padding-right: 50px; }
+    .pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border: 0; border-radius: 8px; background: transparent; color: #64748b; display: flex; align-items: center; justify-content: center; }
+    .pw-eye:hover, .pw-eye:focus-visible { color: var(--blue); background: var(--tint); }
+    .pw-eye svg { width: 20px; height: 20px; }
+    .pw-eye .off, .pw-eye[aria-pressed="true"] .on { display: none; }
+    .pw-eye[aria-pressed="true"] .off { display: block; }
     /* Product + plan cards */
     .pgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
     .pcard { background: #fff; border: 1px solid #dbe3f0; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 6px 20px rgba(15,23,42,.05); }
@@ -714,18 +789,24 @@ $icons = [
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label for="owner_password" class="form-label"><?= htmlspecialchars($T['password']) ?> <span class="req">*</span></label>
-                            <input type="password" class="form-control" id="owner_password" name="owner_password" autocomplete="new-password" placeholder="<?= htmlspecialchars($T['password_ph']) ?>" required>
+                            <div class="pw-wrap">
+                                <input type="password" class="form-control" id="owner_password" name="owner_password" autocomplete="new-password" placeholder="<?= htmlspecialchars($T['password_ph']) ?>" required>
+                                <?= $pwEye('owner_password') ?>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label for="owner_password_confirm" class="form-label"><?= htmlspecialchars($T['confirm']) ?> <span class="req">*</span></label>
-                            <input type="password" class="form-control" id="owner_password_confirm" name="owner_password_confirm" autocomplete="new-password" placeholder="<?= htmlspecialchars($T['confirm_ph']) ?>" required>
+                            <div class="pw-wrap">
+                                <input type="password" class="form-control" id="owner_password_confirm" name="owner_password_confirm" autocomplete="new-password" placeholder="<?= htmlspecialchars($T['confirm_ph']) ?>" required>
+                                <?= $pwEye('owner_password_confirm') ?>
+                            </div>
                         </div>
                     </div>
                     <div class="checks mb-3" id="pwChecks">
-                        <span data-c="len">○ <?= htmlspecialchars($T['chk_len']) ?></span>
-                        <span data-c="letter">○ <?= htmlspecialchars($T['chk_letter']) ?></span>
-                        <span data-c="num">○ <?= htmlspecialchars($T['chk_num']) ?></span>
-                        <span data-c="match">○ <?= htmlspecialchars($T['chk_match']) ?></span>
+                        <span data-c="len"><b class="ck" aria-hidden="true">○</b> <?= htmlspecialchars($T['chk_len']) ?></span>
+                        <span data-c="letter"><b class="ck" aria-hidden="true">○</b> <?= htmlspecialchars($T['chk_letter']) ?></span>
+                        <span data-c="num"><b class="ck" aria-hidden="true">○</b> <?= htmlspecialchars($T['chk_num']) ?></span>
+                        <span data-c="match"><b class="ck" aria-hidden="true">○</b> <?= htmlspecialchars($T['chk_match']) ?></span>
                     </div>
                     <label class="d-flex align-items-start gap-2 mb-4" style="font-size:14px;color:#334155">
                         <input type="checkbox" id="accept_terms" name="accept_terms" value="1" style="width:18px;height:18px;margin-top:2px;flex-shrink:0">
@@ -1035,16 +1116,86 @@ $icons = [
         rd.readAsDataURL(f);
     });
     $('#companyBack').on('click', () => show('plan'));
-    $('#companyNext').on('click', function () {
-        if ($('#company_name').val().trim().length < 2 || !S.subOk) {
-            $('#errCompany').removeClass('d-none-i').text(T.err_company); return;
+
+    // ── Field errors: the exact problem under each field, plus a short summary ──
+    function errAnchor(id) {
+        const $f = $('#' + id);
+        if (id === 'accept_terms') return $f.closest('label');
+        const $w = $f.closest('.input-group, .pw-wrap');
+        return $w.length ? $w : $f;
+    }
+    function setErr(id, msg) {
+        const $f = $('#' + id), $a = errAnchor(id);
+        (id === 'accept_terms' ? $a : $f).addClass('is-bad');
+        $f.attr('aria-invalid', 'true').attr('aria-describedby', 'ferr_' + id);
+        let $e = $('#ferr_' + id);
+        if (!$e.length) { $e = $('<div class="ferr" role="alert"></div>').attr('id', 'ferr_' + id); $a.after($e); }
+        $e.text(msg);
+    }
+    function clearErr(id) {
+        $('#' + id).removeClass('is-bad').removeAttr('aria-invalid').removeAttr('aria-describedby');
+        if (id === 'accept_terms') $('#accept_terms').closest('label').removeClass('is-bad');
+        $('#ferr_' + id).remove();
+    }
+    // errs = [[fieldId, message], …]. Marks every field, summarises, focuses the first.
+    function showErrs(boxId, errs) {
+        const $box = $('#' + boxId);
+        if (!errs.length) { $box.addClass('d-none-i').removeClass('bad'); return true; }
+        errs.forEach(e => setErr(e[0], e[1]));
+        $box.removeClass('d-none-i').addClass('bad').text(errs.length === 1 ? errs[0][1] : fill(T.err_fix, errs.length));
+        const $first = $('#' + errs[0][0]);
+        const top = ($first.closest('.mb-3, .col-md-6, .col-6, label').offset() || $first.offset() || { top: 0 }).top;
+        window.scrollTo({ top: Math.max(0, top - 90), behavior: 'smooth' });
+        setTimeout(() => $first.trigger('focus'), 250);
+        return false;
+    }
+    $('#stepCompany, #stepAdmin').on('input change', 'input, select', function () {
+        if (!this.id || !$('#ferr_' + this.id).length) return;
+        clearErr(this.id);
+        const $step = $(this).closest('section');
+        if (!$step.find('.ferr').length) $step.find('.err').addClass('d-none-i').removeClass('bad');
+    });
+
+    function companyErrors() {
+        const errs = [];
+        if ($('#company_name').val().trim().length < 2) errs.push(['company_name', T.f_name]);
+        if (!S.subOk) {
+            const v = $('#subdomain').val(), h = $('#subHint').text();
+            if (!/^[a-z0-9][a-z0-9-]{2,31}$/.test(v)) errs.push(['subdomain', T.sub_hint]);
+            else if (h === T.sub_checking) errs.push(['subdomain', T.f_sub_wait]);
+            else errs.push(['subdomain', h && h !== T.sub_hint ? h : T.f_sub_taken]);
         }
-        $('#errCompany').addClass('d-none-i');
+        return errs;
+    }
+    $('#companyNext').on('click', function () {
+        ['company_name', 'subdomain'].forEach(clearErr);
+        if (!showErrs('errCompany', companyErrors())) return;
         show('admin');
     });
 
     // ── Admin fields ─────────────────────────────────────────────────────────
-    const userOk = () => /^[A-Za-z][A-Za-z0-9._-]{2,49}$/.test($('#owner_username').val());
+    // Same rules as registerTenant() on the server (core/tenant_registration.php).
+    const USER_RE = /^[A-Za-z][A-Za-z0-9._-]{2,49}$/;
+    const userOk = () => USER_RE.test($('#owner_username').val().trim());
+    function userProblem() {
+        const v = $('#owner_username').val().trim();
+        if (v === '') return T.f_user_empty;
+        if (USER_RE.test(v)) return '';
+        if (/\s/.test(v)) return T.f_user_space;
+        if (v.includes('@')) return T.f_user_at;
+        if (!/^[A-Za-z]/.test(v)) return T.f_user_start;
+        if (/[^A-Za-z0-9._-]/.test(v)) return T.f_user_chars;
+        return T.f_user_short;
+    }
+    // Spaces, dashes, dots and brackets are formatting, not part of the number (the server strips them too).
+    const phoneClean = v => String(v).replace(/[\s().\-]/g, '');
+    function phoneProblem() {
+        const raw = $('#owner_phone').val().trim(), p = phoneClean(raw);
+        if (raw === '') return T.f_phone_empty;
+        if (!/^\+?[0-9]+$/.test(p)) return T.f_phone_chars;
+        const n = p.replace('+', '').length;
+        return (n < 7 || n > 15) ? fill(T.f_phone_len, n) : '';
+    }
     function checks() {
         const pw = $('#owner_password').val(), pw2 = $('#owner_password_confirm').val();
         return { len: pw.length >= 8, letter: /[A-Za-z]/.test(pw), num: /\d/.test(pw), match: pw !== '' && pw === pw2 };
@@ -1054,20 +1205,42 @@ $icons = [
         $('#pwChecks span').each(function () {
             const ok = c[this.getAttribute('data-c')];
             $(this).toggleClass('ok', ok);
-            this.firstChild.nodeValue = (ok ? '✓ ' : '○ ');
+            $(this).find('.ck').text(ok ? '✓' : '○');
         });
         $('#userHint').toggleClass('ok', userOk()).text(userOk() ? T.user_ok : T.user_hint);
     }
     $('#owner_password, #owner_password_confirm, #owner_username').on('input', renderChecks);
     $('#adminBack').on('click', () => show('company'));
 
-    function adminValid() {
-        const c = checks();
-        return $('#owner_first_name').val().trim() && $('#owner_last_name').val().trim() && userOk()
-            && /^\+?[0-9]{7,15}$/.test($('#owner_phone').val().replace(/\s+/g, ''))
-            && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('#owner_email').val().trim())
-            && c.len && c.letter && c.num && c.match && $('#accept_terms').is(':checked');
+    $('#owner_username').on('blur', function () { const v = $(this).val().trim(); if (v !== $(this).val()) $(this).val(v); renderChecks(); });
+
+    // Eye button: show / hide what was typed in a password box.
+    $('.pw-eye').on('click', function () {
+        const $i = $('#' + this.getAttribute('data-pw')), show = $i.attr('type') === 'password';
+        $i.attr('type', show ? 'text' : 'password');
+        $(this).attr({ 'aria-pressed': show ? 'true' : 'false', 'aria-label': show ? T.pw_hide : T.pw_show, title: show ? T.pw_hide : T.pw_show });
+    });
+
+    function adminErrors() {
+        const errs = [], c = checks();
+        if (!$('#owner_first_name').val().trim()) errs.push(['owner_first_name', T.f_first]);
+        if (!$('#owner_last_name').val().trim()) errs.push(['owner_last_name', T.f_last]);
+        const u = userProblem(); if (u) errs.push(['owner_username', u]);
+        const p = phoneProblem(); if (p) errs.push(['owner_phone', p]);
+        const em = $('#owner_email').val().trim();
+        if (em === '') errs.push(['owner_email', T.f_email_empty]);
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) errs.push(['owner_email', T.f_email]);
+        if ($('#owner_password').val() === '') errs.push(['owner_password', T.f_pw_empty]);
+        else if (!(c.len && c.letter && c.num)) {
+            const need = []; if (!c.len) need.push(T.f_pw_len); if (!c.letter) need.push(T.f_pw_letter); if (!c.num) need.push(T.f_pw_num);
+            errs.push(['owner_password', fill(T.f_pw_need, need.join(', '))]);
+        }
+        if ($('#owner_password_confirm').val() === '') errs.push(['owner_password_confirm', T.f_pw2_empty]);
+        else if (!c.match) errs.push(['owner_password_confirm', T.f_pw2]);
+        if (!$('#accept_terms').is(':checked')) errs.push(['accept_terms', T.f_terms]);
+        return errs;
     }
+    const ADMIN_FIELDS = ['owner_first_name', 'owner_last_name', 'owner_username', 'owner_phone', 'owner_email', 'owner_password', 'owner_password_confirm', 'accept_terms'];
 
     // ── Submit ───────────────────────────────────────────────────────────────
     let cTimer = null;
@@ -1089,8 +1262,8 @@ $icons = [
 
     $('#registerForm').on('submit', function (e) {
         e.preventDefault();
-        if (!adminValid()) { $('#errAdmin').removeClass('d-none-i').text(T.err_admin); return; }
-        $('#errAdmin').addClass('d-none-i');
+        ADMIN_FIELDS.forEach(clearErr);
+        if (!showErrs('errAdmin', adminErrors())) return;
         $('#f_product').val(S.product || '');
         $('#f_plan').val(S.plan || '');
         $('#f_term').val(S.term || '');
@@ -1127,11 +1300,31 @@ $icons = [
             failed(msg);
         });
     });
+    // Server refusal → the field it is about, in the page language. Order matters
+    // ("already registered" before the plain phone/email rules).
+    const SERVER_FIELDS = [
+        [/phone number is already registered/i, 'admin', 'owner_phone', () => T.f_phone_taken],
+        [/phone/i, 'admin', 'owner_phone', () => phoneProblem() || T.f_phone_chars],
+        [/email address is already registered/i, 'admin', 'owner_email', () => T.f_email_taken],
+        [/enter your email/i, 'admin', 'owner_email', () => T.f_email_empty],
+        [/email/i, 'admin', 'owner_email', () => T.f_email],
+        [/username/i, 'admin', 'owner_username', () => userProblem() || T.user_hint],
+        [/do not match/i, 'admin', 'owner_password_confirm', () => T.f_pw2],
+        [/password/i, 'admin', 'owner_password', () => T.f_pw_need.replace('%s', [T.f_pw_len, T.f_pw_letter, T.f_pw_num].join(', '))],
+        [/terms/i, 'admin', 'accept_terms', () => T.f_terms],
+        [/subdomain|web address/i, 'company', 'subdomain', () => T.f_sub_taken],
+        [/company name/i, 'company', 'company_name', () => T.f_name],
+        [/logo/i, 'company', 'company_logo', null],
+    ];
     function failed(msg) {
-        const companyErr = /subdomain|web address|company name/i.test(msg);
-        show(companyErr ? 'company' : 'admin');
-        $(companyErr ? '#errCompany' : '#errAdmin').removeClass('d-none-i').text(msg);
-        if (companyErr) { S.subOk = false; checkSub(); }
+        const hit = SERVER_FIELDS.find(r => r[0].test(msg));
+        if (!hit) { show('admin'); $('#errAdmin').removeClass('d-none-i').addClass('bad').text(msg); return; }
+        show(hit[1]);
+        const box = hit[1] === 'company' ? 'errCompany' : 'errAdmin';
+        if (hit[2] === 'company_logo') { $('#' + box).removeClass('d-none-i').addClass('bad').text(msg); return; }
+        clearErr(hit[2]);
+        showErrs(box, [[hit[2], hit[3]()]]);
+        if (hit[2] === 'subdomain') { S.subOk = false; checkSub(); }
     }
 
     // ── Start ────────────────────────────────────────────────────────────────

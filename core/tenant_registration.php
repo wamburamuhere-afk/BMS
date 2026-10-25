@@ -190,7 +190,9 @@ if (!function_exists('registerTenant')) {
 
         $company = trim((string)($in['company_name'] ?? ''));
         $sub     = strtolower(trim((string)($in['subdomain'] ?? '')));
-        $phone   = preg_replace('/\s+/', '', (string)($in['owner_phone'] ?? ''));
+        // Spaces, dashes, dots and brackets are formatting ("0712-345-678", "(+255) 712 345 678"),
+        // so they are removed before the digits-only check — the same rule register.php shows.
+        $phone   = preg_replace('/[\s().\-]+/', '', (string)($in['owner_phone'] ?? ''));
         $pw      = (string)($in['owner_password'] ?? '');
 
         // ── Is signup open at all? ───────────────────────────────────────────
