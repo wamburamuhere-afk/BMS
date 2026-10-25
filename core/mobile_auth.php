@@ -66,7 +66,7 @@ if (!function_exists('mobileBearerAuth')) {
 
         // The web sets this in header.php; API messages wrapped in t() follow it.
         if (empty($_SESSION['user_lang']) && function_exists('get_setting')) {
-            $lang = get_setting('user_language_' . (int)$row['user_id'], 'en');
+            $lang = (function_exists('orgLanguage') ? orgLanguage() : null) ?? get_setting('user_language_' . (int)$row['user_id'], 'en');
             $_SESSION['user_lang'] = in_array($lang, ['en', 'sw'], true) ? $lang : 'en';
             if (function_exists('loadLanguage')) loadLanguage($_SESSION['user_lang']);
         }

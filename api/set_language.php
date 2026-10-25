@@ -5,6 +5,11 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 csrf_check();
 
+if (orgLanguage() !== null) {
+    echo json_encode(['success' => false, 'message' => 'Language is set by your organization']);
+    exit;
+}
+
 $lang = $_POST['lang'] ?? '';
 if (!in_array($lang, ['en', 'sw'], true)) {
     echo json_encode(['success' => false, 'message' => 'Invalid language']);
