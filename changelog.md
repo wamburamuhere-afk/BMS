@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-10-25 — feat(ai): Platform AI — one BJP AI key for every company, monthly limits, and the floating "Ask BMS" chat
+
+**Files:** `core/ai_platform.php` (new), `core/ai_service.php`, `scripts/setup_control_db.php`, `app/superadmin/ai.php` (new), `actions/superadmin_ai.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `app/constant/settings/ai_settings.php`, `api/ai/save_ai_settings.php`, `api/ai/test_ai_config.php`, `api/ai_audit_analysis.php`, `includes/ask_widget.php` (new), `includes/help_panel.php`, `header.php`, `lang/sw.php`, `tests/test_platform_ai_phase1_cli.php` … `phase6_cli.php` (new, 7 files), `platform_ai_plan.md` (new)
+
+- **Superadmin › AI** (new menu item), with three tabs:
+  - **Settings:** one AI provider, model and API key held by BJP, a default monthly limit per company, a total monthly limit for all companies, and Test connection. The key is stored encrypted and never shown again. Saving is refused if the server's encryption secret file is missing.
+  - **Companies:** each company's AI module (on/off), key source and limit, and this month's spend. Key sources are Auto (their own key if they have one, otherwise BJP's), BJP key, Own key, or Off.
+  - **Usage:** this month and last month, top companies, cost by feature, and recent blocked or failed calls.
+- **Companies get AI automatically** when their AI Assistant module is on. Nothing changes until BJP switches platform AI on, and a company that already uses its own key keeps it (Auto).
+- **AI Settings (company side):** a company on the BJP key sees "AI provided by your service provider" and its monthly usage, never BJP's key or model. On "BJP key" or "Off" the company cannot set its own key; on "Auto" it can still choose its own key under "advanced".
+- **Floating "Ask BMS" chat** at the bottom-right, like the Ajira Portal helpdesk. It shows only when the company's AI Assistant module is allowed and the person may use it, and is hidden on the POS Sell screen. It contains:
+  - a greeting by name;
+  - popular questions taken from published help articles;
+  - help articles searched first, with an AI answer when no article fits (limited to what that person may open);
+  - "Talk to a person", which opens Contact support with the chat already filled in;
+  - the real support hours.
+
+  Chat history stays only in that browser tab.
+- **Security fixes found on the way:**
+  - A company whose AI module is switched off in superadmin could still get AI, such as the daily notification summary, if a key was set. AI now checks the module first.
+  - The AI "base URL" accepted internal addresses. In multi-company mode it must now be a public https address, and the connection is pinned to the checked address.
+  - Provider error messages are cleaned of keys before they are logged or shown.
+  - A limit below $0.01, which would round to "no limit", is refused.
+- **Safe by design:**
+  - Every platform AI call is counted in the control database; a company cannot reset its own counter.
+  - If the meter can't be reached, the call is refused rather than made uncounted.
+  - Companies on the BJP key only ever see neutral messages: "limit reached, contact support", "busy" or "temporarily unavailable".
+  - Every superadmin change is in the platform activity log, and never with the key.
+  - Tests use a fake AI provider and never call a real one.
+- **Tests:** 7 new suites, 324 checks: phase 1 (84), 2 (51), 3 (40), 4 (40), 5 (37), 5b (46), 6 end-to-end (26). The existing AI suites and all seven Support suites give the same results as before.
+
+---
+
 ## 2026-10-24 — feat(support): Help & Support Center — Phase 7 (notices, login help, blocked-account contacts, AI limited per user) + end-to-end test
 
 **Files:** `core/support_notices.php` (new), `core/support.php`, `header.php`, `includes/help_panel.php`, `api/support_help.php`, `app/superadmin/support.php`, `actions/superadmin_support_inbox.php`, `login.php`, `core/tenant_bootstrap.php`, `core/ai_insights.php`, `lang/sw.php`, `tests/test_support_center_phase7_cli.php` (new), `tests/test_support_center_phase1_cli.php`, `support_center_plan.md`

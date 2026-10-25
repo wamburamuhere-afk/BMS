@@ -13,6 +13,21 @@ if (!isAdmin())         { http_response_code(403); echo json_encode(['success' =
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 csrf_check();
 
+// Platform AI (platform_ai_plan.md): when the service provider manages this
+// company's AI (key source "BJP key" or "Off"), its own key can't be set here.
+require_once __DIR__ . '/../../core/ai_service.php';
+$__aiMode = aiTenantAiMode();
+if (!$__aiMode['own_allowed']) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'AI for your company is managed by your service provider.']);
+    exit;
+}
+// In a multi-company deployment a base URL must be a public https address (SSRF guard).
+if ($__aiMode['tenant_id'] !== null && trim($_POST['ai_base_url'] ?? '') !== '') {
+    $__bu = aiSafeBaseUrl((string)$_POST['ai_base_url']);
+    if (!$__bu['ok']) { echo json_encode(['success' => false, 'message' => $__bu['error']]); exit; }
+}
+
 try {
     $enabled  = isset($_POST['ai_enabled']) && $_POST['ai_enabled'] === '1' ? '1' : '0';
     $provider = in_array($_POST['ai_provider'] ?? '', ['openai', 'anthropic', 'gemini', 'openrouter'], true) ? $_POST['ai_provider'] : 'openai';

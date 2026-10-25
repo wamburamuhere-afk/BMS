@@ -421,6 +421,7 @@ if (!function_exists('superadminRouteMap')) {
             'support'      => $d . 'support.php',
             'support/article' => $d . 'support_article.php',
             'support/request' => $d . 'support_request.php',
+            'ai'           => $d . 'ai.php',
             'tenants'      => $d . 'tenants.php',
             'tenants/new'  => $d . 'tenant_new.php',
             'tenants/view' => $d . 'tenant_view.php',
