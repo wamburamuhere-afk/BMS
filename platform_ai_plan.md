@@ -46,12 +46,12 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 
 ## 3. Phases (commit after each fully-tested phase; one push + PR at the end)
 
-### Phase 1 — Foundation (control DB + core helper)
+### Phase 1 — Foundation (control DB + core helper) ✅ (81 checks)
 - `core/ai_platform.php`: `aiPlatformSettings()`, `aiPlatformSaveSettings()` (validation per §2), `aiTenantPolicy($tenantId)`, `aiResolveSource($tenantId)`, `aiPlatformMonthSpend($tenantId|null)`, `aiPlatformCapInfo($tenantId)`, `aiPlatformLogUsage()`, `aiSafeBaseUrl()`, `aiSanitizeError()`.
 - `aiPlatformSchema()` adds `platform_ai_usage` (indexes on tenant_id+created_at and created_at) and `tenant_ai_policy` (tenant_id PK, mode, monthly_cap, updated_by, updated_at). It's called from `scripts/setup_control_db.php`, so it runs on every deploy and is idempotent.
 - Test: `tests/test_platform_ai_phase1_cli.php` covers the resolver matrix (no row / own key / platform / off), cap maths, base-URL guard, error sanitising, and refusing to save without the secret file.
 
-### Phase 2 — Engine switch (`core/ai_service.php`)
+### Phase 2 — Engine switch (`core/ai_service.php`) ✅ (51 checks)
 - `aiSettings()` returns the resolved config (`source` = platform|own|off). `aiConfigured()` = entitlement + configured source. `aiCapInfo()` reports the right cap for the source.
 - `aiComplete()`: per-tenant cap + global cap (platform) or tenant cap (own) → call → log to the tenant table and, for platform calls, to the control table. Errors are sanitised. Base-URL guard is applied.
 - Fake-provider test hook added to `_aiHttp`.
@@ -74,6 +74,19 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 - "Ask BMS" in the header and help panel and "Generate with AI" appear automatically for platform tenants. A friendly message is shown when the limit is reached ("This month's AI limit has been reached. Contact support.").
 - `lang/sw.php` strings for all new text.
 - Test: render of each mode (admin and staff), endpoints refuse in platform/off mode, Swahili keys present with no duplicates added.
+
+### Phase 5b — "Ask BMS" chat widget (approved 2026-10-25, modelled on the Ajira Portal helpdesk)
+- A floating round **Ask** button at the bottom-right. **It is rendered only when the company's AI Assistant module is allowed** (`tenantFeatureEnabled('ai_assistant')`) **and** the user may use it (`canView('ai_assistant')`). Otherwise there's no button and no script.
+- It opens the existing help panel with a **Chat** tab first:
+  - greeting by name (EN/SW);
+  - **popular-question chips** taken from the most-viewed published articles, filtered by product and role;
+  - free text → (1) article search first (free, works with no AI), (2) otherwise an AI answer grounded in the articles and only the pages the user can open, with links to the page (Shop/Warehouse wording);
+  - **"Talk to a person"** opens the existing Contact support form pre-filled with the chat (staff → admin, admin → BJP);
+  - shows the real support hours (no fake "online" claim).
+- AI off, unconfigured or limit reached → chat still works with articles + "Talk to a person".
+- Phone: sits above the bottom bar; hidden on the POS Sell screen.
+- Privacy: chat history is session-only (not stored); each AI answer is metered like any other call.
+- Security: POST + CSRF; question length capped; output escaped and links built server-side only from known page keys; per-user rate limit; no raw HTML from the model.
 
 ### Phase 6 — End-to-end + security sweep
 - Full flow on two local tenants with the fake provider: superadmin saves the key → tenant A (platform) asks → usage appears in superadmin → cap lowered → blocked; tenant B (own key) unaffected; tenant C module restricted → no AI anywhere.

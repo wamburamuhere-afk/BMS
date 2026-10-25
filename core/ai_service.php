@@ -24,10 +24,12 @@
  */
 
 require_once __DIR__ . '/crypto.php';
+// Platform AI (platform_ai_plan.md): which key a tenant uses, platform caps + metering.
+require_once __DIR__ . '/ai_platform.php';
 
-if (!function_exists('aiSettings')) {
-    /** Decoded AI config (key decrypted). */
-    function aiSettings(): array
+if (!function_exists('aiOwnSettings')) {
+    /** The tenant's OWN AI config from its system_settings (key decrypted). */
+    function aiOwnSettings(): array
     {
         $enc = getSetting('ai_api_key_enc', '');
         return [
@@ -42,35 +44,78 @@ if (!function_exists('aiSettings')) {
     }
 }
 
+if (!function_exists('aiSettings')) {
+    /**
+     * Decoded AI config (key decrypted) for THIS request, plus 'source'
+     * (own | platform | off) and 'tenant_id'. With no tenant (single-tenant
+     * install, CLI) this is exactly the tenant's own config, as before.
+     */
+    function aiSettings(): array
+    {
+        $own = aiOwnSettings();
+        $tid = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
+        $own['source'] = 'own';
+        $own['tenant_id'] = $tid;
+        if ($tid === null) return $own;
+
+        $ownWorks = $own['enabled'] && $own['model'] !== '' && $own['api_key'] !== '';
+        $src = aiResolveSource($tid, $ownWorks);
+        if ($src === 'own') return $own;
+        if ($src === 'off') {
+            return ['enabled' => false, 'provider' => $own['provider'], 'model' => '', 'api_key' => '', 'base_url' => '',
+                    'cost_cap' => 0.0, 'temperature' => $own['temperature'], 'source' => 'off', 'tenant_id' => $tid];
+        }
+        $p = aiPlatformSettings(true);
+        return ['enabled' => $p['enabled'], 'provider' => $p['provider'], 'model' => $p['model'], 'api_key' => $p['api_key'],
+                'base_url' => $p['base_url'], 'cost_cap' => aiPlatformTenantCap($tid), 'temperature' => $p['temperature'],
+                'source' => 'platform', 'tenant_id' => $tid];
+    }
+}
+
 if (!function_exists('aiConfigured')) {
-    /** True when the assistant is enabled AND has a model + decryptable key. */
+    /**
+     * True when this company is entitled to the AI module (superadmin) AND the
+     * resolved key source is enabled with a model + decryptable key.
+     */
     function aiConfigured(): bool
     {
+        if (function_exists('tenantFeatureEnabled') && !tenantFeatureEnabled('ai_assistant')) return false;
         $s = aiSettings();
         return $s['enabled'] && $s['model'] !== '' && $s['api_key'] !== '';
     }
 }
 
 if (!function_exists('aiMonthSpend')) {
-    /** Total est_cost logged in the current calendar month. */
+    /** Total est_cost logged in the current calendar month on the tenant's OWN key. */
     function aiMonthSpend(): float
     {
         global $pdo;
         try {
             $q = $pdo->query("SELECT COALESCE(SUM(est_cost),0) FROM ai_usage_log
-                               WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')");
+                               WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+                                 AND (provider IS NULL OR provider <> 'platform')");
             return (float)$q->fetchColumn();
         } catch (Throwable $e) { return 0.0; }
     }
 }
 
 if (!function_exists('aiCapInfo')) {
-    /** ['cap'=>float,'spent'=>float,'exceeded'=>bool]. cap 0 = unlimited. */
+    /**
+     * ['cap'=>float,'spent'=>float,'exceeded'=>bool,'source'=>own|platform]. cap 0 = unlimited.
+     * On the platform key the figures are the superadmin-set limit and the
+     * metered spend from the control DB ('exceeded' also covers the global cap
+     * and an unreachable meter, which both block calls).
+     */
     function aiCapInfo(): array
     {
+        $s = aiSettings();
+        if ($s['source'] === 'platform') {
+            $p = aiPlatformCapInfo((int)$s['tenant_id']);
+            return ['cap' => $p['cap'], 'spent' => $p['spent'], 'exceeded' => $p['blocked'], 'source' => 'platform'];
+        }
         $cap = (float)getSetting('ai_monthly_cost_cap', '0');
         $spent = aiMonthSpend();
-        return ['cap' => $cap, 'spent' => $spent, 'exceeded' => ($cap > 0 && $spent >= $cap)];
+        return ['cap' => $cap, 'spent' => $spent, 'exceeded' => ($cap > 0 && $spent >= $cap), 'source' => $s['source']];
     }
 }
 
@@ -134,16 +179,64 @@ if (!function_exists('aiComplete')) {
     function aiComplete(array $messages, array $opts = []): array
     {
         $feature = $opts['feature'] ?? 'generate';
+        if (function_exists('tenantFeatureEnabled') && !tenantFeatureEnabled('ai_assistant')) {
+            return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'AI is not available for this company.'];
+        }
         $s = aiSettings();
 
         if (!$s['enabled'] || $s['model'] === '' || $s['api_key'] === '') {
             return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'AI is not configured.'];
         }
 
-        $cap = aiCapInfo();
-        if ($cap['exceeded']) {
-            aiLogUsage($feature, $s['provider'], $s['model'], 0, 0, 0, 'blocked', 'monthly cost cap reached');
-            return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'Monthly AI cost cap reached. Ask an admin to raise it in AI Settings.'];
+        $isPlatform = $s['source'] === 'platform';
+        $tid        = $s['tenant_id'];
+        $uid        = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        $secrets    = [$s['api_key']];
+        // Platform calls: the tenant's own usage log never names BJP's provider/model.
+        $logProvider = $isPlatform ? 'platform' : $s['provider'];
+        $logModel    = $isPlatform ? 'platform' : $s['model'];
+        $unavailable = ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'AI is temporarily unavailable. Please try again later.'];
+
+        if ($isPlatform) {
+            // Metering must work before a platform call — fail closed, never unmetered.
+            $pc = aiPlatformCapInfo((int)$tid);
+            if (!$pc['available']) {
+                aiLogUsage($feature, $logProvider, $logModel, 0, 0, 0, 'blocked', 'platform metering unavailable');
+                return $unavailable;
+            }
+            if ($pc['exceeded'] || $pc['global_exceeded']) {
+                $why = $pc['exceeded'] ? 'tenant monthly cap reached' : 'platform monthly cap reached';
+                aiLogUsage($feature, $logProvider, $logModel, 0, 0, 0, 'blocked', $why);
+                aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], 0, 0, 0, 'blocked', $why);
+                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => "This month's AI limit has been reached. Please contact support."];
+            }
+            $rl = aiPlatformTenantRateLimited((int)$tid);
+            if ($rl === null) return $unavailable;
+            if ($rl) {
+                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'The AI is busy right now. Please wait a moment and try again.'];
+            }
+        } else {
+            $cap = aiCapInfo();
+            if ($cap['exceeded']) {
+                aiLogUsage($feature, $s['provider'], $s['model'], 0, 0, 0, 'blocked', 'monthly cost cap reached');
+                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'Monthly AI cost cap reached. Ask an admin to raise it in AI Settings.'];
+            }
+        }
+
+        // SSRF guard on a custom base URL (only the OpenAI-compatible adapter uses it).
+        // Enforced for platform calls and any tenant request; single-tenant installs
+        // keep their existing behaviour (e.g. a local gateway).
+        if ($s['base_url'] !== '' && !in_array($s['provider'], ['anthropic', 'gemini'], true) && ($isPlatform || $tid !== null)) {
+            $g = aiSafeBaseUrl($s['base_url']);
+            if (!$g['ok']) {
+                aiLogUsage($feature, $logProvider, $logModel, 0, 0, 0, 'error', 'base URL refused: ' . $g['error']);
+                if ($isPlatform) {
+                    aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], 0, 0, 0, 'error', 'base URL refused: ' . $g['error']);
+                    return $unavailable;
+                }
+                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'The AI base URL is not allowed: ' . $g['error']];
+            }
+            $s['_pin'] = $g;
         }
 
         $temperature = $opts['temperature'] ?? $s['temperature'];
@@ -165,19 +258,31 @@ if (!function_exists('aiComplete')) {
                     break;
             }
         } catch (Throwable $e) {
-            aiLogUsage($feature, $s['provider'], $s['model'], 0, 0, 0, 'error', $e->getMessage());
+            $err = aiSanitizeError($e->getMessage(), $secrets);
+            aiLogUsage($feature, $logProvider, $logModel, 0, 0, 0, 'error', $err);
+            if ($isPlatform) aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], 0, 0, 0, 'error', $err);
             return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'AI request failed.'];
         }
 
         if (!$res['ok']) {
-            aiLogUsage($feature, $s['provider'], $s['model'], 0, 0, 0, 'error', $res['error'] ?? 'unknown');
-            return ['ok' => false, 'text' => '', 'usage' => [], 'error' => $res['error'] ?? 'AI request failed.'];
+            $err = aiSanitizeError($res['error'] ?? 'unknown', $secrets);
+            aiLogUsage($feature, $logProvider, $logModel, 0, 0, 0, 'error', $err);
+            if ($isPlatform) {
+                // Tenants never see BJP's provider errors (quota, billing, key) — only a neutral message.
+                aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], 0, 0, 0, 'error', $err);
+                if (!empty($res['rate_limited'])) {
+                    return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'The AI is busy right now. Please wait a moment and try again.'];
+                }
+                return $unavailable;
+            }
+            return ['ok' => false, 'text' => '', 'usage' => [], 'error' => $err !== '' ? $err : 'AI request failed.'];
         }
 
         $pt = (int)($res['usage']['prompt'] ?? 0);
         $ct = (int)($res['usage']['completion'] ?? 0);
         $cost = aiEstimateCost($s['model'], $pt, $ct);
-        aiLogUsage($feature, $s['provider'], $s['model'], $pt, $ct, $cost, 'ok');
+        aiLogUsage($feature, $logProvider, $logModel, $pt, $ct, $cost, 'ok');
+        if ($isPlatform) aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], $pt, $ct, $cost, 'ok');
 
         return ['ok' => true, 'text' => $res['text'], 'usage' => ['prompt' => $pt, 'completion' => $ct, 'cost' => $cost], 'error' => null];
     }
@@ -185,28 +290,52 @@ if (!function_exists('aiComplete')) {
 
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 if (!function_exists('_aiHttp')) {
-    function _aiHttp(string $url, array $headers, array $body): array
+    /**
+     * $pin (from aiSafeBaseUrl) pins the connection to the validated public IPs
+     * (no DNS rebinding), forces https and disables redirects.
+     */
+    function _aiHttp(string $url, array $headers, array $body, ?array $pin = null): array
     {
-        $ch = curl_init($url);
-        $opts = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_POSTFIELDS     => json_encode($body),
-            CURLOPT_TIMEOUT        => 45,
-            CURLOPT_CONNECTTIMEOUT => 10,
-        ];
-        // Ensure TLS verification has a CA bundle even when php.ini's curl.cainfo
-        // is unset/wrong (common on Windows/WAMP). We ship one in includes/.
-        $caBundle = __DIR__ . '/../includes/cacert.pem';
-        if (is_file($caBundle)) {
-            $opts[CURLOPT_CAINFO] = $caBundle;
+        $fake = PHP_SAPI === 'cli' ? (string)getenv('AI_TEST_FAKE_PROVIDER') : '';
+        if ($fake !== '') {
+            // Test hook (CLI only): never reach a real provider from the test suite.
+            $capture = (string)getenv('AI_TEST_FAKE_CAPTURE');
+            if ($capture !== '') {
+                file_put_contents($capture, json_encode(['url' => $url, 'headers' => $headers, 'body' => $body, 'pin' => $pin]) . "\n", FILE_APPEND | LOCK_EX);
+            }
+            $f    = json_decode((string)@file_get_contents($fake), true) ?: [];
+            $raw  = !empty($f['network_error']) ? false : json_encode($f['body'] ?? []);
+            $code = (int)($f['status'] ?? 200);
+            $err  = (string)($f['network_error'] ?? '');
+        } else {
+            $ch = curl_init($url);
+            $opts = [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_HTTPHEADER     => $headers,
+                CURLOPT_POSTFIELDS     => json_encode($body),
+                CURLOPT_TIMEOUT        => 45,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ];
+            // Ensure TLS verification has a CA bundle even when php.ini's curl.cainfo
+            // is unset/wrong (common on Windows/WAMP). We ship one in includes/.
+            $caBundle = __DIR__ . '/../includes/cacert.pem';
+            if (is_file($caBundle)) {
+                $opts[CURLOPT_CAINFO] = $caBundle;
+            }
+            if ($pin && !empty($pin['ips'])) {
+                $opts[CURLOPT_FOLLOWLOCATION] = false;
+                $opts[CURLOPT_PROTOCOLS]      = CURLPROTO_HTTPS;
+                if (!filter_var($pin['host'], FILTER_VALIDATE_IP)) {
+                    $opts[CURLOPT_RESOLVE] = [$pin['host'] . ':' . (int)$pin['port'] . ':' . $pin['ips'][0]];
+                }
+            }
+            curl_setopt_array($ch, $opts);          // apply POST/body/headers/cert
+            $raw  = curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
         }
-        curl_setopt_array($ch, $opts);          // apply POST/body/headers/cert
-        $raw  = curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
-        curl_close($ch);
 
         if ($raw === false) return ['ok' => false, 'error' => 'Network error: ' . $err];
         $json = json_decode($raw, true);
@@ -240,7 +369,7 @@ if (!function_exists('_aiCallOpenAI')) {
         $body = ['model' => $s['model'], 'messages' => $messages, 'temperature' => $temp, 'max_tokens' => $max];
         if ($json) $body['response_format'] = ['type' => 'json_object'];
         $r = _aiHttp($base . '/chat/completions',
-            ['Content-Type: application/json', 'Authorization: Bearer ' . $s['api_key']], $body);
+            ['Content-Type: application/json', 'Authorization: Bearer ' . $s['api_key']], $body, $s['_pin'] ?? null);
         if (!$r['ok']) return $r;
         $j = $r['json'];
         return ['ok' => true,
