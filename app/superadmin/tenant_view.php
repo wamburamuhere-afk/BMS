@@ -79,6 +79,21 @@ try {
     $error = 'The tenant registry could not be read.';
 }
 
+// Free-trial control: only for a company with no recorded payment (setTenantTrial()
+// refuses the rest too). Its current start date pre-fills the form.
+$__hasPayments = !empty($paymentHistory);
+$__trialStart  = null;
+if ($tenant) {
+    try {
+        if (controlColumnExists('tenants', 'trial_starts_at')) {
+            $ts = getControlPdo()->prepare("SELECT trial_starts_at FROM tenants WHERE id = ?");
+            $ts->execute([(int)$tenant['id']]);
+            $tenant['trial_starts_at'] = $ts->fetchColumn() ?: null;
+        }
+    } catch (Throwable $_e) {}
+    $__trialStart = tenantTrialStartsAt($tenant);
+}
+
 // Entitlements are read SEPARATELY and never inside the block above. They were,
 // and it was wrong: on a host where scripts/setup_control_db.php had not been
 // re-run since Phase 11, the missing `features` table threw, and this whole page
@@ -534,6 +549,11 @@ if ($hasContext ?? false):
                     <button class="btn btn-outline-primary w-100 mb-2" onclick="doExtendAccess()">
                         <i class="bi bi-calendar-plus me-1"></i> Extend access
                     </button>
+                    <?php if (!$__hasPayments && ($tenant['status'] !== 'suspended' || in_array((string)$tenant['suspension_reason'], ['trial_expired', 'subscription_expired'], true))): ?>
+                    <button class="btn btn-outline-primary w-100 mb-2" onclick="doSetTrial()" id="btnSetTrial">
+                        <i class="bi bi-gift me-1"></i> <?= $tenant['status'] === 'trial' ? 'Change free trial dates' : 'Set free trial' ?>
+                    </button>
+                    <?php endif; ?>
                     <button class="btn btn-outline-secondary btn-sm w-100 mb-2" onclick="doSetGraceDays()">
                         <i class="bi bi-hourglass me-1"></i> Grace period for this tenant
                     </button>
@@ -1639,6 +1659,72 @@ function doExtendAccess() {
             }
         }).fail(function () {
             Swal.fire({ icon: 'error', title: 'Error', text: 'Request failed.' });
+        });
+    });
+}
+
+// Free trial: start date → end = start + default length, end editable.
+const TRIAL_DEFAULT_DAYS = <?= (int)tenantDefaultTrialDays() ?>;
+const TRIAL_IS_RUNNING   = <?= ($tenant['status'] ?? '') === 'trial' ? 'true' : 'false' ?>;
+const TRIAL_START        = <?= json_encode(($tenant['status'] ?? '') === 'trial' && $__trialStart ? $__trialStart : date('Y-m-d')) ?>;
+const TRIAL_END          = <?= json_encode(($tenant['status'] ?? '') === 'trial' && !empty($tenant['trial_ends_at']) ? substr((string)$tenant['trial_ends_at'], 0, 10) : null) ?>;
+const TODAY_YMD          = <?= json_encode(date('Y-m-d')) ?>;
+// Local-date maths (toISOString would shift a day in UTC+3).
+function ymdAdd(ymd, days) {
+    const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function ymdDiff(a, b) { return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000); }
+function doSetTrial() {
+    const end0 = TRIAL_END || ymdAdd(TRIAL_START, TRIAL_DEFAULT_DAYS);
+    Swal.fire({
+        title: TRIAL_IS_RUNNING ? 'Change free trial dates' : 'Set free trial',
+        html: '<p class="small text-muted text-start mb-3">The company sees <strong>Free trial · days left</strong> on its Subscription page, '
+            + 'counted from the start date. Its status becomes Trial; a paid-until date or expiry suspension is cleared.</p>'
+            + '<div class="text-start">'
+            + '<label class="form-label small fw-semibold mb-1" for="swalTrialStart">Trial starts</label>'
+            + '<input id="swalTrialStart" type="date" class="form-control mb-3" max="' + TODAY_YMD + '" min="' + ymdAdd(TODAY_YMD, -365) + '" value="' + TRIAL_START + '">'
+            + '<label class="form-label small fw-semibold mb-1" for="swalTrialDays">Length (days)</label>'
+            + '<input id="swalTrialDays" type="number" class="form-control mb-3" min="1" max="365" value="' + ymdDiff(TRIAL_START, end0) + '">'
+            + '<label class="form-label small fw-semibold mb-1" for="swalTrialEnd">Trial ends</label>'
+            + '<input id="swalTrialEnd" type="date" class="form-control" value="' + end0 + '">'
+            + '<div class="form-text">Default length is ' + TRIAL_DEFAULT_DAYS + ' days. Change the length or pick an end date — they stay in step.</div>'
+            + '</div>',
+        showCancelButton: true,
+        confirmButtonText: 'Save trial',
+        didOpen: function () {
+            const s = document.getElementById('swalTrialStart'), n = document.getElementById('swalTrialDays'), e = document.getElementById('swalTrialEnd');
+            const fromDays = function () { const d = parseInt(n.value, 10); if (s.value && d >= 1) e.value = ymdAdd(s.value, d); };
+            s.addEventListener('change', fromDays);
+            n.addEventListener('input', fromDays);
+            e.addEventListener('change', function () { if (s.value && e.value) n.value = ymdDiff(s.value, e.value); });
+        },
+        preConfirm: function () {
+            const s = document.getElementById('swalTrialStart').value, e = document.getElementById('swalTrialEnd').value;
+            if (!s) { Swal.showValidationMessage('Choose the date the trial starts.'); return false; }
+            if (s > TODAY_YMD) { Swal.showValidationMessage('The start date cannot be in the future.'); return false; }
+            if (!e || e <= s) { Swal.showValidationMessage('The trial must end after it starts.'); return false; }
+            if (ymdDiff(s, e) > 365) { Swal.showValidationMessage('A trial can be at most 365 days long.'); return false; }
+            if (e < TODAY_YMD) { Swal.showValidationMessage('That trial would already have ended. Choose a later end date.'); return false; }
+            return { starts: s, ends: e };
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: '/actions/superadmin_tenant_access.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, action: 'set_trial', tenant_id: TENANT_ID, starts: result.value.starts, ends: result.value.ends }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Free trial saved', text: res.message, timer: 2600, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 2600);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Not saved', text: (res && res.message) || 'Could not set the free trial.' });
+            }
+        }).fail(function (xhr) {
+            let msg = 'Request failed.';
+            try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (x) {}
+            Swal.fire({ icon: 'error', title: 'Not saved', text: msg });
         });
     });
 }

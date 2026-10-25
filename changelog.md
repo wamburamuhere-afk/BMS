@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-25 — feat(trial): new companies start on a real free trial; superadmin "Set free trial" with start and end dates
+
+**Files:** `core/tenant_registration.php`, `core/tenant_lifecycle_policy.php`, `scripts/setup_control_db.php`, `actions/superadmin_tenant_access.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenant_new.php`, `api/my_subscription.php`, `tests/test_tenant_free_trial_cli.php` (new), `tests/test_tenant_registration_cli.php`, `tests/test_register_redesign_cli.php`
+
+- **Bug fixed:** a company that signed up on the public Register page, or was approved for Smart BMS, or continued as Smart POS, was saved as "active" with a trial date nothing read. Its trial never ran out and its Subscription page showed "No end date" (∞). These companies now start as **Trial**: they sign in at once, the page shows **Free trial · X days left**, and the normal reminders and expiry apply.
+- **Superadmin › New company** now defaults to **Free trial (14 days)**, counted from when you click Create. "Active (paid) — no trial" is still available.
+- **Superadmin › company page › Set free trial** (or **Change free trial dates** while on trial): choose the **start date**; the end date fills in as start + the default trial length, and you can change the length or pick another end date. The company becomes Trial; any paid-until date, grace window or expiry suspension is cleared, so service resumes. Refused for a company with recorded payments (use Extend access), one suspended by hand, one waiting for approval, and a closed one; the start can't be in the future or over a year ago, and the end must be after the start, within 365 days, and not already past. Every change goes to the activity log.
+- The Subscription page's "Trial started" uses the date set here, otherwise the account creation date.
+- New control-DB column `tenants.trial_starts_at` (added by `scripts/setup_control_db.php`).
+- Not changed automatically: companies that signed up before this fix are still "active" with no end date. Give each one a trial with **Set free trial**, or a paid period with **Extend access**.
+
 ## 2026-10-25 — fix(login): remove the separate "Need help signing in?" link
 
 **Files:** `login.php`, `app/superadmin/support.php`, `tests/test_support_center_phase7_cli.php`

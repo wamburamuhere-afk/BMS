@@ -101,15 +101,17 @@ $startingPlans = planTablesReady()
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Account status <span class="text-danger">*</span></label>
                                 <select class="form-select" name="status" required id="f-status" onchange="toggleTrialDate()">
-                                    <option value="active" selected>Active — can sign in immediately</option>
-                                    <option value="trial">Trial</option>
+                                    <?php require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php'; $__trialDays = tenantDefaultTrialDays(); ?>
+                                    <option value="trial" selected>Free trial (<?= $__trialDays ?> days) — can sign in immediately</option>
+                                    <option value="active">Active (paid) — no trial</option>
                                 </select>
+                                <div class="form-text">Change the trial start or end later on the company's page (Set free trial).</div>
                             </div>
 
-                            <div class="col-12 col-md-6" id="trialDateRow" style="display:none">
-                                <label class="form-label">Trial ends <span class="text-muted fw-normal" style="font-size:.85rem">(default: +14 days)</span></label>
+                            <div class="col-12 col-md-6" id="trialDateRow">
+                                <label class="form-label">Trial ends <span class="text-muted fw-normal" style="font-size:.85rem">(default: +<?= $__trialDays ?> days)</span></label>
                                 <input type="date" class="form-control" name="trial_ends_at" id="f-trial-ends">
-                                <div class="form-text">Leave blank to use the default 14-day trial.</div>
+                                <div class="form-text">Leave blank for the standard <?= $__trialDays ?>-day trial, counted from when you click Create.</div>
                             </div>
 
                             <div class="col-12 col-md-6">
