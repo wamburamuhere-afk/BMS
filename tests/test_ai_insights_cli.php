@@ -38,34 +38,40 @@ try {
     section('3. Each insight matches a direct SQL check (live)');
     [$f,$t] = [date('Y-m-01'), date('Y-m-d')];
 
-    // revenue
+    $qf = $pdo->quote($f); $qt = $pdo->quote($t);
+
+    // revenue = invoices + completed POS sales (the Sales report's sources)
     $r = aiRunInsight('revenue', ['from'=>$f,'to'=>$t]);
-    $exp = (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM invoices WHERE status<>'deleted' AND invoice_date BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn();
-    ok($r['ok'] && approx($r['data']['revenue'],$exp), "revenue == SQL ({$exp})");
+    $inv = (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM invoices WHERE status NOT IN ('cancelled','deleted') AND invoice_date BETWEEN $qf AND $qt")->fetchColumn();
+    $pos = (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM pos_sales WHERE sale_status='completed' AND DATE(sale_date) BETWEEN $qf AND $qt")->fetchColumn();
+    ok($r['ok'] && approx($r['data']['invoice_sales'],$inv) && approx($r['data']['pos_sales'],$pos) && approx($r['data']['revenue'],$inv+$pos), "revenue == invoices ({$inv}) + POS sales ({$pos})");
 
-    // expenses_total
+    // expenses_total + profit = the Income Statement engine (posted ledger)
+    $pl = glProfitLoss($pdo, $f, $t);
     $r = aiRunInsight('expenses_total', ['from'=>$f,'to'=>$t]);
-    $exp = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE (status IS NULL OR status<>'deleted') AND expense_date BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn();
-    ok($r['ok'] && approx($r['data']['expenses'],$exp), "expenses_total == SQL ({$exp})");
-
-    // profit = rev - exp
+    ok($r['ok'] && approx($r['data']['expenses'],$pl['total_expense']) && approx($r['data']['cost_of_goods_sold'],$pl['total_cogs']), "expenses_total == glProfitLoss ({$pl['total_expense']})");
     $r = aiRunInsight('profit', ['from'=>$f,'to'=>$t]);
-    ok($r['ok'] && approx($r['data']['profit'], $r['data']['revenue'] - $r['data']['expenses']), 'profit == revenue - expenses');
+    ok($r['ok'] && approx($r['data']['profit'],$pl['net_profit']) && approx($r['data']['revenue'],$pl['total_revenue']) && approx($r['data']['gross_profit'],$pl['gross_profit']), "profit == glProfitLoss net profit ({$pl['net_profit']})");
 
-    // outstanding_receivables
+    // outstanding_receivables = unpaid invoices + unpaid POS credit sales
     $r = aiRunInsight('outstanding_receivables');
-    $exp = (float)$pdo->query("SELECT COALESCE(SUM(balance_due),0) FROM invoices WHERE status<>'deleted' AND balance_due>0")->fetchColumn();
-    ok($r['ok'] && approx($r['data']['outstanding_receivables'],$exp), "outstanding_receivables == SQL ({$exp})");
+    $inv = (float)$pdo->query("SELECT COALESCE(SUM(balance_due),0) FROM invoices WHERE status NOT IN ('cancelled','deleted') AND balance_due>0")->fetchColumn();
+    $hasPay = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetchColumn();
+    $paid = $hasPay ? "COALESCE((SELECT SUM(amount) FROM pos_sale_payments p WHERE p.sale_id=s.sale_id),0)" : "CASE WHEN s.payment_status='paid' THEN s.grand_total ELSE 0 END";
+    $pos = (float)$pdo->query("SELECT COALESCE(SUM(b),0) FROM (SELECT s.grand_total - $paid b FROM pos_sales s WHERE s.sale_status='completed') x WHERE b > 0.005")->fetchColumn();
+    ok($r['ok'] && approx($r['data']['outstanding_receivables'],$inv+$pos), "outstanding_receivables == invoices ({$inv}) + credit sales ({$pos})");
 
-    // cash_position
+    // cash_position = the cash/bank lines of the Balance Sheet engine (posted ledger)
     $r = aiRunInsight('cash_position');
-    $exp = (float)$pdo->query("SELECT COALESCE(SUM(current_balance),0) FROM accounts a WHERE a.status='active' AND a.account_type='asset' AND a.cash_flow_category='cash' AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parent_account_id=a.account_id)")->fetchColumn();
-    ok($r['ok'] && approx($r['data']['total_cash'],$exp), "cash_position == SQL ({$exp})");
+    $bs = glBalanceSheet($pdo, date('Y-m-d')); $ids = array_flip(glCashAccountIds($pdo)); $exp = 0.0;
+    foreach ($bs['assets'] as $l) if ($l['account_id'] !== null && isset($ids[(int)$l['account_id']])) $exp += $l['amount'];
+    ok($r['ok'] && approx($r['data']['total_cash'],$exp), "cash_position == glBalanceSheet cash lines (".round($exp,2).")");
 
-    // low_stock
+    // low_stock = the Products page Low Stock rule (available across warehouses <= minimum)
     $r = aiRunInsight('low_stock');
-    $exp = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE current_stock <= min_stock_level")->fetchColumn();
-    ok($r['ok'] && $r['data']['below_minimum_count']===$exp, "low_stock count == SQL ({$exp})");
+    $exp = (int)$pdo->query("SELECT COUNT(*) FROM products p LEFT JOIN (SELECT product_id, SUM(stock_quantity-reserved_quantity) av FROM product_stocks GROUP BY product_id) s ON s.product_id=p.product_id
+                              WHERE p.is_service=0 AND p.status='active' AND p.min_stock_level>0 AND COALESCE(s.av,0) <= p.min_stock_level")->fetchColumn();
+    ok($r['ok'] && $r['data']['below_minimum_count']===$exp, "low_stock count == Products page rule ({$exp})");
 
     // top_debtors structure
     $r = aiRunInsight('top_debtors', ['limit'=>3]);
