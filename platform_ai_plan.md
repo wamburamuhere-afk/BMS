@@ -1,6 +1,6 @@
 # Platform AI — one BJP key for every tenant (plan)
 
-Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `bms-ai`, off `origin/develop`) · 2026-10-25
+Status: **ALL PHASES DONE (2026-10-25)** · Branch `feat/platform-ai` (worktree `bms-ai`, off `origin/develop`) · 2026-10-25
 
 ## 0. What exists today (verified in code)
 
@@ -46,7 +46,7 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 
 ## 3. Phases (commit after each fully-tested phase; one push + PR at the end)
 
-### Phase 1 — Foundation (control DB + core helper) ✅ (81 checks)
+### Phase 1 — Foundation (control DB + core helper) ✅ (84 checks)
 - `core/ai_platform.php`: `aiPlatformSettings()`, `aiPlatformSaveSettings()` (validation per §2), `aiTenantPolicy($tenantId)`, `aiResolveSource($tenantId)`, `aiPlatformMonthSpend($tenantId|null)`, `aiPlatformCapInfo($tenantId)`, `aiPlatformLogUsage()`, `aiSafeBaseUrl()`, `aiSanitizeError()`.
 - `aiPlatformSchema()` adds `platform_ai_usage` (indexes on tenant_id+created_at and created_at) and `tenant_ai_policy` (tenant_id PK, mode, monthly_cap, updated_by, updated_at). It's called from `scripts/setup_control_db.php`, so it runs on every deploy and is idempotent.
 - Test: `tests/test_platform_ai_phase1_cli.php` covers the resolver matrix (no row / own key / platform / off), cap maths, base-URL guard, error sanitising, and refusing to save without the secret file.
