@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-10-25 — fix(migrations): legacy-DB mirror for the Help & Support permission migration
+
+**Files:** `migrations/2026_10_24_help_self_service_legacy_db.php` (new)
+
+- `migrations/tenant/2026_10_24_help_self_service.php` had no twin for the root install, which runs only `migrations/*.php`. BJP's own Roles & Permissions page therefore still showed a "Help" switch that does nothing, and the PR lint check (`test_legacy_migration_mirrors_cli`) failed on every pull request. The mirror applies the same idempotent update.
+
 ## 2026-10-25 — fix(register): say exactly which field is wrong, accept normal phone formats, eye on password boxes
 
 **Files:** `register.php`, `core/tenant_registration.php`, `tests/test_register_field_errors_cli.php` (new)
