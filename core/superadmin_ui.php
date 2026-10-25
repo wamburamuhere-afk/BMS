@@ -127,6 +127,19 @@ if (!function_exists('renderSuperadminHeader')) {
                                 </a>
                             </li>
                             <?php
+                            $supportNeeds = 0;
+                            if (is_file(__DIR__ . '/support_inbox.php')) {
+                                require_once __DIR__ . '/support_inbox.php';
+                                $supportNeeds = supportInboxNeedsReplyCount();   // never throws; 0 on any error
+                            }
+                            ?>
+                            <li class="nav-item">
+                                <a class="nav-link<?= $active === 'support' ? ' active' : '' ?>" href="<?= saUrl('support') ?>">
+                                    <i class="bi bi-headset me-1"></i>Support
+                                    <?php if ($supportNeeds > 0): ?><span class="badge rounded-pill bg-danger ms-1"><?= $supportNeeds ?></span><?php endif; ?>
+                                </a>
+                            </li>
+                            <?php
                             $navItem('settings',  saUrl('settings'), 'bi-gear-wide-connected', 'Settings');
                             ?>
                             <li class="nav-item ms-lg-2 my-1">

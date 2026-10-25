@@ -30,6 +30,10 @@ $tr = $pageLang === 'sw' ? [
     'password_ph'       => 'Andika nenosiri lako',
     'remember_me'       => 'Nikumbuke',
     'forgot_pw'         => 'Umesahau nenosiri?',
+    'help_title'        => 'Unahitaji msaada wa kuingia?',
+    'help_staff'        => 'Wafanyakazi: mwombe msimamizi wa kampuni yako akuwekee nenosiri jipya.',
+    'help_admin'        => 'Msimamizi: tumia "Umesahau nenosiri?" hapo juu.',
+    'help_contact'      => 'Bado umekwama? Wasiliana na msaada:',
     'login_btn'         => 'Ingia',
     'logging_in'        => 'Ingia...',
     'new_company'       => 'Kampuni mpya?',
@@ -74,6 +78,10 @@ $tr = $pageLang === 'sw' ? [
     'password_ph'       => 'Enter your password',
     'remember_me'       => 'Remember me',
     'forgot_pw'         => 'Forgot password?',
+    'help_title'        => 'Need help signing in?',
+    'help_staff'        => 'Staff: ask your company admin to set a new password for you.',
+    'help_admin'        => 'Admins: use "Forgot password?" above.',
+    'help_contact'      => 'Still stuck? Contact support:',
     'login_btn'         => 'Login',
     'logging_in'        => 'Logging in...',
     'new_company'       => 'New company?',
@@ -332,10 +340,38 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
             <?php endif; ?>
         </form>
 
+        <?php
+        // "Need help signing in?" — text and contacts from Superadmin › Support › Settings (control DB).
+        $__sup = [];
+        if (is_file(__DIR__ . '/core/support.php')) {
+            try { require_once __DIR__ . '/core/support.php'; $__sup = supportSettings(); } catch (Throwable $e) { $__sup = []; }
+        }
+        $__supTel = static fn(string $n): string => preg_replace('/[^0-9+]/', '', $n);
+        ?>
+        <div class="text-center mt-3">
+            <a class="small" data-bs-toggle="collapse" href="#loginHelp" role="button" aria-expanded="false" aria-controls="loginHelp"><?= htmlspecialchars($tr['help_title']) ?></a>
+        </div>
+        <div class="collapse mt-2" id="loginHelp">
+            <div class="border rounded p-3 small" style="background:#e7f0ff;border-color:#b6ccfe!important">
+                <div class="mb-1"><?= htmlspecialchars($tr['help_staff']) ?></div>
+                <div class="mb-2"><?= htmlspecialchars($tr['help_admin']) ?></div>
+                <?php if (trim((string)($__sup['support_login_help'] ?? '')) !== ''): ?>
+                <div class="mb-2" style="white-space:pre-wrap"><?= htmlspecialchars((string)$__sup['support_login_help']) ?></div>
+                <?php endif; ?>
+                <?php if (($__sup['support_email'] ?? '') !== '' || ($__sup['support_phone'] ?? '') !== '' || ($__sup['support_whatsapp'] ?? '') !== ''): ?>
+                <div class="fw-semibold mb-1"><?= htmlspecialchars($tr['help_contact']) ?></div>
+                <?php if (($__sup['support_email'] ?? '') !== ''): ?><div><i class="fas fa-envelope me-1"></i><a href="mailto:<?= htmlspecialchars($__sup['support_email']) ?>"><?= htmlspecialchars($__sup['support_email']) ?></a></div><?php endif; ?>
+                <?php if (($__sup['support_phone'] ?? '') !== ''): ?><div><i class="fas fa-phone me-1"></i><a href="tel:<?= htmlspecialchars($__supTel($__sup['support_phone'])) ?>"><?= htmlspecialchars($__sup['support_phone']) ?></a></div><?php endif; ?>
+                <?php if (($__sup['support_whatsapp'] ?? '') !== ''): ?><div><i class="fab fa-whatsapp me-1"></i><a href="https://wa.me/<?= htmlspecialchars(ltrim($__supTel($__sup['support_whatsapp']), '+')) ?>" target="_blank" rel="noopener">WhatsApp</a></div><?php endif; ?>
+                <?php if (($__sup['support_hours'] ?? '') !== ''): ?><div class="text-muted mt-1"><?= htmlspecialchars($__sup['support_hours']) ?></div><?php endif; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <div class="footer-links">
             <a href="#"><?= htmlspecialchars($tr['privacy']) ?></a>
             <a href="#"><?= htmlspecialchars($tr['terms']) ?></a>
-            <a href="#"><?= htmlspecialchars($tr['help']) ?></a>
+            <a data-bs-toggle="collapse" href="#loginHelp" role="button" aria-controls="loginHelp"><?= htmlspecialchars($tr['help']) ?></a>
         </div>
     </div>
 </div>

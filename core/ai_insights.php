@@ -278,8 +278,25 @@ if (!function_exists('aiInsightRegistry')) {
                 'description' => 'Look up HOW to use a feature of the system (e.g. how to create an invoice, add a supplier, run payroll, where a setting is). Use this for "how do I…", "where is…", "what does X do" questions.',
                 'params' => ['query' => 'the user\'s how-to question or keywords'],
                 'run' => function (array $a, PDO $pdo) {
+                    $q = (string)($a['query'] ?? '');
+                    // Published help articles first: only those this user can reach, in this company's
+                    // own words (Shop vs Warehouse, Sell vs Sales › POS) — support_center_plan.md D8d.
+                    if (is_file(__DIR__ . '/support_articles.php')) {
+                        require_once __DIR__ . '/support_articles.php';
+                        $ctx = helpRuntimeContext();
+                        $lang = function_exists('currentLanguage') && currentLanguage() === 'sw' ? 'sw' : 'en';
+                        $hits = supportTenantSearch($q, $ctx, $lang);
+                        if ($hits) {
+                            return ['help_articles' => array_map(fn($h) => ['title' => $h['title'], 'steps' => mb_substr($h['_body'], 0, 1500)], array_slice($hits, 0, 3)),
+                                    'note' => 'Answer with these steps and menu paths exactly; they match what this user sees.'];
+                        }
+                        if (supportTenantList($ctx, $lang)) return ['note' => 'No help article matches this question.'];
+                        // No published articles at all yet: the general guide describes full Smart BMS
+                        // menus, so never use it for a Simple Mode (Smart POS) shop.
+                        if (!empty($ctx['simple'])) return ['note' => 'No help article matches this question.'];
+                    }
                     if (!function_exists('aiSearchHelp')) return ['error' => 'Help guide not available.'];
-                    $hits = aiSearchHelp((string)($a['query'] ?? ''), 4);
+                    $hits = aiSearchHelp($q, 4);
                     if (!$hits) return ['note' => 'No matching help section found in the user guide.'];
                     return ['help_sections' => array_map(fn($h) => ['topic' => $h['title'], 'content' => $h['text']], $hits)];
                 },
@@ -288,12 +305,64 @@ if (!function_exists('aiInsightRegistry')) {
     }
 }
 
+if (!function_exists('aiInsightPages')) {
+    /**
+     * The pages a user must be able to open (any one of them) before the AI may use a data
+     * function for them — so the assistant never tells someone a figure their own menus hide
+     * (support_center_plan.md D8d). null = available to everyone signed in.
+     */
+    function aiInsightPages(): array
+    {
+        return [
+            'revenue' => ['invoices', 'sales_report', 'income_statement'],
+            'expenses_total' => ['expenses', 'expense_report'],
+            'profit' => ['income_statement', 'pos_profit_report'],
+            'outstanding_receivables' => ['invoices', 'financial_reports'],
+            'top_debtors' => ['invoices', 'financial_reports'],
+            'top_customers' => ['customers', 'sales_report'],
+            'cash_position' => ['bank_accounts', 'cash_register'],
+            'ar_aging_summary' => ['financial_reports'],
+            'low_stock' => ['products', 'inventory_report'],
+            'invoice_status_counts' => ['invoices'],
+            'sales_trend' => ['sales_report'],
+            'projects_summary' => ['projects'],
+            'purchase_orders_summary' => ['purchase_orders'],
+            'sales_orders_summary' => ['sales_orders'],
+            'quotations_summary' => ['quotations'],
+            'suppliers_count' => ['suppliers'],
+            'employees_summary' => ['employees'],
+            'payroll_summary' => ['payroll'],
+            'pending_leaves' => ['leaves'],
+            'pending_approvals' => ['__admin__'],
+            'search_help' => null,
+        ];
+    }
+}
+
+if (!function_exists('aiInsightAllowed')) {
+    /** May the signed-in user use this data function? Unknown names are never allowed. */
+    function aiInsightAllowed(string $name): bool
+    {
+        $map = aiInsightPages();
+        if (!array_key_exists($name, $map)) return false;
+        $pages = $map[$name];
+        if ($pages === null) return true;
+        if (PHP_SAPI === 'cli' && empty($_SESSION['user_id'])) return true;   // CLI tools / tests without a user
+        foreach ($pages as $p) {
+            if ($p === '__admin__') { if (function_exists('isAdmin') && isAdmin()) return true; continue; }
+            if (function_exists('canView') && canView($p)) return true;
+        }
+        return false;
+    }
+}
+
 if (!function_exists('aiInsightCatalog')) {
-    /** Lightweight catalog (no closures) to put in the model prompt. */
+    /** Lightweight catalog (no closures) to put in the model prompt — only what this user may use. */
     function aiInsightCatalog(): array
     {
         $out = [];
         foreach (aiInsightRegistry() as $name => $def) {
+            if (!aiInsightAllowed($name)) continue;
             $out[] = ['name' => $name, 'description' => $def['description'], 'params' => $def['params']];
         }
         return $out;
@@ -306,6 +375,7 @@ if (!function_exists('aiRunInsight')) {
         global $pdo;
         $reg = aiInsightRegistry();
         if (!isset($reg[$name])) return ['ok' => false, 'error' => "Unknown insight: $name"];
+        if (!aiInsightAllowed($name)) return ['ok' => false, 'error' => 'That information is not available to your role.'];
         try {
             $data = $reg[$name]['run']($args, $pdo);
             return ['ok' => true, 'data' => $data];
