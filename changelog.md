@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-10-25 — fix(migrations): legacy-DB mirror for the Help & Support permission migration
+
+**Files:** `migrations/2026_10_24_help_self_service_legacy_db.php` (new)
+
+- `migrations/tenant/2026_10_24_help_self_service.php` had no twin for the root install, which runs only `migrations/*.php`. BJP's own Roles & Permissions page therefore still showed a "Help" switch that does nothing, and the PR lint check (`test_legacy_migration_mirrors_cli`) failed on every pull request. The mirror applies the same idempotent update.
+
+## 2026-10-25 — fix(register): say exactly which field is wrong, accept normal phone formats, eye on password boxes
+
+**Files:** `register.php`, `core/tenant_registration.php`, `tests/test_register_field_errors_cli.php` (new)
+
+- **Exact errors:** the public registration form no longer shows only "Please complete every field marked *, meet all password rules and accept the Terms." Each wrong field turns red with its own message underneath, for example "A username cannot contain spaces. Use a dot instead, e.g. jane.mwangi" or "Phone: needs 7 to 15 digits. The number you typed has 6." A short summary sits at the top, and the page scrolls to the first problem. The message clears as soon as you start fixing that field. English and Swahili.
+- **Server refusals land on their field too:** for example "this phone number already has an account" (on Phone), "this email already has an account" (on Email) and "that web address is taken" (on Web address, back on the company step), in the page language.
+- **Normal phone formats accepted:** `0712-345-678`, `(+255) 712 345 678` and `0712.345.678` were refused before. Dashes, dots, brackets and spaces are now removed before the digits check, on both the page and the server, and the number is stored as digits only.
+- **Eye button** on Password and Confirm password, to show or hide what you typed.
+- **Bug fixed:** the password checklist labels ("8+ characters", "A number"…) disappeared as soon as you typed; now only the ✓/○ mark changes.
+
 ## 2026-10-25 — fix(login): remove the separate "Need help signing in?" link
 
 **Files:** `login.php`, `app/superadmin/support.php`, `tests/test_support_center_phase7_cli.php`
