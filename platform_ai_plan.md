@@ -88,7 +88,7 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 - Privacy: chat history is session-only (not stored); each AI answer is metered like any other call.
 - Security: POST + CSRF; question length capped; output escaped and links built server-side only from known page keys; per-user rate limit; no raw HTML from the model.
 
-### Phase 6 — End-to-end + security sweep
+### Phase 6 — End-to-end + security sweep ✅ (26 checks)
 - Full flow on two local tenants with the fake provider: superadmin saves the key → tenant A (platform) asks → usage appears in superadmin → cap lowered → blocked; tenant B (own key) unaffected; tenant C module restricted → no AI anywhere.
 - Re-scout for missed callers, run every `test_ai_*` and support suite, `php -l` all touched files, changelog entry, then **one push + PR into develop**.
 
