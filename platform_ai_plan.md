@@ -75,9 +75,9 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 - `lang/sw.php` strings for all new text.
 - Test: render of each mode (admin and staff), endpoints refuse in platform/off mode, Swahili keys present with no duplicates added.
 
-### Phase 5b — "Ask BMS" chat widget (approved 2026-10-25, modelled on the Ajira Portal helpdesk)
+### Phase 5b — "Ask BMS" chat widget ✅ (46 checks) (approved 2026-10-25, modelled on the Ajira Portal helpdesk)
 - A floating round **Ask** button at the bottom-right. **It is rendered only when the company's AI Assistant module is allowed** (`tenantFeatureEnabled('ai_assistant')`) **and** the user may use it (`canView('ai_assistant')`). Otherwise there's no button and no script.
-- It opens the existing help panel with a **Chat** tab first:
+- As built: an Ajira-style chat popup (`includes/ask_widget.php`), not a tab inside the help panel. It adds **no new endpoint**: it reuses `api/support_help.php` (chips + search), `api/ai/ask.php` (AI answers, already limited to what the user may open) and the help panel's Contact form. One help system, two doors. It contains:
   - greeting by name (EN/SW);
   - **popular-question chips** taken from the most-viewed published articles, filtered by product and role;
   - free text → (1) article search first (free, works with no AI), (2) otherwise an AI answer grounded in the articles and only the pages the user can open, with links to the page (Shop/Warehouse wording);

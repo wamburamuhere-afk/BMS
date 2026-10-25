@@ -205,8 +205,10 @@ if (!function_exists('aiPlatformValidate')) {
             $v = trim((string)($in[$k] ?? ''));
             if ($v === '' || !is_numeric($v) || (float)$v < $min || (float)$v > $max) {
                 $e[$k] = "Enter a number from $min to $max.";
+            } elseif ($k !== 'temperature' && (float)$v > 0 && round((float)$v, 2) <= 0) {
+                $e[$k] = 'A limit must be at least 0.01, or 0 for no limit.';   // would round to 0 = no limit
             }
-            $c['ai_platform_' . $k] = is_numeric($v) ? (string)round((float)$v, $k === 'temperature' ? 2 : 2) : '';
+            $c['ai_platform_' . $k] = is_numeric($v) ? (string)round((float)$v, 2) : '';
         }
         if ($c['ai_platform_enabled'] === '1' && !isset($e['model'])) {
             $hasKey = getPlatformSetting('ai_platform_api_key_enc', '') !== '';
@@ -283,6 +285,10 @@ if (!function_exists('aiSetTenantPolicy')) {
         $cap = trim((string)$cap);
         if ($cap !== '' && (!is_numeric($cap) || (float)$cap < 0 || (float)$cap > 100000)) {
             return ['ok' => false, 'error' => 'Monthly limit must be a number from 0 to 100000, or empty for the default.'];
+        }
+        // A positive limit below one cent would round to 0 (= no limit) — refuse it.
+        if ($cap !== '' && (float)$cap > 0 && round((float)$cap, 2) <= 0) {
+            return ['ok' => false, 'error' => 'Monthly limit must be at least 0.01, or 0 for no limit.'];
         }
         $c = getControlPdo();
         $st = $c->prepare("SELECT 1 FROM tenants WHERE id = ? AND status <> 'deleted'");

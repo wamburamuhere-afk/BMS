@@ -106,6 +106,10 @@ foreach ([
 }
 [, $er] = aiPlatformValidate(array_merge($base, ['enabled' => '1']));
 ok('cannot enable without a key', isset($er['api_key']));
+[, $er] = aiPlatformValidate(array_merge($base, ['tenant_cap' => '0.004', 'global_cap' => '0.001']));
+ok('sub-cent limits refused (would round to 0 = no limit)', isset($er['tenant_cap']) && isset($er['global_cap']), json_encode($er));
+[, $er] = aiPlatformValidate(array_merge($base, ['tenant_cap' => '0.01']));
+ok('one cent accepted', !isset($er['tenant_cap']));
 [, $er] = aiPlatformValidate(array_merge($base, ['model' => 'anthropic/claude-3.5-sonnet:beta', 'provider' => 'openrouter']));
 ok('accepts OpenRouter-style model ids', $er === [], json_encode($er));
 
@@ -149,6 +153,7 @@ foreach (['platform', 'own', 'off'] as $m) {
 ok('rejects unknown mode', !aiSetTenantPolicy($tid, 'root', '')['ok']);
 ok('rejects negative cap', !aiSetTenantPolicy($tid, 'platform', '-3')['ok']);
 ok('rejects non-numeric cap', !aiSetTenantPolicy($tid, 'platform', '5;DROP')['ok']);
+ok('rejects a sub-cent cap (would round to unlimited)', !aiSetTenantPolicy($tid, 'platform', '0.004')['ok']);
 ok('rejects unknown company', !aiSetTenantPolicy(987654321, 'platform', '')['ok']);
 if ($deleted) ok('rejects deleted company', !aiSetTenantPolicy($deleted, 'platform', '')['ok']);
 aiSetTenantPolicy($tid, 'platform', '', 1);

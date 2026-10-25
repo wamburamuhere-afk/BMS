@@ -264,6 +264,7 @@ if (!function_exists('helpPanelRender')) {
         form.reset(); formErr.classList.add('d-none');
         document.getElementById('bhSubject').value = (prefill.subject || '').slice(0, 255);
         document.getElementById('bhArticleId').value = prefill.article_id || '';
+        document.getElementById('bhDesc').value = (prefill.body || '').slice(0, 5000);   // e.g. the Ask BMS chat so far
         mode('form');
         if (window.innerWidth >= 576) setTimeout(function () { document.getElementById(prefill.subject ? 'bhDesc' : 'bhSubject').focus(); }, 50);
     }
