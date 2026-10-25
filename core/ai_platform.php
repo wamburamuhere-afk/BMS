@@ -393,3 +393,99 @@ if (!function_exists('aiPlatformLogUsage')) {
         }
     }
 }
+
+if (!function_exists('aiPlatformCompanies')) {
+    /**
+     * Superadmin Companies tab: every non-deleted company with its AI module state,
+     * key source, cap and this month's platform spend. One query, control DB only
+     * (no tenant database is opened). A missing features row counts as ON, the same
+     * fail-open rule as bmsPrimeTenantFeatures().
+     * Filters: q (name/subdomain), mode (auto|platform|own|off), module (on|off).
+     */
+    function aiPlatformCompanies(array $f = []): array
+    {
+        $where = ["t.status <> 'deleted'"]; $args = [];
+        $q = mb_substr(trim((string)($f['q'] ?? '')), 0, 100);
+        if ($q !== '') {
+            $where[] = '(t.company_name LIKE ? OR t.subdomain LIKE ?)';
+            $like = '%' . addcslashes($q, '%_\\') . '%';
+            $args[] = $like; $args[] = $like;
+        }
+        $mode = (string)($f['mode'] ?? '');
+        if (in_array($mode, ['auto', 'platform', 'own', 'off'], true)) {
+            $where[] = "COALESCE(p.mode, 'auto') = ?";
+            $args[] = $mode;
+        }
+        $sql = "SELECT t.id, t.company_name, t.subdomain, t.status,
+                       CASE WHEN f.feature_key IS NULL THEN 1
+                            ELSE (f.is_available = 1 AND COALESCE(tf.is_enabled, f.default_enabled) = 1) END AS ai_module,
+                       COALESCE(p.mode, 'auto') AS mode, p.monthly_cap,
+                       COALESCE(u.spent, 0) AS spent, COALESCE(u.calls, 0) AS calls
+                FROM tenants t
+                LEFT JOIN features f ON f.feature_key = 'ai_assistant'
+                LEFT JOIN tenant_features tf ON tf.tenant_id = t.id AND tf.feature_key = 'ai_assistant'
+                LEFT JOIN tenant_ai_policy p ON p.tenant_id = t.id
+                LEFT JOIN (SELECT tenant_id, SUM(est_cost) spent, SUM(status = 'ok') calls
+                             FROM platform_ai_usage WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01') AND tenant_id IS NOT NULL
+                            GROUP BY tenant_id) u ON u.tenant_id = t.id
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY spent DESC, t.company_name
+                LIMIT 1000";
+        try {
+            $st = getControlPdo()->prepare($sql);
+            $st->execute($args);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('aiPlatformCompanies: ' . $e->getMessage());
+            return [];
+        }
+        $default = aiPlatformSettings()['tenant_cap'];
+        $module = (string)($f['module'] ?? '');
+        $out = [];
+        foreach ($rows as $r) {
+            $r['ai_module'] = (int)$r['ai_module'] === 1;
+            if ($module === 'on' && !$r['ai_module']) continue;
+            if ($module === 'off' && $r['ai_module']) continue;
+            $r['monthly_cap'] = $r['monthly_cap'] === null ? null : (float)$r['monthly_cap'];
+            $r['effective_cap'] = $r['monthly_cap'] ?? $default;
+            $r['spent'] = (float)$r['spent'];
+            $r['calls'] = (int)$r['calls'];
+            $out[] = $r;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('aiPlatformUsageSummary')) {
+    /** Superadmin Usage tab: month totals, by company, by feature, recent problems. */
+    function aiPlatformUsageSummary(): array
+    {
+        $out = ['month' => ['cost' => 0.0, 'calls' => 0, 'blocked' => 0, 'errors' => 0], 'last_month' => ['cost' => 0.0, 'calls' => 0],
+                'by_company' => [], 'by_feature' => [], 'problems' => []];
+        try {
+            $c = getControlPdo();
+            $m = $c->query("SELECT COALESCE(SUM(est_cost),0) cost, COALESCE(SUM(status='ok'),0) calls,
+                                   COALESCE(SUM(status='blocked'),0) blocked, COALESCE(SUM(status='error'),0) errors
+                              FROM platform_ai_usage WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')")->fetch(PDO::FETCH_ASSOC);
+            $out['month'] = ['cost' => (float)$m['cost'], 'calls' => (int)$m['calls'], 'blocked' => (int)$m['blocked'], 'errors' => (int)$m['errors']];
+            $l = $c->query("SELECT COALESCE(SUM(est_cost),0) cost, COALESCE(SUM(status='ok'),0) calls FROM platform_ai_usage
+                             WHERE created_at >= DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01')
+                               AND created_at < DATE_FORMAT(NOW(), '%Y-%m-01')")->fetch(PDO::FETCH_ASSOC);
+            $out['last_month'] = ['cost' => (float)$l['cost'], 'calls' => (int)$l['calls']];
+            $out['by_company'] = $c->query("SELECT u.tenant_id, t.company_name, t.subdomain, SUM(u.est_cost) cost, SUM(u.status='ok') calls,
+                                                   SUM(u.prompt_tokens + u.completion_tokens) tokens
+                                              FROM platform_ai_usage u LEFT JOIN tenants t ON t.id = u.tenant_id
+                                             WHERE u.created_at >= DATE_FORMAT(NOW(), '%Y-%m-01') AND u.tenant_id IS NOT NULL
+                                             GROUP BY u.tenant_id, t.company_name, t.subdomain ORDER BY cost DESC LIMIT 20")->fetchAll(PDO::FETCH_ASSOC);
+            $out['by_feature'] = $c->query("SELECT feature, SUM(est_cost) cost, SUM(status='ok') calls FROM platform_ai_usage
+                                             WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+                                             GROUP BY feature ORDER BY cost DESC")->fetchAll(PDO::FETCH_ASSOC);
+            $out['problems'] = $c->query("SELECT u.created_at, u.tenant_id, t.company_name, u.feature, u.status, u.error
+                                            FROM platform_ai_usage u LEFT JOIN tenants t ON t.id = u.tenant_id
+                                           WHERE u.status <> 'ok' ORDER BY u.id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('aiPlatformUsageSummary: ' . $e->getMessage());
+        }
+        return $out;
+    }
+}

@@ -12,8 +12,20 @@ require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
 $me  = currentSuperadmin();
-$tab = in_array($_GET['tab'] ?? '', ['settings'], true) ? $_GET['tab'] : 'settings';
+$tab = in_array($_GET['tab'] ?? '', ['settings', 'companies', 'usage'], true) ? $_GET['tab'] : 'settings';
 $h   = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+$fQ      = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
+$fMode   = in_array($_GET['mode'] ?? '', ['auto', 'platform', 'own', 'off'], true) ? (string)$_GET['mode'] : '';
+$fModule = in_array($_GET['module'] ?? '', ['on', 'off'], true) ? (string)$_GET['module'] : '';
+$companies = $tab === 'companies' ? aiPlatformCompanies(['q' => $fQ, 'mode' => $fMode, 'module' => $fModule]) : [];
+$usage     = $tab === 'usage' ? aiPlatformUsageSummary() : [];
+$modeLabels = ['auto' => 'Auto', 'platform' => 'BJP key', 'own' => 'Own key', 'off' => 'Off'];
+$modeHelp = [
+    'auto'     => 'Their own key if they have one, otherwise the BJP key.',
+    'platform' => 'Always the BJP key, with the monthly limit.',
+    'own'      => 'Only their own key (set in their AI Settings).',
+    'off'      => 'No AI for this company.',
+];
 
 $s = aiPlatformSettings();
 $keyOk = $s['has_key'] && aiPlatformSettings(true)['api_key'] !== '';
@@ -57,7 +69,7 @@ $models = [
     </div>
 
     <ul class="nav nav-tabs mb-3">
-        <?php foreach (['settings' => ['bi-sliders', 'Settings']] as $k => [$ic, $lbl]): ?>
+        <?php foreach (['settings' => ['bi-sliders', 'Settings'], 'companies' => ['bi-building', 'Companies'], 'usage' => ['bi-graph-up', 'Usage']] as $k => [$ic, $lbl]): ?>
         <li class="nav-item"><a class="nav-link<?= $tab === $k ? ' active' : '' ?>" href="<?= $h(saUrl('ai?tab=' . $k)) ?>"><i class="bi <?= $ic ?> me-1"></i><?= $lbl ?></a></li>
         <?php endforeach; ?>
     </ul>
@@ -147,6 +159,137 @@ $models = [
         </div>
         <p class="text-muted small mt-2 mb-0">Companies only get AI when the AI Assistant module is on for them (Modules / Plans). A company that already uses its own key keeps it until you change it on the Companies tab.</p>
     </form>
+<?php elseif ($tab === 'companies'): ?>
+    <form class="row g-2 mb-3" method="get" action="<?= $h(saUrl('ai')) ?>">
+        <input type="hidden" name="tab" value="companies">
+        <div class="col-12 col-md-4"><input type="search" class="form-control" name="q" value="<?= $h($fQ) ?>" placeholder="Search company or subdomain" aria-label="Search"></div>
+        <div class="col-6 col-md-3">
+            <select class="form-select" name="mode" aria-label="Key source">
+                <option value="">All key sources</option>
+                <?php foreach ($modeLabels as $k => $lbl): ?><option value="<?= $k ?>"<?= $fMode === $k ? ' selected' : '' ?>><?= $lbl ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <select class="form-select" name="module" aria-label="AI module">
+                <option value="">Module on or off</option>
+                <option value="on"<?= $fModule === 'on' ? ' selected' : '' ?>>AI module on</option>
+                <option value="off"<?= $fModule === 'off' ? ' selected' : '' ?>>AI module off</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-2 d-grid"><button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel me-1"></i> Filter</button></div>
+    </form>
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-dark"><tr><th>Company</th><th>AI module</th><th>Key source</th><th class="text-end">Monthly limit</th><th class="text-end">Spent this month</th><th class="text-end">Calls</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        <?php if (!$companies): ?>
+            <tr><td colspan="7" class="text-center text-muted py-4">No companies match.</td></tr>
+        <?php endif; ?>
+        <?php foreach ($companies as $co):
+            $capTxt = $co['effective_cap'] > 0 ? $money($co['effective_cap']) : 'No limit';
+            $pct = $co['effective_cap'] > 0 ? min(100, (int)round(100 * $co['spent'] / $co['effective_cap'])) : 0; ?>
+            <tr>
+                <td><div class="fw-semibold"><?= $h($co['company_name']) ?></div><div class="small text-muted"><?= $h($co['subdomain']) ?> · <?= $h($co['status']) ?></div></td>
+                <td><?= $co['ai_module'] ? '<span class="badge rounded-pill bg-primary">On</span>' : '<span class="badge rounded-pill bg-secondary">Off</span>' ?></td>
+                <td><span title="<?= $h($modeHelp[$co['mode']] ?? '') ?>"><?= $h($modeLabels[$co['mode']] ?? $co['mode']) ?></span></td>
+                <td class="text-end"><?= $h($capTxt) ?><?= $co['monthly_cap'] === null ? ' <span class="small text-muted">(default)</span>' : '' ?></td>
+                <td class="text-end"><?= $h($money($co['spent'])) ?><?php if ($co['effective_cap'] > 0): ?><div class="progress mt-1" style="height:4px" role="progressbar" aria-label="Share of limit used" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar<?= $pct >= 100 ? ' bg-danger' : '' ?>" style="width:<?= $pct ?>%"></div></div><?php endif; ?></td>
+                <td class="text-end"><?= (int)$co['calls'] ?></td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary js-policy" data-id="<?= (int)$co['id'] ?>" data-name="<?= $h($co['company_name']) ?>"
+                            data-mode="<?= $h($co['mode']) ?>" data-cap="<?= $co['monthly_cap'] === null ? '' : $h($co['monthly_cap']) ?>"><i class="bi bi-pencil"></i> Edit</button>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <p class="text-muted small">Spending counts only calls made on the BJP key. "Auto" companies with their own key pay their provider directly.</p>
+
+    <div class="modal fade" id="policyModal" tabindex="-1" aria-labelledby="policyTitle" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+            <form id="policyForm">
+                <div class="modal-header"><h6 class="modal-title fw-bold" id="policyTitle">AI for <span id="policyName"></span></h6><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="set_policy">
+                    <input type="hidden" name="tenant_id" id="policy_tenant">
+                    <div class="mb-3">
+                        <label class="form-label" for="policy_mode">Key source</label>
+                        <select class="form-select" id="policy_mode" name="mode">
+                            <?php foreach ($modeLabels as $k => $lbl): ?><option value="<?= $k ?>"><?= $lbl ?> — <?= $h($modeHelp[$k]) ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label" for="policy_cap">Monthly limit on the BJP key (USD)</label>
+                        <input type="number" class="form-control" id="policy_cap" name="monthly_cap" min="0" max="100000" step="0.01" placeholder="Default (<?= $h($s['tenant_cap'] > 0 ? $money($s['tenant_cap']) : 'no limit') ?>)">
+                        <div class="form-text">Empty = the default limit. 0 = no limit.</div>
+                    </div>
+                    <p class="small text-muted mt-3 mb-0">The AI Assistant module itself is switched on or off on the company's Modules page.</p>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save</button></div>
+            </form>
+        </div></div>
+    </div>
+<?php elseif ($tab === 'usage'): ?>
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="stat"><b><?= $h($money($usage['month']['cost'])) ?></b><span class="small text-muted">This month</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><b><?= (int)$usage['month']['calls'] ?></b><span class="small text-muted">Answers this month</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><b><?= $h($money($usage['last_month']['cost'])) ?></b><span class="small text-muted">Last month (<?= (int)$usage['last_month']['calls'] ?> answers)</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><b><?= (int)$usage['month']['blocked'] ?> / <?= (int)$usage['month']['errors'] ?></b><span class="small text-muted">Blocked / failed this month</span></div></div>
+    </div>
+    <div class="row g-3">
+        <div class="col-12 col-lg-7">
+            <div class="card panel-card">
+                <div class="card-header"><i class="bi bi-building text-primary me-1"></i> Top companies this month</div>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>Company</th><th class="text-end">Answers</th><th class="text-end">Tokens</th><th class="text-end">Cost</th></tr></thead>
+                    <tbody>
+                    <?php if (!$usage['by_company']): ?><tr><td colspan="4" class="text-center text-muted py-3">No usage yet this month.</td></tr><?php endif; ?>
+                    <?php foreach ($usage['by_company'] as $r): ?>
+                        <tr><td><?= $h($r['company_name'] ?? ('#' . $r['tenant_id'])) ?> <span class="small text-muted"><?= $h($r['subdomain'] ?? '') ?></span></td>
+                            <td class="text-end"><?= (int)$r['calls'] ?></td><td class="text-end"><?= number_format((int)$r['tokens']) ?></td><td class="text-end"><?= $h($money($r['cost'])) ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-5">
+            <div class="card panel-card">
+                <div class="card-header"><i class="bi bi-ui-checks-grid text-primary me-1"></i> By feature this month</div>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>Feature</th><th class="text-end">Answers</th><th class="text-end">Cost</th></tr></thead>
+                    <tbody>
+                    <?php if (!$usage['by_feature']): ?><tr><td colspan="3" class="text-center text-muted py-3">No usage yet this month.</td></tr><?php endif; ?>
+                    <?php foreach ($usage['by_feature'] as $r): ?>
+                        <tr><td><?= $h($r['feature']) ?></td><td class="text-end"><?= (int)$r['calls'] ?></td><td class="text-end"><?= $h($money($r['cost'])) ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card panel-card">
+                <div class="card-header"><i class="bi bi-exclamation-triangle text-primary me-1"></i> Recent blocked or failed calls</div>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>When</th><th>Company</th><th>Feature</th><th>Status</th><th>Reason</th></tr></thead>
+                    <tbody>
+                    <?php if (!$usage['problems']): ?><tr><td colspan="5" class="text-center text-muted py-3">Nothing to report.</td></tr><?php endif; ?>
+                    <?php foreach ($usage['problems'] as $r): ?>
+                        <tr><td class="small text-nowrap"><?= $h($r['created_at']) ?></td><td><?= $r['tenant_id'] === null ? '<span class="text-muted">Connection test</span>' : $h($r['company_name'] ?? ('#' . $r['tenant_id'])) ?></td>
+                            <td><?= $h($r['feature']) ?></td><td><?= $r['status'] === 'blocked' ? '<span class="badge bg-secondary">Blocked</span>' : '<span class="badge bg-danger">Failed</span>' ?></td>
+                            <td class="small"><?= $h($r['error']) ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
 <?php endif; ?>
 </div>
 
@@ -188,6 +331,21 @@ $('#aiForm').on('submit', function (e) {
     e.preventDefault();
     saPost($(this).serializeArray(), $(this).find('[type="submit"]')).done(function (r) {
         $('#ai_key').val('');
+        done(r, true);
+    });
+});
+const policyModalEl = document.getElementById('policyModal');
+const policyModal = policyModalEl ? new bootstrap.Modal(policyModalEl) : null;
+$('.js-policy').on('click', function () {
+    const d = $(this).data();
+    $('#policy_tenant').val(d.id); $('#policyName').text(d.name);
+    $('#policy_mode').val(d.mode); $('#policy_cap').val(d.cap === undefined ? '' : d.cap);
+    policyModal.show();
+});
+$('#policyForm').on('submit', function (e) {
+    e.preventDefault();
+    saPost($(this).serializeArray(), $(this).find('[type="submit"]')).done(function (r) {
+        if (r && r.success) policyModal.hide();
         done(r, true);
     });
 });

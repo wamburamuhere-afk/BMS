@@ -63,7 +63,7 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 - `actions/superadmin_ai.php` (actions save_settings, test).
 - Test: auth/CSRF refusal, validation, key never echoed, audit row written.
 
-### Phase 4 — Superadmin → AI → Tenants & Usage
+### Phase 4 — Superadmin → AI → Companies & Usage ✅ (40 checks)
 - **Tenants** tab: every tenant with module on/off, key source (Auto/BJP key/Own key/Off), cap (default/custom/unlimited), this month's spend against the cap, and calls. Superadmin can edit the source and cap.
 - **Usage** tab: this month vs last month totals, by tenant, by feature, and the last 50 errors (sanitised).
 - Actions: `set_policy` (validated mode and cap; the tenant must exist).

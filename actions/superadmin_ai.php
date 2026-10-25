@@ -55,6 +55,28 @@ try {
             echo json_encode(['success' => $r['ok'], 'message' => $r['message']]);
             exit;
 
+        case 'set_policy':
+            $tid = (string)($_POST['tenant_id'] ?? '');
+            if (!ctype_digit($tid) || (int)$tid < 1) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => 'Company not found.']);
+                exit;
+            }
+            $mode = (string)($_POST['mode'] ?? '');
+            $cap  = (string)($_POST['monthly_cap'] ?? '');
+            $r = aiSetTenantPolicy((int)$tid, $mode, $cap, (int)$me['id']);
+            if (!$r['ok']) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => $r['error']]);
+                exit;
+            }
+            $st = getControlPdo()->prepare('SELECT subdomain FROM tenants WHERE id = ?');
+            $st->execute([(int)$tid]);
+            logTenantAdminAction((int)$tid, (string)$st->fetchColumn(), 'ai_policy',
+                'AI key source set to ' . $mode . ', monthly limit ' . (trim($cap) === '' ? 'default' : (string)round((float)$cap, 2)));
+            echo json_encode(['success' => true, 'message' => 'AI settings for this company saved.']);
+            exit;
+
         default:
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Unknown action.']);
