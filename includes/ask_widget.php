@@ -47,9 +47,11 @@ if (!function_exists('askWidgetRender')) {
         $greet = $hour < 12 ? t('Good morning') : ($hour < 17 ? t('Good afternoon') : t('Good evening'));
         $bnav = function_exists('posSimpleModeEnabled') && posSimpleModeEnabled();
         $dark = (($_SESSION['theme'] ?? 'light') === 'dark');
+        require_once __DIR__ . '/../core/ai_service.php';
+        $product = aiProductName();   // "Smart POS" | "Smart BMS"
 
         $s = [
-            'title' => t('Ask BMS'), 'hello' => $greet . ($first !== '' ? ', ' . $first : '') . '!',
+            'title' => $product === 'Smart POS' ? t('Ask Smart POS') : t('Ask Smart BMS'), 'hello' => $greet . ($first !== '' ? ', ' . $first : '') . '!',
             'how' => t('How can we help you today?'), 'popular' => t('Popular questions'),
             'ph' => t('Type your question…'), 'send' => t('Send'), 'person' => t('Talk to a person'),
             'found' => t('These guides may help:'), 'aiOffer' => t('Get an answer from AI'),
@@ -57,7 +59,7 @@ if (!function_exists('askWidgetRender')) {
             'thinking' => t('Thinking…'), 'error' => t('Help is not available right now. Please try again.'),
             'take' => t('Take me there'), 'restart' => t('Start over'), 'close' => t('Close'),
             'hours' => $hours !== '' ? t('Support hours:') . ' ' . $hours : t('Answers cover only what you can open.'),
-            'you' => t('You'), 'bms' => t('BMS'), 'subject' => t('Question:'), 'chat' => t('Chat so far:'),
+            'you' => t('You'), 'bms' => $product, 'subject' => t('Question:'), 'chat' => t('Chat so far:'),
             'aiNote' => t('AI answer — check important figures before acting on them.'),
         ];
         $J = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
@@ -134,6 +136,36 @@ if (!function_exists('askWidgetRender')) {
     let hist = [], busy = false, started = false;
 
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    // AI text → bold, bullet and numbered lists. Built only from createElement + text nodes,
+    // so nothing the model writes can become markup.
+    function inline(node, s) {
+        String(s).replace(/`/g, '').split(/(\*\*[^*]+\*\*)/g).forEach(function (part) {
+            if (/^\*\*[^*]+\*\*$/.test(part)) node.appendChild(el('strong', null, part.slice(2, -2)));
+            else if (part) node.appendChild(document.createTextNode(part.replace(/\*\*/g, '')));
+        });
+    }
+    function rich(text) {
+        const out = el('div'); let list = null, tag = '';
+        String(text).replace(/\r/g, '').split('\n').forEach(function (raw) {
+            const line = raw.trim();
+            if (line === '') return;   // blank lines keep a numbered list going
+            const ul = /^[-*•]\s+(.*)$/.exec(line), ol = /^(\d+)[.)]\s+(.*)$/.exec(line);
+            if (ul || ol) {
+                const want = ul ? 'ul' : 'ol';
+                if (!list || tag !== want) {
+                    list = el(want, 'mb-1'); tag = want;
+                    if (ol) list.start = parseInt(ol[1], 10) || 1;
+                    out.appendChild(list);
+                }
+                const li = el('li'); inline(li, ul ? ul[1] : ol[2]); list.appendChild(li);
+                return;
+            }
+            list = null;
+            const h = /^#{1,6}\s+(.*)$/.exec(line);
+            const p = el('div', h ? 'fw-semibold mt-1' : 'mb-1'); inline(p, h ? h[1] : line); out.appendChild(p);
+        });
+        return out;
+    }
     function save() { try { sessionStorage.setItem(KEY, JSON.stringify(hist.slice(-30))); } catch (e) {} }
     function load() { try { const v = JSON.parse(sessionStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
     function scroll() { log.scrollTop = log.scrollHeight; }
@@ -145,7 +177,7 @@ if (!function_exists('askWidgetRender')) {
     function render(m) {
         if (m.k === 'u') log.appendChild(el('div', 'bms-ask-msg u', m.t));
         else if (m.k === 'b') log.appendChild(el('div', 'bms-ask-msg b', m.t));
-        else if (m.k === 'ai') { log.appendChild(el('div', 'bms-ask-msg b', m.t)); log.appendChild(el('div', 'bms-ask-note', S.aiNote)); }
+        else if (m.k === 'ai') { const w = el('div', 'bms-ask-msg b art'); w.appendChild(rich(m.t)); log.appendChild(w); log.appendChild(el('div', 'bms-ask-note', S.aiNote)); }
         else if (m.k === 'list') {
             const w = el('div', 'bms-ask-msg b'); w.appendChild(el('div', 'mb-1', m.t));
             (m.a || []).forEach(function (a) {
@@ -221,7 +253,8 @@ if (!function_exists('askWidgetRender')) {
         const lines = [];
         hist.forEach(function (m) {
             if (m.k === 'u') lines.push(S.you + ': ' + m.t);
-            else if (m.k === 'b' || m.k === 'ai') lines.push(S.bms + ': ' + m.t);
+            else if (m.k === 'b') lines.push(S.bms + ': ' + m.t);
+            else if (m.k === 'ai') lines.push(S.bms + ': ' + String(m.t).replace(/\*\*/g, ''));
             else if (m.k === 'list') lines.push(S.bms + ': ' + m.t + ' ' + (m.a || []).map(function (a) { return a.title; }).join('; '));
         });
         return lines.join('\n');

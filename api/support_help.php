@@ -16,6 +16,12 @@ require_once __DIR__ . '/../core/support_articles.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
+// This endpoint never includes header.php, so load the caller's saved language
+// here or articles would always come back in English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 if (!canView('help')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }

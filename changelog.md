@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-10-25 — fix(login): remove the separate "Need help signing in?" link
+
+**Files:** `login.php`, `app/superadmin/support.php`, `tests/test_support_center_phase7_cli.php`
+
+- The login page no longer shows the "Need help signing in?" link, because the footer **Help Center** link opens the same sign-in help box (who resets passwords, the login help text and BJP's contacts). The box itself and its content are unchanged.
+- Superadmin › Support › Settings now describes the login help text as "Shown in the Help Center box on every company's login page."
+
+## 2026-10-25 — fix(ai): chat named after the product, replies in the user's language, role- and shop-limited answers that match the reports
+
+**Files:** `core/ai_insights.php`, `core/ai_service.php`, `api/ai/ask.php`, `api/support_help.php`, `includes/ask_widget.php`, `lang/sw.php`, `tests/test_platform_ai_phase7_cli.php` (new), `tests/test_ai_insights_cli.php`, `tests/test_ai_summary_cli.php`, `platform_ai_plan.md`
+
+- **Chat title:** "Ask Smart POS" for Smart POS companies and "Ask Smart BMS" for Smart BMS (Swahili: "Uliza Smart POS" / "Uliza Smart BMS"), taken from the company's plan, or from Simple POS mode on a single-company install.
+- **Reply language:** the AI now always answers in the language the user chose, even when the question is typed in another language. Bug fixed on the way: the AI endpoint and the help-articles endpoint never loaded the user's saved language, so the AI, popular questions and article search were always in English.
+- **Role-aware answers:** the AI is told whether the person is the administrator or staff (role name only, no personal details). "What can you do?" now lists only what that person may see. Data functions were already limited to the pages the role can open and re-checked on the server; that is now covered by tests.
+- **Figures now match the reports:**
+  - Sales, top customers and sales trend include POS/shop sales, not only invoices (same sources as the Sales report).
+  - Money owed includes unpaid shop credit sales.
+  - Profit and expenses come from the Income Statement engine, and cash from the Balance Sheet engine (the posted ledger), instead of raw tables and stored account balances.
+  - Low stock uses the Products page rule.
+- **Shop/warehouse scope:** a staff member limited to one shop now gets stock, sales and ledger figures for that shop only (project scope was already applied).
+- **Formatting:** AI answers show bold text and bullet/numbered lists instead of raw `**` marks. They are built from text nodes only, so nothing the AI writes can become HTML.
+- Tests: new Phase 7 suite (47 checks); the insight and summary suites now compare against the report engines.
+
 ## 2026-10-25 — feat(ai): Platform AI — one BJP AI key for every company, monthly limits, and the floating "Ask BMS" chat
 
 **Files:** `core/ai_platform.php` (new), `core/ai_service.php`, `scripts/setup_control_db.php`, `app/superadmin/ai.php` (new), `actions/superadmin_ai.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `app/constant/settings/ai_settings.php`, `api/ai/save_ai_settings.php`, `api/ai/test_ai_config.php`, `api/ai_audit_analysis.php`, `includes/ask_widget.php` (new), `includes/help_panel.php`, `header.php`, `lang/sw.php`, `tests/test_platform_ai_phase1_cli.php` … `phase6_cli.php` (new, 7 files), `platform_ai_plan.md` (new)
