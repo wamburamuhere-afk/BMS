@@ -30,7 +30,6 @@ $tr = $pageLang === 'sw' ? [
     'password_ph'       => 'Andika nenosiri lako',
     'remember_me'       => 'Nikumbuke',
     'forgot_pw'         => 'Umesahau nenosiri?',
-    'help_title'        => 'Unahitaji msaada wa kuingia?',
     'help_staff'        => 'Wafanyakazi: mwombe msimamizi wa kampuni yako akuwekee nenosiri jipya.',
     'help_admin'        => 'Msimamizi: tumia "Umesahau nenosiri?" hapo juu.',
     'help_contact'      => 'Bado umekwama? Wasiliana na msaada:',
@@ -78,7 +77,6 @@ $tr = $pageLang === 'sw' ? [
     'password_ph'       => 'Enter your password',
     'remember_me'       => 'Remember me',
     'forgot_pw'         => 'Forgot password?',
-    'help_title'        => 'Need help signing in?',
     'help_staff'        => 'Staff: ask your company admin to set a new password for you.',
     'help_admin'        => 'Admins: use "Forgot password?" above.',
     'help_contact'      => 'Still stuck? Contact support:',
@@ -341,17 +339,15 @@ $registerUrlWithLang = $registerUrl . (str_contains($registerUrl, '?') ? '&' : '
         </form>
 
         <?php
-        // "Need help signing in?" — text and contacts from Superadmin › Support › Settings (control DB).
+        // Sign-in help box, opened by the footer "Help Center" link — text and contacts
+        // from Superadmin › Support › Settings (control DB).
         $__sup = [];
         if (is_file(__DIR__ . '/core/support.php')) {
             try { require_once __DIR__ . '/core/support.php'; $__sup = supportSettings(); } catch (Throwable $e) { $__sup = []; }
         }
         $__supTel = static fn(string $n): string => preg_replace('/[^0-9+]/', '', $n);
         ?>
-        <div class="text-center mt-3">
-            <a class="small" data-bs-toggle="collapse" href="#loginHelp" role="button" aria-expanded="false" aria-controls="loginHelp"><?= htmlspecialchars($tr['help_title']) ?></a>
-        </div>
-        <div class="collapse mt-2" id="loginHelp">
+        <div class="collapse mt-3" id="loginHelp">
             <div class="border rounded p-3 small" style="background:#e7f0ff;border-color:#b6ccfe!important">
                 <div class="mb-1"><?= htmlspecialchars($tr['help_staff']) ?></div>
                 <div class="mb-2"><?= htmlspecialchars($tr['help_admin']) ?></div>

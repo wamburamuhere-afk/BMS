@@ -430,7 +430,7 @@ $statusBadge = function (string $st) use ($h): string {
                         <div class="mb-0">
                             <label class="form-label" for="support_login_help">Login page help text</label>
                             <textarea class="form-control" id="support_login_help" name="support_login_help" rows="2" maxlength="500"><?= $e('support_login_help') ?></textarea>
-                            <div class="form-text">Shown under "Need help signing in?" on every company's login page.</div>
+                            <div class="form-text">Shown in the Help Center box on every company's login page.</div>
                         </div>
                     </div>
                 </div>
