@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-25 — fix(login): remove the separate "Need help signing in?" link
+
+**Files:** `login.php`, `app/superadmin/support.php`, `tests/test_support_center_phase7_cli.php`
+
+- The login page no longer shows the "Need help signing in?" link, because the footer **Help Center** link opens the same sign-in help box (who resets passwords, the login help text and BJP's contacts). The box itself and its content are unchanged.
+- Superadmin › Support › Settings now describes the login help text as "Shown in the Help Center box on every company's login page."
+
 ## 2026-10-25 — fix(ai): chat named after the product, replies in the user's language, role- and shop-limited answers that match the reports
 
 **Files:** `core/ai_insights.php`, `core/ai_service.php`, `api/ai/ask.php`, `api/support_help.php`, `includes/ask_widget.php`, `lang/sw.php`, `tests/test_platform_ai_phase7_cli.php` (new), `tests/test_ai_insights_cli.php`, `tests/test_ai_summary_cli.php`, `platform_ai_plan.md`
