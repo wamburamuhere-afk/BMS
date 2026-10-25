@@ -36,6 +36,9 @@ $costCap   = getSetting('ai_monthly_cost_cap', '0');
 $temp      = getSetting('ai_temperature', '0.4');
 $hasKey    = getSetting('ai_api_key_enc', '') !== '';
 $cap       = aiCapInfo();
+// Platform AI (platform_ai_plan.md): own key, provided by the service provider, or off.
+$aiMode    = aiTenantAiMode();
+$provided  = $aiMode['source'] === 'platform';
 
 // Recent usage + per-feature month totals (admin viewer)
 $recent = []; $byFeature = [];
@@ -61,13 +64,36 @@ $providers = [
             <h4 class="mb-0"><i class="bi bi-stars text-primary me-2"></i><?= t('AI Assistant') ?></h4>
             <p class="text-muted mb-0"><?= t('Connect an AI provider to power "Generate with AI" and "Ask BMS".') ?></p>
         </div>
-        <span class="badge rounded-pill bg-<?= $enabled ? 'primary' : 'secondary' ?>">
-            <?= $enabled ? t('Enabled') : t('Disabled') ?>
+        <?php $__on = $aiMode['source'] === 'own' ? $enabled : $aiMode['platform_ready']; ?>
+        <span class="badge rounded-pill bg-<?= $__on ? 'primary' : 'secondary' ?>" id="aiStatusBadge" data-on="<?= $__on ? '1' : '0' ?>">
+            <?= $__on ? t('Enabled') : t('Disabled') ?>
         </span>
     </div>
 
     <div class="row g-3">
         <div class="col-lg-8">
+            <?php if ($aiMode['source'] !== 'own'): ?>
+            <div class="card border-0 shadow-sm" id="aiProvidedCard" data-ai-state="<?= !$provided ? 'off' : ($aiMode['platform_ready'] ? 'ready' : 'pending') ?>">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-stars me-1"></i> <?= $provided ? t('AI provided by your service provider') : t('AI is not included for your company') ?>
+                </div>
+                <div class="card-body">
+                    <?php if ($provided && $aiMode['platform_ready']): ?>
+                        <p class="mb-2"><i class="bi bi-check-circle text-primary me-1"></i> <?= t('"Ask BMS" and "Generate with AI" are ready to use. There is nothing to set up.') ?></p>
+                        <p class="text-muted small mb-0"><?= t('Your company has a monthly AI limit. When it is reached, AI pauses until next month. Contact support if you need more.') ?></p>
+                    <?php elseif ($provided): ?>
+                        <p class="mb-0"><i class="bi bi-hourglass-split text-primary me-1"></i> <?= t('AI has not been switched on by your service provider yet.') ?></p>
+                    <?php else: ?>
+                        <p class="mb-0"><i class="bi bi-info-circle text-primary me-1"></i> <?= t('AI is not included for your company. Please contact support.') ?></p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php if ($aiMode['own_allowed']): ?>
+            <?php if ($aiMode['source'] !== 'own'): ?>
+            <details class="mt-3" id="aiOwnKeyDetails">
+                <summary class="fw-semibold text-primary mb-2"><?= t('Use your own AI provider key instead (advanced)') ?></summary>
+            <?php endif; ?>
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <i class="bi bi-gear me-1"></i> <?= t('Provider Configuration') ?>
@@ -137,6 +163,10 @@ $providers = [
                     </form>
                 </div>
             </div>
+            <?php if ($aiMode['source'] !== 'own'): ?>
+            </details>
+            <?php endif; ?>
+            <?php endif; ?>
         </div>
 
         <div class="col-lg-4">
@@ -155,7 +185,11 @@ $providers = [
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-light fw-semibold"><i class="bi bi-info-circle text-primary me-1"></i> <?= t('How it works') ?></div>
                 <div class="card-body small text-muted">
+                    <?php if ($provided): ?>
+                    <p><?= t('AI is provided by your service provider, within a monthly limit for your company.') ?></p>
+                    <?php else: ?>
                     <p><?= t('BMS uses') ?> <strong><?= t('your own') ?></strong> <?= t('provider account, so you control the model and the bill.') ?></p>
+                    <?php endif; ?>
                     <p class="mb-0"><?= t('The assistant only reads') ?> <strong><?= t('summary figures') ?></strong> <?= t('from your data to answer questions — it never sees raw records and can never change anything.') ?></p>
                 </div>
             </div>
@@ -183,7 +217,7 @@ $providers = [
                         <tr>
                             <td class="small text-nowrap"><?= htmlspecialchars($u['created_at']) ?></td>
                             <td><span class="badge bg-secondary-subtle text-secondary border"><?= htmlspecialchars($u['feature']) ?></span></td>
-                            <td class="small"><?= htmlspecialchars($u['model'] ?: '—') ?></td>
+                            <td class="small"><?= $u['model'] === 'platform' ? t('Service provider') : htmlspecialchars($u['model'] ?: '—') ?></td>
                             <td class="text-end small"><?= (int)$u['prompt_tokens'] + (int)$u['completion_tokens'] ?></td>
                             <td class="text-end small">$<?= number_format((float)$u['est_cost'], 5) ?></td>
                             <td><span class="badge bg-<?= $u['status'] === 'ok' ? 'success' : ($u['status'] === 'blocked' ? 'warning' : 'danger') ?>-subtle text-<?= $u['status'] === 'ok' ? 'success' : ($u['status'] === 'blocked' ? 'warning' : 'danger') ?> border"><?= htmlspecialchars($u['status']) ?></span></td>

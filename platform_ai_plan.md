@@ -69,7 +69,7 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 - Actions: `set_policy` (validated mode and cap; the tenant must exist).
 - Test: policy changes take effect immediately in the resolver; non-numeric or negative cap rejected; unknown tenant rejected.
 
-### Phase 5 — Tenant side
+### Phase 5 — Tenant side ✅ (37 checks)
 - `ai_settings.php` shows per mode as in D6; `save_ai_settings.php` / `test_ai_config.php` return 403 unless the mode is `own`.
 - "Ask BMS" in the header and help panel and "Generate with AI" appear automatically for platform tenants. A friendly message is shown when the limit is reached ("This month's AI limit has been reached. Contact support.").
 - `lang/sw.php` strings for all new text.

@@ -27,6 +27,14 @@ require_once __DIR__ . '/crypto.php';
 // Platform AI (platform_ai_plan.md): which key a tenant uses, platform caps + metering.
 require_once __DIR__ . '/ai_platform.php';
 
+if (!function_exists('aiT')) {
+    /** Translate a user-facing AI message when the i18n helper is loaded. */
+    function aiT(string $s): string
+    {
+        return function_exists('t') ? (string)t($s) : $s;
+    }
+}
+
 if (!function_exists('aiOwnSettings')) {
     /** The tenant's OWN AI config from its system_settings (key decrypted). */
     function aiOwnSettings(): array
@@ -69,6 +77,27 @@ if (!function_exists('aiSettings')) {
         return ['enabled' => $p['enabled'], 'provider' => $p['provider'], 'model' => $p['model'], 'api_key' => $p['api_key'],
                 'base_url' => $p['base_url'], 'cost_cap' => aiPlatformTenantCap($tid), 'temperature' => $p['temperature'],
                 'source' => 'platform', 'tenant_id' => $tid];
+    }
+}
+
+if (!function_exists('aiTenantAiMode')) {
+    /**
+     * What the tenant AI Settings page should show (never includes a key):
+     * source own|platform|off, the superadmin policy, whether the company may
+     * use its own key, and whether the platform key is ready.
+     */
+    function aiTenantAiMode(): array
+    {
+        $tid = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
+        $s = aiSettings();
+        $policy = $tid === null ? 'none' : aiTenantPolicy($tid)['mode'];
+        return [
+            'tenant_id'      => $tid,
+            'source'         => $s['source'],
+            'policy'         => $policy,
+            'own_allowed'    => $tid === null || in_array($policy, ['auto', 'own'], true),
+            'platform_ready' => $s['source'] === 'platform' && $s['enabled'] && $s['model'] !== '' && $s['api_key'] !== '',
+        ];
     }
 }
 
@@ -180,7 +209,7 @@ if (!function_exists('aiComplete')) {
     {
         $feature = $opts['feature'] ?? 'generate';
         if (function_exists('tenantFeatureEnabled') && !tenantFeatureEnabled('ai_assistant')) {
-            return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'AI is not available for this company.'];
+            return ['ok' => false, 'text' => '', 'usage' => [], 'error' => aiT('AI is not available for this company.')];
         }
         $s = aiSettings();
 
@@ -195,7 +224,7 @@ if (!function_exists('aiComplete')) {
         // Platform calls: the tenant's own usage log never names BJP's provider/model.
         $logProvider = $isPlatform ? 'platform' : $s['provider'];
         $logModel    = $isPlatform ? 'platform' : $s['model'];
-        $unavailable = ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'AI is temporarily unavailable. Please try again later.'];
+        $unavailable = ['ok' => false, 'text' => '', 'usage' => [], 'error' => aiT('AI is temporarily unavailable. Please try again later.')];
 
         if ($isPlatform) {
             // Metering must work before a platform call — fail closed, never unmetered.
@@ -208,12 +237,12 @@ if (!function_exists('aiComplete')) {
                 $why = $pc['exceeded'] ? 'tenant monthly cap reached' : 'platform monthly cap reached';
                 aiLogUsage($feature, $logProvider, $logModel, 0, 0, 0, 'blocked', $why);
                 aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], 0, 0, 0, 'blocked', $why);
-                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => "This month's AI limit has been reached. Please contact support."];
+                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => aiT("This month's AI limit has been reached. Please contact support.")];
             }
             $rl = aiPlatformTenantRateLimited((int)$tid);
             if ($rl === null) return $unavailable;
             if ($rl) {
-                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'The AI is busy right now. Please wait a moment and try again.'];
+                return ['ok' => false, 'text' => '', 'usage' => [], 'error' => aiT('The AI is busy right now. Please wait a moment and try again.')];
             }
         } else {
             $cap = aiCapInfo();
@@ -271,7 +300,7 @@ if (!function_exists('aiComplete')) {
                 // Tenants never see BJP's provider errors (quota, billing, key) — only a neutral message.
                 aiPlatformLogUsage($tid, $uid, $feature, $s['provider'], $s['model'], 0, 0, 0, 'error', $err);
                 if (!empty($res['rate_limited'])) {
-                    return ['ok' => false, 'text' => '', 'usage' => [], 'error' => 'The AI is busy right now. Please wait a moment and try again.'];
+                    return ['ok' => false, 'text' => '', 'usage' => [], 'error' => aiT('The AI is busy right now. Please wait a moment and try again.')];
                 }
                 return $unavailable;
             }

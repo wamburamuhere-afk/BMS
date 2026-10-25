@@ -5675,5 +5675,19 @@ return [
     // Help & Support Center (support_center_plan.md, Phase 7)
     'Ask in your own words. Answers cover only what you can open.' => 'Uliza kwa maneno yako. Majibu yanahusu tu unachoweza kufungua.',
     'Dismiss' => 'Funga',
+    // Platform AI (platform_ai_plan.md, Phase 5)
+    'AI provided by your service provider' => 'AI inatolewa na mtoa huduma wako',
+    'AI is not included for your company' => 'AI haijajumuishwa kwa kampuni yako',
+    '"Ask BMS" and "Generate with AI" are ready to use. There is nothing to set up.' => '"Ask BMS" na "Generate with AI" viko tayari kutumika. Hakuna cha kusanidi.',
+    'Your company has a monthly AI limit. When it is reached, AI pauses until next month. Contact support if you need more.' => 'Kampuni yako ina kikomo cha AI cha kila mwezi. Kikifikiwa, AI husimama hadi mwezi ujao. Wasiliana na msaada ukihitaji zaidi.',
+    'AI has not been switched on by your service provider yet.' => 'AI bado haijawashwa na mtoa huduma wako.',
+    'AI is not included for your company. Please contact support.' => 'AI haijajumuishwa kwa kampuni yako. Tafadhali wasiliana na msaada.',
+    'Use your own AI provider key instead (advanced)' => 'Tumia ufunguo wako mwenyewe wa mtoa huduma wa AI badala yake (hali ya juu)',
+    'AI is provided by your service provider, within a monthly limit for your company.' => 'AI inatolewa na mtoa huduma wako, ndani ya kikomo cha kila mwezi cha kampuni yako.',
+    'Service provider' => 'Mtoa huduma',
+    'AI is not available for this company.' => 'AI haipatikani kwa kampuni hii.',
+    'AI is temporarily unavailable. Please try again later.' => 'AI haipatikani kwa muda. Tafadhali jaribu tena baadaye.',
+    "This month's AI limit has been reached. Please contact support." => 'Kikomo cha AI cha mwezi huu kimefikiwa. Tafadhali wasiliana na msaada.',
+    'The AI is busy right now. Please wait a moment and try again.' => 'AI ina shughuli nyingi sasa. Tafadhali subiri kidogo kisha ujaribu tena.',
 
 ];
