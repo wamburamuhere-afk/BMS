@@ -35,6 +35,26 @@ if (!function_exists('aiT')) {
     }
 }
 
+if (!function_exists('aiProductName')) {
+    /**
+     * "Smart POS" or "Smart BMS" for the signed-in company: from its plan's product
+     * (control DB) on a tenant, else from Simple POS mode on a single-company install.
+     */
+    function aiProductName(): string
+    {
+        static $name = null;
+        if ($name !== null) return $name;
+        $key = null;
+        if (function_exists('bmsCurrentTenantId') && bmsCurrentTenantId() !== null && is_file(__DIR__ . '/support_articles.php')) {
+            require_once __DIR__ . '/support_articles.php';
+            $key = supportTenantProductKey();
+        }
+        if ($key !== null) return $name = ($key === 'bms_shop' ? 'Smart POS' : 'Smart BMS');
+        $simple = function_exists('posSimpleModeEnabled') ? posSimpleModeEnabled() : (getSetting('pos_simple_mode', '0') === '1');
+        return $name = $simple ? 'Smart POS' : 'Smart BMS';
+    }
+}
+
 if (!function_exists('aiOwnSettings')) {
     /** The tenant's OWN AI config from its system_settings (key decrypted). */
     function aiOwnSettings(): array

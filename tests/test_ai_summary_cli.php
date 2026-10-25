@@ -34,11 +34,12 @@ ok(strpos($s,'Do NOT invent figures')!==false,'instructs the model not to invent
 section('2. The KPI figures match direct SQL (live)');
 $f=date('Y-m-01'); $t=date('Y-m-d');
 $rev = aiRunInsight('revenue',['period'=>'this_month'])['data']['revenue'] ?? null;
-$expSql=(float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM invoices WHERE status<>'deleted' AND invoice_date BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn();
-ok($rev!==null && approx($rev,$expSql),"this-month revenue KPI == SQL ({$expSql})");
+$expSql=(float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM invoices WHERE status NOT IN ('cancelled','deleted') AND invoice_date BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn()
+       + (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM pos_sales WHERE sale_status='completed' AND DATE(sale_date) BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn();
+ok($rev!==null && approx($rev,$expSql),"this-month revenue KPI == invoices + POS sales ({$expSql})");
 $exp = aiRunInsight('expenses_total',['period'=>'this_month'])['data']['expenses'] ?? null;
-$expSql2=(float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE (status IS NULL OR status<>'deleted') AND expense_date BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn();
-ok($exp!==null && approx($exp,$expSql2),"this-month expenses KPI == SQL ({$expSql2})");
+$expSql2 = glProfitLoss($pdo, $f, $t)['total_expense'];
+ok($exp!==null && approx($exp,$expSql2),"this-month expenses KPI == Income Statement ({$expSql2})");
 
 section('3. Dashboard surfacing removed (per request)');
 // The "This month, in words" AI summary card was permanently removed from the main

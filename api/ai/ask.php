@@ -14,6 +14,12 @@ require_once __DIR__ . '/../../core/ai_service.php';
 require_once __DIR__ . '/../../core/ai_insights.php';
 header('Content-Type: application/json');
 
+// This endpoint never includes header.php, so load the caller's saved language
+// here or the reply language (and help-article language) would always be English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 if (!canView('ai_assistant')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'You do not have access to the AI Assistant']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
@@ -29,15 +35,32 @@ $company  = getSetting('company_name', 'this company');
 $currency = getSetting('currency', 'TZS');
 $today    = date('Y-m-d');
 $catalog  = json_encode(aiInsightCatalog(), JSON_PRETTY_PRINT);
+$product  = aiProductName();
+// Answer in the language the user chose in BMS, whatever language the question is typed in.
+$replyLang = (function_exists('currentLanguage') && currentLanguage() === 'sw') ? 'Swahili (Kiswahili)' : 'English';
+// Role from the server session only (never from the request). No personal details go to the provider.
+$roleName = 'staff';
+try {
+    $st = $pdo->prepare('SELECT r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id WHERE u.user_id = ?');
+    $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+    $roleName = trim((string)$st->fetchColumn()) ?: 'staff';
+} catch (Throwable $e) {}
+$roleName = mb_substr(preg_replace('/[^\p{L}\p{N} _.\-]/u', '', $roleName), 0, 40);
+$who = isAdmin() ? "the company administrator (role: {$roleName})" : "a staff member (role: {$roleName}), not an administrator";
 
-$sys = "You are the assistant for {$company}'s Business Management System. Today is {$today}. Currency is {$currency}.\n"
-     . "You help with TWO kinds of questions, using these functions:\n{$catalog}\n\n"
+$sys = "You are the assistant inside {$product}, the business system used by {$company}. Today is {$today}. Currency is {$currency}.\n"
+     . "The person asking is {$who}.\n"
+     . "These are the ONLY functions you have. They are exactly what this person is allowed to see; nothing else exists for you:\n{$catalog}\n\n"
      . "1) DATA questions ('how much/many', 'who', 'which', 'status') → call the relevant data function.\n"
-     . "2) HOW-TO / usage questions ('how do I…', 'where is…', 'what does X do') → call search_help with the user's query, then explain the steps from the returned guide content.\n\n"
+     . "2) HOW-TO / usage questions ('how do I…', 'where is…', 'what does X do') → call search_help with the user's query, then explain the steps from the returned guide content.\n"
+     . "3) 'What can you do?' → describe in plain words ONLY what the functions above let you answer for this person, plus how-to help for {$product}. Never mention function names, and never offer data that is not in the list.\n\n"
      . "RULES:\n"
      . "- To use a function, reply with ONLY a JSON object: {\"function\":\"<name>\",\"args\":{...}} and nothing else.\n"
      . "- You may call functions one at a time; you'll receive each result, then call another or answer.\n"
+     . "- ALWAYS write your answer in {$replyLang}, even when the question is written in another language.\n"
      . "- When you have what you need, reply in clear plain language. Show amounts with the currency. For how-to answers, give short numbered steps.\n"
+     . "- If asked for information outside the list, or a function says it is not available to the role, say politely that their role does not include it and they can ask their administrator.\n"
+     . "- Format: short paragraphs; start list lines with '- ' and steps with '1. '; you may wrap a short heading in **bold**. No tables, HTML, links or code blocks.\n"
      . "- Never invent numbers or features. If neither a data function nor the help guide can answer, say you don't have that information.\n"
      . "- Do not output SQL or mention database table/column names.";
 
@@ -67,7 +90,7 @@ for ($hop = 0; $hop < $maxHops; $hop++) {
 }
 
 // Hop budget exhausted — make one final answer attempt without more calls.
-$messages[] = ['role' => 'user', 'content' => 'Now answer in plain language using the results above. Do not call any more functions.'];
+$messages[] = ['role' => 'user', 'content' => "Now answer in plain language in {$replyLang} using the results above. Do not call any more functions."];
 $res = aiComplete($messages, ['feature' => 'ask', 'max_tokens' => 500, 'temperature' => 0.2]);
 if ($res['ok']) {
     echo json_encode(['success' => true, 'answer' => trim($res['text']), 'used' => array_values(array_unique($usedFunctions))]);

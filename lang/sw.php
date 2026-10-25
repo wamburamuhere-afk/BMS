@@ -5697,6 +5697,8 @@ return [
     'Popular questions' => 'Maswali yanayoulizwa sana',
     'Type your question…' => 'Andika swali lako…',
     'Talk to a person' => 'Ongea na mtu',
+    'Ask Smart POS' => 'Uliza Smart POS',
+    'Ask Smart BMS' => 'Uliza Smart BMS',
     'These guides may help:' => 'Miongozo hii inaweza kukusaidia:',
     'Get an answer from AI' => 'Pata jibu kutoka kwa AI',
     'I could not find a guide for that.' => 'Sikupata mwongozo wa hilo.',

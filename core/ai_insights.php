@@ -7,8 +7,10 @@
  * + args; BMS runs it and returns a small result for the model to phrase. The
  * model never sees raw rows, never writes SQL, and can never modify anything.
  *
- * Scope-aware: invoice-based functions apply the same project-scope filter as
- * the reports, so a scoped user's answers cover only their data.
+ * Scope-aware: every function applies the same project and shop/warehouse scope
+ * as the matching report, so a scoped user's answers cover only their data.
+ * Sales = invoices + POS sales (as the Sales report); profit, expenses and cash
+ * come from the posted ledger via core/financial_reports.php (as the statements).
  *
  * Public API:
  *   aiInsightCatalog(): array         — catalog (name, description, params) for the prompt
@@ -17,6 +19,7 @@
 
 if (file_exists(__DIR__ . '/project_scope.php')) require_once __DIR__ . '/project_scope.php';
 if (file_exists(__DIR__ . '/ai_help.php')) require_once __DIR__ . '/ai_help.php';
+require_once __DIR__ . '/financial_reports.php';
 
 if (!function_exists('_aiScope')) {
     /** Project-scope clause for an aliased table, or '' (admin/CLI/no-scope). */
@@ -26,6 +29,73 @@ if (!function_exists('_aiScope')) {
             try { return (string)scopeFilterSqlNullable('project', $alias); } catch (Throwable $e) { return ''; }
         }
         return '';
+    }
+}
+
+if (!function_exists('_aiWhScope')) {
+    /** Shop/warehouse-scope clause for an aliased table with a nullable warehouse_id, or '' (admin/CLI). */
+    function _aiWhScope(string $alias, bool $strict = false): string
+    {
+        if (function_exists('scopeFilterSqlNullable') && !empty($_SESSION['user_id'])) {
+            try { return (string)($strict ? scopeFilterSql('warehouse', $alias) : scopeFilterSqlNullable('warehouse', $alias)); }
+            catch (Throwable $e) { return ' AND 0 '; }
+        }
+        return '';
+    }
+}
+
+if (!function_exists('_aiJeScope')) {
+    /** Project + shop scope on the ledger header (alias je), as the reports apply it. */
+    function _aiJeScope(): string { return _aiScope('je') . _aiWhScope('je'); }
+}
+
+if (!function_exists('_aiPosPaidExpr')) {
+    /** Amount paid on a POS sale (alias ps) — same expression as the Sales report. */
+    function _aiPosPaidExpr(PDO $pdo): string
+    {
+        static $expr = null;
+        if ($expr === null) {
+            $has = false;
+            try { $has = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetchColumn(); } catch (Throwable $e) {}
+            $expr = $has
+                ? "COALESCE((SELECT SUM(psp.amount) FROM pos_sale_payments psp WHERE psp.sale_id = ps.sale_id), 0)"
+                : "CASE WHEN ps.payment_status = 'paid' THEN ps.grand_total ELSE 0 END";
+        }
+        return $expr;
+    }
+}
+
+if (!function_exists('_aiSalesRows')) {
+    /**
+     * Invoices + completed POS sales in [$f,$t] as one row set (d, cid, amt, src),
+     * scoped like the Sales report. Returns [sql, params].
+     */
+    function _aiSalesRows(string $f, string $t): array
+    {
+        $inv = "SELECT i.invoice_date AS d, i.customer_id AS cid, i.grand_total AS amt, 'invoice' AS src
+                  FROM invoices i
+                 WHERE i.invoice_date BETWEEN ? AND ? AND i.status NOT IN ('cancelled', 'deleted')" . _aiScope('i') . _aiWhScope('i');
+        $pos = "SELECT DATE(ps.sale_date) AS d, ps.customer_id AS cid, ps.grand_total AS amt, 'pos' AS src
+                  FROM pos_sales ps
+                 WHERE DATE(ps.sale_date) BETWEEN ? AND ? AND ps.sale_status = 'completed'" . _aiScope('ps') . _aiWhScope('ps');
+        return ["$inv UNION ALL $pos", [$f, $t, $f, $t]];
+    }
+}
+
+if (!function_exists('_aiBalances')) {
+    /** Unpaid balances per row: invoices and POS credit sales (cid, owed, src, due), scoped. Returns sql. */
+    function _aiBalances(PDO $pdo): string
+    {
+        $paid = _aiPosPaidExpr($pdo);
+        return "SELECT i.customer_id AS cid, i.balance_due AS owed, 'invoice' AS src
+                  FROM invoices i
+                 WHERE i.status NOT IN ('cancelled', 'deleted') AND i.balance_due > 0" . _aiScope('i') . _aiWhScope('i') . "
+                UNION ALL
+                SELECT x.cid, x.owed, 'pos' FROM (
+                    SELECT ps.customer_id AS cid, ps.grand_total - ($paid) AS owed
+                      FROM pos_sales ps
+                     WHERE ps.sale_status = 'completed'" . _aiScope('ps') . _aiWhScope('ps') . "
+                ) x WHERE x.owed > 0.005";
     }
 }
 
@@ -56,88 +126,93 @@ if (!function_exists('aiInsightRegistry')) {
     {
         return [
             'revenue' => [
-                'description' => 'Total sales/revenue (sum of invoice totals) for a period.',
-                'params' => ['period' => 'this_month|last_month|this_year|last_30_days|this_quarter', 'from' => 'YYYY-MM-DD (optional)', 'to' => 'YYYY-MM-DD (optional)'],
+                'description' => 'Total sales for a period: invoices plus shop/POS sales (the same figure as the Sales report).',
+                'params' => ['period' => 'today|yesterday|last_7_days|this_month|last_month|this_year|last_30_days|this_quarter', 'from' => 'YYYY-MM-DD (optional)', 'to' => 'YYYY-MM-DD (optional)'],
                 'run' => function (array $a, PDO $pdo) {
-                    [$f, $t] = _aiPeriod($a); $sc = _aiScope('i');
-                    $s = $pdo->prepare("SELECT COALESCE(SUM(grand_total),0) total, COUNT(*) n FROM invoices i WHERE i.status <> 'deleted' AND i.invoice_date BETWEEN ? AND ? $sc");
-                    $s->execute([$f, $t]); $r = $s->fetch(PDO::FETCH_ASSOC);
-                    return ['period' => "$f to $t", 'revenue' => (float)$r['total'], 'invoice_count' => (int)$r['n']];
+                    [$f, $t] = _aiPeriod($a); [$u, $p] = _aiSalesRows($f, $t);
+                    $s = $pdo->prepare("SELECT src, COALESCE(SUM(amt),0) total, COUNT(*) n FROM ($u) x GROUP BY src");
+                    $s->execute($p);
+                    $by = ['invoice' => ['total' => 0.0, 'n' => 0], 'pos' => ['total' => 0.0, 'n' => 0]];
+                    foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) $by[$r['src']] = ['total' => (float)$r['total'], 'n' => (int)$r['n']];
+                    return ['period' => "$f to $t", 'revenue' => round($by['invoice']['total'] + $by['pos']['total'], 2),
+                            'invoice_sales' => round($by['invoice']['total'], 2), 'invoice_count' => $by['invoice']['n'],
+                            'pos_sales' => round($by['pos']['total'], 2), 'pos_sale_count' => $by['pos']['n']];
                 },
             ],
             'expenses_total' => [
-                'description' => 'Total business expenses for a period.',
+                'description' => 'Total business expenses for a period, from the books (the same figures as the Income Statement).',
                 'params' => ['period' => 'as above', 'from' => 'optional', 'to' => 'optional'],
                 'run' => function (array $a, PDO $pdo) {
                     [$f, $t] = _aiPeriod($a);
-                    $s = $pdo->prepare("SELECT COALESCE(SUM(amount),0) total, COUNT(*) n FROM expenses WHERE (status IS NULL OR status <> 'deleted') AND expense_date BETWEEN ? AND ?");
-                    $s->execute([$f, $t]); $r = $s->fetch(PDO::FETCH_ASSOC);
-                    return ['period' => "$f to $t", 'expenses' => (float)$r['total'], 'expense_count' => (int)$r['n']];
+                    $pl = glProfitLoss($pdo, $f, $t, null, _aiJeScope());
+                    return ['period' => "$f to $t", 'expenses' => $pl['total_expense'], 'cost_of_goods_sold' => $pl['total_cogs'],
+                            'finance_costs' => $pl['total_finance_cost'],
+                            'by_account' => array_map(fn($l) => ['account' => $l['account_name'], 'amount' => $l['amount']], array_slice($pl['expense'], 0, 15))];
                 },
             ],
             'profit' => [
-                'description' => 'Rough profit = revenue minus expenses for a period.',
+                'description' => 'Profit for a period from the books: sales, cost of goods sold, gross profit, expenses and net profit (the same figures as the Income Statement).',
                 'params' => ['period' => 'as above', 'from' => 'optional', 'to' => 'optional'],
                 'run' => function (array $a, PDO $pdo) {
-                    [$f, $t] = _aiPeriod($a); $sc = _aiScope('i');
-                    $rev = (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM invoices i WHERE i.status<>'deleted' AND i.invoice_date BETWEEN " . $pdo->quote($f) . " AND " . $pdo->quote($t) . " $sc")->fetchColumn();
-                    $exp = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE (status IS NULL OR status<>'deleted') AND expense_date BETWEEN " . $pdo->quote($f) . " AND " . $pdo->quote($t))->fetchColumn();
-                    return ['period' => "$f to $t", 'revenue' => $rev, 'expenses' => $exp, 'profit' => round($rev - $exp, 2)];
+                    [$f, $t] = _aiPeriod($a);
+                    $pl = glProfitLoss($pdo, $f, $t, null, _aiJeScope());
+                    return ['period' => "$f to $t", 'revenue' => $pl['total_revenue'], 'other_income' => $pl['total_other_income'],
+                            'cost_of_goods_sold' => $pl['total_cogs'], 'gross_profit' => $pl['gross_profit'],
+                            'expenses' => $pl['total_expense'], 'finance_costs' => $pl['total_finance_cost'], 'profit' => $pl['net_profit']];
                 },
             ],
             'outstanding_receivables' => [
-                'description' => 'Total amount customers still owe (unpaid invoice balances).',
+                'description' => 'Total amount customers still owe: unpaid invoices plus unpaid shop credit sales.',
                 'params' => [],
                 'run' => function (array $a, PDO $pdo) {
-                    $sc = _aiScope('i');
-                    $r = $pdo->query("SELECT COALESCE(SUM(balance_due),0) total, COUNT(*) n FROM invoices i WHERE i.status<>'deleted' AND i.balance_due > 0 $sc")->fetch(PDO::FETCH_ASSOC);
-                    return ['outstanding_receivables' => (float)$r['total'], 'unpaid_invoices' => (int)$r['n']];
+                    $rows = $pdo->query("SELECT src, COALESCE(SUM(owed),0) total, COUNT(*) n FROM (" . _aiBalances($pdo) . ") b GROUP BY src")->fetchAll(PDO::FETCH_ASSOC);
+                    $by = ['invoice' => ['total' => 0.0, 'n' => 0], 'pos' => ['total' => 0.0, 'n' => 0]];
+                    foreach ($rows as $r) $by[$r['src']] = ['total' => (float)$r['total'], 'n' => (int)$r['n']];
+                    return ['outstanding_receivables' => round($by['invoice']['total'] + $by['pos']['total'], 2),
+                            'unpaid_invoices_total' => round($by['invoice']['total'], 2), 'unpaid_invoices' => $by['invoice']['n'],
+                            'unpaid_credit_sales_total' => round($by['pos']['total'], 2), 'unpaid_credit_sales' => $by['pos']['n']];
                 },
             ],
             'top_debtors' => [
-                'description' => 'Customers who owe the most (by unpaid balance).',
+                'description' => 'Customers who owe the most (unpaid invoices and shop credit sales).',
                 'params' => ['limit' => 'how many (default 5)'],
                 'run' => function (array $a, PDO $pdo) {
-                    $n = max(1, min(20, (int)($a['limit'] ?? 5))); $sc = _aiScope('i');
-                    $s = $pdo->prepare("SELECT c.customer_name, COALESCE(SUM(i.balance_due),0) owed
-                                          FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
-                                         WHERE i.status<>'deleted' AND i.balance_due > 0 $sc
-                                      GROUP BY c.customer_id, c.customer_name ORDER BY owed DESC LIMIT $n");
-                    $s->execute();
-                    return ['top_debtors' => array_map(fn($x) => ['customer' => $x['customer_name'], 'owed' => (float)$x['owed']], $s->fetchAll(PDO::FETCH_ASSOC))];
+                    $n = max(1, min(20, (int)($a['limit'] ?? 5)));
+                    $s = $pdo->query("SELECT c.customer_name, COALESCE(SUM(b.owed),0) owed
+                                        FROM (" . _aiBalances($pdo) . ") b JOIN customers c ON c.customer_id = b.cid
+                                    GROUP BY c.customer_id, c.customer_name ORDER BY owed DESC LIMIT $n");
+                    return ['top_debtors' => array_map(fn($x) => ['customer' => $x['customer_name'], 'owed' => round((float)$x['owed'], 2)], $s->fetchAll(PDO::FETCH_ASSOC))];
                 },
             ],
             'top_customers' => [
-                'description' => 'Best customers by sales total for a period.',
+                'description' => 'Best customers by sales total for a period (invoices plus shop sales; walk-in sales grouped as "Walk-in").',
                 'params' => ['limit' => 'default 5', 'period' => 'as above', 'from' => 'optional', 'to' => 'optional'],
                 'run' => function (array $a, PDO $pdo) {
-                    $n = max(1, min(20, (int)($a['limit'] ?? 5))); [$f, $t] = _aiPeriod($a); $sc = _aiScope('i');
-                    $s = $pdo->prepare("SELECT c.customer_name, COALESCE(SUM(i.grand_total),0) sales
-                                          FROM invoices i JOIN customers c ON c.customer_id=i.customer_id
-                                         WHERE i.status<>'deleted' AND i.invoice_date BETWEEN ? AND ? $sc
-                                      GROUP BY c.customer_id, c.customer_name ORDER BY sales DESC LIMIT $n");
-                    $s->execute([$f, $t]);
-                    return ['period' => "$f to $t", 'top_customers' => array_map(fn($x) => ['customer' => $x['customer_name'], 'sales' => (float)$x['sales']], $s->fetchAll(PDO::FETCH_ASSOC))];
+                    $n = max(1, min(20, (int)($a['limit'] ?? 5))); [$f, $t] = _aiPeriod($a); [$u, $p] = _aiSalesRows($f, $t);
+                    $s = $pdo->prepare("SELECT COALESCE(c.customer_name, 'Walk-in') customer_name, COALESCE(SUM(x.amt),0) sales
+                                          FROM ($u) x LEFT JOIN customers c ON c.customer_id = x.cid
+                                      GROUP BY x.cid, c.customer_name ORDER BY sales DESC LIMIT $n");
+                    $s->execute($p);
+                    return ['period' => "$f to $t", 'top_customers' => array_map(fn($x) => ['customer' => $x['customer_name'], 'sales' => round((float)$x['sales'], 2)], $s->fetchAll(PDO::FETCH_ASSOC))];
                 },
             ],
             'cash_position' => [
-                'description' => 'Current total balance across cash and bank accounts.',
+                'description' => 'Current balance of each cash and bank account and the total, from the books (the same as the Balance Sheet).',
                 'params' => [],
                 'run' => function (array $a, PDO $pdo) {
-                    $s = $pdo->query("SELECT a.account_name, a.current_balance FROM accounts a
-                                       WHERE a.status='active' AND a.account_type='asset' AND a.cash_flow_category='cash'
-                                         AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parent_account_id=a.account_id)
-                                    ORDER BY a.current_balance DESC");
-                    $rows = $s->fetchAll(PDO::FETCH_ASSOC); $total = 0;
-                    foreach ($rows as $r) $total += (float)$r['current_balance'];
-                    return ['total_cash' => round($total, 2), 'accounts' => array_map(fn($r) => ['account' => $r['account_name'], 'balance' => (float)$r['current_balance']], $rows)];
+                    $ids = array_flip(glCashAccountIds($pdo));
+                    $bs = glBalanceSheet($pdo, date('Y-m-d'), null, false, _aiJeScope());
+                    $rows = array_values(array_filter($bs['assets'], fn($l) => $l['account_id'] !== null && isset($ids[(int)$l['account_id']]) && abs($l['amount']) >= 0.005));
+                    usort($rows, fn($x, $y) => $y['amount'] <=> $x['amount']);
+                    $total = 0.0; foreach ($rows as $r) $total += $r['amount'];
+                    return ['total_cash' => round($total, 2), 'accounts' => array_map(fn($r) => ['account' => $r['account_name'], 'balance' => $r['amount']], $rows)];
                 },
             ],
             'ar_aging_summary' => [
-                'description' => 'Receivables grouped by how overdue they are (current, 1-30, 31-60, 61-90, 90+ days).',
+                'description' => 'Unpaid invoices grouped by how overdue they are (current, 1-30, 31-60, 61-90, 90+ days). Invoices only.',
                 'params' => [],
                 'run' => function (array $a, PDO $pdo) {
-                    $sc = _aiScope('i');
+                    $sc = _aiScope('i') . _aiWhScope('i');
                     $s = $pdo->query("SELECT
                           SUM(CASE WHEN DATEDIFF(CURDATE(), due_date) <= 0 THEN balance_due ELSE 0 END) cur,
                           SUM(CASE WHEN DATEDIFF(CURDATE(), due_date) BETWEEN 1 AND 30 THEN balance_due ELSE 0 END) d30,
@@ -149,34 +224,40 @@ if (!function_exists('aiInsightRegistry')) {
                 },
             ],
             'low_stock' => [
-                'description' => 'Products at or below their minimum stock level (reorder needed).',
+                'description' => 'Products at or below their minimum stock level (reorder needed), counting only the shops/warehouses this person may see.',
                 'params' => ['limit' => 'default 10'],
                 'run' => function (array $a, PDO $pdo) {
                     $n = max(1, min(50, (int)($a['limit'] ?? 10)));
-                    $cnt = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE current_stock <= min_stock_level")->fetchColumn();
-                    $s = $pdo->query("SELECT product_name, current_stock, min_stock_level FROM products WHERE current_stock <= min_stock_level ORDER BY (current_stock - min_stock_level) ASC LIMIT $n");
-                    return ['below_minimum_count' => $cnt, 'items' => array_map(fn($r) => ['product' => $r['product_name'], 'stock' => (float)$r['current_stock'], 'minimum' => (float)$r['min_stock_level']], $s->fetchAll(PDO::FETCH_ASSOC))];
+                    // Same rule and scope as the Products page Low Stock card.
+                    $base = "FROM products p
+                        LEFT JOIN (SELECT ps2.product_id, SUM(ps2.stock_quantity - ps2.reserved_quantity) available
+                                     FROM product_stocks ps2 WHERE 1=1" . _aiWhScope('ps2', true) . "
+                                 GROUP BY ps2.product_id) st ON st.product_id = p.product_id
+                        WHERE p.is_service = 0 AND p.status = 'active' AND p.min_stock_level > 0
+                          AND COALESCE(st.available, 0) <= p.min_stock_level" . _aiScope('p') . _aiWhScope('p');
+                    $cnt = (int)$pdo->query("SELECT COUNT(*) $base")->fetchColumn();
+                    $s = $pdo->query("SELECT p.product_name, COALESCE(st.available, 0) stock, p.min_stock_level $base ORDER BY (COALESCE(st.available, 0) - p.min_stock_level) ASC LIMIT $n");
+                    return ['below_minimum_count' => $cnt, 'items' => array_map(fn($r) => ['product' => $r['product_name'], 'stock' => (float)$r['stock'], 'minimum' => (float)$r['min_stock_level']], $s->fetchAll(PDO::FETCH_ASSOC))];
                 },
             ],
             'invoice_status_counts' => [
                 'description' => 'How many invoices are in each status for a period.',
                 'params' => ['period' => 'as above', 'from' => 'optional', 'to' => 'optional'],
                 'run' => function (array $a, PDO $pdo) {
-                    [$f, $t] = _aiPeriod($a); $sc = _aiScope('i');
+                    [$f, $t] = _aiPeriod($a); $sc = _aiScope('i') . _aiWhScope('i');
                     $s = $pdo->prepare("SELECT status, COUNT(*) n, COALESCE(SUM(grand_total),0) total FROM invoices i WHERE i.invoice_date BETWEEN ? AND ? $sc GROUP BY status");
                     $s->execute([$f, $t]);
                     return ['period' => "$f to $t", 'by_status' => $s->fetchAll(PDO::FETCH_ASSOC)];
                 },
             ],
             'sales_trend' => [
-                'description' => 'Monthly sales totals for the last N months (default 6).',
+                'description' => 'Monthly sales totals (invoices plus shop sales) for the last N months (default 6).',
                 'params' => ['months' => 'default 6'],
                 'run' => function (array $a, PDO $pdo) {
-                    $m = max(2, min(24, (int)($a['months'] ?? 6))); $sc = _aiScope('i');
-                    $s = $pdo->prepare("SELECT DATE_FORMAT(invoice_date, '%Y-%m') ym, COALESCE(SUM(grand_total),0) sales
-                                          FROM invoices i WHERE i.status<>'deleted' AND i.invoice_date >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL $m MONTH) $sc
-                                      GROUP BY ym ORDER BY ym");
-                    $s->execute();
+                    $m = max(2, min(24, (int)($a['months'] ?? 6)));
+                    [$u, $p] = _aiSalesRows(date('Y-m-01', strtotime("-$m months", strtotime(date('Y-m-01')))), date('Y-m-d'));
+                    $s = $pdo->prepare("SELECT DATE_FORMAT(x.d, '%Y-%m') ym, ROUND(COALESCE(SUM(x.amt),0), 2) sales FROM ($u) x GROUP BY ym ORDER BY ym");
+                    $s->execute($p);
                     return ['monthly_sales' => $s->fetchAll(PDO::FETCH_ASSOC)];
                 },
             ],

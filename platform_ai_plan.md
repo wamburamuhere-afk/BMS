@@ -92,6 +92,13 @@ Status: **ALL PHASES DONE (2026-10-25)** · Branch `feat/platform-ai` (worktree 
 - Full flow on two local tenants with the fake provider: superadmin saves the key → tenant A (platform) asks → usage appears in superadmin → cap lowered → blocked; tenant B (own key) unaffected; tenant C module restricted → no AI anywhere.
 - Re-scout for missed callers, run every `test_ai_*` and support suite, `php -l` all touched files, changelog entry, then **one push + PR into develop**.
 
+### Phase 7 — Product name, reply language, role + shop limits ✅ (47 checks) (requested 2026-10-25 after a live look)
+- Chat title "Ask Smart POS" / "Ask Smart BMS" from the company's plan product (`aiProductName()`).
+- `ask.php` and `support_help.php` load the user's saved language (they never did); the AI is told to always answer in it.
+- The prompt states admin vs staff (role name only) and limits "what can you do" to the allowed functions.
+- Insights: sales = invoices + POS (as the Sales report); receivables include POS credit; profit/expenses via `glProfitLoss`, cash via `glBalanceSheet`; low stock as the Products page; project + warehouse scope everywhere it applies.
+- Widget renders `**bold**`, bullet and numbered lists from text nodes only.
+
 ## 4. After deploy (what you do)
 1. Superadmin → AI → Settings: choose provider + model, paste the BJP key, set the default tenant cap and global cap, click **Test connection**.
 2. Superadmin → AI → Tenants: check each tenant's source. BJP (Tenant #1) shows "Own key" automatically if its key is set. Switch it to "BJP key" if you want one bill.
