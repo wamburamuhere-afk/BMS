@@ -89,9 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_COOKIE['bms_lang']) && in_array($_COOKIE['bms_lang'], ['en', 'sw'], true)) {
             $_SESSION['user_lang'] = $_COOKIE['bms_lang'];
         }
-        if (orgLanguage() !== null) {
-            $_SESSION['user_lang'] = orgLanguage();
-        }
+        // Organization-wide language (if set) is applied by header.php on the first
+        // page load. Not here: this file loads only includes/config.php, not core/i18n.php.
 
         $response['success'] = true;
     } else {

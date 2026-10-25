@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-25 — hotfix(login, products): login crash after the Language mode release; clear photo-size and lost-connection messages on Add/Edit Product
+
+**Files:** `actions/login.php`, `api/create_product.php`, `api/update_product.php`, `app/bms/product/product_create_footer.php`, `lang/sw.php`, `tests/test_login_and_product_errors_cli.php` (new), `tests/test_org_language_mode_cli.php`
+
+- **Login was broken for everyone (fixed):** since the Language mode release (12:56 UTC), every correct-password login failed with error 500 ("Unable to connect to the server"). Sentry: "Call to undefined function orgLanguage()" at `actions/login.php` line 92. That file loads only `includes/config.php`, not the translation engine. The three added lines are removed; `header.php` already applies the organization language on the first page after login, so the setting still works. The earlier test only read the file's text and used no successful login, so it missed this; the new test performs a real successful login and proves the old file crashes on it.
+- **Photo too large, said exactly:** the Add/Edit Product page names the photo's size ("This photo is 5.3 MB. Maximum file size is 2MB."). A photo over the server's 2 MB upload limit used to be dropped silently and the product saved without it; a request over 8 MB failed with a confusing error. Both now answer "The photo is too large (… MB). The maximum is 2 MB." and nothing is saved. A web-server refusal (413) shows the same photo message.
+- **Lost reply no longer says "System Error":** when the reply never arrives (for example during a code update's Apache reload — the 12:33 failure on pigakazishop), the page checks whether the product was in fact saved. Saved → "The connection was briefly lost, but the product was saved." Not saved → "…the product was not saved. Please try again." So nobody adds the same product twice.
+- English and Swahili. Tests: new suite 19 checks; Language mode suite 18; Simple POS product create suite 58 — all pass.
+
 ## 2026-10-25 — feat(settings): Language mode — per user (default) or per organization
 
 **Files:** `app/constant/settings/system_settings.php`, `core/i18n.php`, `header.php`, `api/set_language.php`, `app/constant/settings/my_settings.php`, `actions/login.php`, `core/mobile_auth.php`, `lang/sw.php`, `tests/test_org_language_mode_cli.php` (new)
