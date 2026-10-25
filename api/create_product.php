@@ -3,6 +3,7 @@
 // File: api/create_product.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+if (isset($_SESSION['user_lang'])) loadLanguage($_SESSION['user_lang']);
 require_once __DIR__ . '/../core/stock_ledger.php';
 require_once __DIR__ . '/../core/stock_posting.php';
 require_once __DIR__ . '/../core/stock_intake.php';
@@ -19,6 +20,17 @@ $user_id = $_SESSION['user_id'];
 // Check permission
 if (!isAdmin() && !canCreate('products')) {
     echo json_encode(['success' => false, 'message' => 'Insufficient permissions']);
+    exit();
+}
+
+// A request over post_max_size reaches PHP with $_POST and $_FILES empty — always the photo.
+if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    echo json_encode(['success' => false, 'message' => sprintf(t('The photo is too large (%s MB). The maximum is 2 MB.'), round((int)$_SERVER['CONTENT_LENGTH'] / 1048576, 1))]);
+    exit();
+}
+// Over upload_max_filesize: PHP drops the file. Say so instead of saving without the photo.
+if (isset($_FILES['product_image']) && in_array($_FILES['product_image']['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+    echo json_encode(['success' => false, 'message' => t('The photo is too large. The maximum is 2 MB.')]);
     exit();
 }
 
@@ -52,7 +64,7 @@ try {
         
         // Validate file size (max 2MB)
         if ($_FILES['product_image']['size'] > 2 * 1024 * 1024) {
-            throw new Exception('File size too large. Maximum size is 2MB.');
+            throw new Exception(sprintf(t('The photo is too large (%s MB). The maximum is 2 MB.'), round($_FILES['product_image']['size'] / 1048576, 1)));
         }
         
         // Move uploaded file

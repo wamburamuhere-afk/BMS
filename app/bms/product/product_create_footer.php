@@ -27,6 +27,11 @@ const PE_I18N = <?= json_encode([
     'creation_failed' => t('Creation Failed'),
     'system_error' => t('System Error'),
     'comm_failed' => t('Communication with server failed.'),
+    'image_size_is' => t('This photo is %s MB.'),
+    'connection_lost' => t('Connection Lost'),
+    'check_and_retry' => t('The connection to the server was lost. Please check the products list, then try again if the change is not there.'),
+    'not_saved_retry' => t('The connection to the server was lost and the product was not saved. Please try again.'),
+    'saved_despite_connection' => t('The connection was briefly lost, but the product was saved.'),
     'initializing_camera' => t('Initializing Camera...'),
     'searching_barcode' => t('Searching for barcode source...'),
     'loading_scanner' => t('Loading scanner...'),
@@ -122,7 +127,7 @@ function previewImage(event) {
         const file = input.files[0];
         
         if (file.size > 2 * 1024 * 1024) {
-            Swal.fire({ icon: 'error', title: PE_I18N.file_too_large, text: PE_I18N.max_file_size });
+            Swal.fire({ icon: 'error', title: PE_I18N.file_too_large, text: imageTooLargeText() });
             input.value = '';
             return;
         }
@@ -402,11 +407,45 @@ function createProduct(status = 'active') {
                 submitBtn.prop('disabled', false).html(originalText);
             }
         },
-        error: function() {
-            Swal.fire({ icon: 'error', title: PE_I18N.system_error, text: PE_I18N.comm_failed });
+        error: function(xhr) {
             submitBtn.prop('disabled', false).html(originalText);
+            // The web server refused the upload before PHP ran: always the photo's size.
+            if (xhr.status === 413) {
+                Swal.fire({ icon: 'error', title: PE_I18N.file_too_large, text: imageTooLargeText() });
+                return;
+            }
+            // The reply was lost or unreadable (e.g. the server was restarting during an
+            // update) — the save may still have gone through. Check before saying it failed,
+            // so the user does not add the same product twice.
+            const name = $.trim($('#product_name').val());
+            if (isEdit || !name) {
+                Swal.fire({ icon: 'warning', title: PE_I18N.connection_lost, text: PE_I18N.check_and_retry });
+                return;
+            }
+            $.getJSON('<?= getUrl("/api/search_products.php") ?>', { q: name })
+                .done(function(r) {
+                    const saved = (r.results || []).some(p => $.trim(p.name || '').toLowerCase() === name.toLowerCase());
+                    if (saved) {
+                        Swal.fire({ icon: 'success', title: PE_I18N.product_created, text: PE_I18N.saved_despite_connection, confirmButtonColor: '#28a745', confirmButtonText: PE_I18N.ok })
+                            .then(() => window.location.href = 'products');
+                    } else {
+                        Swal.fire({ icon: 'warning', title: PE_I18N.connection_lost, text: PE_I18N.not_saved_retry });
+                    }
+                })
+                .fail(function() {
+                    Swal.fire({ icon: 'warning', title: PE_I18N.connection_lost, text: PE_I18N.check_and_retry });
+                });
         }
     });
+}
+
+// "This photo is 5.3 MB. The maximum is 2 MB." — or the plain limit when no photo is picked.
+function imageTooLargeText() {
+    const f = ($('#product_image')[0] || {}).files;
+    if (f && f[0]) {
+        return PE_I18N.image_size_is.replace('%s', (f[0].size / 1024 / 1024).toFixed(1)) + ' ' + PE_I18N.max_file_size;
+    }
+    return PE_I18N.max_file_size;
 }
 
 function saveAsDraft() { 

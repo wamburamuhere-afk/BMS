@@ -56,7 +56,9 @@ $my = src("$root/app/constant/settings/my_settings.php");
 ok(strpos($my, 'if (orgLanguage() === null): ?>') !== false, 'My Settings hides the Language field in org mode');
 ok(strpos($my, "if (orgLanguage() === null) {\n                \$_SESSION['user_lang']") !== false
    || preg_match('/if \(orgLanguage\(\) === null\) \{\s+\$_SESSION\[\'user_lang\'\]/', $my) === 1, 'My Settings save does not override session in org mode');
-ok(strpos(src("$root/actions/login.php"), 'orgLanguage()') !== false, 'login applies org language');
+// login.php loads only includes/config.php (no core/i18n.php), so it must never call
+// orgLanguage() — that crashed every login on 2026-10-25. header.php applies it instead.
+ok(strpos(src("$root/actions/login.php"), 'orgLanguage(') === false, 'login.php does not call orgLanguage() (header.php applies it)');
 ok(strpos(src("$root/core/mobile_auth.php"), 'orgLanguage') !== false, 'mobile login applies org language');
 $ss = src("$root/app/constant/settings/system_settings.php");
 ok(strpos($ss, "name=\"language_mode\"") !== false && strpos($ss, "name=\"org_language\"") !== false, 'System Settings has both selects');
