@@ -1,5 +1,100 @@
 # BMS Changelog
 
+## 2026-10-24 — feat(support): Help & Support Center — Phase 7 (notices, login help, blocked-account contacts, AI limited per user) + end-to-end test
+
+**Files:** `core/support_notices.php` (new), `core/support.php`, `header.php`, `includes/help_panel.php`, `api/support_help.php`, `app/superadmin/support.php`, `actions/superadmin_support_inbox.php`, `login.php`, `core/tenant_bootstrap.php`, `core/ai_insights.php`, `lang/sw.php`, `tests/test_support_center_phase7_cli.php` (new), `tests/test_support_center_phase1_cli.php`, `support_center_plan.md`
+
+- **Notices from BJP:** Superadmin › Support › Notices — information, maintenance or incident messages for all companies, one product, one plan or one company, with a start and optional end time. They show as a banner at the top of every page in those companies; each person can close it for themselves. "End now" stops it everywhere without deleting it.
+- **Login page:** the "Help" link at the bottom did nothing. It now opens "Need help signing in?": staff are told to ask their company admin, admins to use Forgot password, plus BJP's own text and contact details from Support › Settings (English and Swahili).
+- **Blocked companies can still reach support:** the pages shown to a suspended company, one past its grace period, or one awaiting approval now list BJP's email, phone, WhatsApp and office hours.
+- **AI assistant respects each person's access:** every figure the assistant can look up now needs one of its pages (sales, payroll, …). The assistant is only offered what that person may open, and anything else is refused by the code itself. "How do I…" answers now come from the published help articles in the company's own words (Shop vs Warehouse, Sell vs Sales › POS). The Help panel links to Ask BMS when AI is switched on and allowed.
+- **End-to-end test** of the whole journey through the real endpoints: a staff member asks, the admin answers, the staff member replies, the admin forwards it to BJP, BJP writes an internal note and replies, the staff member replies, BJP resolves it, the staff member rates it 5 stars and it closes — with the right notifications at every step, the internal note never visible to the company, and the request invisible to anyone else.
+- **Test:** `tests/test_support_center_phase7_cli.php` — 71 checks. All seven support suites together: 607 checks.
+
+---
+
+## 2026-10-24 — feat(support): Help & Support Center — Phase 6 (notifications, overdue reminders, auto-close)
+
+**Files:** `core/support_notify.php` (new), `api/support_requests.php`, `actions/superadmin_support_inbox.php`, `api/run_background_jobs.php`, `core/support.php`, `tests/test_support_center_phase6_cli.php` (new), `tests/test_support_center_phase4_cli.php`, `tests/test_support_center_phase5_cli.php`, `support_center_plan.md`
+
+- **Inside the company:** a staff member's request notifies the company admins (in BMS and by email); the admin's answer notifies the staff member; further replies go back and forth the same way. These emails use the company's own mail settings.
+- **To BJP:** a new or forwarded request, and every company reply, emails the assigned agent (or the recipients in Support › Settings, or every superadmin). The Support menu's red count shows what needs a reply. The person who asked gets an automatic "we received your request" email with the reference (text set in Support › Settings).
+- **From BJP:** a reply, "resolved" or "closed" tells the person who asked, in their BMS and by email from "<platform> Support", with a link to their own BMS address. Staff see "Support", never "BJP". Internal notes never notify anyone.
+- **Overdue reminders:** if a request's first reply is overdue (business hours, targets from Support › Settings), BJP is emailed once.
+- **Auto-close:** requests resolved more than N days ago (Support › Settings, default 5) with no reply are closed, with a note in the conversation and a notification to the person who asked.
+- Both jobs run from the existing background runner, at most every 10 minutes across the whole platform.
+- **Fast and safe:** the person sending a request or reply gets their answer immediately; emails go out after the response is closed. A mail problem never breaks the action. Email subjects cannot carry extra mail headers, bodies are escaped, links use the company's own address from configuration (no domain written in code).
+- **Tests never send real email:** they capture it to a file, and a guard fails if any support test could reach real mail.
+- **Test:** `tests/test_support_center_phase6_cli.php` — 44 checks (every event's recipients and channel, staff wording, header-injection and escaping, auto-reply, assigned-agent routing, reminders exactly once, auto-close, the real endpoint answering before notifying, the background runner's throttle).
+
+---
+
+## 2026-10-24 — feat(support): Help & Support Center — Phase 5 (BJP support inbox in the superadmin)
+
+**Files:** `core/support_inbox.php` (new), `app/superadmin/support.php`, `app/superadmin/support_request.php` (new), `actions/superadmin_support_inbox.php` (new), `actions/superadmin_support_attachment.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `core/support.php`, `tests/test_support_center_phase5_cli.php` (new), `support_center_plan.md`
+
+- **Superadmin › Support › Inbox** (now the first tab): every request sent to BJP, from every company — and only those. A staff member's question to their own company admin never appears here unless the admin forwards it. Views: Needs a reply, Open, Waiting on company, Resolved, Closed, All; filters by company, product, priority, who it is assigned to, and search (reference, subject, company, or the original HLP number). Unanswered and overdue requests come first. Cards show how many need a reply, how many first replies are overdue, the average first-reply time and the rating over the last 30 days. The Support menu item shows a red count.
+- **Request page:** the whole conversation including internal notes (marked "BJP only"), reply to the company or write an internal note, insert a saved reply, attach files, and choose what happens after sending (wait for the company, keep in progress, or resolve). Change status, priority and who it is assigned to. A side panel shows who asked (name, role, email, the page they were on, browser) and the company (product, plan, end date, Simple Mode, and whether they see "Sell / Shop" or "POS / Warehouse", so the answer uses their words) with their recent requests.
+- **Saved replies** tab: add, edit and retire common answers.
+- **Reply targets** count business hours only (Monday–Friday, 08:00–17:00 EAT) using the targets in Support › Settings.
+- **Safe by design:** superadmin host and session only, CSRF on every change, every change written to the platform activity log; internal notes and their files are never shown to a company; files of requests that never reached BJP cannot be downloaded by agents.
+- **Test:** `tests/test_support_center_phase5_cli.php` — 79 checks (business-hours maths incl. nights and weekends, inbox isolation, sorting, filters and search safety, reply / note / status / assign / priority, attachments both ways, saved replies, guards, escaped pages, JavaScript syntax).
+
+---
+
+## 2026-10-24 — feat(support): Help & Support Center — Phase 4 (send a request, follow it, staff → admin → BJP)
+
+**Files:** `core/support_requests.php` (new), `api/support_requests.php` (new), `api/support_attachment.php` (new), `core/support.php`, `includes/help_panel.php`, `app/constant/settings/help.php`, `lang/sw.php`, `tests/test_support_center_phase4_cli.php` (new), `tests/test_support_center_phase3_cli.php`, `support_center_plan.md`
+
+- **Contact support:** one button for everyone, in the Help panel and on the Help & Support page, and under every article ("Still need help?"). The form asks for a subject, type, urgency and description, and takes up to 3 screenshots or PDFs. The page, article, product, plan, name, role and browser are added automatically.
+- **Who it reaches:** a staff member's request goes to their own company admin (HLP-2026-NNNN); an admin's request goes to BJP Support (SUP-2026-NNNN). An admin can forward a staff request to BJP with one click — same conversation, new SUP number, the staff member can still follow it. Staff never see the words "BJP" or "admin".
+- **My requests:** list (admins can switch between Mine and All company) and a conversation page: reply with files, Mark as resolved, a reply on a resolved request reopens it, rate 1–5 stars to close. A red dot on ? and a count on My requests show when something is waiting for you.
+- **Safe by design:** a request is visible only to the person who sent it and their company admins — never to other staff, never to another company. Attachments are checked by their real content (JPG/PNG/PDF only; a renamed PHP or HTML file is refused), stored under random names in a folder the web server will not serve, and downloaded only through a checked endpoint. BJP internal notes and their files never reach the company. At most 10 new requests per person per hour. Every action is written to the activity log.
+- **Full Swahili** for all new text.
+- **Test:** `tests/test_support_center_phase4_cli.php` — 104 checks (validation, disguised and oversized files, routing, isolation across staff and companies, the whole status flow, forwarding, internal-note isolation, path tampering, the download endpoint, API guards, escaped pages, JavaScript syntax).
+
+---
+
+## 2026-10-24 — feat(support): Help & Support Center — Phase 3 (? Help button and panel in every company's header; Help page rebuilt)
+
+**Files:** `includes/help_panel.php` (new), `api/support_help.php` (new), `header.php`, `app/constant/settings/help.php`, `core/permissions.php`, `core/help_nav.php`, `core/support_articles.php`, `migrations/tenant/2026_10_24_help_self_service.php` (new), `schema/tenant_seed_defaults.sql`, `lang/sw.php`, `tests/test_support_center_phase3_cli.php` (new), `support_center_plan.md`
+
+- **? Help button:** desktop beside the EN pill; on a Smart POS phone in the top bar beside EN and ☰ (the bottom bar is unchanged); on a Smart BMS phone beside ☰. It opens a Help panel from the right (full screen on phones): help for the page you are on, popular articles, search, and articles read inside the panel with "Take me there" and "Was this helpful?". Nothing is loaded until the panel is opened.
+- **Search understands the company's words:** warehouse / shop / store / ghala / duka (and refund/return, credit/madeni, …) find the same articles, and the panel says "In this system warehouses are called shops" when the reader used the other word. Searches are recorded (once per 10 minutes) so BJP can see what people looked for and did not find.
+- **Help & Support page rebuilt:** the old static page offered invoicing and Finance help even to shops that have neither. It now shows search, topics, frequently asked and popular articles — only articles whose pages the reader can open from their own menu, in their company's wording — and article pages with "Take me there". BJP's contact card stays for company admins.
+- **Help was closed to most roles (fixed):** the `help` permission was only granted to Managing Director and Secretary, so Staff, Accountant, CFO and others were refused when they clicked Help. Help is now open to every signed-in user (its content is filtered per user); the useless switch is hidden from Roles & Permissions (tenant migration + new-company seed).
+- **Safe by design:** the panel API needs a signed-in user, POST and the CSRF token; titles are sent as plain text and inserted as text; article bodies are escaped before formatting; an article for a page the user cannot reach cannot be opened by id or found by search. View and vote counters count once per person per session.
+- **Full Swahili** for all new text.
+- **Test:** `tests/test_support_center_phase3_cli.php` — 93 checks (permission rule, migration, page detection, visibility per product/role/status/category, synonyms, counters, API guards and behaviour, XSS, header + page rendering, panel JavaScript syntax).
+
+---
+
+## 2026-10-24 — feat(support): Help & Support Center — Phase 2 (help articles written once, shown in each company's own words)
+
+**Files:** `core/help_nav.php` (new), `core/support_articles.php` (new), `core/support.php`, `scripts/setup_control_db.php`, `app/superadmin/support.php`, `app/superadmin/support_article.php` (new), `actions/superadmin_support_articles.php` (new), `core/superadmin_auth.php`, `tests/test_support_center_phase2_cli.php` (new), `tests/test_support_center_phase1_cli.php`, `support_center_plan.md`
+
+- **Superadmin › Support now has three tabs:** Articles (search, filter, stat cards, publish / move to drafts / archive), Categories (add, edit, hide) and Settings (Phase 1).
+- **Article editor:** English and Swahili title and steps, optional shorter steps for Simple Mode shops, category, the pages the article is about, optional YouTube/Vimeo/Loom link (https only), "show in Frequently asked". A live preview shows exactly what a Smart POS or Smart BMS admin or staff member will see, and warns when that user would not see the article at all.
+- **One article, each company's own words:** steps write page links as `{nav:pos}` and wording as `{shop}`. A Smart POS shop reads "Sell" and "Shop › Shops"; a Smart BMS company reads "Sales › POS" and "Inventory › Warehouses". The paths come from a mirror of the real header menu (same collapse rules, Simple Mode, Shop wording, permissions); a test fails if the header gets a menu page the mirror does not know.
+- **Who sees an article:** only users who can open at least one of its pages (module and role, the same check the menu uses). Articles with no pages are general help for everyone.
+- **Safe by design:** article text is plain text with a tiny format (numbered steps, bullets, Tip:, bold). Everything is escaped before formatting, so no HTML, script or link can ever reach a company's screen. Video links are limited to https YouTube/Vimeo/Loom. Articles are archived, never deleted.
+- **Starter content:** 8 categories and 16 how-to articles (selling, credit sales, returns, products, receiving stock, shops, customers, suppliers, expenses, reports, users), written against the real button labels, inserted once **as drafts** for BJP to review and publish. Tenants see nothing until an article is published.
+- **Test:** `tests/test_support_center_phase2_cli.php` — 153 checks, including the menu paths seen on the live demo shop, 11 XSS payloads, validation, publish/archive, visibility per product and role, action guards, and the pages rendering through the real router.
+
+---
+
+## 2026-10-24 — feat(support): Help & Support Center — Phase 1 (support tables, superadmin Support settings, real contact details on the Help page)
+
+**Files:** `core/support.php` (new), `scripts/setup_control_db.php`, `app/superadmin/support.php` (new), `actions/superadmin_support_settings.php` (new), `core/superadmin_auth.php`, `core/superadmin_ui.php`, `app/constant/settings/help.php`, `lang/sw.php`, `tests/test_support_center_phase1_cli.php` (new), `support_center_plan.md` (new)
+
+- **Plan:** `support_center_plan.md` — one ? Help button, page-aware help that follows each company's product (Smart POS / Smart BMS), wording (Shop / Warehouse) and the user's role, staff requests to their admin and admin requests to BJP, one BJP inbox. Section 0 records the real menus verified on the live demo shop and in `header.php`.
+- **Support tables in the control database:** categories, articles, requests, request messages (with internal notes), attachments, saved replies, notices and the search log. Created by `scripts/setup_control_db.php`, which already runs on every deploy; running it again changes nothing.
+- **Superadmin › Support (new menu item):** BJP sets the support email, phone, WhatsApp, office hours, login-page help text, who receives new requests, the auto-reply, first-reply targets per priority (business hours), when resolved requests close, and the attachment size limit. Saved in the control database only; tenants cannot read or change them. Every field is validated; a rejected save changes nothing.
+- **Help page contact card fixed:** the Email button used an address made from the tenant's own company name (it emailed the company itself) and the Call button dialled a placeholder number. It now shows BJP's real email, phone, WhatsApp and office hours from Superadmin › Support, only to company admins, and is hidden when nothing is set.
+- **Test:** `tests/test_support_center_phase1_cli.php` — 62 checks (schema idempotent, validation, save guards: no session / GET / wrong CSRF / tenant host / unknown action, page renders through the real router, help card).
+
+---
+
 ## 2026-10-24 — security(servers): PHP critical RCE patch (CVE-2026-109618 / CVE-2026-109619) and web-exposure hardening on both production servers
 
 **Files:** `changelog.md` (server-side changes only — no application code changed)

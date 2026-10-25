@@ -1004,6 +1004,17 @@ try {
             say("  + superadmins.{$col} added");
         }
     }
+
+    // Help & Support Center (support_center_plan.md) — BJP-facing requests and
+    // platform-wide help content, readable by every superadmin across tenants.
+    require_once __DIR__ . '/../core/support.php';
+    foreach (supportEnsureSchema($admin, $controlDb) as $t) {
+        say("  · table {$t} ready");
+    }
+    // Starter categories + draft articles, only into empty tables (BJP reviews and publishes).
+    require_once __DIR__ . '/../core/support_articles.php';
+    [$sc, $sa] = supportSeedDefaults($admin, $controlDb);
+    if ($sc || $sa) say("  + support starter content: {$sc} categories, {$sa} draft articles");
 } catch (PDOException $e) {
     die_with('Creating the control tables failed: ' . $e->getMessage());
 }
