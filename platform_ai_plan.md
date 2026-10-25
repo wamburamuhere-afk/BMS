@@ -58,7 +58,7 @@ Status: **DRAFT, waiting for approval** · Branch `feat/platform-ai` (worktree `
 - No caller changes needed. Each of the 9 callers is re-checked by test so all of them behave correctly in each mode.
 - Test: `test_platform_ai_phase2_cli.php` covers a platform tenant getting an answer, a restricted module getting nothing (including the notify digest), cap reached → blocked, control DB down → refused, an own-key tenant unchanged, and the existing `test_ai_*` suites still passing.
 
-### Phase 3 — Superadmin → AI → Settings
+### Phase 3 — Superadmin → AI → Settings ✅ (40 checks)
 - `app/superadmin/ai.php` (route `ai`, nav item "AI") → **Settings** tab: enable, provider, model, base URL, temperature, default tenant cap, global cap, key (replace only), **Test connection** (metered as `test`, tenant NULL).
 - `actions/superadmin_ai.php` (actions save_settings, test).
 - Test: auth/CSRF refusal, validation, key never echoed, audit row written.

@@ -430,3 +430,50 @@ if (!function_exists('_aiCallGemini')) {
                 'usage' => ['prompt' => $um['promptTokenCount'] ?? 0, 'completion' => $um['candidatesTokenCount'] ?? 0]];
     }
 }
+
+if (!function_exists('aiPlatformTest')) {
+    /**
+     * Superadmin "Test connection" for the platform key. Runs outside any tenant,
+     * meters the call as feature 'test' (tenant NULL) and returns a sanitised
+     * result — the key never leaves this function.
+     * @return array{ok:bool,message:string}
+     */
+    function aiPlatformTest(?int $superadminId = null): array
+    {
+        $s = aiPlatformSettings(true);
+        if ($s['model'] === '' || $s['api_key'] === '') {
+            return ['ok' => false, 'message' => 'Save a model and an API key first.'];
+        }
+        try {
+            $st = getControlPdo()->query("SELECT COUNT(*) FROM platform_ai_usage WHERE tenant_id IS NULL AND feature = 'test' AND created_at >= (NOW() - INTERVAL 60 SECOND)");
+            if ((int)$st->fetchColumn() >= 10) return ['ok' => false, 'message' => 'Too many tests in the last minute. Please wait.'];
+        } catch (Throwable $e) {
+            return ['ok' => false, 'message' => 'AI usage metering is not available (control database).'];
+        }
+        if ($s['base_url'] !== '' && !in_array($s['provider'], ['anthropic', 'gemini'], true)) {
+            $g = aiSafeBaseUrl($s['base_url']);
+            if (!$g['ok']) return ['ok' => false, 'message' => 'Base URL refused: ' . $g['error']];
+            $s['_pin'] = $g;
+        }
+        $messages = [['role' => 'system', 'content' => 'You are a connection test. Reply with the single word OK.'],
+                     ['role' => 'user', 'content' => 'Test']];
+        try {
+            switch ($s['provider']) {
+                case 'anthropic': $res = _aiCallAnthropic($s, $messages, 0.0, 10); break;
+                case 'gemini':    $res = _aiCallGemini($s, $messages, 0.0, 10); break;
+                default:          $res = _aiCallOpenAI($s, $messages, 0.0, 10, false); break;
+            }
+        } catch (Throwable $e) {
+            $res = ['ok' => false, 'error' => $e->getMessage()];
+        }
+        if (!$res['ok']) {
+            $err = aiSanitizeError($res['error'] ?? 'unknown', [$s['api_key']]);
+            aiPlatformLogUsage(null, $superadminId, 'test', $s['provider'], $s['model'], 0, 0, 0, 'error', $err);
+            return ['ok' => false, 'message' => 'The provider said: ' . ($err !== '' ? $err : 'no answer')];
+        }
+        $pt = (int)($res['usage']['prompt'] ?? 0);
+        $ct = (int)($res['usage']['completion'] ?? 0);
+        aiPlatformLogUsage(null, $superadminId, 'test', $s['provider'], $s['model'], $pt, $ct, aiEstimateCost($s['model'], $pt, $ct), 'ok');
+        return ['ok' => true, 'message' => 'Connected. ' . $s['provider'] . ' / ' . $s['model'] . ' answered.'];
+    }
+}
