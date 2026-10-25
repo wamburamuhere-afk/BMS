@@ -1015,6 +1015,12 @@ try {
     require_once __DIR__ . '/../core/support_articles.php';
     [$sc, $sa] = supportSeedDefaults($admin, $controlDb);
     if ($sc || $sa) say("  + support starter content: {$sc} categories, {$sa} draft articles");
+
+    // Platform AI (platform_ai_plan.md) — per-tenant key source/cap and platform-key metering.
+    require_once __DIR__ . '/../core/ai_platform.php';
+    foreach (aiPlatformSchema($admin, $controlDb) as $t) {
+        say("  · table {$t} ready");
+    }
 } catch (PDOException $e) {
     die_with('Creating the control tables failed: ' . $e->getMessage());
 }
