@@ -73,6 +73,12 @@ if (!isset($_SESSION['user_lang'])) {
 $__bms_lang_pref = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_preferences']) && isset($_POST['user_language']))
     ? $_POST['user_language']
     : $_SESSION['user_lang'];
+// Organization-wide language (System Settings): overrides every personal choice.
+$__bms_org_lang = orgLanguage();
+if ($__bms_org_lang !== null) {
+    $_SESSION['user_lang'] = $__bms_org_lang;
+    $__bms_lang_pref = $__bms_org_lang;
+}
 loadLanguage($__bms_lang_pref);
 
 // Load permissions if not in session or if we want to ensure they are fresh
@@ -950,12 +956,14 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 <!-- Simple POS mobile: Language + ☰ (opens the left side menu). Desktop: hidden. -->
                 <div class="bms-mobile-actions d-flex d-lg-none align-items-center gap-1 ms-auto">
                     <?php helpPanelButton('mobile'); ?>
+                    <?php if ($__bms_org_lang === null): ?>
                     <button type="button" class="btn btn-outline-light"
                         onclick="event.stopPropagation();bmsToggleLang();"
                         title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>"
                         style="font-size:0.65rem;padding:1px 7px;border-radius:14px;font-weight:700;letter-spacing:0.3px;line-height:1.4;">
                         <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
                     </button>
+                    <?php endif; ?>
                     <button type="button" class="btn btn-outline-light"
                         data-bs-toggle="offcanvas" data-bs-target="#bmsSideMenu" aria-controls="bmsSideMenu"
                         title="<?= htmlspecialchars(t('Menu')) ?>" aria-label="<?= htmlspecialchars(t('Open menu')) ?>"
@@ -1534,11 +1542,13 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                     <ul class="navbar-nav align-items-center flex-row">
                         <li class="nav-item me-1 d-none d-lg-flex align-items-center"><?php helpPanelButton('desktop'); ?></li>
                         <!-- Language toggle pill — switches between EN and SW instantly -->
+                        <?php if ($__bms_org_lang === null): ?>
                         <li class="nav-item me-1">
                             <button class="btn btn-sm btn-outline-light" onclick="bmsToggleLang()" title="<?= $__bms_lang_pref === 'sw' ? 'Switch to English' : 'Badilisha lugha kuwa Kiswahili' ?>" style="font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:700;letter-spacing:0.5px;line-height:1.6;">
                                 <i class="bi bi-globe2 me-1"></i><?= strtoupper($__bms_lang_pref) ?>
                             </button>
                         </li>
+                        <?php endif; ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle py-2 px-3 d-flex align-items-center fw-bold" href="#" id="userDrop" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle fs-5 me-2"></i>

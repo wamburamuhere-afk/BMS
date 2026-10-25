@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-25 — feat(settings): Language mode — per user (default) or per organization
+
+**Files:** `app/constant/settings/system_settings.php`, `core/i18n.php`, `header.php`, `api/set_language.php`, `app/constant/settings/my_settings.php`, `actions/login.php`, `core/mobile_auth.php`, `lang/sw.php`, `tests/test_org_language_mode_cli.php` (new)
+
+- System Settings > General has a new **Language** card: *Language mode* = **Per user** (default, nothing changes) or **Per organization**. In organization mode an *Organization language* select (English / Kiswahili) appears.
+- In organization mode everyone sees the chosen language (web, login and mobile login), the EN/SW globe in the top header is hidden, the Language field in My Settings is hidden, and `api/set_language.php` and the My Settings save refuse personal overrides.
+- New helper `orgLanguage()` in `core/i18n.php` is the single place that decides it. Swahili strings added.
+
 ## 2026-10-25 — fix(migrations): legacy-DB mirror for the Help & Support permission migration
 
 **Files:** `migrations/2026_10_24_help_self_service_legacy_db.php` (new)

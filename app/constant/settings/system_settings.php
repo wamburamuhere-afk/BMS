@@ -36,6 +36,9 @@ if ($_POST) {
                 'date_format' => $_POST['date_format'] ?? '',
                 'items_per_page' => $_POST['items_per_page'] ?? '',
                 'enable_projects' => $_POST['enable_projects'] ?? 0,
+                // Language mode: each user picks their own (default), or one language for the whole organization.
+                'language_mode' => ($_POST['language_mode'] ?? '') === 'organization' ? 'organization' : 'user',
+                'org_language'  => in_array($_POST['org_language'] ?? '', ['en', 'sw'], true) ? $_POST['org_language'] : 'en',
                 // Global "Text Display Case" (2026-09-18) — whitelisted, never
                 // trust the posted value verbatim (see core/text_display_case.php
                 // for what each mode does; textDisplayCaseMode() also re-validates
@@ -388,6 +391,40 @@ if ($_POST) {
                                                 <div class="p-2 px-3 bg-light rounded border fw-bold" id="text_case_preview_box">John Doe Supplies</div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Language mode: per user (default) or one language for the whole organization. -->
+                        <div class="row g-4 mt-1">
+                            <div class="col-12">
+                                <div class="card info-card">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-2 text-dark text-uppercase small letter-spacing-1"><?= t('Language') ?></h6>
+                                        <p class="text-muted small mb-3"><?= t('Choose whether each user picks their own language, or the whole organization uses one language. In organization mode users no longer see a language option in their profile or the top header.') ?></p>
+                                        <?php $lang_mode = get_setting('language_mode', 'user') === 'organization' ? 'organization' : 'user'; $org_lang = get_setting('org_language', 'en') === 'sw' ? 'sw' : 'en'; ?>
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-md-5">
+                                                <label for="language_mode" class="form-label small fw-bold"><?= t('Language mode') ?></label>
+                                                <select class="form-select" id="language_mode" name="language_mode">
+                                                    <option value="user" <?= $lang_mode === 'user' ? 'selected' : '' ?>><?= t('Per user') ?></option>
+                                                    <option value="organization" <?= $lang_mode === 'organization' ? 'selected' : '' ?>><?= t('Per organization') ?></option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5" id="org_language_wrap" style="<?= $lang_mode === 'organization' ? '' : 'display:none' ?>">
+                                                <label for="org_language" class="form-label small fw-bold"><?= t('Organization language') ?></label>
+                                                <select class="form-select" id="org_language" name="org_language">
+                                                    <option value="en" <?= $org_lang === 'en' ? 'selected' : '' ?>><?= t('English') ?></option>
+                                                    <option value="sw" <?= $org_lang === 'sw' ? 'selected' : '' ?>><?= t('Kiswahili') ?></option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <script>
+                                        document.getElementById('language_mode').addEventListener('change', function () {
+                                            document.getElementById('org_language_wrap').style.display = this.value === 'organization' ? '' : 'none';
+                                        });
+                                        </script>
                                     </div>
                                 </div>
                             </div>

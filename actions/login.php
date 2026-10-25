@@ -89,6 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_COOKIE['bms_lang']) && in_array($_COOKIE['bms_lang'], ['en', 'sw'], true)) {
             $_SESSION['user_lang'] = $_COOKIE['bms_lang'];
         }
+        if (orgLanguage() !== null) {
+            $_SESSION['user_lang'] = orgLanguage();
+        }
 
         $response['success'] = true;
     } else {
