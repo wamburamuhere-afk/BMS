@@ -42,7 +42,7 @@ $currency  = get_setting('currency', 'TZS');
     <!-- Print Header (title only — borders/footer come from i_e_print.md) -->
     <div class="print-header d-none d-print-block text-center mb-2">
         <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;"><?= t('PROFIT REPORT') ?></h2>
-        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;"><?= t('Period:') ?> <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;"><?= t('Period:') ?> <span id="print-period"><?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></span></p>
         <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;"><?= t('Generated:') ?> <?= date('d M Y, h:i A') ?></p>
         <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
@@ -160,6 +160,12 @@ $(function () {
     const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
     const DATA_URL = '<?= buildUrl('api/account/get_profit_report.php') ?>';
     const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // Same "d M Y" as the server-rendered header, built from the Y-m-d input value.
+    const fmtDate = ymd => {
+        const p = String(ymd || '').split('-');
+        return p.length === 3 ? `${p[2]} ${MONTHS[+p[1] - 1]} ${p[0]}` : '';
+    };
 
     $('#f-project, #f-warehouse').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
@@ -182,18 +188,26 @@ $(function () {
         });
     }
 
+    let reqSeq = 0;
     function loadReport() {
         const params = {
             date_from: $('#f-from').val(), date_to: $('#f-to').val(),
             project_id: $('#f-project').val() || '',
             warehouse_id: $('#f-warehouse').val() || ''
         };
+        if (!params.date_from || !params.date_to) return;   // mid-edit of a date field
+        // Only the latest request may paint — a slower earlier one (e.g. while
+        // the user is still changing dates) must not overwrite newer figures.
+        const seq = ++reqSeq;
         $.getJSON(DATA_URL, params)
             .done(function (res) {
+                if (seq !== reqSeq) return;
                 if (!res || !res.success) {
                     Swal.fire({ icon: 'error', title: PT.error, text: (res && res.message) || PT.couldNotLoadReport });
                     return;
                 }
+                // The printout states the period these figures are for.
+                $('#print-period').html(safeOutput(fmtDate(params.date_from)) + ' &ndash; ' + safeOutput(fmtDate(params.date_to)));
                 $('#stat-revenue').text(fmt(res.summary.total_revenue));
                 $('#stat-cogs').text(fmt(res.summary.total_cogs));
                 $('#stat-gross').text(fmt(res.summary.gross_profit));
@@ -203,11 +217,11 @@ $(function () {
 
                 renderChart(res.trend);
             })
-            .fail(() => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverErrorLoadingReport }));
+            .fail(() => { if (seq === reqSeq) Swal.fire({ icon: 'error', title: PT.error, text: PT.serverErrorLoadingReport }); });
     }
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
-    $('#f-project, #f-warehouse').on('change', loadReport);
+    $('#f-project, #f-warehouse, #f-from, #f-to').on('change', loadReport);
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Profit Report', 'Loaded profit report');

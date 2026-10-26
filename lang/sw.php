@@ -5725,4 +5725,10 @@ return [
     'AI answer — check important figures before acting on them.' => 'Jibu la AI — hakiki takwimu muhimu kabla ya kuchukua hatua.',
     'Answers cover only what you can open.' => 'Majibu yanahusu tu unachoweza kufungua.',
 
+    // Wholesale-above-retail check (assets/js/bms-price-check.js)
+    'Wholesale price is higher than retail' => 'Bei ya jumla ni kubwa kuliko bei ya rejareja',
+    'Wholesale price ({w}) is higher than retail price ({r}). Is this correct?' => 'Bei ya jumla ({w}) ni kubwa kuliko bei ya rejareja ({r}). Je, ni sahihi?',
+    'Yes, keep it' => 'Ndiyo, iache',
+    'No, change it' => 'Hapana, nibadilishe',
+
 ];

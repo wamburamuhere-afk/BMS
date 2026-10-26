@@ -899,6 +899,15 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </style>
 
 <script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>"></script>
+<script>
+window.BMS_PRICE_CHECK_T = <?= json_encode([
+    'title' => t('Wholesale price is higher than retail'),
+    'text'  => t('Wholesale price ({w}) is higher than retail price ({r}). Is this correct?'),
+    'yes'   => t('Yes, keep it'),
+    'no'    => t('No, change it'),
+]) ?>;
+</script>
+<script src="<?= getUrl('assets/js/bms-price-check.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/bms-price-check.js') ?>"></script>
 </head>
 <body>
     <div class="header-wrapper">

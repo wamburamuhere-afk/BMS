@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-26 — fix(pos, ledger): voided sales no longer count in a shop's Profit Report; product delete keeps history; Profit Report dates; wholesale-above-retail check
+
+**Files:** `core/expense_posting.php`, `core/money_in_posting.php`, `core/payment_source.php`, `core/purchase_posting.php`, `api/account/reverse_journal.php`, `core/ledger_post.php`, `migrations/tenant/2026_10_26_reversal_warehouse_backfill.php` (new), `migrations/2026_10_26_reversal_warehouse_backfill_legacy_db.php` (new), `core/product_delete.php` (new), `api/delete_product.php`, `api/mobile/products/delete.php`, `app/constant/reports/pos_profit_report.php`, `assets/js/bms-price-check.js` (new), `header.php`, `lang/sw.php`, `tests/test_pos_profit_void_shop_and_product_delete_cli.php` (new)
+
+- **Voided sale still counted for its shop (fixed):** a void posts a reversal, but the reversal was saved without the shop. All Shops netted to 0 while the shop's own Profit Report still showed the sale (seen live: Shop 19 showed 8,000 sales for a voided sale). Every reversal now carries the original's shop: POS sale and cost of goods, bills, purchase returns, invoice/credit-note cost of goods, expenses, vouchers, trips, maintenance, asset deletion, customer advances, tender fees, payment voids, books-transaction reversals and manual journal reversals. A one-time, idempotent migration (`backfillReversalWarehouses()`) gives the reversals already posted their shop.
+- **Product delete keeps history:** refused while any shop holds stock (the message names each shop and quantity; negative stock blocks too) — bring the stock to zero first, then delete. The delete removes the product only; past POS sales, stock movements, batches and ledger entries stay. Web and mobile share the rule. Web delete also no longer leaves its transaction open on a refused delete.
+- **Profit Report:** changing a date now reloads the figures; the printout's period follows the dates on screen; a slower earlier request can no longer overwrite newer figures.
+- **Wholesale above retail:** on every form with both prices (POS restock, product create/edit, quick add, batch correction), entering a wholesale price higher than retail asks "Is this correct?". Yes keeps it, No returns to the field; never blocks. Empty wholesale still means retail. English and Swahili.
+- Tests: new suite 43 checks pass; payment void, POS void reversal, credit-note restock, quick restock, restock batch dates and POS profit report suites pass. `test_warehouse_scope_cli` has 1 failure that also fails on develop without this change (Pending Approvals).
+
 ## 2026-10-25 — hotfix(login, products): login crash after the Language mode release; clear photo-size and lost-connection messages on Add/Edit Product
 
 **Files:** `actions/login.php`, `api/create_product.php`, `api/update_product.php`, `app/bms/product/product_create_footer.php`, `lang/sw.php`, `tests/test_login_and_product_errors_cli.php` (new), `tests/test_org_language_mode_cli.php`

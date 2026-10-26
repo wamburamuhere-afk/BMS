@@ -114,7 +114,7 @@ if (!function_exists('reverseAccrualEntry')) {
 
         $rows = $pdo->query("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = " . (int)$accrualId)->fetchAll(PDO::FETCH_ASSOC);
         if (!$rows) { $out['reason'] = 'no_lines'; return $out; }
-        $hdr = $pdo->query("SELECT entry_date, project_id FROM journal_entries WHERE entry_id = " . (int)$accrualId)->fetch(PDO::FETCH_ASSOC);
+        $hdr = $pdo->query("SELECT entry_date, project_id, warehouse_id FROM journal_entries WHERE entry_id = " . (int)$accrualId)->fetch(PDO::FETCH_ASSOC);
         $lines = [];
         foreach ($rows as $r) {
             $lines[] = [
@@ -126,8 +126,11 @@ if (!function_exists('reverseAccrualEntry')) {
         }
         $date = $hdr['entry_date'] ?: date('Y-m-d');
         $pid  = isset($hdr['project_id']) && $hdr['project_id'] !== null ? (int)$hdr['project_id'] : null;
+        // The reversal carries the original's warehouse too — otherwise a per-shop
+        // report keeps the original and loses its reversal (a voided sale still counts).
+        $whId = isset($hdr['warehouse_id']) && $hdr['warehouse_id'] !== null ? (int)$hdr['warehouse_id'] : null;
         try {
-            $entry = postLedgerEntry($pdo, "Accrual reversed — $entityBase #$id", $lines, $pid, $id, $entityBase . '_void', $date, $userId);
+            $entry = postLedgerEntry($pdo, "Accrual reversed — $entityBase #$id", $lines, $pid, $id, $entityBase . '_void', $date, $userId, $whId);
             $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("reverseAccrualEntry $entityBase $id: " . $e->getMessage());

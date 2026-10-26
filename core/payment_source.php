@@ -632,7 +632,7 @@ if (!function_exists('reverseMirroredEntry')) {
             return $out;
         }
 
-        $mirror = $pdo->prepare("SELECT entry_id, project_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ? AND status = 'posted' LIMIT 1");
+        $mirror = $pdo->prepare("SELECT entry_id, project_id, warehouse_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ? AND status = 'posted' LIMIT 1");
         $mirror->execute([$transactionId]);
         $mirrorRow = $mirror->fetch(PDO::FETCH_ASSOC);
         if (!$mirrorRow) { $out['reason'] = 'no_mirror_entry'; return $out; }
@@ -652,11 +652,12 @@ if (!function_exists('reverseMirroredEntry')) {
             ];
         }
 
-        $pid = ($mirrorRow['project_id'] !== null) ? (int)$mirrorRow['project_id'] : null;
+        $pid  = ($mirrorRow['project_id'] !== null) ? (int)$mirrorRow['project_id'] : null;
+        $whId = ($mirrorRow['warehouse_id'] !== null) ? (int)$mirrorRow['warehouse_id'] : null;
         try {
             require_once __DIR__ . '/ledger_post.php';
             $entryId = postLedgerEntry($pdo, "Reversal of transaction #$transactionId", $contra,
-                $pid, $transactionId, 'books_transaction_void', date('Y-m-d'), $userId);
+                $pid, $transactionId, 'books_transaction_void', date('Y-m-d'), $userId, $whId);
         } catch (Throwable $e) {
             error_log("reverseMirroredEntry txn $transactionId: " . $e->getMessage());
             $out['reason'] = 'post_error';
