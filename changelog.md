@@ -7,7 +7,8 @@
 - **"Muuzo" is now "Uzo" (36 lines in `lang/sw.php`):** every Swahili string for one sale (Current Sale, Hold Sale, Void Sale, Sale Completed!, the held-sale, credit-limit and scope messages) now reads "Uzo". The existing u-class wording ("umekamilika", "huu", "wa Sasa") already agreed with it, so only the noun changed. The test that checks `t('Sale')` now expects "Uzo".
 - **Shop Mode no longer says "ghala" for a shop:** the shop-catalog and batch endpoints (`api/stock/*`) and the print header of a stock adjustment used plain warehouse text, so a Shop Mode tenant read "ghala". They now use `wLabel()`: "duka" in Shop Mode, "ghala" otherwise. New Swahili keys added for the shop versions of: a valid shop is required, a valid batch and shop are required, batch not found in this shop, shop not found.
 - **Fixed wrong keys:** `'A valid warehouse is required.'` and `'Warehouse not found.'` translated to "Duka"; they now translate to "Ghala", with separate "shop" keys for Shop Mode.
-- **Left as is on purpose:** "Ghala" where it means stock or inventory (Stock, Add Stock, Inventory Report and similar).
+- **Inventory Report menu label:** "Ripoti ya Ghala" is now "Ripoti ya Stoku" (`lang/sw.php`, key `Inventory Report`), so the Reports menu no longer reads like a report of the shop itself.
+- **Left as is on purpose:** "Ghala" where it means stock or inventory elsewhere (Stock, Add Stock and similar).
 
 ## 2026-10-25 — hotfix(login, products): login crash after the Language mode release; clear photo-size and lost-connection messages on Add/Edit Product
 
