@@ -205,13 +205,18 @@ if (!function_exists('postOutflow')) {
      * Best-effort: if accounts are missing it returns null (the caller's own
      * record still saves); never throws.
      *
+     * $warehouseId tags the mirrored journal entry with the shop the money-out
+     * belongs to (e.g. a Simple POS expense); NULL = company-wide, as before.
+     *
      * @return int|null transaction_id, or null when not posted.
      */
     function postOutflow(PDO $pdo, string $type, ?int $paidFromAccountId, ?int $debitAccountId,
                          float $amount, string $date, ?string $reference, string $description,
-                         ?int $projectId = null, float $whtAmount = 0.0, ?int $whtAccountId = null): ?int
+                         ?int $projectId = null, float $whtAmount = 0.0, ?int $whtAccountId = null,
+                         ?int $warehouseId = null): ?int
     {
         if (!$paidFromAccountId || !$debitAccountId || $amount <= 0) return null;
+        $warehouseId = ($warehouseId !== null && $warehouseId > 0) ? (int)$warehouseId : null;
 
         // Optional withholding-tax split. When WHT applies, the supplier's debt is
         // still cleared in FULL (Dr gross), but the cash that leaves is reduced by
@@ -231,6 +236,7 @@ if (!function_exists('postOutflow')) {
                 'reference_number' => $reference,
                 'description'      => $description,
                 'project_id'       => $projectId,
+                'warehouse_id'     => $warehouseId,
                 'journal_items'    => [
                     ['account_id' => $debitAccountId,    'type' => 'debit',  'amount' => $amount, 'description' => $description],
                     ['account_id' => $paidFromAccountId, 'type' => 'credit', 'amount' => $net,    'description' => $description],
@@ -255,6 +261,7 @@ if (!function_exists('postOutflow')) {
             'account_id'        => $debitAccountId,     // Dr
             'contra_account_id' => $paidFromAccountId,  // Cr (money out)
             'project_id'        => $projectId,
+            'warehouse_id'      => $warehouseId,
         ], $pdo);
         if (empty($res['success'])) return null;
 

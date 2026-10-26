@@ -180,8 +180,10 @@ try {
             $ref  = 'EXP-' . $expense_id;
             $desc = 'Expense #' . $expense_id . ': ' . substr($description, 0, 100);
 
+            // The expense's shop goes onto both entries so the per-shop Profit
+            // Report sees it (NULL = company-wide).
             $accr = postExpenseAccrual($pdo, (int)$expense_id, $expense_account_id, $amount,
-                $expense_date, $project_id, (int)$created_by, $ref, $description);
+                $expense_date, $project_id, (int)$created_by, $ref, $description, $warehouse_id);
 
             $settle_debit = $expense_account_id;
             if (!empty($accr['posted'])) {
@@ -200,7 +202,8 @@ try {
                 $desc,
                 $project_id,
                 0,    // no WHT on Quick Expense
-                null
+                null,
+                $warehouse_id
             );
 
             if (!$txnId) {

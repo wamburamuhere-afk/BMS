@@ -66,7 +66,8 @@ if (!function_exists('postAccrualEntry')) {
      */
     function postAccrualEntry(
         PDO $pdo, string $entityBase, string $label, int $id, int $expenseAccountId, float $amount,
-        string $date, ?int $projectId, int $userId, ?string $reference, ?string $description
+        string $date, ?int $projectId, int $userId, ?string $reference, ?string $description,
+        ?int $warehouseId = null
     ): array {
         $out = ['posted' => false, 'reason' => ''];
         if ($id <= 0 || $amount <= 0) { $out['reason'] = 'no_amount'; return $out; }
@@ -82,13 +83,16 @@ if (!function_exists('postAccrualEntry')) {
         $amount = round($amount, 2);
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$date) ? substr((string)$date, 0, 10) : date('Y-m-d');
         $pid  = ($projectId !== null && $projectId !== 0) ? (int)$projectId : null;
+        // The shop the cost belongs to (Simple POS expenses carry one) — without it
+        // a per-shop Profit Report never sees the expense. NULL = company-wide.
+        $whId = ($warehouseId !== null && $warehouseId > 0) ? (int)$warehouseId : null;
         $desc = $label . ' accrual ' . ($reference ?: ('#' . $id)) . ($description ? ' — ' . substr($description, 0, 80) : '');
 
         try {
             $entry = postLedgerEntry($pdo, $desc, [
                 ['account_id' => (int)$expenseAccountId, 'type' => 'debit',  'amount' => $amount, 'description' => $label . ' incurred'],
                 ['account_id' => (int)$accrued,          'type' => 'credit', 'amount' => $amount, 'description' => 'Accrued (unpaid) ' . strtolower($label)],
-            ], $pid, $id, $entityBase, $date, $userId);
+            ], $pid, $id, $entityBase, $date, $userId, $whId);
             $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("postAccrualEntry $entityBase $id: " . $e->getMessage());
@@ -140,14 +144,54 @@ if (!function_exists('reverseAccrualEntry')) {
     }
 }
 
+if (!function_exists('backfillExpenseWarehouses')) {
+    /**
+     * One-time repair: expense ledger entries posted before they carried the
+     * expense's shop have warehouse_id NULL, so a per-shop Profit Report showed
+     * Total Expenses 0 for every shop. Copies expenses.warehouse_id onto:
+     *   - the approval accrual (entity 'expense_accrual', entity_id = expense_id)
+     *   - the payment / direct posting mirrored from books_transactions
+     *     (entity 'books_transaction', entity_id = expenses.transaction_id) —
+     *     regular expenses only; a payroll-linked payment settles Salaries
+     *     Payable and stays company-wide like the payroll it pays.
+     * Run backfillReversalWarehouses() after this so the voids follow.
+     * Only fills NULLs → idempotent; never re-tags an entry.
+     *
+     * @return int rows updated
+     */
+    function backfillExpenseWarehouses(PDO $pdo): int
+    {
+        if (!(bool)$pdo->query("SHOW COLUMNS FROM expenses LIKE 'warehouse_id'")->fetchColumn()) return 0;
+        $n = 0;
+        $n += $pdo->exec("
+            UPDATE journal_entries je
+              JOIN expenses e ON e.expense_id = je.entity_id
+               SET je.warehouse_id = e.warehouse_id
+             WHERE je.entity_type = 'expense_accrual'
+               AND je.warehouse_id IS NULL
+               AND e.warehouse_id IS NOT NULL
+        ");
+        $n += $pdo->exec("
+            UPDATE journal_entries je
+              JOIN expenses e ON e.transaction_id = je.entity_id
+               SET je.warehouse_id = e.warehouse_id
+             WHERE je.entity_type = 'books_transaction'
+               AND je.warehouse_id IS NULL
+               AND e.warehouse_id IS NOT NULL
+               AND e.payroll_id IS NULL
+        ");
+        return (int)$n;
+    }
+}
+
 /* ── Expense wrappers (OUT-1) ──────────────────────────────────────────────── */
 
 if (!function_exists('expenseIsAccrued')) {
     function expenseIsAccrued(PDO $pdo, int $expenseId): bool { return isDocAccrued($pdo, 'expense_accrual', $expenseId); }
 }
 if (!function_exists('postExpenseAccrual')) {
-    function postExpenseAccrual(PDO $pdo, int $expenseId, int $expenseAccountId, float $amount, string $date, ?int $projectId, int $userId, ?string $reference, ?string $description): array {
-        return postAccrualEntry($pdo, 'expense_accrual', 'Expense', $expenseId, $expenseAccountId, $amount, $date, $projectId, $userId, $reference, $description);
+    function postExpenseAccrual(PDO $pdo, int $expenseId, int $expenseAccountId, float $amount, string $date, ?int $projectId, int $userId, ?string $reference, ?string $description, ?int $warehouseId = null): array {
+        return postAccrualEntry($pdo, 'expense_accrual', 'Expense', $expenseId, $expenseAccountId, $amount, $date, $projectId, $userId, $reference, $description, $warehouseId);
     }
 }
 if (!function_exists('reverseExpenseAccrual')) {

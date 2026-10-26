@@ -200,6 +200,7 @@ try {
                 'account_id'        => $expense_account_id,
                 'contra_account_id' => $bank_account_id,
                 'project_id'        => $project_id,
+                'warehouse_id'      => $warehouse_id,
                 'description'       => $description
             ];
             $txnRes = updateGlobalTransaction($existing_txn_id, $transactionData, $pdo);

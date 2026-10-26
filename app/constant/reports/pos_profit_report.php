@@ -166,25 +166,36 @@ $(function () {
         const p = String(ymd || '').split('-');
         return p.length === 3 ? `${p[2]} ${MONTHS[+p[1] - 1]} ${p[0]}` : '';
     };
+    // "2026-10" → "Oct 2026"
+    const fmtMonth = ym => {
+        const p = String(ym || '').split('-');
+        return p.length === 2 ? `${MONTHS[+p[1] - 1]} ${p[0]}` : String(ym || '');
+    };
 
     $('#f-project, #f-warehouse').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     let cTrend;
     function renderChart(trend) {
         if (cTrend) cTrend.destroy();
+        // Bars, one group per month: each month's figures sit inside that month.
+        // (A curved line rose from the previous month's point, so a sale made
+        // in October looked like it started in September.)
         cTrend = new Chart(document.getElementById('chartTrend'), {
-            type: 'line',
+            type: 'bar',
             data: {
-                labels: trend.map(r => r.label),
+                labels: trend.map(r => fmtMonth(r.label)),
                 datasets: [
-                    { label: PT.revenue, data: trend.map(r => +r.revenue), borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.12)', tension: .3, pointRadius: 2 },
-                    { label: PT.cogs, data: trend.map(r => +r.cogs), borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,.08)', tension: .3, pointRadius: 2 },
-                    { label: PT.netProfit, data: trend.map(r => +r.net_profit), borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.10)', fill: true, tension: .3, pointRadius: 2 },
+                    { label: PT.revenue, data: trend.map(r => +r.revenue), backgroundColor: '#0d6efd' },
+                    { label: PT.cogs, data: trend.map(r => +r.cogs), backgroundColor: '#dc3545' },
+                    { label: PT.netProfit, data: trend.map(r => +r.net_profit), backgroundColor: '#198754' },
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, animation: false,
-                       plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } },
-                       scales: { y: { ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+                       plugins: {
+                           legend: { labels: { boxWidth: 12, font: { size: 10 } } },
+                           tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y) } }
+                       },
+                       scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
         });
     }
 

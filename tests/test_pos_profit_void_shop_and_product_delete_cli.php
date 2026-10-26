@@ -51,8 +51,15 @@ $src = file_get_contents("$root/core/payment_source.php");
 ok(strpos($src, "'books_transaction_void', date('Y-m-d'), \$userId, \$whId)") !== false, 'books-transaction reversal carries it');
 $src = file_get_contents("$root/api/account/reverse_journal.php");
 ok(strpos($src, 'reverses_entry_id, project_id, warehouse_id, created_at') !== false, 'manual journal reversal carries it');
-ok(is_file("$root/migrations/tenant/2026_10_26_reversal_warehouse_backfill.php")
-   && is_file("$root/migrations/2026_10_26_reversal_warehouse_backfill_legacy_db.php"), 'backfill migration exists for tenant + main DB');
+$mig = "$root/migrations/tenant/2026_10_26_ledger_warehouse_backfill.php";
+$migLegacy = "$root/migrations/2026_10_26_ledger_warehouse_backfill_legacy_db.php";
+ok(is_file($mig) && is_file($migLegacy), 'backfill migration exists for tenant + main DB');
+foreach ([$mig, $migLegacy] as $m) {
+    $ms = (string)@file_get_contents($m);
+    ok(strpos($ms, 'backfillExpenseWarehouses($pdo)') !== false
+       && strpos($ms, 'backfillReversalWarehouses($pdo)') > strpos($ms, 'backfillExpenseWarehouses($pdo)'),
+       basename($m) . ': expenses first, then reversals (so expense voids follow)');
+}
 
 // ── 2. Runtime — a voided POS sale nets to zero for its shop ────────────────
 section('2. Runtime — voided POS sale nets to zero in the per-shop P&L');
@@ -211,3 +218,190 @@ $hdr = file_get_contents("$root/header.php");
 ok(strpos($hdr, 'assets/js/bms-price-check.js') !== false && strpos($hdr, 'BMS_PRICE_CHECK_T') !== false, 'loaded on every page with translated labels');
 $sw = include "$root/lang/sw.php";
 ok(isset($sw['Wholesale price ({w}) is higher than retail price ({r}). Is this correct?']), 'Swahili text present');
+
+// ── 8. Expenses carry their shop into the ledger ────────────────────────────
+section('8. Expense posting passes the shop (source contract)');
+$src = file_get_contents("$root/api/account/add_expense.php");
+ok(strpos($src, '$expense_date, $project_id, (int)$created_by, $ref, $description, $warehouse_id);') !== false, 'web quick expense: accrual gets the shop');
+ok(preg_match('/0,\s*\/\/ no WHT on Quick Expense\s*null,\s*\$warehouse_id\s*\)/', $src) === 1, 'web quick expense: payment gets the shop');
+$src = file_get_contents("$root/api/account/update_expense_status.php");
+ok(strpos($src, 'SELECT amount, expense_date, project_id, warehouse_id, description') !== false, 'approve/pay reads the expense shop');
+ok(strpos($src, "\$expense_snap['description'], \$whId);") !== false, 'approval accrual gets the shop');
+ok(strpos($src, '$ref, $desc, $proj, $whtAmt, $whtAccId, $whId);') !== false, 'payment gets the shop');
+$src = file_get_contents("$root/api/mobile/expenses/create.php");
+ok(strpos($src, '$ref, $description, $warehouse_id);') !== false && strpos($src, '$project_id, 0, null, $warehouse_id') !== false, 'mobile expense: both entries get the shop');
+$src = file_get_contents("$root/api/account/update_expense.php");
+ok(strpos($src, "'warehouse_id'      => \$warehouse_id,") !== false, 'editing a legacy posted expense re-mirrors with the shop');
+$src = file_get_contents("$root/api/helpers/transaction_helper.php");
+ok(strpos($src, "array_key_exists('warehouse_id', \$data)") !== false, 'a re-mirror by a caller that passes no shop keeps the existing one');
+
+section('9. Runtime — an expense posted for a shop lowers that shop\'s net profit');
+require_once "$root/api/helpers/transaction_helper.php";
+require_once "$root/core/payment_source.php";
+require_once "$root/core/pos_nav.php";
+$expAcc  = (int)miscExpenseAccountId($pdo);
+$cashAcc = (int)defaultCashAccountId($pdo);
+ok($expAcc > 0 && $cashAcc > 0 && accruedExpensesAccountId($pdo), "have expense (#$expAcc), cash (#$cashAcc) and accrued expenses accounts");
+$pdo->beginTransaction();
+try {
+    $FAKE_EXP = 999000888; $eAmt = 1500.00;
+    $pl0 = glProfitLoss($pdo, $day, $day, null, '', $wh);
+    $a = postExpenseAccrual($pdo, $FAKE_EXP, $expAcc, $eAmt, $day, null, 4, 'EXP-TST', 'shop expense test', $wh);
+    ok(!empty($a['posted']), 'accrual posted');
+    $aw = $pdo->query("SELECT warehouse_id FROM journal_entries WHERE entry_id = " . (int)$a['entry_id'])->fetchColumn();
+    ok((int)$aw === $wh, "accrual entry carries the shop (#$wh)");
+    $pl1 = glProfitLoss($pdo, $day, $day, null, '', $wh);
+    ok(abs(($pl1['total_expense'] - $pl0['total_expense']) - $eAmt) < 0.01, "shop's Total Expenses rose by $eAmt");
+    ok(abs(($pl0['net_profit'] - $pl1['net_profit']) - $eAmt) < 0.01, "shop's Net Profit fell by $eAmt");
+
+    $txn = postOutflow($pdo, 'expense', $cashAcc, (int)accruedExpensesAccountId($pdo), $eAmt, $day, 'EXP-TST', 'shop expense test', null, 0, null, $wh);
+    ok($txn > 0, 'payment posted');
+    $pw = $pdo->prepare("SELECT warehouse_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ?");
+    $pw->execute([$txn]);
+    ok((int)$pw->fetchColumn() === $wh, 'payment entry carries the shop');
+    ok(abs(glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'] - $pl1['total_expense']) < 0.01, 'paying it does not count the expense twice');
+
+    // Direct path (no accrual): the payment itself is the P&L entry.
+    $txn2 = postOutflow($pdo, 'expense', $cashAcc, $expAcc, 700, $day, 'EXP-TST2', 'direct shop expense', null, 0, null, $wh);
+    ok(abs(glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'] - $pl1['total_expense'] - 700) < 0.01, 'a direct (no-accrual) expense also counts for the shop');
+
+    // Company-wide expense (no shop) stays out of the shop view, in All Shops.
+    $all0 = glProfitLoss($pdo, $day, $day, null, '', null)['total_expense'];
+    $shop0 = glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'];
+    postExpenseAccrual($pdo, $FAKE_EXP + 1, $expAcc, 400, $day, null, 4, 'EXP-TST3', 'company-wide', null);
+    ok(abs(glProfitLoss($pdo, $day, $day, null, '', null)['total_expense'] - $all0 - 400) < 0.01, 'company-wide expense counts in All Shops');
+    ok(abs(glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'] - $shop0) < 0.01, 'company-wide expense is not charged to the shop');
+
+    // Void (reject before payment) nets the shop back.
+    reverseExpenseAccrual($pdo, $FAKE_EXP, 4);
+    ok(abs(glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'] - ($pl1['total_expense'] - $eAmt + 700)) < 0.01, 'reversing the accrual removes it from the shop again');
+
+    // Backfill: an expense posted the old way (no shop on its entries).
+    section('10. Runtime — backfill tags expenses posted before the fix');
+    $pdo->prepare("INSERT INTO expenses (expense_date, expense_account_id, amount, bank_account_id, warehouse_id, description, status, created_by)
+                   VALUES (?, ?, 900, ?, ?, 'old shop expense', 'approved', 4)")->execute([$day, $expAcc, $cashAcc, $wh]);
+    $oldExp = (int)$pdo->lastInsertId();
+    $oa = postExpenseAccrual($pdo, $oldExp, $expAcc, 900, $day, null, 4, 'EXP-OLD', 'old', null);   // old behaviour: no shop
+    $oldTxn = postOutflow($pdo, 'expense', $cashAcc, (int)accruedExpensesAccountId($pdo), 900, $day, 'EXP-OLD', 'old', null, 0, null, null);
+    $pdo->prepare("UPDATE expenses SET transaction_id = ? WHERE expense_id = ?")->execute([$oldTxn, $oldExp]);
+    $before = glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'];
+    $n = backfillExpenseWarehouses($pdo);
+    ok($n >= 2, "backfill tagged $n entr(ies) (accrual + payment)");
+    $chk2 = $pdo->prepare("SELECT warehouse_id FROM journal_entries WHERE entry_id = ?");
+    $chk2->execute([(int)$oa['entry_id']]);
+    ok((int)$chk2->fetchColumn() === $wh, 'old accrual now carries the shop');
+    ok(abs(glProfitLoss($pdo, $day, $day, null, '', $wh)['total_expense'] - $before - 900) < 0.01, 'the old expense now shows in the shop\'s Profit Report');
+    backfillExpenseWarehouses($pdo);
+    $chk2->execute([(int)$oa['entry_id']]);
+    ok((int)$chk2->fetchColumn() === $wh, 'second run leaves it as is');
+} finally {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+}
+
+// ── 11. End to end — the real approve → paid endpoint ───────────────────────
+section('11. Endpoint — approve then pay a shop expense (api/account/update_expense_status.php)');
+$runApi = function (string $file, array $post) use ($root): array {
+    $harness = tempnam(sys_get_temp_dir(), 'bmsexp') . '.php';
+    file_put_contents($harness, '<?php $_SERVER["REQUEST_METHOD"]="POST"; $_POST=' . var_export($post, true) . ';'
+        . 'require ' . var_export("$root/roots.php", true) . ';'
+        . '$_SESSION["user_id"]=4; $_SESSION["is_admin"]=true; $_SESSION["role_id"]=1;'
+        . 'require ' . var_export("$root/$file", true) . ';');
+    $out = shell_exec('"' . PHP_BINARY . '" -d display_errors=0 "' . $harness . '" 2>&1');
+    @unlink($harness);
+    $json = null;
+    if (preg_match('/\{.*\}/s', (string)$out, $m)) $json = json_decode($m[0], true);
+    return [$json, $out];
+};
+$accruedAcc = (int)accruedExpensesAccountId($pdo);
+$balStmt = $pdo->prepare("SELECT account_id, current_balance FROM accounts WHERE account_id IN (?, ?, ?)");
+$balStmt->execute([$cashAcc, $expAcc, $accruedAcc]);
+$savedBal = $balStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+$pdo->prepare("INSERT INTO expenses (expense_date, expense_account_id, amount, bank_account_id, warehouse_id, description, status, created_by)
+               VALUES (?, ?, 2500, ?, ?, 'ZZ e2e shop expense', 'pending', 4)")->execute([$day, $expAcc, $cashAcc, $wh]);
+$e2e = (int)$pdo->lastInsertId();
+$e2eTxn = null;
+try {
+    $shopBefore = glProfitLoss($pdo, $day, $day, null, '', $wh);
+    [$r1, $raw1] = $runApi('api/account/update_expense_status.php', ['expense_id' => $e2e, 'status' => 'approved']);
+    ok(is_array($r1) && !empty($r1['success']), 'approved' . (is_array($r1) ? '' : ' (raw: ' . substr((string)$raw1, 0, 200) . ')'));
+    $s = $pdo->prepare("SELECT warehouse_id FROM journal_entries WHERE entity_type = 'expense_accrual' AND entity_id = ? AND status = 'posted'");
+    $s->execute([$e2e]);
+    ok((int)$s->fetchColumn() === $wh, 'approval entry carries the expense\'s shop');
+    $shopMid = glProfitLoss($pdo, $day, $day, null, '', $wh);
+    ok(abs(($shopMid['total_expense'] - $shopBefore['total_expense']) - 2500) < 0.01, 'shop Profit Report: Total Expenses +2,500');
+    ok(abs(($shopBefore['net_profit'] - $shopMid['net_profit']) - 2500) < 0.01, 'shop Profit Report: Net Profit −2,500');
+
+    [$r2, $raw2] = $runApi('api/account/update_expense_status.php', ['expense_id' => $e2e, 'status' => 'paid']);
+    ok(is_array($r2) && !empty($r2['success']), 'paid' . (is_array($r2) ? '' : ' (raw: ' . substr((string)$raw2, 0, 200) . ')'));
+    $e2eTxn = (int)$pdo->query("SELECT transaction_id FROM expenses WHERE expense_id = $e2e")->fetchColumn();
+    $s = $pdo->prepare("SELECT warehouse_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ?");
+    $s->execute([$e2eTxn]);
+    ok((int)$s->fetchColumn() === $wh, 'payment entry carries the shop');
+    $shopAfter = glProfitLoss($pdo, $day, $day, null, '', $wh);
+    ok(abs($shopAfter['total_expense'] - $shopMid['total_expense']) < 0.01, 'paying does not double the expense');
+} finally {
+    // Remove everything the run created and put the account balances back.
+    $ids = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE (entity_type IN ('expense_accrual','expense_accrual_void') AND entity_id = ?)
+                                                               OR (entity_type IN ('books_transaction','books_transaction_void') AND entity_id = ?)");
+    $ids->execute([$e2e, (int)$e2eTxn]);
+    foreach ($ids->fetchAll(PDO::FETCH_COLUMN) as $eid) {
+        $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id = ?")->execute([$eid]);
+        $pdo->prepare("DELETE FROM journal_entries WHERE entry_id = ?")->execute([$eid]);
+    }
+    if ($e2eTxn) {
+        $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$e2eTxn]);
+        $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$e2eTxn]);
+    }
+    $pdo->prepare("DELETE FROM bank_transactions WHERE reference_number = ?")->execute(['EXP-' . $e2e]);
+    $pdo->prepare("DELETE FROM workflow_signatures WHERE entity_type = 'expense' AND entity_id = ?")->execute([$e2e]);
+    $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$e2e]);
+    foreach ($savedBal as $acc => $bal) {
+        $pdo->prepare("UPDATE accounts SET current_balance = ? WHERE account_id = ?")->execute([$bal, $acc]);
+    }
+}
+
+// ── 12. Monthly Trend ───────────────────────────────────────────────────────
+section('12. Monthly Trend — each month in its own place, latest months kept');
+$src = file_get_contents("$root/app/constant/reports/pos_profit_report.php");
+ok(strpos($src, "type: 'bar'") !== false && strpos($src, "type: 'line'") === false, 'bars per month (a curved line made an October sale look like September)');
+ok(strpos($src, 'labels: trend.map(r => fmtMonth(r.label))') !== false, 'month labels read "Oct 2026"');
+$src = file_get_contents("$root/api/account/get_profit_report.php");
+ok(strpos($src, "->modify('-23 months')") !== false, 'a range longer than 24 months keeps the latest 24');
+ok(strpos($src, "max(\$cursor->format('Y-m-d'), \$date_from)") !== false, 'first month starts at the From date, so the trend adds up to the cards');
+
+// Runtime: the real endpoint (GET) — needs Simple POS mode on this DB.
+$runGet = function (array $get) use ($root): array {
+    $harness = tempnam(sys_get_temp_dir(), 'bmspr') . '.php';
+    file_put_contents($harness, '<?php $_SERVER["REQUEST_METHOD"]="GET"; $_GET=' . var_export($get, true) . ';'
+        . 'require ' . var_export("$root/roots.php", true) . ';'
+        . '$_SESSION["user_id"]=4; $_SESSION["is_admin"]=true; $_SESSION["role_id"]=1;'
+        . 'require ' . var_export("$root/api/account/get_profit_report.php", true) . ';');
+    $out = shell_exec('"' . PHP_BINARY . '" -d display_errors=0 "' . $harness . '" 2>&1');
+    @unlink($harness);
+    $json = null;
+    if (preg_match('/\{.*\}/s', (string)$out, $m)) $json = json_decode($m[0], true);
+    return [$json, $out];
+};
+if (!posSimpleModeEnabled()) {
+    echo "  · Simple POS mode is off on this database — endpoint run skipped (source checks above still apply).\n";
+} else {
+    $today = date('Y-m-d');
+    [$res, $raw] = $runGet(['date_from' => date('Y-m-d', strtotime('-40 months')), 'date_to' => $today]);
+    ok(is_array($res) && !empty($res['success']), 'endpoint answers' . (is_array($res) ? '' : ' (raw: ' . substr((string)$raw, 0, 200) . ')'));
+    if (is_array($res) && !empty($res['trend'])) {
+        $labels = array_column($res['trend'], 'label');
+        ok(count($labels) === 24, '40-month range → 24 months in the trend');
+        ok(end($labels) === date('Y-m'), 'the trend ends at the current month (' . date('Y-m') . ')');
+    }
+    // A mid-month From date: trend totals equal the summary cards.
+    $from = date('Y-m-15', strtotime('-2 months'));
+    [$res, $raw] = $runGet(['date_from' => $from, 'date_to' => $today]);
+    if (is_array($res) && !empty($res['success'])) {
+        $sumRev = array_sum(array_column($res['trend'], 'revenue'));
+        $sumNet = array_sum(array_column($res['trend'], 'net_profit'));
+        ok(abs($sumRev - $res['summary']['total_revenue']) < 0.01 && abs($sumNet - $res['summary']['net_profit']) < 0.01,
+           "trend adds up to the cards for a mid-month From date ($from)");
+    } else {
+        ok(false, 'endpoint answers for a mid-month range');
+    }
+}
