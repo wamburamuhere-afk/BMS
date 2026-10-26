@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-26 — fix(pos): voiding a credit sale with a deposit left the deposit in the cash drawer
+
+**Files:** `api/pos/void_sale.php`, `core/pos_shift_reporting.php`, `migrations/tenant/2026_10_26_pos_void_drawer_cash_fix.php` (new), `migrations/2026_10_26_pos_void_drawer_cash_fix_legacy_db.php` (new), `tests/test_pos_void_drawer_cash_cli.php` (new)
+
+- **The bug (seen live on the POS header):** "Cash Balance" showed TZS 1,000 with starting cash 0, while the Z-report said expected cash 0. Cause: a credit sale that took a 1,000 deposit records that cash in the drawer ledger (`cash_register_transactions`), but `void_sale.php` only took cash back when `pos_sales.payment_method` was `cash`. Voiding the credit sale left the deposit in the drawer. A split sale's cash leg and a settled credit sale had the same problem.
+- **Fix in `void_sale.php`:** it now asks the drawer ledger how much cash the sale still holds (new `posSaleDrawerCashOwed()` in `core/pos_shift_reporting.php`) and takes exactly that back, against the operator's active shift. A split sale's row has no `sale_id`, so it is matched by receipt number. An older cash sale with no drawer row still refunds its total, as before.
+- **Existing wrong balances:** the two new migrations call `posFixVoidedSaleDrawerCash()`, which adds the missing "Void:" refund for already-voided sales into OPEN shifts only; closed shifts were reconciled at close and are not touched. Safe to run twice (it counts refunds already there). It matches sales to drawer rows in PHP, not SQL, because the two tables do not share a collation on every database.
+- **Test:** `tests/test_pos_void_drawer_cash_cli.php` runs the real `void_sale.php` on a credit deposit, a cash sale, an older cash sale, a split sale and a credit sale with no deposit, then checks the repair function (open shift fixed once, closed shift left alone, already-refunded sale untouched). 20 assertions.
 ## 2026-10-26 — fix(i18n): Swahili "Muuzo" becomes "Uzo"; shop wording in stock messages
 
 **Files:** `lang/sw.php`, `api/stock/get_warehouse_batches.php`, `api/stock/update_warehouse_batch.php`, `api/stock/generate_shop_catalog_link.php`, `api/stock/revoke_shop_catalog_link.php`, `app/bms/stock/adjustment_print.php`, `tests/test_activity_log_permission_and_sell_label_cli.php`
