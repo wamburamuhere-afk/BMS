@@ -369,6 +369,20 @@ $src = file_get_contents("$root/api/account/get_profit_report.php");
 ok(strpos($src, "->modify('-23 months')") !== false, 'a range longer than 24 months keeps the latest 24');
 ok(strpos($src, "max(\$cursor->format('Y-m-d'), \$date_from)") !== false, 'first month starts at the From date, so the trend adds up to the cards');
 
+// ── 13. Dashboard (Simple POS) summary — full figures, readable change chips ─
+section('13. Dashboard summary: full figures, readable chips');
+$dash = file_get_contents("$root/app/dashboard.php");
+$sPos   = strpos($dash, 'function renderSimpleChart(');
+$simple = substr($dash, $sPos, strpos($dash, 'function updateDashboardMetrics(') - $sPos);   // the whole function
+ok(strpos($dash, 'function fmtFull(') !== false, 'full-figure formatter exists');
+ok(substr_count($simple, '${fmtFull(') === 4 && strpos($simple, '${fmtAbbrev(') === false, 'the four summary boxes show full figures (no "K")');
+ok(strpos($simple, 'return label + fmtFull(context.parsed.y);') !== false, 'tooltip shows full figures');
+ok(strpos($simple, 'callback: v => fmtAbbrev(v)') !== false, 'only the Y-axis stays abbreviated');
+ok(strpos($dash, "(up && pct >= 1000)") !== false, 'a rise of 1,000%+ reads as a multiple (66×)');
+ok(strpos($simple, "t('to loss')") !== false && strpos($simple, "t('back to profit')") !== false, 'profit ↔ loss is said in words, not a % across zero');
+ok(strpos($simple, "t('Compared with')") !== false, 'the comparison period is named');
+ok(isset($sw['Compared with'], $sw['to loss'], $sw['back to profit']), 'Swahili text present');
+
 // Runtime: the real endpoint (GET) — needs Simple POS mode on this DB.
 $runGet = function (array $get) use ($root): array {
     $harness = tempnam(sys_get_temp_dir(), 'bmspr') . '.php';

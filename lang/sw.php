@@ -5731,4 +5731,9 @@ return [
     'Yes, keep it' => 'Ndiyo, iache',
     'No, change it' => 'Hapana, nibadilishe',
 
+    // Dashboard Simple POS summary (app/dashboard.php)
+    'Compared with' => 'Ikilinganishwa na',
+    'to loss' => 'kuwa hasara',
+    'back to profit' => 'kurudi faidani',
+
 ];

@@ -2200,6 +2200,15 @@ function fmtAbbrev(n) {
     return sign + 'TSh ' + av.toLocaleString();
 }
 
+// Full figure — TSh 165,500 — for every number a person reads (summary boxes,
+// tooltips). Only the chart's Y-axis keeps fmtAbbrev(), where space is tight.
+function fmtFull(n) {
+    const v = Math.round((Number(n) || 0) * 100) / 100;
+    const sign = v < 0 ? '-' : '';
+    const dp = Number.isInteger(v) ? 0 : 2;   // 165,500 — or 12,345,678.50, never ".5"
+    return sign + 'TSh ' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+
 // % change vs the previous data point — null when there's nothing to compare
 // against (first period, or previous value was exactly zero: a % off zero is
 // undefined, not "infinite", so the caller shows no chip rather than lying).
@@ -2208,12 +2217,19 @@ function pctDelta(curr, prev) {
     return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
-function deltaChipHtml(pct) {
+// A rise of 1,000% or more reads as a multiple ("▲ 66×") — "▲6520%" is true
+// but unreadable when the previous period was tiny. Hover names the period
+// it is compared with.
+function deltaChipHtml(pct, prevPeriod) {
     if (pct === null) return '';
     const up = pct >= 0;
     const cls = up ? 'text-success' : 'text-danger';
     const arrow = up ? '▲' : '▼';
-    return `<span class="${cls} small fw-bold ms-1">${arrow}${Math.abs(pct).toFixed(0)}%</span>`;
+    const text = (up && pct >= 1000)
+        ? (1 + pct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 }) + '×'
+        : Math.abs(pct).toFixed(0) + '%';
+    const title = prevPeriod ? ` title="${safeOutput(<?= json_encode(t('Compared with')) ?> + ' ' + prevPeriod)}"` : '';
+    return `<span class="${cls} small fw-bold ms-1 text-nowrap"${title}>${arrow} ${text}</span>`;
 }
 
 function renderChart(data) {
@@ -2502,7 +2518,7 @@ function renderSimpleChart(data) {
                         label: function(context) {
                             let label = context.dataset.label || '';
                             if (label) label += ': ';
-                            return label + fmtAbbrev(context.parsed.y);
+                            return label + fmtFull(context.parsed.y);
                         },
                         afterBody: function(items) {
                             const sales = items.find(i => i.datasetIndex === 0);
@@ -2510,7 +2526,7 @@ function renderSimpleChart(data) {
                             const opex  = items.find(i => i.datasetIndex === 2);
                             if (sales && cogs && opex) {
                                 const netProfit = sales.parsed.y - cogs.parsed.y - opex.parsed.y;
-                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + ': ' + fmtAbbrev(netProfit)];
+                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + ': ' + fmtFull(netProfit)];
                             }
                             return [];
                         }
@@ -2544,31 +2560,46 @@ function renderSimpleChart(data) {
     const netProfit = (last.net_profit != null) ? parseFloat(last.net_profit) : (sales - cogs - opex);
     const margin   = sales > 0 ? (netProfit / sales) * 100 : null;
 
-    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0)) : '';
-    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0)) : '';
-    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0)) : '';
+    const prevPeriod = prev ? String(prev.period) : '';
+    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0), prevPeriod) : '';
+    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0), prevPeriod) : '';
+    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0), prevPeriod) : '';
     const profitPrev = prev ? ((prev.net_profit != null) ? parseFloat(prev.net_profit) : ((parseFloat(prev.revenue) || 0) - (parseFloat(prev.expense) || 0) - (parseFloat(prev.operating_expenses) || 0))) : null;
-    const profitDelta = prev ? deltaChipHtml(pctDelta(netProfit, profitPrev)) : '';
+    // Profit ↔ loss: a % across zero is meaningless ("▼ 120100%"), so say what happened.
+    let profitDelta = '';
+    if (prev && profitPrev !== null && profitPrev !== 0 && netProfit !== 0 && (profitPrev > 0) !== (netProfit > 0)) {
+        const toLoss = netProfit < 0;
+        const title  = ` title="${safeOutput(<?= json_encode(t('Compared with')) ?> + ' ' + prevPeriod)}"`;
+        profitDelta = `<span class="${toLoss ? 'text-danger' : 'text-success'} small fw-bold ms-1 text-nowrap"${title}>${toLoss ? '▼ ' + <?= json_encode(t('to loss')) ?> : '▲ ' + <?= json_encode(t('back to profit')) ?>}</span>`;
+    } else if (prev) {
+        profitDelta = deltaChipHtml(pctDelta(netProfit, profitPrev), prevPeriod);
+    }
 
+    // Full figures on one line each; the size steps down on narrow phones so
+    // a long amount never wraps or gets cut.
+    const valStyle = 'font-size: clamp(0.9rem, 3.4vw, 1.05rem);';
     $('#performanceSummary').append(`
         <div class="mt-4 p-3 bg-light rounded shadow-sm border">
-            <span class="text-muted small d-block uppercase fw-bold mb-2" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
+            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-1 mb-2">
+                <span class="text-muted small uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${safeOutput(last.period)})</span>
+                ${prevPeriod ? `<span class="text-muted" style="font-size: 0.7rem;"><?= t('Compared with') ?> ${safeOutput(prevPeriod)}</span>` : ''}
+            </div>
             <div class="row g-3 text-center">
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Sales') ?></div>
-                    <div class="h6 mb-0 text-primary">${fmtAbbrev(sales)}${salesDelta}</div>
+                    <div class="fw-bold mb-0 text-primary text-nowrap" style="${valStyle}">${fmtFull(sales)}</div>${salesDelta ? `<div>${salesDelta}</div>` : ''}
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Cost of Goods') ?></div>
-                    <div class="h6 mb-0 text-danger">${fmtAbbrev(cogs)}${cogsDelta}</div>
+                    <div class="fw-bold mb-0 text-danger text-nowrap" style="${valStyle}">${fmtFull(cogs)}</div>${cogsDelta ? `<div>${cogsDelta}</div>` : ''}
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Expenses') ?></div>
-                    <div class="h6 mb-0" style="color:#fd7e14;">${fmtAbbrev(opex)}${opexDelta}</div>
+                    <div class="fw-bold mb-0 text-nowrap" style="color:#fd7e14; ${valStyle}">${fmtFull(opex)}</div>${opexDelta ? `<div>${opexDelta}</div>` : ''}
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Net Profit') ?></div>
-                    <div class="h6 mb-0 text-${netProfit >= 0 ? 'success' : 'danger'}">${fmtAbbrev(netProfit)}${profitDelta}</div>
+                    <div class="fw-bold mb-0 text-${netProfit >= 0 ? 'success' : 'danger'} text-nowrap" style="${valStyle}">${fmtFull(netProfit)}</div>${profitDelta ? `<div>${profitDelta}</div>` : ''}
                     ${margin !== null ? `<small class="d-block text-muted" style="font-size: 0.7rem;">${margin.toFixed(0)}% <?= t('margin') ?></small>` : ''}
                 </div>
             </div>
