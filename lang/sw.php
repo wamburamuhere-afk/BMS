@@ -202,7 +202,7 @@ return [
     'Sales Report' => 'Ripoti ya Mauzo',
     'Purchase Report' => 'Ripoti ya Ununuzi',
     'PO vs Invoice Report' => 'Ripoti ya Oda dhidi ya Ankara',
-    'Inventory Report' => 'Ripoti ya Ghala',
+    'Inventory Report' => 'Ripoti ya Stoku',
     'Expense Report' => 'Ripoti ya Matumizi',
     'Analytics' => 'Uchambuzi',
     'Customer Analysis' => 'Uchambuzi wa Wateja',
