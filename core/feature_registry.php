@@ -941,6 +941,40 @@ if (!function_exists('bmsRouteAvailable')) {
     }
 }
 
+if (!function_exists('simpleModeHiddenPageKeys')) {
+    /**
+     * Always-on pages a POS Simple Mode (Smart POS) tenant has no use for —
+     * the accountant-facing books and the stock/customer tools header.php
+     * already leaves out of every Simple Mode menu. tenantModuleAllowsPage()
+     * refuses them while Simple Mode is on, so they are also gone from the
+     * Roles & Permissions matrix (core/role_permission_ui.php) instead of
+     * showing a checkbox for a page nobody can find. Grants are kept, so
+     * turning Simple Mode off restores everything.
+     *
+     * Deliberately NOT listed, though they look accounting/stock shaped —
+     * Simple Mode itself uses them:
+     *   reports            api/mobile/me.php reports_view (the app's Reports tab)
+     *   categories         product category create (web + api/mobile/categories)
+     *   stock_adjustments  Shops → "Transfer Stock" (stock_transfers.php)
+     *   expense_report, inventory_report, sales_report — the Simple Mode Reports menu
+     */
+    function simpleModeHiddenPageKeys(): array
+    {
+        return [
+            // Accounting statements and books
+            'balance_sheet', 'cash_flow', 'income_statement', 'profit_loss_report',
+            'trial_balance', 'ledger_report', 'financial_reports', 'financial_statements',
+            'tax_report', 'chart_of_accounts', 'transactions',
+            // Stock tools outside the Simple Mode "Shop" menu
+            'inventory_valuation', 'locations',
+            // Customer tools with no Simple Mode entry point
+            'customer_groups', 'customer_import',
+            // Loans
+            'loans', 'loan_documents',
+        ];
+    }
+}
+
 if (!function_exists('tenantModuleAllowsPage')) {
     /**
      * The question the permission layer asks: may this request's tenant reach
@@ -956,6 +990,14 @@ if (!function_exists('tenantModuleAllowsPage')) {
      */
     function tenantModuleAllowsPage(string $pageKey): bool
     {
+        // POS Simple Mode: pages the Smart POS UI never shows are off for the
+        // whole tenant, admin included — see simpleModeHiddenPageKeys(). Same
+        // get_setting() read as the 'expenses' bypass below, for the same reason.
+        if (in_array($pageKey, simpleModeHiddenPageKeys(), true)
+            && function_exists('get_setting') && get_setting('pos_simple_mode', '0') === '1') {
+            return false;
+        }
+
         // 'expenses' bundled into POS Simple Mode ("normal business man" —
         // core/pos_nav.php::posSimpleModeEnabled()), 2026-09-14: basic
         // expense tracking is a POS baseline for a shop with no accountant,

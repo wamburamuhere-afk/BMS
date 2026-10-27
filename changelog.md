@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(permissions): Smart POS (Simple Mode) hides and refuses pages its UI never shows
+
+**Files:** `core/feature_registry.php`, `app/bms/invoice/reports.php`, `api/account/search_customers.php`, `app/bms/customer/customers.php`, `tests/test_simple_mode_hidden_pages_cli.php` (new)
+
+- **Problem:** the Roles & Permissions page hid a permission only when its module was off. Simple Mode only trims the menus, so Smart POS still listed checkboxes for pages it never shows (Balance Sheet, Trial Balance, Chart of Accounts…), and an old grant still opened them by URL.
+- **`simpleModeHiddenPageKeys()`** (one list): balance_sheet, cash_flow, income_statement, profit_loss_report, trial_balance, ledger_report, financial_reports, financial_statements, tax_report, chart_of_accounts, transactions, inventory_valuation, locations, customer_groups, customer_import, loans, loan_documents. `tenantModuleAllowsPage()` refuses them while `pos_simple_mode` is on (admin included), so they leave the matrix and their routes 404. Grants are kept — turning Simple Mode off restores everything. Smart BMS is unaffected.
+- **Deliberately kept** (Simple Mode uses them): `reports` (mobile Reports tab), `categories` (category create), `stock_adjustments` (Shops → Transfer Stock), Sales/Inventory/Expense reports.
+- **Reports hub** (`/reports`): the Financial Reports card and `?report=balance_sheet|cash_flow|trial_balance|general_ledger|journal_mappings` follow the same rule (they only checked `reports` before).
+- **Customer search API:** also allowed for `sales_report` / `service_sales_report`, so the Sales Report customer filter keeps working without `financial_reports`.
+- **Customers list:** "View Account" (customer statement) link shows only with `financial_reports`.
+- **Test:** 233 checks — list integrity, entitlement on/off (admin too), matrix hide + grant preserved on save, router, pages on/off. With the block switched off, 86 checks fail.
+
+## 2026-10-27 — fix(superadmin): tenant page crash "Undefined constant BMS_GRACE_PERIOD_DAYS" (Sentry 6ee17ca6)
+
+**Files:** `app/superadmin/tenant_view.php`, `core/tenant_admin.php`
+
+- **Crash:** opening a tenant from a grace-period notification or dashboard tile (`notif_type`/`from_cat` = `trial_grace_started`, `in_grace`, `subscription_grace_started`) hit a fatal error — the "Action Required" banner still used `BMS_GRACE_PERIOD_DAYS`, which was removed when the grace period moved to `core/tenant_lifecycle_policy.php`. The banner now uses `tenantGraceDaysFor($tenant)`, so it also shows this tenant's real grace period.
+- **Per-tenant override never shown:** `getTenant()` did not return `grace_days`, so the tenant page always showed the platform default and labelled it "(platform default)" even when an override was set. It is now read in a separate guarded query (same pattern as `vendor_customer_id`), so a control DB without the column still loads every tenant.
+
 ## 2026-10-27 — feat(mobile): "Ask Smart POS" AI chat in the Flutter app (mobile API upgrade, Phase 9)
 
 **Files:** `api/mobile/ai_ask.php` (new), `api/mobile/me.php`, `tests/test_mobile_ai_cli.php` (new)

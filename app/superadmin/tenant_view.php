@@ -194,13 +194,13 @@ if ($hasContext ?? false):
             $bannerIcon  = 'bi-hourglass-split';
             $bannerClass = 'alert-warning';
             $bannerTitle = 'Trial grace period active';
-            $bannerBody  = 'This tenant\'s free trial has ended. A ' . BMS_GRACE_PERIOD_DAYS . '-day grace period is in progress. Review the Billing tab to record a payment or take action.';
+            $bannerBody  = 'This tenant\'s free trial has ended. A ' . tenantGraceDaysFor($tenant) . '-day grace period is in progress. Review the Billing tab to record a payment or take action.';
             break;
         case 'subscription_grace_started':
             $bannerIcon  = 'bi-hourglass';
             $bannerClass = 'alert-warning';
             $bannerTitle = 'Subscription grace period active';
-            $bannerBody  = 'This tenant\'s subscription has expired. A ' . BMS_GRACE_PERIOD_DAYS . '-day grace period is in progress. Review the Billing tab to record a payment or contact the tenant.';
+            $bannerBody  = 'This tenant\'s subscription has expired. A ' . tenantGraceDaysFor($tenant) . '-day grace period is in progress. Review the Billing tab to record a payment or contact the tenant.';
             break;
         case 'trial_expired':
             $bannerIcon  = 'bi-hourglass-bottom';
