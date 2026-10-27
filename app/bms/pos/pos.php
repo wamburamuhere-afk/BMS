@@ -198,10 +198,9 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             <?php else: ?>
             <span class="pos-hdr-mini-bal d-md-none"><?= t('No shift') ?></span>
             <?php endif; ?>
-            <?php $pos_action_count = 3 + ($can_record_old_sale ? 1 : 0); // sheet rows: drawer, overview, start/end shift, + old sale ?>
             <button type="button" class="pos-hdr-actions d-md-none" id="posActionsBtn"
                     data-bs-toggle="offcanvas" data-bs-target="#posActionsSheet" aria-controls="posActionsSheet" aria-haspopup="dialog">
-                <?= t('Actions') ?> <span class="pos-hdr-actions-count"><?= $pos_action_count ?></span>
+                <i class="bi bi-grid-fill"></i> <?= t('Actions') ?> <i class="bi bi-chevron-down"></i>
             </button>
             </div>
             <small class="opacity-75" id="posShiftInfoLine">
@@ -1025,14 +1024,15 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         margin-left: auto; font-weight: 800; font-size: .95rem; white-space: nowrap;
         font-variant-numeric: tabular-nums;
     }
+    /* A solid white button on the blue bar, so it plainly reads as tappable. */
     .pos-hdr-actions {
-        flex: none; height: 34px; border: 0; border-radius: 8px; padding: 0 8px 0 10px;
-        background: rgba(255, 255, 255, .16); color: #fff; font-size: .8rem; font-weight: 600;
+        flex: none; height: 36px; border: 0; border-radius: 10px; padding: 0 10px;
+        background: #fff; color: #0d6efd; font-size: .82rem; font-weight: 700;
         display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .18);
     }
-    .pos-hdr-actions-count {
-        background: #fff; color: #0d6efd; border-radius: 999px; font-size: .68rem; font-weight: 800; padding: 1px 6px;
-    }
+    .pos-hdr-actions .bi-chevron-down { font-size: .75rem; }
+    .pos-hdr-actions:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
     .pos-hdr-actions:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     /* Shift info: each piece (Shift/Started/Cashier) is its own nowrap
        chip, wrapping cleanly between items — never mid-value. The "|"

@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(pos): phone "Actions" button is a solid white button
+
+**Files:** `app/bms/pos/pos.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **The issue (seen live):** the phone Sell bar's "Actions 4" was a faint blue box on the blue bar, so cashiers could not tell it was tappable.
+- **Fix (style A, chosen from 8 mock-ups):** a solid white button with a grid icon, "Actions" and ⌄, and a shadow that presses in on tap. The count badge is removed. Tapping it opens the same Actions sheet as before. Desktop unchanged.
+- **Test:** `test_pos_old_sale_ui_cli.php` 37 checks pass (count check replaced by the button check). Browser at 320 / 360 / 412 px: white button inside the bar, no overlap with the balance, no sideways scroll, sheet opens; hidden on desktop.
+
 ## 2026-10-27 — fix(pos): receipts show quantity as sold (1, 1.5), not 1.000
 
 **Files:** `helpers.php`, `api/pos/print_receipt.php`, `api/pos/email_receipt.php`, `core/escpos_printer.php`, `tests/test_pos_receipt_qty_format_cli.php` (new)
