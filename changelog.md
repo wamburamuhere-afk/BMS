@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): Record Old Sale in the Flutter app (mobile API upgrade, Phase 3)
+
+**Files:** `api/mobile/me.php`, `api/pos/save_pos_setting.php`, `api/pos/get_z_report.php`, `tests/helpers/mobile_http.inc.php` (new), `tests/test_mobile_old_sale_cli.php` (new)
+
+- **The gap:** the server already took old sales from the app (`process_sale` `old_sale` + `sold_at`, `old_sale_context`, `void_sale`), but the app could not tell who may use it or how far back, could not change the limit, and its Z-report did not show old sales.
+- **`me.php`:** `permissions.pos_past_sales` (same gate as the web button) and `pos_settings.old_sale_max_days` (POS Settings, default 30).
+- **`save_pos_setting`:** accepts `pos_old_sale_max_days` (1–365), like the web POS Settings page.
+- **`get_z_report` (app Z-report):** adds `recorded_later` (old sales in the shift: when it happened + when typed in) and `is_backdated_shift`, matching the web Z-report.
+- **Test helper:** `tests/helpers/mobile_http.inc.php` — throwaway company + local server + Bearer calls, reused by the next phases.
+- **Test:** 21 checks over HTTP — owner vs staff permission, the setting (save / 0 / 400), shop + product from the app, an old sale yesterday (receipt numbered that day, stored that day, `is_past_entry`), Z-report, future / too-old refused, void, staff refused (403). `test_pos_old_sale_flow_cli` fails the same on develop (local product below its minimum price); `test_mobile_api_http_cli` needs API credentials in the environment.
+
 ## 2026-10-27 — feat(superadmin): bell alerts for company activity (mobile API upgrade, Phase 2)
 
 **Files:** `core/tenant_activity_alerts.php` (new), `core/superadmin_notifications.php`, `core/superadmin_ui.php`, `core/mobile_auth.php`, `actions/login.php`, `actions/superadmin_activity_scan.php` (new), `api/cron/trial_enforcement.php`, `app/superadmin/tenant_view.php`, `scripts/setup_control_db.php`, `tests/test_superadmin_activity_alerts_cli.php` (new)

@@ -117,6 +117,10 @@ try {
 
         // Shop mode: true = "Duka/Shop" wording; false = "Ghala/Warehouse" wording
         'shop_mode'            => get_setting('shop_mode', '0') === '1',
+
+        // Record Old Sale: how many days back an old sale may be dated
+        // (core/pos_old_sales.php; POS Settings, default 30).
+        'old_sale_max_days'    => (int)get_setting('pos_old_sale_max_days', '30') ?: 30,
     ];
     // Loyalty (POS Advanced plans only — same entitlement gate as the web settings page).
     $loyaltyEntitled = function_exists('canView') && canView('pos_advanced');
@@ -151,6 +155,8 @@ try {
         'users_manage'      => isAdmin(),
         'company_edit'      => isAdmin(),
         'pos_settings_edit' => function_exists('canEdit') ? canEdit('pos_config_settings') : false,
+        // Record Old Sale (process_sale old_sale + old_sale_context) — same gate as the web button.
+        'pos_past_sales'    => function_exists('canView') ? canView('pos_past_sales') : false,
     ];
 
     echo json_encode([

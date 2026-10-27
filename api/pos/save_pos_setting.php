@@ -79,6 +79,10 @@ $allowed = [
     'pos_loyalty_redeem_value' => static function (string $v): ?string {
         return is_numeric($v) && (float)$v >= 0 ? (string)(float)$v : null;
     },
+    // Record Old Sale: how many days back an old sale may be dated (web: 1–365).
+    'pos_old_sale_max_days' => static function (string $v): ?string {
+        return ctype_digit($v) && (int)$v >= 1 && (int)$v <= 365 ? (string)(int)$v : null;
+    },
 ];
 
 // The web only saves loyalty settings for tenants entitled to POS Advanced.
