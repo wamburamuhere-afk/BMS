@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-28 — fix: Supplier Categories page never worked; Receive Payment didn't load invoices
+
+**Files:** `app/bms/Suppliers/supplier_categories.php`, `api/add_supplier_category.php` (new), `api/update_supplier_category.php` (new), `api/update_supplier_category_status.php` (new), `api/delete_supplier_category.php` (new), `migrations/tenant/2026_10_28_supplier_categories_soft_delete.php` (new) + `migrations/2026_10_28_supplier_categories_soft_delete_legacy_db.php` (new), `app/constant/accounts/receive_payment.php`
+
+- **Supplier Categories** (broken since the first commit): `editCategory()` was cut off mid-function, CSS sat inside the `<script>` with no `</script>`, so the whole script failed (no DataTable, no buttons). None of the APIs it called existed. Now: script rewritten (`editCategory`, `updateCategoryStatus`, `confirmDeleteCategory`), four APIs added (§9 shape: auth, permission on `categories`, POST + CSRF, activity log), AJAX URLs via `buildUrl()`, buttons follow `canCreate/canEdit/canDelete('categories')`.
+- **Delete is a soft delete** (`status = 'deleted'`, migration adds the enum value) and is refused while suppliers use the category. Re-adding a deleted name restores that row instead of hitting the unique key.
+- **Receive Payment:** `$('#f-customer').on('change', loadOutstanding)` ran before `window.loadOutstanding` was assigned — a ReferenceError that stopped the rest of the setup, so picking a customer / Filter never loaded invoices. The handler now resolves the function when the change fires.
+- **Checked in a browser:** Supplier Categories add / edit / deactivate / activate / delete / re-add / duplicate refused / in-use delete refused / no-CSRF 419 — all pass, no JS errors; Receive Payment has no JS error and the customer change calls `loadOutstanding`.
+
 ## 2026-10-27 — fix(permissions): Smart POS (Simple Mode) hides and refuses pages its UI never shows
 
 **Files:** `core/feature_registry.php`, `app/bms/invoice/reports.php`, `api/account/search_customers.php`, `app/bms/customer/customers.php`, `tests/test_simple_mode_hidden_pages_cli.php` (new)
