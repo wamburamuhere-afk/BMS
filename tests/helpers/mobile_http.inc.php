@@ -18,7 +18,11 @@ require_once dirname(__DIR__, 2) . '/core/control_db.php';
 require_once dirname(__DIR__, 2) . '/core/tenant_provisioner.php';
 
 if (!function_exists('mhStart')) {
-    function mhStart(string $prefix): ?array
+    /**
+     * $opt['capture_mail'] = path: the server records mail there instead of sending
+     * (support mail via SUPPORT_MAIL_CAPTURE_FILE, everything else via a sendEmail stub).
+     */
+    function mhStart(string $prefix, array $opt = []): ?array
     {
         if (!tenantModeEnabled() || !tenantBaseDomain()) return null;
         $sub = $prefix . substr(bin2hex(random_bytes(3)), 0, 5);
@@ -28,12 +32,34 @@ if (!function_exists('mhStart')) {
         $tid  = (int)$r['tenant_id'];
         $root = dirname(__DIR__, 2);
         $port = 18000 + random_int(0, 1999);
-        $srv  = proc_open([PHP_BINARY, '-d', 'max_execution_time=0', '-S', "127.0.0.1:$port", '-t', $root],
-            [0 => ['pipe', 'r'], 1 => ['file', 'NUL', 'w'], 2 => ['file', 'NUL', 'w']], $pipes);
+        $cmd  = [PHP_BINARY, '-d', 'max_execution_time=0'];
+        $prepend = null;
+        if (!empty($opt['capture_mail'])) {
+            // Inside the repo: a temp path with "~" (Windows short names) breaks auto_prepend_file.
+            $prepend = __DIR__ . '/.mh_prepend_' . bin2hex(random_bytes(4)) . '.php';
+            $cap = var_export((string)$opt['capture_mail'], true);
+            file_put_contents($prepend, "<?php\ndefine('SUPPORT_MAIL_CAPTURE_FILE', $cap);\n"
+                . "function sendEmail(\$to, string \$subject, string \$html, array \$o = []): bool {\n"
+                . "    file_put_contents($cap, json_encode(['to' => (string)\$to, 'subject' => \$subject]) . \"\\n\", FILE_APPEND); return true;\n}\n");
+            array_push($cmd, '-d', 'auto_prepend_file=' . $prepend);
+        }
+        array_push($cmd, '-S', "127.0.0.1:$port", '-t', $root);
+        $srv  = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['file', 'NUL', 'w'], 2 => ['file', 'NUL', 'w']], $pipes);
         usleep(800000);
-        $m = ['tid' => $tid, 'sub' => $sub, 'host' => $sub . '.' . tenantBaseDomain(), 'port' => $port, 'srv' => $srv];
+        $m = ['tid' => $tid, 'sub' => $sub, 'host' => $sub . '.' . tenantBaseDomain(), 'port' => $port, 'srv' => $srv, 'prepend' => $prepend];
+        $GLOBALS['__mh_started'][] = $m;
         register_shutdown_function(function () use ($m) { mhStop($m); });
         return $m;
+    }
+
+    /**
+     * Remove every company this run started. Call it from the test's own summary
+     * shutdown function BEFORE exit(1): an exit inside a shutdown function skips
+     * the shutdown functions registered after it (mhStart's cleanup).
+     */
+    function mhStopAll(): void
+    {
+        foreach ($GLOBALS['__mh_started'] ?? [] as $m) mhStop($m);
     }
 
     function mhStop(array $m): void
@@ -48,6 +74,7 @@ if (!function_exists('mhStart')) {
             if ($pid > 0 && PHP_OS_FAMILY === 'Windows') @exec('taskkill /PID ' . $pid . ' /F /T 2>NUL');
             @proc_close($m['srv']);
         }
+        if (!empty($m['prepend'])) @unlink($m['prepend']);
         $tid = $m['tid'];
         try { getProvisioningPdo()->exec("DROP DATABASE IF EXISTS `bms_t$tid`"); getProvisioningPdo()->exec("DROP USER IF EXISTS 'bms_u$tid'@'%'"); } catch (Throwable $e) {}
         $c = getControlPdo();

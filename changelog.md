@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): Help & Support in the Flutter app (mobile API upgrade, Phase 8)
+
+**Files:** `api/mobile/support.php` (new), `tests/test_mobile_support_cli.php` (new), `tests/helpers/mobile_http.inc.php`, `tests/test_mobile_old_sale_cli.php`, `tests/test_mobile_subscription_cli.php`, `tests/test_mobile_language_mode_cli.php`, `tests/test_mobile_parity_cli.php`
+
+- **`api/mobile/support.php?action=…`:** help articles (`home`, `search`, `article`, `feedback`, `dismiss_notice`) and support requests (`create`, `list`, `reply`, `resolve`, `rate`, `forward`, files as multipart `attachments[]`) run the web endpoints themselves — same rules: the `help` permission, staff see their own requests and admins the company's, staff → admin → BJP forwarding, same notifications.
+- **`view`** (new for the app): one request with its conversation (author, mine, body, time, attachments with a download URL) and the same buttons the web Help page shows (`can_reply`, `can_resolve`, `can_forward`, `can_rate`). **`attachment`** downloads a file through the web's own access check.
+- **Test helper fix:** a failing test no longer leaves its throwaway company and server behind (`mhStopAll()` runs before `exit(1)`); `mhStart()` can capture mail in its server (`capture_mail`).
+- **Test:** 22 checks over HTTP — articles (home, search, open, unknown 404, GET 405), a request with a screenshot (list, view, download the PNG, reply, resolve, rate), too-short refused, mail captured not sent, staff cannot see or open the owner's request, no token 401. All support-center suites pass.
+
 ## 2026-10-27 — feat(mobile): price warnings + product/stock/expense parity for the app (mobile API upgrade, Phase 7)
 
 **Files:** `core/price_check.php` (new), `api/mobile/products/create.php`, `api/mobile/products/update.php`, `api/pos/quick_restock.php`, `tests/test_mobile_parity_cli.php` (new)

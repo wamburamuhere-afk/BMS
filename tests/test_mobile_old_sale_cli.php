@@ -24,6 +24,7 @@ register_shutdown_function(function () {
     global $pass, $fail;
     echo "\nPasses:   \033[32m$pass\033[0m\n";
     echo "Failures: " . ($fail === 0 ? "\033[32m0\033[0m" : "\033[31m$fail\033[0m") . "\n";
+    mhStopAll();   // before exit(1), which would skip mhStart's own cleanup
     if ($fail > 0) exit(1);
 });
 

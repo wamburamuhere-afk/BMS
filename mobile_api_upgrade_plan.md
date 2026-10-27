@@ -139,6 +139,6 @@ The app does what the web does, everywhere:
 | 5 Subscription | ✅ done 2026-10-27 — 24 checks (tests/test_mobile_subscription_cli.php); single endpoint api/mobile/subscription.php?action= (runs the web endpoint) |
 | 6 Language mode | ✅ done 2026-10-27 — 14 checks (tests/test_mobile_language_mode_cli.php) |
 | 7 Parity | ✅ done 2026-10-27 — 21 checks (tests/test_mobile_parity_cli.php); product delete with stock = 409 |
-| 8 Help & Support | — |
+| 8 Help & Support | ✅ done 2026-10-27 — 22 checks (tests/test_mobile_support_cli.php); single endpoint api/mobile/support.php?action= + new `view` |
 | 9 AI chat | — |
 | 10 Doc v28 + regression | — |
