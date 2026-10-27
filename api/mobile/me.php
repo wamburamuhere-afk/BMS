@@ -159,8 +159,17 @@ try {
         'pos_past_sales'    => function_exists('canView') ? canView('pos_past_sales') : false,
     ];
 
+    // ── Plan limits (core/tenant_quotas.php): null max = unlimited ────────────
+    $limits = [
+        'shops' => ['used' => function_exists('tenantActiveShopCount') ? tenantActiveShopCount($pdo) : null,
+                    'max'  => function_exists('tenantShopLimit') ? tenantShopLimit() : null],
+        'users' => ['used' => function_exists('tenantActiveUserCount') ? tenantActiveUserCount($pdo) : null,
+                    'max'  => function_exists('tenantUserLimit') ? tenantUserLimit() : null],
+    ];
+
     echo json_encode([
         'success' => true,
+        'limits'  => $limits,
         'user'    => [
             'id'         => (int)$user['user_id'],
             'name'       => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),

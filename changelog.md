@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(mobile): app signup matches the web — plans, username, Smart BMS approval, plan limits (mobile API upgrade, Phase 4)
+
+**Files:** `api/mobile/register.php`, `api/mobile/register_status.php`, `api/mobile/me.php`, `cron/process_registration_jobs.php`, `scripts/setup_control_db.php`, `tests/test_mobile_signup_plans_cli.php` (new), `tests/helpers/mobile_http.inc.php`
+
+- **Bug fixed — Smart BMS approval was skipped from the app:** a Smart BMS plan chosen in the app went live straight away; the web locks it until a superadmin approves. The registration worker now holds it (`holdTenantForApproval`), issues no token, and `register.php` / `register_status` return `pending_approval: true` with a "waiting for approval" message.
+- **Superadmins are told about app signups** too (bell for Smart BMS requests + the "new company registered" email), as for web signups.
+- **Username:** optional `owner_username` (same rule as the web: starts with a letter, 3–50); empty keeps the phone as the username. New control column `registration_jobs.owner_username` (deploy adds it).
+- **Phone:** spaces, dashes, dots and brackets are ignored and 7–15 digits are required, as on the web (before: only spaces removed, no digit check).
+- **Plan:** `register_status` returns the chosen `plan` (key, term, name, product).
+- **`me.php` → `limits`:** `shops` and `users` as `{used, max}` (null max = unlimited), so the app can show "1 of 1 shops" before the server refuses with `shop_limit_reached`.
+- **Test:** 24 checks over HTTP — public offers, refusals (bad phone / username / plan), Smart POS signup with plan + username (token, plan, unformatted phone, sign-in by username), limits and the shop-limit refusal, Smart BMS signup locked with no token and the superadmin bell. Related suites re-run; `test_pos_phase8_registers_cli` (3) fails the same on develop; `test_service_plans_customer_link_cli` passes alone (it fails only after other suites leave queue rows behind — cleared).
+
 ## 2026-10-27 — feat(mobile): Record Old Sale in the Flutter app (mobile API upgrade, Phase 3)
 
 **Files:** `api/mobile/me.php`, `api/pos/save_pos_setting.php`, `api/pos/get_z_report.php`, `tests/helpers/mobile_http.inc.php` (new), `tests/test_mobile_old_sale_cli.php` (new)

@@ -135,7 +135,7 @@ The app does what the web does, everywhere:
 | 1 Last Active | ✅ done 2026-10-27 — 18 checks (tests/test_mobile_last_active_cli.php) |
 | 2 Superadmin bell | ✅ done 2026-10-27 — 31 checks (tests/test_superadmin_activity_alerts_cli.php) |
 | 3 Old sale | ✅ done 2026-10-27 — 21 checks (tests/test_mobile_old_sale_cli.php); gap found + fixed: app Z-report had no "recorded later" |
-| 4 Plans + shop limit | — |
+| 4 Plans + shop limit | ✅ done 2026-10-27 — 24 checks (tests/test_mobile_signup_plans_cli.php); bug fixed: Smart BMS from the app skipped approval; added username, phone rule, superadmin notice |
 | 5 Subscription | — |
 | 6 Language mode | — |
 | 7 Parity | — |

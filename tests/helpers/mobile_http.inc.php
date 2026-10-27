@@ -42,10 +42,12 @@ if (!function_exists('mhStart')) {
         if (isset($done[$m['tid']])) return;
         $done[$m['tid']] = true;
         // proc_terminate() alone can leave the built-in server running on Windows.
-        $pid = (int)(@proc_get_status($m['srv'])['pid'] ?? 0);
-        @proc_terminate($m['srv']);
-        if ($pid > 0 && PHP_OS_FAMILY === 'Windows') @exec('taskkill /PID ' . $pid . ' /F /T 2>NUL');
-        @proc_close($m['srv']);
+        if (is_resource($m['srv'] ?? null)) {
+            $pid = (int)(@proc_get_status($m['srv'])['pid'] ?? 0);
+            @proc_terminate($m['srv']);
+            if ($pid > 0 && PHP_OS_FAMILY === 'Windows') @exec('taskkill /PID ' . $pid . ' /F /T 2>NUL');
+            @proc_close($m['srv']);
+        }
         $tid = $m['tid'];
         try { getProvisioningPdo()->exec("DROP DATABASE IF EXISTS `bms_t$tid`"); getProvisioningPdo()->exec("DROP USER IF EXISTS 'bms_u$tid'@'%'"); } catch (Throwable $e) {}
         $c = getControlPdo();

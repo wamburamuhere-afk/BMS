@@ -990,6 +990,8 @@ try {
     foreach ([
         'plan_key'  => "ADD COLUMN `plan_key` VARCHAR(64) NULL AFTER `device_name`",
         'plan_term' => "ADD COLUMN `plan_term` VARCHAR(8) NULL AFTER `plan_key`",
+        // The owner's chosen login name (web signup has it; NULL = the phone, as before).
+        'owner_username' => "ADD COLUMN `owner_username` VARCHAR(50) NULL AFTER `owner_phone`",
     ] as $col => $clause) {
         if (!in_array($col, $rjCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`registration_jobs` {$clause}");
