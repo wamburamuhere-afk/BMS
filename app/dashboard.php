@@ -500,7 +500,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
                    COUNT(CASE WHEN c.status = 'active' THEN 1 END) as active_customers,
                    COUNT(CASE WHEN c.created_at BETWEEN :start_date AND :end_date THEN 1 END) as new_customers
             FROM customers c
-            WHERE 1=1
+            WHERE c.status != 'deleted'
               {$custScope}
         ");
         $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
