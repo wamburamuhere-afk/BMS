@@ -147,6 +147,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             align-items: stretch !important;
             gap: 10px;
             padding: 14px 14px !important;
+            border-radius: 12px;   /* rounded like the Actions button inside it */
         }
         #posHeaderBar > .d-flex.align-items-center.gap-3 {
             width: 100%;
