@@ -202,10 +202,22 @@ try {
         ];
     }
 
+    // ── "Ask Smart POS / Ask BMS" (api/mobile/ai_ask.php) — same gates as the web chat ──
+    require_once __DIR__ . '/../../core/ai_service.php';
+    $aiAllowed = (!function_exists('tenantFeatureEnabled') || tenantFeatureEnabled('ai_assistant')) && canView('ai_assistant');
+    $aiReady   = $aiAllowed && aiConfigured();
+    $ai = [
+        'allowed'       => $aiAllowed,                       // module on + this user may use it
+        'ready'         => $aiReady,                         // … and a key is set: show the chat
+        'limit_reached' => $aiReady && !empty(aiCapInfo()['exceeded']),
+        'name'          => function_exists('aiProductName') ? aiProductName() : 'Smart POS',
+    ];
+
     echo json_encode([
         'success' => true,
         'limits'  => $limits,
         'subscription' => $subscription,
+        'ai'      => $ai,
         'user'    => [
             'id'         => (int)$user['user_id'],
             'name'       => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),

@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): "Ask Smart POS" AI chat in the Flutter app (mobile API upgrade, Phase 9)
+
+**Files:** `api/mobile/ai_ask.php` (new), `api/mobile/me.php`, `tests/test_mobile_ai_cli.php` (new)
+
+- **`POST api/mobile/ai_ask.php`** (`question`) → `{answer, used}`: runs the web endpoint `api/ai/ask.php` itself — the AI Assistant module and permission, the company's or BJP's key, the monthly cap, the rate limit, answers only from what this user may open, in their language. Optional `client_uuid` for safe retries.
+- **`me.php` → `ai`:** `allowed`, `ready` (show the chat — the same rule as the web's floating chat), `limit_reached`, `name` ("Smart POS" / "BMS").
+- **Test:** 12 checks over HTTP — no key (not ready, 422), a key set (ready; empty question 422; the provider address refused by the AI service's SSRF guard → clean error, nothing leaves the machine), cap reached, module off (403), no token (401). AI suites pass; `test_ai_foundation_cli` fails 1 the same on develop.
+
 ## 2026-10-27 — feat(mobile): Help & Support in the Flutter app (mobile API upgrade, Phase 8)
 
 **Files:** `api/mobile/support.php` (new), `tests/test_mobile_support_cli.php` (new), `tests/helpers/mobile_http.inc.php`, `tests/test_mobile_old_sale_cli.php`, `tests/test_mobile_subscription_cli.php`, `tests/test_mobile_language_mode_cli.php`, `tests/test_mobile_parity_cli.php`
