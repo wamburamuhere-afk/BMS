@@ -64,6 +64,9 @@ ok(has($pos, 'class="pos-scan-txt"') && has($pos, '#posHeaderBar #scannerReadyBa
 ok(has($js, "el.addEventListener('hidden.bs.offcanvas', function () { fn(); }, { once: true });"), 'a sheet row runs its action only after the sheet has closed');
 ok(has($js, "\$('#posActOldSaleTitle').text(on ? OLD_SALE_T.sheetOn") && has($js, "\$('#posActOldSaleExit').toggleClass('d-none', !on);"), 'old-sale row shows the chosen time, with a stop row, while recording');
 ok(!has($js, 'togglePosHeader') && !has($js, 'posHeaderExpanded'), 'old fold/unfold code removed');
+ok(has($pos, 'id="posOldSaleStrip"') && has($pos, 'onclick="exitOldSaleMode()"><?= t(\'Stop\') ?>') && has($js, "\$('#posOldSaleStrip').toggleClass('d-none', !on);"), 'phones: old-sale strip under the bar while recording, with Change and Stop');
+ok(has($pos, "<small><?= t('Cash in drawer') ?></small><span class=\"cash-balance-display\">"), 'phones: balance labelled "Cash in drawer" (label kept when the amount refreshes)');
+ok(has($js, 'const POS_ALL_SHOPS = ') && has($js, "if (!\$shopSel.val() && !POS_ALL_SHOPS") && has($js, '${PT.chooseShopTitle}'), 'no shop chosen (shop-limited user): ask for the shop instead of a 403 error');
 ok(has($pos, '.pos-old-sale-pop {') && has($pos, 'position: fixed; top: auto; left: 0; right: 0; bottom: 0;'), 'pop-up becomes a bottom sheet on phones');
 ok(!preg_match('/pos-old-sale[^{]*\{[^}]*#ffc107/', $pos), 'white and blue only (no yellow)');
 ok(has($js, "if (!oldSale) {\n        Swal.fire({\n            icon: 'warning',\n            title: PT.noActiveShiftTitle") || has($js, "if (!oldSale) {\r\n        Swal.fire({"), 'no "start a shift" stop while recording an old sale');

@@ -35,6 +35,8 @@ let currentHoldId = null;         // the pos_held_sales row backing the open tab
 let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetched once and reused
 
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
+// True for admins / users granted every shop: they may load products with no shop chosen.
+const POS_ALL_SHOPS = <?= json_encode(function_exists('hasAllWarehouseAccess') ? hasAllWarehouseAccess() : true) ?>;
 const PT = {
     service: <?= json_encode(t('Service')) ?>,
     lowStock: <?= json_encode(t('LOW STOCK')) ?>,
@@ -43,6 +45,8 @@ const PT = {
     noProductsFound: <?= json_encode(t('No products found')) ?>,
     tryDifferentSearch: <?= json_encode(t('Try a different search or category')) ?>,
     errorLoadingProducts: <?= json_encode(t('Error loading products')) ?>,
+    chooseShopTitle: <?= json_encode(wLabel('Choose your warehouse', 'Choose your shop', true)) ?>,
+    chooseShopHelp: <?= json_encode(wLabel('Pick a warehouse above to see its products and stock.', 'Pick a shop above to see its products and stock.', true)) ?>,
     statusLabel: <?= json_encode(t('Status:')) ?>,
     retry: <?= json_encode(t('Retry')) ?>,
     noSku: <?= json_encode(t('No SKU')) ?>,
@@ -702,7 +706,23 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
 
     $('#loadingProducts').show();
     $('#productGrid').empty();
-    
+
+    // No shop chosen yet, by someone who may only see their own shops: the
+    // product API would refuse (403) and show a red error. Ask for the shop instead.
+    const $shopSel = $('#posWarehouseId');
+    if (!$shopSel.val() && !POS_ALL_SHOPS && $shopSel.find('option').filter(function () { return this.value !== ''; }).length > 1) {
+        $('#loadingProducts').hide();
+        $shopSel.addClass('pos-shop-needed').one('change', function () { $(this).removeClass('pos-shop-needed'); });
+        $('#productGrid').html(`
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-shop" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h5 class="mt-3">${PT.chooseShopTitle}</h5>
+                <p class="text-muted">${PT.chooseShopHelp}</p>
+            </div>
+        `);
+        return;
+    }
+
     console.log('=== LOADING PRODUCTS ===');
     console.log('Category:', categoryId);
     console.log('Search:', searchTerm);
@@ -3433,6 +3453,7 @@ const OLD_SALE_T = {
     sheetOffHelp: <?= json_encode(t('A sale from an earlier day you forgot to enter')) ?>,
     sheetOn: <?= json_encode(t('Old sale: %s')) ?>,
     sheetOnHelp: <?= json_encode(t('Tap to change the date or time')) ?>,
+    stripOn: <?= json_encode(t('Recording old sale: %s')) ?>,
     today: <?= json_encode(t('Today')) ?>,
     yesterday: <?= json_encode(t('Yesterday')) ?>,
     daysAgo: <?= json_encode(t('%d days ago')) ?>,
@@ -3596,6 +3617,8 @@ function applyOldSaleUi() {
     $('#posActOldSaleTitle').text(on ? OLD_SALE_T.sheetOn.replace('%s', oldSaleLongDate(oldSale.at)) : OLD_SALE_T.sheetOff);
     $('#posActOldSaleHelp').text(on ? OLD_SALE_T.sheetOnHelp : OLD_SALE_T.sheetOffHelp);
     $('#posActOldSaleExit').toggleClass('d-none', !on);
+    $('#posOldSaleStrip').toggleClass('d-none', !on);
+    $('#posOldSaleStripText').text(on ? OLD_SALE_T.stripOn.replace('%s', oldSaleLongDate(oldSale.at)) : '');
     $('#oldSaleChipText').text(on ? oldSaleShortDate(oldSale.at) : '');
     $('#cartHeaderTop').parent().toggleClass('pos-old-sale-head', on);
     $('#cartTitleText, #mobileCartTitleText').text(on ? OLD_SALE_T.title : OLD_SALE_T.current);
