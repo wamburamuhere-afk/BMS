@@ -18,6 +18,8 @@
  * bottom line, not just gross margin).
  *
  * GET: period = daily|weekly|monthly|quarterly|yearly (default monthly)
+ *      fill_gaps = 1 (optional) — one row per period in the window, zeros
+ *      where nothing happened (the dashboard's bar chart).
  * Permission: canView('pos')
  */
 require_once __DIR__ . '/../../roots.php';
@@ -71,6 +73,34 @@ try {
     if ($expenseScope === '') { $expenseScope = ' AND 1=1'; }
 
     $rows = posSimpleBuySellSeries($pdo, $startDate, $endDate, $period, $scope, $expenseScope);
+
+    // fill_gaps=1 (the dashboard's bar chart asks for it): every period in the
+    // window gets a row, zeros where nothing was sold, so a day without sales
+    // shows as an empty slot instead of vanishing and making two distant days
+    // look like neighbours. Opt-in — any other caller keeps today's rows.
+    if (!empty($_GET['fill_gaps'])) {
+        $byKey = [];
+        foreach ($rows as $r) $byKey[(string)$r['period']] = $r;
+        $filled = [];
+        $seen   = [];
+        $cursor = new DateTime($startDate);
+        $last   = new DateTime($endDate);
+        while ($cursor <= $last) {
+            switch ($period) {
+                case 'daily':     $k = $cursor->format('Y-m-d'); break;
+                case 'weekly':    $k = $cursor->format('o-W'); break;   // = MySQL '%x-%v'
+                case 'quarterly': $k = $cursor->format('Y') . '-Q' . (int)ceil((int)$cursor->format('n') / 3); break;
+                case 'yearly':    $k = $cursor->format('Y'); break;
+                default:          $k = $cursor->format('Y-m'); break;
+            }
+            if (!isset($seen[$k])) {
+                $seen[$k] = true;
+                $filled[] = $byKey[$k] ?? ['period' => $k, 'sold' => 0.0, 'bought' => 0.0, 'expenses' => 0.0, 'profit' => 0.0, 'net_profit' => 0.0];
+            }
+            $cursor->modify('+1 day');
+        }
+        $rows = $filled;
+    }
 
     $data = [];
     foreach ($rows as $row) {

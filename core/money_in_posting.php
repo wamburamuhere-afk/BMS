@@ -154,7 +154,7 @@ if (!function_exists('reversePaymentReceived')) {
 
         $rows = $pdo->query("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = $origId")->fetchAll(PDO::FETCH_ASSOC);
         if (!$rows) { $out['reason'] = 'no_lines'; return $out; }
-        $hdr = $pdo->query("SELECT entry_date, project_id FROM journal_entries WHERE entry_id = $origId")->fetch(PDO::FETCH_ASSOC);
+        $hdr = $pdo->query("SELECT entry_date, project_id, warehouse_id FROM journal_entries WHERE entry_id = $origId")->fetch(PDO::FETCH_ASSOC);
 
         $lines = [];
         foreach ($rows as $r) {
@@ -165,11 +165,12 @@ if (!function_exists('reversePaymentReceived')) {
                 'description' => 'Payment reversal — receipt voided',
             ];
         }
-        $pid = isset($hdr['project_id']) && $hdr['project_id'] !== null ? (int)$hdr['project_id'] : null;
+        $pid  = isset($hdr['project_id']) && $hdr['project_id'] !== null ? (int)$hdr['project_id'] : null;
+        $whId = isset($hdr['warehouse_id']) && $hdr['warehouse_id'] !== null ? (int)$hdr['warehouse_id'] : null;
 
         try {
             $entry = postLedgerEntry($pdo, "Payment #$paymentId voided — receipt reversed",
-                $lines, $pid, $paymentId, 'payment_void', date('Y-m-d'), $userId);
+                $lines, $pid, $paymentId, 'payment_void', date('Y-m-d'), $userId, $whId);
             $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("reversePaymentReceived $paymentId: " . $e->getMessage());

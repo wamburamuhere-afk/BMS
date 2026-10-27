@@ -5731,4 +5731,24 @@ return [
     'AI answer — check important figures before acting on them.' => 'Jibu la AI — hakiki takwimu muhimu kabla ya kuchukua hatua.',
     'Answers cover only what you can open.' => 'Majibu yanahusu tu unachoweza kufungua.',
 
+    // Wholesale-above-retail check (assets/js/bms-price-check.js)
+    'Wholesale price is higher than retail' => 'Bei ya jumla ni kubwa kuliko bei ya rejareja',
+    'Wholesale price ({w}) is higher than retail price ({r}). Is this correct?' => 'Bei ya jumla ({w}) ni kubwa kuliko bei ya rejareja ({r}). Je, ni sahihi?',
+    'Yes, keep it' => 'Ndiyo, iache',
+    'No, change it' => 'Hapana, nibadilishe',
+
+    // Dashboard Simple POS summary (app/dashboard.php)
+    'Compared with' => 'Ikilinganishwa na',
+    'to loss' => 'kuwa hasara',
+    'back to profit' => 'kurudi faidani',
+    'Sales & Profit' => 'Mauzo na Faida',
+    'Loss' => 'Hasara',
+    'Profit' => 'Faida',
+    'No sales in this period.' => 'Hakuna mauzo katika kipindi hiki.',
+    'Costs were more than sales — a loss of %s.' => 'Gharama zilizidi mauzo — hasara ya %s.',
+    'Where your sales money went' => 'Pesa ya mauzo yako ilikokwenda',
+    'Out of every TSh 100 sold:' => 'Kati ya kila TSh 100 uliyouza:',
+    'Paid for the goods' => 'Gharama ya bidhaa',
+    'Your profit' => 'Faida yako',
+
 ];

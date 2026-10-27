@@ -47,14 +47,15 @@ try {
     $desc  = 'Reversal of ' . ($entry['reference_number'] ?: ('journal #' . $id)) . ' — ' . (string)$entry['description'];
     $date  = date('Y-m-d');
     $pid   = ($entry['project_id'] !== null && $entry['project_id'] !== '') ? (int)$entry['project_id'] : null;
+    $whId  = (isset($entry['warehouse_id']) && $entry['warehouse_id'] !== null && $entry['warehouse_id'] !== '') ? (int)$entry['warehouse_id'] : null;
 
     $pdo->beginTransaction();
 
     $pdo->prepare("INSERT INTO journal_entries
                      (entry_date, reference_number, description, notes, status, created_by,
-                      debit_account_id, credit_account_id, amount, reverses_entry_id, project_id, created_at)
-                   VALUES (?, ?, ?, ?, 'posted', ?, 0, 0, ?, ?, ?, NOW())")
-        ->execute([$date, $refNo, $desc, 'Auto-generated reversal', $_SESSION['user_id'], $total, $id, $pid]);
+                      debit_account_id, credit_account_id, amount, reverses_entry_id, project_id, warehouse_id, created_at)
+                   VALUES (?, ?, ?, ?, 'posted', ?, 0, 0, ?, ?, ?, ?, NOW())")
+        ->execute([$date, $refNo, $desc, 'Auto-generated reversal', $_SESSION['user_id'], $total, $id, $pid, $whId]);
     $revId = (int)$pdo->lastInsertId();
 
     $jitems = [];
