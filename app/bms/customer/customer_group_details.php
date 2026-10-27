@@ -21,11 +21,12 @@ $group_id = $_GET['id'];
 $stmt = $pdo->prepare("
     SELECT 
         cg.*,
-        COUNT(cgc.customer_id) as customer_count,
+        COUNT(gc.customer_id) as customer_count,
         u.username as created_by_name,
         u2.username as updated_by_name
     FROM customer_groups cg
     LEFT JOIN customer_group_customers cgc ON cg.group_id = cgc.group_id
+    LEFT JOIN customers gc ON gc.customer_id = cgc.customer_id AND gc.status != 'deleted'
     LEFT JOIN users u ON cg.created_by = u.user_id
     LEFT JOIN users u2 ON cg.updated_by = u2.user_id
     WHERE cg.group_id = ?
@@ -66,7 +67,7 @@ $stmt->execute([$group_id]);
 $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch group statistics
-$total_customers = $pdo->query("SELECT COUNT(*) as total FROM customers")->fetchColumn();
+$total_customers = $pdo->query("SELECT COUNT(*) as total FROM customers WHERE status != 'deleted'")->fetchColumn();
 $member_percentage = $total_customers > 0 ? round(($group['customer_count'] / $total_customers) * 100, 1) : 0;
 
 // Decode rules if they exist

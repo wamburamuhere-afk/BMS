@@ -21,10 +21,11 @@ $group_id = $_GET['id'];
 $stmt = $pdo->prepare("
     SELECT 
         cg.*,
-        COUNT(cgc.customer_id) as customer_count,
+        COUNT(gc.customer_id) as customer_count,
         u.username as created_by_name
     FROM customer_groups cg
     LEFT JOIN customer_group_customers cgc ON cg.group_id = cgc.group_id
+    LEFT JOIN customers gc ON gc.customer_id = cgc.customer_id AND gc.status != 'deleted'
     LEFT JOIN users u ON cg.created_by = u.user_id
     WHERE cg.group_id = ?
     GROUP BY cg.group_id
