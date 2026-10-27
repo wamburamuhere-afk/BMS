@@ -166,14 +166,22 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             margin-right: 0 !important;
         }
         #posHeaderBar .pos-hdr-top { display: flex; align-items: center; gap: 8px; }
-        #posHeaderBar.pos-hdr-collapsed #posShiftInfoLine,
-        #posHeaderBar.pos-hdr-collapsed > .d-flex.align-items-center.gap-3 { display: none !important; }
+        /* Phones: the bar is one line; shift info, balance and the buttons move
+           into the Actions sheet. The button block is kept in the page (height 0,
+           hidden) because the Record Old Sale pop-up lives inside it and is
+           shown from there as a fixed bottom sheet. */
+        #posHeaderBar.pos-hdr-collapsed #posShiftInfoLine { display: none !important; }
+        #posHeaderBar.pos-hdr-collapsed > .d-flex.align-items-center.gap-3 {
+            display: block !important; height: 0; overflow: hidden; visibility: hidden;
+            padding: 0 !important; border: 0 !important; margin-top: -10px;
+        }
+        #posHeaderBar.pos-hdr-collapsed #oldSalePopover { visibility: visible; }
     }
     </style>
     <!-- POS Header -->
-    <!-- Phones: with a shift open the bar folds to one line (title · scanner dot ·
-         balance · chevron); the chevron shows shift info, balance and actions. -->
-    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center<?= $shift_active ? ' pos-hdr-collapsible pos-hdr-collapsed' : '' ?>">
+    <!-- Phones: the bar is one line (title · scanner dot · balance · Actions);
+         "Actions" opens #posActionsSheet with the shift details and every action. -->
+    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center pos-hdr-collapsed">
         <div>
             <div class="pos-hdr-top">
             <h4 class="mb-0">
@@ -187,11 +195,14 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             </h4>
             <?php if ($shift_active): ?>
             <span class="pos-hdr-mini-bal d-md-none cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></span>
-            <button type="button" class="pos-hdr-toggle d-md-none" id="posHeaderToggle" onclick="togglePosHeader()"
-                    aria-expanded="false" aria-label="<?= htmlspecialchars(t('Show shift details and actions')) ?>">
-                <i class="bi bi-chevron-down"></i>
-            </button>
+            <?php else: ?>
+            <span class="pos-hdr-mini-bal d-md-none"><?= t('No shift') ?></span>
             <?php endif; ?>
+            <?php $pos_action_count = 3 + ($can_record_old_sale ? 1 : 0); // sheet rows: drawer, overview, start/end shift, + old sale ?>
+            <button type="button" class="pos-hdr-actions d-md-none" id="posActionsBtn"
+                    data-bs-toggle="offcanvas" data-bs-target="#posActionsSheet" aria-controls="posActionsSheet" aria-haspopup="dialog">
+                <?= t('Actions') ?> <span class="pos-hdr-actions-count"><?= $pos_action_count ?></span>
+            </button>
             </div>
             <small class="opacity-75" id="posShiftInfoLine">
                 <?php if ($shift_active): ?>
@@ -264,6 +275,63 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </button>
                 <?php endif; ?>
             </div>
+        </div>
+    </div>
+
+    <!-- Phones: every header action in one sheet, each explained in a line, so a
+         new cashier knows what each one does. Rows call the same functions as the
+         desktop buttons, after the sheet has closed (posAction()). -->
+    <div class="offcanvas offcanvas-bottom pos-actions-sheet d-md-none" tabindex="-1" id="posActionsSheet" aria-labelledby="posActionsTitle">
+        <div class="pos-actions-grab" aria-hidden="true"></div>
+        <div class="pos-actions-head">
+            <?php if ($shift_active): ?>
+            <div style="min-width:0">
+                <div class="fw-bold" id="posActionsTitle"><?= sprintf(t('Shift open since %s'), date('H:i', strtotime($shift_active['start_time']))) ?></div>
+                <small class="text-muted"><?= htmlspecialchars($shift_active['shift_code']) ?> · <?= htmlspecialchars($cashier_name) ?></small>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold text-nowrap cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></div>
+                <small class="text-muted text-nowrap"><?= t('Starting:') ?> <?= htmlspecialchars($currency) ?> <?= number_format((float)$starting_cash, 2) ?></small>
+            </div>
+            <?php else: ?>
+            <div>
+                <div class="fw-bold" id="posActionsTitle"><?= t('No shift open') ?></div>
+                <small class="text-muted"><?= t('Start a shift before you sell today') ?></small>
+            </div>
+            <?php endif; ?>
+            <button type="button" class="btn-close ms-2" data-bs-dismiss="offcanvas" aria-label="<?= t('Close') ?>"></button>
+        </div>
+        <div class="pos-actions-list">
+            <?php if (!$shift_active): ?>
+            <button type="button" class="pos-act pos-act-warn" onclick="posAction(startShift)">
+                <span class="pos-act-i"><i class="bi bi-play-circle"></i></span>
+                <span><b><?= t('Start Shift') ?></b><small><?= t('Count the cash in the drawer and begin selling') ?></small></span>
+            </button>
+            <?php endif; ?>
+            <button type="button" class="pos-act" onclick="posAction(openCashDrawer)" <?= $shift_active ? '' : 'disabled' ?>>
+                <span class="pos-act-i"><i class="bi bi-cash"></i></span>
+                <span><b><?= t('Open Drawer') ?></b><small><?= $shift_active ? t('Open the cash drawer without a sale') : t('Start a shift first') ?></small></span>
+            </button>
+            <?php if ($can_record_old_sale): ?>
+            <button type="button" class="pos-act" id="posActOldSale" onclick="posAction(toggleOldSalePopover)">
+                <span class="pos-act-i"><i class="bi bi-clock-history"></i></span>
+                <span><b id="posActOldSaleTitle"><?= t('Record Old Sale') ?></b><small id="posActOldSaleHelp"><?= t('A sale from an earlier day you forgot to enter') ?></small></span>
+            </button>
+            <button type="button" class="pos-act d-none" id="posActOldSaleExit" onclick="posAction(exitOldSaleMode)">
+                <span class="pos-act-i"><i class="bi bi-x-circle"></i></span>
+                <span><b><?= t('Stop recording old sale') ?></b><small><?= t("Go back to today's sales") ?></small></span>
+            </button>
+            <?php endif; ?>
+            <a class="pos-act" href="<?= getUrl('pos/dashboard') ?>">
+                <span class="pos-act-i"><i class="bi bi-speedometer2"></i></span>
+                <span><b><?= htmlspecialchars(wLabel('Workspace', 'Sales Overview')) ?></b><small><?= t("Today's totals, past shifts and receipts") ?></small></span>
+            </a>
+            <?php if ($shift_active): ?>
+            <button type="button" class="pos-act pos-act-danger" onclick="posAction(endShift)">
+                <span class="pos-act-i"><i class="bi bi-power"></i></span>
+                <span><b><?= t('End Shift') ?></b><small><?= t('Count your cash and close the day') ?></small></span>
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -952,19 +1020,20 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     }
     #posHeaderBar #scannerReadyBadge > * { display: none; }
 
-    /* Folded bar (shift open): balance + chevron share the title line. */
+    /* One-line bar: balance (or "No shift") + the Actions button share the title line. */
     .pos-hdr-mini-bal {
         margin-left: auto; font-weight: 800; font-size: .95rem; white-space: nowrap;
         font-variant-numeric: tabular-nums;
     }
-    #posHeaderBar:not(.pos-hdr-collapsed) .pos-hdr-mini-bal { visibility: hidden; }
-    .pos-hdr-toggle {
-        flex: none; width: 34px; height: 34px; border: 0; border-radius: 8px;
-        background: rgba(255, 255, 255, .15); color: #fff; display: grid; place-items: center;
+    .pos-hdr-actions {
+        flex: none; height: 34px; border: 0; border-radius: 8px; padding: 0 8px 0 10px;
+        background: rgba(255, 255, 255, .16); color: #fff; font-size: .8rem; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 6px;
     }
-    .pos-hdr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-    .pos-hdr-toggle .bi { transition: transform .2s; }
-    #posHeaderBar:not(.pos-hdr-collapsed) .pos-hdr-toggle .bi { transform: rotate(180deg); }
+    .pos-hdr-actions-count {
+        background: #fff; color: #0d6efd; border-radius: 999px; font-size: .68rem; font-weight: 800; padding: 1px 6px;
+    }
+    .pos-hdr-actions:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     /* Shift info: each piece (Shift/Started/Cashier) is its own nowrap
        chip, wrapping cleanly between items — never mid-value. The "|"
        separators (meaningful only as an inline run-on) are hidden in
@@ -1026,22 +1095,33 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         padding: 8px 10px;
         font-weight: 600;
     }
-    /* Shift actions as equal icon tiles (icon over a short label). Each
-       tile takes an equal share of the width and style.css's 85px button
-       min-width is dropped, so the row never runs off the right edge. */
-    .pos-hdr-collapsible #posShiftButtons { flex-wrap: wrap; gap: 6px; }
-    .pos-hdr-collapsible #posShiftButtons > .btn,
-    .pos-hdr-collapsible #posShiftButtons .pos-old-sale-wrap > .btn {
-        flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
-        justify-content: center; gap: 3px; padding: 8px 2px 6px !important;
-        font-size: .68rem !important; line-height: 1.15; border-radius: 10px;
+
+    /* Actions sheet (phones): shift details on top, one row per action. */
+    .pos-actions-sheet.offcanvas-bottom { height: auto; max-height: 85vh; border-radius: 16px 16px 0 0; }
+    .pos-actions-grab { width: 40px; height: 4px; border-radius: 2px; background: #ced4da; margin: 8px auto 4px; }
+    .pos-actions-head {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+        padding: 8px 16px 12px; border-bottom: 1px solid #dee2e6;
     }
-    .pos-hdr-collapsible #posShiftButtons .pos-old-sale-wrap { min-width: 0; }
-    .pos-hdr-collapsible #posShiftButtons .btn .bi { font-size: 1.15rem; }
-    .pos-hdr-collapsible #posShiftButtons .btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pos-hdr-collapsible #posShiftButtons .pos-end-shift-btn { background: rgba(220, 53, 69, .25); border-color: rgba(255, 180, 188, .6); }
-    /* While recording an old sale the date chip gets its own full row. */
-    .pos-hdr-collapsible #posShiftButtons .pos-old-sale-wrap.is-on { flex-basis: 100%; order: -1; }
+    .pos-actions-head small { display: block; font-size: .75rem; }
+    .pos-actions-list { overflow-y: auto; padding: 4px 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
+    .pos-act {
+        display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none;
+        padding: 10px 4px; border-bottom: 1px solid #f0f2f5; color: #212529; text-decoration: none;
+    }
+    .pos-act:last-child { border-bottom: 0; }
+    .pos-act b { display: block; font-size: .92rem; }
+    .pos-act small { display: block; color: #6c757d; font-size: .76rem; line-height: 1.35; }
+    .pos-act-i {
+        width: 40px; height: 40px; border-radius: 10px; background: #e7f1ff; color: #0d6efd;
+        display: grid; place-items: center; flex: none; font-size: 1.15rem;
+    }
+    .pos-act:disabled { opacity: .45; }
+    .pos-act:focus-visible { outline: 2px solid #0d6efd; outline-offset: -2px; border-radius: 8px; }
+    .pos-act-warn .pos-act-i { background: #ffc107; color: #3d2c00; }
+    .pos-act-danger .pos-act-i { background: #fde8ea; color: #dc3545; }
+    .pos-act-danger b { color: #b02a37; }
+    .pos-act-on .pos-act-i { background: #0d6efd; color: #fff; }
 
     /* Warehouse/project selectors + search + category row — smaller text,
        tighter spacing, still full width so nothing needs pinch-zoom. */
@@ -1169,6 +1249,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 /* style.css gives every .btn min-width:85px — it turned the round cart button
    into an oval and pushed the search row's buttons onto a second line. */
 #mobileCartFab { min-width: 0; }
+body.pos-actions-open #mobileCartFab { visibility: hidden; }
 .pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 .pos-sheet-qty { width: 64px; height: 40px; padding: 0 4px; font-size: 1.05rem; -moz-appearance: textfield; }

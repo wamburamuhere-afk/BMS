@@ -3429,6 +3429,10 @@ const OLD_SALE_T = {
     exited: <?= json_encode(t("Back to today's sales")) ?>,
     offline: <?= json_encode(t('Recording an old sale needs an internet connection.')) ?>,
     weekdays: <?= json_encode([t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')]) ?>,
+    sheetOff: <?= json_encode(t('Record Old Sale')) ?>,
+    sheetOffHelp: <?= json_encode(t('A sale from an earlier day you forgot to enter')) ?>,
+    sheetOn: <?= json_encode(t('Old sale: %s')) ?>,
+    sheetOnHelp: <?= json_encode(t('Tap to change the date or time')) ?>,
     today: <?= json_encode(t('Today')) ?>,
     yesterday: <?= json_encode(t('Yesterday')) ?>,
     daysAgo: <?= json_encode(t('%d days ago')) ?>,
@@ -3587,7 +3591,11 @@ function applyOldSaleUi() {
     const on = !!oldSale;
     $('#oldSaleBtn').toggleClass('d-none', on);
     $('#oldSaleChip').toggleClass('d-none', !on);
-    $('#oldSaleWrap').toggleClass('is-on', on);
+    // Phones' Actions sheet: the old-sale row shows the chosen time, plus a way out.
+    $('#posActOldSale').toggleClass('pos-act-on', on);
+    $('#posActOldSaleTitle').text(on ? OLD_SALE_T.sheetOn.replace('%s', oldSaleLongDate(oldSale.at)) : OLD_SALE_T.sheetOff);
+    $('#posActOldSaleHelp').text(on ? OLD_SALE_T.sheetOnHelp : OLD_SALE_T.sheetOffHelp);
+    $('#posActOldSaleExit').toggleClass('d-none', !on);
     $('#oldSaleChipText').text(on ? oldSaleShortDate(oldSale.at) : '');
     $('#cartHeaderTop').parent().toggleClass('pos-old-sale-head', on);
     $('#cartTitleText, #mobileCartTitleText').text(on ? OLD_SALE_T.title : OLD_SALE_T.current);
@@ -3645,19 +3653,21 @@ function confirmOldSale(paymentData, proceed) {
         });
 }
 
-// Phones: fold/unfold the header bar; the choice is remembered on this device.
-function togglePosHeader(expand) {
-    const $bar = $('#posHeaderBar');
-    if (!$bar.hasClass('pos-hdr-collapsible')) return;
-    if (typeof expand !== 'boolean') expand = $bar.hasClass('pos-hdr-collapsed');
-    $bar.toggleClass('pos-hdr-collapsed', !expand);
-    $('#posHeaderToggle').attr('aria-expanded', expand ? 'true' : 'false');
-    try { localStorage.setItem('posHeaderExpanded', expand ? '1' : '0'); } catch (e) {}
+// Phones: a row in the Actions sheet runs the same function as the desktop
+// button, once the sheet has finished closing (so its backdrop and focus
+// handling never clash with the next pop-up or dialog).
+function posAction(fn) {
+    const el = document.getElementById('posActionsSheet');
+    const sheet = el && window.bootstrap ? bootstrap.Offcanvas.getInstance(el) : null;
+    if (!sheet || !el.classList.contains('show')) { fn(); return; }
+    el.addEventListener('hidden.bs.offcanvas', function () { fn(); }, { once: true });
+    sheet.hide();
 }
+// The floating cart button sits above Bootstrap panels; hide it while the sheet is open.
 $(function () {
-    let saved = null;
-    try { saved = localStorage.getItem('posHeaderExpanded'); } catch (e) {}
-    if (saved === '1') togglePosHeader(true);
+    $('#posActionsSheet')
+        .on('show.bs.offcanvas', function () { document.body.classList.add('pos-actions-open'); })
+        .on('hidden.bs.offcanvas', function () { document.body.classList.remove('pos-actions-open'); });
 });
 
 $(function () {

@@ -116,7 +116,7 @@ $itemsHtml = '<table border="1" cellpadding="4" cellspacing="0" width="100%" sty
 foreach ($lines as $l) {
     $itemsHtml .= '<tr>'
         . '<td>' . $esc($l['product_name']) . '</td>'
-        . '<td align="center">' . $esc($l['quantity']) . '</td>'
+        . '<td align="center">' . $esc(format_qty($l['quantity'])) . '</td>'
         . '<td align="right">' . number_format((float)$l['unit_price'], 0) . '</td>'
         . '<td align="right">' . number_format((float)$l['line_total'], 0) . '</td>'
         . '</tr>';
