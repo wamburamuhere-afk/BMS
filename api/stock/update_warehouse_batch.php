@@ -48,12 +48,12 @@ $batchId     = (int)($_POST['batch_id'] ?? 0);
 $warehouseId = (int)($_POST['warehouse_id'] ?? 0);
 if ($batchId <= 0 || $warehouseId <= 0) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => t('A valid batch and warehouse are required.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('A valid batch and warehouse are required.', 'A valid batch and shop are required.')]);
     exit;
 }
 if (!userCan('warehouse', $warehouseId)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
 
@@ -67,7 +67,7 @@ try {
     $check->execute([$batchId, $warehouseId]);
     if (!$check->fetchColumn()) {
         http_response_code(404);
-        echo json_encode(['success' => false, 'message' => t('Batch not found in this warehouse.')]);
+        echo json_encode(['success' => false, 'message' => wLabel('Batch not found in this warehouse.', 'Batch not found in this shop.')]);
         exit;
     }
 
