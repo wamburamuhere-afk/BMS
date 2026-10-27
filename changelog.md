@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(customers): deleted customers no longer counted on the dashboard and Customer Groups
+
+**Files:** `app/dashboard.php`, `app/bms/customer/customer_groups.php`, `app/bms/customer/customer_group_details.php`, `app/bms/customer/customer_group_members.php`, `core/tenant_admin.php`, `tests/test_customer_count_excludes_deleted_cli.php` (new)
+
+- **The bug (seen live):** after creating and then deleting a customer, the Customers page was empty but the dashboard "Customer Overview" card still showed 1. Deleting a customer only sets `status = 'deleted'` (kept for invoice/payment history); the Customers page hides those rows, but the dashboard stats query counted every row.
+- **Fix:** the dashboard customer stats (total and new this period) now skip deleted customers. The same gap was found and fixed on Customer Groups (Total Customers and each group's member count — a deleted customer stays in its groups) and in the superadmin tenant snapshot's customer count.
+- **Checked and already correct:** the Customers list and its API, mobile customer list, customer print, the over-credit-limit alerts (active only) and every customer dropdown (active only or not deleted).
+- **Test:** 24 checks: lint + the filters are in place, then renders the real dashboard and Customer Groups pages as an admin: create a customer in a temp group → counts go up by one; soft-delete it like `api/delete_customer.php` → counts return to the baseline. Fixture rows are removed. Against the old dashboard code the test fails exactly as reported (count stays one too high).
+
 ## 2026-10-27 — feat(prices, dashboard): warn when selling below the buying price; smooth Net profit line
 
 **Files:** `assets/js/bms-price-check.js`, `header.php`, `lang/sw.php`, `app/dashboard.php`, `tests/test_pos_profit_void_shop_and_product_delete_cli.php`
