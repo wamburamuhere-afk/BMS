@@ -1906,6 +1906,8 @@ function get_progress_color($percentage) {
                             <p class="mt-2 text-muted small"><?= t('Loading performance data...') ?></p>
                         </div>
                     </div>
+                    <!-- Phones only: the tapped period's figures, in place of the floating tooltip box. -->
+                    <div id="chartTapLine" class="d-md-none small text-muted text-center mt-2 d-flex flex-wrap justify-content-center column-gap-2 row-gap-1" aria-live="polite"></div>
                     <div id="performanceSummary"></div>
                 </div>
             </div>
@@ -2210,8 +2212,38 @@ function fmtFull(n) {
     return sign + 'TSh ' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
+// Phones: no floating tooltip box over the chart (it covers the bars); a tap
+// shows that period's figures in one line under the chart instead (#chartTapLine).
+// Desktop keeps the tooltip exactly as it was.
+const chartPhoneQuery = window.matchMedia('(max-width: 767.98px)');
+const CHART_TAP_HINT = <?= json_encode(t('Tap the chart to see one period')) ?>;
+function chartTapTooltip(partsFor) {
+    return {
+        enabled: !chartPhoneQuery.matches,
+        external: function (ctx) {
+            const pts = ctx.tooltip.dataPoints;
+            if (!chartPhoneQuery.matches || ctx.tooltip.opacity === 0 || !pts || !pts.length) return;
+            const i = pts[0].dataIndex;
+            const esc = s => $('<div>').text(String(s)).html();
+            // parts: [text, extra class] — each kept on one line, wrapping between parts.
+            const html = [['<b>' + esc(ctx.chart.data.labels[i]) + '</b>', '']]
+                .concat(partsFor(i).map(p => [esc(p[0]), p[1] || '']))
+                .map(p => '<span class="text-nowrap ' + p[1] + '">' + p[0] + '</span>').join('');
+            $('#chartTapLine').html(html);
+        }
+    };
+}
+if (chartPhoneQuery.addEventListener) {
+    chartPhoneQuery.addEventListener('change', function () {
+        if (!dashboardChart) return;
+        dashboardChart.options.plugins.tooltip.enabled = !chartPhoneQuery.matches;
+        dashboardChart.update('none');
+    });
+}
+
 function renderChart(data) {
     if (!document.getElementById('performanceChart')) return;
+    $('#chartTapLine').text(data.length ? CHART_TAP_HINT : '');
     if (POS_SIMPLE_MODE) { renderSimpleChart(data); return; }
     renderNormalChart(data);
 }
@@ -2301,6 +2333,14 @@ function renderNormalChart(data) {
                     }
                 },
                 tooltip: {
+                    ...chartTapTooltip(i => {
+                        const p = revenueData[i] - expenseData[i];
+                        return [
+                            [<?= json_encode(t('Revenue (Invoiced)')) ?> + ' ' + fmtFull(revenueData[i]), 'text-primary'],
+                            [<?= json_encode(t('Expenses')) ?> + ' ' + fmtFull(expenseData[i]), 'text-danger'],
+                            [<?= json_encode(t('Net Profit')) ?> + ' ' + fmtFull(p), 'fw-semibold ' + (p < 0 ? 'text-danger' : 'text-success')],
+                        ];
+                    }),
                     padding: 14,
                     backgroundColor: 'rgba(17,24,39,0.9)',
                     titleFont: { size: 13, weight: 'bold' },
@@ -2475,6 +2515,13 @@ function renderSimpleChart(data) {
                               sort: (a, b) => a.datasetIndex - b.datasetIndex }
                 },
                 tooltip: {
+                    ...chartTapTooltip(i => [
+                        [<?= json_encode(t('Sales')) ?> + ' ' + fmtFull(salesData[i]), 'text-primary'],
+                        [<?= json_encode(t('Expenses')) ?> + ' ' + fmtFull(opExpenseData[i]), ''],
+                        [<?= json_encode(t('Cost of goods sold')) ?> + ' ' + fmtFull(cogsData[i]), ''],
+                        [(profitData[i] < 0 ? <?= json_encode(t('Net loss')) ?> : <?= json_encode(t('Net Profit')) ?>) + ' ' + fmtFull(profitData[i]),
+                         'fw-semibold ' + (profitData[i] < 0 ? 'text-danger' : 'text-success')],
+                    ]),
                     padding: 14,
                     backgroundColor: 'rgba(17,24,39,0.9)',
                     titleFont: { size: 13, weight: 'bold' },

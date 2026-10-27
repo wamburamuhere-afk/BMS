@@ -120,6 +120,15 @@ try {
         ok($r['success'] === true, "period=$period still returns success=true");
     }
 
+    // ── E. Phones: tap line under the chart instead of the tooltip box ───────
+    section('E. Phones — tapped period shown under the chart, desktop tooltip unchanged');
+    $dash = file_get_contents("$root/app/dashboard.php");
+    ok(strpos($dash, 'id="chartTapLine" class="d-md-none') !== false, 'tap line exists and is hidden from tablet/desktop width up');
+    ok(strpos($dash, "matchMedia('(max-width: 767.98px)')") !== false && strpos($dash, 'enabled: !chartPhoneQuery.matches,') !== false,
+        'tooltip box is off only below 768px (desktop keeps it)');
+    ok(substr_count($dash, '...chartTapTooltip(') === 2, 'both chart modes (normal and Simple POS) use the tap line');
+    ok(strpos($dash, "dashboardChart.options.plugins.tooltip.enabled = !chartPhoneQuery.matches;") !== false, 'turning or resizing the screen switches between the two');
+
 } catch (Throwable $e) {
     ok(false, 'threw: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
 }
