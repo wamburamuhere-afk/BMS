@@ -179,6 +179,9 @@ if (!function_exists('renderSuperadminHeader')) {
                                         $isGrace   = in_array($nType, ['trial_grace_started', 'subscription_grace_started'], true);
                                         $iconClass = $isTrial ? 'trial' : 'sub';
                                         $iconBi    = $isGrace ? 'bi-hourglass' : ($isTrial ? 'bi-hourglass-split' : 'bi-credit-card');
+                                        $activityIcons = ['first_login' => 'bi-box-arrow-in-right', 'first_product' => 'bi-box-seam',
+                                                          'first_sale' => 'bi-cart-check', 'inactive' => 'bi-moon'];
+                                        if (isset($activityIcons[$nType])) $iconBi = $activityIcons[$nType];
                                         $timeAgo   = (int)floor((time() - strtotime((string)$n['created_at'])) / 60);
                                         $timeLabel = $timeAgo < 60 ? $timeAgo . 'm ago'
                                                    : ($timeAgo < 1440 ? floor($timeAgo/60) . 'h ago'
@@ -272,6 +275,15 @@ if (!function_exists('renderSuperadminHeader')) {
         })();
         </script>
         <?php endif; ?>
+        <script>
+        // Company activity alerts (first sign-in / product / sale, inactive) —
+        // the server runs the scan at most every 10 minutes; this page never waits.
+        (function () {
+            const fd = new FormData();
+            fd.append('_csrf', <?= json_encode(csrf_token()) ?>);
+            if (navigator.sendBeacon) navigator.sendBeacon('/actions/superadmin_activity_scan.php', fd);
+        })();
+        </script>
         <?php
     }
 }

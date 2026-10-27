@@ -101,7 +101,9 @@ if (!function_exists('mobileTouchTenantActive')) {
             if (!function_exists('bmsCurrentTenantId') || !function_exists('getControlPdo')) return;
             $tid = bmsCurrentTenantId();
             if ($tid === null) return;
-            getControlPdo()->prepare("UPDATE tenants SET last_active_at = NOW() WHERE id = ?")->execute([$tid]);
+            // + the superadmin's "first sign-in" alert (core/tenant_activity_alerts.php)
+            require_once __DIR__ . '/tenant_activity_alerts.php';
+            taaMarkActive($tid, 'app');
         } catch (Throwable $e) {
             error_log('mobileTouchTenantActive: ' . $e->getMessage());
         }

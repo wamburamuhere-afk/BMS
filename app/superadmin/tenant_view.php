@@ -214,6 +214,20 @@ if ($hasContext ?? false):
             $bannerTitle = 'Subscription expired — tenant suspended';
             $bannerBody  = 'This tenant\'s subscription expired and was automatically suspended after the grace period. Record a payment to reactivate.';
             break;
+        case 'first_login':
+        case 'first_product':
+        case 'first_sale':
+            $bannerIcon  = 'bi-stars';
+            $bannerClass = 'alert-success';
+            $bannerTitle = ['first_login' => 'First sign-in', 'first_product' => 'First product added', 'first_sale' => 'First sale made'][$notifType];
+            $bannerBody  = 'This company is getting started. The Users and Activity tabs show who is using it.';
+            break;
+        case 'inactive':
+            $bannerIcon  = 'bi-moon';
+            $bannerClass = 'alert-secondary';
+            $bannerTitle = 'No recent activity';
+            $bannerBody  = 'Nobody from this company has used the web or the app for a while. Consider reaching out.';
+            break;
         case 'billing_overdue':
         case 'billing_due_soon':
             $bannerIcon  = 'bi-receipt';

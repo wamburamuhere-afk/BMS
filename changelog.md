@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(superadmin): bell alerts for company activity (mobile API upgrade, Phase 2)
+
+**Files:** `core/tenant_activity_alerts.php` (new), `core/superadmin_notifications.php`, `core/superadmin_ui.php`, `core/mobile_auth.php`, `actions/login.php`, `actions/superadmin_activity_scan.php` (new), `api/cron/trial_enforcement.php`, `app/superadmin/tenant_view.php`, `scripts/setup_control_db.php`, `tests/test_superadmin_activity_alerts_cli.php` (new)
+
+- **New bell alerts, once per company:** **First sign-in** (web or app — instant, the app one says "on the mobile app"), **First product**, **First sale** (completed sales or issued invoices; a held cart does not count), and **No activity** for 7, then 14, then 30 days (new activity re-arms it). Bell only, no email.
+- **No flood on go-live:** "first" alerts only for companies created after the feature went live, "no activity" only for companies active after it (`activity_alerts_since`, set on first use).
+- **When it runs:** first sign-in at web/app sign-in (`taaMarkActive()`, which also stamps Last Active); the others in a scan run by the daily cron and, at most every 10 minutes, in the background when a superadmin page is open (`actions/superadmin_activity_scan.php`). Only new companies' own databases are opened.
+- **Schema (deploy runs it):** `superadmin_notifications.type` gains `first_login`, `first_product`, `first_sale`, `inactive`; new control table `tenant_activity_alerts` remembers what was sent.
+- **Bell + tenant page:** own icons and a short banner for each new alert.
+- **Test:** 31 checks — real web and app sign-ins over HTTP, products and sales in a test company's database, all inactive stages, re-arm, no-flood rules, scan endpoint 405/401. Related suites re-run; `test_login_finalize_dispatch_cli` (3) and `test_login_history_cli` (4) fail the same on develop without this change.
+
 ## 2026-10-27 — feat(mobile): superadmin sees Flutter app activity (mobile API upgrade, Phase 1)
 
 **Files:** `core/mobile_auth.php`, `api/mobile/login.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `tests/test_mobile_last_active_cli.php` (new), `mobile_api_upgrade_plan.md` (new)

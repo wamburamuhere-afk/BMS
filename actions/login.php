@@ -55,11 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($__tenantId !== null) {
                 $_SESSION['tenant_id'] = $__tenantId;
                 // Update last_active_at in the control DB for the tenant dashboard
+                // (+ the superadmin's "first sign-in" alert, core/tenant_activity_alerts.php)
                 try {
                     if (function_exists('getControlPdo')) {
-                        getControlPdo()->prepare(
-                            "UPDATE tenants SET last_active_at = NOW() WHERE id = ?"
-                        )->execute([$__tenantId]);
+                        require_once __DIR__ . '/../core/tenant_activity_alerts.php';
+                        taaMarkActive($__tenantId, 'web');
                     }
                 } catch (Throwable $__e) {
                     // Non-fatal: never block a login because of a control-DB hiccup
