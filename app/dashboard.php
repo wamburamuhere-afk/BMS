@@ -1860,7 +1860,7 @@ function get_progress_color($percentage) {
             <?php if (hasReportsAccess()): ?>
             <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Sales & Profit') : t('Performance Overview') ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Sales, Expenses & Profit') : t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <?php
                         // Simple Mode defaults this chart to Daily — a small
@@ -2210,32 +2210,6 @@ function fmtFull(n) {
     return sign + 'TSh ' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
-// % change vs the previous data point — null when there's nothing to compare
-// against (first period, or previous value was exactly zero: a % off zero is
-// undefined, not "infinite", so the caller shows no chip rather than lying).
-function pctDelta(curr, prev) {
-    if (prev === undefined || prev === null || prev === 0) return null;
-    // Nothing this period (e.g. a day with no sales): "▼ 100%" on every box is
-    // noise — the summary already says "No sales in this period".
-    if (curr === 0) return null;
-    return ((curr - prev) / Math.abs(prev)) * 100;
-}
-
-// A rise of 1,000% or more reads as a multiple ("▲ 66×") — "▲6520%" is true
-// but unreadable when the previous period was tiny. Hover names the period
-// it is compared with.
-function deltaChipHtml(pct, prevPeriod) {
-    if (pct === null) return '';
-    const up = pct >= 0;
-    const cls = up ? 'text-success' : 'text-danger';
-    const arrow = up ? '▲' : '▼';
-    const text = (up && pct >= 1000)
-        ? (1 + pct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 }) + '×'
-        : Math.abs(pct).toFixed(0) + '%';
-    const title = prevPeriod ? ` title="${safeOutput(<?= json_encode(t('Compared with')) ?> + ' ' + prevPeriod)}"` : '';
-    return `<span class="${cls} small fw-bold ms-1 text-nowrap"${title}>${arrow} ${text}</span>`;
-}
-
 function renderChart(data) {
     if (!document.getElementById('performanceChart')) return;
     if (POS_SIMPLE_MODE) { renderSimpleChart(data); return; }
@@ -2460,11 +2434,14 @@ function renderSimpleChart(data) {
 
     $('#performanceSummary').empty();
 
-    // Two bars per period — Sales and Profit — so "how much did I sell, how
-    // much did I keep" reads at a glance. Every period has its own slot (the
-    // API fills empty days with zeros), so an empty day shows as a gap and a
-    // sale always sits on its own day. Cost of Goods and Expenses are in the
-    // tooltip and the summary below, in full.
+    // The last 7 periods of whatever the filter is (7 days, 7 weeks … 7 years).
+    // The API fills empty periods with zeros, so these are 7 consecutive
+    // periods and a sale always sits on its own day.
+    data = data.slice(-7);
+
+    // Bars: Sales and Expenses (what happened). Line: Net profit — Sales minus
+    // the buying price of the goods sold (each at its own batch's cost) minus
+    // Expenses — so a tall Sales bar is never mistaken for profit.
     const labels       = data.length > 0 ? data.map(row => row.period) : [];
     const salesData     = data.length > 0 ? data.map(row => parseFloat(row.revenue) || 0) : [];
     const cogsData      = data.length > 0 ? data.map(row => parseFloat(row.expense) || 0) : [];
@@ -2476,9 +2453,11 @@ function renderSimpleChart(data) {
         data: {
             labels: labels,
             datasets: [
-                { label: <?= json_encode(t('Sales')) ?>, data: salesData, backgroundColor: '#0d6efd', borderRadius: 3, maxBarThickness: 34 },
-                // A loss is a red bar below zero.
-                { label: <?= json_encode(t('Profit')) ?>, data: profitData, backgroundColor: profitData.map(v => v < 0 ? '#dc3545' : '#198754'), borderRadius: 3, maxBarThickness: 34 },
+                { label: <?= json_encode(t('Sales')) ?>, data: salesData, backgroundColor: '#0d6efd', borderRadius: 3, maxBarThickness: 34, order: 2, pointStyle: 'rect' },
+                { label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData, backgroundColor: '#fd7e14', borderRadius: 3, maxBarThickness: 34, order: 2, pointStyle: 'rect' },
+                // Lower order draws on top of the bars.
+                { type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData, borderColor: '#198754', backgroundColor: '#198754',
+                  borderWidth: 2.5, tension: 0, pointRadius: 4, pointHoverRadius: 6, order: 1, pointStyle: 'circle' },
             ]
         },
         options: {
@@ -2488,7 +2467,9 @@ function renderSimpleChart(data) {
             plugins: {
                 legend: {
                     display: true, position: 'top', align: 'end',
-                    labels: { boxWidth: 12, boxHeight: 12, font: { size: 12 }, padding: 20 }
+                    // Sales, Expenses, Net Profit — in that order (draw order would put the line first).
+                    labels: { usePointStyle: true, pointStyleWidth: 18, boxHeight: 10, font: { size: 12 }, padding: 20,
+                              sort: (a, b) => a.datasetIndex - b.datasetIndex }
                 },
                 tooltip: {
                     padding: 14,
@@ -2505,14 +2486,14 @@ function renderSimpleChart(data) {
                             const i = context.dataIndex;
                             return [
                                 <?= json_encode(t('Sales')) ?> + ': ' + fmtFull(salesData[i]),
-                                <?= json_encode(t('Cost of Goods')) ?> + ': ' + fmtFull(cogsData[i]),
                                 <?= json_encode(t('Expenses')) ?> + ': ' + fmtFull(opExpenseData[i]),
+                                <?= json_encode(t('Cost of goods sold')) ?> + ': ' + fmtFull(cogsData[i]),
                             ];
                         },
                         afterBody: function(items) {
                             if (!items.length) return [];
                             const p = profitData[items[0].dataIndex];
-                            return ['─────────────────', (p < 0 ? <?= json_encode(t('Loss')) ?> : <?= json_encode(t('Profit')) ?>) + ': ' + fmtFull(p)];
+                            return ['─────────────────', (p < 0 ? <?= json_encode(t('Net loss')) ?> : <?= json_encode(t('Net Profit')) ?>) + ': ' + fmtFull(p)];
                         }
                     }
                 }
@@ -2533,97 +2514,51 @@ function renderSimpleChart(data) {
         }
     });
 
-    if (data.length === 0) return;
+    // "How your profit is worked out" for the same 7 periods the chart shows:
+    // Sales − Cost of goods sold − Expenses = Net profit.
+    const sum = arr => arr.reduce((a, b) => a + b, 0);
+    const tSales  = sum(salesData);
+    const tCogs   = sum(cogsData);
+    const tOpex   = sum(opExpenseData);
+    const tProfit = sum(profitData);
+    const unit    = ($('#chartPeriod').val() || 'daily');
+    const heading = ({
+        daily:     <?= json_encode(t('Last 7 days — how your profit is worked out')) ?>,
+        weekly:    <?= json_encode(t('Last 7 weeks — how your profit is worked out')) ?>,
+        monthly:   <?= json_encode(t('Last 7 months — how your profit is worked out')) ?>,
+        quarterly: <?= json_encode(t('Last 7 quarters — how your profit is worked out')) ?>,
+        yearly:    <?= json_encode(t('Last 7 years — how your profit is worked out')) ?>,
+    })[unit] || <?= json_encode(t('Last 7 days — how your profit is worked out')) ?>;
+    const loss = tProfit < 0;
+    const box  = (label, value, color, final) => `
+        <div class="flex-fill text-center rounded border px-2 py-2 ${final ? (loss ? 'bg-danger-subtle border-danger-subtle' : 'bg-success-subtle border-success-subtle') : 'bg-white'}" style="min-width:0;">
+            <div class="text-muted ${final ? 'fw-bold' : ''}" style="font-size:0.72rem;">${label}</div>
+            <div class="fw-bold text-nowrap" style="color:${color}; font-size: clamp(0.85rem, 3.2vw, 1rem);">${fmtFull(value)}</div>
+        </div>`;
+    const op = s => `<span class="align-self-center text-muted fs-5 px-1">${s}</span>`;
+    const finalLabel = loss ? <?= json_encode(t('Net loss')) ?> : <?= json_encode(t('Net Profit')) ?>;
+    const finalColor = loss ? '#b02a37' : '#146c43';
 
-    const last = data[data.length - 1];
-    const prev = data.length > 1 ? data[data.length - 2] : null;
-
-    const sales    = parseFloat(last.revenue) || 0;
-    const cogs     = parseFloat(last.expense) || 0;
-    const opex     = parseFloat(last.operating_expenses) || 0;
-    const netProfit = (last.net_profit != null) ? parseFloat(last.net_profit) : (sales - cogs - opex);
-    const margin   = sales > 0 ? (netProfit / sales) * 100 : null;
-
-    const prevPeriod = prev ? String(prev.period) : '';
-    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0), prevPeriod) : '';
-    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0), prevPeriod) : '';
-    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0), prevPeriod) : '';
-    const profitPrev = prev ? ((prev.net_profit != null) ? parseFloat(prev.net_profit) : ((parseFloat(prev.revenue) || 0) - (parseFloat(prev.expense) || 0) - (parseFloat(prev.operating_expenses) || 0))) : null;
-    // Profit ↔ loss: a % across zero is meaningless ("▼ 120100%"), so say what happened.
-    let profitDelta = '';
-    if (prev && profitPrev !== null && profitPrev !== 0 && netProfit !== 0 && (profitPrev > 0) !== (netProfit > 0)) {
-        const toLoss = netProfit < 0;
-        const title  = ` title="${safeOutput(<?= json_encode(t('Compared with')) ?> + ' ' + prevPeriod)}"`;
-        profitDelta = `<span class="${toLoss ? 'text-danger' : 'text-success'} small fw-bold ms-1 text-nowrap"${title}>${toLoss ? '▼ ' + <?= json_encode(t('to loss')) ?> : '▲ ' + <?= json_encode(t('back to profit')) ?>}</span>`;
-    } else if (prev) {
-        profitDelta = deltaChipHtml(pctDelta(netProfit, profitPrev), prevPeriod);
-    }
-
-    // Full figures on one line each; the size steps down on narrow phones so
-    // a long amount never wraps or gets cut.
-    const valStyle = 'font-size: clamp(0.9rem, 3.4vw, 1.05rem);';
     $('#performanceSummary').append(`
-        <div class="mt-4 p-3 bg-light rounded shadow-sm border">
-            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-1 mb-2">
-                <span class="text-muted small uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${safeOutput(last.period)})</span>
-                ${prevPeriod ? `<span class="text-muted" style="font-size: 0.7rem;"><?= t('Compared with') ?> ${safeOutput(prevPeriod)}</span>` : ''}
+        <div class="mt-3 p-3 bg-light rounded border">
+            <div class="text-muted fw-bold text-uppercase mb-2" style="font-size:0.7rem;">${safeOutput(heading)}</div>
+            <!-- Wide screens: one line, Sales − Cost of goods sold − Expenses = Net profit -->
+            <div class="d-none d-md-flex align-items-stretch gap-1">
+                ${box(<?= json_encode(t('Sales')) ?>, tSales, '#0d6efd', false)}${op('−')}
+                ${box(<?= json_encode(t('Cost of goods sold')) ?>, tCogs, '#b02a37', false)}${op('−')}
+                ${box(<?= json_encode(t('Expenses')) ?>, tOpex, '#b35c00', false)}${op('=')}
+                ${box(finalLabel, tProfit, finalColor, true)}
             </div>
-            <div class="row g-3 text-center">
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Sales') ?></div>
-                    <div class="fw-bold mb-0 text-primary text-nowrap" style="${valStyle}">${fmtFull(sales)}</div>${salesDelta ? `<div>${salesDelta}</div>` : ''}
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Cost of Goods') ?></div>
-                    <div class="fw-bold mb-0 text-danger text-nowrap" style="${valStyle}">${fmtFull(cogs)}</div>${cogsDelta ? `<div>${cogsDelta}</div>` : ''}
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Expenses') ?></div>
-                    <div class="fw-bold mb-0 text-nowrap" style="color:#fd7e14; ${valStyle}">${fmtFull(opex)}</div>${opexDelta ? `<div>${opexDelta}</div>` : ''}
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Net Profit') ?></div>
-                    <div class="fw-bold mb-0 text-${netProfit >= 0 ? 'success' : 'danger'} text-nowrap" style="${valStyle}">${fmtFull(netProfit)}</div>${profitDelta ? `<div>${profitDelta}</div>` : ''}
-                    ${margin !== null ? `<small class="d-block text-muted" style="font-size: 0.7rem;">${margin.toFixed(0)}% <?= t('margin') ?></small>` : ''}
-                </div>
+            <!-- Phones: the same sum, read top to bottom like a receipt -->
+            <div class="d-md-none small">
+                <div class="d-flex justify-content-between py-1"><span><?= t('Sales') ?></span><strong class="text-nowrap" style="color:#0d6efd;">${fmtFull(tSales)}</strong></div>
+                <div class="d-flex justify-content-between py-1"><span>− <?= t('Cost of goods sold') ?></span><strong class="text-nowrap" style="color:#b02a37;">${fmtFull(tCogs)}</strong></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span>− <?= t('Expenses') ?></span><strong class="text-nowrap" style="color:#b35c00;">${fmtFull(tOpex)}</strong></div>
+                <div class="d-flex justify-content-between pt-2 fw-bold" style="color:${finalColor};"><span>= ${safeOutput(finalLabel)}</span><span class="text-nowrap">${fmtFull(tProfit)}</span></div>
             </div>
-            ${moneyWentHtml(sales, cogs, opex, netProfit)}
+            <div class="text-muted mt-2" style="font-size:0.75rem;"><?= t("Cost of goods sold = what you paid for the items you sold, each at its own batch's buying price.") ?></div>
         </div>
     `);
-}
-
-// "Where your sales money went" — the latest period's sales split into what
-// paid for the goods, expenses and profit, per TSh 100 sold. No sales → a
-// plain sentence; a loss → says so instead of a bar that can't add up.
-function moneyWentHtml(sales, cogs, opex, netProfit) {
-    const wrap = inner => `<div class="mt-3 pt-3 border-top">${inner}</div>`;
-    if (!(sales > 0)) {
-        return wrap(`<div class="small text-muted"><?= t('No sales in this period.') ?></div>`);
-    }
-    if (netProfit < 0) {
-        return wrap(`<div class="small fw-bold text-danger">${safeOutput(<?= json_encode(t('Costs were more than sales — a loss of %s.')) ?>.replace('%s', fmtFull(-netProfit)))}</div>`);
-    }
-    // Whole shillings per TSh 100 that always add up to 100.
-    const goods = Math.round(cogs / sales * 100);
-    const exp   = Math.min(100 - goods, Math.round(opex / sales * 100));
-    const keep  = Math.max(0, 100 - goods - exp);
-    const seg = (pct, color) => pct > 0 ? `<div style="width:${pct}%; background:${color};"></div>` : '';
-    const row = (color, label, per100, amount) => `
-        <div class="d-flex justify-content-between align-items-center gap-2 small">
-            <span class="d-flex align-items-center gap-2"><span style="width:10px; height:10px; border-radius:2px; background:${color}; display:inline-block;"></span>${safeOutput(label)}</span>
-            <span class="text-nowrap"><strong>TSh ${per100}</strong> <span class="text-muted">· ${fmtFull(amount)}</span></span>
-        </div>`;
-    return wrap(`
-        <div class="small fw-bold mb-1"><?= t('Where your sales money went') ?></div>
-        <div class="small text-muted mb-2"><?= t('Out of every TSh 100 sold:') ?></div>
-        <div class="d-flex rounded overflow-hidden mb-2" style="height:14px; background:#e9ecef;">
-            ${seg(goods, '#dc3545')}${seg(exp, '#fd7e14')}${seg(keep, '#198754')}
-        </div>
-        <div class="d-flex flex-column gap-1">
-            ${row('#dc3545', <?= json_encode(t('Paid for the goods')) ?>, goods, cogs)}
-            ${row('#fd7e14', <?= json_encode(t('Expenses')) ?>, exp, opex)}
-            ${row('#198754', <?= json_encode(t('Your profit')) ?>, keep, netProfit)}
-        </div>`);
 }
 
 function updateDashboardMetrics(data) {

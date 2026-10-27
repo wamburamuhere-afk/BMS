@@ -170,13 +170,14 @@ $normalChartBody = substr($dashSrc, strpos($dashSrc, 'function renderNormalChart
 strpos($normalChartBody, 'if (POS_SIMPLE_MODE)') === false
     ? pass('renderNormalChart() no longer branches on POS_SIMPLE_MODE — Simple Mode never touches this code path')
     : fail('renderNormalChart() still contains a POS_SIMPLE_MODE branch — the old dead-weight duplication was not cleaned up');
-// 2026-10-26: Sales + Profit bars (easier to read); Cost of Goods and
-// Expenses are still shown, in full, in the tooltip and the summary below.
+// 2026-10-27 ("Chart 2"): Sales + Expenses bars and a Net profit line; the
+// cost of goods sold is in the tooltip and the "how your profit is worked
+// out" row below the chart.
 strpos($dashSrc, "{ label: <?= json_encode(t('Sales')) ?>, data: salesData") !== false
-    && strpos($dashSrc, "{ label: <?= json_encode(t('Profit')) ?>, data: profitData") !== false
-    && strpos($dashSrc, "<?= json_encode(t('Cost of Goods')) ?> + ': ' + fmtFull(cogsData[i])") !== false
-    && strpos($dashSrc, "<?= json_encode(t('Expenses')) ?> + ': ' + fmtFull(opExpenseData[i])") !== false
-    ? pass('renderSimpleChart() plots Sales + Profit bars; Cost of Goods and Expenses are in the tooltip')
+    && strpos($dashSrc, "{ label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData") !== false
+    && strpos($dashSrc, "{ type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData") !== false
+    && strpos($dashSrc, "<?= json_encode(t('Cost of goods sold')) ?> + ': ' + fmtFull(cogsData[i])") !== false
+    ? pass('renderSimpleChart() plots Sales + Expenses bars and a Net profit line; cost of goods sold is in the tooltip')
     : fail('renderSimpleChart() does not wire up the expected datasets');
 
 // ─────────────────────────────────────────────────────────────────────────
