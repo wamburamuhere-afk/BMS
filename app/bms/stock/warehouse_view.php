@@ -109,13 +109,15 @@ foreach ($stocks as $s) {
     elseif ($maxlvl  > 0 && $qty > $maxlvl)    $health_over++;
 }
 
-// Recent activity — last 8 movements for this warehouse
+// Recent activity — last 8 movements for this warehouse. A voided POS sale never
+// happened, so its stock-out and the void's stock-back are not listed.
+require_once __DIR__ . '/../../../core/stock_ledger.php';
 $stmt_recent = $pdo->prepare("
     SELECT sm.movement_type, sm.quantity, sm.movement_date, sm.created_at,
            p.product_name, sm.reference_number
     FROM stock_movements sm
     JOIN products p ON sm.product_id = p.product_id
-    WHERE sm.warehouse_id = ?
+    WHERE sm.warehouse_id = ?" . stockMovementNotVoidedSaleSql($pdo, 'sm') . "
     ORDER BY sm.created_at DESC
     LIMIT 8
 ");

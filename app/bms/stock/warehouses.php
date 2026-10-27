@@ -483,6 +483,11 @@ $count_stmt = $pdo->prepare($count_query);
 $count_stmt->execute($params);
 $total_count = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
 
+// A voided POS sale never happened: its stock-out and the void's stock-back are
+// left out of the 30-day in/out figures (core/stock_ledger.php).
+require_once ROOT_DIR . '/core/stock_ledger.php';
+$void_skip = stockMovementNotVoidedSaleSql($pdo, 'sm');
+
 // Get warehouses — full filtered result set; DataTable handles pagination client-side
 $query = "
     SELECT 
@@ -515,19 +520,19 @@ $query = "
         (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('purchase_in','adjustment_in','transfer_in','return_in','production_in','found') THEN sm.quantity ELSE 0 END), 0)
          FROM stock_movements sm
          WHERE sm.warehouse_id = w.warehouse_id
-           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as inbound_30d,
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY){$void_skip}) as inbound_30d,
         (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('sale_out','adjustment_out','transfer_out','return_out','production_out','damaged','expired','theft','issue_out') THEN sm.quantity ELSE 0 END), 0)
          FROM stock_movements sm
          WHERE sm.warehouse_id = w.warehouse_id
-           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as outbound_30d,
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY){$void_skip}) as outbound_30d,
         (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('purchase_in','adjustment_in','transfer_in','return_in','production_in','found') THEN sm.total_cost ELSE 0 END), 0)
          FROM stock_movements sm
          WHERE sm.warehouse_id = w.warehouse_id
-           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as value_in_30d,
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY){$void_skip}) as value_in_30d,
         (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('sale_out','adjustment_out','transfer_out','return_out','production_out','damaged','expired','theft','issue_out') THEN sm.total_cost ELSE 0 END), 0)
          FROM stock_movements sm
          WHERE sm.warehouse_id = w.warehouse_id
-           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as value_out_30d
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY){$void_skip}) as value_out_30d
     FROM warehouses w
     LEFT JOIN users u ON w.created_by = u.user_id
     LEFT JOIN users u2 ON w.updated_by = u2.user_id

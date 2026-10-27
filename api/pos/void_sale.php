@@ -89,7 +89,7 @@ try {
         // COMPONENTS, not itself (it never had its own stock decremented).
         if (!empty($ln['is_combo'])) {
             if ($warehouse_id !== null) {
-                reverseComboComponents($pdo, $pid, $qty, $warehouse_id, $project_id, $sale_id, $sale['receipt_number'], $_SESSION['user_id']);
+                reverseComboComponents($pdo, $pid, $qty, $warehouse_id, $project_id, $sale_id, $sale['receipt_number'], $_SESSION['user_id'], 'pos_void');
             }
             continue;
         }

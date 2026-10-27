@@ -116,3 +116,37 @@ if (!function_exists('recordStockMovement')) {
         return (int)$pdo->lastInsertId();
     }
 }
+
+if (!function_exists('stockMovementNotVoidedSaleSql')) {
+    /**
+     * SQL fragment (starts with " AND ") that leaves out the stock movements of a
+     * VOIDED POS sale: the sale's own stock-out and the void's stock-back. A void
+     * means the sale never happened, so stock summaries and recent-activity feeds
+     * must not show it as stock that went out and came back. The full stock
+     * movement ledger keeps both rows for the audit trail.
+     *
+     * Matched by the voided sale's id plus the row's own type/notes (never a text
+     * comparison across tables, which differ in collation on some databases):
+     *   - the sale:   reference_type 'pos_sale'
+     *   - the void:   reference_type 'pos_void'
+     *   - older combo voids: reference_type 'return', notes "Combo component reversal for …"
+     *     (a return sale can never be voided, so a real return never matches)
+     *   - voids written before the ENUM had 'pos_void' (stored as ''): notes "Void of POS Sale #…"
+     * Returns '' where there is no pos_sales table.
+     */
+    function stockMovementNotVoidedSaleSql(PDO $pdo, string $alias = 'sm'): string
+    {
+        static $hasPos = null;
+        if ($hasPos === null) {
+            try { $hasPos = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetchColumn(); } catch (Throwable $e) { $hasPos = false; }
+        }
+        if (!$hasPos) return '';
+        $a = preg_replace('/[^A-Za-z0-9_]/', '', $alias);
+        return " AND NOT (
+                    (   {$a}.reference_type IN ('pos_sale', 'pos_void')
+                     OR ({$a}.reference_type = 'return' AND {$a}.notes LIKE 'Combo component reversal for %')
+                     OR (COALESCE({$a}.reference_type, '') = '' AND {$a}.notes LIKE 'Void of POS Sale #%'))
+                    AND EXISTS (SELECT 1 FROM pos_sales vps WHERE vps.sale_id = {$a}.reference_id AND vps.sale_status = 'voided')
+                )";
+    }
+}
