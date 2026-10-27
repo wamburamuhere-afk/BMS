@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(stock): voided POS sales no longer show as stock out on Warehouses and Recent Activity
+
+**Files:** `core/stock_ledger.php`, `app/bms/stock/warehouses.php`, `app/bms/stock/warehouse_view.php`, `app/bms/product/product_view.php`, `api/pos/void_sale.php`, `tests/test_stock_activity_voided_sales_cli.php` (new)
+
+- **The bug (seen live):** after selling from a shop and voiding every sale, stock went back to normal and the sales disappeared, but the Warehouses list still showed units dispatched in the last 30 days, and the shop page's Recent Activity still listed the sales as stock out (followed by "Returned by Customer"). Both read the stock movement log, where a void adds a stock-back row instead of removing the sale's stock-out.
+- **Fix:** new `stockMovementNotVoidedSaleSql()` in `core/stock_ledger.php` leaves out a voided POS sale's stock-out and the void's stock-back (including older combo reversals stored as `'return'` and older voids stored without a type). Used by the Warehouses 30-day in/out units and values, the shop page's Recent Activity, and the product page's recent movements. Matching is by the voided sale's id plus each row's own type and note, never a text comparison across tables.
+- **Kept on purpose:** the full Stock Movements ledger still shows every row, for the audit trail. Stock quantities were already correct and are unchanged.
+- **Also:** voiding a combo now tags its component reversals `'pos_void'` like every other void.
+- **Test:** 17 checks, rolled back on the real local DB: hidden vs kept rows (completed sale, genuine return and adjustment are kept), the 30-day "out" figure, and both pages render with no errors.
+
 ## 2026-10-27 — feat(pos): Record Old Sale (Rekodi Mauzo ya Zamani)
 
 **Files:** `core/pos_old_sales.php` (new), `api/pos/old_sale_context.php` (new), `api/pos/process_sale.php`, `api/pos/void_sale.php`, `api/pos/get_sales.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/zreport.php`, `app/bms/pos/shift_history.php`, `app/bms/pos/pos_dashboard.php`, `app/constant/settings/pos_config_settings.php`, `core/feature_registry.php`, `lang/sw.php`, `migrations/tenant/2026_10_27_pos_record_old_sale.php` (new), `migrations/2026_10_27_pos_record_old_sale_legacy_db.php` (new), `tests/test_pos_old_sale_cli.php`, `tests/test_pos_old_sale_flow_cli.php`, `tests/test_pos_old_sale_ui_cli.php` (new), `tests/test_service_plans_pos_cli.php`
