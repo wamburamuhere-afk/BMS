@@ -84,7 +84,7 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
 
     foreach (($data['items'] ?? []) as $item) {
         $out .= (string)($item['product_name'] ?? '') . "\n";
-        $qtyPrice = number_format((float)($item['quantity'] ?? 0), 2) . ' x ' . number_format((float)($item['unit_price'] ?? 0), 2);
+        $qtyPrice = format_qty($item['quantity'] ?? 0) . ' x ' . number_format((float)($item['unit_price'] ?? 0), 2);
         $out .= $twoCol('  ' . $qtyPrice, number_format((float)($item['line_total'] ?? 0), 2));
     }
     $out .= $line;
