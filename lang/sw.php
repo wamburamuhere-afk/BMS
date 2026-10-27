@@ -5737,18 +5737,16 @@ return [
     'Yes, keep it' => 'Ndiyo, iache',
     'No, change it' => 'Hapana, nibadilishe',
 
-    // Dashboard Simple POS summary (app/dashboard.php)
-    'Compared with' => 'Ikilinganishwa na',
-    'to loss' => 'kuwa hasara',
-    'back to profit' => 'kurudi faidani',
-    'Sales & Profit' => 'Mauzo na Faida',
-    'Loss' => 'Hasara',
+    // Dashboard Simple POS chart (app/dashboard.php)
     'Profit' => 'Faida',
-    'No sales in this period.' => 'Hakuna mauzo katika kipindi hiki.',
-    'Costs were more than sales — a loss of %s.' => 'Gharama zilizidi mauzo — hasara ya %s.',
-    'Where your sales money went' => 'Pesa ya mauzo yako ilikokwenda',
-    'Out of every TSh 100 sold:' => 'Kati ya kila TSh 100 uliyouza:',
-    'Paid for the goods' => 'Gharama ya bidhaa',
-    'Your profit' => 'Faida yako',
+    'Sales, Expenses & Profit' => 'Mauzo, Matumizi na Faida',
+    'Cost of goods sold' => 'Gharama ya bidhaa zilizouzwa',
+    'Net loss' => 'Hasara halisi',
+    'Last 7 days — how your profit is worked out' => 'Siku 7 zilizopita — jinsi faida yako inavyopatikana',
+    'Last 7 weeks — how your profit is worked out' => 'Wiki 7 zilizopita — jinsi faida yako inavyopatikana',
+    'Last 7 months — how your profit is worked out' => 'Miezi 7 iliyopita — jinsi faida yako inavyopatikana',
+    'Last 7 quarters — how your profit is worked out' => 'Robo 7 zilizopita — jinsi faida yako inavyopatikana',
+    'Last 7 years — how your profit is worked out' => 'Miaka 7 iliyopita — jinsi faida yako inavyopatikana',
+    "Cost of goods sold = what you paid for the items you sold, each at its own batch's buying price." => 'Gharama ya bidhaa zilizouzwa = ulicholipa kununua bidhaa ulizouza, kila moja kwa bei ya kununulia ya batch yake.',
 
 ];
