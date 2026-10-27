@@ -141,4 +141,4 @@ The app does what the web does, everywhere:
 | 7 Parity | ✅ done 2026-10-27 — 21 checks (tests/test_mobile_parity_cli.php); product delete with stock = 409 |
 | 8 Help & Support | ✅ done 2026-10-27 — 22 checks (tests/test_mobile_support_cli.php); single endpoint api/mobile/support.php?action= + new `view` |
 | 9 AI chat | ✅ done 2026-10-27 — 12 checks (tests/test_mobile_ai_cli.php); provider never called in tests (SSRF guard) |
-| 10 Doc v28 + regression | — |
+| 10 Doc v28 + regression | 🟡 2026-10-27 — all 9 suites together: 187/187 pass, nothing left behind; API doc v28 drafted (not published). Waiting: push + PR, then publish v28 at the same link after merge, then live check |
