@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(dashboard): nothing shown on chart tap on phones
+
+**Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
+
+- **Change requested after seeing it live:** the figures line under the chart (added in the entry below) is removed. On phones, tapping either dashboard chart (Simple POS "Sales, Expenses & Profit" and the normal "Performance Overview") now shows nothing: no tooltip box and no line. Desktop/tablet keep the tooltip box on hover, unchanged.
+- The now-unused "Tap the chart to see one period" Swahili string is removed.
+- **Test:** chart test 23 checks pass (section E updated). Browser at 360px: both charts, no box and no line after a tap; desktop: box still enabled.
+
 ## 2026-10-27 — fix(dashboard): no tooltip box over the chart on phones; tapped period shown under it
 
 **Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
