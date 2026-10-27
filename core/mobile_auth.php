@@ -29,7 +29,7 @@ if (!function_exists('mobileBearerAuth')) {
         global $pdo;
 
         $stmt = $pdo->prepare("
-            SELECT mt.token_id, mt.user_id, mt.expires_at,
+            SELECT mt.token_id, mt.user_id, mt.expires_at, mt.last_used_at,
                    u.role, u.user_role, u.role_id,
                    u.first_name, u.last_name, u.is_active
               FROM mobile_tokens mt
@@ -78,9 +78,36 @@ if (!function_exists('mobileBearerAuth')) {
                 ->execute([$row['token_id']]);
         } catch (Exception $e) { /* non-fatal */ }
 
+        // App use counts as company activity for the superadmin, at most once per
+        // 15 minutes per device — the token's previous stamp is the throttle.
+        if ($row['last_used_at'] === null || strtotime((string)$row['last_used_at']) < time() - 900) {
+            mobileTouchTenantActive();
+        }
+
         return true;
     }
 
+}
+
+if (!function_exists('mobileTouchTenantActive')) {
+    /**
+     * Stamp the superadmin's "Last Active" (control DB tenants.last_active_at,
+     * the column web login sets in actions/login.php) for this company.
+     * Best-effort: never blocks the app request.
+     */
+    function mobileTouchTenantActive(): void
+    {
+        try {
+            if (!function_exists('bmsCurrentTenantId') || !function_exists('getControlPdo')) return;
+            $tid = bmsCurrentTenantId();
+            if ($tid === null) return;
+            // + the superadmin's "first sign-in" alert (core/tenant_activity_alerts.php)
+            require_once __DIR__ . '/tenant_activity_alerts.php';
+            taaMarkActive($tid, 'app');
+        } catch (Throwable $e) {
+            error_log('mobileTouchTenantActive: ' . $e->getMessage());
+        }
+    }
 }
 
 if (!function_exists('mobileRun')) {

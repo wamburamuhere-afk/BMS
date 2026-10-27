@@ -37,6 +37,21 @@ if (!$job) {
     exit;
 }
 
+// Login name (owner_username, else the phone), the chosen plan, and whether the
+// company waits for a superadmin's Smart BMS approval — same as the web signup.
+$loginName = trim((string)($job['owner_username'] ?? '')) !== '' ? trim((string)$job['owner_username']) : (string)$job['owner_phone'];
+$planInfo  = null;
+if (!empty($job['plan_key'])) {
+    try {
+        require_once __DIR__ . '/../../core/plans.php';
+        $pl = getPlanByKey((string)$job['plan_key']);
+        $planInfo = ['plan_key' => (string)$job['plan_key'], 'term_key' => (string)($job['plan_term'] ?? ''),
+                     'name' => $pl ? (string)$pl['name'] : null, 'product_key' => $pl ? (string)($pl['product_key'] ?? '') : null];
+    } catch (Throwable $e) { /* plan catalogue unavailable — leave null */ }
+}
+$pendingApproval = ($planInfo['product_key'] ?? '') === 'bms_full';
+$job['owner_phone'] = $loginName;   // the "username" every response below returns
+
 switch ($job['status']) {
 
     case 'pending':
@@ -49,6 +64,8 @@ switch ($job['status']) {
             'username'   => $job['owner_phone'],
             'subdomain'  => $job['subdomain'],
             'tenant_url' => $job['tenant_url'],
+            'plan'       => $planInfo,
+            'pending_approval' => $pendingApproval,
         ]);
         break;
 
@@ -63,7 +80,11 @@ switch ($job['status']) {
 
     case 'ready':
         http_response_code(200);
-        echo json_encode(regStatusBuildReadyPayload($cpdo, $job));
+        $payload = regStatusBuildReadyPayload($cpdo, $job) + ['plan' => $planInfo, 'pending_approval' => $pendingApproval];
+        if ($pendingApproval) {
+            $payload['message'] = 'Your Smart BMS account is built and is waiting for approval. We will email you when it is approved.';
+        }
+        echo json_encode($payload);
         break;
 
     default:
@@ -84,7 +105,7 @@ function regStatusBuildReadyPayload(PDO $cpdo, array $job): array
         'username'   => $job['owner_phone'],
         'subdomain'  => $job['subdomain'],
         'tenant_url' => $job['tenant_url'],
-        'note'       => 'Use your phone number as your username.',
+        'note'       => trim((string)($job['owner_username'] ?? '')) !== '' ? 'Use your username to log in.' : 'Use your phone number as your username.',
         'message'    => $job['token']
             ? 'Your BMS account is ready! You are now logged in.'
             : 'Your account is ready. Please log in with your phone number and password.',

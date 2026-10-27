@@ -82,12 +82,15 @@ if ($password === null) {
     exit(1);
 }
 
+// The owner's login name: chosen in the app (owner_username), else the phone, as before.
+$loginName = trim((string)($job['owner_username'] ?? '')) !== '' ? trim((string)$job['owner_username']) : (string)$job['owner_phone'];
+
 // ── Provision the tenant ──────────────────────────────────────────────────────
 try {
     $result = provisionTenant(
         $job['company_name'],
         $job['subdomain'],
-        $job['owner_phone'],   // stored as users.username
+        $loginName,            // stored as users.username
         $password,
         [
             'status'           => 'active',
@@ -126,6 +129,21 @@ try {
 } catch (Throwable $e) {
     error_log('process_registration_jobs: finishSelfRegistration failed for tenant ' . $tenantId . ': ' . $e->getMessage());
 }
+
+// Smart BMS is not self-service — locked until a superadmin approves, exactly as
+// a web signup (registerTenant()). Superadmins are told either way.
+$needsApproval = !empty($choice['ok']) && (string)($choice['plan']['product_key'] ?? '') === 'bms_full';
+try {
+    if ($needsApproval) holdTenantForApproval($tenantId);
+} catch (Throwable $e) {
+    error_log('process_registration_jobs: holdTenantForApproval failed for tenant ' . $tenantId . ': ' . $e->getMessage());
+}
+try {
+    notifySuperadminsOfNewRegistration($tenantId, (string)$job['subdomain'], (string)$job['owner_email'], (string)$job['company_name'],
+        $needsApproval ? (string)($choice['plan']['name'] ?? '') : null);
+} catch (Throwable $e) {
+    error_log('process_registration_jobs: notifySuperadminsOfNewRegistration: ' . $e->getMessage());
+}
 // On BJP's install (BMS_VENDOR_CONTEXT=1) the new company becomes a customer now;
 // elsewhere vendor_bridge_retry / background jobs on the root pick it up.
 try {
@@ -159,16 +177,17 @@ try {
             );
             $tpdo->exec("SET time_zone = '+03:00'");
 
-            // Find the owner user (provisioner stores phone as username)
+            // Find the owner user (the provisioner stored $loginName as username)
             $userStmt = $tpdo->prepare("SELECT user_id FROM users WHERE username = ? LIMIT 1");
-            $userStmt->execute([$job['owner_phone']]);
+            $userStmt->execute([$loginName]);
             $userId = $userStmt->fetchColumn();
 
             if (!$userId) {
                 $userId = $tpdo->query("SELECT user_id FROM users WHERE role_id = 1 LIMIT 1")->fetchColumn();
             }
 
-            if ($userId) {
+            // A company waiting for Smart BMS approval is locked — no token until approved.
+            if ($userId && !$needsApproval) {
                 $token = bin2hex(random_bytes(32));
                 $tpdo->prepare("
                     INSERT INTO mobile_tokens (token, user_id, device_name, expires_at)

@@ -3,6 +3,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/mobile_auth.php';
+require_once __DIR__ . '/../../../core/price_check.php';
 mobileBearerAuth();
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
@@ -219,6 +220,8 @@ try {
                                              array_keys($openingByShop), array_values($openingByShop)),
         'image_url'       => $image_url,
         'message'         => ucfirst($kind) . ' created successfully',
+        // Saved as typed; the app asks "Is this correct?" like the web (core/price_check.php).
+        'warnings'        => priceCheckWarnings($cost_price, $selling_price, $extra['wholesale_price'] ?? null),
     ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

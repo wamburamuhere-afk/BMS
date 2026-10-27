@@ -3,6 +3,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/mobile_auth.php';
+require_once __DIR__ . '/../../../core/price_check.php';
 mobileBearerAuth();
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
@@ -178,6 +179,10 @@ try {
         'stock_adjustment'  => $stockResults[0] ?? null,
         'stock_adjustments' => $stockResults,
         'image_url'         => $image_url,
+        // When a price was sent: the web's "Is this correct?" check on the resulting figures.
+        'warnings'          => array_intersect_key($body, array_flip(['selling_price', 'cost_price', 'wholesale_price']))
+            ? priceCheckWarnings($set['cost_price'] ?? $existing['cost_price'], $selling, $set['wholesale_price'] ?? null)
+            : [],
     ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

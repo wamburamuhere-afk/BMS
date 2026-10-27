@@ -28,6 +28,7 @@ require_once __DIR__ . '/../../core/mobile_auth.php'; mobileBearerAuth();
 require_once __DIR__ . '/../../core/stock_intake.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/price_check.php';
 require_once __DIR__ . '/../../core/gl_accounts.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/pos_nav.php';        // posSimpleModeEnabled()
@@ -281,6 +282,8 @@ try {
         'message' => t('Product restocked successfully!'),
         'batch_id' => $intake['batch_id'],
         'reference_number' => $ref,
+        // Saved as typed; the app asks "Is this correct?" like the web form (core/price_check.php).
+        'warnings' => priceCheckWarnings($buying_price, $selling_price, $wholesale_price),
     ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

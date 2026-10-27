@@ -35,7 +35,10 @@ try {
         exit;
     }
 
-    $language = get_setting('user_language_' . $user_id, 'en');
+    // The EFFECTIVE language: an admin can set one for the whole company
+    // (Language Mode = organization, core/i18n.php orgLanguage()); else the user's own.
+    $orgLang  = function_exists('orgLanguage') ? orgLanguage() : null;
+    $language = $orgLang ?? get_setting('user_language_' . $user_id, 'en');
     $currency = get_setting('company_currency', 'TZS');
 
     // ── Company ───────────────────────────────────────────────────────────────
@@ -117,6 +120,10 @@ try {
 
         // Shop mode: true = "Duka/Shop" wording; false = "Ghala/Warehouse" wording
         'shop_mode'            => get_setting('shop_mode', '0') === '1',
+
+        // Record Old Sale: how many days back an old sale may be dated
+        // (core/pos_old_sales.php; POS Settings, default 30).
+        'old_sale_max_days'    => (int)get_setting('pos_old_sale_max_days', '30') ?: 30,
     ];
     // Loyalty (POS Advanced plans only — same entitlement gate as the web settings page).
     $loyaltyEntitled = function_exists('canView') && canView('pos_advanced');
@@ -151,10 +158,66 @@ try {
         'users_manage'      => isAdmin(),
         'company_edit'      => isAdmin(),
         'pos_settings_edit' => function_exists('canEdit') ? canEdit('pos_config_settings') : false,
+        // Record Old Sale (process_sale old_sale + old_sale_context) — same gate as the web button.
+        'pos_past_sales'    => function_exists('canView') ? canView('pos_past_sales') : false,
+    ];
+
+    // ── Plan limits (core/tenant_quotas.php): null max = unlimited ────────────
+    $limits = [
+        'shops' => ['used' => function_exists('tenantActiveShopCount') ? tenantActiveShopCount($pdo) : null,
+                    'max'  => function_exists('tenantShopLimit') ? tenantShopLimit() : null],
+        'users' => ['used' => function_exists('tenantActiveUserCount') ? tenantActiveUserCount($pdo) : null,
+                    'max'  => function_exists('tenantUserLimit') ? tenantUserLimit() : null],
+    ];
+
+    // ── Subscription summary for every user (the web's header banner) ─────────
+    // Admins open the full page via api/mobile/subscription.php (can_manage).
+    $subscription = null;
+    if (function_exists('bmsCurrentTenant') && ($tRow = bmsCurrentTenant())) {
+        require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php';
+        $endsAt   = tenantAccessEndsAt($tRow);
+        $daysLeft = tenantDaysRemaining($tRow);
+        $graceUntil = !empty($tRow['grace_until']) ? substr((string)$tRow['grace_until'], 0, 10) : null;
+        $state = $endsAt === null ? 'no_end'
+               : ($daysLeft !== null && $daysLeft < 0 ? 'grace' : ((string)$tRow['status'] === 'trial' ? 'trial' : 'active'));
+        $planName = null;
+        if (!empty($tRow['plan'])) {
+            try {
+                $ps = getControlPdo()->prepare("SELECT name FROM plans WHERE plan_key = ?");
+                $ps->execute([(string)$tRow['plan']]);
+                $planName = $ps->fetchColumn() ?: null;
+            } catch (Throwable $e) { /* plan catalogue not set up */ }
+        }
+        $subscription = [
+            'plan_key'   => $tRow['plan'] ?? null,
+            'plan_name'  => $planName,
+            'status'     => $state,                 // trial | active | grace | no_end
+            'ends_at'    => $endsAt !== null ? substr($endsAt, 0, 10) : null,
+            'days_left'  => $daysLeft,              // negative while in grace
+            'grace_until'     => $state === 'grace' ? $graceUntil : null,
+            'grace_days_left' => $state === 'grace' && $graceUntil ? max(0, (int)floor((strtotime($graceUntil) - strtotime('today')) / 86400)) : null,
+            // Same rule as the web banner: last 7 days before the end, or in grace.
+            'warning'    => $state === 'grace' || ($daysLeft !== null && $daysLeft >= 0 && $daysLeft <= 7),
+            'can_manage' => isAdmin(),
+        ];
+    }
+
+    // ── "Ask Smart POS / Ask BMS" (api/mobile/ai_ask.php) — same gates as the web chat ──
+    require_once __DIR__ . '/../../core/ai_service.php';
+    $aiAllowed = (!function_exists('tenantFeatureEnabled') || tenantFeatureEnabled('ai_assistant')) && canView('ai_assistant');
+    $aiReady   = $aiAllowed && aiConfigured();
+    $ai = [
+        'allowed'       => $aiAllowed,                       // module on + this user may use it
+        'ready'         => $aiReady,                         // … and a key is set: show the chat
+        'limit_reached' => $aiReady && !empty(aiCapInfo()['exceeded']),
+        'name'          => function_exists('aiProductName') ? aiProductName() : 'Smart POS',
     ];
 
     echo json_encode([
         'success' => true,
+        'limits'  => $limits,
+        'subscription' => $subscription,
+        'ai'      => $ai,
         'user'    => [
             'id'         => (int)$user['user_id'],
             'name'       => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
@@ -165,6 +228,8 @@ try {
             'phone'      => $user['username']   ?? '',
             'email'      => $user['email']      ?? '',
             'language'   => $language,
+            'language_mode'   => $orgLang !== null ? 'organization' : 'user',
+            'language_locked' => $orgLang !== null,   // true → hide the app's language switch
             'currency'   => $currency,
             'is_admin'   => isAdmin(),
             'avatar_url' => !empty($user['avatar']) ? 'uploads/avatars/' . basename($user['avatar']) : '',

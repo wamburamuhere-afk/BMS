@@ -1,5 +1,91 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): "Ask Smart POS" AI chat in the Flutter app (mobile API upgrade, Phase 9)
+
+**Files:** `api/mobile/ai_ask.php` (new), `api/mobile/me.php`, `tests/test_mobile_ai_cli.php` (new)
+
+- **`POST api/mobile/ai_ask.php`** (`question`) → `{answer, used}`: runs the web endpoint `api/ai/ask.php` itself — the AI Assistant module and permission, the company's or BJP's key, the monthly cap, the rate limit, answers only from what this user may open, in their language. Optional `client_uuid` for safe retries.
+- **`me.php` → `ai`:** `allowed`, `ready` (show the chat — the same rule as the web's floating chat), `limit_reached`, `name` ("Smart POS" / "BMS").
+- **Test:** 12 checks over HTTP — no key (not ready, 422), a key set (ready; empty question 422; the provider address refused by the AI service's SSRF guard → clean error, nothing leaves the machine), cap reached, module off (403), no token (401). AI suites pass; `test_ai_foundation_cli` fails 1 the same on develop.
+
+## 2026-10-27 — feat(mobile): Help & Support in the Flutter app (mobile API upgrade, Phase 8)
+
+**Files:** `api/mobile/support.php` (new), `tests/test_mobile_support_cli.php` (new), `tests/helpers/mobile_http.inc.php`, `tests/test_mobile_old_sale_cli.php`, `tests/test_mobile_subscription_cli.php`, `tests/test_mobile_language_mode_cli.php`, `tests/test_mobile_parity_cli.php`
+
+- **`api/mobile/support.php?action=…`:** help articles (`home`, `search`, `article`, `feedback`, `dismiss_notice`) and support requests (`create`, `list`, `reply`, `resolve`, `rate`, `forward`, files as multipart `attachments[]`) run the web endpoints themselves — same rules: the `help` permission, staff see their own requests and admins the company's, staff → admin → BJP forwarding, same notifications.
+- **`view`** (new for the app): one request with its conversation (author, mine, body, time, attachments with a download URL) and the same buttons the web Help page shows (`can_reply`, `can_resolve`, `can_forward`, `can_rate`). **`attachment`** downloads a file through the web's own access check.
+- **Test helper fix:** a failing test no longer leaves its throwaway company and server behind (`mhStopAll()` runs before `exit(1)`); `mhStart()` can capture mail in its server (`capture_mail`).
+- **Test:** 22 checks over HTTP — articles (home, search, open, unknown 404, GET 405), a request with a screenshot (list, view, download the PNG, reply, resolve, rate), too-short refused, mail captured not sent, staff cannot see or open the owner's request, no token 401. All support-center suites pass.
+
+## 2026-10-27 — feat(mobile): price warnings + product/stock/expense parity for the app (mobile API upgrade, Phase 7)
+
+**Files:** `core/price_check.php` (new), `api/mobile/products/create.php`, `api/mobile/products/update.php`, `api/pos/quick_restock.php`, `tests/test_mobile_parity_cli.php` (new)
+
+- **Selling below the buying price, for the app:** the web asks "Is this correct?" in the browser (`assets/js/bms-price-check.js`); the app had nothing. `products/create`, `products/update` (when a price is sent) and `pos/quick_restock` now return a non-blocking `warnings` list — `below_buying_retail`, `below_buying_wholesale`, `wholesale_above_retail`, each with the same translated sentence. The figures are saved as typed, exactly like the web's "Yes, keep it".
+- **Checked and documented (no code change needed):** `products/delete` is refused with **409** while any shop holds stock and keeps every past sale and movement; `expenses/create` takes an optional `warehouse_id` (the shop's profit), like the web form; the dashboard chart's `fill_gaps=1` returns every day; subscription services stay out of the POS (BJP install only).
+- **Test:** 21 checks — the rule itself, then over HTTP: create (saved + warned), update with and without prices, restock (saved + warned), delete refused with stock / allowed at zero with history kept, expense on its shop, chart with all 30 days. Related suites pass; `test_supplier_access_simple_pos_cli` (1) and `test_warehouse_batches_tab_cli` (4) fail the same on develop.
+
+## 2026-10-27 — fix(mobile): the app follows the company's language mode (mobile API upgrade, Phase 6)
+
+**Files:** `api/mobile/login.php`, `api/mobile/me.php`, `api/mobile/profile/language.php`, `lang/sw.php`, `tests/test_mobile_language_mode_cli.php` (new)
+
+- **The gap:** when an admin sets one language for everyone (Settings → General → Language Mode = organization), the web follows it but the app showed each user's own choice and let them save another.
+- **Now:** `login.php` and `me.php` return the **effective** language plus `language_mode` (`user` | `organization`) and `language_locked`; `profile/language` refuses with **409** "Language is set by your organization" (Swahili: "Lugha imewekwa na kampuni yako"), like the web switch. The user's own choice is kept and returns when the mode goes back to per-user.
+- **Test:** 14 checks over HTTP — per-user switch, organization English and Swahili (login, me, refusal, server messages), back to per-user. Related suites pass; three fail the same on develop (`test_activity_log_permission_and_sell_label_cli`, `test_dashboard_kpi_row_cli`, `test_my_settings_help_i18n_cli`).
+
+## 2026-10-27 — feat(mobile): Subscription in the Flutter app (mobile API upgrade, Phase 5)
+
+**Files:** `api/mobile/subscription.php` (new), `api/mobile/me.php`, `api/mobile/notifications/list.php`, `tests/test_mobile_subscription_cli.php` (new)
+
+- **`api/mobile/subscription.php?action=…`:** the web Subscription page for the app — `status`, `catalog`, `documents`, `badge`, `request`, `contracts`, `contract_sign`. It runs the web endpoint `api/my_subscription.php` itself (one copy of the logic): admins only, this company only, POSTs accepted with the Bearer token (JSON or form; optional `client_uuid` for safe retries).
+- **`me.php` → `subscription` (every user):** `plan_key`, `plan_name`, `status` (`trial` | `active` | `grace` | `no_end`), `ends_at`, `days_left`, `grace_until`, `grace_days_left`, `warning` (the web banner's rule: last 7 days, or in grace) and `can_manage` (admin).
+- **App notifications:** new first group **Subscription** — "Your free trial / subscription ends in N days" in the last 7 days, then "…has ended. Your grace period ends in N days", same wording as the web banner.
+- **Test:** 24 checks over HTTP — trial / paid / grace / no end date in `me.php` and notifications, status matches the web page, POST and JSON bodies pass the web rules (422) through CSRF, BJP-backed actions answer like the web page, unknown action 422, staff see the summary but get 403 on the page, no token 401. Related suites pass; `test_settings_admin_drawer_cli` fails 1 the same on develop.
+
+## 2026-10-27 — fix(mobile): app signup matches the web — plans, username, Smart BMS approval, plan limits (mobile API upgrade, Phase 4)
+
+**Files:** `api/mobile/register.php`, `api/mobile/register_status.php`, `api/mobile/me.php`, `cron/process_registration_jobs.php`, `scripts/setup_control_db.php`, `tests/test_mobile_signup_plans_cli.php` (new), `tests/helpers/mobile_http.inc.php`
+
+- **Bug fixed — Smart BMS approval was skipped from the app:** a Smart BMS plan chosen in the app went live straight away; the web locks it until a superadmin approves. The registration worker now holds it (`holdTenantForApproval`), issues no token, and `register.php` / `register_status` return `pending_approval: true` with a "waiting for approval" message.
+- **Superadmins are told about app signups** too (bell for Smart BMS requests + the "new company registered" email), as for web signups.
+- **Username:** optional `owner_username` (same rule as the web: starts with a letter, 3–50); empty keeps the phone as the username. New control column `registration_jobs.owner_username` (deploy adds it).
+- **Phone:** spaces, dashes, dots and brackets are ignored and 7–15 digits are required, as on the web (before: only spaces removed, no digit check).
+- **Plan:** `register_status` returns the chosen `plan` (key, term, name, product).
+- **`me.php` → `limits`:** `shops` and `users` as `{used, max}` (null max = unlimited), so the app can show "1 of 1 shops" before the server refuses with `shop_limit_reached`.
+- **Test:** 24 checks over HTTP — public offers, refusals (bad phone / username / plan), Smart POS signup with plan + username (token, plan, unformatted phone, sign-in by username), limits and the shop-limit refusal, Smart BMS signup locked with no token and the superadmin bell. Related suites re-run; `test_pos_phase8_registers_cli` (3) fails the same on develop; `test_service_plans_customer_link_cli` passes alone (it fails only after other suites leave queue rows behind — cleared).
+
+## 2026-10-27 — feat(mobile): Record Old Sale in the Flutter app (mobile API upgrade, Phase 3)
+
+**Files:** `api/mobile/me.php`, `api/pos/save_pos_setting.php`, `api/pos/get_z_report.php`, `tests/helpers/mobile_http.inc.php` (new), `tests/test_mobile_old_sale_cli.php` (new)
+
+- **The gap:** the server already took old sales from the app (`process_sale` `old_sale` + `sold_at`, `old_sale_context`, `void_sale`), but the app could not tell who may use it or how far back, could not change the limit, and its Z-report did not show old sales.
+- **`me.php`:** `permissions.pos_past_sales` (same gate as the web button) and `pos_settings.old_sale_max_days` (POS Settings, default 30).
+- **`save_pos_setting`:** accepts `pos_old_sale_max_days` (1–365), like the web POS Settings page.
+- **`get_z_report` (app Z-report):** adds `recorded_later` (old sales in the shift: when it happened + when typed in) and `is_backdated_shift`, matching the web Z-report.
+- **Test helper:** `tests/helpers/mobile_http.inc.php` — throwaway company + local server + Bearer calls, reused by the next phases.
+- **Test:** 21 checks over HTTP — owner vs staff permission, the setting (save / 0 / 400), shop + product from the app, an old sale yesterday (receipt numbered that day, stored that day, `is_past_entry`), Z-report, future / too-old refused, void, staff refused (403). `test_pos_old_sale_flow_cli` fails the same on develop (local product below its minimum price); `test_mobile_api_http_cli` needs API credentials in the environment.
+
+## 2026-10-27 — feat(superadmin): bell alerts for company activity (mobile API upgrade, Phase 2)
+
+**Files:** `core/tenant_activity_alerts.php` (new), `core/superadmin_notifications.php`, `core/superadmin_ui.php`, `core/mobile_auth.php`, `actions/login.php`, `actions/superadmin_activity_scan.php` (new), `api/cron/trial_enforcement.php`, `app/superadmin/tenant_view.php`, `scripts/setup_control_db.php`, `tests/test_superadmin_activity_alerts_cli.php` (new)
+
+- **New bell alerts, once per company:** **First sign-in** (web or app — instant, the app one says "on the mobile app"), **First product**, **First sale** (completed sales or issued invoices; a held cart does not count), and **No activity** for 7, then 14, then 30 days (new activity re-arms it). Bell only, no email.
+- **No flood on go-live:** "first" alerts only for companies created after the feature went live, "no activity" only for companies active after it (`activity_alerts_since`, set on first use).
+- **When it runs:** first sign-in at web/app sign-in (`taaMarkActive()`, which also stamps Last Active); the others in a scan run by the daily cron and, at most every 10 minutes, in the background when a superadmin page is open (`actions/superadmin_activity_scan.php`). Only new companies' own databases are opened.
+- **Schema (deploy runs it):** `superadmin_notifications.type` gains `first_login`, `first_product`, `first_sale`, `inactive`; new control table `tenant_activity_alerts` remembers what was sent.
+- **Bell + tenant page:** own icons and a short banner for each new alert.
+- **Test:** 31 checks — real web and app sign-ins over HTTP, products and sales in a test company's database, all inactive stages, re-arm, no-flood rules, scan endpoint 405/401. Related suites re-run; `test_login_finalize_dispatch_cli` (3) and `test_login_history_cli` (4) fail the same on develop without this change.
+
+## 2026-10-27 — feat(mobile): superadmin sees Flutter app activity (mobile API upgrade, Phase 1)
+
+**Files:** `core/mobile_auth.php`, `api/mobile/login.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `tests/test_mobile_last_active_cli.php` (new), `mobile_api_upgrade_plan.md` (new)
+
+- **The gap:** the superadmin "Last Active" (`tenants.last_active_at`) was set only by web login, so a company that used only the app showed "Never".
+- **Now:** app sign-in sets it, and app use sets it too — at most once per 15 minutes per device (the token's previous "last used" time is the throttle, so normal app calls add no query).
+- **Tenant page → Users:** each user's last sign-in is labelled **App** or **Web**, with the app's last use and the device name underneath; the "most recent activity" line counts app use too.
+- **Plan:** `mobile_api_upgrade_plan.md` — 10 phases to bring the Flutter API level with the web (this is Phase 1).
+- **Test:** 18 checks, real HTTP calls with a Bearer token on a throwaway company (login, first call, throttle, after 15 min idle, bad token, App vs Web in the user list).
+
 ## 2026-10-27 — fix(pos): clearer phone POS for new cashiers (old-sale strip, balance label, choose-shop prompt)
 
 **Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
