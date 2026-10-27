@@ -104,6 +104,12 @@ $restaurant_pos_enabled = canView('restaurant_pos');
 $can_add_new_product = canCreate('products');
 $can_restock_product  = canView('pos_restock');
 
+// Record Old Sale (Rekodi Mauzo ya Zamani) — a sale made on an earlier day,
+// typed in now. Role-granted permission; rules live in core/pos_old_sales.php.
+require_once ROOT_DIR . '/core/pos_old_sales.php';
+$can_record_old_sale = canView('pos_past_sales');
+$old_sale_max_days   = posOldSaleMaxDays();
+
 $pos_simple = posSimpleModeEnabled();
 // A shift still open from an earlier day: cash totals keep accumulating into it.
 $shift_from_earlier_day = $shift_active && date('Y-m-d', strtotime($shift_active['start_time'])) < date('Y-m-d');
@@ -195,6 +201,47 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= wLabel('POS Workspace — stats, shift history, catalog setup', 'Sales Overview — stats, shift history, catalog setup') ?>">
                     <i class="bi bi-speedometer2"></i> <?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?>
                 </a>
+                <?php if ($can_record_old_sale): ?>
+                <div class="pos-old-sale-wrap me-2" id="oldSaleWrap">
+                    <button type="button" class="btn btn-outline-light btn-sm" id="oldSaleBtn" onclick="toggleOldSalePopover()"
+                            aria-haspopup="dialog" aria-expanded="false" aria-controls="oldSalePopover"
+                            title="<?= htmlspecialchars(t('Record a sale made on an earlier day')) ?>">
+                        <i class="bi bi-clock-history"></i>
+                        <span class="d-none d-md-inline"><?= t('Record Old Sale') ?></span><span class="d-md-none"><?= t('Old Sale') ?></span>
+                    </button>
+                    <span class="pos-old-sale-chip d-none" id="oldSaleChip">
+                        <button type="button" class="pos-old-sale-chip-open" onclick="toggleOldSalePopover()" title="<?= htmlspecialchars(t('Change the date or time')) ?>">
+                            <i class="bi bi-clock-history"></i> <span id="oldSaleChipText"></span>
+                        </button>
+                        <button type="button" class="pos-old-sale-chip-x" onclick="exitOldSaleMode()" aria-label="<?= htmlspecialchars(t('Exit old-sale mode')) ?>" title="<?= htmlspecialchars(t('Exit old-sale mode')) ?>">&times;</button>
+                    </span>
+                    <div class="pos-old-sale-pop d-none" id="oldSalePopover" role="dialog" aria-modal="false" aria-labelledby="oldSalePopTitle">
+                        <div class="fw-semibold mb-2" id="oldSalePopTitle"><?= t('When was this sale made?') ?></div>
+                        <div class="d-flex flex-wrap gap-1 mb-2" id="oldSaleQuick">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-days="1"><?= t('Yesterday') ?></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-days="2"><?= t('2 days ago') ?></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-days="3"><?= t('3 days ago') ?></button>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-7">
+                                <label class="form-label small mb-1" for="oldSaleDate"><?= t('Date') ?></label>
+                                <input type="date" class="form-control form-control-sm" id="oldSaleDate"
+                                       min="<?= date('Y-m-d', strtotime("-{$old_sale_max_days} days")) ?>" max="<?= date('Y-m-d') ?>">
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small mb-1" for="oldSaleTime"><?= t('Time') ?></label>
+                                <input type="time" class="form-control form-control-sm" id="oldSaleTime" value="12:00">
+                            </div>
+                        </div>
+                        <div class="small mb-2" id="oldSalePreview" aria-live="polite"></div>
+                        <div class="small text-muted mb-2"><?= sprintf(t('Allowed: the last %d days'), $old_sale_max_days) ?></div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-sm btn-light border" onclick="closeOldSalePopover()"><?= t('Cancel') ?></button>
+                            <button type="button" class="btn btn-sm btn-primary" id="oldSaleStartBtn" onclick="startOldSaleMode()" disabled><?= t('Start recording') ?></button>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
                     <i class="bi bi-cash"></i> <?= t('Open Drawer') ?>
@@ -406,7 +453,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             <!-- Current Sale Header -->
             <div class="p-3 border-bottom bg-white">
                 <div id="cartHeaderTop" class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0"><i class="bi bi-cart3"></i> <?= t('Current Sale') ?></h5>
+                    <h5 class="mb-0"><i class="bi bi-cart3" id="cartTitleIcon"></i> <span id="cartTitleText"><?= t('Current Sale') ?></span></h5>
                     <div id="cartHeaderActions" class="btn-group btn-group-sm">
                         <?php if (canEdit('pos_discount_override')): ?>
                         <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="<?= t('Apply Discount') ?>">
@@ -434,6 +481,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                         </button>
                     </div>
                 </div>
+                <div class="alert alert-primary py-2 px-2 small mb-2 d-none" id="oldSaleCartNote" role="status"></div>
                 <div class="row g-2 small">
                     <div class="col-6">
                         <div class="text-muted"><?= t('Receipt #') ?></div>
@@ -647,7 +695,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     <div class="offcanvas-header border-bottom py-2 px-3">
         <h6 class="offcanvas-title mb-0 fw-bold">
             <i class="bi bi-cart3 me-1 text-primary"></i>
-            <?= t('Current Sale') ?>
+            <span id="mobileCartTitleText"><?= t('Current Sale') ?></span>
             <span id="mobileCartOffcanvasCount" class="badge bg-primary ms-1 fw-normal">0</span>
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="<?= t('Close') ?>"></button>
@@ -668,7 +716,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         </div>
         <button class="btn btn-success w-100 fw-bold"
                 data-bs-dismiss="offcanvas"
-                onclick="processPayment()">
+                onclick="processPayment()" id="mobilePayBtn">
             <i class="bi bi-check-circle me-1"></i><?= t('PROCESS PAYMENT') ?>
         </button>
     </div>
@@ -683,6 +731,42 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 </script>
 
 <style>
+/* Record Old Sale — header button, pop-up (a bottom sheet on phones), chip
+   while the mode is on, and the cart header tint. White and blue, like the POS. */
+.pos-old-sale-wrap { display: inline-block; position: relative; vertical-align: middle; }
+.pos-old-sale-pop {
+    position: absolute; top: calc(100% + 8px); right: 0; width: 320px; z-index: 1085;
+    background: #fff; color: #212529; text-align: left; font-size: .875rem;
+    border: 1px solid #dee2e6; border-radius: 10px; padding: 12px 14px;
+    box-shadow: 0 10px 30px rgba(13, 32, 64, .22);
+}
+.pos-old-sale-pop::before {
+    content: ""; position: absolute; top: -7px; right: 28px; width: 12px; height: 12px;
+    background: #fff; border-left: 1px solid #dee2e6; border-top: 1px solid #dee2e6; transform: rotate(45deg);
+}
+.pos-old-sale-pop .btn-outline-primary.active { background: #0d6efd; color: #fff; }
+.pos-old-sale-backdrop { position: fixed; inset: 0; background: rgba(13, 32, 64, .42); z-index: 1084; }
+.pos-old-sale-chip {
+    display: inline-flex; align-items: center; gap: 4px; background: #fff; color: #0a58ca;
+    border-radius: 20px; padding: 2px 4px 2px 10px; font-size: .82rem; font-weight: 600; white-space: nowrap;
+}
+.pos-old-sale-chip button { border: 0; background: transparent; color: inherit; font-weight: 600; padding: 2px 0; }
+.pos-old-sale-chip .pos-old-sale-chip-x {
+    width: 24px; height: 24px; border-radius: 50%; background: #e7f1ff; line-height: 1; font-size: 1rem; padding: 0;
+}
+.pos-old-sale-chip button:focus-visible, .pos-old-sale-wrap .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.pos-old-sale-head { background: #e7f1ff !important; border-bottom: 2px solid #0d6efd !important; }
+.pos-old-sale-head #cartTitleText { color: #0b3a82; }
+@media (max-width: 767.98px) {
+    #posShiftButtons .pos-old-sale-wrap { flex: 1 1 0; display: flex; margin-right: 0 !important; }
+    #posShiftButtons .pos-old-sale-wrap > .btn { width: 100%; }
+    #posShiftButtons .pos-old-sale-chip { width: 100%; justify-content: space-between; }
+    .pos-old-sale-pop {
+        position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto;
+        border-radius: 16px 16px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .pos-old-sale-pop::before { display: none; }
+}
 #pos-container {
     height: 100vh;
     overflow: hidden;

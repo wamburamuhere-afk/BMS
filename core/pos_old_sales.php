@@ -136,10 +136,9 @@ if (!function_exists('posOldSaleResolveShift')) {
         $code = 'SHIFT-' . date('Ymd-His', $ts) . '-' . str_pad((string)mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
         $pdo->prepare("INSERT INTO cash_register_shifts
                           (shift_code, user_id, register_id, warehouse_id, start_time, end_time, starting_cash, ending_cash,
-                           expected_cash, cash_difference, status, is_past_entry, notes, closed_by, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 'closed', 1, ?, ?, NOW())")
-            ->execute([$code, $userId, $registerId ?: 1, $warehouseId, $soldAt, $soldAt,
-                       'Back-dated shift for sales recorded later (no cash count).', $userId]);
+                           expected_cash, cash_difference, status, is_past_entry, closed_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 'closed', 1, ?, NOW())")
+            ->execute([$code, $userId, $registerId ?: 1, $warehouseId, $soldAt, $soldAt, $userId]);
         $id = (int)$pdo->lastInsertId();
         $st = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE shift_id = ?");
         $st->execute([$id]);

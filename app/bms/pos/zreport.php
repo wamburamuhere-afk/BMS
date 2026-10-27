@@ -73,10 +73,16 @@ $returnCount   = $extras['return_count'];
 $unpostedCount = $extras['unposted_count'];
 
 // Transaction listing for the shift (receipt-level detail).
-$txStmt = $pdo->prepare("SELECT sale_id, receipt_number, sale_date, payment_method, grand_total, sale_status, is_return_sale
+// is_past_entry = an old sale typed in later (Record Old Sale); guarded for a
+// tenant that has not run migration 2026_10_27_pos_record_old_sale yet.
+$has_past_col = (bool)$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'is_past_entry'")->fetch();
+$txStmt = $pdo->prepare("SELECT sale_id, receipt_number, sale_date, payment_method, grand_total, sale_status, is_return_sale, created_at"
+                        . ($has_past_col ? ", is_past_entry" : ", 0 AS is_past_entry") . "
                             FROM pos_sales WHERE shift_id = ? ORDER BY sale_date");
 $txStmt->execute([$shift_id]);
 $transactions = $txStmt->fetchAll(PDO::FETCH_ASSOC);
+$recorded_later = array_values(array_filter($transactions, function ($t) { return !empty($t['is_past_entry']); }));
+$is_backdated_shift = !empty($shift['is_past_entry']);
 
 $company_name = getSetting('company_name', 'BUSINESS MANAGEMENT SYSTEM');
 $currency     = getSetting('currency', 'TZS');
@@ -105,6 +111,9 @@ $currency     = getSetting('currency', 'TZS');
         .badge-voided { background: #fde2e2; color: #a02020; }
         .badge-return { background: #fff3cd; color: #856404; }
         .badge-completed { background: #e6f4ea; color: #1a7f37; }
+        .badge-past { background: #0d6efd; color: #fff; }
+        .info-box { background: #e7f1ff; border: 1px solid #b6d4fe; color: #0b3a82; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; }
+        .muted { color: #777; font-size: 11px; }
         .warn-box { background: #fff3cd; border: 1px solid #ffe08a; color: #6b4e00; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; }
         @media print { .no-print { display: none; } }
     </style>
@@ -125,6 +134,12 @@ $currency     = getSetting('currency', 'TZS');
         <?php if ($shift['end_time']): ?> · <?= t('Closed:') ?> <?= date('d/m/Y H:i', strtotime($shift['end_time'])) ?><?php endif; ?>
         · <?= t('Status:') ?> <strong><?= htmlspecialchars(ucfirst($shift['status'])) ?></strong>
     </div>
+
+    <?php if ($is_backdated_shift): ?>
+    <div class="info-box">
+        <strong><?= t('Back-dated shift.') ?></strong> <?= t('Created for sales recorded later for this day. No cash was counted, so the counted cash follows the expected cash.') ?>
+    </div>
+    <?php endif; ?>
 
     <?php if ($unpostedCount > 0): ?>
     <div class="warn-box">
@@ -196,7 +211,7 @@ $currency     = getSetting('currency', 'TZS');
             <tbody>
                 <?php foreach ($transactions as $t): ?>
                 <tr>
-                    <td><?= htmlspecialchars($t['receipt_number']) ?></td>
+                    <td><?= htmlspecialchars($t['receipt_number']) ?><?php if (!empty($t['is_past_entry'])): ?> <span class="badge badge-past"><?= t('Old sale') ?></span><?php endif; ?></td>
                     <td><?= date('H:i', strtotime($t['sale_date'])) ?></td>
                     <td><?= $t['is_return_sale'] ? t('Return') : t('Sale') ?></td>
                     <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $t['payment_method']))) ?></td>
@@ -210,6 +225,26 @@ $currency     = getSetting('currency', 'TZS');
             </tbody>
         </table>
     </div>
+
+    <?php if ($recorded_later): ?>
+    <div class="section">
+        <h2><?= sprintf(t('Recorded later (%d)'), count($recorded_later)) ?></h2>
+        <table>
+            <thead><tr><th><?= t('Receipt #') ?></th><th><?= t('Sale time') ?></th><th><?= t('Entered') ?></th><th class="text-end"><?= t('Amount') ?></th><th><?= t('Status') ?></th></tr></thead>
+            <tbody>
+                <?php foreach ($recorded_later as $t): ?>
+                <tr>
+                    <td><?= htmlspecialchars($t['receipt_number']) ?></td>
+                    <td><?= date('d/m/Y H:i', strtotime($t['sale_date'])) ?></td>
+                    <td class="muted"><?= date('d/m/Y H:i', strtotime($t['created_at'])) ?></td>
+                    <td class="text-end"><?= number_format((float)$t['grand_total'], 2) ?></td>
+                    <td><?= htmlspecialchars(ucfirst($t['sale_status'])) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
 
     <?php if (!empty($shift['notes'])): ?>
     <div class="section"><h2><?= t('Notes') ?></h2><div><?= nl2br(htmlspecialchars($shift['notes'])) ?></div></div>

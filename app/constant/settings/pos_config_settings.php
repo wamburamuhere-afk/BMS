@@ -29,6 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Phase 10 (pos_upgrade_plan.md §7) — receipt printing preferences.
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
+        // Record Old Sale — how many days back a sale may be dated (core/pos_old_sales.php).
+        $old_days = (int)($_POST['pos_old_sale_max_days'] ?? 30);
+        save_setting('pos_old_sale_max_days', ($old_days >= 1 && $old_days <= 365) ? $old_days : 30);
         // Phase 11/13 — loyalty program settings only take effect for a
         // tenant actually entitled to 'pos_advanced'; silently ignored
         // otherwise so a raw POST can't turn it on without the entitlement.
@@ -48,7 +51,8 @@ $pos_products_display_limit_mobile = (int)get_setting('pos_products_display_limi
 $pos_discount_type      = get_setting('pos_discount_type', 'percentage');
 $pos_receipt_width      = get_setting('pos_receipt_width', '80');
 $pos_auto_print_receipt = get_setting('pos_auto_print_receipt', '0');
-$pos_loyalty_enabled          = get_setting('pos_loyalty_enabled', '0');
+$pos_old_sale_max_days  = (int)get_setting('pos_old_sale_max_days', '30');
+$pos_loyalty_enabled         = get_setting('pos_loyalty_enabled', '0');
 $pos_loyalty_spend_per_point  = get_setting('pos_loyalty_spend_per_point', '1000');
 $pos_loyalty_redeem_value     = get_setting('pos_loyalty_redeem_value', '50');
 $pos_currency = getSetting('currency', 'TZS');
@@ -132,6 +136,13 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                             <input type="checkbox" class="form-check-input" id="pos_auto_print_receipt" name="pos_auto_print_receipt" value="1" <?= $pos_auto_print_receipt == '1' ? 'checked' : '' ?>>
                             <label class="form-check-label" for="pos_auto_print_receipt"><?= t('Automatically open and print the receipt when a sale completes') ?></label>
                             <div class="form-text"><?= t('Sends the receipt straight to your browser\'s print dialog / default printer — no "Print Receipt" click needed. Requires a printer already set as your OS/browser default.') ?></div>
+                        </div>
+
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Record Old Sale') ?></h6>
+                        <div class="mb-3">
+                            <label for="pos_old_sale_max_days" class="form-label"><?= t('How many days back an old sale may be dated') ?></label>
+                            <input type="number" class="form-control" id="pos_old_sale_max_days" name="pos_old_sale_max_days" min="1" max="365" step="1" value="<?= (int)$pos_old_sale_max_days ?: 30 ?>" style="max-width: 160px;">
+                            <div class="form-text"><?= t('People with the "POS Record Old Sale" permission can record a sale made up to this many days ago (1 to 365). Admins have it; give it to other roles in Roles & Permissions.') ?></div>
                         </div>
 
                         <?php if ($pos_advanced_entitled): ?>
