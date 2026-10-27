@@ -132,7 +132,7 @@ The app does what the web does, everywhere:
 
 | Phase | Status |
 |---|---|
-| 1 Last Active | in progress |
+| 1 Last Active | ✅ done 2026-10-27 — 18 checks (tests/test_mobile_last_active_cli.php) |
 | 2 Superadmin bell | — |
 | 3 Old sale | — |
 | 4 Plans + shop limit | — |

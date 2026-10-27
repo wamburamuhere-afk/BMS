@@ -993,7 +993,7 @@ if (!function_exists('tenantUserDirectory')) {
      * panel can warn that an admin is one forgotten password away from being
      * locked out for good, BEFORE it happens — see accountsWithoutRecoveryContact().
      *
-     * @return array<int,array{user_id:int,name:string,username:string,email:string,phone:string,role:string,is_admin:bool,is_active:bool,has_recovery_email:bool,last_login:?string,created_at:?string}>|null
+     * @return array<int,array{user_id:int,name:string,username:string,email:string,phone:string,role:string,is_admin:bool,is_active:bool,has_recovery_email:bool,last_login:?string,last_login_via:?string,app_last_used:?string,app_device:?string,created_at:?string}>|null
      */
     function tenantUserDirectory(int $tenantId): ?array
     {
@@ -1011,6 +1011,27 @@ if (!function_exists('tenantUserDirectory')) {
                 $t['db_username'], $pw,
                 [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
             );
+            // Same clock the app writes with (tenant_bootstrap), so the app's
+            // TIMESTAMP columns compare correctly with users.last_login.
+            $tPdo->exec("SET time_zone = '+03:00'");
+
+            // Flutter app use per user: newest sign-in, last request, device.
+            $app = [];
+            try {
+                foreach ($tPdo->query("
+                    SELECT mt.user_id, mt.device_name, mt.created_at AS signed_in,
+                           COALESCE(mt.last_used_at, mt.created_at) AS used
+                    FROM mobile_tokens mt
+                    ORDER BY COALESCE(mt.last_used_at, mt.created_at) DESC
+                ") as $m) {
+                    $uid = (int)$m['user_id'];
+                    if (!isset($app[$uid])) {
+                        $app[$uid] = ['used' => (string)$m['used'], 'device' => (string)$m['device_name'], 'signed_in' => (string)$m['signed_in']];
+                    } elseif ((string)$m['signed_in'] > $app[$uid]['signed_in']) {
+                        $app[$uid]['signed_in'] = (string)$m['signed_in'];
+                    }
+                }
+            } catch (Throwable $e) { /* no mobile_tokens table on this company */ }
 
             $rows = $tPdo->query("
                 SELECT user_id, first_name, last_name, username, email, phone,
@@ -1038,6 +1059,14 @@ if (!function_exists('tenantUserDirectory')) {
                     // password?" at all. The panel turns this into a warning.
                     'has_recovery_email' => $email !== '',
                     'last_login' => $r['last_login'] !== null ? (string)$r['last_login'] : null,
+                    // Where that last sign-in happened: the app stamps last_login
+                    // in the same second it issues the token (api/mobile/login.php).
+                    'last_login_via' => $r['last_login'] === null ? null
+                        : (isset($app[(int)$r['user_id']])
+                           && abs(strtotime((string)$r['last_login']) - strtotime($app[(int)$r['user_id']]['signed_in'])) <= 60
+                           ? 'app' : 'web'),
+                    'app_last_used' => $app[(int)$r['user_id']]['used'] ?? null,
+                    'app_device'    => $app[(int)$r['user_id']]['device'] ?? null,
                     'created_at' => $r['created_at'] !== null ? (string)$r['created_at'] : null,
                 ];
             }

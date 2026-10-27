@@ -95,6 +95,8 @@ try {
     // Stamp last_login the same way the web login does
     $pdo->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")
         ->execute([$user['user_id']]);
+    // …and the superadmin's "Last Active" for the company, as web login does.
+    mobileTouchTenantActive();
 
     // Language per-user from system_settings
     $language = get_setting('user_language_' . $user['user_id'], 'en');
