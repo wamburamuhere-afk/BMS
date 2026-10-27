@@ -136,7 +136,7 @@ The app does what the web does, everywhere:
 | 2 Superadmin bell | ✅ done 2026-10-27 — 31 checks (tests/test_superadmin_activity_alerts_cli.php) |
 | 3 Old sale | ✅ done 2026-10-27 — 21 checks (tests/test_mobile_old_sale_cli.php); gap found + fixed: app Z-report had no "recorded later" |
 | 4 Plans + shop limit | ✅ done 2026-10-27 — 24 checks (tests/test_mobile_signup_plans_cli.php); bug fixed: Smart BMS from the app skipped approval; added username, phone rule, superadmin notice |
-| 5 Subscription | — |
+| 5 Subscription | ✅ done 2026-10-27 — 24 checks (tests/test_mobile_subscription_cli.php); single endpoint api/mobile/subscription.php?action= (runs the web endpoint) |
 | 6 Language mode | — |
 | 7 Parity | — |
 | 8 Help & Support | — |

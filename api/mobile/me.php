@@ -167,9 +167,42 @@ try {
                     'max'  => function_exists('tenantUserLimit') ? tenantUserLimit() : null],
     ];
 
+    // ── Subscription summary for every user (the web's header banner) ─────────
+    // Admins open the full page via api/mobile/subscription.php (can_manage).
+    $subscription = null;
+    if (function_exists('bmsCurrentTenant') && ($tRow = bmsCurrentTenant())) {
+        require_once __DIR__ . '/../../core/tenant_lifecycle_policy.php';
+        $endsAt   = tenantAccessEndsAt($tRow);
+        $daysLeft = tenantDaysRemaining($tRow);
+        $graceUntil = !empty($tRow['grace_until']) ? substr((string)$tRow['grace_until'], 0, 10) : null;
+        $state = $endsAt === null ? 'no_end'
+               : ($daysLeft !== null && $daysLeft < 0 ? 'grace' : ((string)$tRow['status'] === 'trial' ? 'trial' : 'active'));
+        $planName = null;
+        if (!empty($tRow['plan'])) {
+            try {
+                $ps = getControlPdo()->prepare("SELECT name FROM plans WHERE plan_key = ?");
+                $ps->execute([(string)$tRow['plan']]);
+                $planName = $ps->fetchColumn() ?: null;
+            } catch (Throwable $e) { /* plan catalogue not set up */ }
+        }
+        $subscription = [
+            'plan_key'   => $tRow['plan'] ?? null,
+            'plan_name'  => $planName,
+            'status'     => $state,                 // trial | active | grace | no_end
+            'ends_at'    => $endsAt !== null ? substr($endsAt, 0, 10) : null,
+            'days_left'  => $daysLeft,              // negative while in grace
+            'grace_until'     => $state === 'grace' ? $graceUntil : null,
+            'grace_days_left' => $state === 'grace' && $graceUntil ? max(0, (int)floor((strtotime($graceUntil) - strtotime('today')) / 86400)) : null,
+            // Same rule as the web banner: last 7 days before the end, or in grace.
+            'warning'    => $state === 'grace' || ($daysLeft !== null && $daysLeft >= 0 && $daysLeft <= 7),
+            'can_manage' => isAdmin(),
+        ];
+    }
+
     echo json_encode([
         'success' => true,
         'limits'  => $limits,
+        'subscription' => $subscription,
         'user'    => [
             'id'         => (int)$user['user_id'],
             'name'       => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),

@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): Subscription in the Flutter app (mobile API upgrade, Phase 5)
+
+**Files:** `api/mobile/subscription.php` (new), `api/mobile/me.php`, `api/mobile/notifications/list.php`, `tests/test_mobile_subscription_cli.php` (new)
+
+- **`api/mobile/subscription.php?action=…`:** the web Subscription page for the app — `status`, `catalog`, `documents`, `badge`, `request`, `contracts`, `contract_sign`. It runs the web endpoint `api/my_subscription.php` itself (one copy of the logic): admins only, this company only, POSTs accepted with the Bearer token (JSON or form; optional `client_uuid` for safe retries).
+- **`me.php` → `subscription` (every user):** `plan_key`, `plan_name`, `status` (`trial` | `active` | `grace` | `no_end`), `ends_at`, `days_left`, `grace_until`, `grace_days_left`, `warning` (the web banner's rule: last 7 days, or in grace) and `can_manage` (admin).
+- **App notifications:** new first group **Subscription** — "Your free trial / subscription ends in N days" in the last 7 days, then "…has ended. Your grace period ends in N days", same wording as the web banner.
+- **Test:** 24 checks over HTTP — trial / paid / grace / no end date in `me.php` and notifications, status matches the web page, POST and JSON bodies pass the web rules (422) through CSRF, BJP-backed actions answer like the web page, unknown action 422, staff see the summary but get 403 on the page, no token 401. Related suites pass; `test_settings_admin_drawer_cli` fails 1 the same on develop.
+
 ## 2026-10-27 — fix(mobile): app signup matches the web — plans, username, Smart BMS approval, plan limits (mobile API upgrade, Phase 4)
 
 **Files:** `api/mobile/register.php`, `api/mobile/register_status.php`, `api/mobile/me.php`, `cron/process_registration_jobs.php`, `scripts/setup_control_db.php`, `tests/test_mobile_signup_plans_cli.php` (new), `tests/helpers/mobile_http.inc.php`
