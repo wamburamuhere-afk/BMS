@@ -52,8 +52,14 @@ try {
         ? "(SELECT COALESCE(SUM(amount),0) FROM pos_sale_payments psp WHERE psp.sale_id = ps.sale_id)"
         : "CASE WHEN ps.payment_status = 'paid' THEN ps.grand_total ELSE 0 END";
 
+    // Old sales typed in later (Record Old Sale) carry is_past_entry; guarded for a
+    // tenant that has not run migration 2026_10_27_pos_record_old_sale yet.
+    $hasPastCol = (bool)$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'is_past_entry'")->fetch();
+    $pastExpr   = $hasPastCol ? "ps.is_past_entry" : "0";
+
     $sql = "SELECT ps.sale_id, ps.receipt_number, ps.sale_date, ps.grand_total, ps.tax_amount,
                    ps.payment_method, ps.payment_status, ps.sale_status, ps.is_return_sale,
+                   {$pastExpr} AS is_past_entry, ps.created_at,
                    ps.original_sale_id, ps.void_reason,
                    COALESCE(NULLIF(ps.customer_name,''), c.customer_name, c.company_name, 'Walk-in') AS party,
                    pr.project_name, {$paidExpr} AS amount_paid
@@ -75,7 +81,8 @@ try {
         $r['grand_total']    = (float)$r['grand_total'];
         $r['tax_amount']     = (float)$r['tax_amount'];
         $r['is_return_sale'] = (int)$r['is_return_sale'];
-        $r['amount_paid']    = (float)($r['amount_paid'] ?? 0);
+        $r['is_past_entry']  = (int)$r['is_past_entry'];
+        $r['amount_paid']   = (float)($r['amount_paid'] ?? 0);
         $r['balance_due']    = round($r['grand_total'] - $r['amount_paid'], 2);
         $r['can_void']       = ($r['is_return_sale'] === 0 && $r['sale_status'] === 'completed');
         $r['can_return']     = ($r['is_return_sale'] === 0 && in_array($r['sale_status'], ['completed', 'partially_refunded'], true));

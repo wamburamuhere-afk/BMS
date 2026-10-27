@@ -27,6 +27,7 @@ require_once __DIR__ . '/../../core/pos_credit_limit.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
 require_once __DIR__ . '/../../core/service_plans.php';
+require_once __DIR__ . '/../../core/pos_old_sales.php';
 mobileBearerAuth();
 
 if (!isset($_SESSION['user_id'])) {
@@ -68,6 +69,19 @@ try {
     // Read body once here — php://input is a one-shot stream.
     $_posRawBody    = file_get_contents('php://input');
     $_posEarlyInput = json_decode($_posRawBody, true) ?: [];
+
+    // Self-heal the "Record Old Sale" flags (migration 2026_10_27_pos_record_old_sale)
+    // for a tenant that hasn't run it yet — DDL must stay outside the transaction.
+    if (!empty($_posEarlyInput['old_sale'])) {
+        try {
+            if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'is_past_entry'")->fetch()) {
+                $pdo->exec("ALTER TABLE pos_sales ADD COLUMN is_past_entry TINYINT(1) NOT NULL DEFAULT 0");
+            }
+            if (!$pdo->query("SHOW COLUMNS FROM cash_register_shifts LIKE 'is_past_entry'")->fetch()) {
+                $pdo->exec("ALTER TABLE cash_register_shifts ADD COLUMN is_past_entry TINYINT(1) NOT NULL DEFAULT 0");
+            }
+        } catch (PDOException $_ddlE) {}
+    }
 
     // Idempotency pre-check (read-only, outside the transaction).
     // If this client_uuid is already committed, return the original result immediately
@@ -138,7 +152,8 @@ try {
     if (is_array($items) && ($mapped = spPlatformMappedNames($pdo, array_column(array_filter($items, 'is_array'), 'product_id')))) {
         throw new Exception('"' . reset($mapped) . '" is a system subscription. Sell this through an invoice so the company\'s subscription is extended.', 422);
     }
-    $receipt_number = $input['receipt_number'] ?? nextReceiptNumber($pdo);
+    // Allocated below, once the sale's own date is known (an old sale numbers on its day).
+    $receipt_number = $input['receipt_number'] ?? null;
     $split_details = $input['split_details'] ?? null;
 
     // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales only
@@ -162,6 +177,28 @@ try {
             $sold_at         = date('Y-m-d H:i:s', $ts);
             $sale_date_value = date('Y-m-d H:i:s', $ts);
         }
+    }
+
+    // Record Old Sale (core/pos_old_sales.php): a sale made on an earlier day,
+    // typed in now from the POS. Its own date and time decide the receipt number,
+    // the shift it lands in, and the date of its stock, ledger and bank entries.
+    $is_old_sale = !empty($input['old_sale']);
+    if ($is_old_sale) {
+        if (!canView('pos_past_sales')) {
+            throw new Exception(t('You do not have permission to record old sales.'), 403);
+        }
+        $old_at = trim((string)($input['sold_at'] ?? ''));
+        if ($old_err = posOldSaleTimeError($old_at)) {
+            throw new Exception($old_err, 422);
+        }
+        $sold_at = $sale_date_value = date('Y-m-d H:i:s', strtotime($old_at));
+        $receipt_number = null;   // never the terminal's own today-dated number
+    }
+    // The day every entry of this sale is dated: today for a normal sale, the
+    // sale's own day for an old sale or an offline sale synced later.
+    $effective_date = substr($sale_date_value, 0, 10);
+    if ($receipt_number === null) {
+        $receipt_number = nextReceiptNumber($pdo, $effective_date === date('Y-m-d') ? '' : date('Ymd', strtotime($effective_date)));
     }
 
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module. All three fields
@@ -226,9 +263,15 @@ try {
 
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
     // validated before the insert, not silently passed through as null.
-    $stmt = $pdo->prepare("SELECT shift_id, register_id, warehouse_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
-    $stmt->execute([$user_id]);
-    $shift = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($is_old_sale) {
+        // The cashier's own shift that covered that time, or a closed
+        // back-dated one for that day — never today's shift by default.
+        $shift = posOldSaleResolveShift($pdo, (int)$user_id, $sale_date_value, $warehouse_id, null);
+    } else {
+        $stmt = $pdo->prepare("SELECT shift_id, register_id, warehouse_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
+        $stmt->execute([$user_id]);
+        $shift = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     $shift_id = $shift['shift_id'] ?? null;
     if (!$shift_id) {
         throw new Exception("Please start a cash register shift before completing a sale.", 409);
@@ -838,8 +881,8 @@ try {
             $pmRow = in_array($payment_method, ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'], true) ? $payment_method : 'cash';
             $pdo->prepare("
                 INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW())
-            ")->execute([$sale_id, $amount_paid_now, $pmRow, $receipt_number, ($is_credit ? 'Deposit at sale' : 'Paid at sale'), $user_id]);
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ")->execute([$sale_id, $amount_paid_now, $pmRow, $receipt_number, ($is_credit ? 'Deposit at sale' : 'Paid at sale'), $user_id, $sale_date_value]);
         }
     }
 
@@ -858,14 +901,14 @@ try {
             $pdo->prepare("
                 INSERT INTO cash_register_transactions (
                     shift_id, transaction_type, amount, payment_method, reference_number, sale_id, created_by, created_at
-                ) VALUES (?, 'sale', ?, 'cash', ?, ?, ?, NOW())
-            ")->execute([$shift_id, $cash_received, $receipt_number, $sale_id, $user_id]);
+                ) VALUES (?, 'sale', ?, 'cash', ?, ?, ?, ?)
+            ")->execute([$shift_id, $cash_received, $receipt_number, $sale_id, $user_id, $sale_date_value]);
         } elseif ($payment_method === 'split' && isset($split_details['cash']) && $split_details['cash'] > 0) {
             $pdo->prepare("
                 INSERT INTO cash_register_transactions (
                     shift_id, transaction_type, amount, payment_method, reference_number, created_by, created_at
-                ) VALUES (?, 'sale', ?, 'cash', ?, ?, NOW())
-            ")->execute([$shift_id, $split_details['cash'], $receipt_number, $user_id]);
+                ) VALUES (?, 'sale', ?, 'cash', ?, ?, ?)
+            ")->execute([$shift_id, $split_details['cash'], $receipt_number, $user_id, $sale_date_value]);
         }
     }
 
@@ -875,9 +918,30 @@ try {
     // Best-effort: never fails the sale (postPosSale does not throw); idempotent.
     require_once __DIR__ . '/../../core/sales_posting.php';
 require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransaction
+
+    // A sale dated on an earlier day (old sale, or an offline sale synced later)
+    // dates its stock movements on that day too — the lines above, combo
+    // components included, all carry reference_type 'pos_sale'.
+    if ($effective_date !== date('Y-m-d')) {
+        $pdo->prepare("UPDATE stock_movements SET movement_date = ? WHERE reference_type = 'pos_sale' AND reference_id = ?")
+            ->execute([$effective_date, $sale_id]);
+    }
+
+    // An old sale may not land inside a bank reconciliation that is already
+    // finalized for the account its payment goes into.
+    if ($is_old_sale && $amount_paid_now > 0) {
+        $old_lock = posOldSaleReconLock($pdo, (int)posReceiptAccountId($pdo, $payment_method), $effective_date);
+        if ($old_lock) {
+            throw new Exception(sprintf(
+                t('The account this payment goes into is reconciled for %s to %s (%s). An old sale cannot be added inside that period.'),
+                $old_lock['period_start'], $old_lock['period_end'], $old_lock['reconciliation_number']
+            ), 409);
+        }
+    }
+
     $glPost = postPosSale(
         $pdo, (int)$sale_id, $payment_method, (float)$amount_paid_now, (float)$balance_due,
-        (float)$calculated_total, (float)$calculated_tax, date('Y-m-d'), $receipt_number,
+        (float)$calculated_total, (float)$calculated_tax, $effective_date, $receipt_number,
         $project_id !== null ? (int)$project_id : null, (int)$user_id
     );
     // Accountability: a sale is never blocked by accounting, but if it could not post to the
@@ -894,7 +958,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
             $posAccount = posReceiptAccountId($pdo, $payment_method);
             if ($posAccount) {
                 recordBankTransaction($pdo, (int)$posAccount, $amount_paid_now, 'deposit',
-                    date('Y-m-d'), $receipt_number,
+                    $effective_date, $receipt_number,
                     "POS Sale #{$receipt_number}", $user_id);
             }
         } catch (Throwable $e) {
@@ -903,7 +967,30 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         }
     }
 
+    if ($is_old_sale) {
+        $pdo->prepare("UPDATE pos_sales SET is_past_entry = 1 WHERE sale_id = ?")->execute([$sale_id]);
+    }
+
     $pdo->commit();
+
+    // An old sale that landed in a closed shift (the cashier's own, or the
+    // back-dated one) refreshes that shift's saved Z-report figures.
+    if ($is_old_sale && ($shift['status'] ?? '') !== 'active') {
+        try {
+            posOldSaleRecomputeShift($pdo, (int)$shift_id);
+        } catch (Throwable $e) {
+            error_log("POS old sale shift recompute warning #{$receipt_number}: " . $e->getMessage());
+        }
+    }
+    if ($is_old_sale) {
+        logAudit($pdo, $user_id, 'pos_old_sale', [
+            'entity_type' => 'pos_sale',
+            'entity_id'   => $sale_id,
+            'new_values'  => ['receipt_number' => $receipt_number, 'sold_at' => $sale_date_value,
+                              'shift_id' => (int)$shift_id, 'shift_created' => !empty($shift['created']),
+                              'grand_total' => round($calculated_total, 2)],
+        ]);
+    }
 
     // Phase 30 (pos_upgrade_plan.md §9) — closing a table's bill frees the
     // table for the next guest. Best-effort, after commit: a failure here
@@ -922,8 +1009,9 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
 
     // Log the activity
     $username = $_SESSION['username'] ?? 'User';
-    logActivity($pdo, $user_id, 'Create POS Sale', "$username created POS Sale #$receipt_number (Total: " . number_format($calculated_total, 2) . ")");
-    
+    logActivity($pdo, $user_id, 'Create POS Sale', "$username created POS Sale #$receipt_number (Total: " . number_format($calculated_total, 2) . ")"
+        . ($is_old_sale ? " — old sale dated $sale_date_value" : ''));
+
     echo json_encode([
         'success' => true,
         'message' => $balance_due > 0.01
@@ -935,7 +1023,11 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         'amount_paid' => round($amount_paid_now, 2),
         'balance_due' => $balance_due,
         'loyalty_points_earned' => $loyalty_points_earned,
-        'loyalty_points_redeemed' => $loyalty_points_redeemed
+        'loyalty_points_redeemed' => $loyalty_points_redeemed,
+        'is_old_sale' => $is_old_sale,
+        'sale_date' => $sale_date_value,
+        'shift_code' => $is_old_sale ? ($shift['shift_code'] ?? null) : null,
+        'shift_created' => $is_old_sale && !empty($shift['created']),
     ]);
     
 } catch (PosCreditLimitExceededException $e) {

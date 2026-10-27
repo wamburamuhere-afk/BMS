@@ -13,6 +13,8 @@ let allProducts = [];  // full catalog, never filtered — scanner always search
 let currentDiscountPercentage = 0;
 let currentShiftId = '<?= $shift_id ?>';
 let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
+// Record Old Sale mode: { at: 'YYYY-MM-DD HH:MM', label: '<which shift>' } while on, else null.
+let oldSale = null;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
@@ -1606,18 +1608,22 @@ function processPayment() {
     }
 
     <?php if (!$shift_active): ?>
-    Swal.fire({
-        icon: 'warning',
-        title: PT.noActiveShiftTitle,
-        text: PT.noActiveShiftText,
-        showConfirmButton: true,
-        confirmButtonText: PT.startShift
-    }).then((result) => {
-        if (result.isConfirmed) {
-            startShift();
-        }
-    });
-    return;
+    // An old sale goes into the shift that covered its own time, so it does
+    // not need a shift open today.
+    if (!oldSale) {
+        Swal.fire({
+            icon: 'warning',
+            title: PT.noActiveShiftTitle,
+            text: PT.noActiveShiftText,
+            showConfirmButton: true,
+            confirmButtonText: PT.startShift
+        }).then((result) => {
+            if (result.isConfirmed) {
+                startShift();
+            }
+        });
+        return;
+    }
     <?php endif; ?>
 
     // Warehouse is compulsory — a sale must come out of a specific warehouse's stock.
@@ -1757,6 +1763,22 @@ function processPayment() {
         due_date: dueDate || null
     };
 
+    // Record Old Sale: the server numbers the receipt on the sale's own day and
+    // picks the shift that covered that time; the cashier confirms first.
+    if (oldSale) {
+        delete paymentData.receipt_number;
+        delete paymentData.table_id;
+        delete paymentData.sale_type;
+        paymentData.old_sale = 1;
+        paymentData.sold_at = oldSale.at;
+        paymentData.client_uuid = oldSaleUuid();
+        confirmOldSale(paymentData, function () {
+            $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
+            submitPayment(paymentData);
+        });
+        return;
+    }
+
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
 
     submitPayment(paymentData);
@@ -1786,12 +1808,15 @@ function submitPayment(paymentData) {
                 // Phase 22 (pos_upgrade_plan.md §8) — build the WhatsApp share
                 // text from the cart BEFORE it's cleared below (no gateway —
                 // a plain wa.me deep-link the cashier's own device opens).
-                const whatsappReceiptText = buildWhatsAppReceiptText(currentReceiptNumber);
+                // The server's number is the real one (an old sale is numbered on its own day).
+                const savedReceipt = response.receipt_number || currentReceiptNumber;
+                const whatsappReceiptText = buildWhatsAppReceiptText(savedReceipt);
+                const oldSaleMsg = response.is_old_sale ? ' ' + OLD_SALE_T.recordedFor.replace('%s', oldSaleLongDate(response.sale_date)) : '';
 
                 Swal.fire({
                     icon: 'success',
-                    title: PT.saleCompleted,
-                    text: PT.receiptHash + currentReceiptNumber + loyaltyMsg,
+                    title: response.is_old_sale ? OLD_SALE_T.saved : PT.saleCompleted,
+                    text: PT.receiptHash + savedReceipt + oldSaleMsg + loyaltyMsg,
                     showCancelButton: true,
                     showDenyButton: true,
                     confirmButtonText: POS_AUTO_PRINT_RECEIPT ? PT.printAgain : PT.printReceipt,
@@ -1858,7 +1883,7 @@ function submitPayment(paymentData) {
                         paymentData.override_credit_limit = 1;
                         submitPayment(paymentData);
                     } else {
-                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                        $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
                     }
                 });
                 return;
@@ -1869,7 +1894,7 @@ function submitPayment(paymentData) {
                     text: response.message
                 });
             }
-            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+            $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
         },
         error: function(xhr) {
             let msg = PT.genericErrorRetry;
@@ -1893,7 +1918,7 @@ function submitPayment(paymentData) {
                         paymentData.override_credit_limit = 1;
                         submitPayment(paymentData);
                     } else {
-                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                        $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
                     }
                 });
                 return;
@@ -1903,7 +1928,7 @@ function submitPayment(paymentData) {
                 title: PT.error,
                 text: msg
             });
-            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+            $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
         }
     });
 }
@@ -2224,6 +2249,10 @@ function openVariantPicker(parentId) {
 }
 
 function holdSale() {
+    if (oldSale) {
+        Swal.fire({ icon: 'info', text: OLD_SALE_T.noHold });
+        return;
+    }
     if (cart.length === 0) {
         Swal.fire({
             icon: 'warning',
@@ -2946,12 +2975,12 @@ function generateNewReceipt() {
     $.get('<?= buildUrl('/api/pos/generate_receipt_number.php') ?>', function(res) {
         if (res.success) {
             currentReceiptNumber = res.receipt_number;
-            $('#receiptNumber').text(currentReceiptNumber);
         } else {
             // Fallback
             currentReceiptNumber = 'POS-' + Date.now().toString().slice(-10);
-            $('#receiptNumber').text(currentReceiptNumber);
         }
+        // In old-sale mode the number is given by the server on save, dated on the sale's day.
+        $('#receiptNumber').text(oldSale ? OLD_SALE_T.receiptLater.replace('%s', oldSaleShortDate(oldSale.at)) : currentReceiptNumber);
     });
 }
 
@@ -3369,5 +3398,223 @@ $(function () {
         posSheet.pending = btn;
         bootstrap.Offcanvas.getOrCreateInstance(sheet).hide();
     }, true);
+});
+
+// ── Record Old Sale (Rekodi Mauzo ya Zamani) ─────────────────────────────────
+// A small header button opens a pop-up (a bottom sheet on phones) to pick when
+// the sale happened. While the mode is on the header shows a chip with that
+// time, the cart is labelled as an old sale, and Pay saves it for that day after
+// a confirmation. Server side: core/pos_old_sales.php and process_sale.php
+// (old_sale + sold_at); the preview comes from api/pos/old_sale_context.php.
+const OLD_SALE_T = {
+    recordedFor: <?= json_encode(t('Recorded for %s.')) ?>,
+    saved: <?= json_encode(t('Old sale saved')) ?>,
+    noHold: <?= json_encode(t('Hold is not available while recording an old sale.')) ?>,
+    receiptLater: <?= json_encode(t('Given on save, dated %s')) ?>,
+    title: <?= json_encode(t('Old Sale Entry')) ?>,
+    current: <?= json_encode(t('Current Sale')) ?>,
+    note: <?= json_encode(t('Recording an old sale for %s.')) ?>,
+    payBtn: <?= json_encode(t('SAVE OLD SALE')) ?>,
+    checking: <?= json_encode(t('Checking…')) ?>,
+    confirmTitle: <?= json_encode(t('Confirm old sale')) ?>,
+    when: <?= json_encode(t('Sale date and time')) ?>,
+    shift: <?= json_encode(t('Shift')) ?>,
+    total: <?= json_encode(t('Total')) ?>,
+    payment: <?= json_encode(t('Payment')) ?>,
+    dated: <?= json_encode(t('Stock, books and bank are dated %s.')) ?>,
+    similar: <?= json_encode(t('A sale with the same total is already recorded that day:')) ?>,
+    similarHint: <?= json_encode(t('Continue only if this is a different sale.')) ?>,
+    confirmBtn: <?= json_encode(t('Confirm and save')) ?>,
+    back: <?= json_encode(t('Back')) ?>,
+    exited: <?= json_encode(t("Back to today's sales")) ?>,
+    offline: <?= json_encode(t('Recording an old sale needs an internet connection.')) ?>,
+    weekdays: <?= json_encode([t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')]) ?>,
+    methods: <?= json_encode($payment_methods + ['split' => t('Split Payment')]) ?>
+};
+const OLD_SALE_CONTEXT_URL = '<?= buildUrl('/api/pos/old_sale_context.php') ?>';
+let oldSalePreviewTimer = null;
+let oldSalePreviewSeq = 0;
+
+function oldSalePad(n) { return (n < 10 ? '0' : '') + n; }
+function oldSaleYmd(d) { return d.getFullYear() + '-' + oldSalePad(d.getMonth() + 1) + '-' + oldSalePad(d.getDate()); }
+function oldSaleShortDate(at) {
+    const p = String(at).split(/[ T]/), d = p[0].split('-');
+    return d[2] + '/' + d[1] + ' · ' + (p[1] || '').slice(0, 5);
+}
+function oldSaleLongDate(at) {
+    const p = String(at).split(/[ T]/), d = p[0].split('-').map(Number);
+    const wd = OLD_SALE_T.weekdays[new Date(d[0], d[1] - 1, d[2]).getDay()];
+    return wd + ' ' + oldSalePad(d[2]) + '/' + oldSalePad(d[1]) + '/' + d[0] + ', ' + (p[1] || '').slice(0, 5);
+}
+function oldSaleEsc(s) { return $('<div>').text(String(s)).html(); }
+function oldSaleUuid() {
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+function payButtonHtml() {
+    return oldSale
+        ? '<i class="bi bi-clock-history"></i> ' + oldSaleEsc(OLD_SALE_T.payBtn)
+        : '<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn;
+}
+
+function toggleOldSalePopover() {
+    const $pop = $('#oldSalePopover');
+    if (!$pop.length) return;
+    if (!$pop.hasClass('d-none')) { closeOldSalePopover(); return; }
+
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    $('#oldSaleDate').val(oldSale ? oldSale.at.slice(0, 10) : oldSaleYmd(yesterday));
+    $('#oldSaleTime').val(oldSale ? oldSale.at.slice(11, 16) : '12:00');
+    oldSaleMarkQuick();
+    $pop.removeClass('d-none');
+    $('#oldSaleBtn, #oldSaleChip .pos-old-sale-chip-open').attr('aria-expanded', 'true');
+    if (window.innerWidth < 768 && !$('.pos-old-sale-backdrop').length) {
+        $('<div class="pos-old-sale-backdrop"></div>').appendTo('body').on('click', closeOldSalePopover);
+    }
+    refreshOldSalePreview();
+    $('#oldSaleDate').trigger('focus');
+}
+
+function closeOldSalePopover() {
+    $('#oldSalePopover').addClass('d-none');
+    $('.pos-old-sale-backdrop').remove();
+    $('#oldSaleBtn, #oldSaleChip .pos-old-sale-chip-open').attr('aria-expanded', 'false');
+}
+
+function oldSaleMarkQuick() {
+    const chosen = $('#oldSaleDate').val();
+    $('#oldSaleQuick button').each(function () {
+        const d = new Date(); d.setDate(d.getDate() - parseInt($(this).data('days'), 10));
+        $(this).toggleClass('active', oldSaleYmd(d) === chosen);
+    });
+}
+
+function refreshOldSalePreview() {
+    clearTimeout(oldSalePreviewTimer);
+    const date = $('#oldSaleDate').val(), time = $('#oldSaleTime').val();
+    const $out = $('#oldSalePreview'), $go = $('#oldSaleStartBtn');
+    $go.prop('disabled', true);
+    if (!date || !time) { $out.text(''); return; }
+    $out.removeClass('text-danger text-primary').addClass('text-muted').text(OLD_SALE_T.checking);
+    const seq = ++oldSalePreviewSeq;
+    oldSalePreviewTimer = setTimeout(function () {
+        $.getJSON(OLD_SALE_CONTEXT_URL, { sold_at: date + ' ' + time, warehouse_id: $('#posWarehouseId').val() || '' })
+            .done(function (res) {
+                if (seq !== oldSalePreviewSeq) return;   // a newer choice is already being checked
+                if (!res.success || res.error) {
+                    $out.removeClass('text-muted text-primary').addClass('text-danger').text(res.error || res.message || PT.serverError);
+                    return;
+                }
+                $out.removeClass('text-muted text-danger').addClass('text-primary').text(res.shift.label);
+                $go.data('label', res.shift.label).prop('disabled', false);
+            })
+            .fail(function (xhr) {
+                if (seq !== oldSalePreviewSeq) return;
+                let msg = PT.serverError;
+                try { msg = JSON.parse(xhr.responseText).message || msg; } catch (e) {}
+                $out.removeClass('text-muted text-primary').addClass('text-danger').text(msg);
+            });
+    }, 250);
+}
+
+function startOldSaleMode() {
+    const date = $('#oldSaleDate').val(), time = $('#oldSaleTime').val();
+    if (!date || !time) return;
+    oldSale = { at: date + ' ' + time, label: $('#oldSaleStartBtn').data('label') || '' };
+    closeOldSalePopover();
+    applyOldSaleUi();
+    Swal.fire({ toast: true, position: 'top-end', icon: 'info', timer: 2600, showConfirmButton: false,
+                title: OLD_SALE_T.note.replace('%s', oldSaleLongDate(oldSale.at)) });
+}
+
+function exitOldSaleMode() {
+    oldSale = null;
+    closeOldSalePopover();
+    applyOldSaleUi();
+    Swal.fire({ toast: true, position: 'top-end', icon: 'success', timer: 2000, showConfirmButton: false, title: OLD_SALE_T.exited });
+}
+
+function applyOldSaleUi() {
+    const on = !!oldSale;
+    $('#oldSaleBtn').toggleClass('d-none', on);
+    $('#oldSaleChip').toggleClass('d-none', !on);
+    $('#oldSaleChipText').text(on ? oldSaleShortDate(oldSale.at) : '');
+    $('#cartHeaderTop').parent().toggleClass('pos-old-sale-head', on);
+    $('#cartTitleText, #mobileCartTitleText').text(on ? OLD_SALE_T.title : OLD_SALE_T.current);
+    $('#cartTitleIcon').attr('class', on ? 'bi bi-clock-history' : 'bi bi-cart3');
+    $('#oldSaleCartNote').toggleClass('d-none', !on)
+        .text(on ? OLD_SALE_T.note.replace('%s', oldSaleLongDate(oldSale.at)) + (oldSale.label ? ' ' + oldSale.label : '') : '');
+    $('#receiptNumber').text(on ? OLD_SALE_T.receiptLater.replace('%s', oldSaleShortDate(oldSale.at)) : currentReceiptNumber);
+    const $pay = $('#processPaymentBtn');
+    if (!$pay.prop('disabled')) $pay.html(payButtonHtml());
+    $('#mobilePayBtn').html(on
+        ? '<i class="bi bi-clock-history me-1"></i>' + oldSaleEsc(OLD_SALE_T.payBtn)
+        : '<i class="bi bi-check-circle me-1"></i>' + PT.processPaymentBtn);
+}
+
+// Shows what will be saved, and warns about a likely double entry, before the
+// sale is sent. proceed() is only called when the cashier confirms.
+function confirmOldSale(paymentData, proceed) {
+    if (navigator.onLine === false) {
+        Swal.fire({ icon: 'error', title: PT.error, text: OLD_SALE_T.offline });
+        return;
+    }
+    $.getJSON(OLD_SALE_CONTEXT_URL, { sold_at: oldSale.at, warehouse_id: paymentData.warehouse_id || '', total: paymentData.total })
+        .done(function (res) {
+            if (!res.success || res.error) {
+                Swal.fire({ icon: 'error', title: PT.error, text: res.error || res.message || PT.serverError });
+                return;
+            }
+            const money = POS_CURRENCY + ' ' + Number(paymentData.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const method = OLD_SALE_T.methods[paymentData.payment_method] || paymentData.payment_method;
+            const row = function (k, v) {
+                return '<tr><th class="text-muted fw-normal pe-3 py-1 align-top">' + oldSaleEsc(k) + '</th><td class="py-1">' + v + '</td></tr>';
+            };
+            let html = '<table class="table table-sm mb-2 text-start small"><tbody>' +
+                row(OLD_SALE_T.when, oldSaleEsc(oldSaleLongDate(oldSale.at))) +
+                row(OLD_SALE_T.shift, oldSaleEsc(res.shift.label)) +
+                row(OLD_SALE_T.total, '<strong>' + oldSaleEsc(money) + '</strong>') +
+                row(OLD_SALE_T.payment, oldSaleEsc(method)) +
+                '</tbody></table>' +
+                '<div class="small text-muted text-start">' + oldSaleEsc(OLD_SALE_T.dated.replace('%s', oldSale.at.slice(8, 10) + '/' + oldSale.at.slice(5, 7) + '/' + oldSale.at.slice(0, 4))) + '</div>';
+            if (res.similar && res.similar.length) {
+                html += '<div class="alert alert-warning small text-start mt-2 mb-0">' + oldSaleEsc(OLD_SALE_T.similar) + '<ul class="mb-1 mt-1">' +
+                    res.similar.map(function (s) { return '<li>' + oldSaleEsc(s.receipt_number + ' · ' + s.time) + '</li>'; }).join('') +
+                    '</ul>' + oldSaleEsc(OLD_SALE_T.similarHint) + '</div>';
+            }
+            Swal.fire({
+                icon: 'question', title: OLD_SALE_T.confirmTitle, html: html,
+                showCancelButton: true, confirmButtonText: OLD_SALE_T.confirmBtn, cancelButtonText: OLD_SALE_T.back,
+                confirmButtonColor: '#0d6efd', focusCancel: !!(res.similar && res.similar.length)
+            }).then(function (r) { if (r.isConfirmed) proceed(); });
+        })
+        .fail(function (xhr) {
+            let msg = PT.serverError;
+            try { msg = JSON.parse(xhr.responseText).message || msg; } catch (e) {}
+            Swal.fire({ icon: 'error', title: PT.error, text: msg });
+        });
+}
+
+$(function () {
+    if (!$('#oldSaleWrap').length) return;
+    $('#oldSaleQuick').on('click', 'button', function () {
+        const d = new Date(); d.setDate(d.getDate() - parseInt($(this).data('days'), 10));
+        $('#oldSaleDate').val(oldSaleYmd(d));
+        oldSaleMarkQuick();
+        refreshOldSalePreview();
+    });
+    $('#oldSaleDate, #oldSaleTime').on('change input', function () { oldSaleMarkQuick(); refreshOldSalePreview(); });
+    // Close the pop-up on a click outside it, or with Escape.
+    $(document).on('mousedown', function (e) {
+        if (!$('#oldSalePopover').hasClass('d-none') && !$(e.target).closest('#oldSaleWrap').length && !$(e.target).hasClass('pos-old-sale-backdrop')) {
+            closeOldSalePopover();
+        }
+    });
+    $(document).on('keydown', function (e) {
+        if (e.key === 'Escape' && !$('#oldSalePopover').hasClass('d-none')) closeOldSalePopover();
+    });
 });
 </script>
