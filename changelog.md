@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): superadmin sees Flutter app activity (mobile API upgrade, Phase 1)
+
+**Files:** `core/mobile_auth.php`, `api/mobile/login.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `tests/test_mobile_last_active_cli.php` (new), `mobile_api_upgrade_plan.md` (new)
+
+- **The gap:** the superadmin "Last Active" (`tenants.last_active_at`) was set only by web login, so a company that used only the app showed "Never".
+- **Now:** app sign-in sets it, and app use sets it too — at most once per 15 minutes per device (the token's previous "last used" time is the throttle, so normal app calls add no query).
+- **Tenant page → Users:** each user's last sign-in is labelled **App** or **Web**, with the app's last use and the device name underneath; the "most recent activity" line counts app use too.
+- **Plan:** `mobile_api_upgrade_plan.md` — 10 phases to bring the Flutter API level with the web (this is Phase 1).
+- **Test:** 18 checks, real HTTP calls with a Bearer token on a throwaway company (login, first call, throttle, after 15 min idle, bad token, App vs Web in the user list).
+
 ## 2026-10-27 — fix(pos): receipts show quantity as sold (1, 1.5), not 1.000
 
 **Files:** `helpers.php`, `api/pos/print_receipt.php`, `api/pos/email_receipt.php`, `core/escpos_printer.php`, `tests/test_pos_receipt_qty_format_cli.php` (new)
