@@ -138,6 +138,16 @@ if (!function_exists('getTenant')) {
         } catch (Throwable $e) {
             // columns not there yet — the panel says so
         }
+
+        // Per-tenant grace override (tenant_lifecycle_policy.php) — read separately
+        // for the same reason; missing column = NULL = follow the platform default.
+        try {
+            $g = getControlPdo()->prepare("SELECT grace_days FROM tenants WHERE id = ?");
+            $g->execute([$id]);
+            $row += (array)$g->fetch();
+        } catch (Throwable $e) {
+            // column not there yet — tenantGraceDaysFor() falls back to the default
+        }
         return $row;
     }
 }
