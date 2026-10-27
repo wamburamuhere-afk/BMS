@@ -86,6 +86,30 @@
 - **Plan:** `mobile_api_upgrade_plan.md` — 10 phases to bring the Flutter API level with the web (this is Phase 1).
 - **Test:** 18 checks, real HTTP calls with a Bearer token on a throwaway company (login, first call, throttle, after 15 min idle, bad token, App vs Web in the user list).
 
+## 2026-10-27 — fix(pos): clearer phone POS for new cashiers (old-sale strip, balance label, choose-shop prompt)
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **Old-sale mode is visible on phones:** while recording an old sale, a blue strip under the Sell bar reads "Recording old sale: Saturday 24/10/2026, 15:30" with **Change** and **Stop**. Before, only the cart header changed colour, so a cashier could forget the mode and record today's sales as an old day. Desktop keeps its existing date chip.
+- **Balance is labelled:** the phone bar's amount now has "Cash in drawer" above it (the figure is starting cash + cash sales + cash in/out − refunds). The label stays when the amount refreshes after a sale.
+- **Choose your shop:** a cashier limited to some shops, with more than one and none picked, used to see a red "Error loading products — Status: 403". Now the product area says "Choose your shop — Pick a shop above to see its products and stock" and the shop picker gets a red outline until one is chosen. Admins / all-shop users and single-shop users are unchanged (single shop is already picked automatically).
+- **Test:** `test_pos_old_sale_ui_cli.php` 40 checks pass (3 new). Browser at 360 px: strip shows with the date and hides on Stop/desktop; label shown on phone, hidden on desktop, kept after the amount changes; shop-limited render (2 shops) shows the prompt and outline, and picking a shop clears it and loads products.
+
+## 2026-10-27 — fix(pos): phone Sell bar has rounded corners
+
+**Files:** `app/bms/pos/pos.php`
+
+- The blue Sell bar on phones now has 12px rounded corners, matching the rounded Actions button inside it. Set in the early (first-paint) phone CSS so it never flashes square. Desktop unchanged.
+- **Checked:** browser at 360 px shows 12px corners; at 1000 px the bar stays square.
+
+## 2026-10-27 — fix(pos): phone "Actions" button is a solid white button
+
+**Files:** `app/bms/pos/pos.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **The issue (seen live):** the phone Sell bar's "Actions 4" was a faint blue box on the blue bar, so cashiers could not tell it was tappable.
+- **Fix (style A, chosen from 8 mock-ups):** a solid white button with a grid icon, "Actions" and ⌄, and a shadow that presses in on tap. The count badge is removed. Tapping it opens the same Actions sheet as before. Desktop unchanged.
+- **Test:** `test_pos_old_sale_ui_cli.php` 37 checks pass (count check replaced by the button check). Browser at 320 / 360 / 412 px: white button inside the bar, no overlap with the balance, no sideways scroll, sheet opens; hidden on desktop.
+
 ## 2026-10-27 — fix(pos): receipts show quantity as sold (1, 1.5), not 1.000
 
 **Files:** `helpers.php`, `api/pos/print_receipt.php`, `api/pos/email_receipt.php`, `core/escpos_printer.php`, `tests/test_pos_receipt_qty_format_cli.php` (new)

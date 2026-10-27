@@ -5828,4 +5828,11 @@ return [
     'Old sale: %s' => 'Mauzo ya zamani: %s',
     'Tap to change the date or time' => 'Gusa kubadilisha tarehe au muda',
     'Language is set by your organization' => 'Lugha imewekwa na kampuni yako',
+    'Cash in drawer' => 'Pesa kwenye droo',
+    'Stop' => 'Acha',
+    'Recording old sale: %s' => 'Unarekodi mauzo ya zamani: %s',
+    'Choose your shop' => 'Chagua duka lako',
+    'Choose your warehouse' => 'Chagua ghala lako',
+    'Pick a shop above to see its products and stock.' => 'Chagua duka hapo juu kuona bidhaa na stoku yake.',
+    'Pick a warehouse above to see its products and stock.' => 'Chagua ghala hapo juu kuona bidhaa na stoku yake.',
 ];
