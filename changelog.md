@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(register): signup is faster and no longer says "failed" when the account was created
+
+**Files:** `register.php` (script only), `actions/register_tenant.php`, `actions/register_status.php` (new), `actions/register_after.php` (new), `core/tenant_registration.php`, `scripts/build_tenant_template.php` (new), `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql` (regenerated), `tests/test_register_fast_no_false_fail_cli.php` (new)
+
+- **The bug (seen live):** after "Create my account" the page often waited a long time on the last step and then said "Registration failed. Please try again.", yet the company existed in superadmin and the owner could sign in. The page gives up after 120 s; the server carries on (`ignore_user_abort`) and finishes the account.
+- **Why it was slow:** every signup re-ran all 91 tenant migrations, one PHP process each (~25–30 s locally), because the new-company template was an old snapshot; and the welcome + superadmin emails were sent over SMTP while the visitor waited (up to 20 s each).
+- **Faster:** new `scripts/build_tenant_template.php` builds the template from the old one plus every tenant migration (in a scratch database, nothing from any real company) and records them in `schema_migrations`, so signup has nothing to re-run. A company built the old way and one built the new way were compared table by table: same tables, columns, indexes, foreign keys and data (seed timestamps included). Local signup: 40–64 s → 19–27 s. The regenerated seed keeps the old file's shape (one row per INSERT). Rebuild the template after adding tenant migrations (they still run at signup until then).
+- **Emails after the answer:** the web form now creates the account, answers, and the ready screen beacons `actions/register_after.php`, which sends the welcome and the superadmin notice (the panel bell still rings immediately). The welcome now goes to the owner's email address — before, it was addressed to their username, so it never arrived.
+- **No false "failed":** each signup carries a random id. If the page loses the answer (timeout, dropped connection), it asks `actions/register_status.php` (this visitor's own session only) and shows the normal ready screen once the account is done; a real refusal still shows its own message. No visible change to the page; no field removed.
+- **Tests:** new suite 19 checks (mail captured, never sent). Browser on a local copy: normal signup → ready screen; signup with the answer cut after 3 s → still the ready screen, no error; taken subdomain → its own message. Related suites re-run; the only failures (`test_service_plans_e2e_cli`, `test_supplier_access_simple_pos_cli`, `test_tenant_registration_cli`, `test_tenant_module_smoke_cli`'s Mobile Money tables) fail the same on develop without this change.
+
 ## 2026-10-27 — fix(dashboard): nothing shown on chart tap on phones
 
 **Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`

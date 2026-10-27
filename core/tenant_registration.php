@@ -308,6 +308,11 @@ if (!function_exists('registerTenant')) {
         // until a superadmin approves it (approveBmsTenant()). Smart POS is instant.
         $needsApproval = (string)($choice['plan']['product_key'] ?? '') === 'bms_full';
 
+        // defer_emails: the web form sends the welcome + superadmin emails in a
+        // follow-up request (sendDeferredRegistrationEmails), so SMTP time is
+        // never part of the visitor's wait. The result carries what to send.
+        $deferEmails = !empty($in['defer_emails']);
+
         $r = provisionTenant($company, $sub, $username, $pw, [
             'status'            => 'active',      // so the owner can sign in immediately
             'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
@@ -326,7 +331,7 @@ if (!function_exists('registerTenant')) {
             'logo_tmp_path'       => $in['logo_tmp_path'] ?? null,
             'logo_extension'      => $in['logo_extension'] ?? null,
             'company_type'        => mb_substr(trim((string)($in['business_type'] ?? '')), 0, 60),
-            'skip_welcome_email'  => !empty($in['skip_welcome_email']) || $needsApproval,
+            'skip_welcome_email'  => !empty($in['skip_welcome_email']) || $needsApproval || $deferEmails,
         ]);
 
         if (!$r['ok']) {
@@ -348,10 +353,11 @@ if (!function_exists('registerTenant')) {
 
         logRegistrationAttempt($ip, $phone, $sub, 'success', null, $r['tenant_id']);
 
-        // Notify all superadmins by email — best-effort, never fatal.
+        // Notify all superadmins by email — best-effort, never fatal. When the
+        // emails are deferred, the panel bell still rings now; only SMTP waits.
+        $bmsPlan = $needsApproval ? (string)($choice['plan']['name'] ?? '') : null;
         try {
-            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $ownerEmail, $company,
-                $needsApproval ? (string)($choice['plan']['name'] ?? '') : null);
+            notifySuperadminsOfNewRegistration((int)$r['tenant_id'], $sub, $ownerEmail, $company, $bmsPlan, true, !$deferEmails);
         } catch (Throwable $_notifyE) {
             error_log('notifySuperadminsOfNewRegistration threw: ' . $_notifyE->getMessage());
         }
@@ -363,6 +369,10 @@ if (!function_exists('registerTenant')) {
             'login_url' => tenantLoginUrl($sub),
             'username'  => $username,
             'pending_approval' => $needsApproval,
+            'deferred_emails'  => $deferEmails ? [
+                'tenant_id' => (int)$r['tenant_id'], 'subdomain' => $sub, 'owner_email' => $ownerEmail,
+                'company' => $company, 'bms_plan' => $bmsPlan, 'welcome' => !$needsApproval,
+            ] : null,
         ];
     }
 }
@@ -572,16 +582,18 @@ if (!function_exists('notifySuperadminsOfNewRegistration')) {
      * Same pattern as notifySuperadminsOfModuleRequest() in core/module_requests.php.
      */
     function notifySuperadminsOfNewRegistration(
-        int $tenantId, string $subdomain, string $ownerEmail, string $companyName, ?string $bmsPlan = null
+        int $tenantId, string $subdomain, string $ownerEmail, string $companyName, ?string $bmsPlan = null,
+        bool $bell = true, bool $mail = true
     ): void {
         require_once __DIR__ . '/platform_settings.php';
         require_once __DIR__ . '/mailer.php';
 
         // The panel bell first — it does not depend on SMTP being configured.
-        if ($bmsPlan !== null) {
+        if ($bell && $bmsPlan !== null) {
             require_once __DIR__ . '/superadmin_notifications.php';
             insertSaNotification($tenantId, 'bms_request', $companyName, $subdomain);
         }
+        if (!$mail) return;
 
         $mailer = platformMailerOpts();
         if (!$mailer['configured']) return;   // SMTP not set up yet — silently skip
@@ -624,6 +636,36 @@ if (!function_exists('notifySuperadminsOfNewRegistration')) {
             }
         } catch (Throwable $e) {
             error_log('notifySuperadminsOfNewRegistration: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('sendDeferredRegistrationEmails')) {
+    /**
+     * The emails registerTenant() left out when called with defer_emails:
+     * the owner's welcome (to the address they typed — their username is often
+     * not an email) and the superadmin notice. The bell already rang.
+     * Best-effort, never throws.
+     *
+     * @param array $d registerTenant()'s 'deferred_emails' value
+     */
+    function sendDeferredRegistrationEmails(array $d): void
+    {
+        $sub = (string)($d['subdomain'] ?? '');
+        if ($sub === '') return;
+        if (!empty($d['welcome']) && filter_var((string)($d['owner_email'] ?? ''), FILTER_VALIDATE_EMAIL)) {
+            try {
+                require_once __DIR__ . '/tenant_provisioner.php';
+                sendTenantWelcomeEmail((string)$d['company'], $sub, (string)$d['owner_email']);
+            } catch (Throwable $e) {
+                error_log('sendDeferredRegistrationEmails welcome: ' . $e->getMessage());
+            }
+        }
+        try {
+            notifySuperadminsOfNewRegistration((int)$d['tenant_id'], $sub, (string)$d['owner_email'],
+                (string)$d['company'], $d['bms_plan'] ?? null, false, true);
+        } catch (Throwable $e) {
+            error_log('sendDeferredRegistrationEmails notify: ' . $e->getMessage());
         }
     }
 }
