@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 8.4.7, for Win64 (x86_64)
 --
--- Host: localhost    Database: bms
+-- Host: localhost    Database: tenant
 -- ------------------------------------------------------
 -- Server version	8.4.7
 
@@ -8,8 +8,6 @@
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
 /*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
@@ -19,6 +17,7 @@
 -- Table structure for table `access_log`
 --
 
+DROP TABLE IF EXISTS `access_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `access_log` (
@@ -36,6 +35,7 @@ CREATE TABLE `access_log` (
 -- Table structure for table `account_categories`
 --
 
+DROP TABLE IF EXISTS `account_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `account_categories` (
@@ -57,6 +57,7 @@ CREATE TABLE `account_categories` (
 -- Table structure for table `account_sub_types`
 --
 
+DROP TABLE IF EXISTS `account_sub_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `account_sub_types` (
@@ -81,16 +82,17 @@ CREATE TABLE `account_sub_types` (
 -- Table structure for table `account_types`
 --
 
+DROP TABLE IF EXISTS `account_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `account_types` (
   `type_id` int NOT NULL AUTO_INCREMENT,
   `type_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `statement` enum('BS','IS') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `category` enum('asset','liability','equity','revenue','expense','cogs','finance_cost','other_income') COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `category` enum('asset','liability','equity','revenue','expense','cogs','finance_cost','other_income') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `normal_side` enum('debit','credit') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `cash_flow_category` enum('operating','investing','financing','cash','none') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `liquidity` enum('current','non_current') COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `liquidity` enum('current','non_current') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `display_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   PRIMARY KEY (`type_id`),
   UNIQUE KEY `type_name` (`type_name`)
@@ -101,6 +103,7 @@ CREATE TABLE `account_types` (
 -- Table structure for table `accounting_periods`
 --
 
+DROP TABLE IF EXISTS `accounting_periods`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `accounting_periods` (
@@ -125,6 +128,7 @@ CREATE TABLE `accounting_periods` (
 -- Table structure for table `accounts`
 --
 
+DROP TABLE IF EXISTS `accounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `accounts` (
@@ -147,7 +151,7 @@ CREATE TABLE `accounts` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `level` int DEFAULT NULL COMMENT 'Tree depth: 1=top, 2=child, 3=grandchild',
   `is_system` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 = system-critical account; edit/delete locked',
-  `normal_balance` enum('debit','credit') COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Per-account natural side; defaults from account type',
+  `normal_balance` enum('debit','credit') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Per-account natural side; defaults from account type',
   `is_subledger` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`account_id`),
   UNIQUE KEY `account_code` (`account_code`)
@@ -158,6 +162,7 @@ CREATE TABLE `accounts` (
 -- Table structure for table `activity_logs`
 --
 
+DROP TABLE IF EXISTS `activity_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `activity_logs` (
@@ -178,6 +183,7 @@ CREATE TABLE `activity_logs` (
 -- Table structure for table `ai_usage_log`
 --
 
+DROP TABLE IF EXISTS `ai_usage_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ai_usage_log` (
@@ -203,6 +209,7 @@ CREATE TABLE `ai_usage_log` (
 -- Table structure for table `allowance_types`
 --
 
+DROP TABLE IF EXISTS `allowance_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `allowance_types` (
@@ -223,6 +230,7 @@ CREATE TABLE `allowance_types` (
 -- Table structure for table `announcement_reads`
 --
 
+DROP TABLE IF EXISTS `announcement_reads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `announcement_reads` (
@@ -237,6 +245,7 @@ CREATE TABLE `announcement_reads` (
 -- Table structure for table `announcements`
 --
 
+DROP TABLE IF EXISTS `announcements`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `announcements` (
@@ -263,6 +272,7 @@ CREATE TABLE `announcements` (
 -- Table structure for table `appraisal_cycles`
 --
 
+DROP TABLE IF EXISTS `appraisal_cycles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_cycles` (
@@ -282,6 +292,7 @@ CREATE TABLE `appraisal_cycles` (
 -- Table structure for table `asset_audit_log`
 --
 
+DROP TABLE IF EXISTS `asset_audit_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `asset_audit_log` (
@@ -304,6 +315,7 @@ CREATE TABLE `asset_audit_log` (
 -- Table structure for table `asset_categories`
 --
 
+DROP TABLE IF EXISTS `asset_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `asset_categories` (
@@ -315,15 +327,15 @@ CREATE TABLE `asset_categories` (
   `default_annual_rate_percent` decimal(5,2) DEFAULT NULL,
   `default_salvage_percent` decimal(5,2) NOT NULL DEFAULT '0.00',
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `status` enum('active','archived','deleted') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `status` enum('active','archived','deleted') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `code_prefix` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Asset code prefix, e.g. COMP',
+  `code_prefix` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Asset code prefix, e.g. COMP',
   `is_depreciable` tinyint(1) NOT NULL DEFAULT '1' COMMENT '0 for Land / non-depreciable',
   `tax_rate` decimal(5,2) DEFAULT NULL COMMENT 'Statutory ITA reducing-balance rate (tax area)',
-  `gl_asset_account` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `gl_accum_account` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `gl_expense_account` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `gl_asset_account` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `gl_accum_account` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `gl_expense_account` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sort_order` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`category_id`),
   UNIQUE KEY `uq_category_name` (`category_name`)
@@ -334,6 +346,7 @@ CREATE TABLE `asset_categories` (
 -- Table structure for table `asset_depreciation_areas`
 --
 
+DROP TABLE IF EXISTS `asset_depreciation_areas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `asset_depreciation_areas` (
@@ -359,6 +372,7 @@ CREATE TABLE `asset_depreciation_areas` (
 -- Table structure for table `asset_depreciation_runs`
 --
 
+DROP TABLE IF EXISTS `asset_depreciation_runs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `asset_depreciation_runs` (
@@ -387,6 +401,7 @@ CREATE TABLE `asset_depreciation_runs` (
 -- Table structure for table `asset_disposals`
 --
 
+DROP TABLE IF EXISTS `asset_disposals`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `asset_disposals` (
@@ -414,6 +429,7 @@ CREATE TABLE `asset_disposals` (
 -- Table structure for table `asset_settings`
 --
 
+DROP TABLE IF EXISTS `asset_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `asset_settings` (
@@ -435,6 +451,7 @@ CREATE TABLE `asset_settings` (
 -- Table structure for table `assets`
 --
 
+DROP TABLE IF EXISTS `assets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assets` (
@@ -489,6 +506,7 @@ CREATE TABLE `assets` (
 -- Table structure for table `attachment_labels`
 --
 
+DROP TABLE IF EXISTS `attachment_labels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `attachment_labels` (
@@ -508,6 +526,7 @@ CREATE TABLE `attachment_labels` (
 -- Table structure for table `attendance`
 --
 
+DROP TABLE IF EXISTS `attendance`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `attendance` (
@@ -549,6 +568,7 @@ CREATE TABLE `attendance` (
 -- Table structure for table `attendance_audit_log`
 --
 
+DROP TABLE IF EXISTS `attendance_audit_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `attendance_audit_log` (
@@ -573,6 +593,7 @@ CREATE TABLE `attendance_audit_log` (
 -- Table structure for table `attendance_rules`
 --
 
+DROP TABLE IF EXISTS `attendance_rules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `attendance_rules` (
@@ -600,16 +621,17 @@ CREATE TABLE `attendance_rules` (
 -- Table structure for table `attendance_sites`
 --
 
+DROP TABLE IF EXISTS `attendance_sites`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `attendance_sites` (
   `site_id` int NOT NULL AUTO_INCREMENT,
-  `site_name` varchar(150) COLLATE utf8mb4_general_ci NOT NULL,
+  `site_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `project_id` int DEFAULT NULL,
   `latitude` decimal(10,7) NOT NULL,
   `longitude` decimal(10,7) NOT NULL,
   `radius_meters` int NOT NULL DEFAULT '150',
-  `status` enum('active','inactive','deleted') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'active',
+  `status` enum('active','inactive','deleted') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'active',
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -623,6 +645,7 @@ CREATE TABLE `attendance_sites` (
 -- Table structure for table `attendance_summary`
 --
 
+DROP TABLE IF EXISTS `attendance_summary`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `attendance_summary` (
@@ -653,6 +676,7 @@ CREATE TABLE `attendance_summary` (
 -- Table structure for table `audit_logs`
 --
 
+DROP TABLE IF EXISTS `audit_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `audit_logs` (
@@ -677,6 +701,7 @@ CREATE TABLE `audit_logs` (
 -- Table structure for table `bank_reconciliation_adjustments`
 --
 
+DROP TABLE IF EXISTS `bank_reconciliation_adjustments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `bank_reconciliation_adjustments` (
@@ -700,6 +725,7 @@ CREATE TABLE `bank_reconciliation_adjustments` (
 -- Table structure for table `bank_reconciliations`
 --
 
+DROP TABLE IF EXISTS `bank_reconciliations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `bank_reconciliations` (
@@ -736,6 +762,7 @@ CREATE TABLE `bank_reconciliations` (
 -- Table structure for table `bank_transactions`
 --
 
+DROP TABLE IF EXISTS `bank_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `bank_transactions` (
@@ -782,6 +809,7 @@ CREATE TABLE `bank_transactions` (
 -- Table structure for table `bank_transfers`
 --
 
+DROP TABLE IF EXISTS `bank_transfers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `bank_transfers` (
@@ -824,6 +852,7 @@ CREATE TABLE `bank_transfers` (
 -- Table structure for table `banks`
 --
 
+DROP TABLE IF EXISTS `banks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `banks` (
@@ -849,6 +878,7 @@ CREATE TABLE `banks` (
 -- Table structure for table `books_transactions`
 --
 
+DROP TABLE IF EXISTS `books_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `books_transactions` (
@@ -869,6 +899,7 @@ CREATE TABLE `books_transactions` (
 -- Table structure for table `brands`
 --
 
+DROP TABLE IF EXISTS `brands`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `brands` (
@@ -891,6 +922,7 @@ CREATE TABLE `brands` (
 -- Table structure for table `budgets`
 --
 
+DROP TABLE IF EXISTS `budgets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `budgets` (
@@ -925,6 +957,7 @@ CREATE TABLE `budgets` (
 -- Table structure for table `candidate_interviews`
 --
 
+DROP TABLE IF EXISTS `candidate_interviews`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `candidate_interviews` (
@@ -948,6 +981,7 @@ CREATE TABLE `candidate_interviews` (
 -- Table structure for table `candidates`
 --
 
+DROP TABLE IF EXISTS `candidates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `candidates` (
@@ -976,15 +1010,15 @@ CREATE TABLE `candidates` (
 
 --
 -- Table structure for table `cash_denomination_counts`
--- Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting at shift open/close.
 --
 
+DROP TABLE IF EXISTS `cash_denomination_counts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cash_denomination_counts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `shift_id` int NOT NULL,
-  `context` enum('open','close') NOT NULL,
+  `context` enum('open','close') COLLATE utf8mb4_unicode_ci NOT NULL,
   `denomination_value` decimal(12,2) NOT NULL,
   `count` int NOT NULL DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -998,6 +1032,7 @@ CREATE TABLE `cash_denomination_counts` (
 -- Table structure for table `cash_register_shifts`
 --
 
+DROP TABLE IF EXISTS `cash_register_shifts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cash_register_shifts` (
@@ -1005,6 +1040,7 @@ CREATE TABLE `cash_register_shifts` (
   `shift_code` varchar(50) NOT NULL,
   `user_id` int NOT NULL,
   `register_id` int DEFAULT '1',
+  `warehouse_id` int DEFAULT NULL,
   `starting_cash` decimal(15,2) DEFAULT '0.00',
   `ending_cash` decimal(15,2) DEFAULT '0.00',
   `start_time` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -1025,12 +1061,14 @@ CREATE TABLE `cash_register_shifts` (
   `closed_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_past_entry` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`shift_id`),
   UNIQUE KEY `shift_code` (`shift_code`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_status` (`status`),
   KEY `idx_start_time` (`start_time`),
-  KEY `closed_by` (`closed_by`)
+  KEY `closed_by` (`closed_by`),
+  KEY `ix_shifts_warehouse` (`warehouse_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1038,6 +1076,7 @@ CREATE TABLE `cash_register_shifts` (
 -- Table structure for table `cash_register_transactions`
 --
 
+DROP TABLE IF EXISTS `cash_register_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cash_register_transactions` (
@@ -1052,7 +1091,9 @@ CREATE TABLE `cash_register_transactions` (
   `description` text,
   `created_by` int NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `client_uuid` varchar(36) DEFAULT NULL,
   PRIMARY KEY (`transaction_id`),
+  UNIQUE KEY `ux_crt_client_uuid` (`client_uuid`),
   KEY `idx_shift_id` (`shift_id`),
   KEY `idx_transaction_type` (`transaction_type`),
   KEY `idx_created_at` (`created_at`),
@@ -1065,6 +1106,7 @@ CREATE TABLE `cash_register_transactions` (
 -- Table structure for table `categories`
 --
 
+DROP TABLE IF EXISTS `categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `categories` (
@@ -1090,6 +1132,7 @@ CREATE TABLE `categories` (
 -- Table structure for table `chart_of_accounts`
 --
 
+DROP TABLE IF EXISTS `chart_of_accounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `chart_of_accounts` (
@@ -1110,6 +1153,7 @@ CREATE TABLE `chart_of_accounts` (
 -- Table structure for table `checklist_template_items`
 --
 
+DROP TABLE IF EXISTS `checklist_template_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `checklist_template_items` (
@@ -1127,6 +1171,7 @@ CREATE TABLE `checklist_template_items` (
 -- Table structure for table `checklist_templates`
 --
 
+DROP TABLE IF EXISTS `checklist_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `checklist_templates` (
@@ -1146,15 +1191,16 @@ CREATE TABLE `checklist_templates` (
 -- Table structure for table `code_change_log`
 --
 
+DROP TABLE IF EXISTS `code_change_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `code_change_log` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `sequence_name` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `table_name` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sequence_name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `table_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `record_id` int DEFAULT NULL,
-  `old_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `new_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `old_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `new_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `changed_by` int DEFAULT NULL,
   `changed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -1167,13 +1213,14 @@ CREATE TABLE `code_change_log` (
 -- Table structure for table `code_sequences`
 --
 
+DROP TABLE IF EXISTS `code_sequences`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `code_sequences` (
-  `sequence_name` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sequence_name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `last_no` int unsigned NOT NULL DEFAULT '0',
   `digits` tinyint NOT NULL DEFAULT '4',
-  `label` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `label` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`sequence_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1183,6 +1230,7 @@ CREATE TABLE `code_sequences` (
 -- Table structure for table `collateral_attachments`
 --
 
+DROP TABLE IF EXISTS `collateral_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `collateral_attachments` (
@@ -1202,6 +1250,7 @@ CREATE TABLE `collateral_attachments` (
 -- Table structure for table `collateral_status_logs`
 --
 
+DROP TABLE IF EXISTS `collateral_status_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `collateral_status_logs` (
@@ -1220,6 +1269,7 @@ CREATE TABLE `collateral_status_logs` (
 -- Table structure for table `collection_letters`
 --
 
+DROP TABLE IF EXISTS `collection_letters`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `collection_letters` (
@@ -1246,6 +1296,7 @@ CREATE TABLE `collection_letters` (
 -- Table structure for table `collection_strategies`
 --
 
+DROP TABLE IF EXISTS `collection_strategies`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `collection_strategies` (
@@ -1273,6 +1324,7 @@ CREATE TABLE `collection_strategies` (
 -- Table structure for table `collection_strategy_actions`
 --
 
+DROP TABLE IF EXISTS `collection_strategy_actions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `collection_strategy_actions` (
@@ -1296,6 +1348,7 @@ CREATE TABLE `collection_strategy_actions` (
 -- Table structure for table `collection_strategy_templates`
 --
 
+DROP TABLE IF EXISTS `collection_strategy_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `collection_strategy_templates` (
@@ -1319,6 +1372,7 @@ CREATE TABLE `collection_strategy_templates` (
 -- Table structure for table `compliance_documents`
 --
 
+DROP TABLE IF EXISTS `compliance_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `compliance_documents` (
@@ -1351,6 +1405,7 @@ CREATE TABLE `compliance_documents` (
 -- Table structure for table `compliance_records`
 --
 
+DROP TABLE IF EXISTS `compliance_records`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `compliance_records` (
@@ -1364,6 +1419,7 @@ CREATE TABLE `compliance_records` (
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `file_size` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1372,6 +1428,7 @@ CREATE TABLE `compliance_records` (
 -- Table structure for table `councils`
 --
 
+DROP TABLE IF EXISTS `councils`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `councils` (
@@ -1388,6 +1445,7 @@ CREATE TABLE `councils` (
 -- Table structure for table `countries`
 --
 
+DROP TABLE IF EXISTS `countries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `countries` (
@@ -1411,6 +1469,7 @@ CREATE TABLE `countries` (
 -- Table structure for table `credit_note_attachments`
 --
 
+DROP TABLE IF EXISTS `credit_note_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `credit_note_attachments` (
@@ -1432,6 +1491,7 @@ CREATE TABLE `credit_note_attachments` (
 -- Table structure for table `credit_note_items`
 --
 
+DROP TABLE IF EXISTS `credit_note_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `credit_note_items` (
@@ -1453,6 +1513,7 @@ CREATE TABLE `credit_note_items` (
 -- Table structure for table `credit_notes`
 --
 
+DROP TABLE IF EXISTS `credit_notes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `credit_notes` (
@@ -1493,6 +1554,7 @@ CREATE TABLE `credit_notes` (
 -- Table structure for table `crm_labels`
 --
 
+DROP TABLE IF EXISTS `crm_labels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `crm_labels` (
@@ -1510,6 +1572,7 @@ CREATE TABLE `crm_labels` (
 -- Table structure for table `crm_lead_activities`
 --
 
+DROP TABLE IF EXISTS `crm_lead_activities`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `crm_lead_activities` (
@@ -1535,6 +1598,7 @@ CREATE TABLE `crm_lead_activities` (
 -- Table structure for table `crm_lead_labels`
 --
 
+DROP TABLE IF EXISTS `crm_lead_labels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `crm_lead_labels` (
@@ -1552,6 +1616,7 @@ CREATE TABLE `crm_lead_labels` (
 -- Table structure for table `crm_lead_stage_history`
 --
 
+DROP TABLE IF EXISTS `crm_lead_stage_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `crm_lead_stage_history` (
@@ -1572,6 +1637,7 @@ CREATE TABLE `crm_lead_stage_history` (
 -- Table structure for table `crm_leads`
 --
 
+DROP TABLE IF EXISTS `crm_leads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `crm_leads` (
@@ -1625,6 +1691,7 @@ CREATE TABLE `crm_leads` (
 -- Table structure for table `crm_pipeline_stages`
 --
 
+DROP TABLE IF EXISTS `crm_pipeline_stages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `crm_pipeline_stages` (
@@ -1644,6 +1711,7 @@ CREATE TABLE `crm_pipeline_stages` (
 -- Table structure for table `customer_additional_attachments`
 --
 
+DROP TABLE IF EXISTS `customer_additional_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_additional_attachments` (
@@ -1660,6 +1728,7 @@ CREATE TABLE `customer_additional_attachments` (
 -- Table structure for table `customer_attachments`
 --
 
+DROP TABLE IF EXISTS `customer_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_attachments` (
@@ -1668,6 +1737,7 @@ CREATE TABLE `customer_attachments` (
   `file_type` enum('ID Document','Passport Photo','Proof of Address','Income Proof') NOT NULL,
   `file_path` varchar(255) NOT NULL,
   `uploaded_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `file_size` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `customer_id` (`customer_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC;
@@ -1677,6 +1747,7 @@ CREATE TABLE `customer_attachments` (
 -- Table structure for table `customer_categories`
 --
 
+DROP TABLE IF EXISTS `customer_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_categories` (
@@ -1698,6 +1769,7 @@ CREATE TABLE `customer_categories` (
 -- Table structure for table `customer_contacts`
 --
 
+DROP TABLE IF EXISTS `customer_contacts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_contacts` (
@@ -1722,9 +1794,36 @@ CREATE TABLE `customer_contacts` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `customer_contracts`
+--
+
+DROP TABLE IF EXISTS `customer_contracts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `customer_contracts` (
+  `contract_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `customer_id` int NOT NULL,
+  `tenant_id` int DEFAULT NULL,
+  `invoice_id` int NOT NULL,
+  `invoice_ref` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_id` int DEFAULT NULL,
+  `document_id` int NOT NULL,
+  `period_label` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `period_start` date DEFAULT NULL,
+  `period_end` date DEFAULT NULL,
+  `status` enum('active','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`contract_id`),
+  UNIQUE KEY `ux_cc_invoice` (`invoice_id`),
+  KEY `idx_cc_customer` (`customer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `customer_group_customers`
 --
 
+DROP TABLE IF EXISTS `customer_group_customers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_group_customers` (
@@ -1742,6 +1841,7 @@ CREATE TABLE `customer_group_customers` (
 -- Table structure for table `customer_groups`
 --
 
+DROP TABLE IF EXISTS `customer_groups`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_groups` (
@@ -1761,9 +1861,33 @@ CREATE TABLE `customer_groups` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `customer_loyalty_transactions`
+--
+
+DROP TABLE IF EXISTS `customer_loyalty_transactions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `customer_loyalty_transactions` (
+  `loyalty_txn_id` int NOT NULL AUTO_INCREMENT,
+  `customer_id` int NOT NULL,
+  `sale_id` int DEFAULT NULL,
+  `txn_type` enum('earn','redeem','earn_reversal','redeem_reversal') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `points` int NOT NULL COMMENT 'always positive; txn_type gives direction',
+  `balance_after` int NOT NULL,
+  `notes` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`loyalty_txn_id`),
+  KEY `idx_customer_id` (`customer_id`),
+  KEY `idx_sale_id` (`sale_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `customer_lpo_attachments`
 --
 
+DROP TABLE IF EXISTS `customer_lpo_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_lpo_attachments` (
@@ -1783,6 +1907,7 @@ CREATE TABLE `customer_lpo_attachments` (
 -- Table structure for table `customer_lpo_items`
 --
 
+DROP TABLE IF EXISTS `customer_lpo_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_lpo_items` (
@@ -1806,6 +1931,7 @@ CREATE TABLE `customer_lpo_items` (
 -- Table structure for table `customer_lpos`
 --
 
+DROP TABLE IF EXISTS `customer_lpos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_lpos` (
@@ -1825,16 +1951,16 @@ CREATE TABLE `customer_lpos` (
   `created_by` int NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `prepared_by_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `prepared_by_role` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `prepared_by_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `prepared_by_role` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `prepared_at` datetime DEFAULT NULL,
   `reviewed_by` int DEFAULT NULL,
-  `reviewed_by_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `reviewed_by_role` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reviewed_by_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reviewed_by_role` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `reviewed_at` datetime DEFAULT NULL,
   `approved_by` int DEFAULT NULL,
-  `approved_by_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `approved_by_role` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `approved_by_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `approved_by_role` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `approved_at` datetime DEFAULT NULL,
   PRIMARY KEY (`lpo_id`),
   KEY `idx_customer_id` (`customer_id`),
@@ -1844,31 +1970,10 @@ CREATE TABLE `customer_lpos` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `customer_loyalty_transactions`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `customer_loyalty_transactions` (
-  `loyalty_txn_id` int NOT NULL AUTO_INCREMENT,
-  `customer_id` int NOT NULL,
-  `sale_id` int DEFAULT NULL,
-  `txn_type` enum('earn','redeem','earn_reversal','redeem_reversal') NOT NULL,
-  `points` int NOT NULL COMMENT 'always positive; txn_type gives direction',
-  `balance_after` int NOT NULL,
-  `notes` varchar(255) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`loyalty_txn_id`),
-  KEY `idx_customer_id` (`customer_id`),
-  KEY `idx_sale_id` (`sale_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `customers`
 --
 
+DROP TABLE IF EXISTS `customers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customers` (
@@ -1882,7 +1987,7 @@ CREATE TABLE `customers` (
   `tin_number` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `contact_person` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `contact_title` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `customer_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT 'business',
+  `customer_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'business',
   `occupation_business` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `company_email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -1894,7 +1999,7 @@ CREATE TABLE `customers` (
   `city` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `council` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ward` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `village` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `village` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `state` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `country` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Tanzania',
   `postal_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -1910,7 +2015,7 @@ CREATE TABLE `customers` (
   `bank_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bank_account` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bank_address` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `status` enum('active','inactive','suspended','blacklisted') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'active',
+  `status` enum('active','inactive','suspended','blacklisted','deleted') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `created_by` int DEFAULT NULL,
@@ -1945,8 +2050,11 @@ CREATE TABLE `customers` (
   `other_attachment_4_label` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `default_wht_rate_id` int DEFAULT NULL,
   `ledger_account_id` int DEFAULT NULL,
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`customer_id`),
   UNIQUE KEY `customer_code` (`customer_code`),
+  UNIQUE KEY `ux_customers_client_uuid` (`client_uuid`),
+  UNIQUE KEY `uq_customers_client_uuid` (`client_uuid`),
   KEY `idx_customer_name` (`customer_name`),
   KEY `idx_customer_code` (`customer_code`),
   KEY `idx_status` (`status`),
@@ -1959,6 +2067,7 @@ CREATE TABLE `customers` (
 -- Table structure for table `debit_note_attachments`
 --
 
+DROP TABLE IF EXISTS `debit_note_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `debit_note_attachments` (
@@ -1980,6 +2089,7 @@ CREATE TABLE `debit_note_attachments` (
 -- Table structure for table `debit_note_items`
 --
 
+DROP TABLE IF EXISTS `debit_note_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `debit_note_items` (
@@ -2001,6 +2111,7 @@ CREATE TABLE `debit_note_items` (
 -- Table structure for table `debit_notes`
 --
 
+DROP TABLE IF EXISTS `debit_notes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `debit_notes` (
@@ -2043,6 +2154,7 @@ CREATE TABLE `debit_notes` (
 -- Table structure for table `deduction_types`
 --
 
+DROP TABLE IF EXISTS `deduction_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `deduction_types` (
@@ -2064,6 +2176,7 @@ CREATE TABLE `deduction_types` (
 -- Table structure for table `deleted_expenses`
 --
 
+DROP TABLE IF EXISTS `deleted_expenses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `deleted_expenses` (
@@ -2092,6 +2205,7 @@ CREATE TABLE `deleted_expenses` (
 -- Table structure for table `deliveries`
 --
 
+DROP TABLE IF EXISTS `deliveries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `deliveries` (
@@ -2099,7 +2213,7 @@ CREATE TABLE `deliveries` (
   `project_id` int DEFAULT NULL,
   `warehouse_id` int DEFAULT NULL,
   `supplier_id` int DEFAULT NULL,
-  `party_type` enum('supplier','subcontractor','customer') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'supplier',
+  `party_type` enum('supplier','subcontractor','customer') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'supplier',
   `subcontractor_id` int DEFAULT NULL,
   `do_id` int DEFAULT NULL,
   `dn_type` enum('inbound','outbound') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'inbound',
@@ -2154,6 +2268,7 @@ CREATE TABLE `deliveries` (
 -- Table structure for table `delivery_attachments`
 --
 
+DROP TABLE IF EXISTS `delivery_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `delivery_attachments` (
@@ -2173,6 +2288,7 @@ CREATE TABLE `delivery_attachments` (
 -- Table structure for table `delivery_items`
 --
 
+DROP TABLE IF EXISTS `delivery_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `delivery_items` (
@@ -2199,6 +2315,7 @@ CREATE TABLE `delivery_items` (
 -- Table structure for table `delivery_order_items`
 --
 
+DROP TABLE IF EXISTS `delivery_order_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `delivery_order_items` (
@@ -2220,6 +2337,7 @@ CREATE TABLE `delivery_order_items` (
 -- Table structure for table `delivery_orders`
 --
 
+DROP TABLE IF EXISTS `delivery_orders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `delivery_orders` (
@@ -2256,6 +2374,7 @@ CREATE TABLE `delivery_orders` (
 -- Table structure for table `departments`
 --
 
+DROP TABLE IF EXISTS `departments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `departments` (
@@ -2284,6 +2403,7 @@ CREATE TABLE `departments` (
 -- Table structure for table `depreciation_entries`
 --
 
+DROP TABLE IF EXISTS `depreciation_entries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `depreciation_entries` (
@@ -2311,6 +2431,7 @@ CREATE TABLE `depreciation_entries` (
 -- Table structure for table `designation_indicator_targets`
 --
 
+DROP TABLE IF EXISTS `designation_indicator_targets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `designation_indicator_targets` (
@@ -2331,6 +2452,7 @@ CREATE TABLE `designation_indicator_targets` (
 -- Table structure for table `designations`
 --
 
+DROP TABLE IF EXISTS `designations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `designations` (
@@ -2355,6 +2477,7 @@ CREATE TABLE `designations` (
 -- Table structure for table `districts`
 --
 
+DROP TABLE IF EXISTS `districts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `districts` (
@@ -2378,14 +2501,15 @@ CREATE TABLE `districts` (
 -- Table structure for table `do_attachments`
 --
 
+DROP TABLE IF EXISTS `do_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `do_attachments` (
   `do_attachment_id` int NOT NULL AUTO_INCREMENT,
   `do_id` int NOT NULL,
-  `attachment_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `file_path` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `original_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `attachment_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `file_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `original_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `file_size` int DEFAULT NULL,
   `uploaded_by` int DEFAULT NULL,
   `uploaded_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2399,6 +2523,7 @@ CREATE TABLE `do_attachments` (
 -- Table structure for table `document_assignees`
 --
 
+DROP TABLE IF EXISTS `document_assignees`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_assignees` (
@@ -2417,6 +2542,7 @@ CREATE TABLE `document_assignees` (
 -- Table structure for table `document_categories`
 --
 
+DROP TABLE IF EXISTS `document_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_categories` (
@@ -2433,6 +2559,7 @@ CREATE TABLE `document_categories` (
 -- Table structure for table `document_comments`
 --
 
+DROP TABLE IF EXISTS `document_comments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_comments` (
@@ -2451,6 +2578,7 @@ CREATE TABLE `document_comments` (
 -- Table structure for table `document_downloads`
 --
 
+DROP TABLE IF EXISTS `document_downloads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_downloads` (
@@ -2468,6 +2596,7 @@ CREATE TABLE `document_downloads` (
 -- Table structure for table `document_expiry_reminders`
 --
 
+DROP TABLE IF EXISTS `document_expiry_reminders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_expiry_reminders` (
@@ -2485,6 +2614,7 @@ CREATE TABLE `document_expiry_reminders` (
 -- Table structure for table `document_notes`
 --
 
+DROP TABLE IF EXISTS `document_notes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_notes` (
@@ -2503,12 +2633,13 @@ CREATE TABLE `document_notes` (
 -- Table structure for table `document_signature_tokens`
 --
 
+DROP TABLE IF EXISTS `document_signature_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_signature_tokens` (
   `id` int NOT NULL AUTO_INCREMENT,
   `signature_id` int NOT NULL,
-  `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token_hash` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `expires_at` datetime NOT NULL,
   `used_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2522,6 +2653,7 @@ CREATE TABLE `document_signature_tokens` (
 -- Table structure for table `document_signatures`
 --
 
+DROP TABLE IF EXISTS `document_signatures`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_signatures` (
@@ -2530,9 +2662,9 @@ CREATE TABLE `document_signatures` (
   `signature_id` int DEFAULT NULL,
   `requested_by` int NOT NULL,
   `signed_by` int DEFAULT NULL,
-  `signer_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `signer_email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `signer_type` enum('internal','external') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'internal',
+  `signer_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signer_email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signer_type` enum('internal','external') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'internal',
   `signature_position` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'bottom_right',
   `hash_algorithm` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `hash_before` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -2561,26 +2693,28 @@ CREATE TABLE `document_signatures` (
 -- Table structure for table `document_templates`
 --
 
+DROP TABLE IF EXISTS `document_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_templates` (
   `id` int NOT NULL AUTO_INCREMENT,
   `template_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `subject` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `recipient` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `recipient_address` text COLLATE utf8mb4_unicode_ci,
+  `subject` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `recipient` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `recipient_address` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `use_letterhead` tinyint(1) DEFAULT NULL,
-  `signature_align` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signature_align` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `category_id` int DEFAULT NULL,
   `file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `file_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `content` longtext COLLATE utf8mb4_unicode_ci,
+  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `usage_count` int DEFAULT '0',
   `is_active` tinyint(1) DEFAULT '1',
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `file_size` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -2589,6 +2723,7 @@ CREATE TABLE `document_templates` (
 -- Table structure for table `document_workflows`
 --
 
+DROP TABLE IF EXISTS `document_workflows`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `document_workflows` (
@@ -2611,22 +2746,23 @@ CREATE TABLE `document_workflows` (
 -- Table structure for table `documents`
 --
 
+DROP TABLE IF EXISTS `documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `documents` (
   `id` int NOT NULL AUTO_INCREMENT,
   `document_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
-  `content` longtext COLLATE utf8mb4_general_ci,
+  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
   `use_letterhead` tinyint(1) NOT NULL DEFAULT '1',
-  `recipient_address` text COLLATE utf8mb4_general_ci,
-  `signature_align` varchar(10) COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'left',
-  `custom_sender_info` text COLLATE utf8mb4_general_ci,
+  `recipient_address` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
+  `signature_align` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'left',
+  `custom_sender_info` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
   `file_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `original_filename` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `file_size` int NOT NULL,
   `file_type` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
-  `document_code` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `document_code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `category_id` int DEFAULT NULL,
   `template_id` int DEFAULT NULL,
   `version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '1.0',
@@ -2650,6 +2786,7 @@ CREATE TABLE `documents` (
 -- Table structure for table `education_levels`
 --
 
+DROP TABLE IF EXISTS `education_levels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `education_levels` (
@@ -2663,6 +2800,7 @@ CREATE TABLE `education_levels` (
 -- Table structure for table `email_logs`
 --
 
+DROP TABLE IF EXISTS `email_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `email_logs` (
@@ -2684,6 +2822,7 @@ CREATE TABLE `email_logs` (
 -- Table structure for table `email_templates`
 --
 
+DROP TABLE IF EXISTS `email_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `email_templates` (
@@ -2703,6 +2842,7 @@ CREATE TABLE `email_templates` (
 -- Table structure for table `employee_allowances`
 --
 
+DROP TABLE IF EXISTS `employee_allowances`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_allowances` (
@@ -2723,6 +2863,7 @@ CREATE TABLE `employee_allowances` (
 -- Table structure for table `employee_appraisal_items`
 --
 
+DROP TABLE IF EXISTS `employee_appraisal_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_appraisal_items` (
@@ -2742,6 +2883,7 @@ CREATE TABLE `employee_appraisal_items` (
 -- Table structure for table `employee_appraisals`
 --
 
+DROP TABLE IF EXISTS `employee_appraisals`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_appraisals` (
@@ -2771,6 +2913,7 @@ CREATE TABLE `employee_appraisals` (
 -- Table structure for table `employee_checklist_items`
 --
 
+DROP TABLE IF EXISTS `employee_checklist_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_checklist_items` (
@@ -2792,6 +2935,7 @@ CREATE TABLE `employee_checklist_items` (
 -- Table structure for table `employee_checklists`
 --
 
+DROP TABLE IF EXISTS `employee_checklists`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_checklists` (
@@ -2813,6 +2957,7 @@ CREATE TABLE `employee_checklists` (
 -- Table structure for table `employee_contracts`
 --
 
+DROP TABLE IF EXISTS `employee_contracts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_contracts` (
@@ -2846,16 +2991,17 @@ CREATE TABLE `employee_contracts` (
 -- Table structure for table `employee_credentials`
 --
 
+DROP TABLE IF EXISTS `employee_credentials`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_credentials` (
   `credential_id` int NOT NULL AUTO_INCREMENT,
   `employee_id` int NOT NULL,
-  `type` enum('qr','webauthn') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'qr',
-  `token` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `public_key` text COLLATE utf8mb4_general_ci,
+  `type` enum('qr','webauthn') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'qr',
+  `token` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `public_key` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
   `counter` bigint NOT NULL DEFAULT '0',
-  `status` enum('active','revoked','deleted') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'active',
+  `status` enum('active','revoked','deleted') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`credential_id`),
@@ -2870,6 +3016,7 @@ CREATE TABLE `employee_credentials` (
 -- Table structure for table `employee_deductions`
 --
 
+DROP TABLE IF EXISTS `employee_deductions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_deductions` (
@@ -2890,6 +3037,7 @@ CREATE TABLE `employee_deductions` (
 -- Table structure for table `employee_document_types`
 --
 
+DROP TABLE IF EXISTS `employee_document_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_document_types` (
@@ -2909,6 +3057,7 @@ CREATE TABLE `employee_document_types` (
 -- Table structure for table `employee_documents`
 --
 
+DROP TABLE IF EXISTS `employee_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_documents` (
@@ -2939,6 +3088,7 @@ CREATE TABLE `employee_documents` (
 -- Table structure for table `employee_goals`
 --
 
+DROP TABLE IF EXISTS `employee_goals`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_goals` (
@@ -2965,6 +3115,7 @@ CREATE TABLE `employee_goals` (
 -- Table structure for table `employee_lifecycle_events`
 --
 
+DROP TABLE IF EXISTS `employee_lifecycle_events`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_lifecycle_events` (
@@ -3016,6 +3167,7 @@ CREATE TABLE `employee_lifecycle_events` (
 -- Table structure for table `employee_salary_components`
 --
 
+DROP TABLE IF EXISTS `employee_salary_components`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_salary_components` (
@@ -3042,6 +3194,7 @@ CREATE TABLE `employee_salary_components` (
 -- Table structure for table `employee_shifts`
 --
 
+DROP TABLE IF EXISTS `employee_shifts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_shifts` (
@@ -3066,6 +3219,7 @@ CREATE TABLE `employee_shifts` (
 -- Table structure for table `employee_trips`
 --
 
+DROP TABLE IF EXISTS `employee_trips`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_trips` (
@@ -3104,6 +3258,7 @@ CREATE TABLE `employee_trips` (
 -- Table structure for table `employees`
 --
 
+DROP TABLE IF EXISTS `employees`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employees` (
@@ -3198,6 +3353,7 @@ CREATE TABLE `employees` (
 -- Table structure for table `employment_types`
 --
 
+DROP TABLE IF EXISTS `employment_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employment_types` (
@@ -3219,6 +3375,7 @@ CREATE TABLE `employment_types` (
 -- Table structure for table `expense_categories`
 --
 
+DROP TABLE IF EXISTS `expense_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `expense_categories` (
@@ -3241,6 +3398,7 @@ CREATE TABLE `expense_categories` (
 -- Table structure for table `expense_category_map`
 --
 
+DROP TABLE IF EXISTS `expense_category_map`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `expense_category_map` (
@@ -3256,6 +3414,7 @@ CREATE TABLE `expense_category_map` (
 -- Table structure for table `expense_types`
 --
 
+DROP TABLE IF EXISTS `expense_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `expense_types` (
@@ -3275,6 +3434,7 @@ CREATE TABLE `expense_types` (
 -- Table structure for table `expenses`
 --
 
+DROP TABLE IF EXISTS `expenses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `expenses` (
@@ -3291,8 +3451,10 @@ CREATE TABLE `expenses` (
   `reference_number` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `payment_method` enum('cash','bank_transfer','mobile_money','cheque','card') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'cash',
   `vendor` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `paid_to_type` enum('supplier','staff','sub_contractor') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `paid_to_type` enum('supplier','staff','sub_contractor','other') COLLATE utf8mb4_general_ci DEFAULT NULL,
   `paid_to_id` int DEFAULT NULL,
+  `payee_manual_role` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `payee_manual_name` varchar(150) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `invoice_id` int DEFAULT NULL,
   `payroll_id` int DEFAULT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
@@ -3305,18 +3467,129 @@ CREATE TABLE `expenses` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `project_id` int DEFAULT NULL,
+  `warehouse_id` int DEFAULT NULL,
   `budget_id` int DEFAULT NULL,
   `voucher_id` int DEFAULT NULL,
+  `client_uuid` varchar(36) COLLATE utf8mb4_general_ci DEFAULT NULL,
   PRIMARY KEY (`expense_id`),
+  UNIQUE KEY `ux_expenses_client_uuid` (`client_uuid`),
+  UNIQUE KEY `uq_expenses_client_uuid` (`client_uuid`),
   KEY `expense_account_id` (`expense_account_id`),
   KEY `bank_account_id` (`bank_account_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=72 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `field_report_days`
+--
+
+DROP TABLE IF EXISTS `field_report_days`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `field_report_days` (
+  `day_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `report_date` date NOT NULL,
+  `submitted_at` datetime NOT NULL,
+  `visit_count` int unsigned NOT NULL DEFAULT '0',
+  `changed_after_submit` tinyint(1) NOT NULL DEFAULT '0',
+  `last_changed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`day_id`),
+  UNIQUE KEY `ux_frd_user_date` (`user_id`,`report_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `field_report_shares`
+--
+
+DROP TABLE IF EXISTS `field_report_shares`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `field_report_shares` (
+  `share_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `token_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `filename` varchar(190) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `pdf` mediumblob NOT NULL,
+  `created_by` int unsigned NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` datetime NOT NULL,
+  PRIMARY KEY (`share_id`),
+  UNIQUE KEY `ux_frs_token` (`token_hash`),
+  KEY `idx_frs_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `field_visit_services`
+--
+
+DROP TABLE IF EXISTS `field_visit_services`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `field_visit_services` (
+  `visit_id` int unsigned NOT NULL,
+  `product_id` int unsigned NOT NULL,
+  `service_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`visit_id`,`product_id`),
+  KEY `idx_fvs_product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `field_visits`
+--
+
+DROP TABLE IF EXISTS `field_visits`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `field_visits` (
+  `visit_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `visit_date` date NOT NULL,
+  `visit_time` time DEFAULT NULL,
+  `location` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `latitude` decimal(10,7) DEFAULT NULL,
+  `longitude` decimal(10,7) DEFAULT NULL,
+  `gps_accuracy_m` int unsigned DEFAULT NULL,
+  `client_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `client_phone` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone_normalized` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `business_type` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
+  `business_other` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `gave_business_card` tinyint(1) NOT NULL DEFAULT '0',
+  `gave_trial_link` tinyint(1) NOT NULL DEFAULT '0',
+  `gave_training` tinyint(1) NOT NULL DEFAULT '0',
+  `interest` enum('interested','thinking','not_interested') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `follow_up_date` date DEFAULT NULL,
+  `follow_up_done_at` datetime DEFAULT NULL,
+  `follow_up_done_by` int unsigned DEFAULT NULL,
+  `joined` tinyint(1) NOT NULL DEFAULT '0',
+  `joined_at` date DEFAULT NULL,
+  `joined_marked_by` int unsigned DEFAULT NULL,
+  `tenant_id` int DEFAULT NULL,
+  `tenant_subdomain` varchar(63) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_id` int DEFAULT NULL,
+  `status` enum('active','deleted') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_by` int unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_by` int unsigned DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`visit_id`),
+  KEY `idx_fv_user_date` (`user_id`,`visit_date`),
+  KEY `idx_fv_date` (`visit_date`),
+  KEY `idx_fv_phone` (`phone_normalized`),
+  KEY `idx_fv_follow_up` (`user_id`,`follow_up_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `form_lookups`
 --
 
+DROP TABLE IF EXISTS `form_lookups`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `form_lookups` (
@@ -3338,6 +3611,7 @@ CREATE TABLE `form_lookups` (
 -- Table structure for table `genders`
 --
 
+DROP TABLE IF EXISTS `genders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `genders` (
@@ -3351,6 +3625,7 @@ CREATE TABLE `genders` (
 -- Table structure for table `goal_types`
 --
 
+DROP TABLE IF EXISTS `goal_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `goal_types` (
@@ -3368,6 +3643,7 @@ CREATE TABLE `goal_types` (
 -- Table structure for table `guarantors`
 --
 
+DROP TABLE IF EXISTS `guarantors`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `guarantors` (
@@ -3412,6 +3688,7 @@ CREATE TABLE `guarantors` (
 -- Table structure for table `holidays`
 --
 
+DROP TABLE IF EXISTS `holidays`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `holidays` (
@@ -3437,6 +3714,7 @@ CREATE TABLE `holidays` (
 -- Table structure for table `id_types`
 --
 
+DROP TABLE IF EXISTS `id_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `id_types` (
@@ -3450,6 +3728,7 @@ CREATE TABLE `id_types` (
 -- Table structure for table `import_logs`
 --
 
+DROP TABLE IF EXISTS `import_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `import_logs` (
@@ -3473,6 +3752,7 @@ CREATE TABLE `import_logs` (
 -- Table structure for table `inspection_attachments`
 --
 
+DROP TABLE IF EXISTS `inspection_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `inspection_attachments` (
@@ -3495,6 +3775,7 @@ CREATE TABLE `inspection_attachments` (
 -- Table structure for table `inspection_inspectors`
 --
 
+DROP TABLE IF EXISTS `inspection_inspectors`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `inspection_inspectors` (
@@ -3514,6 +3795,7 @@ CREATE TABLE `inspection_inspectors` (
 -- Table structure for table `interest_periods`
 --
 
+DROP TABLE IF EXISTS `interest_periods`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `interest_periods` (
@@ -3527,6 +3809,7 @@ CREATE TABLE `interest_periods` (
 -- Table structure for table `interest_rates`
 --
 
+DROP TABLE IF EXISTS `interest_rates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `interest_rates` (
@@ -3541,6 +3824,7 @@ CREATE TABLE `interest_rates` (
 -- Table structure for table `interim_payment_certificates`
 --
 
+DROP TABLE IF EXISTS `interim_payment_certificates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `interim_payment_certificates` (
@@ -3583,6 +3867,7 @@ CREATE TABLE `interim_payment_certificates` (
 -- Table structure for table `invoice_items`
 --
 
+DROP TABLE IF EXISTS `invoice_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `invoice_items` (
@@ -3594,11 +3879,24 @@ CREATE TABLE `invoice_items` (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pcs',
-  `unit_price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
   `tax_rate` decimal(5,2) DEFAULT '0.00',
-  `tax_amount` decimal(10,2) DEFAULT '0.00',
-  `line_total` decimal(10,2) DEFAULT '0.00',
+  `tax_amount` decimal(15,2) DEFAULT '0.00',
+  `line_total` decimal(15,2) DEFAULT '0.00',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `discount_percent` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `discount_amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `price_term_id` int unsigned DEFAULT NULL,
+  `price_term_label` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `term_duration_value` int unsigned DEFAULT NULL,
+  `term_duration_unit` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_price_id` int unsigned DEFAULT NULL,
+  `plan_addon_id` int unsigned DEFAULT NULL,
+  `addon_quota` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `addon_units` int DEFAULT NULL,
+  `discount_type` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'percent',
   PRIMARY KEY (`invoice_item_id`),
   KEY `idx_invoice_id` (`invoice_id`),
   KEY `idx_order_item_id` (`order_item_id`)
@@ -3609,6 +3907,7 @@ CREATE TABLE `invoice_items` (
 -- Table structure for table `invoices`
 --
 
+DROP TABLE IF EXISTS `invoices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `invoices` (
@@ -3620,18 +3919,18 @@ CREATE TABLE `invoices` (
   `customer_id` int NOT NULL,
   `invoice_date` date NOT NULL,
   `due_date` date DEFAULT NULL,
-  `subtotal` decimal(12,2) DEFAULT '0.00',
-  `tax_amount` decimal(12,2) DEFAULT '0.00',
-  `discount_amount` decimal(12,2) DEFAULT '0.00',
-  `shipping_cost` decimal(10,2) DEFAULT '0.00',
-  `grand_total` decimal(12,2) DEFAULT '0.00',
-  `paid_amount` decimal(12,2) DEFAULT '0.00',
-  `balance_due` decimal(12,2) DEFAULT '0.00',
+  `subtotal` decimal(15,2) DEFAULT '0.00',
+  `tax_amount` decimal(15,2) DEFAULT '0.00',
+  `discount_amount` decimal(15,2) DEFAULT '0.00',
+  `shipping_cost` decimal(15,2) DEFAULT '0.00',
+  `grand_total` decimal(15,2) DEFAULT '0.00',
+  `paid_amount` decimal(15,2) DEFAULT '0.00',
+  `balance_due` decimal(15,2) DEFAULT '0.00',
   `currency` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'TZS',
   `payment_terms` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `terms_conditions` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `status` enum('draft','pending','reviewed','approved','sent','paid','partial','overdue','cancelled') COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `status` enum('draft','pending','reviewed','approved','sent','paid','partial','overdue','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
   `sent_date` date DEFAULT NULL,
   `payment_date` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -3648,7 +3947,7 @@ CREATE TABLE `invoices` (
   `approved_by_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `approved_by_role` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `approved_at` datetime DEFAULT NULL,
-  `output_vat_posted` decimal(12,2) DEFAULT NULL,
+  `output_vat_posted` decimal(15,2) DEFAULT NULL,
   PRIMARY KEY (`invoice_id`),
   UNIQUE KEY `invoice_number` (`invoice_number`),
   KEY `idx_invoice_number` (`invoice_number`),
@@ -3666,6 +3965,7 @@ CREATE TABLE `invoices` (
 -- Table structure for table `job_openings`
 --
 
+DROP TABLE IF EXISTS `job_openings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `job_openings` (
@@ -3691,6 +3991,7 @@ CREATE TABLE `job_openings` (
 -- Table structure for table `journal_entries`
 --
 
+DROP TABLE IF EXISTS `journal_entries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `journal_entries` (
@@ -3710,9 +4011,10 @@ CREATE TABLE `journal_entries` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `project_id` int DEFAULT NULL COMMENT 'FK to projects.project_id; NULL = company-wide entry',
+  `warehouse_id` int DEFAULT NULL,
   `entity_id` int unsigned DEFAULT NULL COMMENT 'Source document PK (invoice_id, expense_id, etc.)',
   `entity_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Source document table identifier (invoice, expense, payroll, etc.)',
-  `parent_entity_type` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Parent document type (e.g. invoice for a payment entry)',
+  `parent_entity_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Parent document type (e.g. invoice for a payment entry)',
   `parent_entity_id` int unsigned DEFAULT NULL COMMENT 'Parent document PK (e.g. invoice_id) so all part-payments group to it',
   PRIMARY KEY (`entry_id`),
   UNIQUE KEY `reference_number` (`reference_number`),
@@ -3721,6 +4023,7 @@ CREATE TABLE `journal_entries` (
   KEY `ix_je_parent` (`parent_entity_type`,`parent_entity_id`),
   KEY `ix_je_reverses` (`reverses_entry_id`),
   KEY `ix_je_status_date` (`status`,`entry_date`),
+  KEY `ix_je_warehouse` (`warehouse_id`),
   CONSTRAINT `fk_je_project_id` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_je_reverses` FOREIGN KEY (`reverses_entry_id`) REFERENCES `journal_entries` (`entry_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2433 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -3730,6 +4033,7 @@ CREATE TABLE `journal_entries` (
 -- Table structure for table `journal_entry_items`
 --
 
+DROP TABLE IF EXISTS `journal_entry_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `journal_entry_items` (
@@ -3752,6 +4056,7 @@ CREATE TABLE `journal_entry_items` (
 -- Table structure for table `journal_mappings`
 --
 
+DROP TABLE IF EXISTS `journal_mappings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `journal_mappings` (
@@ -3771,20 +4076,21 @@ CREATE TABLE `journal_mappings` (
   KEY `ix_jm_active` (`is_active`),
   CONSTRAINT `fk_jm_credit_acct` FOREIGN KEY (`credit_account_id`) REFERENCES `accounts` (`account_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_jm_debit_acct` FOREIGN KEY (`debit_account_id`) REFERENCES `accounts` (`account_id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=39545 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Phase 4 auto-posting: event_type → (debit, credit) account mapping';
+) ENGINE=InnoDB AUTO_INCREMENT=39553 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Phase 4 auto-posting: event_type → (debit, credit) account mapping';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `journal_source_types`
 --
 
+DROP TABLE IF EXISTS `journal_source_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `journal_source_types` (
-  `source_type` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
-  `label` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `area` varchar(50) COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'general',
-  `description` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `source_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `label` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `area` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'general',
+  `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`source_type`)
@@ -3792,9 +4098,71 @@ CREATE TABLE `journal_source_types` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `kitchen_stations`
+--
+
+DROP TABLE IF EXISTS `kitchen_stations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `kitchen_stations` (
+  `station_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`station_id`),
+  KEY `idx_ks_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `kitchen_ticket_items`
+--
+
+DROP TABLE IF EXISTS `kitchen_ticket_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `kitchen_ticket_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `ticket_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
+  `modifiers_summary` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('queued','preparing','ready','served') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_kti_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `kitchen_tickets`
+--
+
+DROP TABLE IF EXISTS `kitchen_tickets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `kitchen_tickets` (
+  `ticket_id` int NOT NULL AUTO_INCREMENT,
+  `hold_id` int DEFAULT NULL,
+  `warehouse_id` int NOT NULL,
+  `station_id` int NOT NULL,
+  `table_id` int DEFAULT NULL,
+  `status` enum('queued','preparing','ready','served') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`ticket_id`),
+  KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
+  KEY `idx_kt_hold` (`hold_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `leads`
 --
 
+DROP TABLE IF EXISTS `leads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leads` (
@@ -3818,6 +4186,7 @@ CREATE TABLE `leads` (
 -- Table structure for table `leave_approval_history`
 --
 
+DROP TABLE IF EXISTS `leave_approval_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leave_approval_history` (
@@ -3838,6 +4207,7 @@ CREATE TABLE `leave_approval_history` (
 -- Table structure for table `leave_approval_workflow`
 --
 
+DROP TABLE IF EXISTS `leave_approval_workflow`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leave_approval_workflow` (
@@ -3865,6 +4235,7 @@ CREATE TABLE `leave_approval_workflow` (
 -- Table structure for table `leave_balance`
 --
 
+DROP TABLE IF EXISTS `leave_balance`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leave_balance` (
@@ -3890,6 +4261,7 @@ CREATE TABLE `leave_balance` (
 -- Table structure for table `leave_balances`
 --
 
+DROP TABLE IF EXISTS `leave_balances`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leave_balances` (
@@ -3912,6 +4284,7 @@ CREATE TABLE `leave_balances` (
 -- Table structure for table `leave_entitlement`
 --
 
+DROP TABLE IF EXISTS `leave_entitlement`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leave_entitlement` (
@@ -3937,6 +4310,7 @@ CREATE TABLE `leave_entitlement` (
 -- Table structure for table `leave_types`
 --
 
+DROP TABLE IF EXISTS `leave_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leave_types` (
@@ -3968,6 +4342,7 @@ CREATE TABLE `leave_types` (
 -- Table structure for table `leaves`
 --
 
+DROP TABLE IF EXISTS `leaves`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `leaves` (
@@ -4013,6 +4388,7 @@ CREATE TABLE `leaves` (
 -- Table structure for table `lending_policies`
 --
 
+DROP TABLE IF EXISTS `lending_policies`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `lending_policies` (
@@ -4028,6 +4404,7 @@ CREATE TABLE `lending_policies` (
 -- Table structure for table `letter_templates`
 --
 
+DROP TABLE IF EXISTS `letter_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `letter_templates` (
@@ -4047,6 +4424,7 @@ CREATE TABLE `letter_templates` (
 -- Table structure for table `loan_applications`
 --
 
+DROP TABLE IF EXISTS `loan_applications`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_applications` (
@@ -4070,6 +4448,7 @@ CREATE TABLE `loan_applications` (
 -- Table structure for table `loan_collateral`
 --
 
+DROP TABLE IF EXISTS `loan_collateral`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_collateral` (
@@ -4094,6 +4473,7 @@ CREATE TABLE `loan_collateral` (
 -- Table structure for table `loan_collection_assignments`
 --
 
+DROP TABLE IF EXISTS `loan_collection_assignments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_collection_assignments` (
@@ -4123,6 +4503,7 @@ CREATE TABLE `loan_collection_assignments` (
 -- Table structure for table `loan_disbursements`
 --
 
+DROP TABLE IF EXISTS `loan_disbursements`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_disbursements` (
@@ -4143,6 +4524,7 @@ CREATE TABLE `loan_disbursements` (
 -- Table structure for table `loan_documents`
 --
 
+DROP TABLE IF EXISTS `loan_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_documents` (
@@ -4167,6 +4549,7 @@ CREATE TABLE `loan_documents` (
 -- Table structure for table `loan_products`
 --
 
+DROP TABLE IF EXISTS `loan_products`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_products` (
@@ -4190,6 +4573,7 @@ CREATE TABLE `loan_products` (
 -- Table structure for table `loan_rejections`
 --
 
+DROP TABLE IF EXISTS `loan_rejections`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_rejections` (
@@ -4207,6 +4591,7 @@ CREATE TABLE `loan_rejections` (
 -- Table structure for table `loan_repayment_schedule`
 --
 
+DROP TABLE IF EXISTS `loan_repayment_schedule`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_repayment_schedule` (
@@ -4234,6 +4619,7 @@ CREATE TABLE `loan_repayment_schedule` (
 -- Table structure for table `loan_repayments`
 --
 
+DROP TABLE IF EXISTS `loan_repayments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_repayments` (
@@ -4256,6 +4642,7 @@ CREATE TABLE `loan_repayments` (
 -- Table structure for table `loan_risk_factors`
 --
 
+DROP TABLE IF EXISTS `loan_risk_factors`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_risk_factors` (
@@ -4288,6 +4675,7 @@ CREATE TABLE `loan_risk_factors` (
 -- Table structure for table `loan_types`
 --
 
+DROP TABLE IF EXISTS `loan_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_types` (
@@ -4307,6 +4695,7 @@ CREATE TABLE `loan_types` (
 -- Table structure for table `loans`
 --
 
+DROP TABLE IF EXISTS `loans`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loans` (
@@ -4368,6 +4757,7 @@ CREATE TABLE `loans` (
 -- Table structure for table `location_sync_log`
 --
 
+DROP TABLE IF EXISTS `location_sync_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `location_sync_log` (
@@ -4387,6 +4777,7 @@ CREATE TABLE `location_sync_log` (
 -- Table structure for table `locations`
 --
 
+DROP TABLE IF EXISTS `locations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `locations` (
@@ -4418,6 +4809,7 @@ CREATE TABLE `locations` (
 -- Table structure for table `maintenance_logs`
 --
 
+DROP TABLE IF EXISTS `maintenance_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `maintenance_logs` (
@@ -4451,6 +4843,7 @@ CREATE TABLE `maintenance_logs` (
 -- Table structure for table `marital_statuses`
 --
 
+DROP TABLE IF EXISTS `marital_statuses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `marital_statuses` (
@@ -4464,6 +4857,7 @@ CREATE TABLE `marital_statuses` (
 -- Table structure for table `marketing_campaigns`
 --
 
+DROP TABLE IF EXISTS `marketing_campaigns`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `marketing_campaigns` (
@@ -4488,6 +4882,7 @@ CREATE TABLE `marketing_campaigns` (
 -- Table structure for table `meeting_attendees`
 --
 
+DROP TABLE IF EXISTS `meeting_attendees`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `meeting_attendees` (
@@ -4511,6 +4906,7 @@ CREATE TABLE `meeting_attendees` (
 -- Table structure for table `meetings`
 --
 
+DROP TABLE IF EXISTS `meetings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `meetings` (
@@ -4547,6 +4943,7 @@ CREATE TABLE `meetings` (
 -- Table structure for table `message_recipients`
 --
 
+DROP TABLE IF EXISTS `message_recipients`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `message_recipients` (
@@ -4566,6 +4963,7 @@ CREATE TABLE `message_recipients` (
 -- Table structure for table `messages`
 --
 
+DROP TABLE IF EXISTS `messages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `messages` (
@@ -4587,6 +4985,7 @@ CREATE TABLE `messages` (
 -- Table structure for table `migrations`
 --
 
+DROP TABLE IF EXISTS `migrations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `migrations` (
@@ -4599,9 +4998,92 @@ CREATE TABLE `migrations` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `mobile_idempotency_keys`
+--
+
+DROP TABLE IF EXISTS `mobile_idempotency_keys`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `mobile_idempotency_keys` (
+  `client_uuid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `endpoint` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` int NOT NULL,
+  `http_code` smallint DEFAULT NULL,
+  `response_body` mediumtext COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`client_uuid`),
+  KEY `idx_endpoint` (`endpoint`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `mobile_tokens`
+--
+
+DROP TABLE IF EXISTS `mobile_tokens`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `mobile_tokens` (
+  `token_id` int NOT NULL AUTO_INCREMENT,
+  `token` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` int NOT NULL,
+  `device_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`token_id`),
+  UNIQUE KEY `uq_token` (`token`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `modifier_groups`
+--
+
+DROP TABLE IF EXISTS `modifier_groups`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `modifier_groups` (
+  `group_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `selection_type` enum('single','multiple') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'single',
+  `min_select` int NOT NULL DEFAULT '0',
+  `max_select` int NOT NULL DEFAULT '1',
+  `is_required` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `modifier_options`
+--
+
+DROP TABLE IF EXISTS `modifier_options`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `modifier_options` (
+  `option_id` int NOT NULL AUTO_INCREMENT,
+  `group_id` int NOT NULL,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `price_adjustment` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`option_id`),
+  KEY `idx_mo_group` (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `modules`
 --
 
+DROP TABLE IF EXISTS `modules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `modules` (
@@ -4616,6 +5098,7 @@ CREATE TABLE `modules` (
 -- Table structure for table `nip_material_component_status`
 --
 
+DROP TABLE IF EXISTS `nip_material_component_status`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `nip_material_component_status` (
@@ -4634,6 +5117,7 @@ CREATE TABLE `nip_material_component_status` (
 -- Table structure for table `nip_material_list_nips`
 --
 
+DROP TABLE IF EXISTS `nip_material_list_nips`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `nip_material_list_nips` (
@@ -4654,6 +5138,7 @@ CREATE TABLE `nip_material_list_nips` (
 -- Table structure for table `nip_material_lists`
 --
 
+DROP TABLE IF EXISTS `nip_material_lists`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `nip_material_lists` (
@@ -4675,6 +5160,7 @@ CREATE TABLE `nip_material_lists` (
 -- Table structure for table `notification_dedupe`
 --
 
+DROP TABLE IF EXISTS `notification_dedupe`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_dedupe` (
@@ -4690,6 +5176,7 @@ CREATE TABLE `notification_dedupe` (
 -- Table structure for table `notification_events`
 --
 
+DROP TABLE IF EXISTS `notification_events`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_events` (
@@ -4712,6 +5199,7 @@ CREATE TABLE `notification_events` (
 -- Table structure for table `notification_log`
 --
 
+DROP TABLE IF EXISTS `notification_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_log` (
@@ -4735,6 +5223,7 @@ CREATE TABLE `notification_log` (
 -- Table structure for table `notification_outbox`
 --
 
+DROP TABLE IF EXISTS `notification_outbox`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_outbox` (
@@ -4766,6 +5255,7 @@ CREATE TABLE `notification_outbox` (
 -- Table structure for table `notification_rules`
 --
 
+DROP TABLE IF EXISTS `notification_rules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_rules` (
@@ -4790,6 +5280,7 @@ CREATE TABLE `notification_rules` (
 -- Table structure for table `notifications`
 --
 
+DROP TABLE IF EXISTS `notifications`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notifications` (
@@ -4798,8 +5289,8 @@ CREATE TABLE `notifications` (
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `type` enum('loan','payment','system','report','alert') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
-  `event_key` varchar(80) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `category` varchar(40) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `event_key` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `category` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `priority` enum('low','medium','high') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'medium',
   `is_read` tinyint(1) DEFAULT '0',
   `loan_id` int DEFAULT NULL,
@@ -4815,9 +5306,54 @@ CREATE TABLE `notifications` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `password_reset_attempts`
+--
+
+DROP TABLE IF EXISTS `password_reset_attempts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `password_reset_attempts` (
+  `attempt_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `identifier` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `request_ip` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`attempt_id`),
+  KEY `idx_pra_identifier` (`identifier`,`created_at`),
+  KEY `idx_pra_ip` (`request_ip`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `password_resets`
+--
+
+DROP TABLE IF EXISTS `password_resets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `password_resets` (
+  `reset_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `token_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `channel` enum('email','sms') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'email',
+  `destination` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `kind` enum('self_service','operator_otp') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'self_service',
+  `issued_by` int DEFAULT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `request_ip` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`reset_id`),
+  UNIQUE KEY `uq_pr_token` (`token_hash`),
+  KEY `idx_pr_user` (`user_id`,`created_at`),
+  KEY `idx_pr_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `payment_allocations`
 --
 
+DROP TABLE IF EXISTS `payment_allocations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_allocations` (
@@ -4838,6 +5374,7 @@ CREATE TABLE `payment_allocations` (
 -- Table structure for table `payment_attachments`
 --
 
+DROP TABLE IF EXISTS `payment_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_attachments` (
@@ -4858,6 +5395,7 @@ CREATE TABLE `payment_attachments` (
 -- Table structure for table `payment_audit_log`
 --
 
+DROP TABLE IF EXISTS `payment_audit_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_audit_log` (
@@ -4880,6 +5418,7 @@ CREATE TABLE `payment_audit_log` (
 -- Table structure for table `payment_deletion_log`
 --
 
+DROP TABLE IF EXISTS `payment_deletion_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_deletion_log` (
@@ -4910,6 +5449,7 @@ CREATE TABLE `payment_deletion_log` (
 -- Table structure for table `payment_reminders`
 --
 
+DROP TABLE IF EXISTS `payment_reminders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_reminders` (
@@ -4939,6 +5479,7 @@ CREATE TABLE `payment_reminders` (
 -- Table structure for table `payment_vouchers`
 --
 
+DROP TABLE IF EXISTS `payment_vouchers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_vouchers` (
@@ -4961,7 +5502,7 @@ CREATE TABLE `payment_vouchers` (
   `prepared_by` int NOT NULL,
   `reviewed_by` int DEFAULT NULL,
   `approved_by` int DEFAULT NULL,
-  `status` enum('pending','reviewed','approved','partially_paid','paid','cancelled','draft') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','reviewed','approved','partially_paid','paid','cancelled','draft') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `project_id` int DEFAULT NULL,
   `expense_id` int DEFAULT NULL,
@@ -4974,6 +5515,7 @@ CREATE TABLE `payment_vouchers` (
 -- Table structure for table `payments`
 --
 
+DROP TABLE IF EXISTS `payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payments` (
@@ -5019,6 +5561,7 @@ CREATE TABLE `payments` (
 -- Table structure for table `payroll`
 --
 
+DROP TABLE IF EXISTS `payroll`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payroll` (
@@ -5068,6 +5611,7 @@ CREATE TABLE `payroll` (
 -- Table structure for table `payroll_audit_log`
 --
 
+DROP TABLE IF EXISTS `payroll_audit_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payroll_audit_log` (
@@ -5090,6 +5634,7 @@ CREATE TABLE `payroll_audit_log` (
 -- Table structure for table `payroll_items`
 --
 
+DROP TABLE IF EXISTS `payroll_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payroll_items` (
@@ -5111,6 +5656,7 @@ CREATE TABLE `payroll_items` (
 -- Table structure for table `payroll_settings`
 --
 
+DROP TABLE IF EXISTS `payroll_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payroll_settings` (
@@ -5129,6 +5675,7 @@ CREATE TABLE `payroll_settings` (
 -- Table structure for table `payslip_history`
 --
 
+DROP TABLE IF EXISTS `payslip_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payslip_history` (
@@ -5155,6 +5702,7 @@ CREATE TABLE `payslip_history` (
 -- Table structure for table `penalty_adjustments`
 --
 
+DROP TABLE IF EXISTS `penalty_adjustments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `penalty_adjustments` (
@@ -5174,6 +5722,7 @@ CREATE TABLE `penalty_adjustments` (
 -- Table structure for table `performance_indicator_categories`
 --
 
+DROP TABLE IF EXISTS `performance_indicator_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `performance_indicator_categories` (
@@ -5192,6 +5741,7 @@ CREATE TABLE `performance_indicator_categories` (
 -- Table structure for table `performance_indicators`
 --
 
+DROP TABLE IF EXISTS `performance_indicators`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `performance_indicators` (
@@ -5211,6 +5761,7 @@ CREATE TABLE `performance_indicators` (
 -- Table structure for table `permissions`
 --
 
+DROP TABLE IF EXISTS `permissions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `permissions` (
@@ -5225,13 +5776,14 @@ CREATE TABLE `permissions` (
   `is_hidden` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`permission_id`),
   UNIQUE KEY `page_key` (`page_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=228 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=244 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `petty_cash_funds`
 --
 
+DROP TABLE IF EXISTS `petty_cash_funds`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `petty_cash_funds` (
@@ -5249,6 +5801,7 @@ CREATE TABLE `petty_cash_funds` (
 -- Table structure for table `petty_cash_transactions`
 --
 
+DROP TABLE IF EXISTS `petty_cash_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `petty_cash_transactions` (
@@ -5281,6 +5834,7 @@ CREATE TABLE `petty_cash_transactions` (
 -- Table structure for table `policy_audit_log`
 --
 
+DROP TABLE IF EXISTS `policy_audit_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `policy_audit_log` (
@@ -5298,6 +5852,7 @@ CREATE TABLE `policy_audit_log` (
 -- Table structure for table `pos_held_sales`
 --
 
+DROP TABLE IF EXISTS `pos_held_sales`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_held_sales` (
@@ -5333,6 +5888,7 @@ CREATE TABLE `pos_held_sales` (
 -- Table structure for table `pos_payments`
 --
 
+DROP TABLE IF EXISTS `pos_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_payments` (
@@ -5358,12 +5914,14 @@ CREATE TABLE `pos_payments` (
 -- Table structure for table `pos_registers`
 --
 
+DROP TABLE IF EXISTS `pos_registers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_registers` (
   `register_id` int NOT NULL AUTO_INCREMENT,
   `register_name` varchar(100) NOT NULL,
   `register_code` varchar(50) NOT NULL,
+  `warehouse_id` int DEFAULT NULL,
   `location` varchar(255) DEFAULT NULL,
   `default_cashier` int DEFAULT NULL,
   `opening_cash` decimal(15,2) DEFAULT '0.00',
@@ -5384,16 +5942,16 @@ CREATE TABLE `pos_registers` (
   PRIMARY KEY (`register_id`),
   UNIQUE KEY `register_code` (`register_code`),
   KEY `idx_status` (`status`),
-  KEY `default_cashier` (`default_cashier`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
+  KEY `default_cashier` (`default_cashier`),
+  KEY `ix_pos_registers_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `pos_sale_item_batches`
--- Phase 17 (pos_upgrade_plan.md §8) — links a sale line to the batch(es) it
--- drew from (FEFO), consumed via core/pos_batch_consumption.php.
 --
 
+DROP TABLE IF EXISTS `pos_sale_item_batches`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_sale_item_batches` (
@@ -5409,11 +5967,29 @@ CREATE TABLE `pos_sale_item_batches` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `pos_sale_item_serials`
--- Phase 26 (pos_upgrade_plan.md §9) — links a sale line to the specific
--- serial(s) it sold, consumed via core/pos_serial_tracking.php.
+-- Table structure for table `pos_sale_item_modifiers`
 --
 
+DROP TABLE IF EXISTS `pos_sale_item_modifiers`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pos_sale_item_modifiers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_item_id` int NOT NULL,
+  `option_id` int DEFAULT NULL,
+  `option_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `price_adjustment` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_psim_sale_item` (`sale_item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `pos_sale_item_serials`
+--
+
+DROP TABLE IF EXISTS `pos_sale_item_serials`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_sale_item_serials` (
@@ -5431,6 +6007,7 @@ CREATE TABLE `pos_sale_item_serials` (
 -- Table structure for table `pos_sale_items`
 --
 
+DROP TABLE IF EXISTS `pos_sale_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_sale_items` (
@@ -5464,6 +6041,7 @@ CREATE TABLE `pos_sale_items` (
 -- Table structure for table `pos_sale_payments`
 --
 
+DROP TABLE IF EXISTS `pos_sale_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_sale_payments` (
@@ -5473,9 +6051,11 @@ CREATE TABLE `pos_sale_payments` (
   `payment_method` enum('cash','card','mobile_money','bank_transfer','voucher','loyalty_points') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cash',
   `reference` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `received_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`payment_id`),
+  UNIQUE KEY `ux_pos_sale_payments_client_uuid` (`client_uuid`),
   KEY `idx_pos_pay_sale` (`sale_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1155 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -5484,12 +6064,15 @@ CREATE TABLE `pos_sale_payments` (
 -- Table structure for table `pos_sales`
 --
 
+DROP TABLE IF EXISTS `pos_sales`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_sales` (
   `sale_id` int NOT NULL AUTO_INCREMENT,
   `receipt_number` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `shift_id` int NOT NULL,
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sold_at` datetime DEFAULT NULL,
   `shift_code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_id` int NOT NULL,
   `assigned_to` int DEFAULT NULL,
@@ -5542,13 +6125,16 @@ CREATE TABLE `pos_sales` (
   `delivery_time` datetime DEFAULT NULL,
   `sale_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `payment_date` datetime DEFAULT NULL,
+  `due_date` date DEFAULT NULL,
   `voided_at` datetime DEFAULT NULL,
   `voided_by` int DEFAULT NULL,
   `void_reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_past_entry` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`sale_id`),
   UNIQUE KEY `receipt_number` (`receipt_number`),
+  UNIQUE KEY `ux_pos_sales_client_uuid` (`client_uuid`),
   KEY `idx_receipt_number` (`receipt_number`),
   KEY `idx_shift_id` (`shift_id`),
   KEY `idx_user_id` (`user_id`),
@@ -5562,18 +6148,17 @@ CREATE TABLE `pos_sales` (
   KEY `idx_original_sale_id` (`original_sale_id`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_completed_sales` (`sale_status`,`sale_date`),
+  KEY `idx_pos_sales_due_date` (`due_date`),
+  KEY `idx_pos_sales_past_entry` (`is_past_entry`),
   FULLTEXT KEY `idx_search_fields` (`receipt_number`,`customer_name`,`customer_phone`,`internal_notes`)
 ) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `pos_sales_targets`
--- Phase 29 (pos_upgrade_plan.md §9) — Sales Targets vs Actual dashboard tile.
--- warehouse_id/user_id use 0 (never NULL) as the "all warehouses"/"all
--- cashiers" sentinel so the UNIQUE key can't admit duplicate company-wide
--- rows for the same month.
 --
 
+DROP TABLE IF EXISTS `pos_sales_targets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pos_sales_targets` (
@@ -5592,50 +6177,30 @@ CREATE TABLE `pos_sales_targets` (
 
 --
 -- Table structure for table `price_groups`
--- Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
 --
 
+DROP TABLE IF EXISTS `price_groups`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `price_groups` (
   `price_group_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_default` tinyint(1) NOT NULL DEFAULT '0',
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`price_group_id`),
   UNIQUE KEY `uq_price_group_name` (`name`),
   KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `product_promotions`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `product_promotions` (
-  `promo_id` int NOT NULL AUTO_INCREMENT,
-  `product_id` int NOT NULL,
-  `price` decimal(15,2) NOT NULL,
-  `starts_at` datetime NOT NULL,
-  `ends_at` datetime NOT NULL,
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `created_by` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`promo_id`),
-  KEY `idx_product_window` (`product_id`,`status`,`starts_at`,`ends_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `product_assembly_components`
 --
 
+DROP TABLE IF EXISTS `product_assembly_components`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_assembly_components` (
@@ -5655,10 +6220,9 @@ CREATE TABLE `product_assembly_components` (
 
 --
 -- Table structure for table `product_batch_expiry_reminders`
--- Phase 17 (pos_upgrade_plan.md §8) — milestone-dedupe, mirrors
--- document_expiry_reminders' exact shape.
 --
 
+DROP TABLE IF EXISTS `product_batch_expiry_reminders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_batch_expiry_reminders` (
@@ -5673,78 +6237,36 @@ CREATE TABLE `product_batch_expiry_reminders` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `product_expiry_reminders`
--- 2026-09-11 — milestone-dedupe for plain (non-batch-tracked) products,
--- mirrors product_batch_expiry_reminders' exact shape. Closes the gap where
--- a product without batch tracking never triggered an automatic alert.
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `product_expiry_reminders` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `product_id` int NOT NULL,
-  `warehouse_id` int NOT NULL,
-  `milestone` int NOT NULL,
-  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_product_warehouse_milestone` (`product_id`,`warehouse_id`,`milestone`),
-  KEY `idx_product_id` (`product_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `product_batches`
--- Phase 17 (pos_upgrade_plan.md §8) — real batch/lot stock ledger, fed at
--- GRN approval (api/approve_grn.php), consumed FEFO at POS sale
--- (core/pos_batch_consumption.php). Sparse: only products whose GRN line
--- specified a batch_number/expiry_date get rows here.
 --
 
+DROP TABLE IF EXISTS `product_batches`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_batches` (
   `batch_id` int NOT NULL AUTO_INCREMENT,
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `product_id` int NOT NULL,
   `warehouse_id` int NOT NULL,
-  `batch_number` varchar(100) DEFAULT NULL,
+  `supplier_id` int DEFAULT NULL,
+  `batch_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
+  `manufacturing_date` date DEFAULT NULL,
   `quantity_received` decimal(10,3) NOT NULL DEFAULT '0.000',
   `quantity_remaining` decimal(10,3) NOT NULL DEFAULT '0.000',
   `unit_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `wholesale_price` decimal(15,2) DEFAULT NULL,
+  `selling_price` decimal(15,2) DEFAULT NULL,
   `receipt_id` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`batch_id`),
+  UNIQUE KEY `uq_product_batches_client_uuid` (`client_uuid`),
   KEY `idx_product_warehouse` (`product_id`,`warehouse_id`),
   KEY `idx_expiry_date` (`expiry_date`),
   KEY `idx_quantity_remaining` (`quantity_remaining`),
-  KEY `idx_receipt_id` (`receipt_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `product_serials`
--- Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock tracking.
--- Modeled on product_batches above, generalized to single units (qty
--- always 1). Sparse: only products with track_serials=1 get rows here.
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `product_serials` (
-  `serial_id` int NOT NULL AUTO_INCREMENT,
-  `product_id` int NOT NULL,
-  `warehouse_id` int NOT NULL,
-  `serial_number` varchar(191) NOT NULL,
-  `status` enum('in_stock','sold','returned','damaged') NOT NULL DEFAULT 'in_stock',
-  `sale_item_id` int DEFAULT NULL,
-  `receipt_id` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`serial_id`),
-  UNIQUE KEY `uq_product_serial` (`product_id`,`serial_number`),
-  KEY `idx_product_wh_status` (`product_id`,`warehouse_id`,`status`)
+  KEY `idx_receipt_id` (`receipt_id`),
+  KEY `idx_product_batches_supplier_id` (`supplier_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -5752,6 +6274,7 @@ CREATE TABLE `product_serials` (
 -- Table structure for table `product_categories`
 --
 
+DROP TABLE IF EXISTS `product_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_categories` (
@@ -5772,11 +6295,47 @@ CREATE TABLE `product_categories` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `product_price_group_prices`
--- Phase 14 (pos_upgrade_plan.md §8) — sparse per-product override for a price
--- group; a product with no row here falls back to products.selling_price.
+-- Table structure for table `product_expiry_reminders`
 --
 
+DROP TABLE IF EXISTS `product_expiry_reminders`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_expiry_reminders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `milestone` int NOT NULL,
+  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_product_warehouse_milestone` (`product_id`,`warehouse_id`,`milestone`),
+  KEY `idx_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_modifier_groups`
+--
+
+DROP TABLE IF EXISTS `product_modifier_groups`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_modifier_groups` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `group_id` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_pmg_product_group` (`product_id`,`group_id`),
+  KEY `idx_pmg_group` (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_price_group_prices`
+--
+
+DROP TABLE IF EXISTS `product_price_group_prices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_price_group_prices` (
@@ -5793,9 +6352,55 @@ CREATE TABLE `product_price_group_prices` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `product_promotions`
+--
+
+DROP TABLE IF EXISTS `product_promotions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_promotions` (
+  `promo_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `price` decimal(15,2) NOT NULL,
+  `starts_at` datetime NOT NULL,
+  `ends_at` datetime NOT NULL,
+  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`promo_id`),
+  KEY `idx_product_window` (`product_id`,`status`,`starts_at`,`ends_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_serials`
+--
+
+DROP TABLE IF EXISTS `product_serials`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_serials` (
+  `serial_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `serial_number` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('in_stock','sold','returned','damaged') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'in_stock',
+  `sale_item_id` int DEFAULT NULL,
+  `receipt_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`serial_id`),
+  UNIQUE KEY `uq_product_serial` (`product_id`,`serial_number`),
+  KEY `idx_product_wh_status` (`product_id`,`warehouse_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `product_stocks`
 --
 
+DROP TABLE IF EXISTS `product_stocks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_stocks` (
@@ -5820,15 +6425,15 @@ CREATE TABLE `product_stocks` (
 
 --
 -- Table structure for table `product_unit_conversions`
--- Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
 --
 
+DROP TABLE IF EXISTS `product_unit_conversions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_unit_conversions` (
   `id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,
-  `unit_label` varchar(50) NOT NULL,
+  `unit_label` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `base_unit_multiplier` decimal(12,4) NOT NULL DEFAULT '1.0000',
   `unit_price_override` decimal(15,2) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -5843,6 +6448,7 @@ CREATE TABLE `product_unit_conversions` (
 -- Table structure for table `product_units`
 --
 
+DROP TABLE IF EXISTS `product_units`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_units` (
@@ -5860,15 +6466,17 @@ CREATE TABLE `product_units` (
 -- Table structure for table `products`
 --
 
+DROP TABLE IF EXISTS `products`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `products` (
   `product_id` int NOT NULL AUTO_INCREMENT,
   `product_code` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `product_name` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `category_id` int DEFAULT NULL,
   `brand_id` int DEFAULT NULL,
+  `tax_rate_id` int unsigned DEFAULT NULL,
   `unit_of_measure` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `purchase_price` decimal(15,2) DEFAULT '0.00',
   `min_selling_price` decimal(15,2) NOT NULL DEFAULT '0.00',
@@ -5885,7 +6493,7 @@ CREATE TABLE `products` (
   `project_id` int DEFAULT NULL,
   `status` enum('active','inactive','discontinued','draft','pending','approved') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'active',
   `barcode` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `barcode_symbology` enum('CODE128','CODE39','UPC_A','UPC_E','EAN_8','EAN_13') NOT NULL DEFAULT 'CODE128',
+  `barcode_symbology` enum('CODE128','CODE39','UPC_A','UPC_E','EAN_8','EAN_13') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CODE128',
   `track_serials` tinyint(1) NOT NULL DEFAULT '0',
   `kitchen_station_id` int DEFAULT NULL,
   `created_by` int DEFAULT NULL,
@@ -5912,26 +6520,75 @@ CREATE TABLE `products` (
   `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `serial_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `warranty_period` int DEFAULT '0',
-  `warranty_unit` enum('days','months','years') DEFAULT NULL,
+  `warranty_unit` enum('days','months','years') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `guarantee_period` int DEFAULT NULL,
-  `guarantee_unit` enum('days','months','years') DEFAULT NULL,
+  `guarantee_unit` enum('days','months','years') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `expiry_days` int DEFAULT '0',
+  `parent_product_id` int DEFAULT NULL,
+  `variant_attributes` json DEFAULT NULL,
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `product_code` (`product_code`),
+  UNIQUE KEY `ux_products_client_uuid` (`client_uuid`),
+  UNIQUE KEY `uq_products_client_uuid` (`client_uuid`),
   KEY `idx_product_code` (`product_code`),
   KEY `idx_category` (`category_id`),
   KEY `idx_brand` (`brand_id`),
   KEY `idx_supplier` (`supplier_id`),
   KEY `idx_status` (`status`),
   KEY `idx_current_stock` (`current_stock`),
-  KEY `idx_product_name` (`product_name`(255))
+  KEY `idx_product_name` (`product_name`(255)),
+  KEY `idx_products_parent` (`parent_product_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `project_boq_bills`
+--
+
+DROP TABLE IF EXISTS `project_boq_bills`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `project_boq_bills` (
+  `bill_id` int NOT NULL AUTO_INCREMENT,
+  `project_id` int NOT NULL,
+  `bill_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bill No. 1 - General',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`bill_id`),
+  KEY `idx_pbb_project` (`project_id`),
+  CONSTRAINT `fk_pbb_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `project_boq_items`
+--
+
+DROP TABLE IF EXISTS `project_boq_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `project_boq_items` (
+  `item_id` int NOT NULL AUTO_INCREMENT,
+  `bill_id` int NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  KEY `idx_pbi_bill` (`bill_id`),
+  CONSTRAINT `fk_pbi_bill` FOREIGN KEY (`bill_id`) REFERENCES `project_boq_bills` (`bill_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `project_goods_return_items`
 --
 
+DROP TABLE IF EXISTS `project_goods_return_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_goods_return_items` (
@@ -5949,6 +6606,7 @@ CREATE TABLE `project_goods_return_items` (
 -- Table structure for table `project_goods_returns`
 --
 
+DROP TABLE IF EXISTS `project_goods_returns`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_goods_returns` (
@@ -5972,6 +6630,7 @@ CREATE TABLE `project_goods_returns` (
 -- Table structure for table `project_inspections`
 --
 
+DROP TABLE IF EXISTS `project_inspections`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_inspections` (
@@ -6010,6 +6669,7 @@ CREATE TABLE `project_inspections` (
 -- Table structure for table `project_milestones`
 --
 
+DROP TABLE IF EXISTS `project_milestones`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_milestones` (
@@ -6037,6 +6697,7 @@ CREATE TABLE `project_milestones` (
 -- Table structure for table `project_notes`
 --
 
+DROP TABLE IF EXISTS `project_notes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_notes` (
@@ -6044,7 +6705,7 @@ CREATE TABLE `project_notes` (
   `project_id` int NOT NULL,
   `user_id` int NOT NULL,
   `note_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
-  `status` varchar(20) COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'active',
+  `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`note_id`),
@@ -6056,6 +6717,7 @@ CREATE TABLE `project_notes` (
 -- Table structure for table `project_planning_reports`
 --
 
+DROP TABLE IF EXISTS `project_planning_reports`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_planning_reports` (
@@ -6075,6 +6737,7 @@ CREATE TABLE `project_planning_reports` (
 -- Table structure for table `project_planning_tasks`
 --
 
+DROP TABLE IF EXISTS `project_planning_tasks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_planning_tasks` (
@@ -6099,6 +6762,7 @@ CREATE TABLE `project_planning_tasks` (
 -- Table structure for table `project_progress_report_attachments`
 --
 
+DROP TABLE IF EXISTS `project_progress_report_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_progress_report_attachments` (
@@ -6118,6 +6782,7 @@ CREATE TABLE `project_progress_report_attachments` (
 -- Table structure for table `project_progress_report_details`
 --
 
+DROP TABLE IF EXISTS `project_progress_report_details`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_progress_report_details` (
@@ -6139,6 +6804,7 @@ CREATE TABLE `project_progress_report_details` (
 -- Table structure for table `project_progress_reports`
 --
 
+DROP TABLE IF EXISTS `project_progress_reports`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_progress_reports` (
@@ -6163,6 +6829,7 @@ CREATE TABLE `project_progress_reports` (
 -- Table structure for table `project_scope_documents`
 --
 
+DROP TABLE IF EXISTS `project_scope_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_scope_documents` (
@@ -6174,6 +6841,7 @@ CREATE TABLE `project_scope_documents` (
   `file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `uploaded_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `file_size` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -6182,6 +6850,7 @@ CREATE TABLE `project_scope_documents` (
 -- Table structure for table `project_sub_contractors`
 --
 
+DROP TABLE IF EXISTS `project_sub_contractors`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `project_sub_contractors` (
@@ -6204,6 +6873,7 @@ CREATE TABLE `project_sub_contractors` (
 -- Table structure for table `projects`
 --
 
+DROP TABLE IF EXISTS `projects`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `projects` (
@@ -6239,49 +6909,10 @@ CREATE TABLE `projects` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `project_boq_bills`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `project_boq_bills` (
-  `bill_id` int NOT NULL AUTO_INCREMENT,
-  `project_id` int NOT NULL,
-  `bill_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bill No. 1 - General',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`bill_id`),
-  KEY `idx_pbb_project` (`project_id`),
-  CONSTRAINT `fk_pbb_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `project_boq_items`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `project_boq_items` (
-  `item_id` int NOT NULL AUTO_INCREMENT,
-  `bill_id` int NOT NULL,
-  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
-  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`item_id`),
-  KEY `idx_pbi_bill` (`bill_id`),
-  CONSTRAINT `fk_pbi_bill` FOREIGN KEY (`bill_id`) REFERENCES `project_boq_bills` (`bill_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `public_holidays`
 --
 
+DROP TABLE IF EXISTS `public_holidays`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `public_holidays` (
@@ -6308,6 +6939,7 @@ CREATE TABLE `public_holidays` (
 -- Table structure for table `purchase_order_attachments`
 --
 
+DROP TABLE IF EXISTS `purchase_order_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_order_attachments` (
@@ -6331,6 +6963,7 @@ CREATE TABLE `purchase_order_attachments` (
 -- Table structure for table `purchase_order_items`
 --
 
+DROP TABLE IF EXISTS `purchase_order_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_order_items` (
@@ -6365,6 +6998,8 @@ CREATE TABLE `purchase_order_items` (
 -- Temporary view structure for view `purchase_order_summary`
 --
 
+DROP TABLE IF EXISTS `purchase_order_summary`;
+/*!50001 DROP VIEW IF EXISTS `purchase_order_summary`*/;
 SET @saved_cs_client     = @@character_set_client;
 /*!50503 SET character_set_client = utf8mb4 */;
 /*!50001 CREATE VIEW `purchase_order_summary` AS SELECT 
@@ -6387,6 +7022,7 @@ SET character_set_client = @saved_cs_client;
 -- Table structure for table `purchase_orders`
 --
 
+DROP TABLE IF EXISTS `purchase_orders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_orders` (
@@ -6419,7 +7055,7 @@ CREATE TABLE `purchase_orders` (
   `terms_conditions` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `rfq_id` int DEFAULT NULL,
   `proforma_invoice_ref` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `supplier_quote_ref` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `supplier_quote_ref` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `shipping_cost` decimal(15,2) DEFAULT '0.00',
   `created_by` int DEFAULT NULL,
   `approved_by` int DEFAULT NULL,
@@ -6445,6 +7081,7 @@ CREATE TABLE `purchase_orders` (
 -- Table structure for table `purchase_receipt_attachments`
 --
 
+DROP TABLE IF EXISTS `purchase_receipt_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_receipt_attachments` (
@@ -6466,6 +7103,7 @@ CREATE TABLE `purchase_receipt_attachments` (
 -- Table structure for table `purchase_receipts`
 --
 
+DROP TABLE IF EXISTS `purchase_receipts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_receipts` (
@@ -6504,6 +7142,8 @@ CREATE TABLE `purchase_receipts` (
 -- Temporary view structure for view `purchase_return_item_details`
 --
 
+DROP TABLE IF EXISTS `purchase_return_item_details`;
+/*!50001 DROP VIEW IF EXISTS `purchase_return_item_details`*/;
 SET @saved_cs_client     = @@character_set_client;
 /*!50503 SET character_set_client = utf8mb4 */;
 /*!50001 CREATE VIEW `purchase_return_item_details` AS SELECT 
@@ -6542,6 +7182,7 @@ SET character_set_client = @saved_cs_client;
 -- Table structure for table `purchase_return_items`
 --
 
+DROP TABLE IF EXISTS `purchase_return_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_return_items` (
@@ -6577,6 +7218,7 @@ CREATE TABLE `purchase_return_items` (
 -- Table structure for table `purchase_returns`
 --
 
+DROP TABLE IF EXISTS `purchase_returns`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `purchase_returns` (
@@ -6616,6 +7258,7 @@ CREATE TABLE `purchase_returns` (
 -- Table structure for table `quotation_items`
 --
 
+DROP TABLE IF EXISTS `quotation_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `quotation_items` (
@@ -6627,18 +7270,29 @@ CREATE TABLE `quotation_items` (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pcs',
-  `unit_price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
   `tax_rate` decimal(5,2) DEFAULT '0.00',
-  `tax_amount` decimal(10,2) DEFAULT '0.00',
+  `tax_amount` decimal(15,2) DEFAULT '0.00',
   `discount_percent` decimal(5,2) DEFAULT '0.00',
-  `discount_amount` decimal(10,2) DEFAULT '0.00',
-  `line_total` decimal(10,2) DEFAULT '0.00',
+  `discount_amount` decimal(15,2) DEFAULT '0.00',
+  `line_total` decimal(15,2) DEFAULT '0.00',
   `quantity_delivered` decimal(10,3) DEFAULT '0.000',
   `quantity_invoiced` decimal(10,3) DEFAULT '0.000',
   `batch_number` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `price_term_id` int unsigned DEFAULT NULL,
+  `price_term_label` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `term_duration_value` int unsigned DEFAULT NULL,
+  `term_duration_unit` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_price_id` int unsigned DEFAULT NULL,
+  `plan_addon_id` int unsigned DEFAULT NULL,
+  `addon_quota` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `addon_units` int DEFAULT NULL,
+  `discount_type` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'percent',
   PRIMARY KEY (`order_item_id`),
   KEY `idx_order_id` (`order_id`),
   KEY `idx_product_id` (`product_id`),
@@ -6650,6 +7304,7 @@ CREATE TABLE `quotation_items` (
 -- Table structure for table `quotations`
 --
 
+DROP TABLE IF EXISTS `quotations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `quotations` (
@@ -6703,6 +7358,7 @@ CREATE TABLE `quotations` (
 -- Table structure for table `receipt_items`
 --
 
+DROP TABLE IF EXISTS `receipt_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `receipt_items` (
@@ -6731,6 +7387,7 @@ CREATE TABLE `receipt_items` (
 -- Table structure for table `reconciliation_items`
 --
 
+DROP TABLE IF EXISTS `reconciliation_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `reconciliation_items` (
@@ -6753,6 +7410,7 @@ CREATE TABLE `reconciliation_items` (
 -- Table structure for table `regions`
 --
 
+DROP TABLE IF EXISTS `regions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `regions` (
@@ -6774,6 +7432,7 @@ CREATE TABLE `regions` (
 -- Table structure for table `reminder_templates`
 --
 
+DROP TABLE IF EXISTS `reminder_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `reminder_templates` (
@@ -6794,6 +7453,7 @@ CREATE TABLE `reminder_templates` (
 -- Table structure for table `repayment_cycles`
 --
 
+DROP TABLE IF EXISTS `repayment_cycles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `repayment_cycles` (
@@ -6807,6 +7467,7 @@ CREATE TABLE `repayment_cycles` (
 -- Table structure for table `repayments`
 --
 
+DROP TABLE IF EXISTS `repayments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `repayments` (
@@ -6821,9 +7482,99 @@ CREATE TABLE `repayments` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `restaurant_floors`
+--
+
+DROP TABLE IF EXISTS `restaurant_floors`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_floors` (
+  `floor_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`floor_id`),
+  KEY `idx_rf_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_reservation_reminders`
+--
+
+DROP TABLE IF EXISTS `restaurant_reservation_reminders`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_reservation_reminders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `reservation_id` int NOT NULL,
+  `milestone` int NOT NULL,
+  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_rrr_reservation_milestone` (`reservation_id`,`milestone`),
+  KEY `idx_rrr_reservation` (`reservation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_reservations`
+--
+
+DROP TABLE IF EXISTS `restaurant_reservations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_reservations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `table_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `customer_id` int DEFAULT NULL,
+  `customer_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_phone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reservation_time` datetime NOT NULL,
+  `party_size` int NOT NULL DEFAULT '1',
+  `status` enum('booked','seated','completed','cancelled','no_show') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'booked',
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_rr_warehouse_time` (`warehouse_id`,`reservation_time`),
+  KEY `idx_rr_table` (`table_id`),
+  KEY `idx_rr_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_tables`
+--
+
+DROP TABLE IF EXISTS `restaurant_tables`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_tables` (
+  `table_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `floor_id` int NOT NULL,
+  `table_number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `seats` int NOT NULL DEFAULT '2',
+  `status` enum('available','occupied','reserved','cleaning') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'available',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`table_id`),
+  KEY `idx_rt_warehouse` (`warehouse_id`),
+  KEY `idx_rt_floor` (`floor_id`),
+  KEY `idx_rt_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `revenue_categories`
 --
 
+DROP TABLE IF EXISTS `revenue_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `revenue_categories` (
@@ -6842,6 +7593,7 @@ CREATE TABLE `revenue_categories` (
 -- Table structure for table `revenues`
 --
 
+DROP TABLE IF EXISTS `revenues`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `revenues` (
@@ -6884,6 +7636,7 @@ CREATE TABLE `revenues` (
 -- Table structure for table `rfq`
 --
 
+DROP TABLE IF EXISTS `rfq`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `rfq` (
@@ -6923,6 +7676,7 @@ CREATE TABLE `rfq` (
 -- Table structure for table `rfq_attachments`
 --
 
+DROP TABLE IF EXISTS `rfq_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `rfq_attachments` (
@@ -6944,6 +7698,7 @@ CREATE TABLE `rfq_attachments` (
 -- Table structure for table `rfq_items`
 --
 
+DROP TABLE IF EXISTS `rfq_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `rfq_items` (
@@ -6964,6 +7719,7 @@ CREATE TABLE `rfq_items` (
 -- Table structure for table `role_permissions`
 --
 
+DROP TABLE IF EXISTS `role_permissions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `role_permissions` (
@@ -6985,13 +7741,14 @@ CREATE TABLE `role_permissions` (
   CONSTRAINT `fk_role_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`) ON DELETE CASCADE,
   CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE CASCADE,
   CONSTRAINT `role_permissions_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=3565 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3575 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `roles`
 --
 
+DROP TABLE IF EXISTS `roles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `roles` (
@@ -7010,6 +7767,7 @@ CREATE TABLE `roles` (
 -- Table structure for table `salary_components`
 --
 
+DROP TABLE IF EXISTS `salary_components`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `salary_components` (
@@ -7037,6 +7795,7 @@ CREATE TABLE `salary_components` (
 -- Table structure for table `sales_order_items`
 --
 
+DROP TABLE IF EXISTS `sales_order_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sales_order_items` (
@@ -7048,18 +7807,29 @@ CREATE TABLE `sales_order_items` (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pcs',
-  `unit_price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
   `tax_rate` decimal(5,2) DEFAULT '0.00',
-  `tax_amount` decimal(10,2) DEFAULT '0.00',
+  `tax_amount` decimal(15,2) DEFAULT '0.00',
   `discount_percent` decimal(5,2) DEFAULT '0.00',
-  `discount_amount` decimal(10,2) DEFAULT '0.00',
-  `line_total` decimal(10,2) DEFAULT '0.00',
+  `discount_amount` decimal(15,2) DEFAULT '0.00',
+  `line_total` decimal(15,2) DEFAULT '0.00',
   `quantity_delivered` decimal(10,3) DEFAULT '0.000',
   `quantity_invoiced` decimal(10,3) DEFAULT '0.000',
   `batch_number` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `price_term_id` int unsigned DEFAULT NULL,
+  `price_term_label` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `term_duration_value` int unsigned DEFAULT NULL,
+  `term_duration_unit` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `plan_price_id` int unsigned DEFAULT NULL,
+  `plan_addon_id` int unsigned DEFAULT NULL,
+  `addon_quota` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `addon_units` int DEFAULT NULL,
+  `discount_type` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'percent',
   PRIMARY KEY (`order_item_id`),
   KEY `idx_order_id` (`order_id`),
   KEY `idx_product_id` (`product_id`),
@@ -7071,6 +7841,7 @@ CREATE TABLE `sales_order_items` (
 -- Table structure for table `sales_orders`
 --
 
+DROP TABLE IF EXISTS `sales_orders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sales_orders` (
@@ -7126,6 +7897,7 @@ CREATE TABLE `sales_orders` (
 -- Table structure for table `sales_return_attachments`
 --
 
+DROP TABLE IF EXISTS `sales_return_attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sales_return_attachments` (
@@ -7147,6 +7919,7 @@ CREATE TABLE `sales_return_attachments` (
 -- Table structure for table `sales_return_items`
 --
 
+DROP TABLE IF EXISTS `sales_return_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sales_return_items` (
@@ -7171,6 +7944,7 @@ CREATE TABLE `sales_return_items` (
 -- Table structure for table `sales_return_payments`
 --
 
+DROP TABLE IF EXISTS `sales_return_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sales_return_payments` (
@@ -7194,6 +7968,7 @@ CREATE TABLE `sales_return_payments` (
 -- Table structure for table `sales_returns`
 --
 
+DROP TABLE IF EXISTS `sales_returns`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sales_returns` (
@@ -7234,6 +8009,7 @@ CREATE TABLE `sales_returns` (
 -- Table structure for table `sc_payments`
 --
 
+DROP TABLE IF EXISTS `sc_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sc_payments` (
@@ -7260,9 +8036,97 @@ CREATE TABLE `sc_payments` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `schema_migrations`
+--
+
+DROP TABLE IF EXISTS `schema_migrations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `schema_migrations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `migration_name` varchar(191) NOT NULL,
+  `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=92 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `service_plan_items`
+--
+
+DROP TABLE IF EXISTS `service_plan_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `service_plan_items` (
+  `item_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `plan_id` int unsigned NOT NULL,
+  `label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`item_id`),
+  KEY `idx_spi_plan` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `service_plans`
+--
+
+DROP TABLE IF EXISTS `service_plans`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `service_plans` (
+  `plan_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `plan_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tagline` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_popular` tinyint(1) NOT NULL DEFAULT '0',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `status` enum('active','inactive','deleted') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`plan_id`),
+  KEY `idx_sp_product` (`product_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `service_price_terms`
+--
+
+DROP TABLE IF EXISTS `service_price_terms`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `service_price_terms` (
+  `term_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `plan_id` int unsigned DEFAULT NULL,
+  `term_label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `duration_value` int unsigned NOT NULL,
+  `duration_unit` enum('day','week','month','year') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `is_default` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('active','inactive','deleted') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`term_id`),
+  KEY `idx_spt_product` (`product_id`,`status`),
+  KEY `idx_spt_plan` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `shift_schedules`
 --
 
+DROP TABLE IF EXISTS `shift_schedules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `shift_schedules` (
@@ -7290,6 +8154,7 @@ CREATE TABLE `shift_schedules` (
 -- Table structure for table `shipping_methods`
 --
 
+DROP TABLE IF EXISTS `shipping_methods`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `shipping_methods` (
@@ -7312,6 +8177,7 @@ CREATE TABLE `shipping_methods` (
 -- Table structure for table `signature_documents`
 --
 
+DROP TABLE IF EXISTS `signature_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `signature_documents` (
@@ -7332,6 +8198,7 @@ CREATE TABLE `signature_documents` (
 -- Table structure for table `signature_history`
 --
 
+DROP TABLE IF EXISTS `signature_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `signature_history` (
@@ -7351,6 +8218,7 @@ CREATE TABLE `signature_history` (
 -- Table structure for table `sms_alerts`
 --
 
+DROP TABLE IF EXISTS `sms_alerts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sms_alerts` (
@@ -7381,6 +8249,7 @@ CREATE TABLE `sms_alerts` (
 -- Table structure for table `sms_gateway_settings`
 --
 
+DROP TABLE IF EXISTS `sms_gateway_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sms_gateway_settings` (
@@ -7403,6 +8272,7 @@ CREATE TABLE `sms_gateway_settings` (
 -- Table structure for table `sms_templates`
 --
 
+DROP TABLE IF EXISTS `sms_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sms_templates` (
@@ -7422,6 +8292,7 @@ CREATE TABLE `sms_templates` (
 -- Table structure for table `statutory_remittances`
 --
 
+DROP TABLE IF EXISTS `statutory_remittances`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `statutory_remittances` (
@@ -7447,6 +8318,7 @@ CREATE TABLE `statutory_remittances` (
 -- Table structure for table `stock_movements`
 --
 
+DROP TABLE IF EXISTS `stock_movements`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `stock_movements` (
@@ -7485,6 +8357,7 @@ CREATE TABLE `stock_movements` (
 -- Table structure for table `stock_transactions`
 --
 
+DROP TABLE IF EXISTS `stock_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `stock_transactions` (
@@ -7515,6 +8388,7 @@ CREATE TABLE `stock_transactions` (
 -- Table structure for table `stock_transfer_items`
 --
 
+DROP TABLE IF EXISTS `stock_transfer_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `stock_transfer_items` (
@@ -7535,6 +8409,7 @@ CREATE TABLE `stock_transfer_items` (
 -- Table structure for table `stock_transfers`
 --
 
+DROP TABLE IF EXISTS `stock_transfers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `stock_transfers` (
@@ -7560,6 +8435,7 @@ CREATE TABLE `stock_transfers` (
 -- Table structure for table `sub_contractor_projects`
 --
 
+DROP TABLE IF EXISTS `sub_contractor_projects`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sub_contractor_projects` (
@@ -7577,6 +8453,7 @@ CREATE TABLE `sub_contractor_projects` (
 -- Table structure for table `sub_contractors`
 --
 
+DROP TABLE IF EXISTS `sub_contractors`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `sub_contractors` (
@@ -7600,7 +8477,7 @@ CREATE TABLE `sub_contractors` (
   `postal_address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `council` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ward` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `village` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `village` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `city` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `state` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `country` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Tanzania',
@@ -7639,9 +8516,48 @@ CREATE TABLE `sub_contractors` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `subscription_requests`
+--
+
+DROP TABLE IF EXISTS `subscription_requests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `subscription_requests` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `request_number` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tenant_id` int NOT NULL,
+  `subdomain` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `company_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_id` int DEFAULT NULL COMMENT 'the customer the company was linked to when it asked',
+  `product_id` int NOT NULL,
+  `term_token` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'local term id or plan token p{id}',
+  `term_label` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `extras` text COLLATE utf8mb4_unicode_ci COMMENT 'JSON {token: qty}',
+  `lines` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'JSON: the priced lines the quotation form fills in',
+  `subtotal` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `tax_amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `total` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `status` enum('pending','quoted','declined','replaced') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `quotation_id` int DEFAULT NULL,
+  `handled_by` int DEFAULT NULL,
+  `decline_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `handled_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_sr_number` (`request_number`),
+  KEY `idx_sr_status` (`status`),
+  KEY `idx_sr_tenant` (`tenant_id`,`status`),
+  KEY `idx_sr_quotation` (`quotation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `supplier_categories`
 --
 
+DROP TABLE IF EXISTS `supplier_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_categories` (
@@ -7664,6 +8580,7 @@ CREATE TABLE `supplier_categories` (
 -- Table structure for table `supplier_contacts`
 --
 
+DROP TABLE IF EXISTS `supplier_contacts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_contacts` (
@@ -7692,6 +8609,7 @@ CREATE TABLE `supplier_contacts` (
 -- Table structure for table `supplier_credit_notes`
 --
 
+DROP TABLE IF EXISTS `supplier_credit_notes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_credit_notes` (
@@ -7722,6 +8640,7 @@ CREATE TABLE `supplier_credit_notes` (
 -- Table structure for table `supplier_invoice_items`
 --
 
+DROP TABLE IF EXISTS `supplier_invoice_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_invoice_items` (
@@ -7746,6 +8665,7 @@ CREATE TABLE `supplier_invoice_items` (
 -- Table structure for table `supplier_invoice_payments`
 --
 
+DROP TABLE IF EXISTS `supplier_invoice_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_invoice_payments` (
@@ -7772,6 +8692,7 @@ CREATE TABLE `supplier_invoice_payments` (
 -- Table structure for table `supplier_invoices`
 --
 
+DROP TABLE IF EXISTS `supplier_invoices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_invoices` (
@@ -7823,6 +8744,7 @@ CREATE TABLE `supplier_invoices` (
 -- Table structure for table `supplier_ledger`
 --
 
+DROP TABLE IF EXISTS `supplier_ledger`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_ledger` (
@@ -7852,6 +8774,7 @@ CREATE TABLE `supplier_ledger` (
 -- Table structure for table `supplier_payments`
 --
 
+DROP TABLE IF EXISTS `supplier_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_payments` (
@@ -7894,6 +8817,7 @@ CREATE TABLE `supplier_payments` (
 -- Table structure for table `supplier_projects`
 --
 
+DROP TABLE IF EXISTS `supplier_projects`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `supplier_projects` (
@@ -7911,6 +8835,8 @@ CREATE TABLE `supplier_projects` (
 -- Temporary view structure for view `supplier_summary`
 --
 
+DROP TABLE IF EXISTS `supplier_summary`;
+/*!50001 DROP VIEW IF EXISTS `supplier_summary`*/;
 SET @saved_cs_client     = @@character_set_client;
 /*!50503 SET character_set_client = utf8mb4 */;
 /*!50001 CREATE VIEW `supplier_summary` AS SELECT 
@@ -7936,6 +8862,7 @@ SET character_set_client = @saved_cs_client;
 -- Table structure for table `suppliers`
 --
 
+DROP TABLE IF EXISTS `suppliers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `suppliers` (
@@ -7959,7 +8886,7 @@ CREATE TABLE `suppliers` (
   `postal_address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `council` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ward` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `village` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `village` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `city` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `state` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `country` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Tanzania',
@@ -7982,8 +8909,12 @@ CREATE TABLE `suppliers` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `default_wht_rate_id` int DEFAULT NULL,
   `ledger_account_id` int DEFAULT NULL,
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`supplier_id`),
   UNIQUE KEY `supplier_code` (`supplier_code`),
+  UNIQUE KEY `ux_suppliers_client_uuid` (`client_uuid`),
+  UNIQUE KEY `uq_suppliers_client_uuid` (`client_uuid`),
   KEY `idx_supplier_code` (`supplier_code`),
   KEY `idx_supplier_name` (`supplier_name`),
   KEY `idx_company_name` (`company_name`),
@@ -8001,6 +8932,7 @@ CREATE TABLE `suppliers` (
 -- Table structure for table `system_settings`
 --
 
+DROP TABLE IF EXISTS `system_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `system_settings` (
@@ -8018,6 +8950,7 @@ CREATE TABLE `system_settings` (
 -- Table structure for table `tax_brackets`
 --
 
+DROP TABLE IF EXISTS `tax_brackets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tax_brackets` (
@@ -8043,6 +8976,7 @@ CREATE TABLE `tax_brackets` (
 -- Table structure for table `tax_rates`
 --
 
+DROP TABLE IF EXISTS `tax_rates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tax_rates` (
@@ -8064,6 +8998,7 @@ CREATE TABLE `tax_rates` (
 -- Table structure for table `tax_slabs`
 --
 
+DROP TABLE IF EXISTS `tax_slabs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tax_slabs` (
@@ -8087,9 +9022,100 @@ CREATE TABLE `tax_slabs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `tender_boq_bills`
+--
+
+DROP TABLE IF EXISTS `tender_boq_bills`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_boq_bills` (
+  `bill_id` int NOT NULL AUTO_INCREMENT,
+  `tender_id` int NOT NULL,
+  `bill_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bill No. 1 - General',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`bill_id`),
+  KEY `idx_tbb_tender` (`tender_id`),
+  CONSTRAINT `fk_tbb_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tender_boq_items`
+--
+
+DROP TABLE IF EXISTS `tender_boq_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_boq_items` (
+  `item_id` int NOT NULL AUTO_INCREMENT,
+  `bill_id` int NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  KEY `idx_tbi_bill` (`bill_id`),
+  CONSTRAINT `fk_tbi_bill` FOREIGN KEY (`bill_id`) REFERENCES `tender_boq_bills` (`bill_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tender_checklist_items`
+--
+
+DROP TABLE IF EXISTS `tender_checklist_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_checklist_items` (
+  `item_id` int NOT NULL AUTO_INCREMENT,
+  `tender_id` int NOT NULL,
+  `item_text` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_ready` tinyint(1) NOT NULL DEFAULT '0',
+  `is_custom` tinyint(1) NOT NULL DEFAULT '0',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  KEY `idx_tci_tender` (`tender_id`),
+  CONSTRAINT `fk_tci_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tender_materials`
+--
+
+DROP TABLE IF EXISTS `tender_materials`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_materials` (
+  `material_id` int NOT NULL AUTO_INCREMENT,
+  `tender_id` int NOT NULL,
+  `product_id` int DEFAULT NULL,
+  `material` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specification` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`material_id`),
+  KEY `idx_tm_tender` (`tender_id`),
+  KEY `idx_tm_product` (`product_id`),
+  CONSTRAINT `fk_tm_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_tm_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `tender_staff`
 --
 
+DROP TABLE IF EXISTS `tender_staff`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tender_staff` (
@@ -8106,6 +9132,7 @@ CREATE TABLE `tender_staff` (
 -- Table structure for table `tenders`
 --
 
+DROP TABLE IF EXISTS `tenders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tenders` (
@@ -8179,95 +9206,10 @@ CREATE TABLE `tenders` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tender_boq_bills`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tender_boq_bills` (
-  `bill_id` int NOT NULL AUTO_INCREMENT,
-  `tender_id` int NOT NULL,
-  `bill_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bill No. 1 - General',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`bill_id`),
-  KEY `idx_tbb_tender` (`tender_id`),
-  CONSTRAINT `fk_tbb_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `tender_boq_items`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tender_boq_items` (
-  `item_id` int NOT NULL AUTO_INCREMENT,
-  `bill_id` int NOT NULL,
-  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
-  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`item_id`),
-  KEY `idx_tbi_bill` (`bill_id`),
-  CONSTRAINT `fk_tbi_bill` FOREIGN KEY (`bill_id`) REFERENCES `tender_boq_bills` (`bill_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `tender_materials`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tender_materials` (
-  `material_id` int NOT NULL AUTO_INCREMENT,
-  `tender_id` int NOT NULL,
-  `product_id` int DEFAULT NULL,
-  `material` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `specification` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
-  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`material_id`),
-  KEY `idx_tm_tender` (`tender_id`),
-  KEY `idx_tm_product` (`product_id`),
-  CONSTRAINT `fk_tm_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_tm_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `tender_checklist_items`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tender_checklist_items` (
-  `item_id` int NOT NULL AUTO_INCREMENT,
-  `tender_id` int NOT NULL,
-  `item_text` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `is_ready` tinyint(1) NOT NULL DEFAULT '0',
-  `is_custom` tinyint(1) NOT NULL DEFAULT '0',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`item_id`),
-  KEY `idx_tci_tender` (`tender_id`),
-  CONSTRAINT `fk_tci_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `training_participants`
 --
 
+DROP TABLE IF EXISTS `training_participants`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `training_participants` (
@@ -8296,6 +9238,7 @@ CREATE TABLE `training_participants` (
 -- Table structure for table `training_types`
 --
 
+DROP TABLE IF EXISTS `training_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `training_types` (
@@ -8313,6 +9256,7 @@ CREATE TABLE `training_types` (
 -- Table structure for table `trainings`
 --
 
+DROP TABLE IF EXISTS `trainings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trainings` (
@@ -8341,6 +9285,7 @@ CREATE TABLE `trainings` (
 -- Table structure for table `transactions`
 --
 
+DROP TABLE IF EXISTS `transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `transactions` (
@@ -8348,7 +9293,7 @@ CREATE TABLE `transactions` (
   `loan_id` int DEFAULT NULL,
   `transaction_date` date NOT NULL,
   `amount` decimal(15,2) NOT NULL,
-  `transaction_type` enum('disbursement','repayment','fee','interest','expense','general','supplier_payment','received_invoice_payment','sc_payment','payroll','voucher','petty_cash','transfer','revenue','journal','debit_note_refund','credit_note_refund','petty_cash_topup','trip') COLLATE utf8mb4_general_ci NOT NULL,
+  `transaction_type` enum('disbursement','repayment','fee','interest','expense','general','supplier_payment','received_invoice_payment','sc_payment','payroll','voucher','petty_cash','transfer','revenue','journal','debit_note_refund','credit_note_refund','petty_cash_topup','trip','stock_restock') COLLATE utf8mb4_general_ci NOT NULL,
   `payment_method` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `reference_number` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `account_id` int DEFAULT '0',
@@ -8364,6 +9309,7 @@ CREATE TABLE `transactions` (
 -- Table structure for table `user_attachment_labels`
 --
 
+DROP TABLE IF EXISTS `user_attachment_labels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_attachment_labels` (
@@ -8383,6 +9329,7 @@ CREATE TABLE `user_attachment_labels` (
 -- Table structure for table `user_projects`
 --
 
+DROP TABLE IF EXISTS `user_projects`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_projects` (
@@ -8402,6 +9349,7 @@ CREATE TABLE `user_projects` (
 -- Table structure for table `user_scope_overrides`
 --
 
+DROP TABLE IF EXISTS `user_scope_overrides`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_scope_overrides` (
@@ -8421,6 +9369,7 @@ CREATE TABLE `user_scope_overrides` (
 -- Table structure for table `user_sessions`
 --
 
+DROP TABLE IF EXISTS `user_sessions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_sessions` (
@@ -8465,6 +9414,7 @@ CREATE TABLE `user_sessions` (
 -- Table structure for table `user_signatures`
 --
 
+DROP TABLE IF EXISTS `user_signatures`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_signatures` (
@@ -8477,6 +9427,7 @@ CREATE TABLE `user_signatures` (
   `status` enum('active','inactive') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'active',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `file_size` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -8485,6 +9436,7 @@ CREATE TABLE `user_signatures` (
 -- Table structure for table `users`
 --
 
+DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
@@ -8509,14 +9461,59 @@ CREATE TABLE `users` (
   `avatar` varchar(255) DEFAULT NULL,
   `password_changed_at` datetime DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`user_id`)
+  `must_change_password` tinyint(1) NOT NULL DEFAULT '0',
+  `email_verified_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `uq_users_username` (`username`),
+  KEY `idx_users_email` (`email`),
+  KEY `idx_users_phone` (`phone`)
 ) ENGINE=InnoDB AUTO_INCREMENT=999050 DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `vendor_bridge_outbox`
+--
+
+DROP TABLE IF EXISTS `vendor_bridge_outbox`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `vendor_bridge_outbox` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `invoice_id` int NOT NULL,
+  `status` enum('pending','done','skipped','alerted') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `attempts` int NOT NULL DEFAULT '0',
+  `result` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `processed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_vbo_invoice` (`invoice_id`),
+  KEY `idx_vbo_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `vendor_subscription_services`
+--
+
+DROP TABLE IF EXISTS `vendor_subscription_services`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `vendor_subscription_services` (
+  `product_id` int NOT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `contract_template_id` int DEFAULT NULL,
+  `platform_product_key` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`product_id`),
+  UNIQUE KEY `uq_vss_platform_product` (`platform_product_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `villages`
 --
 
+DROP TABLE IF EXISTS `villages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `villages` (
@@ -8535,6 +9532,7 @@ CREATE TABLE `villages` (
 -- Table structure for table `voucher_payments`
 --
 
+DROP TABLE IF EXISTS `voucher_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `voucher_payments` (
@@ -8561,13 +9559,14 @@ CREATE TABLE `voucher_payments` (
 -- Table structure for table `wards`
 --
 
+DROP TABLE IF EXISTS `wards`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `wards` (
   `ward_id` int NOT NULL AUTO_INCREMENT,
   `ward_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `district_id` int DEFAULT NULL,
-  `ward_code` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ward_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `council_id` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -8582,6 +9581,7 @@ CREATE TABLE `wards` (
 -- Table structure for table `warehouses`
 --
 
+DROP TABLE IF EXISTS `warehouses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `warehouses` (
@@ -8607,9 +9607,15 @@ CREATE TABLE `warehouses` (
   `is_primary` int NOT NULL DEFAULT '0',
   `capacity` decimal(15,2) NOT NULL DEFAULT '0.00',
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `pos_mode` enum('retail','restaurant','hybrid') NOT NULL DEFAULT 'retail',
+  `public_catalog_token_hash` char(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `public_catalog_token_created_at` datetime DEFAULT NULL,
+  `pos_mode` enum('retail','restaurant','hybrid') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'retail',
+  `client_uuid` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`warehouse_id`),
   UNIQUE KEY `warehouse_code` (`warehouse_code`),
+  UNIQUE KEY `idx_warehouses_public_catalog_token_hash` (`public_catalog_token_hash`),
+  UNIQUE KEY `ux_warehouses_client_uuid` (`client_uuid`),
+  UNIQUE KEY `uq_warehouses_client_uuid` (`client_uuid`),
   KEY `idx_warehouse_code` (`warehouse_code`),
   KEY `idx_warehouse_name` (`warehouse_name`),
   KEY `idx_status` (`status`),
@@ -8621,6 +9627,7 @@ CREATE TABLE `warehouses` (
 -- Table structure for table `workflow_documents`
 --
 
+DROP TABLE IF EXISTS `workflow_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `workflow_documents` (
@@ -8639,6 +9646,7 @@ CREATE TABLE `workflow_documents` (
 -- Table structure for table `workflow_signatures`
 --
 
+DROP TABLE IF EXISTS `workflow_signatures`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `workflow_signatures` (
@@ -8665,6 +9673,7 @@ CREATE TABLE `workflow_signatures` (
 -- Table structure for table `workflow_steps`
 --
 
+DROP TABLE IF EXISTS `workflow_steps`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `workflow_steps` (
@@ -8686,201 +9695,6 @@ CREATE TABLE `workflow_steps` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `restaurant_floors`
---
--- Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
---
-
-CREATE TABLE `restaurant_floors` (
-  `floor_id` int NOT NULL AUTO_INCREMENT,
-  `warehouse_id` int NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `sort_order` int NOT NULL DEFAULT '0',
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`floor_id`),
-  KEY `idx_rf_warehouse` (`warehouse_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `restaurant_tables`
---
-
-CREATE TABLE `restaurant_tables` (
-  `table_id` int NOT NULL AUTO_INCREMENT,
-  `warehouse_id` int NOT NULL,
-  `floor_id` int NOT NULL,
-  `table_number` varchar(50) NOT NULL,
-  `seats` int NOT NULL DEFAULT '2',
-  `status` enum('available','occupied','reserved','cleaning') NOT NULL DEFAULT 'available',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`table_id`),
-  KEY `idx_rt_warehouse` (`warehouse_id`),
-  KEY `idx_rt_floor` (`floor_id`),
-  KEY `idx_rt_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `kitchen_stations`
---
-
-CREATE TABLE `kitchen_stations` (
-  `station_id` int NOT NULL AUTO_INCREMENT,
-  `warehouse_id` int NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`station_id`),
-  KEY `idx_ks_warehouse` (`warehouse_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `kitchen_tickets`
---
-
-CREATE TABLE `kitchen_tickets` (
-  `ticket_id` int NOT NULL AUTO_INCREMENT,
-  `hold_id` int DEFAULT NULL,
-  `warehouse_id` int NOT NULL,
-  `station_id` int NOT NULL,
-  `table_id` int DEFAULT NULL,
-  `status` enum('queued','preparing','ready','served') NOT NULL DEFAULT 'queued',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`ticket_id`),
-  KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
-  KEY `idx_kt_hold` (`hold_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `kitchen_ticket_items`
---
-
-CREATE TABLE `kitchen_ticket_items` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `ticket_id` int NOT NULL,
-  `product_id` int NOT NULL,
-  `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
-  `modifiers_summary` varchar(500) DEFAULT NULL,
-  `status` enum('queued','preparing','ready','served') NOT NULL DEFAULT 'queued',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_kti_ticket` (`ticket_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `modifier_groups`
---
-
-CREATE TABLE `modifier_groups` (
-  `group_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) NOT NULL,
-  `selection_type` enum('single','multiple') NOT NULL DEFAULT 'single',
-  `min_select` int NOT NULL DEFAULT '0',
-  `max_select` int NOT NULL DEFAULT '1',
-  `is_required` tinyint(1) NOT NULL DEFAULT '0',
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `created_by` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`group_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `modifier_options`
---
-
-CREATE TABLE `modifier_options` (
-  `option_id` int NOT NULL AUTO_INCREMENT,
-  `group_id` int NOT NULL,
-  `name` varchar(150) NOT NULL,
-  `price_adjustment` decimal(12,2) NOT NULL DEFAULT '0.00',
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`option_id`),
-  KEY `idx_mo_group` (`group_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `product_modifier_groups`
---
-
-CREATE TABLE `product_modifier_groups` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `product_id` int NOT NULL,
-  `group_id` int NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_pmg_product_group` (`product_id`,`group_id`),
-  KEY `idx_pmg_group` (`group_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `pos_sale_item_modifiers`
---
-
-CREATE TABLE `pos_sale_item_modifiers` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `sale_item_id` int NOT NULL,
-  `option_id` int DEFAULT NULL,
-  `option_name` varchar(150) NOT NULL,
-  `price_adjustment` decimal(12,2) NOT NULL DEFAULT '0.00',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_psim_sale_item` (`sale_item_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `restaurant_reservations`
---
-
-CREATE TABLE `restaurant_reservations` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `table_id` int NOT NULL,
-  `warehouse_id` int NOT NULL,
-  `customer_id` int DEFAULT NULL,
-  `customer_name` varchar(150) DEFAULT NULL,
-  `customer_phone` varchar(30) DEFAULT NULL,
-  `reservation_time` datetime NOT NULL,
-  `party_size` int NOT NULL DEFAULT '1',
-  `status` enum('booked','seated','completed','cancelled','no_show') NOT NULL DEFAULT 'booked',
-  `notes` text,
-  `created_by` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_rr_warehouse_time` (`warehouse_id`,`reservation_time`),
-  KEY `idx_rr_table` (`table_id`),
-  KEY `idx_rr_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Table structure for table `restaurant_reservation_reminders`
---
-
-CREATE TABLE `restaurant_reservation_reminders` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `reservation_id` int NOT NULL,
-  `milestone` int NOT NULL,
-  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_rrr_reservation_milestone` (`reservation_id`,`milestone`),
-  KEY `idx_rrr_reservation` (`reservation_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping events for database 'bms'
---
-
---
--- Dumping routines for database 'bms'
---
-
---
 -- Final view structure for view `purchase_order_summary`
 --
 
@@ -8892,7 +9706,7 @@ CREATE TABLE `restaurant_reservation_reminders` (
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 SQL SECURITY INVOKER */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY INVOKER */
 /*!50001 VIEW `purchase_order_summary` AS select `po`.`purchase_order_id` AS `purchase_order_id`,`po`.`order_number` AS `order_number`,`po`.`order_date` AS `order_date`,`po`.`expected_date` AS `expected_date`,`po`.`status` AS `status`,`po`.`grand_total` AS `grand_total`,`po`.`currency` AS `currency`,`s`.`supplier_name` AS `supplier_name`,`s`.`company_name` AS `company_name`,`u`.`username` AS `created_by`,count(`poi`.`item_id`) AS `item_count`,sum(`poi`.`quantity`) AS `total_quantity`,sum(`poi`.`received_quantity`) AS `received_quantity` from (((`purchase_orders` `po` left join `suppliers` `s` on((`po`.`supplier_id` = `s`.`supplier_id`))) left join `users` `u` on((`po`.`created_by` = `u`.`user_id`))) left join `purchase_order_items` `poi` on((`po`.`purchase_order_id` = `poi`.`purchase_order_id`))) group by `po`.`purchase_order_id` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -8910,7 +9724,7 @@ CREATE TABLE `restaurant_reservation_reminders` (
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 SQL SECURITY INVOKER */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY INVOKER */
 /*!50001 VIEW `purchase_return_item_details` AS select `pri`.`return_item_id` AS `return_item_id`,`pri`.`purchase_return_id` AS `purchase_return_id`,`pri`.`purchase_order_item_id` AS `purchase_order_item_id`,`pri`.`product_id` AS `product_id`,`pri`.`product_name` AS `product_name`,`pri`.`sku` AS `sku`,`pri`.`description` AS `description`,`pri`.`quantity` AS `quantity`,`pri`.`unit` AS `unit`,`pri`.`unit_price` AS `unit_price`,`pri`.`tax_rate` AS `tax_rate`,`pri`.`tax_amount` AS `tax_amount`,`pri`.`line_total` AS `line_total`,`pri`.`reason` AS `reason`,`pri`.`condition` AS `condition`,`pri`.`disposition` AS `disposition`,`pri`.`batch_number` AS `batch_number`,`pri`.`expiry_date` AS `expiry_date`,`pri`.`created_at` AS `created_at`,`pri`.`updated_at` AS `updated_at`,`pr`.`return_number` AS `return_number`,`pr`.`return_date` AS `return_date`,`pr`.`status` AS `return_status`,`s`.`supplier_name` AS `supplier_name`,`s`.`supplier_id` AS `supplier_id`,`p`.`product_code` AS `product_code`,`p`.`barcode` AS `barcode`,`poi`.`product_name` AS `original_product_name`,`poi`.`quantity` AS `original_quantity` from ((((`purchase_return_items` `pri` left join `purchase_returns` `pr` on((`pri`.`purchase_return_id` = `pr`.`purchase_return_id`))) left join `suppliers` `s` on((`pr`.`supplier_id` = `s`.`supplier_id`))) left join `products` `p` on((`pri`.`product_id` = `p`.`product_id`))) left join `purchase_order_items` `poi` on((`pri`.`purchase_order_item_id` = `poi`.`order_item_id`))) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -8928,28 +9742,11 @@ CREATE TABLE `restaurant_reservation_reminders` (
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 SQL SECURITY INVOKER */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY INVOKER */
 /*!50001 VIEW `supplier_summary` AS select `s`.`supplier_id` AS `supplier_id`,`s`.`supplier_code` AS `supplier_code`,`s`.`supplier_name` AS `supplier_name`,`s`.`company_name` AS `company_name`,`s`.`contact_person` AS `contact_person`,`s`.`phone` AS `phone`,`s`.`email` AS `email`,`s`.`city` AS `city`,`s`.`country` AS `country`,`sc`.`category_name` AS `category_name`,`s`.`status` AS `status`,count(distinct `po`.`purchase_order_id`) AS `total_orders`,coalesce(sum((case when (`po`.`status` = 'completed') then `po`.`grand_total` else 0 end)),0) AS `total_spent`,coalesce(sum((case when (`po`.`status` in ('pending','ordered','received')) then `po`.`grand_total` else 0 end)),0) AS `pending_amount`,count(distinct `sp`.`payment_id`) AS `total_payments`,coalesce(sum(`sp`.`amount`),0) AS `total_paid` from (((`suppliers` `s` left join `supplier_categories` `sc` on((`s`.`category_id` = `sc`.`category_id`))) left join `purchase_orders` `po` on((`s`.`supplier_id` = `po`.`supplier_id`))) left join `supplier_payments` `sp` on((`s`.`supplier_id` = `sp`.`supplier_id`))) where (`s`.`status` <> 'deleted') group by `s`.`supplier_id` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
---
--- Table structure for table `schema_migrations`
---
--- HAND-ADDED, not part of the mysqldump above (multi-tenancy Phase 8,
--- 2026-08-31). Tracks which files under migrations/tenant/ have been applied
--- to THIS tenant database. core/tenant_migration_runner.php reads and writes
--- it; migration files never touch it directly.
---
-CREATE TABLE IF NOT EXISTS `schema_migrations` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `migration_name` varchar(191) NOT NULL,
-  `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
@@ -8959,18 +9756,4 @@ CREATE TABLE IF NOT EXISTS `schema_migrations` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-31  1:59:11
-
--- Mobile app Bearer tokens (added 2026-09-26; also in migrations/tenant/2026_09_21_mobile_tokens.php)
-CREATE TABLE IF NOT EXISTS `mobile_tokens` (
-  `token_id`     INT           NOT NULL AUTO_INCREMENT,
-  `token`        CHAR(64)      NOT NULL,
-  `user_id`      INT           NOT NULL,
-  `device_name`  VARCHAR(255)  NOT NULL DEFAULT '',
-  `last_used_at` TIMESTAMP     NULL DEFAULT NULL,
-  `expires_at`   DATETIME      NULL DEFAULT NULL,
-  `created_at`   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`token_id`),
-  UNIQUE KEY `uq_token` (`token`),
-  KEY `idx_user_id` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Dump completed

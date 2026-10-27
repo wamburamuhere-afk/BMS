@@ -1268,38 +1268,62 @@ $icons = [
         $('#f_plan').val(S.plan || '');
         $('#f_term').val(S.term || '');
         const finish = startCreating();
+        // Random id for this signup: if the answer below is lost, the page asks
+        // actions/register_status.php about it instead of reporting a failure.
+        const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+        const fd = new FormData(this);
+        fd.append('reg_token', token);
         $.ajax({
             url: '/actions/register_tenant.php', method: 'POST', dataType: 'json',
-            data: new FormData(this), contentType: false, processData: false, timeout: 120000
+            data: fd, contentType: false, processData: false, timeout: 120000
         }).done(function (res) {
             finish();
-            if (!res || !res.success) return failed((res && res.message) || T.err_generic);
-            if (navigator.sendBeacon) navigator.sendBeacon('/api/platform/vendor_link_kick.php');
-            const addr = res.subdomain + '.' + BASE;
-            if (res.pending_approval) {
-                $('#pendAddr').text(addr); $('#pendUser').text(res.username);
-                setTimeout(() => show('pending'), 500);
-                return;
-            }
-            const name = prod() ? prod().name : 'Smart POS';
-            $('#doneHead').text(fill(T.ready_h, name));
-            $('#doneSub').text($('#company_name').val().trim() + ' · ' + fill(T.trial_until, TRIAL_END));
-            $('#doneAddr').text(addr);
-            $('#doneUser').text(res.username);
-            if (plan() && price()) {
-                $('#donePlan').text(plan().name + ' · ' + price().label + ' · ' + fill(T.plan_after, fmt(price().price) + ' TZS'));
-                $('#donePlanRow').removeClass('d-none-i');
-            }
-            $('#doneSent').text(fill(T.sent_to, $('#owner_email').val().trim()));
-            $('#doneSignIn').attr('href', res.login_url + '?u=' + encodeURIComponent(res.username));
-            setTimeout(() => show('done'), 500);
+            created(res);
         }).fail(function (xhr) {
-            finish();
-            let msg = T.err_generic;
+            let msg = null;
             try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (x) {}
-            failed(msg);
+            if (msg) { finish(); return failed(msg); }
+            // No answer from the server — the account may still be being built.
+            let tries = 0;
+            (function poll() {
+                $.getJSON('/actions/register_status.php', { token: token }).done(function (st) {
+                    if (st.state === 'done') { finish(); return created(st.response); }
+                    if (st.state === 'failed') { finish(); return failed(st.message || T.err_generic); }
+                    if (st.state === 'running' && ++tries < 75) return setTimeout(poll, 4000);
+                    finish(); failed(T.err_generic);
+                }).fail(function () {
+                    if (++tries < 75) return setTimeout(poll, 4000);
+                    finish(); failed(T.err_generic);
+                });
+            })();
         });
     });
+    // The account is ready (or the server refused it) — show the matching screen.
+    function created(res) {
+        if (!res || !res.success) return failed((res && res.message) || T.err_generic);
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon('/actions/register_after.php');
+            navigator.sendBeacon('/api/platform/vendor_link_kick.php');
+        }
+        const addr = res.subdomain + '.' + BASE;
+        if (res.pending_approval) {
+            $('#pendAddr').text(addr); $('#pendUser').text(res.username);
+            setTimeout(() => show('pending'), 500);
+            return;
+        }
+        const name = prod() ? prod().name : 'Smart POS';
+        $('#doneHead').text(fill(T.ready_h, name));
+        $('#doneSub').text($('#company_name').val().trim() + ' · ' + fill(T.trial_until, TRIAL_END));
+        $('#doneAddr').text(addr);
+        $('#doneUser').text(res.username);
+        if (plan() && price()) {
+            $('#donePlan').text(plan().name + ' · ' + price().label + ' · ' + fill(T.plan_after, fmt(price().price) + ' TZS'));
+            $('#donePlanRow').removeClass('d-none-i');
+        }
+        $('#doneSent').text(fill(T.sent_to, $('#owner_email').val().trim()));
+        $('#doneSignIn').attr('href', res.login_url + '?u=' + encodeURIComponent(res.username));
+        setTimeout(() => show('done'), 500);
+    }
     // Server refusal → the field it is about, in the page language. Order matters
     // ("already registered" before the plain phone/email rules).
     const SERVER_FIELDS = [
