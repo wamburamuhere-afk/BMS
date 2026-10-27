@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(pos): phone Sell bar has rounded corners
+
+**Files:** `app/bms/pos/pos.php`
+
+- The blue Sell bar on phones now has 12px rounded corners, matching the rounded Actions button inside it. Set in the early (first-paint) phone CSS so it never flashes square. Desktop unchanged.
+- **Checked:** browser at 360 px shows 12px corners; at 1000 px the bar stays square.
+
 ## 2026-10-27 — fix(pos): phone "Actions" button is a solid white button
 
 **Files:** `app/bms/pos/pos.php`, `tests/test_pos_old_sale_ui_cli.php`
