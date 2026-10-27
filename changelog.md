@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(pos): "Actions" sheet on phones, every header action explained
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **The issue:** on phones the folded Sell bar hid its four buttons (Overview, Old Sale, Open Drawer, End Shift) behind a bare ⌄; a new cashier could not tell they were there.
+- **Phones (desktop unchanged):** the bar is always one line: Sell, scanner dot, cash balance (or "No shift") and an **Actions** button with a count. It opens a sheet from the bottom: shift status, number, cashier, balance and starting cash on top, then one row per action with a line explaining it: Open Drawer, Record Old Sale, Sales Overview (Workspace), End Shift (red, last). With no shift open, Start Shift is the first row (yellow) and Open Drawer is greyed out ("Start a shift first"). While an old sale is being recorded, its row shows the date and time ("Old sale: Saturday 24/10/2026, 15:30") and a "Stop recording old sale" row appears.
+- Each row calls the same function as the desktop button, after the sheet has closed. The Record Old Sale pop-up still lives in the (now hidden) desktop button block and opens as the bottom sheet as before. The floating cart button is hidden while the sheet is open.
+- **Replaced:** the ⌄ fold/unfold header and its remembered choice (`togglePosHeader`, `posHeaderExpanded`) and the phone action tiles.
+- **Test:** `test_pos_old_sale_ui_cli.php` 37 checks pass (header checks rewritten for the sheet). Browser, rendered as admin with and without a rolled-back test shift at 320 / 360 / 412 px and 1100 px: one-line bar with no sideways scroll; sheet rows correct for shift open and no shift; Old Sale row opens the pop-up (visible and tappable); old-sale mode shows the date and Stop row, and stopping resets it; cart button hidden while the sheet is open; desktop shows the original buttons and no Actions button.
 ## 2026-10-27 — fix(register): signup is faster and no longer says "failed" when the account was created
 
 **Files:** `register.php` (script only), `actions/register_tenant.php`, `actions/register_status.php` (new), `actions/register_after.php` (new), `core/tenant_registration.php`, `scripts/build_tenant_template.php` (new), `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql` (regenerated), `tests/test_register_fast_no_false_fail_cli.php` (new)
