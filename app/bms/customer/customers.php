@@ -1281,7 +1281,7 @@ $(document).ready(function() {
                                     <li><a class="dropdown-item" href="<?= getUrl('sales_orders') ?>?customer=${row.customer_id}"><i class="bi bi-cart text-success"></i> <?= t('View Orders') ?></a></li>
                                     <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>?customer=${row.customer_id}"><i class="bi bi-receipt text-warning"></i> <?= t('View Invoices') ?></a></li>
                         `;
-                        if (row.total_invoices > 0) {
+                        if (row.total_invoices > 0 && <?= json_encode(canView('financial_reports')) ?>) {
                             actions += `<li><a class="dropdown-item" href="<?= getUrl('customer_statement') ?>?customer_id=${row.customer_id}"><i class="bi bi-file-earmark-text text-primary"></i> <?= t('View Account') ?></a></li>`;
                         }
                         if (<?= json_encode($company_type != 'microfinance' && $can_edit_customers) ?>) {
@@ -1350,7 +1350,7 @@ $(document).ready(function() {
                                         <button class="btn btn-sm btn-outline-warning" onclick="editCustomer(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Edit') ?>"><i class="bi bi-pencil"></i></button>
                                         <?php endif; ?>
                                         <?php if (!$simpleCustomerForm): ?>
-                                        ${customer.total_invoices > 0 ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View Account') ?>"><i class="bi bi-file-earmark-text"></i></a>` : ''}
+                                        ${customer.total_invoices > 0 && <?= json_encode(canView('financial_reports')) ?> ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View Account') ?>"><i class="bi bi-file-earmark-text"></i></a>` : ''}
                                         <?php endif; ?>
                                         <?php if ($can_delete_customers): ?>
                                         <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Delete') ?>"><i class="bi bi-trash"></i></button>
