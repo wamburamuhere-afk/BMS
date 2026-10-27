@@ -35,7 +35,10 @@ try {
         exit;
     }
 
-    $language = get_setting('user_language_' . $user_id, 'en');
+    // The EFFECTIVE language: an admin can set one for the whole company
+    // (Language Mode = organization, core/i18n.php orgLanguage()); else the user's own.
+    $orgLang  = function_exists('orgLanguage') ? orgLanguage() : null;
+    $language = $orgLang ?? get_setting('user_language_' . $user_id, 'en');
     $currency = get_setting('company_currency', 'TZS');
 
     // ── Company ───────────────────────────────────────────────────────────────
@@ -213,6 +216,8 @@ try {
             'phone'      => $user['username']   ?? '',
             'email'      => $user['email']      ?? '',
             'language'   => $language,
+            'language_mode'   => $orgLang !== null ? 'organization' : 'user',
+            'language_locked' => $orgLang !== null,   // true → hide the app's language switch
             'currency'   => $currency,
             'is_admin'   => isAdmin(),
             'avatar_url' => !empty($user['avatar']) ? 'uploads/avatars/' . basename($user['avatar']) : '',

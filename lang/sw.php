@@ -5827,4 +5827,5 @@ return [
     'Count your cash and close the day' => 'Hesabu pesa zako na funga siku',
     'Old sale: %s' => 'Mauzo ya zamani: %s',
     'Tap to change the date or time' => 'Gusa kubadilisha tarehe au muda',
+    'Language is set by your organization' => 'Lugha imewekwa na kampuni yako',
 ];

@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(mobile): the app follows the company's language mode (mobile API upgrade, Phase 6)
+
+**Files:** `api/mobile/login.php`, `api/mobile/me.php`, `api/mobile/profile/language.php`, `lang/sw.php`, `tests/test_mobile_language_mode_cli.php` (new)
+
+- **The gap:** when an admin sets one language for everyone (Settings → General → Language Mode = organization), the web follows it but the app showed each user's own choice and let them save another.
+- **Now:** `login.php` and `me.php` return the **effective** language plus `language_mode` (`user` | `organization`) and `language_locked`; `profile/language` refuses with **409** "Language is set by your organization" (Swahili: "Lugha imewekwa na kampuni yako"), like the web switch. The user's own choice is kept and returns when the mode goes back to per-user.
+- **Test:** 14 checks over HTTP — per-user switch, organization English and Swahili (login, me, refusal, server messages), back to per-user. Related suites pass; three fail the same on develop (`test_activity_log_permission_and_sell_label_cli`, `test_dashboard_kpi_row_cli`, `test_my_settings_help_i18n_cli`).
+
 ## 2026-10-27 — feat(mobile): Subscription in the Flutter app (mobile API upgrade, Phase 5)
 
 **Files:** `api/mobile/subscription.php` (new), `api/mobile/me.php`, `api/mobile/notifications/list.php`, `tests/test_mobile_subscription_cli.php` (new)

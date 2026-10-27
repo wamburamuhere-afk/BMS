@@ -98,8 +98,9 @@ try {
     // …and the superadmin's "Last Active" for the company, as web login does.
     mobileTouchTenantActive();
 
-    // Language per-user from system_settings
-    $language = get_setting('user_language_' . $user['user_id'], 'en');
+    // The effective language: the company's (Language Mode = organization) or the user's own.
+    $orgLang  = function_exists('orgLanguage') ? orgLanguage() : null;
+    $language = $orgLang ?? get_setting('user_language_' . $user['user_id'], 'en');
 
     require_once __DIR__ . '/../../helpers.php';
     logActivity($pdo, $user['user_id'], 'Mobile Login', "Mobile login from device: {$device_name}");
@@ -118,6 +119,8 @@ try {
             'phone'        => $user['username'] ?? '',
             'email'        => $user['email']    ?? '',
             'language'     => $language,
+            'language_mode'   => $orgLang !== null ? 'organization' : 'user',
+            'language_locked' => $orgLang !== null,
             'currency'     => get_setting('company_currency', 'TZS'),
         ],
         'company'    => [
