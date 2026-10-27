@@ -369,44 +369,45 @@ $src = file_get_contents("$root/api/account/get_profit_report.php");
 ok(strpos($src, "->modify('-23 months')") !== false, 'a range longer than 24 months keeps the latest 24');
 ok(strpos($src, "max(\$cursor->format('Y-m-d'), \$date_from)") !== false, 'first month starts at the From date, so the trend adds up to the cards');
 
-// ── 13. Dashboard (Simple POS) summary — full figures, readable change chips ─
-section('13. Dashboard summary: full figures, readable chips');
+// ── 13/14. Smart POS chart ("Chart 2", chosen 2026-10-27) ───────────────────
+section('13. Smart POS chart: Sales + Expenses bars, Net profit line');
 $dash = file_get_contents("$root/app/dashboard.php");
 $sPos   = strpos($dash, 'function renderSimpleChart(');
 $simple = substr($dash, $sPos, strpos($dash, 'function updateDashboardMetrics(') - $sPos);   // the whole function
-ok(strpos($dash, 'function fmtFull(') !== false, 'full-figure formatter exists');
-$boxesFrom = strpos($simple, "\$('#performanceSummary').append(");
-$boxes     = substr($simple, $boxesFrom, strpos($simple, 'moneyWentHtml(sales, cogs, opex, netProfit)') - $boxesFrom);
-ok(substr_count($boxes, '${fmtFull(') === 4 && strpos($simple, '${fmtAbbrev(') === false, 'the four summary boxes show full figures (no "K")');
-ok(strpos($simple, "+ ': ' + fmtFull(salesData[i])") !== false && strpos($simple, "+ ': ' + fmtFull(p)") !== false, 'tooltip shows full figures');
+ok(strpos($simple, "{ label: <?= json_encode(t('Sales')) ?>, data: salesData") !== false
+   && strpos($simple, "{ label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData") !== false, 'two bars: Sales and Expenses');
+ok(strpos($simple, "{ type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData") !== false && strpos($simple, 'tension: 0') !== false,
+   'Net profit is a straight line over the bars (Sales − goods cost − Expenses)');
+ok(strpos($simple, 'sort: (a, b) => a.datasetIndex - b.datasetIndex') !== false, 'legend reads Sales, Expenses, Net Profit');
+ok(strpos($simple, 'data = data.slice(-7);') !== false, 'the chart shows the last 7 periods of the chosen filter');
+ok(strpos($simple, "+ ': ' + fmtFull(salesData[i])") !== false && strpos($simple, "t('Cost of goods sold')) ?> + ': ' + fmtFull(cogsData[i])") !== false,
+   'tooltip: Sales, Expenses, Cost of goods sold, Net profit — full figures');
 ok(strpos($simple, 'callback: v => fmtAbbrev(v)') !== false, 'only the Y-axis stays abbreviated');
-ok(strpos($dash, "(up && pct >= 1000)") !== false, 'a rise of 1,000%+ reads as a multiple (66×)');
-ok(strpos($simple, "t('to loss')") !== false && strpos($simple, "t('back to profit')") !== false, 'profit ↔ loss is said in words, not a % across zero');
-ok(strpos($simple, "t('Compared with')") !== false, 'the comparison period is named');
-ok(isset($sw['Compared with'], $sw['to loss'], $sw['back to profit']), 'Swahili text present');
-
-// ── 14. Smart POS chart: bars per day, empty days kept, money-went line ─────
-section('14. Smart POS chart: easy to read');
-ok(strpos($simple, "type: 'bar'") !== false && strpos($simple, "type: 'line'") === false, 'bars (no curved line that leans into the previous day)');
-ok(strpos($simple, "label: <?= json_encode(t('Profit')) ?>") !== false && strpos($simple, "v < 0 ? '#dc3545' : '#198754'") !== false, 'Sales + Profit bars; a loss is a red bar below zero');
-ok(strpos($dash, 'function moneyWentHtml(') !== false && strpos($simple, 'moneyWentHtml(sales, cogs, opex, netProfit)') !== false, '"Where your sales money went" line under the summary');
-ok(strpos($dash, "POS_SIMPLE_MODE ? { period: period, fill_gaps: 1 }") !== false, 'dashboard asks the API for every day, empty ones included');
-ok(strpos($dash, "t('Sales & Profit') : t('Performance Overview')") !== false, 'card title "Sales & Profit"');
-ok(strpos($dash, 'if (curr === 0) return null;') !== false, 'no "▼ 100%" chips on a period with nothing in it');
-ok(isset($sw['Sales & Profit'], $sw['Profit'], $sw['Loss'], $sw['Where your sales money went'], $sw['Paid for the goods'], $sw['Your profit'], $sw['No sales in this period.']), 'Swahili text present');
-
-// "TSh N of every 100" always adds up to 100 — same arithmetic as moneyWentHtml().
-$split = function (float $sales, float $cogs, float $opex): array {
-    $goods = (int)round($cogs / $sales * 100);
-    $exp   = (int)min(100 - $goods, round($opex / $sales * 100));
-    return [$goods, $exp, max(0, 100 - $goods - $exp)];
-};
-foreach ([[165500, 115500, 0], [165500, 115500, 20000], [1000, 333, 333], [999, 1, 0], [100, 100, 0]] as [$s, $c, $o]) {
-    [$g, $e, $k] = $split($s, $c, $o);
-    ok($g + $e + $k === 100 && $g >= 0 && $e >= 0 && $k >= 0, "money split adds to 100 for sales $s / goods $c / expenses $o ($g + $e + $k)");
+ok(strpos($dash, "POS_SIMPLE_MODE ? { period: period, fill_gaps: 1 }") !== false, 'empty periods are kept (one slot each)');
+ok(strpos($dash, "t('Sales, Expenses & Profit') : t('Performance Overview')") !== false, 'card title "Sales, Expenses & Profit"');
+foreach (['pctDelta', 'deltaChipHtml', 'moneyWentHtml'] as $gone) {
+    ok(strpos($dash, "function $gone(") === false, "old summary helper $gone() removed (no dead code)");
 }
-$jsSplit = substr($dash, strpos($dash, 'function moneyWentHtml('), 1500);
-ok(strpos($jsSplit, 'Math.round(cogs / sales * 100)') !== false && strpos($jsSplit, 'Math.min(100 - goods, Math.round(opex / sales * 100))') !== false, 'the page uses that same arithmetic');
+
+section('14. "How your profit is worked out" follows the filter');
+foreach (['daily' => 'days', 'weekly' => 'weeks', 'monthly' => 'months', 'quarterly' => 'quarters', 'yearly' => 'years'] as $unit => $word) {
+    $label = "Last 7 $word — how your profit is worked out";
+    ok(strpos($simple, "$unit: ") !== false && strpos($simple, "t('$label')") !== false && isset($sw[$label]), "$unit → \"$label\" (+ Swahili)");
+}
+ok(strpos($simple, "box(<?= json_encode(t('Sales')) ?>, tSales") !== false && strpos($simple, "box(<?= json_encode(t('Cost of goods sold')) ?>, tCogs") !== false
+   && strpos($simple, "box(<?= json_encode(t('Expenses')) ?>, tOpex") !== false && strpos($simple, 'box(finalLabel, tProfit') !== false,
+   'Sales − Cost of goods sold − Expenses = Net profit');
+ok(strpos($simple, 'd-none d-md-flex') !== false && strpos($simple, 'class="d-md-none small"') !== false, 'one line on wide screens, a receipt on phones');
+ok(strpos($simple, "loss ? <?= json_encode(t('Net loss')) ?>") !== false, 'a negative total reads "Net loss"');
+ok(isset($sw['Sales, Expenses & Profit'], $sw['Cost of goods sold'], $sw['Net loss'], $sw['Profit']), 'Swahili text present');
+foreach (['Compared with', 'to loss', 'back to profit', 'Sales & Profit', 'Where your sales money went', 'Paid for the goods', 'Your profit', 'No sales in this period.'] as $k) {
+    ok(!isset($sw[$k]), "unused translation '$k' removed");
+}
+
+// The totals are plain sums of the same 7 rows — no rounding drift.
+$rows = [[0,0,5000],[0,0,0],[1200,800,2000],[0,0,0],[1200,800,0],[2500,1500,3000],[165500,115500,10000]];
+$tS = array_sum(array_column($rows, 0)); $tC = array_sum(array_column($rows, 1)); $tE = array_sum(array_column($rows, 2));
+ok($tS - $tC - $tE == 31800 && $tS == 170400 && $tC == 118600 && $tE == 20000, 'sample week: 170,400 − 118,600 − 20,000 = 31,800');
 
 // Runtime: the real chart API with and without fill_gaps.
 $runChart = function (array $get) use ($root): array {
