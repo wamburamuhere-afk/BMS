@@ -197,7 +197,7 @@ $(document).ready(function () {
         buttons: [
             { extend: 'excelHtml5', className: 'd-none', filename: 'shift_history_<?= date('Y-m-d') ?>', exportOptions: { columns: ':not(.no-export)' } }
         ],
-        columnDefs: [{ targets: 'no-sort', orderable: false }],
+        columnDefs: [$.extend({ targets: 0 }, BMSSerial.column()), { targets: 'no-sort', orderable: false }],
         language: { emptyTable: T_NO_SHIFTS_FOUND, zeroRecords: T_NO_SHIFTS_FOUND }
     });
 

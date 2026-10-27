@@ -7,6 +7,9 @@ require_once __DIR__ . '/../core/warehouse_scope.php';
 // Ensure no output before JSON
 if (ob_get_length()) ob_clean(); 
 header('Content-Type: application/json');
+
+// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
 error_reporting(E_ALL);
 ini_set('display_errors', 0); 
 ini_set('log_errors', 1);
@@ -160,7 +163,7 @@ try {
         LEFT JOIN users u2 ON pr.created_by = u2.user_id
         WHERE $where_sql
         GROUP BY pr.receipt_id 
-        ORDER BY pr.receipt_date DESC, pr.created_at DESC
+        ORDER BY pr.receipt_date " . ($sn_rev ? 'ASC' : 'DESC') . ", pr.created_at " . ($sn_rev ? 'ASC' : 'DESC') . ", pr.receipt_id " . ($sn_rev ? 'ASC' : 'DESC') . "
         LIMIT ? OFFSET ?
     ";
 

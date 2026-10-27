@@ -20,6 +20,9 @@ global $pdo;
 
 header('Content-Type: application/json');
 
+// S/No (column 0) descending = the normal newest-first order reversed (assets/js/bms-serial.js).
+$sn_d = ((int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc') ? 'ASC' : 'DESC';
+
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['error' => 'Unauthorized']); exit; }
 if (!canView('journals')) { http_response_code(403); echo json_encode(['error' => 'Permission denied']); exit; }
 
@@ -65,7 +68,7 @@ try {
               FROM journal_entries je
               LEFT JOIN users u ON u.user_id = je.created_by
              WHERE $whereSql
-             ORDER BY je.entry_date DESC, je.entry_id DESC
+             ORDER BY je.entry_date $sn_d, je.entry_id $sn_d
              LIMIT $start, $length";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

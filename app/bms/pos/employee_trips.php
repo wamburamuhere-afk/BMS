@@ -221,7 +221,7 @@ $('#tripPayForm').on('submit', function(e){
 <?php endif; ?>
 
 $(function(){
-    tpTable=$('#tripsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[3,'desc']],dom:'rtip',columnDefs:[{targets:0,orderable:false,searchable:false,className:'text-center',render:(d,t,row,meta)=>meta.row+1+meta.settings._iDisplayStart}],language:{emptyTable:'No trips yet.'},drawCallback:function(){ tpCards(this.api().rows({page:'current'})[0].map(i=>TP_ROWS[i]).filter(Boolean)); } });
+    tpTable=$('#tripsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[3,'desc']],dom:'rtip',columnDefs:[$.extend({ targets: 0, className: 'text-center' }, BMSSerial.column())],language:{emptyTable:'No trips yet.'},drawCallback:function(){ tpCards(this.api().rows({page:'current'})[0].map(i=>TP_ROWS[i]).filter(Boolean)); } });
     $('#tpf_employee').select2({ theme:'bootstrap-5',placeholder:'All employees',allowClear:true,width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
     $('#tpf_status,#tpf_employee').on('change', loadTrips);
     $('#tpf_reset').on('click', function(){ $('#tpf_status').val(''); $('#tpf_employee').val(null).trigger('change.select2'); loadTrips(); });

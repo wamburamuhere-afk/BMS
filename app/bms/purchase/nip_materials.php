@@ -629,14 +629,11 @@ $(function() {
         lengthMenu: [[5,10,25,50,100,-1],['5','10','25','50','100','All']],
         dom: 'rtip',
         order: [[0,'asc']],
-        columnDefs: [{ orderable: false, targets: [0, 5] }],
+        columnDefs: [{ orderable: false, targets: 5 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { paginate: { previous: 'Prev', next: 'Next' }, info: 'Showing _START_–_END_ of _TOTAL_' },
         drawCallback: function() {
             var info = this.api().page.info();
             $('#mlCountLabel').text(info.recordsDisplay + ' lists');
-            this.api().rows({ page: 'current' }).every(function(rowIdx) {
-                $(this.node()).find('.ml-row-no').text(info.start + rowIdx + 1);
-            });
         }
     });
     } // end DataTables guard

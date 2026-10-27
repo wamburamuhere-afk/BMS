@@ -1,6 +1,10 @@
 <?php
 // api/operations/get_maintenance_logs.php
 header('Content-Type: application/json');
+
+// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+$sn_d = $sn_rev ? 'ASC' : 'DESC';
 require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
@@ -40,7 +44,7 @@ try {
                            FROM maintenance_logs m 
                            JOIN assets a ON m.asset_id = a.asset_id 
                            WHERE $where_clause 
-                           ORDER BY m.maintenance_date DESC 
+                           ORDER BY m.maintenance_date $sn_d, m.log_id $sn_d 
                            LIMIT $start, $length");
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);

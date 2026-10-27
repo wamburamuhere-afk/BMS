@@ -271,11 +271,8 @@ $(document).ready(function() {
             }
         },
         columns: [
-            {
-                // S/NO — running row number (server-side aware: offset + index).
-                data: null, orderable: false, searchable: false, className: 'text-center text-muted',
-                render: (d, t, r, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            // S/NO — page position; descending counts down (assets/js/bms-serial.js).
+            BMSSerial.column({ className: 'text-center text-muted' }),
             {
                 data: 'entry_date',
                 render: data => `<strong>${new Date(data).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</strong>`

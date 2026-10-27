@@ -238,7 +238,7 @@ function renderProjectSuppliers(suppliers) {
         </div>`;
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#projSuppliersTable')) $('#projSuppliersTable').DataTable().destroy();
-    $('#projSuppliersTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 6] }] });
+    $('#projSuppliersTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: 6 }, $.extend({ targets: 0 }, BMSSerial.column())] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projSuppliersTable');
 }
 

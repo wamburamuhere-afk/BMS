@@ -1,6 +1,10 @@
 <?php
 // api/operations/get_projects.php
 header('Content-Type: application/json');
+
+// S/No (column 1) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 1 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+$sn_d = $sn_rev ? 'ASC' : 'DESC';
 require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
@@ -66,7 +70,7 @@ try {
             ) as budget
         FROM projects p
         WHERE $where_clause $scopeAliasedP
-        ORDER BY p.start_date DESC
+        ORDER BY p.start_date $sn_d, p.project_id $sn_d
         LIMIT $start, $length
     ");
     $stmt->execute($params);

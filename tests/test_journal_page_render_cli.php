@@ -41,7 +41,7 @@ foreach (['app/constant/accounts/journals.php','app/constant/accounts/journal_de
 // ── 2. list-page source fixes ───────────────────────────────────────────────
 ok(strpos($listSrc,'S/NO')!==false, 'list: S/NO column header present');
 ok(strpos($listSrc,'container-fluid')!==false, 'list: full-width container');
-ok(strpos($listSrc,'_iDisplayStart')!==false, 'list: S/NO uses running row number');
+ok(strpos($listSrc,'BMSSerial.column(')!==false, 'list: S/NO uses the shared serial column (running row number, sortable)');
 ok(strpos($listSrc,'Swal.fire')!==false, 'list: uses SweetAlert');
 ok(strpos($listSrc,'!confirm(')===false, 'list: no native confirm()');
 ok(strpos($listSrc,'buildUrl("api/reverse_journal")')!==false, 'list: clean (no-.php) reverse route');

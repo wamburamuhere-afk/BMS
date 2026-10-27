@@ -507,7 +507,7 @@ function pvActions(r) {
 
 // §UI-2 — DataTable
 const colDefs = [
-    { data: null,              className: 'ps-3',       orderable: false,  render: (d,t,r,m) => m.row + 1 },
+    BMSSerial.column({ className: 'ps-3' }),
     { data: 'voucher_number',                           render: d => `<span class="custom-code">${esc(d)}</span>` },
     { data: 'vouch_date' },
     <?php if ($enable_projects): ?>

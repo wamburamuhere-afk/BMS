@@ -227,7 +227,7 @@ function initTables() {
         order: [], dom: 'tip',
         language: { emptyTable: 'No leads yet' },
         columns: [
-            { orderable: false, width: '40px', className: 'text-muted' },
+            BMSSerial.column({ width: '40px', className: 'text-muted' }),
             { orderable: true },
             { orderable: true },
             { orderable: true },
@@ -240,7 +240,7 @@ function initTables() {
         order: [], dom: 'tip',
         language: { emptyTable: 'No pending activities' },
         columns: [
-            { orderable: false, width: '40px', className: 'text-muted' },
+            BMSSerial.column({ width: '40px', className: 'text-muted' }),
             { orderable: true },
             { orderable: true },
             { orderable: true },
@@ -251,7 +251,7 @@ function initTables() {
         order: [], dom: 'tip',
         language: { emptyTable: 'No won leads yet' },
         columns: [
-            { orderable: false, width: '40px', className: 'text-muted' },
+            BMSSerial.column({ width: '40px', className: 'text-muted' }),
             { orderable: true },
             { orderable: false, className: 'text-center' },
             { orderable: true,  className: 'text-end' },

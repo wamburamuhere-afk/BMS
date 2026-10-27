@@ -5,6 +5,9 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/warehouse_scope.php';
 header('Content-Type: application/json');
 
+// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+
 if (!isAuthenticated()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
@@ -132,7 +135,7 @@ try {
             (SELECT COUNT(*) FROM delivery_items di WHERE di.delivery_id = d.delivery_id) AS total_items
         $join_sql
         WHERE $full_sql
-        ORDER BY d.created_at DESC
+        ORDER BY d.created_at " . ($sn_rev ? 'ASC' : 'DESC') . ", d.delivery_id " . ($sn_rev ? 'ASC' : 'DESC') . "
         LIMIT ? OFFSET ?
     ");
     $idx = 1;

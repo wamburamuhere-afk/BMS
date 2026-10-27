@@ -1111,7 +1111,7 @@ $(document).ready(function () {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'Not assigned to any project yet.', zeroRecords: 'No matching projects found.' },
         drawCallback: function () {
             renderProjectCards(this.api().rows({ page: 'current' }).data().toArray());
@@ -1121,7 +1121,7 @@ $(document).ready(function () {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No recent payment history found.', zeroRecords: 'No matching payments found.' },
         drawCallback: function () {
             renderPaymentCards(this.api().rows({ page: 'current' }).data().toArray());
@@ -1228,7 +1228,7 @@ function initRiScTable() {
         responsive: false,
         pageLength: 10,
         order: [[3, 'desc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No received invoices recorded yet.', zeroRecords: 'No matching invoices.' },
         drawCallback: function () {
             renderRiScCards(this.api().rows({ page: 'current' }).data().toArray());

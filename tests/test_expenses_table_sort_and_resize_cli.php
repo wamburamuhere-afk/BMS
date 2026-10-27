@@ -107,6 +107,11 @@ function makeJQueryLike(isWindow) {
 const fakeWindow = {};
 function fakeDollar(sel) { return makeJQueryLike(sel === fakeWindow); }
 
+// assets/js/bms-serial.js (the S/No column helper) is loaded by header.php on
+// every real page before this module; load the real file here the same way.
+global.document = global.document || {};
+fakeDollar.extend = function () { return Object.assign.apply(null, arguments); };
+new Function('window', 'jQuery', fs.readFileSync(process.argv[3], 'utf8'))(global, fakeDollar);
 const fn = new Function('window', '$', 'jQuery', code + '; return window.BMSExpensesTable;');
 const BMSExpensesTable = fn(fakeWindow, fakeDollar, fakeDollar);
 
@@ -131,7 +136,7 @@ JS;
     $tmpJs = sys_get_temp_dir() . '/bms_exp_table_test_' . uniqid() . '.js';
     file_put_contents($tmpJs, $nodeScript);
     $out = []; $rc = 0;
-    exec('node ' . escapeshellarg($tmpJs) . ' ' . escapeshellarg($jsFile) . ' 2>&1', $out, $rc);
+    exec('node ' . escapeshellarg($tmpJs) . ' ' . escapeshellarg($jsFile) . ' ' . escapeshellarg("$root/assets/js/bms-serial.js") . ' 2>&1', $out, $rc);
     @unlink($tmpJs);
 
     if ($rc !== 0) {

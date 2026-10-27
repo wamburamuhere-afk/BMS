@@ -830,8 +830,7 @@ function initDataTable() {
         pageLength: 25,
         order: [[4, 'desc']],
         columns: [
-            { data: null, orderable: false, className: 'ps-3 text-muted small',
-              render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
+            BMSSerial.column({ className: 'ps-3 text-muted small' }),
             { data: 'invoice_ref', render: v => `<span class="fw-bold">${safeOutput(v)}</span>` },
             { data: 'invoice_type', render: v => v === 'supplier'
                 ? '<span class="badge badge-supplier"><i class="bi bi-building me-1"></i>Supplier</span>'

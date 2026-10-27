@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-10-28 — feat(ui): S/No is sortable on every DataTable (one shared definition)
+
+**New:** `assets/js/bms-serial.js` (loaded in `header.php` right after jQuery). **Pages / modules:** 84 DataTables across ~50 pages + the shared table modules in `assets/js/tables/`, `pos-credit-aging.js`, `warehouse-batches.js`, `includes/project_view/scripts/`. **APIs:** `api/get_customers_paged.php`, `api/account/get_invoices.php`, `api/account/get_sales_orders.php`, `api/account/get_expenses.php`, `api/account/get_journals.php`, `api/account/get_bank_reconciliations.php`, `api/operations/get_assets.php`, `api/operations/get_maintenance_logs.php`, `api/operations/get_projects.php`, `api/get_employees.php`, `api/get_login_history.php`, `api/get_delivery_notes_list.php`, `api/get_grns.php`, `api/get_purchase_returns.php`, `ajax/get_users.php`, `app/activity_log.php`.
+
+- **What S/No means now (everywhere):** a row's position in the list's normal order; the number stays with its row. Click S/No → ascending = normal order, descending = reversed; sorting any other column keeps each row's own number. `BMSSerial.column()` is the one definition.
+- **Bug fixed along the way:** client-side tables numbered rows with `meta.row + _iDisplayStart + 1`, which is wrong past page 1 (row 26 could show as 51). Page 2 now continues 26, 27…
+- **Server-side tables:** each API reverses its normal order when S/No is sorted descending (with a unique-id tie-breaker so pages are stable); the number counts down to match.
+- **Statements** (Bank / Customer / Vendor / Material List): only S/No sorts there — oldest/newest first; each row keeps its own running balance.
+- **Same look as before:** Purchase Orders, RFQ and Bank Reconciliation used to start sorted on S/No, so the same rows now show numbered 1..N.
+- **Left as is:** Product Categories (and Restaurant Menu Type, same page) — a parent/child tree; reversing it would put children above parents (`test_ui_constants_group_a_cli` pins `ordering: false`).
+- **Security fixes in APIs touched:** `get_bank_reconciliations.php` had no login/permission check and put the search text, sort column/direction and paging straight into SQL — now auth + `canView('bank_reconciliation')`, bound search, whitelisted sort, int paging (and it sorted on a column that does not exist). Sort direction was unchecked SQL in `get_employees.php`, `get_purchase_returns.php`, `account/get_expenses.php` — whitelisted.
+- **Wrong column sorting fixed:** `get_employees.php` and `get_purchase_returns.php` mapped page columns one place off (Employee # sorted by name, etc.; employees also missed the Project column) — now mapped by the real column.
+- **RFQ page:** a stray `}` killed its script block, so Filter / Clear / Export did nothing — removed.
+- **Tests:** Node harnesses of `test_expenses_table_sort_and_resize_cli`, `test_pos_credit_aging_table_cli`, `test_warehouse_batches_tab_cli` now load the real `bms-serial.js` (as the page header does); `test_journal_page_render_cli` checks for the shared serial column.
+- **Checked in a browser:** 84 tables — default view numbered 1..N, S/No asc/desc reverses rows and numbers, other-column sort keeps numbers, page 2 continues, server reverse is exact, no JS errors (548 checks). Whole-site re-audit: no new JS errors; four earlier ones gone. 171 related CLI suites: same failures as before the change (two differ only by shared-test-data drift).
+
 ## 2026-10-28 — feat(ui): DataTables on the 11 main list pages that had none
 
 **Files:** `app/constant/accounts/customer_deposits.php`, `app/bms/pos/paye_register.php`, `app/bms/invoice/po_invoice_report.php`, `app/constant/reports/employee_statement.php`, `app/bms/restaurant/modifier_group.php`, `app/bms/restaurant/reservations.php`, `app/bms/restaurant/tables.php`, `app/bms/sales/sales_returns/sales_returns.php`, `app/constant/accounts/petty_cash.php`, `app/bms/stock/stock_movements.php`, `api/sales/get_returns_paged.php`, `api/petty_cash/get_transactions.php`, `api/stock/get_stock_movements.php` (new), `tests/test_ui_constants_group_a_cli.php`

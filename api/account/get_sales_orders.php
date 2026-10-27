@@ -5,6 +5,10 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
+// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+$sn_d = $sn_rev ? 'ASC' : 'DESC';
+
 if (!isAuthenticated()) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -237,7 +241,7 @@ try {
         WHERE $where_sql $scopeSO
         GROUP BY so.sales_order_id
         $having_sql
-        ORDER BY so.order_date DESC, so.created_at DESC
+        ORDER BY so.order_date $sn_d, so.created_at $sn_d, so.sales_order_id $sn_d
         LIMIT ? OFFSET ?
     ";
 

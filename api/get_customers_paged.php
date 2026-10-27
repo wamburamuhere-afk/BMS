@@ -26,6 +26,8 @@ try {
     $start = isset($_GET['start']) ? intval($_GET['start']) : 0;
     $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
     $search_value = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
+    // S/No (column 0) descending = the normal A→Z order reversed (assets/js/bms-serial.js).
+    $sn_dir = ((int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc') ? 'DESC' : 'ASC';
 
     // Base query conditions
     $where_conditions = ["c.status != 'deleted'"];
@@ -131,7 +133,7 @@ try {
             GROUP BY customer_id
         ) inv_stats ON c.customer_id = inv_stats.customer_id
         WHERE $where_sql
-        ORDER BY c.customer_name ASC
+        ORDER BY c.customer_name $sn_dir, c.customer_id $sn_dir
         LIMIT ? OFFSET ?
     ";
 

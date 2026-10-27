@@ -1581,7 +1581,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No projects found for this supplier.', zeroRecords: 'No matching projects found.' }
     });
 
@@ -1596,7 +1596,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No purchase orders found.', zeroRecords: 'No matching purchase orders found.' }
     });
 
@@ -1604,7 +1604,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No payment history found.', zeroRecords: 'No matching payments found.' }
     });
 
@@ -1612,7 +1612,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[1, 'desc']],
-        columnDefs: [{ orderable: false, targets: [0] }],
+        columnDefs: [$.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No audit entries recorded for this supplier yet.', zeroRecords: 'No matching audit entries.' }
     });
 });
@@ -2330,7 +2330,7 @@ function initRiTable() {
     riDt = $('#riTable').DataTable({
         data: [], pageLength: 10, order: [[2, 'desc']], autoWidth: false,
         columns: [
-            { data: null, orderable: false, className: 'text-muted', render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
+            BMSSerial.column({ className: 'text-muted' }),
             { data: 'invoice_ref', render: v => `<span class="fw-bold">${safeOutput(v)}</span>` },
             { data: 'date_raised' },
             { data: 'date_recorded' },

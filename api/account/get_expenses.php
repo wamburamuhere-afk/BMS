@@ -53,8 +53,8 @@ if ($filter_category_id > 0 || $filter_type_id > 0) {
 }
 
 // Get order parameters
-$orderColumnIndex = $_GET['order'][0]['column'] ?? 0;
-$orderDirection = $_GET['order'][0]['dir'] ?? 'desc';
+$orderColumnIndex = (int)($_GET['order'][0]['column'] ?? 0);
+$orderDirection = strtolower((string)($_GET['order'][0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
 
 // Define column mapping
 // Define column mapping
@@ -197,8 +197,11 @@ $countStmt->closeCursor();
 if (isset($columns[$orderColumnIndex]) && !empty($columns[$orderColumnIndex])) {
     $orderBy = $columns[$orderColumnIndex];
     $query .= " ORDER BY $orderBy $orderDirection";
+} elseif ($orderColumnIndex === 0 && $orderDirection === 'DESC') {
+    // S/No descending = the normal newest-first order reversed (assets/js/bms-serial.js).
+    $query .= " ORDER BY e.expense_date ASC, e.created_at ASC, e.expense_id ASC";
 } else {
-    $query .= " ORDER BY e.expense_date DESC, e.created_at DESC";
+    $query .= " ORDER BY e.expense_date DESC, e.created_at DESC, e.expense_id DESC";
 }
 
 // Add pagination

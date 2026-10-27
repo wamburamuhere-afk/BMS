@@ -497,14 +497,7 @@ $(document).ready(function() {
             }
         },
         columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'ps-4 text-center text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            BMSSerial.column({ width: '50px', className: 'ps-4 text-center text-muted small fw-bold' }),
             {
                 data: 'invoice_number',
                 className: 'ps-4',

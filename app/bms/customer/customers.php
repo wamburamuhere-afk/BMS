@@ -1172,14 +1172,10 @@ $(document).ready(function() {
                 }
             },
             columns: [
-                {
-                    data: null,
-                    orderable: false,
-                    searchable: false,
+                BMSSerial.column({
                     className: 'text-center text-muted small fw-bold ps-3',
-                    render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1,
                     createdCell: (td) => $(td).attr('data-label', 'S/NO')
-                },
+                }),
                 { 
                     data: 'customer_code',
                     render: (data) => `<code>${safeOutput(data)}</code>`,

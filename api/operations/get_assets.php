@@ -6,6 +6,10 @@
 // (from the latest posted depreciation_entries, falling back to a live
 // DepreciationService calc), custodian name, condition, and a location filter.
 header('Content-Type: application/json');
+
+// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+$sn_d = $sn_rev ? 'ASC' : 'DESC';
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/asset_depreciation_service.php';
 require_once __DIR__ . '/../../core/asset_settings.php';
@@ -58,7 +62,7 @@ try {
           FROM assets a
           LEFT JOIN users u ON u.user_id = a.custodian_id
          WHERE $where_clause
-      ORDER BY a.created_at DESC
+      ORDER BY a.created_at $sn_d, a.asset_id $sn_d
          LIMIT $start, $length
     ");
     $data_stmt->execute($params);

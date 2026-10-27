@@ -45,11 +45,7 @@
     function columns(cfg) {
         var esc = window.BMSTbl.esc, date = window.BMSTbl.date;
         var all = [
-            { key: 'sno', col: {
-                data: null, orderable: false, searchable: false, width: '50px',
-                className: 'ps-3 text-muted small fw-bold text-center',
-                render: function (d, t, r, meta) { return meta.row + meta.settings._iDisplayStart + 1; }
-            }},
+            { key: 'sno', col: BMSSerial.column({ width: '50px', className: 'ps-3 text-muted small fw-bold text-center' })},
             { key: 'dn_number', col: {
                 data: 'dn_number',
                 render: function (data, type, row) {

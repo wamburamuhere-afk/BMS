@@ -5,6 +5,10 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
+// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
+$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+$sn_d = $sn_rev ? 'ASC' : 'DESC';
+
 
 if (!isAuthenticated()) {
     http_response_code(401);
@@ -179,7 +183,7 @@ try {
         LEFT JOIN projects p ON i.project_id = p.project_id
         LEFT JOIN users u1 ON i.created_by = u1.user_id
         WHERE $where_sql $scopeI
-        ORDER BY i.invoice_date DESC, i.created_at DESC
+        ORDER BY i.invoice_date $sn_d, i.created_at $sn_d, i.invoice_id $sn_d
         LIMIT ? OFFSET ?
     ";
 
