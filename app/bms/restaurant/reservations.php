@@ -186,7 +186,7 @@ function loadReservations() {
     if (!wid) return;
     $.getJSON('<?= buildUrl('api/restaurant/get_reservations.php') ?>', { warehouse_id: wid, date: date }, function (res) {
         const rows = res.success ? res.data : [];
-        if (!rows.length) { $('#resBody').html(`<tr><td colspan="6" class="text-center text-muted py-4">${STRINGS.noRecords}</td></tr>`); return; }
+        if ($.fn.DataTable.isDataTable('#resTable')) $('#resTable').DataTable().destroy();
         let html = '';
         rows.forEach(r => {
             const time = new Date(r.reservation_time.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -201,7 +201,7 @@ function loadReservations() {
                 actions += `<button class="btn btn-sm btn-outline-secondary" onclick="setResStatus(${r.id}, 'completed')" title="${STATUS_LABELS.completed}"><i class="bi bi-check2-circle"></i></button>`;
             }
             html += `<tr>
-                <td>${time}</td>
+                <td data-order="${safeOutput(r.reservation_time)}">${time}</td>
                 <td>${safeOutput(r.customer_name)}${r.customer_phone ? '<div class="small text-muted">' + safeOutput(r.customer_phone) + '</div>' : ''}</td>
                 <td>${safeOutput(r.table_number)}</td>
                 <td>${r.party_size}</td>
@@ -210,6 +210,12 @@ function loadReservations() {
             </tr>`;
         });
         $('#resBody').html(html);
+        $('#resTable').DataTable({
+            responsive: false, autoWidth: false, pageLength: 25, order: [[0, 'asc']],
+            dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
+            columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+            language: { emptyTable: STRINGS.noRecords }
+        });
     });
 }
 

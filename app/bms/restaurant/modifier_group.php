@@ -227,10 +227,7 @@ function loadGroups() {
 }
 
 function renderTable() {
-    if (!GROUPS_DATA.length) {
-        $('#groupsBody').html(`<tr><td colspan="9" class="text-center text-muted py-4">${STRINGS.noRecords}</td></tr>`);
-        return;
-    }
+    if ($.fn.DataTable.isDataTable('#groupsTable')) $('#groupsTable').DataTable().destroy();
     let html = '';
     GROUPS_DATA.forEach((g, i) => {
         const statusColor = g.status === 'active' ? '#198754' : '#6c757d';
@@ -249,6 +246,12 @@ function renderTable() {
         </tr>`;
     });
     $('#groupsBody').html(html);
+    $('#groupsTable').DataTable({
+        responsive: false, autoWidth: false, pageLength: 25, order: [],
+        dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
+        columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+        language: { emptyTable: STRINGS.noRecords }
+    });
 }
 
 function renderCards() {

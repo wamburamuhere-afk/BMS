@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-28 — feat(ui): DataTables on the 11 main list pages that had none
+
+**Files:** `app/constant/accounts/customer_deposits.php`, `app/bms/pos/paye_register.php`, `app/bms/invoice/po_invoice_report.php`, `app/constant/reports/employee_statement.php`, `app/bms/restaurant/modifier_group.php`, `app/bms/restaurant/reservations.php`, `app/bms/restaurant/tables.php`, `app/bms/sales/sales_returns/sales_returns.php`, `app/constant/accounts/petty_cash.php`, `app/bms/stock/stock_movements.php`, `api/sales/get_returns_paged.php`, `api/petty_cash/get_transactions.php`, `api/stock/get_stock_movements.php` (new), `tests/test_ui_constants_group_a_cli.php`
+
+- **Client-side DataTables** (search, sort, paging; Actions not sortable; S/No sortable): Customer Deposits, PO vs Invoice Report, Restaurant Modifier Groups / Reservations / Tables. JS-filled tables now destroy + rebuild the DataTable on each reload; the colspan "no records" rows became the DataTable's own empty message. Amount cells carry `data-order` + `type: 'num'`, so `TZS 150,000` sorts after `TZS 70,000`.
+- **Registers / statements** (PAYE Register, Employee Statement): sort + search with every row on one page, so Print and the Totals footer still cover everything. Employee Statement sorts only by S/No (oldest/newest first; each row keeps its own running balance); the Opening row is now a full-width row that always stays at the oldest end.
+- **Server-side DataTables** for the three server-paged lists (a client DataTable would only have sorted one page): Sales Returns (`get_returns_paged.php` gains a `draw` mode — old callers unchanged), Petty Cash (`get_transactions.php` gains whitelisted `sort`/`dir`; signed amount; the page's own search box, Show picker, card view and "print every row" keep working), Stock Movements (new `api/stock/get_stock_movements.php` — same filters and project/warehouse scope as the page had, plus search). Sorting is a column-index whitelist; S/No = default order, descending = oldest first.
+- Sales Returns cells are now escaped (`safeOutput`) — the old renderer inserted names/numbers raw.
+- `test_ui_constants_group_a_cli.php`: the specs that pinned these pages to "no DataTable" now accept the server-side DataTable (dated note, same as tenders.php's).
+- **Checked in a browser** (57 + 16 checks): each table is a DataTable with no JS errors; S/No sorts both ways (data + header click); server sort/search reach the server; amounts sort numerically; Petty Cash print fetches all rows then restores; restaurant status dropdown / Edit buttons still work. 26 related CLI suites: failures identical before and after.
+
 ## 2026-10-28 — fix: Supplier Categories page never worked; Receive Payment didn't load invoices
 
 **Files:** `app/bms/Suppliers/supplier_categories.php`, `api/add_supplier_category.php` (new), `api/update_supplier_category.php` (new), `api/update_supplier_category_status.php` (new), `api/delete_supplier_category.php` (new), `migrations/tenant/2026_10_28_supplier_categories_soft_delete.php` (new) + `migrations/2026_10_28_supplier_categories_soft_delete_legacy_db.php` (new), `app/constant/accounts/receive_payment.php`

@@ -16,9 +16,6 @@ $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0
 $movement_type = isset($_GET['movement_type']) ? $_GET['movement_type'] : '';
 $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
-$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$per_page = isset($_GET['per_page']) ? max(1, intval($_GET['per_page'])) : 50;
-$offset = ($page - 1) * $per_page;
 
 if ($warehouse_id > 0 && !userCan('warehouse', $warehouse_id)) {
     $warehouse_id = 0; // ignore an out-of-scope filter rather than error on a list page
@@ -32,73 +29,7 @@ if ($product_id > 0) {
     $product_info = $p_stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// Build query
-$query = "
-    SELECT 
-        sm.*,
-        p.product_name,
-        p.sku,
-        w.warehouse_name,
-        u.username as created_by_name
-    FROM stock_movements sm
-    LEFT JOIN products p ON sm.product_id = p.product_id
-    LEFT JOIN warehouses w ON sm.warehouse_id = w.warehouse_id
-    LEFT JOIN users u ON sm.created_by = u.user_id
-    WHERE 1=1
-";
-
-$params = [];
-if ($product_id > 0) {
-    $query .= " AND sm.product_id = ?";
-    $params[] = $product_id;
-}
-if ($warehouse_id > 0) {
-    $query .= " AND sm.warehouse_id = ?";
-    $params[] = $warehouse_id;
-}
-if (!empty($movement_type)) {
-    $query .= " AND sm.movement_type = ?";
-    $params[] = $movement_type;
-}
-if (!empty($date_from)) {
-    $query .= " AND DATE(sm.created_at) >= ?";
-    $params[] = $date_from;
-}
-if (!empty($date_to)) {
-    $query .= " AND DATE(sm.created_at) <= ?";
-    $params[] = $date_to;
-}
-$query .= scopeFilterSqlNullable('project', 'sm');
-$query .= scopeFilterSqlNullable('warehouse', 'sm');
-
-// Get total count for pagination
-$count_query = str_replace("sm.*, p.product_name, p.sku, w.warehouse_name, u.username as created_by_name", "COUNT(*)", $query);
-$count_stmt = $pdo->prepare($count_query);
-$count_stmt->execute($params);
-$total_records = $count_stmt->fetchColumn();
-$total_pages = ceil($total_records / $per_page);
-
-// Add ordering and limit
-$query .= " ORDER BY sm.created_at DESC LIMIT $per_page OFFSET $offset";
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$movements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Helper for badges
-function getMovementBadge($type) {
-    $badges = [
-        'purchase_in' => ['color' => 'success', 'label' => 'Purchase In'],
-        'sale_out' => ['color' => 'primary', 'label' => 'Sale Out'],
-        'adjustment_in' => ['color' => 'info', 'label' => 'Adjustment In'],
-        'adjustment_out' => ['color' => 'warning', 'label' => 'Adjustment Out'],
-        'stock_transfer' => ['color' => 'secondary', 'label' => 'Transfer'],
-        'return_in' => ['color' => 'info', 'label' => 'Return In'],
-        'return_out' => ['color' => 'danger', 'label' => 'Return Out']
-    ];
-    
-    $config = $badges[$type] ?? ['color' => 'dark', 'label' => ucfirst(str_replace('_', ' ', $type))];
-    return '<span class="badge bg-' . $config['color'] . '">' . $config['label'] . '</span>';
-}
+// Rows come from api/stock/get_stock_movements.php (server-side DataTable below).
 ?>
 
 <div class="container-fluid py-4">
@@ -207,7 +138,7 @@ function getMovementBadge($type) {
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 w-100" id="movementsTable">
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-3"><?= t('Date') ?></th>
@@ -223,68 +154,10 @@ function getMovementBadge($type) {
                             <th><?= t('By') ?></th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php if (empty($movements)): ?>
-                            <tr>
-                                <td colspan="<?= $product_id ? 8 : 9 ?>" class="text-center py-5 text-muted">
-                                    <i class="bi bi-info-circle fs-2 d-block mb-2"></i>
-                                    No stock movements found.
-                                </td>
-                            </tr>
-                        <?php else: ?>
-                            <?php foreach ($movements as $m): ?>
-                                <tr>
-                                    <td class="ps-3">
-                                        <div class="fw-bold"><?= format_date($m['created_at']) ?></div>
-                                        <small class="text-muted"><?= date('h:i A', strtotime($m['created_at'])) ?></small>
-                                    </td>
-                                    <td><?= getMovementBadge($m['movement_type']) ?></td>
-                                    <?php if (!$product_id): ?>
-                                        <td>
-                                            <div class="fw-bold"><?= caseFormat($m['product_name']) ?></div>
-                                            <code class="small"><?= caseFormat($m['sku']) ?></code>
-                                        </td>
-                                    <?php endif; ?>
-                                    <td><?= caseFormat($m['warehouse_name']) ?></td>
-                                    <td>
-                                        <div class="small fw-bold text-dark"><?= caseFormat($m['reference_number']) ?></div>
-                                        <?php if (!empty($m['reason'])): ?>
-                                            <small class="text-muted d-block"><?= caseFormat($m['reason']) ?></small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-end fw-bold <?= $m['quantity'] > 0 ? 'text-success' : 'text-danger' ?>">
-                                        <?= $m['quantity'] > 0 ? '+' : '' ?><?= format_number($m['quantity'], 3) ?>
-                                    </td>
-                                    <td class="text-end text-muted"><?= format_number($m['stock_before'], 3) ?></td>
-                                    <td class="text-end fw-bold"><?= format_number($m['stock_after'], 3) ?></td>
-                                    <td><small class="text-muted"><?= caseFormat($m['created_by_name']) ?></small></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
             
-            <!-- Pagination -->
-            <?php if ($total_pages > 1): ?>
-                <div class="card-footer bg-white border-top-0 py-3">
-                    <nav aria-label="Page navigation" class="no-print">
-                        <ul class="pagination pagination-sm justify-content-center mb-0">
-                            <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $page-1])) ?>">Previous</a>
-                            </li>
-                            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                <li class="page-item <?= ($page == $i) ? 'active' : '' ?>">
-                                    <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>"><?= $i ?></a>
-                                </li>
-                            <?php endfor; ?>
-                            <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $page+1])) ?>">Next</a>
-                            </li>
-                        </ul>
-                    </nav>
-                </div>
-            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -299,10 +172,31 @@ function getMovementBadge($type) {
 </style>
 
 <script>
-// §UI-3 — searchable Select2 on the DB-backed Warehouse filter. No client-side
-// DataTable is added: this list is already server-paginated (LIMIT/OFFSET via
-// the GET form), which a DataTable would conflict with.
+// Server-side DataTable over api/stock/get_stock_movements.php: the server pages,
+// sorts and searches with the same filters the form above submits.
+// §UI-3 — searchable Select2 on the DB-backed Warehouse filter.
 $(function () {
+    $('#movementsTable').DataTable({
+        processing: true,
+        serverSide: true,
+        responsive: false,
+        autoWidth: false,
+        pageLength: 50,
+        order: [[0, 'desc']],
+        dom: '<"d-flex justify-content-end px-3 pt-3 no-print"f>rt<"d-flex justify-content-between align-items-center px-3 py-3 no-print"ip>',
+        ajax: {
+            url: '<?= buildUrl('api/stock/get_stock_movements.php') ?>',
+            data: d => Object.assign(d, <?= json_encode([
+                'product_id' => $product_id, 'warehouse_id' => $warehouse_id,
+                'movement_type' => $movement_type, 'date_from' => $date_from, 'date_to' => $date_to,
+            ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)
+        },
+        columnDefs: [{ targets: <?= $product_id ? '[4, 5, 6]' : '[5, 6, 7]' ?>, className: 'text-end' }, { targets: 0, className: 'ps-3' }],
+        language: {
+            emptyTable: '<div class="text-muted py-4"><i class="bi bi-info-circle fs-2 d-block mb-2"></i>No stock movements found.</div>'
+        }
+    });
+
     if ($('#smWarehouseFilter').length && !$('#smWarehouseFilter').hasClass('select2-hidden-accessible')) {
         $('#smWarehouseFilter').select2({ theme: 'bootstrap-5', width: '100%' });
     }

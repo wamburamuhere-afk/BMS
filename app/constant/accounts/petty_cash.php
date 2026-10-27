@@ -288,22 +288,12 @@ try {
                         <th class="text-end pe-4 d-print-none"><?= t('Actions') ?></th>
                     </tr>
                 </thead>
-                <tbody id="transactionsTableBody">
-                    <tr><td colspan="11" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></td></tr>
-                </tbody>
+                <tbody id="transactionsTableBody"></tbody>
             </table>
-        </div>
-        <!-- Pagination Controls -->
-        <div class="card-footer bg-white border-top-0 py-3">
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-end mb-0" id="pagination">
-                    <!-- Pagination links will be loaded here -->
-                </ul>
-            </nav>
         </div>
     </div>
 
-    <!-- Card View (populated by renderTable JS) -->
+    <!-- Card View (populated by renderCards JS) -->
     <div id="pcCardView" style="display:none;">
         <div class="row g-3" id="pcCardGrid">
             <div class="col-12 text-center py-5 text-muted">Loading...</div>
@@ -631,7 +621,7 @@ try {
             $('#expense_account_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select expense account' });
         });
 
-        loadTransactions(1);
+        initPettyCashTable();
         
         // Search listener with debounce
         let timeout = null;
@@ -645,42 +635,120 @@ try {
         });
     });
 
+    // Server-side DataTable: get_transactions.php pages, sorts and filters, so
+    // every page is reachable and S/No flips newest-first / oldest-first.
+    // The page keeps its own search box and "Show" picker; they drive the table.
+    let pcTable = null;
+    const PC_ATTACH_URL = '<?= getUrl('api/petty_cash/get_attachment.php') ?>';
+
+    function pcFilterQuery() {
+        const v = id => (document.getElementById(id) || {}).value || '';
+        return `search=${encodeURIComponent(v('searchInput'))}&from_date=${v('filter_from_date')}&to_date=${v('filter_to_date')}`
+             + `&expense_account_id=${v('filter_expense_account_id')}&type=${v('filter_type')}&fund_account_id=${v('fund_selector')}`;
+    }
+
+    function pcRow(t) {
+        const isDeposit = t.type === 'deposit';
+        return {
+            isDeposit,
+            amountClass: isDeposit ? 'text-success' : 'text-danger',
+            badgeClass: isDeposit ? 'success' : 'danger',
+            sign: isDeposit ? '+' : '-',
+            amount: new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(t.amount).replace('TZS', '').trim(),
+            dateStr: new Date(t.transaction_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}),
+            jsonT: JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;")
+        };
+    }
+
+    function initPettyCashTable() {
+        pcTable = $('#transactionsTable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: false,
+            autoWidth: false,
+            searching: false,               // the page's own #searchInput filters server-side
+            lengthChange: false,            // the page's own #filter_limit picks the page size
+            pageLength: parseInt(document.getElementById('filter_limit').value, 10) || 10,
+            order: [[0, 'asc']],
+            dom: 'rt<"d-flex justify-content-between align-items-center px-4 py-3 d-print-none"ip>',
+            ajax: function (req, callback) {
+                const all = req.length < 0;
+                const limit = all ? 100000 : req.length;
+                const page = all ? 1 : Math.floor(req.start / req.length) + 1;
+                const ord = (req.order && req.order[0]) || { column: 0, dir: 'asc' };
+                const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=${page}&limit=${limit}&sort=${ord.column}&dir=${ord.dir}&` + pcFilterQuery();
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Failed to load data' });
+                            callback({ draw: req.draw, recordsTotal: 0, recordsFiltered: 0, data: [] });
+                            return;
+                        }
+                        const total = parseInt(data.pagination.total_records, 10) || 0;
+                        const start = all ? 0 : req.start;
+                        data.transactions.forEach((t, i) => {
+                            t._sn = (ord.column === 0 && ord.dir === 'desc') ? total - start - i : start + i + 1;
+                        });
+                        $('#stat_balance').text(data.stats.balance);
+                        $('#stat_expenses').text(data.stats.monthly_expenses);
+                        $('#stat_count').text(data.stats.total_transactions);
+                        setTimeout(resizeTextToFit, 10);
+                        document.getElementById('total_records_badge').innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> ${total} records`;
+                        renderCards(data.transactions);
+                        callback({ draw: req.draw, recordsTotal: total, recordsFiltered: total, data: data.transactions });
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load data' });
+                        callback({ draw: req.draw, recordsTotal: 0, recordsFiltered: 0, data: [] });
+                    });
+            },
+            columns: [
+                { data: '_sn', className: 'ps-4 text-center text-muted small fw-bold' },
+                { data: 'transaction_date', className: 'ps-4', render: (d, x, t) => pcRow(t).dateStr },
+                { data: 'type', render: (d, x, t) => {
+                    const r = pcRow(t);
+                    return `<span class="badge rounded-pill bg-${r.badgeClass} bg-opacity-10 text-${r.badgeClass}">${t.type.charAt(0).toUpperCase() + t.type.slice(1)}</span>`
+                        + (Number(t.needs_review) === 1 ? '<span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle ms-1" title="Back-posted with a default account — edit to set the correct one"><i class="bi bi-exclamation-triangle"></i> Review</span>' : '');
+                } },
+                { data: 'description', render: d => d || '-' },
+                { data: null, orderable: false, render: (d, x, t) => t.type === 'expense' ? (t.expense_account_name || t.category_name || '-') : (t.source_account_name || t.category_name || '-') },
+                { data: 'reference_number', render: d => d || '-' },
+                { data: 'received_by', render: d => `<small>${d || '-'}</small>` },
+                { data: 'username', render: d => `<small class="text-muted">${d || 'System'}</small>` },
+                { data: 'amount', className: 'text-end fw-bold pe-4', render: (d, x, t) => { const r = pcRow(t); return `<span class="${r.amountClass}">${r.sign}${r.amount}</span>`; } },
+                { data: null, orderable: false, className: 'text-center d-print-none', render: (d, x, t) => t.receipt_file
+                    ? `<a href="${PC_ATTACH_URL}?id=${t.id}" target="_blank" class="text-warning" title="View Attachment"><i class="bi bi-paperclip fs-5"></i></a>`
+                    : '<span class="text-muted small">-</span>' },
+                { data: null, orderable: false, className: 'text-end pe-4 d-print-none', render: (d, x, t) => {
+                    const jsonT = pcRow(t).jsonT;
+                    return `<div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            <li><a class="dropdown-item" href="#" onclick='viewTransactionDetails(${jsonT}); return false;'><i class="bi bi-eye me-2 text-info"></i> View Details</a></li>
+                            <li><a class="dropdown-item" href="#" onclick='printVoucher(${t.id}); return false;'><i class="bi bi-printer me-2 text-secondary"></i> Print Voucher</a></li>
+                            ${t.receipt_file ? `<li><a class="dropdown-item" href="${PC_ATTACH_URL}?id=${t.id}" target="_blank"><i class="bi bi-paperclip me-2 text-warning"></i> View Attachment</a></li>` : ''}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick='editTransaction(${jsonT}); return false;'><i class="bi bi-pencil me-2 text-primary"></i> Edit</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteTransaction(${t.id}); return false;"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                        </ul>
+                    </div>`;
+                } }
+            ],
+            language: {
+                emptyTable: `<div class="text-muted py-4"><i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i><h5><?= t('No transactions found') ?></h5><p class="mb-0">Start by topping up your petty cash fund</p></div>`
+            }
+        });
+    }
+
+    // Reload the list (first page by default) with the current filters.
     function loadTransactions(page) {
-        currentPage = page;
-        const tbody = document.getElementById('transactionsTableBody');
-        const limit = document.getElementById('filter_limit').value;
-        const from_date = document.getElementById('filter_from_date').value;
-        const to_date = document.getElementById('filter_to_date').value;
-        const expense_account_id = document.getElementById('filter_expense_account_id').value;
-        const type = document.getElementById('filter_type').value;
-        const search = document.getElementById('searchInput').value;
-        const fund = (document.getElementById('fund_selector') || {}).value || '';
-
-        if(page === 1) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
-        }
-
-        const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&expense_account_id=${expense_account_id}&type=${type}&fund_account_id=${fund}`;
-
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderTable(data.transactions);
-                    renderPagination(data.pagination);
-                    $('#stat_balance').text(data.stats.balance);
-                    $('#stat_expenses').text(data.stats.monthly_expenses);
-                    $('#stat_count').text(data.stats.total_transactions);
-                    setTimeout(resizeTextToFit, 10);
-                    document.getElementById('total_records_badge').innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> ${data.pagination.total_records} records`;
-                } else {
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${data.message}</td></tr>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">Failed to load data</td></tr>';
-            });
+        if (!pcTable) return;
+        pcTable.page.len(parseInt(document.getElementById('filter_limit').value, 10) || 10);
+        if (page && page > 1) pcTable.page(page - 1).draw('page');
+        else pcTable.ajax.reload();
     }
 
     function applyFilters() {
@@ -716,39 +784,15 @@ try {
 
     function printPettyCash() {
         logReportAction('Printed Petty Cash List', 'User printed the petty cash transaction list');
-        // This table is not a DataTable — it's a custom AJAX-paginated list
-        // (loadTransactions() fetches one page of `filter_limit` rows at a
-        // time), so printing without this would only ever show whichever
-        // page currently happens to be loaded. Temporarily fetch every row,
-        // print, then restore the normal paginated view.
-        const limitSelect = document.getElementById('filter_limit');
-        const originalLimit = limitSelect.value;
-        const originalPage = currentPage;
-        limitSelect.value = '100000';
-        loadAllTransactionsForPrint().then(function() {
+        // The table holds one page at a time; fetch every row, print, then go back.
+        const len = pcTable.page.len();
+        const page = pcTable.page();
+        pcTable.one('draw', function () {
             window.print();
-            limitSelect.value = originalLimit;
-            loadTransactions(originalPage || 1);
+            pcTable.one('draw', function () { pcTable.page(page).draw('page'); });
+            pcTable.page.len(len).draw();
         });
-    }
-
-    function loadAllTransactionsForPrint() {
-        return new Promise(function(resolve) {
-            const from_date = document.getElementById('filter_from_date').value;
-            const to_date = document.getElementById('filter_to_date').value;
-            const expense_account_id = document.getElementById('filter_expense_account_id').value;
-            const type = document.getElementById('filter_type').value;
-            const search = document.getElementById('searchInput').value;
-            const fund = (document.getElementById('fund_selector') || {}).value || '';
-            const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=1&limit=100000&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&expense_account_id=${expense_account_id}&type=${type}&fund_account_id=${fund}`;
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) renderTable(data.transactions);
-                    resolve();
-                })
-                .catch(() => resolve());
-        });
+        pcTable.page.len(-1).draw();
     }
 
     function exportExcel() {
@@ -769,102 +813,15 @@ try {
         document.body.removeChild(link);
     }
 
-    function renderTable(transactions) {
-        const tbody = document.getElementById('transactionsTableBody');
+    function renderCards(transactions) {
         const cardGrid = document.getElementById('pcCardGrid');
-        tbody.innerHTML = '';
         cardGrid.innerHTML = '';
-
         if (transactions.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="11" class="text-center py-5">
-                        <div class="text-muted">
-                            <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
-                            <h5><?= t('No transactions found') ?></h5>
-                            <p>Start by topping up your petty cash fund</p>
-                        </div>
-                    </td>
-                </tr>`;
             cardGrid.innerHTML = '<div class="col-12 text-center py-5 text-muted">No transactions found.</div>';
             return;
         }
-
-        transactions.forEach((t, index) => {
-            const sn = index + 1;
-            const isDeposit = t.type === 'deposit';
-            const amountClass = isDeposit ? 'text-success' : 'text-danger';
-            const badgeClass = isDeposit ? 'success' : 'danger';
-            const sign = isDeposit ? '+' : '-';
-            
-            const amount = new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(t.amount).replace('TZS', '').trim();
-            const dateStr = new Date(t.transaction_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
-
-            const jsonT = JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
-
-            const row = `
-                <tr>
-                    <td class="ps-4 text-center text-muted small fw-bold">${sn}</td>
-                    <td class="ps-4">${dateStr}</td>
-                    <td>
-                        <span class="badge rounded-pill bg-${badgeClass} bg-opacity-10 text-${badgeClass}">
-                            ${t.type.charAt(0).toUpperCase() + t.type.slice(1)}
-                        </span>
-                        ${Number(t.needs_review) === 1 ? '<span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle ms-1" title="Back-posted with a default account — edit to set the correct one"><i class="bi bi-exclamation-triangle"></i> Review</span>' : ''}
-                    </td>
-                    <td>${t.description || '-'}</td>
-                    <td>${t.type === 'expense' ? (t.expense_account_name || t.category_name || '-') : (t.source_account_name || t.category_name || '-')}</td>
-                    <td>${t.reference_number || '-'}</td>
-                    <td><small>${t.received_by || '-'}</small></td>
-                    <td><small class="text-muted">${t.username || 'System'}</small></td>
-                    <td class="text-end fw-bold ${amountClass}">${sign}${amount}</td>
-                    <td class="text-center d-print-none">
-                        ${t.receipt_file
-                            ? `<a href="<?= getUrl('api/petty_cash/get_attachment.php') ?>?id=${t.id}" target="_blank" class="text-warning" title="View Attachment"><i class="bi bi-paperclip fs-5"></i></a>`
-                            : '<span class="text-muted small">-</span>'}
-                    </td>
-                    <td class="text-end pe-4 d-print-none">
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-gear"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick='viewTransactionDetails(${jsonT}); return false;'>
-                                        <i class="bi bi-eye me-2 text-info"></i> View Details
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick='printVoucher(${t.id}); return false;'>
-                                        <i class="bi bi-printer me-2 text-secondary"></i> Print Voucher
-                                    </a>
-                                </li>
-                                ${t.receipt_file ? `
-                                <li>
-                                    <a class="dropdown-item" href="<?= getUrl('api/petty_cash/get_attachment.php') ?>?id=${t.id}" target="_blank">
-                                        <i class="bi bi-paperclip me-2 text-warning"></i> View Attachment
-                                    </a>
-                                </li>` : ''}
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick='editTransaction(${jsonT}); return false;'>
-                                        <i class="bi bi-pencil me-2 text-primary"></i> Edit
-                                    </a>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item text-danger" href="#" onclick="deleteTransaction(${t.id}); return false;">
-                                        <i class="bi bi-trash me-2"></i> Delete
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </td>
-                </tr>
-            `;
-            tbody.innerHTML += row;
-
-            // Card view (reuse isDeposit/amountClass/sign/jsonT declared above)
+        transactions.forEach(t => {
+            const { isDeposit, sign, amount, dateStr, jsonT } = pcRow(t);
             cardGrid.innerHTML += `
                 <div class="col-xl-3 col-lg-4 col-md-6">
                     <div class="card h-100 border-0 shadow-sm rounded-3">
@@ -891,44 +848,6 @@ try {
                     </div>
                 </div>`;
         });
-    }
-
-    function renderPagination(pg) {
-        const nav = document.getElementById('pagination');
-        nav.innerHTML = '';
-        
-        if (pg.total_pages <= 1) return;
-
-        nav.innerHTML += `
-            <li class="page-item ${pg.current_page === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="loadTransactions(${pg.current_page - 1}); return false;">Previous</a>
-            </li>
-        `;
-
-        for (let i = 1; i <= pg.total_pages; i++) {
-            if (
-                i === 1 || 
-                i === pg.total_pages || 
-                (i >= pg.current_page - 1 && i <= pg.current_page + 1)
-            ) {
-                nav.innerHTML += `
-                    <li class="page-item ${i === pg.current_page ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="loadTransactions(${i}); return false;">${i}</a>
-                    </li>
-                `;
-            } else if (
-                i === pg.current_page - 2 || 
-                i === pg.current_page + 2
-            ) {
-                nav.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-            }
-        }
-
-        nav.innerHTML += `
-            <li class="page-item ${pg.current_page === pg.total_pages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="loadTransactions(${pg.current_page + 1}); return false;">Next</a>
-            </li>
-        `;
     }
 
     function updateStats(stats) {
