@@ -209,15 +209,24 @@ ok(strpos($src, 'id="print-period"') !== false && strpos($src, "\$('#print-perio
 ok(strpos($src, 'if (seq !== reqSeq) return;') !== false, 'a slower earlier request cannot overwrite newer figures');
 
 // ── 7. Wholesale-above-retail confirmation ──────────────────────────────────
-section('7. Wholesale above retail — confirm, never block');
+section('7. Price checks — confirm, never block');
 $js = file_get_contents("$root/assets/js/bms-price-check.js");
-ok(strpos($js, 'input[name="wholesale_price"], input[name="selling_price"]') !== false, 'watches both price fields (either order of typing)');
-ok(strpos($js, 'w <= 0 || r <= 0 || w <= r) return;') !== false, 'silent when wholesale is empty, zero, equal or lower');
-ok(strpos($js, "\$w.data('bmsPriceOk', key)") !== false, '"Yes" keeps the figure and is not asked again for the same pair');
+ok(strpos($js, "var BUY  = 'input[name=\"buying_price\"], input[name=\"cost_price\"], input[name=\"unit_cost\"]';") !== false
+   && strpos($js, "BUY + ', input[name=\"wholesale_price\"], input[name=\"selling_price\"]'") !== false, 'watches buying, wholesale and retail fields (any order of typing)');
+ok(strpos($js, 'if (pos(b) && pos(r) && r < b) issues.push({ title: T.buyTitle, text: T.buyRetail });') !== false, 'retail below buying → "you would sell at a loss"');
+ok(strpos($js, 'if (pos(b) && pos(w) && w < b) issues.push({ title: T.buyTitle, text: T.buyWholesale });') !== false, 'wholesale below buying → warned too');
+ok(strpos($js, 'if (pos(w) && pos(r) && w > r) issues.push({ title: T.title, text: T.text });') !== false, 'wholesale above retail → warned (as before)');
+ok(strpos($js, "if (!issues.length) return;") !== false && strpos($js, "var pos = function (v) { return v !== null && v > 0; };") !== false, 'silent when fields are empty, zero, or prices are fine');
+ok(strpos($js, ".not('[readonly]')") !== false && strpos($js, "if (\$changed.is('[readonly]')) return;") !== false, 'read-only (calculated) cost fields are ignored');
+ok(strpos($js, "\$holder.data('bmsPriceOk', key)") !== false && strpos($js, "\$changed.trigger('focus')") !== false, '"Yes" keeps the figures and is not asked again; "No" returns to the field');
+ok(strpos($js, 'esc(fill(i.text))') !== false, 'several problems at once are listed in one dialog, escaped');
 $hdr = file_get_contents("$root/header.php");
 ok(strpos($hdr, 'assets/js/bms-price-check.js') !== false && strpos($hdr, 'BMS_PRICE_CHECK_T') !== false, 'loaded on every page with translated labels');
 $sw = include "$root/lang/sw.php";
-ok(isset($sw['Wholesale price ({w}) is higher than retail price ({r}). Is this correct?']), 'Swahili text present');
+ok(isset($sw['Wholesale price ({w}) is higher than retail price ({r}). Is this correct?'], $sw['Selling price is below the buying price'],
+         $sw['Retail price ({r}) is lower than the buying price ({b}) — you would sell at a loss. Is this correct?'],
+         $sw['Wholesale price ({w}) is lower than the buying price ({b}) — you would sell at a loss. Is this correct?'], $sw['Please check these prices']), 'Swahili text present');
+ok(strpos($hdr, "'buyRetail'    => t(") !== false && strpos($hdr, "'buyWholesale' => t(") !== false, 'buying-price labels passed through t()');
 
 // ── 8. Expenses carry their shop into the ledger ────────────────────────────
 section('8. Expense posting passes the shop (source contract)');
@@ -376,8 +385,9 @@ $sPos   = strpos($dash, 'function renderSimpleChart(');
 $simple = substr($dash, $sPos, strpos($dash, 'function updateDashboardMetrics(') - $sPos);   // the whole function
 ok(strpos($simple, "{ label: <?= json_encode(t('Sales')) ?>, data: salesData") !== false
    && strpos($simple, "{ label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData") !== false, 'two bars: Sales and Expenses');
-ok(strpos($simple, "{ type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData") !== false && strpos($simple, 'tension: 0') !== false,
-   'Net profit is a straight line over the bars (Sales − goods cost − Expenses)');
+ok(strpos($simple, "{ type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData") !== false
+   && strpos($simple, "cubicInterpolationMode: 'monotone'") !== false && strpos($simple, 'tension: 0') === false,
+   'Net profit is a smooth line that never overshoots the real values (monotone), over the bars');
 ok(strpos($simple, 'sort: (a, b) => a.datasetIndex - b.datasetIndex') !== false, 'legend reads Sales, Expenses, Net Profit');
 ok(strpos($simple, 'data = data.slice(-7);') !== false, 'the chart shows the last 7 periods of the chosen filter');
 ok(strpos($simple, "+ ': ' + fmtFull(salesData[i])") !== false && strpos($simple, "t('Cost of goods sold')) ?> + ': ' + fmtFull(cogsData[i])") !== false,

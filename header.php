@@ -903,6 +903,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 window.BMS_PRICE_CHECK_T = <?= json_encode([
     'title' => t('Wholesale price is higher than retail'),
     'text'  => t('Wholesale price ({w}) is higher than retail price ({r}). Is this correct?'),
+    'buyTitle'     => t('Selling price is below the buying price'),
+    'buyRetail'    => t('Retail price ({r}) is lower than the buying price ({b}) — you would sell at a loss. Is this correct?'),
+    'buyWholesale' => t('Wholesale price ({w}) is lower than the buying price ({b}) — you would sell at a loss. Is this correct?'),
+    'multiTitle'   => t('Please check these prices'),
     'yes'   => t('Yes, keep it'),
     'no'    => t('No, change it'),
 ]) ?>;

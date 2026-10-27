@@ -5736,6 +5736,10 @@ return [
     'Wholesale price ({w}) is higher than retail price ({r}). Is this correct?' => 'Bei ya jumla ({w}) ni kubwa kuliko bei ya rejareja ({r}). Je, ni sahihi?',
     'Yes, keep it' => 'Ndiyo, iache',
     'No, change it' => 'Hapana, nibadilishe',
+    'Selling price is below the buying price' => 'Bei ya kuuzia iko chini ya bei ya kununulia',
+    'Retail price ({r}) is lower than the buying price ({b}) — you would sell at a loss. Is this correct?' => 'Bei ya rejareja ({r}) iko chini ya bei ya kununulia ({b}) — utauza kwa hasara. Je, ni sahihi?',
+    'Wholesale price ({w}) is lower than the buying price ({b}) — you would sell at a loss. Is this correct?' => 'Bei ya jumla ({w}) iko chini ya bei ya kununulia ({b}) — utauza kwa hasara. Je, ni sahihi?',
+    'Please check these prices' => 'Tafadhali hakiki bei hizi',
 
     // Dashboard Simple POS chart (app/dashboard.php)
     'Profit' => 'Faida',
