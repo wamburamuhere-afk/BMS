@@ -5735,5 +5735,14 @@ return [
     'Compared with' => 'Ikilinganishwa na',
     'to loss' => 'kuwa hasara',
     'back to profit' => 'kurudi faidani',
+    'Sales & Profit' => 'Mauzo na Faida',
+    'Loss' => 'Hasara',
+    'Profit' => 'Faida',
+    'No sales in this period.' => 'Hakuna mauzo katika kipindi hiki.',
+    'Costs were more than sales — a loss of %s.' => 'Gharama zilizidi mauzo — hasara ya %s.',
+    'Where your sales money went' => 'Pesa ya mauzo yako ilikokwenda',
+    'Out of every TSh 100 sold:' => 'Kati ya kila TSh 100 uliyouza:',
+    'Paid for the goods' => 'Gharama ya bidhaa',
+    'Your profit' => 'Faida yako',
 
 ];

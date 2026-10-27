@@ -1860,7 +1860,7 @@ function get_progress_color($percentage) {
             <?php if (hasReportsAccess()): ?>
             <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Bought vs Sold') : t('Performance Overview') ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Sales & Profit') : t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <?php
                         // Simple Mode defaults this chart to Daily — a small
@@ -2154,7 +2154,8 @@ function loadPerformanceChart(period = 'monthly') {
     $.ajax({
         url: apiUrl,
         type: 'GET',
-        data: { period: period },
+        // Simple POS bar chart: one slot per period, empty days included.
+        data: POS_SIMPLE_MODE ? { period: period, fill_gaps: 1 } : { period: period },
         dataType: 'json',
         success: function(response) {
             $('#chartLoader').hide();
@@ -2214,6 +2215,9 @@ function fmtFull(n) {
 // undefined, not "infinite", so the caller shows no chip rather than lying).
 function pctDelta(curr, prev) {
     if (prev === undefined || prev === null || prev === 0) return null;
+    // Nothing this period (e.g. a day with no sales): "▼ 100%" on every box is
+    // noise — the summary already says "No sales in this period".
+    if (curr === 0) return null;
     return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
@@ -2456,45 +2460,25 @@ function renderSimpleChart(data) {
 
     $('#performanceSummary').empty();
 
+    // Two bars per period — Sales and Profit — so "how much did I sell, how
+    // much did I keep" reads at a glance. Every period has its own slot (the
+    // API fills empty days with zeros), so an empty day shows as a gap and a
+    // sale always sits on its own day. Cost of Goods and Expenses are in the
+    // tooltip and the summary below, in full.
     const labels       = data.length > 0 ? data.map(row => row.period) : [];
     const salesData     = data.length > 0 ? data.map(row => parseFloat(row.revenue) || 0) : [];
     const cogsData      = data.length > 0 ? data.map(row => parseFloat(row.expense) || 0) : [];
     const opExpenseData = data.length > 0 ? data.map(row => parseFloat(row.operating_expenses) || 0) : [];
-
-    function lineDataset(label, data, color, dash) {
-        return {
-            label: label,
-            data: data,
-            borderColor: color,
-            backgroundColor: function(context) {
-                const chart = context.chart;
-                const { chartArea } = chart;
-                if (!chartArea) return color + '14';
-                const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                gradient.addColorStop(0, color + '2E');
-                gradient.addColorStop(1, color + '03');
-                return gradient;
-            },
-            fill: true,
-            tension: 0.4,
-            borderWidth: dash ? 2 : 2.5,
-            borderDash: dash || [],
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: '#fff',
-            pointBorderColor: color,
-            pointBorderWidth: 2,
-        };
-    }
+    const profitData    = data.length > 0 ? data.map((row, i) => (row.net_profit != null) ? (parseFloat(row.net_profit) || 0) : (salesData[i] - cogsData[i] - opExpenseData[i])) : [];
 
     dashboardChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [
-                lineDataset(<?= json_encode(t('Sales')) ?>, salesData, '#0d6efd', null),
-                lineDataset(<?= json_encode(t('Cost of Goods')) ?>, cogsData, '#dc3545', [6, 3]),
-                lineDataset(<?= json_encode(t('Expenses')) ?>, opExpenseData, '#fd7e14', [2, 2]),
+                { label: <?= json_encode(t('Sales')) ?>, data: salesData, backgroundColor: '#0d6efd', borderRadius: 3, maxBarThickness: 34 },
+                // A loss is a red bar below zero.
+                { label: <?= json_encode(t('Profit')) ?>, data: profitData, backgroundColor: profitData.map(v => v < 0 ? '#dc3545' : '#198754'), borderRadius: 3, maxBarThickness: 34 },
             ]
         },
         options: {
@@ -2504,7 +2488,7 @@ function renderSimpleChart(data) {
             plugins: {
                 legend: {
                     display: true, position: 'top', align: 'end',
-                    labels: { usePointStyle: true, pointStyleWidth: 12, boxHeight: 8, font: { size: 12 }, padding: 20 }
+                    labels: { boxWidth: 12, boxHeight: 12, font: { size: 12 }, padding: 20 }
                 },
                 tooltip: {
                     padding: 14,
@@ -2515,20 +2499,20 @@ function renderSimpleChart(data) {
                     borderWidth: 1,
                     cornerRadius: 8,
                     callbacks: {
+                        // One block per period: the whole story, full figures.
                         label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            return label + fmtFull(context.parsed.y);
+                            if (context.datasetIndex !== 0) return null;
+                            const i = context.dataIndex;
+                            return [
+                                <?= json_encode(t('Sales')) ?> + ': ' + fmtFull(salesData[i]),
+                                <?= json_encode(t('Cost of Goods')) ?> + ': ' + fmtFull(cogsData[i]),
+                                <?= json_encode(t('Expenses')) ?> + ': ' + fmtFull(opExpenseData[i]),
+                            ];
                         },
                         afterBody: function(items) {
-                            const sales = items.find(i => i.datasetIndex === 0);
-                            const cogs  = items.find(i => i.datasetIndex === 1);
-                            const opex  = items.find(i => i.datasetIndex === 2);
-                            if (sales && cogs && opex) {
-                                const netProfit = sales.parsed.y - cogs.parsed.y - opex.parsed.y;
-                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + ': ' + fmtFull(netProfit)];
-                            }
-                            return [];
+                            if (!items.length) return [];
+                            const p = profitData[items[0].dataIndex];
+                            return ['─────────────────', (p < 0 ? <?= json_encode(t('Loss')) ?> : <?= json_encode(t('Profit')) ?>) + ': ' + fmtFull(p)];
                         }
                     }
                 }
@@ -2603,8 +2587,43 @@ function renderSimpleChart(data) {
                     ${margin !== null ? `<small class="d-block text-muted" style="font-size: 0.7rem;">${margin.toFixed(0)}% <?= t('margin') ?></small>` : ''}
                 </div>
             </div>
+            ${moneyWentHtml(sales, cogs, opex, netProfit)}
         </div>
     `);
+}
+
+// "Where your sales money went" — the latest period's sales split into what
+// paid for the goods, expenses and profit, per TSh 100 sold. No sales → a
+// plain sentence; a loss → says so instead of a bar that can't add up.
+function moneyWentHtml(sales, cogs, opex, netProfit) {
+    const wrap = inner => `<div class="mt-3 pt-3 border-top">${inner}</div>`;
+    if (!(sales > 0)) {
+        return wrap(`<div class="small text-muted"><?= t('No sales in this period.') ?></div>`);
+    }
+    if (netProfit < 0) {
+        return wrap(`<div class="small fw-bold text-danger">${safeOutput(<?= json_encode(t('Costs were more than sales — a loss of %s.')) ?>.replace('%s', fmtFull(-netProfit)))}</div>`);
+    }
+    // Whole shillings per TSh 100 that always add up to 100.
+    const goods = Math.round(cogs / sales * 100);
+    const exp   = Math.min(100 - goods, Math.round(opex / sales * 100));
+    const keep  = Math.max(0, 100 - goods - exp);
+    const seg = (pct, color) => pct > 0 ? `<div style="width:${pct}%; background:${color};"></div>` : '';
+    const row = (color, label, per100, amount) => `
+        <div class="d-flex justify-content-between align-items-center gap-2 small">
+            <span class="d-flex align-items-center gap-2"><span style="width:10px; height:10px; border-radius:2px; background:${color}; display:inline-block;"></span>${safeOutput(label)}</span>
+            <span class="text-nowrap"><strong>TSh ${per100}</strong> <span class="text-muted">· ${fmtFull(amount)}</span></span>
+        </div>`;
+    return wrap(`
+        <div class="small fw-bold mb-1"><?= t('Where your sales money went') ?></div>
+        <div class="small text-muted mb-2"><?= t('Out of every TSh 100 sold:') ?></div>
+        <div class="d-flex rounded overflow-hidden mb-2" style="height:14px; background:#e9ecef;">
+            ${seg(goods, '#dc3545')}${seg(exp, '#fd7e14')}${seg(keep, '#198754')}
+        </div>
+        <div class="d-flex flex-column gap-1">
+            ${row('#dc3545', <?= json_encode(t('Paid for the goods')) ?>, goods, cogs)}
+            ${row('#fd7e14', <?= json_encode(t('Expenses')) ?>, exp, opex)}
+            ${row('#198754', <?= json_encode(t('Your profit')) ?>, keep, netProfit)}
+        </div>`);
 }
 
 function updateDashboardMetrics(data) {

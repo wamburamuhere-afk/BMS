@@ -375,13 +375,73 @@ $dash = file_get_contents("$root/app/dashboard.php");
 $sPos   = strpos($dash, 'function renderSimpleChart(');
 $simple = substr($dash, $sPos, strpos($dash, 'function updateDashboardMetrics(') - $sPos);   // the whole function
 ok(strpos($dash, 'function fmtFull(') !== false, 'full-figure formatter exists');
-ok(substr_count($simple, '${fmtFull(') === 4 && strpos($simple, '${fmtAbbrev(') === false, 'the four summary boxes show full figures (no "K")');
-ok(strpos($simple, 'return label + fmtFull(context.parsed.y);') !== false, 'tooltip shows full figures');
+$boxesFrom = strpos($simple, "\$('#performanceSummary').append(");
+$boxes     = substr($simple, $boxesFrom, strpos($simple, 'moneyWentHtml(sales, cogs, opex, netProfit)') - $boxesFrom);
+ok(substr_count($boxes, '${fmtFull(') === 4 && strpos($simple, '${fmtAbbrev(') === false, 'the four summary boxes show full figures (no "K")');
+ok(strpos($simple, "+ ': ' + fmtFull(salesData[i])") !== false && strpos($simple, "+ ': ' + fmtFull(p)") !== false, 'tooltip shows full figures');
 ok(strpos($simple, 'callback: v => fmtAbbrev(v)') !== false, 'only the Y-axis stays abbreviated');
 ok(strpos($dash, "(up && pct >= 1000)") !== false, 'a rise of 1,000%+ reads as a multiple (66×)');
 ok(strpos($simple, "t('to loss')") !== false && strpos($simple, "t('back to profit')") !== false, 'profit ↔ loss is said in words, not a % across zero');
 ok(strpos($simple, "t('Compared with')") !== false, 'the comparison period is named');
 ok(isset($sw['Compared with'], $sw['to loss'], $sw['back to profit']), 'Swahili text present');
+
+// ── 14. Smart POS chart: bars per day, empty days kept, money-went line ─────
+section('14. Smart POS chart: easy to read');
+ok(strpos($simple, "type: 'bar'") !== false && strpos($simple, "type: 'line'") === false, 'bars (no curved line that leans into the previous day)');
+ok(strpos($simple, "label: <?= json_encode(t('Profit')) ?>") !== false && strpos($simple, "v < 0 ? '#dc3545' : '#198754'") !== false, 'Sales + Profit bars; a loss is a red bar below zero');
+ok(strpos($dash, 'function moneyWentHtml(') !== false && strpos($simple, 'moneyWentHtml(sales, cogs, opex, netProfit)') !== false, '"Where your sales money went" line under the summary');
+ok(strpos($dash, "POS_SIMPLE_MODE ? { period: period, fill_gaps: 1 }") !== false, 'dashboard asks the API for every day, empty ones included');
+ok(strpos($dash, "t('Sales & Profit') : t('Performance Overview')") !== false, 'card title "Sales & Profit"');
+ok(strpos($dash, 'if (curr === 0) return null;') !== false, 'no "▼ 100%" chips on a period with nothing in it');
+ok(isset($sw['Sales & Profit'], $sw['Profit'], $sw['Loss'], $sw['Where your sales money went'], $sw['Paid for the goods'], $sw['Your profit'], $sw['No sales in this period.']), 'Swahili text present');
+
+// "TSh N of every 100" always adds up to 100 — same arithmetic as moneyWentHtml().
+$split = function (float $sales, float $cogs, float $opex): array {
+    $goods = (int)round($cogs / $sales * 100);
+    $exp   = (int)min(100 - $goods, round($opex / $sales * 100));
+    return [$goods, $exp, max(0, 100 - $goods - $exp)];
+};
+foreach ([[165500, 115500, 0], [165500, 115500, 20000], [1000, 333, 333], [999, 1, 0], [100, 100, 0]] as [$s, $c, $o]) {
+    [$g, $e, $k] = $split($s, $c, $o);
+    ok($g + $e + $k === 100 && $g >= 0 && $e >= 0 && $k >= 0, "money split adds to 100 for sales $s / goods $c / expenses $o ($g + $e + $k)");
+}
+$jsSplit = substr($dash, strpos($dash, 'function moneyWentHtml('), 1500);
+ok(strpos($jsSplit, 'Math.round(cogs / sales * 100)') !== false && strpos($jsSplit, 'Math.min(100 - goods, Math.round(opex / sales * 100))') !== false, 'the page uses that same arithmetic');
+
+// Runtime: the real chart API with and without fill_gaps.
+$runChart = function (array $get) use ($root): array {
+    $harness = tempnam(sys_get_temp_dir(), 'bmsch') . '.php';
+    file_put_contents($harness, '<?php $_SERVER["REQUEST_METHOD"]="GET"; $_GET=' . var_export($get, true) . ';'
+        . 'require ' . var_export("$root/roots.php", true) . ';'
+        . '$_SESSION["user_id"]=4; $_SESSION["is_admin"]=true; $_SESSION["role_id"]=1;'
+        . 'require ' . var_export("$root/api/pos/get_simple_dashboard_chart.php", true) . ';');
+    $out = shell_exec('"' . PHP_BINARY . '" -d display_errors=0 "' . $harness . '" 2>&1');
+    @unlink($harness);
+    $json = null;
+    if (preg_match('/\{.*\}/s', (string)$out, $m)) $json = json_decode($m[0], true);
+    return [$json, $out];
+};
+[$plain, $rawP]  = $runChart(['period' => 'daily']);
+[$filled, $rawF] = $runChart(['period' => 'daily', 'fill_gaps' => 1]);
+ok(is_array($plain) && !empty($plain['success']) && is_array($filled) && !empty($filled['success']),
+   'chart API answers with and without fill_gaps' . (is_array($filled) ? '' : ' (raw: ' . substr((string)$rawF, 0, 200) . ')'));
+if (is_array($plain) && is_array($filled) && !empty($filled['success'])) {
+    ok(count($filled['data']) === 30, 'daily + fill_gaps → one row for each of the 30 days (got ' . count($filled['data']) . ')');
+    ok(end($filled['data'])['period'] === date('M d'), 'the last bar is today (' . date('M d') . ')');
+    $sum = fn(array $rows, string $k) => round(array_sum(array_map(fn($r) => (float)$r[$k], $rows)), 2);
+    ok($sum($plain['data'], 'revenue') === $sum($filled['data'], 'revenue')
+       && $sum($plain['data'], 'expense') === $sum($filled['data'], 'expense')
+       && $sum($plain['data'], 'net_profit') === $sum($filled['data'], 'net_profit'),
+       'filling the gaps adds only zeros — the totals are unchanged');
+    ok(count($plain['data']) <= 30, 'without fill_gaps the API answers exactly as before (no extra rows)');
+    foreach (['weekly', 'monthly', 'quarterly', 'yearly'] as $p) {
+        [$pf] = $runChart(['period' => $p, 'fill_gaps' => 1]);
+        [$pp] = $runChart(['period' => $p]);
+        $labels = is_array($pf) ? array_column($pf['data'], 'period') : [];
+        ok(is_array($pf) && count($labels) === count(array_unique($labels)) && $sum($pf['data'], 'revenue') === $sum($pp['data'] ?? [], 'revenue'),
+           "$p + fill_gaps: one row per period, no duplicates, same totals (" . count($labels) . ' rows)');
+    }
+}
 
 // Runtime: the real endpoint (GET) — needs Simple POS mode on this DB.
 $runGet = function (array $get) use ($root): array {
