@@ -2210,6 +2210,17 @@ function fmtFull(n) {
     return sign + 'TSh ' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
+// Phones: no tooltip box over the chart (it covers the bars) and nothing
+// shown on tap. Desktop keeps the tooltip exactly as it was.
+const chartPhoneQuery = window.matchMedia('(max-width: 767.98px)');
+if (chartPhoneQuery.addEventListener) {
+    chartPhoneQuery.addEventListener('change', function () {
+        if (!dashboardChart) return;
+        dashboardChart.options.plugins.tooltip.enabled = !chartPhoneQuery.matches;
+        dashboardChart.update('none');
+    });
+}
+
 function renderChart(data) {
     if (!document.getElementById('performanceChart')) return;
     if (POS_SIMPLE_MODE) { renderSimpleChart(data); return; }
@@ -2301,6 +2312,7 @@ function renderNormalChart(data) {
                     }
                 },
                 tooltip: {
+                    enabled: !chartPhoneQuery.matches,
                     padding: 14,
                     backgroundColor: 'rgba(17,24,39,0.9)',
                     titleFont: { size: 13, weight: 'bold' },
@@ -2475,6 +2487,7 @@ function renderSimpleChart(data) {
                               sort: (a, b) => a.datasetIndex - b.datasetIndex }
                 },
                 tooltip: {
+                    enabled: !chartPhoneQuery.matches,
                     padding: 14,
                     backgroundColor: 'rgba(17,24,39,0.9)',
                     titleFont: { size: 13, weight: 'bold' },

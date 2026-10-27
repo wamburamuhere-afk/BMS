@@ -165,19 +165,34 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             flex: 1 1 0;
             margin-right: 0 !important;
         }
+        #posHeaderBar .pos-hdr-top { display: flex; align-items: center; gap: 8px; }
+        #posHeaderBar.pos-hdr-collapsed #posShiftInfoLine,
+        #posHeaderBar.pos-hdr-collapsed > .d-flex.align-items-center.gap-3 { display: none !important; }
     }
     </style>
     <!-- POS Header -->
-    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
+    <!-- Phones: with a shift open the bar folds to one line (title · scanner dot ·
+         balance · chevron); the chevron shows shift info, balance and actions. -->
+    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center<?= $shift_active ? ' pos-hdr-collapsible pos-hdr-collapsed' : '' ?>">
         <div>
+            <div class="pos-hdr-top">
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> <?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?>
+                <i class="bi bi-cash-register"></i> <span class="pos-hdr-title"><?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?></span>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
-                      title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>">
-                    <i class="bi bi-upc-scan"></i> <?= t('SCANNER READY') ?>
+                      title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>"
+                      aria-label="<?= htmlspecialchars(t('Scanner ready')) ?>">
+                    <i class="bi bi-upc-scan"></i> <span class="pos-scan-txt"><?= t('SCANNER READY') ?></span>
                 </span>
             </h4>
+            <?php if ($shift_active): ?>
+            <span class="pos-hdr-mini-bal d-md-none cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></span>
+            <button type="button" class="pos-hdr-toggle d-md-none" id="posHeaderToggle" onclick="togglePosHeader()"
+                    aria-expanded="false" aria-label="<?= htmlspecialchars(t('Show shift details and actions')) ?>">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+            <?php endif; ?>
+            </div>
             <small class="opacity-75" id="posShiftInfoLine">
                 <?php if ($shift_active): ?>
                 <span class="pos-shift-info-item"><?= t('Shift:') ?> <?= $shift_active['shift_code'] ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Cashier:') ?> <?= htmlspecialchars($cashier_name) ?></span>
@@ -199,7 +214,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                      the stats/shift-history/catalog-setup hub for whoever wants it,
                      without forcing every cashier through it first every day. -->
                 <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= wLabel('POS Workspace — stats, shift history, catalog setup', 'Sales Overview — stats, shift history, catalog setup') ?>">
-                    <i class="bi bi-speedometer2"></i> <?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?>
+                    <i class="bi bi-speedometer2"></i> <span><?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?></span>
                 </a>
                 <?php if ($can_record_old_sale): ?>
                 <div class="pos-old-sale-wrap me-2" id="oldSaleWrap">
@@ -217,24 +232,18 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                     </span>
                     <div class="pos-old-sale-pop d-none" id="oldSalePopover" role="dialog" aria-modal="false" aria-labelledby="oldSalePopTitle">
                         <div class="fw-semibold mb-2" id="oldSalePopTitle"><?= t('When was this sale made?') ?></div>
-                        <div class="d-flex flex-wrap gap-1 mb-2" id="oldSaleQuick">
-                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-days="1"><?= t('Yesterday') ?></button>
-                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-days="2"><?= t('2 days ago') ?></button>
-                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-days="3"><?= t('3 days ago') ?></button>
-                        </div>
-                        <div class="row g-2 mb-2">
-                            <div class="col-7">
-                                <label class="form-label small mb-1" for="oldSaleDate"><?= t('Date') ?></label>
-                                <input type="date" class="form-control form-control-sm" id="oldSaleDate"
-                                       min="<?= date('Y-m-d', strtotime("-{$old_sale_max_days} days")) ?>" max="<?= date('Y-m-d') ?>">
-                            </div>
-                            <div class="col-5">
-                                <label class="form-label small mb-1" for="oldSaleTime"><?= t('Time') ?></label>
-                                <input type="time" class="form-control form-control-sm" id="oldSaleTime" value="12:00">
-                            </div>
+                        <!-- One "When" field; tapping it opens a day list (last N days) and a time list. -->
+                        <input type="hidden" id="oldSaleDate">
+                        <input type="hidden" id="oldSaleTime" value="12:00">
+                        <button type="button" class="pos-old-sale-when mb-2" id="oldSaleWhenBtn" onclick="toggleOldSalePicker()"
+                                aria-expanded="false" aria-controls="oldSalePicker">
+                            <i class="bi bi-calendar-event"></i><span id="oldSaleWhenText"></span><i class="bi bi-chevron-down"></i>
+                        </button>
+                        <div class="pos-old-sale-picker d-none mb-2" id="oldSalePicker">
+                            <ul id="oldSaleDayList" aria-label="<?= htmlspecialchars(t('Day')) ?>"></ul>
+                            <ul id="oldSaleTimeList" aria-label="<?= htmlspecialchars(t('Time')) ?>"></ul>
                         </div>
                         <div class="small mb-2" id="oldSalePreview" aria-live="polite"></div>
-                        <div class="small text-muted mb-2"><?= sprintf(t('Allowed: the last %d days'), $old_sale_max_days) ?></div>
                         <div class="d-flex justify-content-end gap-2">
                             <button type="button" class="btn btn-sm btn-light border" onclick="closeOldSalePopover()"><?= t('Cancel') ?></button>
                             <button type="button" class="btn btn-sm btn-primary" id="oldSaleStartBtn" onclick="startOldSaleMode()" disabled><?= t('Start recording') ?></button>
@@ -244,10 +253,10 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 <?php endif; ?>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
-                    <i class="bi bi-cash"></i> <?= t('Open Drawer') ?>
+                    <i class="bi bi-cash"></i> <span><?= t('Open Drawer') ?></span>
                 </button>
-                <button class="btn btn-outline-light btn-sm" onclick="endShift()">
-                    <i class="bi bi-power"></i> <?= t('End Shift') ?>
+                <button class="btn btn-outline-light btn-sm pos-end-shift-btn" onclick="endShift()">
+                    <i class="bi bi-power"></i> <span><?= t('End Shift') ?></span>
                 </button>
                 <?php else: ?>
                 <button class="btn btn-warning btn-sm" onclick="startShift()">
@@ -745,6 +754,28 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     background: #fff; border-left: 1px solid #dee2e6; border-top: 1px solid #dee2e6; transform: rotate(45deg);
 }
 .pos-old-sale-pop .btn-outline-primary.active { background: #0d6efd; color: #fff; }
+.pos-old-sale-when {
+    display: flex; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 6px 12px;
+    border: 1px solid #0d6efd; border-radius: 10px; background: #fff; color: #212529; text-align: left; font-weight: 600;
+}
+.pos-old-sale-when .bi-calendar-event { color: #0d6efd; font-size: 1.05rem; }
+.pos-old-sale-when span { flex: 1; min-width: 0; }
+.pos-old-sale-when .bi-chevron-down { transition: transform .2s; }
+.pos-old-sale-when[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
+.pos-old-sale-when:focus-visible { outline: 2px solid #0d6efd; outline-offset: 2px; }
+.pos-old-sale-picker {
+    display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); height: 210px;
+    border: 1px solid #dee2e6; border-radius: 10px; overflow: hidden;
+}
+.pos-old-sale-picker ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.pos-old-sale-picker ul + ul { border-left: 1px solid #dee2e6; }
+.pos-old-sale-picker button {
+    display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 8px;
+    border-radius: 6px; font-size: .84rem; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-old-sale-picker button small { display: block; font-size: .72rem; opacity: .75; }
+.pos-old-sale-picker button:hover { background: #f1f4f8; }
+.pos-old-sale-picker button.active { background: #0d6efd; color: #fff; }
 .pos-old-sale-backdrop { position: fixed; inset: 0; background: rgba(13, 32, 64, .42); z-index: 1084; }
 .pos-old-sale-chip {
     display: inline-flex; align-items: center; gap: 4px; background: #fff; color: #0a58ca;
@@ -910,16 +941,30 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         gap: 6px;
         margin-bottom: 2px;
     }
-    /* Scanner badge, when the scanner is active, drops to its own line
-       under the title instead of squeezing the title text. */
-    #posHeaderBar h4 #scannerReadyBadge {
-        flex-basis: 100%;
-        margin-left: 0 !important;
-        width: fit-content;
-    }
+    /* Scanner badge: a small green dot beside the title instead of a
+       full-width "SCANNER READY" bar (the text stays as its tooltip/label). */
+    #posHeaderBar h4 { min-width: 0; }
+    #posHeaderBar .pos-hdr-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     #posHeaderBar #scannerReadyBadge {
-        font-size: 0.62rem !important;
+        flex: none; width: 9px; height: 9px; padding: 0; margin-left: 2px !important;
+        border-radius: 50%; background: #3ddc84 !important; box-shadow: 0 0 0 3px rgba(61, 220, 132, .3);
+        font-size: 0 !important;
     }
+    #posHeaderBar #scannerReadyBadge > * { display: none; }
+
+    /* Folded bar (shift open): balance + chevron share the title line. */
+    .pos-hdr-mini-bal {
+        margin-left: auto; font-weight: 800; font-size: .95rem; white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    #posHeaderBar:not(.pos-hdr-collapsed) .pos-hdr-mini-bal { visibility: hidden; }
+    .pos-hdr-toggle {
+        flex: none; width: 34px; height: 34px; border: 0; border-radius: 8px;
+        background: rgba(255, 255, 255, .15); color: #fff; display: grid; place-items: center;
+    }
+    .pos-hdr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .pos-hdr-toggle .bi { transition: transform .2s; }
+    #posHeaderBar:not(.pos-hdr-collapsed) .pos-hdr-toggle .bi { transform: rotate(180deg); }
     /* Shift info: each piece (Shift/Started/Cashier) is its own nowrap
        chip, wrapping cleanly between items — never mid-value. The "|"
        separators (meaningful only as an inline run-on) are hidden in
@@ -981,6 +1026,22 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         padding: 8px 10px;
         font-weight: 600;
     }
+    /* Shift actions as equal icon tiles (icon over a short label). Each
+       tile takes an equal share of the width and style.css's 85px button
+       min-width is dropped, so the row never runs off the right edge. */
+    .pos-hdr-collapsible #posShiftButtons { flex-wrap: wrap; gap: 6px; }
+    .pos-hdr-collapsible #posShiftButtons > .btn,
+    .pos-hdr-collapsible #posShiftButtons .pos-old-sale-wrap > .btn {
+        flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 3px; padding: 8px 2px 6px !important;
+        font-size: .68rem !important; line-height: 1.15; border-radius: 10px;
+    }
+    .pos-hdr-collapsible #posShiftButtons .pos-old-sale-wrap { min-width: 0; }
+    .pos-hdr-collapsible #posShiftButtons .btn .bi { font-size: 1.15rem; }
+    .pos-hdr-collapsible #posShiftButtons .btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pos-hdr-collapsible #posShiftButtons .pos-end-shift-btn { background: rgba(220, 53, 69, .25); border-color: rgba(255, 180, 188, .6); }
+    /* While recording an old sale the date chip gets its own full row. */
+    .pos-hdr-collapsible #posShiftButtons .pos-old-sale-wrap.is-on { flex-basis: 100%; order: -1; }
 
     /* Warehouse/project selectors + search + category row — smaller text,
        tighter spacing, still full width so nothing needs pinch-zoom. */

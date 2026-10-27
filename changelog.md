@@ -11,6 +11,32 @@
 - **No false "failed":** each signup carries a random id. If the page loses the answer (timeout, dropped connection), it asks `actions/register_status.php` (this visitor's own session only) and shows the normal ready screen once the account is done; a real refusal still shows its own message. No visible change to the page; no field removed.
 - **Tests:** new suite 19 checks (mail captured, never sent). Browser on a local copy: normal signup → ready screen; signup with the answer cut after 3 s → still the ready screen, no error; taken subdomain → its own message. Related suites re-run; the only failures (`test_service_plans_e2e_cli`, `test_supplier_access_simple_pos_cli`, `test_tenant_registration_cli`, `test_tenant_module_smoke_cli`'s Mobile Money tables) fail the same on develop without this change.
 
+## 2026-10-27 — fix(dashboard): nothing shown on chart tap on phones
+
+**Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
+
+- **Change requested after seeing it live:** the figures line under the chart (added in the entry below) is removed. On phones, tapping either dashboard chart (Simple POS "Sales, Expenses & Profit" and the normal "Performance Overview") now shows nothing: no tooltip box and no line. Desktop/tablet keep the tooltip box on hover, unchanged.
+- The now-unused "Tap the chart to see one period" Swahili string is removed.
+- **Test:** chart test 23 checks pass (section E updated). Browser at 360px: both charts, no box and no line after a tap; desktop: box still enabled.
+
+## 2026-10-27 — fix(dashboard): no tooltip box over the chart on phones; tapped period shown under it
+
+**Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
+
+- **The issue (seen live on a phone):** tapping the Sales, Expenses & Profit chart opened the dark tooltip box on top of the bars, hiding most of the chart.
+- **Phones (below 768px):** the box is turned off. Tapping a period shows its figures in one line under the chart instead, e.g. "Wk 43, 2026 · Sales TSh 165,500 · Expenses TSh 0 · Cost of goods sold TSh 115,500 · Net Profit TSh 50,000" (Net loss in red). Before a tap it reads "Tap the chart to see one period". Works for both the Simple POS chart and the normal Performance Overview chart.
+- **Desktop/tablet:** unchanged; the tooltip box shows on hover as before. Turning or resizing the screen switches between the two.
+- **Test:** chart test 23 checks pass (4 new). Browser: rendered dashboard at 360px and desktop. Phone tap shows the line and no box; desktop hover shows the box and hides the line.
+
+## 2026-10-27 — feat(pos): one "When" field for Record Old Sale; folding Sell bar on phones
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **Record Old Sale, "When was this sale made?":** the quick buttons (Yesterday / 2 / 3 days ago) plus a separate date and time field asked for the day twice. They are replaced by one "When" field ("Yesterday, Monday 26/10 · 12:00"). Tapping it opens two lists: days (Today, Yesterday, 2 days ago … up to the POS Settings limit, each with its weekday and date) and times every 30 minutes. Picking a time closes the lists. Same hidden `oldSaleDate`/`oldSaleTime` values, so the preview, start and save logic are unchanged. The "Allowed: the last N days" line is dropped; the list itself enforces it.
+- **Sell bar on phones (desktop unchanged):** with a shift open, the bar folds to one line: title, scanner dot, cash balance and a ⌄ button. Tapping it shows the shift info, balance and the actions as four equal icon tiles (Overview, Old Sale, Open Drawer, End Shift). The tiles share the width and drop style.css's 85px button min-width, which was cutting End Shift off on narrow phones. The open/folded choice is remembered on the device. With no shift the bar stays open so Start Shift is always visible. While recording an old sale, its date chip gets its own row.
+- **"SCANNER READY" on phones:** now a small green dot next to the title; the text stays as its tooltip and screen-reader label. A long title shortens with "…" so the dot and balance always show.
+- **Test:** `test_pos_old_sale_ui_cli.php` updated for the new picker and header (32 checks pass). Browser: rendered as admin with a rolled-back test shift at 320 / 360 / 412 px and desktop. No sideways scroll, all four tiles inside the bar; day list = 31 entries (today to 30 days ago), 48 time slots, list scrolls to the chosen time, picking a day/time updates the field.
+
 ## 2026-10-27 — fix(customers): deleted customers no longer counted on the dashboard and Customer Groups
 
 **Files:** `app/dashboard.php`, `app/bms/customer/customer_groups.php`, `app/bms/customer/customer_group_details.php`, `app/bms/customer/customer_group_members.php`, `core/tenant_admin.php`, `tests/test_customer_count_excludes_deleted_cli.php` (new)

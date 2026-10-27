@@ -120,6 +120,14 @@ try {
         ok($r['success'] === true, "period=$period still returns success=true");
     }
 
+    // ── E. Phones: no tooltip box and nothing shown on tap ───────────────────
+    section('E. Phones — no tooltip on tap, desktop tooltip unchanged');
+    $dash = file_get_contents("$root/app/dashboard.php");
+    ok(strpos($dash, "matchMedia('(max-width: 767.98px)')") !== false, 'phone width is below 768px');
+    ok(substr_count($dash, 'enabled: !chartPhoneQuery.matches,') === 2, 'tooltip box is off on phones in both chart modes (normal and Simple POS)');
+    ok(strpos($dash, 'chartTapLine') === false && strpos($dash, 'chartTapTooltip') === false, 'no figures line under the chart on phones');
+    ok(strpos($dash, "dashboardChart.options.plugins.tooltip.enabled = !chartPhoneQuery.matches;") !== false, 'turning or resizing the screen switches between the two');
+
 } catch (Throwable $e) {
     ok(false, 'threw: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
 }
