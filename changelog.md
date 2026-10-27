@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(superadmin): tenant page crash "Undefined constant BMS_GRACE_PERIOD_DAYS" (Sentry 6ee17ca6)
+
+**Files:** `app/superadmin/tenant_view.php`, `core/tenant_admin.php`
+
+- **Crash:** opening a tenant from a grace-period notification or dashboard tile (`notif_type`/`from_cat` = `trial_grace_started`, `in_grace`, `subscription_grace_started`) hit a fatal error — the "Action Required" banner still used `BMS_GRACE_PERIOD_DAYS`, which was removed when the grace period moved to `core/tenant_lifecycle_policy.php`. The banner now uses `tenantGraceDaysFor($tenant)`, so it also shows this tenant's real grace period.
+- **Per-tenant override never shown:** `getTenant()` did not return `grace_days`, so the tenant page always showed the platform default and labelled it "(platform default)" even when an override was set. It is now read in a separate guarded query (same pattern as `vendor_customer_id`), so a control DB without the column still loads every tenant.
+
 ## 2026-10-27 — feat(mobile): "Ask Smart POS" AI chat in the Flutter app (mobile API upgrade, Phase 9)
 
 **Files:** `api/mobile/ai_ask.php` (new), `api/mobile/me.php`, `tests/test_mobile_ai_cli.php` (new)
