@@ -2455,9 +2455,12 @@ function renderSimpleChart(data) {
             datasets: [
                 { label: <?= json_encode(t('Sales')) ?>, data: salesData, backgroundColor: '#0d6efd', borderRadius: 3, maxBarThickness: 34, order: 2, pointStyle: 'rect' },
                 { label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData, backgroundColor: '#fd7e14', borderRadius: 3, maxBarThickness: 34, order: 2, pointStyle: 'rect' },
-                // Lower order draws on top of the bars.
+                // Lower order draws on top of the bars. A smooth curve that
+                // never overshoots ('monotone'): between two periods it stays
+                // within their real values, so it can't show a profit or loss
+                // that never happened.
                 { type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData, borderColor: '#198754', backgroundColor: '#198754',
-                  borderWidth: 2.5, tension: 0, pointRadius: 4, pointHoverRadius: 6, order: 1, pointStyle: 'circle' },
+                  borderWidth: 2.5, cubicInterpolationMode: 'monotone', pointRadius: 4, pointHoverRadius: 6, order: 1, pointStyle: 'circle' },
             ]
         },
         options: {

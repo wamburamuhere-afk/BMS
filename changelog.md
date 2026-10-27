@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(prices, dashboard): warn when selling below the buying price; smooth Net profit line
+
+**Files:** `assets/js/bms-price-check.js`, `header.php`, `lang/sw.php`, `app/dashboard.php`, `tests/test_pos_profit_void_shop_and_product_delete_cli.php`
+
+- **Selling below the buying price — warning, never a block:** on every form that takes prices (POS restock `buying_price`, product create/edit/quick add `cost_price`, batch correction `unit_cost`), entering a retail or wholesale price lower than the buying price (or a buying price above them) asks "Retail price (100,000) is lower than the buying price (1,000,000) — you would sell at a loss. Is this correct?". Yes keeps the figures; No returns to the field just changed. Seen live on shop.bms: a RICE batch saved at 1,000,000 per unit against a 100,000 selling price (an extra zero) turned weeks 39–41 into big losses. The existing wholesale-above-retail check is unchanged; several problems at once are listed in one dialog. Read-only (calculated) cost fields are ignored. English and Swahili.
+- **Smart POS chart:** the Net profit line is a smooth curve that never overshoots (Chart.js `cubicInterpolationMode: 'monotone'`) — between two periods it stays within their real values, so it can't show a profit or loss that never happened.
+- Tests: suite 124 checks pass. Browser: restock, product, batch and read-only forms (typo warns, fixed price silent, equal/normal silent, two problems listed together); curve control points stay within each segment's real values.
+
 ## 2026-10-27 — fix(stock): voided POS sales no longer show as stock out on Warehouses and Recent Activity
 
 **Files:** `core/stock_ledger.php`, `app/bms/stock/warehouses.php`, `app/bms/stock/warehouse_view.php`, `app/bms/product/product_view.php`, `api/pos/void_sale.php`, `tests/test_stock_activity_voided_sales_cli.php` (new)
