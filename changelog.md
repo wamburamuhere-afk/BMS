@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(pos): clearer phone POS for new cashiers (old-sale strip, balance label, choose-shop prompt)
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **Old-sale mode is visible on phones:** while recording an old sale, a blue strip under the Sell bar reads "Recording old sale: Saturday 24/10/2026, 15:30" with **Change** and **Stop**. Before, only the cart header changed colour, so a cashier could forget the mode and record today's sales as an old day. Desktop keeps its existing date chip.
+- **Balance is labelled:** the phone bar's amount now has "Cash in drawer" above it (the figure is starting cash + cash sales + cash in/out − refunds). The label stays when the amount refreshes after a sale.
+- **Choose your shop:** a cashier limited to some shops, with more than one and none picked, used to see a red "Error loading products — Status: 403". Now the product area says "Choose your shop — Pick a shop above to see its products and stock" and the shop picker gets a red outline until one is chosen. Admins / all-shop users and single-shop users are unchanged (single shop is already picked automatically).
+- **Test:** `test_pos_old_sale_ui_cli.php` 40 checks pass (3 new). Browser at 360 px: strip shows with the date and hides on Stop/desktop; label shown on phone, hidden on desktop, kept after the amount changes; shop-limited render (2 shops) shows the prompt and outline, and picking a shop clears it and loads products.
+
 ## 2026-10-27 — fix(pos): phone Sell bar has rounded corners
 
 **Files:** `app/bms/pos/pos.php`

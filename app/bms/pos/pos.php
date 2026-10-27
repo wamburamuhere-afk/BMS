@@ -195,7 +195,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </span>
             </h4>
             <?php if ($shift_active): ?>
-            <span class="pos-hdr-mini-bal d-md-none cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></span>
+            <span class="pos-hdr-mini-bal d-md-none"><small><?= t('Cash in drawer') ?></small><span class="cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></span></span>
             <?php else: ?>
             <span class="pos-hdr-mini-bal d-md-none"><?= t('No shift') ?></span>
             <?php endif; ?>
@@ -277,6 +277,17 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             </div>
         </div>
     </div>
+
+    <?php if ($can_record_old_sale): ?>
+    <!-- Phones: while an old sale is being recorded, say so right under the bar
+         (the desktop shows the date chip in the header buttons instead). -->
+    <div class="pos-old-sale-strip d-none d-md-none" id="posOldSaleStrip" role="status">
+        <i class="bi bi-clock-history"></i>
+        <span id="posOldSaleStripText"></span>
+        <button type="button" onclick="toggleOldSalePopover()"><?= t('Change') ?></button>
+        <button type="button" onclick="exitOldSaleMode()"><?= t('Stop') ?></button>
+    </div>
+    <?php endif; ?>
 
     <!-- Phones: every header action in one sheet, each explained in a line, so a
          new cashier knows what each one does. Rows call the same functions as the
@@ -1024,6 +1035,19 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     .pos-hdr-mini-bal {
         margin-left: auto; font-weight: 800; font-size: .95rem; white-space: nowrap;
         font-variant-numeric: tabular-nums;
+        display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15;
+    }
+    #posHeaderBar .pos-hdr-mini-bal small { font-size: .62rem; font-weight: 600; opacity: .85; }
+    /* Old-sale strip under the bar (phones). */
+    .pos-old-sale-strip {
+        display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 8px 8px 8px 12px;
+        background: #e7f1ff; color: #0b3a82; border: 1px solid #b6d4fe; border-radius: 10px;
+        font-size: .82rem; font-weight: 600;
+    }
+    .pos-old-sale-strip.d-none { display: none !important; }
+    .pos-old-sale-strip span { flex: 1; min-width: 0; }
+    .pos-old-sale-strip button {
+        border: 0; border-radius: 6px; background: #fff; color: #0a58ca; font-weight: 600; font-size: .78rem; padding: 4px 10px;
     }
     /* A solid white button on the blue bar, so it plainly reads as tappable. */
     .pos-hdr-actions {
@@ -1251,6 +1275,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
    into an oval and pushed the search row's buttons onto a second line. */
 #mobileCartFab { min-width: 0; }
 body.pos-actions-open #mobileCartFab { visibility: hidden; }
+/* Shop not chosen yet: red outline only (Bootstrap's is-invalid icon hides the text in the narrow phone picker). */
+#posWarehouseId.pos-shop-needed { border-color: #dc3545; box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .25); }
 .pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 .pos-sheet-qty { width: 64px; height: 40px; padding: 0 4px; font-size: 1.05rem; -moz-appearance: textfield; }
