@@ -101,6 +101,21 @@ try {
         $shift[$f] = (float)($shift[$f] ?? 0);
     }
     $shift['shift_id'] = (int)$shift['shift_id'];
+    // Record Old Sale — same as the web Z-report (app/bms/pos/zreport.php): sales
+    // typed in later, and whether this whole shift was created back-dated.
+    // Guarded for a company that has not run 2026_10_27_pos_record_old_sale yet.
+    $recordedLater = [];
+    if ($pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'is_past_entry'")->fetch()) {
+        $rl = $pdo->prepare("SELECT sale_id, receipt_number, sale_date, created_at, payment_method, grand_total, sale_status
+                               FROM pos_sales WHERE shift_id = ? AND is_past_entry = 1 ORDER BY sale_date");
+        $rl->execute([$shiftId]);
+        foreach ($rl->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $r['sale_id'] = (int)$r['sale_id'];
+            $r['grand_total'] = (float)$r['grand_total'];
+            $recordedLater[] = $r;
+        }
+    }
+    $shift['is_past_entry'] = (int)($shift['is_past_entry'] ?? 0);
     $cashierName = trim(($shift['first_name'] ?? '') . ' ' . ($shift['last_name'] ?? ''));
     unset($shift['first_name'], $shift['last_name']);
 
@@ -114,6 +129,9 @@ try {
         'top_products' => $topProducts,
         'cash_in'      => (float)$drawer['cash_in'],
         'cash_out'     => (float)$drawer['cash_out'],
+        // Old sales in this shift: sale_date = when it happened, created_at = when typed in.
+        'recorded_later'     => $recordedLater,
+        'is_backdated_shift' => $shift['is_past_entry'] === 1,
     ]);
 } catch (Throwable $e) {
     error_log('get_z_report: ' . $e->getMessage());

@@ -17,9 +17,10 @@ if (!function_exists('insertSaNotification')) {
      * Silently skips if an identical (tenant_id, type) row already exists today,
      * so the bootstrap gate and the cron batch never double-up.
      */
-    function insertSaNotification(int $tenantId, string $type, string $tenantName, string $subdomain): void
+    function insertSaNotification(int $tenantId, string $type, string $tenantName, string $subdomain, ?string $detail = null): void
     {
-        $allowed = ['trial_expired', 'subscription_expired', 'trial_grace_started', 'subscription_grace_started', 'bms_request'];
+        $allowed = ['trial_expired', 'subscription_expired', 'trial_grace_started', 'subscription_grace_started', 'bms_request',
+                    'first_login', 'first_product', 'first_sale', 'inactive'];
         if (!in_array($type, $allowed, true)) return;
         try {
             $ctrl = getControlPdo();
@@ -38,6 +39,11 @@ if (!function_exists('insertSaNotification')) {
                 'trial_grace_started'         => 'Trial grace period started',
                 'subscription_grace_started'  => 'Subscription grace period started',
                 'bms_request'                 => 'Smart BMS request awaiting approval',
+                // Company activity (core/tenant_activity_alerts.php)
+                'first_login'                 => 'First sign-in',
+                'first_product'               => 'First product',
+                'first_sale'                  => 'First sale',
+                'inactive'                    => 'No activity',
             ];
             $typeBodies = [
                 'trial_expired'               => 'free trial has expired. Awaiting your action.',
@@ -48,7 +54,7 @@ if (!function_exists('insertSaNotification')) {
             ];
             $label = $typeLabels[$type];
             $title = $label . ' — ' . $tenantName;
-            $body  = $tenantName . ' (' . $subdomain . ') — ' . ($typeBodies[$type] ?? strtolower($label) . '.');
+            $body  = $tenantName . ' (' . $subdomain . ') — ' . ($detail ?? $typeBodies[$type] ?? strtolower($label) . '.');
 
             $ctrl->prepare("
                 INSERT INTO superadmin_notifications (type, title, body, tenant_id, tenant_name, subdomain)

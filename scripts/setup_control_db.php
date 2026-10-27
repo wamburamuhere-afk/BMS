@@ -913,7 +913,24 @@ try {
         $admin->exec("ALTER TABLE `{$controlDb}`.`superadmin_notifications`
             MODIFY COLUMN `type` ENUM('trial_expired','subscription_expired','trial_grace_started','subscription_grace_started','bms_request') NOT NULL");
         say('  · superadmin_notifications.type ENUM expanded (bms_request added)');
+        $snType = 'bms_request';   // so the step below sees the expanded list
     }
+    // Company activity alerts (core/tenant_activity_alerts.php, mobile API upgrade Phase 2).
+    if ($snType !== false && strpos((string)$snType, 'first_login') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`superadmin_notifications`
+            MODIFY COLUMN `type` ENUM('trial_expired','subscription_expired','trial_grace_started','subscription_grace_started','bms_request',
+                                      'first_login','first_product','first_sale','inactive') NOT NULL");
+        say('  · superadmin_notifications.type ENUM expanded (first_login, first_product, first_sale, inactive added)');
+    }
+    // One row per company + alert already sent, so each rings once.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_activity_alerts` (
+            `tenant_id` INT          NOT NULL,
+            `alert`     VARCHAR(40)  NOT NULL,
+            `sent_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`tenant_id`, `alert`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
 
     // Expand billing_cycle ENUM to include quarterly and biannual (idempotent check).
     $bcType = $admin->query("
@@ -973,6 +990,8 @@ try {
     foreach ([
         'plan_key'  => "ADD COLUMN `plan_key` VARCHAR(64) NULL AFTER `device_name`",
         'plan_term' => "ADD COLUMN `plan_term` VARCHAR(8) NULL AFTER `plan_key`",
+        // The owner's chosen login name (web signup has it; NULL = the phone, as before).
+        'owner_username' => "ADD COLUMN `owner_username` VARCHAR(50) NULL AFTER `owner_phone`",
     ] as $col => $clause) {
         if (!in_array($col, $rjCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`registration_jobs` {$clause}");

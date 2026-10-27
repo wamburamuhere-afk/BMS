@@ -214,6 +214,20 @@ if ($hasContext ?? false):
             $bannerTitle = 'Subscription expired — tenant suspended';
             $bannerBody  = 'This tenant\'s subscription expired and was automatically suspended after the grace period. Record a payment to reactivate.';
             break;
+        case 'first_login':
+        case 'first_product':
+        case 'first_sale':
+            $bannerIcon  = 'bi-stars';
+            $bannerClass = 'alert-success';
+            $bannerTitle = ['first_login' => 'First sign-in', 'first_product' => 'First product added', 'first_sale' => 'First sale made'][$notifType];
+            $bannerBody  = 'This company is getting started. The Users and Activity tabs show who is using it.';
+            break;
+        case 'inactive':
+            $bannerIcon  = 'bi-moon';
+            $bannerClass = 'alert-secondary';
+            $bannerTitle = 'No recent activity';
+            $bannerBody  = 'Nobody from this company has used the web or the app for a while. Consider reaching out.';
+            break;
         case 'billing_overdue':
         case 'billing_due_soon':
             $bannerIcon  = 'bi-receipt';
@@ -1820,6 +1834,21 @@ function applyPlan() {
     });
 }
 
+// Last sign-in with where it happened (Web / App), plus the app's last use and device.
+function lastLoginCell(u) {
+    let html = u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>';
+    if (u.last_login_via) {
+        html += u.last_login_via === 'app'
+            ? ' <span class="badge" style="background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7">App</span>'
+            : ' <span class="badge" style="background:#eef2f7;color:#334155;border:1px solid #cbd5e1">Web</span>';
+    }
+    if (u.app_last_used) {
+        html += '<div class="text-muted" style="font-size:.75rem"><i class="bi bi-phone me-1"></i>App used '
+            + safeOutput(u.app_last_used) + (u.app_device ? ' · ' + safeOutput(u.app_device) : '') + '</div>';
+    }
+    return html;
+}
+
 function loadUsers() {
     // On demand, deliberately — same discipline as checkUsage(): this is the
     // one other thing on this page that briefly opens the tenant's own
@@ -1850,13 +1879,14 @@ function loadUsers() {
                 const role = (u.role && u.role.trim()) ? u.role.trim() : 'No role set';
                 roleCounts[role] = (roleCounts[role] || 0) + 1;
                 if (u.last_login && (!lastActivity || u.last_login > lastActivity)) lastActivity = u.last_login;
+                if (u.app_last_used && (!lastActivity || u.app_last_used > lastActivity)) lastActivity = u.app_last_used;
             });
             const roleBadges = Object.keys(roleCounts).sort().map(function (role) {
                 return '<span class="badge" style="background:#e7f0ff;color:#084298;border:1px solid #b6ccfe;font-weight:600">'
                     + safeOutput(role) + ': ' + roleCounts[role] + '</span>';
             }).join('');
             $('#usersRoleBadges').html(roleBadges);
-            $('#usersLastActivity').html('<i class="bi bi-clock me-1"></i>Most recent sign-in across the company: '
+            $('#usersLastActivity').html('<i class="bi bi-clock me-1"></i>Most recent activity across the company (web sign-in or app use): '
                 + (lastActivity ? '<strong>' + safeOutput(lastActivity) + '</strong>' : '<span class="text-muted">no one has signed in yet</span>'));
             $('#usersSummary').removeClass('d-none');
 
@@ -1905,7 +1935,7 @@ function loadUsers() {
                     + '<td>' + (u.phone ? safeOutput(u.phone) : '<span class="text-muted">—</span>') + '</td>'
                     + '<td>' + safeOutput(u.role) + '</td>'
                     + '<td>' + statusBadge + '</td>'
-                    + '<td>' + (u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>') + '</td>'
+                    + '<td>' + lastLoginCell(u) + '</td>'
                     + '<td class="text-end">' + userActions(u) + '</td>'
                     + '</tr>';
             });
