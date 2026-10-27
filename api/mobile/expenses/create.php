@@ -107,8 +107,9 @@ try {
     $ref  = 'EXP-' . $expense_id;
     $desc = 'Expense #' . $expense_id . ': ' . substr($description, 0, 100);
 
+    // The expense's shop goes onto both entries (per-shop Profit Report).
     $accr = postExpenseAccrual($pdo, $expense_id, $expense_account_id, $amount,
-        $expense_date, $project_id, $created_by, $ref, $description);
+        $expense_date, $project_id, $created_by, $ref, $description, $warehouse_id);
 
     $settle_debit = $expense_account_id;
     if (!empty($accr['posted'])) {
@@ -120,7 +121,7 @@ try {
         $pdo, 'expense',
         $bank_account_id, $settle_debit,
         $amount, $expense_date, $ref, $desc,
-        $project_id, 0, null
+        $project_id, 0, null, $warehouse_id
     );
     if (!$txnId) {
         throw new RuntimeException('Ledger posting failed — check expense and cash accounts are active');

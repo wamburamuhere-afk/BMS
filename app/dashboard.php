@@ -1860,7 +1860,7 @@ function get_progress_color($percentage) {
             <?php if (hasReportsAccess()): ?>
             <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Bought vs Sold') : t('Performance Overview') ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Sales & Profit') : t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <?php
                         // Simple Mode defaults this chart to Daily — a small
@@ -2154,7 +2154,8 @@ function loadPerformanceChart(period = 'monthly') {
     $.ajax({
         url: apiUrl,
         type: 'GET',
-        data: { period: period },
+        // Simple POS bar chart: one slot per period, empty days included.
+        data: POS_SIMPLE_MODE ? { period: period, fill_gaps: 1 } : { period: period },
         dataType: 'json',
         success: function(response) {
             $('#chartLoader').hide();
@@ -2200,20 +2201,39 @@ function fmtAbbrev(n) {
     return sign + 'TSh ' + av.toLocaleString();
 }
 
+// Full figure — TSh 165,500 — for every number a person reads (summary boxes,
+// tooltips). Only the chart's Y-axis keeps fmtAbbrev(), where space is tight.
+function fmtFull(n) {
+    const v = Math.round((Number(n) || 0) * 100) / 100;
+    const sign = v < 0 ? '-' : '';
+    const dp = Number.isInteger(v) ? 0 : 2;   // 165,500 — or 12,345,678.50, never ".5"
+    return sign + 'TSh ' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+
 // % change vs the previous data point — null when there's nothing to compare
 // against (first period, or previous value was exactly zero: a % off zero is
 // undefined, not "infinite", so the caller shows no chip rather than lying).
 function pctDelta(curr, prev) {
     if (prev === undefined || prev === null || prev === 0) return null;
+    // Nothing this period (e.g. a day with no sales): "▼ 100%" on every box is
+    // noise — the summary already says "No sales in this period".
+    if (curr === 0) return null;
     return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
-function deltaChipHtml(pct) {
+// A rise of 1,000% or more reads as a multiple ("▲ 66×") — "▲6520%" is true
+// but unreadable when the previous period was tiny. Hover names the period
+// it is compared with.
+function deltaChipHtml(pct, prevPeriod) {
     if (pct === null) return '';
     const up = pct >= 0;
     const cls = up ? 'text-success' : 'text-danger';
     const arrow = up ? '▲' : '▼';
-    return `<span class="${cls} small fw-bold ms-1">${arrow}${Math.abs(pct).toFixed(0)}%</span>`;
+    const text = (up && pct >= 1000)
+        ? (1 + pct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 }) + '×'
+        : Math.abs(pct).toFixed(0) + '%';
+    const title = prevPeriod ? ` title="${safeOutput(<?= json_encode(t('Compared with')) ?> + ' ' + prevPeriod)}"` : '';
+    return `<span class="${cls} small fw-bold ms-1 text-nowrap"${title}>${arrow} ${text}</span>`;
 }
 
 function renderChart(data) {
@@ -2440,45 +2460,25 @@ function renderSimpleChart(data) {
 
     $('#performanceSummary').empty();
 
+    // Two bars per period — Sales and Profit — so "how much did I sell, how
+    // much did I keep" reads at a glance. Every period has its own slot (the
+    // API fills empty days with zeros), so an empty day shows as a gap and a
+    // sale always sits on its own day. Cost of Goods and Expenses are in the
+    // tooltip and the summary below, in full.
     const labels       = data.length > 0 ? data.map(row => row.period) : [];
     const salesData     = data.length > 0 ? data.map(row => parseFloat(row.revenue) || 0) : [];
     const cogsData      = data.length > 0 ? data.map(row => parseFloat(row.expense) || 0) : [];
     const opExpenseData = data.length > 0 ? data.map(row => parseFloat(row.operating_expenses) || 0) : [];
-
-    function lineDataset(label, data, color, dash) {
-        return {
-            label: label,
-            data: data,
-            borderColor: color,
-            backgroundColor: function(context) {
-                const chart = context.chart;
-                const { chartArea } = chart;
-                if (!chartArea) return color + '14';
-                const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                gradient.addColorStop(0, color + '2E');
-                gradient.addColorStop(1, color + '03');
-                return gradient;
-            },
-            fill: true,
-            tension: 0.4,
-            borderWidth: dash ? 2 : 2.5,
-            borderDash: dash || [],
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: '#fff',
-            pointBorderColor: color,
-            pointBorderWidth: 2,
-        };
-    }
+    const profitData    = data.length > 0 ? data.map((row, i) => (row.net_profit != null) ? (parseFloat(row.net_profit) || 0) : (salesData[i] - cogsData[i] - opExpenseData[i])) : [];
 
     dashboardChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [
-                lineDataset(<?= json_encode(t('Sales')) ?>, salesData, '#0d6efd', null),
-                lineDataset(<?= json_encode(t('Cost of Goods')) ?>, cogsData, '#dc3545', [6, 3]),
-                lineDataset(<?= json_encode(t('Expenses')) ?>, opExpenseData, '#fd7e14', [2, 2]),
+                { label: <?= json_encode(t('Sales')) ?>, data: salesData, backgroundColor: '#0d6efd', borderRadius: 3, maxBarThickness: 34 },
+                // A loss is a red bar below zero.
+                { label: <?= json_encode(t('Profit')) ?>, data: profitData, backgroundColor: profitData.map(v => v < 0 ? '#dc3545' : '#198754'), borderRadius: 3, maxBarThickness: 34 },
             ]
         },
         options: {
@@ -2488,7 +2488,7 @@ function renderSimpleChart(data) {
             plugins: {
                 legend: {
                     display: true, position: 'top', align: 'end',
-                    labels: { usePointStyle: true, pointStyleWidth: 12, boxHeight: 8, font: { size: 12 }, padding: 20 }
+                    labels: { boxWidth: 12, boxHeight: 12, font: { size: 12 }, padding: 20 }
                 },
                 tooltip: {
                     padding: 14,
@@ -2499,20 +2499,20 @@ function renderSimpleChart(data) {
                     borderWidth: 1,
                     cornerRadius: 8,
                     callbacks: {
+                        // One block per period: the whole story, full figures.
                         label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            return label + fmtAbbrev(context.parsed.y);
+                            if (context.datasetIndex !== 0) return null;
+                            const i = context.dataIndex;
+                            return [
+                                <?= json_encode(t('Sales')) ?> + ': ' + fmtFull(salesData[i]),
+                                <?= json_encode(t('Cost of Goods')) ?> + ': ' + fmtFull(cogsData[i]),
+                                <?= json_encode(t('Expenses')) ?> + ': ' + fmtFull(opExpenseData[i]),
+                            ];
                         },
                         afterBody: function(items) {
-                            const sales = items.find(i => i.datasetIndex === 0);
-                            const cogs  = items.find(i => i.datasetIndex === 1);
-                            const opex  = items.find(i => i.datasetIndex === 2);
-                            if (sales && cogs && opex) {
-                                const netProfit = sales.parsed.y - cogs.parsed.y - opex.parsed.y;
-                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + ': ' + fmtAbbrev(netProfit)];
-                            }
-                            return [];
+                            if (!items.length) return [];
+                            const p = profitData[items[0].dataIndex];
+                            return ['─────────────────', (p < 0 ? <?= json_encode(t('Loss')) ?> : <?= json_encode(t('Profit')) ?>) + ': ' + fmtFull(p)];
                         }
                     }
                 }
@@ -2544,36 +2544,86 @@ function renderSimpleChart(data) {
     const netProfit = (last.net_profit != null) ? parseFloat(last.net_profit) : (sales - cogs - opex);
     const margin   = sales > 0 ? (netProfit / sales) * 100 : null;
 
-    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0)) : '';
-    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0)) : '';
-    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0)) : '';
+    const prevPeriod = prev ? String(prev.period) : '';
+    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0), prevPeriod) : '';
+    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0), prevPeriod) : '';
+    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0), prevPeriod) : '';
     const profitPrev = prev ? ((prev.net_profit != null) ? parseFloat(prev.net_profit) : ((parseFloat(prev.revenue) || 0) - (parseFloat(prev.expense) || 0) - (parseFloat(prev.operating_expenses) || 0))) : null;
-    const profitDelta = prev ? deltaChipHtml(pctDelta(netProfit, profitPrev)) : '';
+    // Profit ↔ loss: a % across zero is meaningless ("▼ 120100%"), so say what happened.
+    let profitDelta = '';
+    if (prev && profitPrev !== null && profitPrev !== 0 && netProfit !== 0 && (profitPrev > 0) !== (netProfit > 0)) {
+        const toLoss = netProfit < 0;
+        const title  = ` title="${safeOutput(<?= json_encode(t('Compared with')) ?> + ' ' + prevPeriod)}"`;
+        profitDelta = `<span class="${toLoss ? 'text-danger' : 'text-success'} small fw-bold ms-1 text-nowrap"${title}>${toLoss ? '▼ ' + <?= json_encode(t('to loss')) ?> : '▲ ' + <?= json_encode(t('back to profit')) ?>}</span>`;
+    } else if (prev) {
+        profitDelta = deltaChipHtml(pctDelta(netProfit, profitPrev), prevPeriod);
+    }
 
+    // Full figures on one line each; the size steps down on narrow phones so
+    // a long amount never wraps or gets cut.
+    const valStyle = 'font-size: clamp(0.9rem, 3.4vw, 1.05rem);';
     $('#performanceSummary').append(`
         <div class="mt-4 p-3 bg-light rounded shadow-sm border">
-            <span class="text-muted small d-block uppercase fw-bold mb-2" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
+            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-1 mb-2">
+                <span class="text-muted small uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${safeOutput(last.period)})</span>
+                ${prevPeriod ? `<span class="text-muted" style="font-size: 0.7rem;"><?= t('Compared with') ?> ${safeOutput(prevPeriod)}</span>` : ''}
+            </div>
             <div class="row g-3 text-center">
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Sales') ?></div>
-                    <div class="h6 mb-0 text-primary">${fmtAbbrev(sales)}${salesDelta}</div>
+                    <div class="fw-bold mb-0 text-primary text-nowrap" style="${valStyle}">${fmtFull(sales)}</div>${salesDelta ? `<div>${salesDelta}</div>` : ''}
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Cost of Goods') ?></div>
-                    <div class="h6 mb-0 text-danger">${fmtAbbrev(cogs)}${cogsDelta}</div>
+                    <div class="fw-bold mb-0 text-danger text-nowrap" style="${valStyle}">${fmtFull(cogs)}</div>${cogsDelta ? `<div>${cogsDelta}</div>` : ''}
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Expenses') ?></div>
-                    <div class="h6 mb-0" style="color:#fd7e14;">${fmtAbbrev(opex)}${opexDelta}</div>
+                    <div class="fw-bold mb-0 text-nowrap" style="color:#fd7e14; ${valStyle}">${fmtFull(opex)}</div>${opexDelta ? `<div>${opexDelta}</div>` : ''}
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Net Profit') ?></div>
-                    <div class="h6 mb-0 text-${netProfit >= 0 ? 'success' : 'danger'}">${fmtAbbrev(netProfit)}${profitDelta}</div>
+                    <div class="fw-bold mb-0 text-${netProfit >= 0 ? 'success' : 'danger'} text-nowrap" style="${valStyle}">${fmtFull(netProfit)}</div>${profitDelta ? `<div>${profitDelta}</div>` : ''}
                     ${margin !== null ? `<small class="d-block text-muted" style="font-size: 0.7rem;">${margin.toFixed(0)}% <?= t('margin') ?></small>` : ''}
                 </div>
             </div>
+            ${moneyWentHtml(sales, cogs, opex, netProfit)}
         </div>
     `);
+}
+
+// "Where your sales money went" — the latest period's sales split into what
+// paid for the goods, expenses and profit, per TSh 100 sold. No sales → a
+// plain sentence; a loss → says so instead of a bar that can't add up.
+function moneyWentHtml(sales, cogs, opex, netProfit) {
+    const wrap = inner => `<div class="mt-3 pt-3 border-top">${inner}</div>`;
+    if (!(sales > 0)) {
+        return wrap(`<div class="small text-muted"><?= t('No sales in this period.') ?></div>`);
+    }
+    if (netProfit < 0) {
+        return wrap(`<div class="small fw-bold text-danger">${safeOutput(<?= json_encode(t('Costs were more than sales — a loss of %s.')) ?>.replace('%s', fmtFull(-netProfit)))}</div>`);
+    }
+    // Whole shillings per TSh 100 that always add up to 100.
+    const goods = Math.round(cogs / sales * 100);
+    const exp   = Math.min(100 - goods, Math.round(opex / sales * 100));
+    const keep  = Math.max(0, 100 - goods - exp);
+    const seg = (pct, color) => pct > 0 ? `<div style="width:${pct}%; background:${color};"></div>` : '';
+    const row = (color, label, per100, amount) => `
+        <div class="d-flex justify-content-between align-items-center gap-2 small">
+            <span class="d-flex align-items-center gap-2"><span style="width:10px; height:10px; border-radius:2px; background:${color}; display:inline-block;"></span>${safeOutput(label)}</span>
+            <span class="text-nowrap"><strong>TSh ${per100}</strong> <span class="text-muted">· ${fmtFull(amount)}</span></span>
+        </div>`;
+    return wrap(`
+        <div class="small fw-bold mb-1"><?= t('Where your sales money went') ?></div>
+        <div class="small text-muted mb-2"><?= t('Out of every TSh 100 sold:') ?></div>
+        <div class="d-flex rounded overflow-hidden mb-2" style="height:14px; background:#e9ecef;">
+            ${seg(goods, '#dc3545')}${seg(exp, '#fd7e14')}${seg(keep, '#198754')}
+        </div>
+        <div class="d-flex flex-column gap-1">
+            ${row('#dc3545', <?= json_encode(t('Paid for the goods')) ?>, goods, cogs)}
+            ${row('#fd7e14', <?= json_encode(t('Expenses')) ?>, exp, opex)}
+            ${row('#198754', <?= json_encode(t('Your profit')) ?>, keep, netProfit)}
+        </div>`);
 }
 
 function updateDashboardMetrics(data) {

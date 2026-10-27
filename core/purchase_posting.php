@@ -330,7 +330,7 @@ if (!function_exists('remediateBuriedVatForEntry')) {
     function remediateBuriedVatForEntry(PDO $pdo, int $entryId, int $userId): array
     {
         $out = ['done' => false, 'reason' => ''];
-        $e = $pdo->prepare("SELECT entry_id, entity_type, entity_id, entry_date, project_id FROM journal_entries WHERE entry_id = ? AND status = 'posted'");
+        $e = $pdo->prepare("SELECT entry_id, entity_type, entity_id, entry_date, project_id, warehouse_id FROM journal_entries WHERE entry_id = ? AND status = 'posted'");
         $e->execute([$entryId]);
         $row = $e->fetch(PDO::FETCH_ASSOC);
         if (!$row) { $out['reason'] = 'not_found'; return $out; }
@@ -362,11 +362,12 @@ if (!function_exists('remediateBuriedVatForEntry')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$row['entry_date']) ? substr((string)$row['entry_date'], 0, 10) : date('Y-m-d');
         $pid  = !empty($row['project_id']) ? (int)$row['project_id'] : null;
+        $whId = !empty($row['warehouse_id']) ? (int)$row['warehouse_id'] : null;
         try {
             $newId = postLedgerEntry($pdo, "VAT reclass — move Input VAT out of cost (bill #$billId)", [
                 ['account_id' => (int)$vatAcc, 'type' => 'debit',  'amount' => $tax, 'description' => 'Input VAT recoverable (reclassified out of cost)'],
                 ['account_id' => $costAcc,     'type' => 'credit', 'amount' => $tax, 'description' => 'Remove VAT previously buried in cost'],
-            ], $pid, $billId, 'bill_vat_remediation', $date, $userId);
+            ], $pid, $billId, 'bill_vat_remediation', $date, $userId, $whId);
             $pdo->prepare("UPDATE journal_entries SET parent_entity_type = 'supplier_invoice', parent_entity_id = ? WHERE entry_id = ?")
                 ->execute([$billId, $newId]);
             $out['done'] = true; $out['reason'] = 'remediated'; $out['entry_id'] = $newId;

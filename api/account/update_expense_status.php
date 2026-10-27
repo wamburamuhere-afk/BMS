@@ -52,7 +52,7 @@ try {
     // Snapshot BEFORE the UPDATE: amount/date/project for posting, the source
     // bank + expense accounts to post against, the current transaction_id +
     // status (so we post once and can void a paid expense), plus payroll link.
-    $snap_stmt = $pdo->prepare("SELECT amount, expense_date, project_id, description,
+    $snap_stmt = $pdo->prepare("SELECT amount, expense_date, project_id, warehouse_id, description,
                                        status AS old_status, transaction_id,
                                        bank_account_id, expense_account_id,
                                        payroll_id, reference_number,
@@ -92,6 +92,9 @@ try {
     $bank = (int)($expense_snap['bank_account_id'] ?? 0);
     $exp_acc = (int)($expense_snap['expense_account_id'] ?? 0);
     $proj = $expense_snap['project_id'] !== null ? (int)$expense_snap['project_id'] : null;
+    // The expense's shop (Simple POS) — tags its ledger entries so the per-shop
+    // Profit Report counts it. NULL = company-wide.
+    $whId = !empty($expense_snap['warehouse_id']) ? (int)$expense_snap['warehouse_id'] : null;
 
     // OUT-1 accrual — recognise the expense in the P&L when it is APPROVED
     // (Dr Expense / Cr Accrued Expenses), so the GL is accrual basis. Best-effort;
@@ -100,7 +103,7 @@ try {
     // gross via postPayrollAccrual to avoid a double charge).
     if ($status === 'approved' && $amt > 0 && $exp_acc > 0 && empty($expense_snap['payroll_id'])) {
         $accr = postExpenseAccrual($pdo, (int)$expense_id, $exp_acc, $amt,
-            $expense_snap['expense_date'], $proj, (int)$_SESSION['user_id'], $ref, $expense_snap['description']);
+            $expense_snap['expense_date'], $proj, (int)$_SESSION['user_id'], $ref, $expense_snap['description'], $whId);
         if (!empty($accr['posted'])) $post_result = ['posted' => true, 'entry_id' => $accr['entry_id'], 'reason' => 'accrued'];
     }
 
@@ -204,7 +207,7 @@ try {
                 }
 
                 $txnId = postOutflow($pdo, 'expense', $bank, $settle_debit, $amt,
-                    $expense_snap['expense_date'], $ref, $desc, $proj, $whtAmt, $whtAccId);
+                    $expense_snap['expense_date'], $ref, $desc, $proj, $whtAmt, $whtAccId, $whId);
                 if (!$txnId) {
                     throw new Exception('Ledger posting failed — check the Paid-From and expense accounts.');
                 }
