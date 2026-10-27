@@ -5814,5 +5814,4 @@ return [
     'Day' => 'Siku',
     'Scanner ready' => 'Skana iko tayari',
     'Show shift details and actions' => 'Onyesha taarifa za zamu na vitendo',
-    'Tap the chart to see one period' => 'Gusa chati kuona kipindi kimoja',
 ];
