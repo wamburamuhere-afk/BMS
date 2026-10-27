@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(dashboard): no tooltip box over the chart on phones; tapped period shown under it
+
+**Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
+
+- **The issue (seen live on a phone):** tapping the Sales, Expenses & Profit chart opened the dark tooltip box on top of the bars, hiding most of the chart.
+- **Phones (below 768px):** the box is turned off. Tapping a period shows its figures in one line under the chart instead, e.g. "Wk 43, 2026 · Sales TSh 165,500 · Expenses TSh 0 · Cost of goods sold TSh 115,500 · Net Profit TSh 50,000" (Net loss in red). Before a tap it reads "Tap the chart to see one period". Works for both the Simple POS chart and the normal Performance Overview chart.
+- **Desktop/tablet:** unchanged; the tooltip box shows on hover as before. Turning or resizing the screen switches between the two.
+- **Test:** chart test 23 checks pass (4 new). Browser: rendered dashboard at 360px and desktop. Phone tap shows the line and no box; desktop hover shows the box and hides the line.
+
 ## 2026-10-27 — feat(pos): one "When" field for Record Old Sale; folding Sell bar on phones
 
 **Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
