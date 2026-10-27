@@ -145,7 +145,7 @@ if (!function_exists('bmsFeatureRegistry')) {
                 // pos_upgrade_plan.md §8) are loss-control RBAC permissions,
                 // not a premium tier feature — every plan/tier that has POS
                 // at all needs the ability to grant/withhold them per role.
-                'page_keys'   => ['pos', 'pos_config_settings', 'pos_price_override', 'pos_discount_override', 'pos_restock'],
+                'page_keys'   => ['pos', 'pos_config_settings', 'pos_price_override', 'pos_discount_override', 'pos_restock', 'pos_past_sales'],
                 // Verified in code: pos.php filters sellable stock through
                 // userCan('warehouse', ...) — POS sells FROM a warehouse.
                 'depends_on'  => ['warehouses'],

@@ -103,7 +103,7 @@ foreach ($shifts as $s) {
                 <?php $sno = 0; foreach ($shifts as $s): $sno++; $diff = (float)$s['cash_difference']; ?>
                 <tr>
                     <td class="text-center"><?= $sno ?></td>
-                    <td><?= caseFormat($s['shift_code']) ?></td>
+                    <td><?= caseFormat($s['shift_code']) ?><?php if (!empty($s['is_past_entry'])): ?> <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle" title="<?= htmlspecialchars(t('Created for sales recorded later for this day. No cash was counted, so the counted cash follows the expected cash.')) ?>"><?= t('Back-dated') ?></span><?php endif; ?></td>
                     <td><?= caseFormat($s['register_name'], '—') ?></td>
                     <?php if ($show_shop): ?><td><?= caseFormat($s['warehouse_name'], '—') ?></td><?php endif; ?>
                     <?php if ($can_view_all): ?><td><?= caseFormat($s['cashier_name']) ?></td><?php endif; ?>
@@ -164,6 +164,7 @@ const T_NO_SHIFTS_FOUND = <?= json_encode(t('No shifts found')) ?>;
 const T_TOTAL_LABEL     = <?= json_encode(t('Total:')) ?>;
 const T_DIFF_LABEL      = <?= json_encode(t('Diff:')) ?>;
 const T_ZREPORT_LABEL   = <?= json_encode(t('Z-Report')) ?>;
+const T_BACKDATED_LABEL = <?= json_encode(t('Back-dated')) ?>;
 const SHOW_SHOP         = <?= $show_shop ? 'true' : 'false' ?>;
 
 function renderShiftCards(rows) {
@@ -172,7 +173,7 @@ function renderShiftCards(rows) {
     let html = '';
     rows.forEach(r => {
         html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
-            <div class="d-flex justify-content-between"><span class="fw-bold">${r.code}</span><span class="badge bg-${r.status === 'active' ? 'success' : 'secondary'}">${r.status}</span></div>
+            <div class="d-flex justify-content-between"><span class="fw-bold">${r.code}${r.backdated ? ' <span class="badge bg-primary-subtle text-primary-emphasis">' + T_BACKDATED_LABEL + '</span>' : ''}</span><span class="badge bg-${r.status === 'active' ? 'success' : 'secondary'}">${r.status}</span></div>
             <small class="text-muted">${r.register ? caseFormatJs(r.register) : '—'}${(SHOW_SHOP && r.warehouse) ? ' · ' + caseFormatJs(r.warehouse) : ''} · ${r.opened}</small>
             <div class="mt-2 small">${T_TOTAL_LABEL} ${r.total} ${r.diff ? '· ' + T_DIFF_LABEL + ' ' + r.diff : ''}</div>
             <a href="${r.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-file-earmark-text"></i> ${T_ZREPORT_LABEL}</a>
@@ -210,6 +211,7 @@ $(document).ready(function () {
             'total' => $currency . ' ' . number_format((float)$s['total_sales'], 2),
             'diff' => $s['status'] === 'closed' ? number_format((float)$s['cash_difference'], 2) : '',
             'shift_id' => (int)$s['shift_id'],
+            'backdated' => !empty($s['is_past_entry']),
         ];
     }, $shifts)) ?>;
     rows.forEach(r => { r.url = zreportBaseUrl + '?shift_id=' + r.shift_id; });

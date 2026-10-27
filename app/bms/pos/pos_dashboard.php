@@ -712,6 +712,14 @@ $company_logo = getSetting('company_logo', '');
 <script>
 const DASH_URL    = '<?= buildUrl('api/pos/get_dashboard.php') ?>';
 const GET_SALES   = '<?= buildUrl('api/pos/get_sales.php') ?>';
+// Record Old Sale — a sale typed in later for an earlier day gets a small badge;
+// hovering it shows when it was entered.
+const T_OLD_SALE  = <?= json_encode(t('Old sale')) ?>;
+const T_ENTERED   = <?= json_encode(t('Entered %s')) ?>;
+function oldSaleBadge(r) {
+    if (!r || !Number(r.is_past_entry)) return '';
+    return ' <span class="badge bg-primary" title="' + safeOutput(T_ENTERED.replace('%s', r.created_at || '')) + '">' + safeOutput(T_OLD_SALE) + '</span>';
+}
 const GET_ITEMS   = '<?= buildUrl('api/pos/get_sale_items.php') ?>';
 const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';
 const RETURN_URL  = '<?= buildUrl('api/pos/create_return.php') ?>';
@@ -921,7 +929,7 @@ function initDashboardTables() {
         responsive: false, pageLength: 8, dom: 'tip', order: [],
         columns: [
             { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
-            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
+            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
             { data: 'party', render: d => caseFormatJs(d) },
             { data: 'grand_total', className: 'text-end fw-bold', render: d => money(d) },
             { data: 'sale_status', render: d => statusBadge(d) }
@@ -995,7 +1003,7 @@ function initHistoryTable() {
         ],
         columns: [
             { data: null,             orderable: false, className: 'text-muted', render: (d,t,r,m) => m.row+1 },
-            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
+            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
             { data: 'sale_date',      render: d => fmt(d) },
             { data: 'party',          render: d => caseFormatJs(d) },
             { data: 'grand_total',    className: 'text-end fw-bold', render: d => money(d) },
@@ -1246,7 +1254,7 @@ function renderCards(rows) {
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between">
-                        <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number)}</div>
+                        <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number) + oldSaleBadge(row)}</div>
                         <div>${statusBadge(row.sale_status)}</div>
                     </div>
                     <small class="text-muted">${caseFormatJs(row.party)} &middot; ${fmt(row.sale_date)}</small>
