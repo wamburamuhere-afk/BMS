@@ -33,7 +33,7 @@ ok(strpos($sp, 'function spPosExcludeSql') !== false && strpos($sp, 'function sp
 $list = $src('api/pos/simple_products.php');
 ok(strpos($list, "\$platformExclude = spPosExcludeSql(\$pdo);") !== false && strpos($list, "WHERE p.status = 'active'\" . \$platformExclude") !== false, 'POS product list hides platform subscriptions');
 $sale = $src('api/pos/process_sale.php');
-$g = strpos($sale, 'spPlatformMappedNames('); $rn = strpos($sale, 'nextReceiptNumber($pdo);');
+$g = strpos($sale, 'spPlatformMappedNames('); $rn = strpos($sale, 'nextReceiptNumber($pdo');
 ok($g !== false && $rn !== false && $g < $rn && $g < strpos($sale, 'INSERT INTO pos_sales'), 'process_sale refuses them before a receipt number or a sale is made');
 foreach (['core/service_plans.php', 'api/pos/simple_products.php', 'api/pos/process_sale.php'] as $f) {
     ok(strpos((string)shell_exec('php -l ' . escapeshellarg("$root/$f") . ' 2>&1'), 'No syntax errors') !== false, "$f lints clean");

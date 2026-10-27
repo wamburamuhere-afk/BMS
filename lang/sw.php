@@ -5751,4 +5751,14 @@ return [
     'Paid for the goods' => 'Gharama ya bidhaa',
     'Your profit' => 'Faida yako',
 
+    // POS Record Old Sale (Rekodi Mauzo ya Zamani), 2026-10-27
+    'Choose the date and time of the sale.' => 'Chagua tarehe na saa ya uzo.',
+    'An old sale cannot have a time that has not happened yet.' => 'Uzo wa zamani hauwezi kuwa na muda ambao bado haujafika.',
+    'This date is more than %d days ago. Pick a closer date, or ask an administrator to change the limit.' => 'Tarehe hii ni zaidi ya siku %d zilizopita. Chagua tarehe ya karibu zaidi, au muombe msimamizi abadilishe kikomo.',
+    'You do not have permission to record old sales.' => 'Huna ruhusa ya kurekodi mauzo ya zamani.',
+    'The account this payment goes into is reconciled for %s to %s (%s). An old sale cannot be added inside that period.' => 'Akaunti inayopokea malipo haya imeshalinganishwa (reconciled) kuanzia %s hadi %s (%s). Uzo wa zamani hauwezi kuongezwa ndani ya kipindi hicho.',
+    'Goes into your shift that is still open (%s). Your current cash balance will go up.' => 'Utaingia kwenye zamu yako ambayo bado iko wazi (%s). Salio lako la fedha la sasa litaongezeka.',
+    'Goes into your closed shift of %s (%s). Its Z-report is updated.' => 'Utaingia kwenye zamu yako iliyofungwa ya %s (%s). Ripoti yake ya Z itasasishwa.',
+    'Goes into your back-dated shift of %s (%s).' => 'Utaingia kwenye zamu yako ya nyuma ya %s (%s).',
+    'You had no shift at that time on %s. A closed back-dated shift will be created.' => 'Hukuwa na zamu muda huo tarehe %s. Zamu ya nyuma iliyofungwa itaundwa.',
 ];

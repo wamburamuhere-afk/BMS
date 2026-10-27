@@ -134,9 +134,15 @@ try {
         $drawer_refund = $sale['payment_method'] === 'cash' ? (float)$sale['grand_total'] : 0.0;
     }
     if ($drawer_refund > 0) {
-        $shiftStmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
-        $shiftStmt->execute([$_SESSION['user_id']]);
-        $active_shift = $shiftStmt->fetchColumn();
+        if (!empty($sale['is_past_entry'])) {
+            // An old sale (typed in later) was never in today's drawer:
+            // reverse it inside its own shift, like it never happened there.
+            $active_shift = (int)$sale['shift_id'];
+        } else {
+            $shiftStmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
+            $shiftStmt->execute([$_SESSION['user_id']]);
+            $active_shift = $shiftStmt->fetchColumn();
+        }
         if ($active_shift) {
             $pdo->prepare("INSERT INTO cash_register_transactions
                               (shift_id, transaction_type, amount, payment_method, reference_number, sale_id, reason, created_by, created_at)
@@ -173,6 +179,16 @@ try {
     reverseLoyaltyForSale($pdo, $sale_id, (int)$_SESSION['user_id']);
 
     $pdo->commit();
+
+    // An old sale sits in a closed shift: refresh that shift's saved Z-report figures.
+    if (!empty($sale['is_past_entry'])) {
+        try {
+            require_once __DIR__ . '/../../core/pos_old_sales.php';
+            posOldSaleRecomputeShift($pdo, (int)$sale['shift_id']);
+        } catch (Throwable $e) {
+            error_log('void_sale old-sale shift recompute: ' . $e->getMessage());
+        }
+    }
 
     logActivity($pdo, $_SESSION['user_id'], "Voided POS Sale #{$sale['receipt_number']} (" . number_format((float)$sale['grand_total'], 2) . ")");
     logAudit($pdo, $_SESSION['user_id'], 'pos_void', [
