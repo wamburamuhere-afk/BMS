@@ -16,10 +16,11 @@ autoEnforcePermission('customer_groups');
 $stmt = $pdo->query("
     SELECT 
         cg.*,
-        COUNT(cgc.customer_id) as customer_count,
+        COUNT(gc.customer_id) as customer_count,
         u.username as created_by_name
     FROM customer_groups cg
     LEFT JOIN customer_group_customers cgc ON cg.group_id = cgc.group_id
+    LEFT JOIN customers gc ON gc.customer_id = cgc.customer_id AND gc.status != 'deleted'
     LEFT JOIN users u ON cg.created_by = u.user_id
     GROUP BY cg.group_id
     ORDER BY cg.created_at DESC
@@ -27,7 +28,7 @@ $stmt = $pdo->query("
 $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch total customers count for statistics
-$total_customers = $pdo->query("SELECT COUNT(*) as total FROM customers")->fetchColumn();
+$total_customers = $pdo->query("SELECT COUNT(*) as total FROM customers WHERE status != 'deleted'")->fetchColumn();
 
 ?>
 

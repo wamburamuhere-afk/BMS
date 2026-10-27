@@ -1087,7 +1087,7 @@ if (!function_exists('tenantOperationalSnapshot')) {
                 'shops'   => $shops,
                 'records' => [
                     'products'  => (int)$tPdo->query("SELECT COUNT(*) FROM products")->fetchColumn(),
-                    'customers' => (int)$tPdo->query("SELECT COUNT(*) FROM customers")->fetchColumn(),
+                    'customers' => (int)$tPdo->query("SELECT COUNT(*) FROM customers WHERE status != 'deleted'")->fetchColumn(),
                     'invoices'  => (int)$tPdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn(),
                 ],
             ];
