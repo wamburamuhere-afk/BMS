@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — fix(pos): receipts show quantity as sold (1, 1.5), not 1.000
+
+**Files:** `helpers.php`, `api/pos/print_receipt.php`, `api/pos/email_receipt.php`, `core/escpos_printer.php`, `tests/test_pos_receipt_qty_format_cli.php` (new)
+
+- **The issue:** POS receipts printed every quantity with three decimals ("1.000", "1.500"), because the quantity column is stored as DECIMAL with 3 places and the receipt printed the raw value. The network thermal printer forced two ("1.00 x").
+- **Fix:** new `format_qty()` in `helpers.php` keeps real decimals and drops trailing zeros: 1 → "1", 1.5 → "1.5", 0.125 → "0.125". Used on the printed receipt (QTY column and the "@ price x qty" line), the emailed receipt and the network thermal printer. Money figures are unchanged.
+- **Test:** new suite, 18 checks: the formatter, all three receipts use it, the real printed receipt for a local sale with lines set to 1 and 1.5 inside a rolled-back transaction shows "1" and "1.5" with no "1.000", and the thermal text shows "1 x" / "1.5 x". Network printer suite (34) still passes.
+
 ## 2026-10-27 — feat(pos): "Actions" sheet on phones, every header action explained
 
 **Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
