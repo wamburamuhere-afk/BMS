@@ -5811,4 +5811,7 @@ return [
     'Entered' => 'Iliingizwa',
     'Entered %s' => 'Iliingizwa %s',
     'Back-dated' => 'Ya nyuma',
+    'Day' => 'Siku',
+    'Scanner ready' => 'Skana iko tayari',
+    'Show shift details and actions' => 'Onyesha taarifa za zamu na vitendo',
 ];

@@ -3429,6 +3429,10 @@ const OLD_SALE_T = {
     exited: <?= json_encode(t("Back to today's sales")) ?>,
     offline: <?= json_encode(t('Recording an old sale needs an internet connection.')) ?>,
     weekdays: <?= json_encode([t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')]) ?>,
+    today: <?= json_encode(t('Today')) ?>,
+    yesterday: <?= json_encode(t('Yesterday')) ?>,
+    daysAgo: <?= json_encode(t('%d days ago')) ?>,
+    maxDays: <?= (int)($old_sale_max_days ?? 30) ?>,
     methods: <?= json_encode($payment_methods + ['split' => t('Split Payment')]) ?>
 };
 const OLD_SALE_CONTEXT_URL = '<?= buildUrl('/api/pos/old_sale_context.php') ?>';
@@ -3468,14 +3472,15 @@ function toggleOldSalePopover() {
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
     $('#oldSaleDate').val(oldSale ? oldSale.at.slice(0, 10) : oldSaleYmd(yesterday));
     $('#oldSaleTime').val(oldSale ? oldSale.at.slice(11, 16) : '12:00');
-    oldSaleMarkQuick();
+    oldSaleRenderPicker();
+    oldSaleShowPicker(false);
     $pop.removeClass('d-none');
     $('#oldSaleBtn, #oldSaleChip .pos-old-sale-chip-open').attr('aria-expanded', 'true');
     if (window.innerWidth < 768 && !$('.pos-old-sale-backdrop').length) {
         $('<div class="pos-old-sale-backdrop"></div>').appendTo('body').on('click', closeOldSalePopover);
     }
     refreshOldSalePreview();
-    $('#oldSaleDate').trigger('focus');
+    $('#oldSaleWhenBtn').trigger('focus');
 }
 
 function closeOldSalePopover() {
@@ -3484,13 +3489,54 @@ function closeOldSalePopover() {
     $('#oldSaleBtn, #oldSaleChip .pos-old-sale-chip-open').attr('aria-expanded', 'false');
 }
 
-function oldSaleMarkQuick() {
-    const chosen = $('#oldSaleDate').val();
-    $('#oldSaleQuick button').each(function () {
-        const d = new Date(); d.setDate(d.getDate() - parseInt($(this).data('days'), 10));
-        $(this).toggleClass('active', oldSaleYmd(d) === chosen);
+// Days back from today for a Y-m-d date (0 = today, 1 = yesterday).
+function oldSaleDaysBack(ymd) {
+    const p = String(ymd).split('-').map(Number), today = new Date();
+    const a = new Date(p[0], p[1] - 1, p[2]), b = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return Math.round((b - a) / 86400000);
+}
+function oldSaleDayName(n) { return n === 0 ? OLD_SALE_T.today : n === 1 ? OLD_SALE_T.yesterday : OLD_SALE_T.daysAgo.replace('%d', n); }
+function oldSaleDayDate(d) { return OLD_SALE_T.weekdays[d.getDay()] + ' ' + oldSalePad(d.getDate()) + '/' + oldSalePad(d.getMonth() + 1); }
+
+// The "When" field text plus the day list (today back to maxDays days ago,
+// as the server allows) and the time list (every 30 minutes; a saved
+// off-grid time is added to the list).
+function oldSaleRenderPicker() {
+    const date = $('#oldSaleDate').val(), time = $('#oldSaleTime').val();
+    let days = '';
+    for (let n = 0; n <= OLD_SALE_T.maxDays; n++) {
+        const d = new Date(); d.setDate(d.getDate() - n);
+        const ymd = oldSaleYmd(d);
+        days += '<li><button type="button" data-date="' + ymd + '" class="' + (ymd === date ? 'active' : '') + '">' +
+            oldSaleEsc(oldSaleDayName(n)) + '<small>' + oldSaleEsc(oldSaleDayDate(d)) + '</small></button></li>';
+    }
+    const slots = [];
+    for (let h = 0; h < 24; h++) { slots.push(oldSalePad(h) + ':00', oldSalePad(h) + ':30'); }
+    if (time && slots.indexOf(time) < 0) { slots.push(time); slots.sort(); }
+    const times = slots.map(function (t) {
+        return '<li><button type="button" data-time="' + t + '" class="' + (t === time ? 'active' : '') + '">' + t + '</button></li>';
+    }).join('');
+    $('#oldSaleDayList').html(days);
+    $('#oldSaleTimeList').html(times);
+
+    const n = date ? oldSaleDaysBack(date) : 0;
+    const p = String(date).split('-').map(Number);
+    $('#oldSaleWhenText').text(date && time
+        ? oldSaleDayName(n) + ', ' + oldSaleDayDate(new Date(p[0], p[1] - 1, p[2])) + ' · ' + time : '');
+}
+
+function oldSaleShowPicker(show) {
+    $('#oldSalePicker').toggleClass('d-none', !show);
+    $('#oldSaleWhenBtn').attr('aria-expanded', show ? 'true' : 'false');
+    if (!show) return;
+    // Bring the chosen day and time into view.
+    $('#oldSalePicker ul').each(function () {
+        const on = $(this).find('button.active').get(0);
+        if (on) this.scrollTop = on.parentNode.offsetTop - this.clientHeight / 2 + on.offsetHeight / 2;
     });
 }
+
+function toggleOldSalePicker() { oldSaleShowPicker($('#oldSalePicker').hasClass('d-none')); }
 
 function refreshOldSalePreview() {
     clearTimeout(oldSalePreviewTimer);
@@ -3541,6 +3587,7 @@ function applyOldSaleUi() {
     const on = !!oldSale;
     $('#oldSaleBtn').toggleClass('d-none', on);
     $('#oldSaleChip').toggleClass('d-none', !on);
+    $('#oldSaleWrap').toggleClass('is-on', on);
     $('#oldSaleChipText').text(on ? oldSaleShortDate(oldSale.at) : '');
     $('#cartHeaderTop').parent().toggleClass('pos-old-sale-head', on);
     $('#cartTitleText, #mobileCartTitleText').text(on ? OLD_SALE_T.title : OLD_SALE_T.current);
@@ -3598,15 +3645,34 @@ function confirmOldSale(paymentData, proceed) {
         });
 }
 
+// Phones: fold/unfold the header bar; the choice is remembered on this device.
+function togglePosHeader(expand) {
+    const $bar = $('#posHeaderBar');
+    if (!$bar.hasClass('pos-hdr-collapsible')) return;
+    if (typeof expand !== 'boolean') expand = $bar.hasClass('pos-hdr-collapsed');
+    $bar.toggleClass('pos-hdr-collapsed', !expand);
+    $('#posHeaderToggle').attr('aria-expanded', expand ? 'true' : 'false');
+    try { localStorage.setItem('posHeaderExpanded', expand ? '1' : '0'); } catch (e) {}
+}
+$(function () {
+    let saved = null;
+    try { saved = localStorage.getItem('posHeaderExpanded'); } catch (e) {}
+    if (saved === '1') togglePosHeader(true);
+});
+
 $(function () {
     if (!$('#oldSaleWrap').length) return;
-    $('#oldSaleQuick').on('click', 'button', function () {
-        const d = new Date(); d.setDate(d.getDate() - parseInt($(this).data('days'), 10));
-        $('#oldSaleDate').val(oldSaleYmd(d));
-        oldSaleMarkQuick();
+    $('#oldSaleDayList').on('click', 'button', function () {
+        $('#oldSaleDate').val($(this).data('date'));
+        oldSaleRenderPicker();
         refreshOldSalePreview();
     });
-    $('#oldSaleDate, #oldSaleTime').on('change input', function () { oldSaleMarkQuick(); refreshOldSalePreview(); });
+    $('#oldSaleTimeList').on('click', 'button', function () {
+        $('#oldSaleTime').val($(this).data('time'));
+        oldSaleRenderPicker();
+        oldSaleShowPicker(false);
+        refreshOldSalePreview();
+    });
     // Close the pop-up on a click outside it, or with Escape.
     $(document).on('mousedown', function (e) {
         if (!$('#oldSalePopover').hasClass('d-none') && !$(e.target).closest('#oldSaleWrap').length && !$(e.target).hasClass('pos-old-sale-backdrop')) {

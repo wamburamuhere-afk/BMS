@@ -50,9 +50,15 @@ section('1. POS screen wiring');
 // ─────────────────────────────────────────────────────────────────────────
 ok(has($pos, "\$can_record_old_sale = canView('pos_past_sales');") && has($pos, '<?php if ($can_record_old_sale): ?>'), 'button only for people with pos_past_sales');
 ok(has($pos, 'id="oldSaleBtn"') && has($pos, "t('Record Old Sale')") && has($pos, "t('Old Sale')"), 'header button: full label on desktop, short on phones');
-ok(has($pos, 'id="oldSaleQuick"') && has($pos, 'data-days="1"') && has($pos, 'id="oldSaleDate"') && has($pos, 'id="oldSaleTime"') && has($pos, 'id="oldSalePreview"'), 'pop-up: quick days, date, time, live preview');
-ok(has($pos, 'min="<?= date(\'Y-m-d\', strtotime("-{$old_sale_max_days} days")) ?>"') && has($pos, 'max="<?= date(\'Y-m-d\') ?>"'), 'date picker limited to the allowed days, never the future');
+ok(has($pos, 'id="oldSaleWhenBtn"') && has($pos, 'id="oldSaleDayList"') && has($pos, 'id="oldSaleTimeList"') && has($pos, 'id="oldSaleDate"') && has($pos, 'id="oldSaleTime"') && has($pos, 'id="oldSalePreview"'), 'pop-up: one "When" field with day + time lists, live preview');
+ok(!has($pos, 'id="oldSaleQuick"') && !has($pos, 'type="date"'), 'no separate quick-day buttons or date input (day asked once)');
+ok(has($js, 'maxDays: <?= (int)($old_sale_max_days ?? 30) ?>') && has($js, 'for (let n = 0; n <= OLD_SALE_T.maxDays; n++)'), 'day list limited to the allowed days (today back to the limit, never a future day)');
 ok(has($pos, 'id="oldSaleChip"') && has($pos, 'exitOldSaleMode()'), 'chip with the chosen time and an exit button');
+ok(has($pos, "<?= \$shift_active ? ' pos-hdr-collapsible pos-hdr-collapsed' : '' ?>") && has($pos, 'id="posHeaderToggle" onclick="togglePosHeader()"'), 'phone header folds only with an open shift (Start Shift always reachable)');
+ok(has($pos, '#posHeaderBar.pos-hdr-collapsed > .d-flex.align-items-center.gap-3 { display: none !important; }'), 'folded state is in the hoisted CSS (no flash on first paint)');
+ok(has($pos, 'flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;'), 'phone action tiles share the width and drop the 85px min-width (never cut off)');
+ok(has($pos, 'class="pos-scan-txt"') && has($pos, '#posHeaderBar #scannerReadyBadge > * { display: none; }'), 'phone scanner badge is a dot, label kept for screen readers');
+ok(has($js, "localStorage.setItem('posHeaderExpanded'") && has($js, "\$('#oldSaleWrap').toggleClass('is-on', on);"), 'fold choice remembered; old-sale chip gets its own row');
 ok(has($pos, '.pos-old-sale-pop {') && has($pos, 'position: fixed; top: auto; left: 0; right: 0; bottom: 0;'), 'pop-up becomes a bottom sheet on phones');
 ok(!preg_match('/pos-old-sale[^{]*\{[^}]*#ffc107/', $pos), 'white and blue only (no yellow)');
 ok(has($js, "if (!oldSale) {\n        Swal.fire({\n            icon: 'warning',\n            title: PT.noActiveShiftTitle") || has($js, "if (!oldSale) {\r\n        Swal.fire({"), 'no "start a shift" stop while recording an old sale');
