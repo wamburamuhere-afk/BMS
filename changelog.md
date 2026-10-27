@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-27 — feat(mobile): price warnings + product/stock/expense parity for the app (mobile API upgrade, Phase 7)
+
+**Files:** `core/price_check.php` (new), `api/mobile/products/create.php`, `api/mobile/products/update.php`, `api/pos/quick_restock.php`, `tests/test_mobile_parity_cli.php` (new)
+
+- **Selling below the buying price, for the app:** the web asks "Is this correct?" in the browser (`assets/js/bms-price-check.js`); the app had nothing. `products/create`, `products/update` (when a price is sent) and `pos/quick_restock` now return a non-blocking `warnings` list — `below_buying_retail`, `below_buying_wholesale`, `wholesale_above_retail`, each with the same translated sentence. The figures are saved as typed, exactly like the web's "Yes, keep it".
+- **Checked and documented (no code change needed):** `products/delete` is refused with **409** while any shop holds stock and keeps every past sale and movement; `expenses/create` takes an optional `warehouse_id` (the shop's profit), like the web form; the dashboard chart's `fill_gaps=1` returns every day; subscription services stay out of the POS (BJP install only).
+- **Test:** 21 checks — the rule itself, then over HTTP: create (saved + warned), update with and without prices, restock (saved + warned), delete refused with stock / allowed at zero with history kept, expense on its shop, chart with all 30 days. Related suites pass; `test_supplier_access_simple_pos_cli` (1) and `test_warehouse_batches_tab_cli` (4) fail the same on develop.
+
 ## 2026-10-27 — fix(mobile): the app follows the company's language mode (mobile API upgrade, Phase 6)
 
 **Files:** `api/mobile/login.php`, `api/mobile/me.php`, `api/mobile/profile/language.php`, `lang/sw.php`, `tests/test_mobile_language_mode_cli.php` (new)
