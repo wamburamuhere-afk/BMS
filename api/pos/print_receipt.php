@@ -308,7 +308,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         <?php foreach ($items as $item): ?>
         <div class="item-row">
             <div class="item-name"><?= caseFormat($item['product_name']) ?></div>
-            <div class="item-qty"><?= $item['quantity'] ?></div>
+            <div class="item-qty"><?= format_qty($item['quantity']) ?></div>
             <div class="item-price"><?= number_format($item['line_total'], 0) ?></div>
         </div>
         <?php if ($receipt_template !== 'slim'): ?>
@@ -326,7 +326,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <?php else: ?>
                 <?= number_format($item['unit_price'], 0) ?>
             <?php endif; ?>
-            x <?= $item['quantity'] ?>
+            x <?= format_qty($item['quantity']) ?>
             <?php if ($receipt_template === 'detailed' && (float)($item['discount_amount'] ?? 0) > 0.009): ?>
                 — <?= t('Discount:') ?> -<?= number_format($item['discount_amount'], 0) ?>
             <?php endif; ?>

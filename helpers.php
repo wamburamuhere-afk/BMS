@@ -558,6 +558,14 @@ if (!function_exists('format_number')) {
     }
 }
 
+if (!function_exists('format_qty')) {
+    /** A quantity as it was entered: 1 → "1", 1.5 → "1.5", 0.125 → "0.125" (never "1.000"). */
+    function format_qty($qty) {
+        $s = number_format((float)$qty, 3);
+        return strpos($s, '.') === false ? $s : rtrim(rtrim($s, '0'), '.');
+    }
+}
+
 if (!function_exists('get_setting')) {
     function get_setting($key, $default = '') {
         global $pdo;
