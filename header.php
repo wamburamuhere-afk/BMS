@@ -1630,6 +1630,20 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         .bms-bnav .bn-item i { font-size: clamp(1.05rem, 3.8vw, 1.3rem); line-height: 1; }
         .bms-bnav .bn-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .bms-bnav .bn-item.active { color: #0d6efd; font-weight: 700; }
+        /* Products tab menu (Receive Stock / New Product / View Products) */
+        .bms-bnav .bn-drop { flex: 1 1 0; min-width: 0; display: flex; }
+        .bms-bnav .bn-drop > .bn-item { width: 100%; }
+        .bms-bnav .bn-drop > .bn-item[aria-expanded="true"] { color: #0d6efd; font-weight: 700; }
+        .bms-bnav .bn-prod-menu { width: 290px; max-width: calc(100vw - 24px); border-radius: 14px; margin-bottom: 10px !important;
+            <?= $__bn_dark ? 'background:#2b3035;' : '' ?> }
+        .bms-bnav .bn-prod-menu .dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 10px; white-space: normal;
+            <?= $__bn_dark ? 'color:#e1e7ec;' : '' ?> }
+        .bms-bnav .bn-prod-menu .dropdown-item strong { display: block; font-size: 0.95rem; }
+        .bms-bnav .bn-prod-menu .dropdown-item small { display: block; color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; line-height: 1.35; }
+        .bms-bnav .bn-prod-menu .bn-pm-main { background: rgba(13, 110, 253, <?= $__bn_dark ? '0.18' : '0.08' ?>); }
+        .bms-bnav .bn-pm-ico { flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; }
+        .bms-bnav .bn-pm-new { background: #fff4d6; color: #8a5a00; }
+        .bms-bnav .bn-pm-list { background: <?= $__bn_dark ? '#3a3f45' : '#f1f3f5' ?>; color: <?= $__bn_dark ? '#e1e7ec' : '#495057' ?>; }
         .bms-sheet { height: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0;
             <?= $__bn_dark ? 'background:#24282d;color:#e1e7ec;' : '' ?> }
         .bms-sheet .list-group-item { display: flex; align-items: center; gap: 10px; padding: 0.8rem 0.25rem; font-size: 0.95rem;
@@ -1679,7 +1693,37 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         <?php if (canView('dashboard')): ?>
         <a class="bn-item<?= $__bn_on('dashboard') ? ' active' : '' ?>" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i><span><?= t('Dashboard') ?></span></a>
         <?php endif; ?>
-        <?php if (canView('products')): ?>
+        <?php
+        // Products opens a small menu above the tab: Receive Stock / New Product /
+        // View Products. Same gates as the dashboard's Add Product menu; with
+        // neither extra permission it stays a plain link to the product list.
+        $__bn_new_product   = canCreate('products');
+        $__bn_receive_stock = canView('pos') && canView('pos_restock');
+        ?>
+        <?php if (canView('products') && ($__bn_new_product || $__bn_receive_stock)): ?>
+        <div class="dropup bn-drop">
+            <button type="button" class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-box"></i><span><?= t('Products') ?></span></button>
+            <ul class="dropdown-menu shadow border-0 p-1 bn-prod-menu">
+                <?php if ($__bn_receive_stock): ?>
+                <li><a class="dropdown-item bn-pm-main" href="<?= getUrl('pos') ?>?restock=1">
+                    <span class="bn-pm-ico bg-primary text-white"><i class="bi bi-box-arrow-in-down"></i></span>
+                    <span><strong><?= t('Receive Stock') ?></strong><small><?= t('Add stock to a product you already have') ?></small></span>
+                </a></li>
+                <?php endif; ?>
+                <?php if ($__bn_new_product): ?>
+                <li><a class="dropdown-item" href="<?= getUrl('product_create') ?>">
+                    <span class="bn-pm-ico bn-pm-new"><i class="bi bi-plus-square"></i></span>
+                    <span><strong><?= t('New Product') ?></strong><small><?= t("Create a product you don't have yet") ?></small></span>
+                </a></li>
+                <?php endif; ?>
+                <li><hr class="dropdown-divider mx-2"></li>
+                <li><a class="dropdown-item" href="<?= getUrl('products') ?>">
+                    <span class="bn-pm-ico bn-pm-list"><i class="bi bi-list-ul"></i></span>
+                    <span><strong><?= t('View Products') ?></strong></span>
+                </a></li>
+            </ul>
+        </div>
+        <?php elseif (canView('products')): ?>
         <a class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" href="<?= getUrl('products') ?>"><i class="bi bi-box"></i><span><?= t('Products') ?></span></a>
         <?php endif; ?>
         <?php if (canView('pos')): ?>

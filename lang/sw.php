@@ -5835,4 +5835,8 @@ return [
     'Choose your warehouse' => 'Chagua ghala lako',
     'Pick a shop above to see its products and stock.' => 'Chagua duka hapo juu kuona bidhaa na stoku yake.',
     'Pick a warehouse above to see its products and stock.' => 'Chagua ghala hapo juu kuona bidhaa na stoku yake.',
+    // Add Product menu (dashboard Quick Links + phone bottom bar Products)
+    'Add stock to a product you already have' => 'Ongeza idadi kwenye bidhaa uliyonayo tayari',
+    "Create a product you don't have yet" => 'Sajili bidhaa usiyokuwa nayo bado',
+    'View Products' => 'Angalia Bidhaa',
 ];
