@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-28 — fix: page size "All" no longer breaks server-side lists (DataTables "Ajax error")
+
+**New:** `dt_page_length()` in `helpers.php`, `tests/test_dt_page_length_cli.php`.
+**Changed:** `ajax/get_users.php`, `api/account/get_expenses.php`, `api/account/get_invoices.php`, `api/account/get_sales_orders.php`, `api/account/get_chart_of_accounts.php`, `api/document/get_compliance_documents.php`, `api/document/get_documents.php`, `api/get_campaigns.php`, `api/get_compliance.php`, `api/get_customers_paged.php`, `api/get_delivery_notes_list.php`, `api/get_documents.php`, `api/get_email_templates.php`, `api/get_employees.php`, `api/get_grns.php`, `api/get_leads.php`, `api/get_notifications.php`, `api/get_pending_signatures.php`, `api/get_purchase_returns.php`, `api/get_signature_history.php`, `api/get_templates.php`, `api/get_user_signatures.php`, `api/operations/get_assets.php`, `api/operations/get_maintenance_logs.php`, `api/operations/get_projects.php`.
+
+- **Cause:** choosing "All" in a list's page-size box sends `length=-1`; these 25 list APIs built `LIMIT 0, -1` (invalid SQL) → HTTP 500 → "DataTables warning: table id=expensesTable - Ajax error" (tn/7). Chart of Accounts caught the error and showed an empty table instead.
+- **Fix:** one helper, `dt_page_length($_GET['length'] ?? null, default)` — missing → the list's own default (10, or 25 for Delivery Notes), a normal size kept, below 1 (-1 = "All") → every row. Each API changes one line to use it; nothing else in the APIs changed.
+- **Already correct, not changed:** Bank Reconciliations, Journals, Audit Logs, Login History, Payroll, Activity Log.
+- **Not changed (reported):** `api/get_campaigns.php`, `api/get_compliance.php`, `api/get_templates.php` put `start` into the SQL without casting it to a number. `tests/test_dt_header_sort_cli.php` already fails 65 of 132 checks on `develop` before this change (identical before / after).
+- **Checked:** all 25 APIs as admin with "All" and with 25 — "All" returns every row (Expenses 47/47, Chart of Accounts 114/114, Notifications 1069/1069…), 25 still pages. `test_dt_page_length_cli` 83 checks.
+
 ## 2026-10-28 — chore: remove `NUL` and debug log from the repo; GRN list stops writing a debug log
 
 **Removed:** `NUL`, `debug_grn_log.txt` (both added by mistake in `de20875e`).

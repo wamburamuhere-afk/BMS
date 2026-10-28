@@ -12,7 +12,7 @@ try {
 
     $draw   = intval($_GET['draw']   ?? 1);
     $start  = intval($_GET['start']  ?? 0);
-    $length = intval($_GET['length'] ?? 10);
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = trim($_GET['search']['value'] ?? '');
     $userId = $_SESSION['user_id'];
 

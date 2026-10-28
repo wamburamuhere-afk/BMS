@@ -23,7 +23,7 @@ try {
     // DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
     $start = isset($_GET['start']) ? intval($_GET['start']) : 0;
-    $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
     $order_column_index = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : 0;
     $order_dir = strtolower((string)($_GET['order'][0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
