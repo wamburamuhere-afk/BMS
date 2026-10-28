@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-28 — fix: Add Product / Products menus did nothing when clicked; Smart POS only
+
+**Changed:** `app/dashboard.php`, `header.php`.
+
+- **Bug (from #2610):** clicking Add Product (dashboard) or Products (phone bottom bar) did nothing. `header.php` closes every open dropdown on any click that is not on a `.dropdown-toggle`; the two new buttons lacked that class, so the click that opened the menu closed it at once. Both buttons now carry `dropdown-toggle` (Bootstrap's caret hidden).
+- **Menu covered:** on the dashboard the open menu sat behind the KPI cards (the Quick Links card is a stacking context) — the card is lifted (`.apm-open`, z 1060) while the menu is open. On the phone the Ask BMS button (z 1040) covered View Products — the bar is lifted to 1041 while the menu is open.
+- **Smart POS only:** the dashboard menu now appears only when `pos_simple_mode` is on. Smart BMS keeps the original plain Add Product link to `product_create` (the bottom bar already exists only in Smart POS).
+- **Checked:** on shop.demo.bjptechnologies.co.tz with the fix applied in the browser — desktop: Add Product opens the menu above the cards; phone width (400 px): Products opens Receive Stock / New Product / View Products above the chat button, the dashboard tile opens its menu; Receive Stock → `/pos?restock=1` opens the Restock form, New Product → `/product_create`, View Products → `/products`. Local render with `pos_simple_mode` 1 vs 0: menu + bottom bar vs the original plain tile and no bar (setting restored).
+
 ## 2026-10-28 — fix: Expenses payee-columns repair now also runs on the root install (bms / demo)
 
 **New:** `migrations/2026_10_28_expenses_payee_columns_legacy_db.php`.
