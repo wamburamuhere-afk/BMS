@@ -4,7 +4,7 @@ require_once __DIR__ . '/../roots.php';
 
 try {
     $draw = $_GET['draw'] ?? 1;
-    $start = $_GET['start'] ?? 0;
+    $start = max(0, (int)($_GET['start'] ?? 0));
     $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = $_GET['search']['value'] ?? '';
     

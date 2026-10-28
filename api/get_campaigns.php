@@ -12,14 +12,14 @@ if (!hasPermission('view_campaigns')) {
 
 try {
     $draw = $_GET['draw'] ?? 1;
-    $start = $_GET['start'] ?? 0;
+    $start = max(0, (int)($_GET['start'] ?? 0));
     $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = $_GET['search']['value'] ?? '';
     
     // Columns
     $columns = ['campaign_name', 'type', 'budget', 'spent', 'start_date', 'status'];
     $order_idx = $_GET['order'][0]['column'] ?? 0;
-    $order_dir = $_GET['order'][0]['dir'] ?? 'asc';
+    $order_dir = strtolower((string)($_GET['order'][0]['dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
     $order_col = $columns[$order_idx] ?? 'start_date';
 
     $query = "SELECT * FROM marketing_campaigns WHERE 1=1";
