@@ -1603,7 +1603,7 @@ function get_progress_color($percentage) {
                         </div>
                         <?php elseif ($ql_new_product || $ql_receive_stock): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= $ql_new_product ? getUrl('product_create') : getUrl('pos') . '?restock=1' ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                            <a href="<?= $ql_new_product ? getUrl('product_create') : getUrl('receive_stock') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
                                 <i class="bi <?= $ql_new_product ? 'bi-plus-circle' : 'bi-box-arrow-in-down' ?> display-6"></i>
                                 <div class="mt-2"><?= $ql_new_product ? t('Add Product') : t('Receive Stock') ?></div>
                             </a>
