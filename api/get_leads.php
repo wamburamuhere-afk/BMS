@@ -18,7 +18,7 @@ try {
     $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
     $order_column_index = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : 0;
-    $order_dir = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'desc';
+    $order_dir = strtolower((string)($_GET['order'][0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
 
     // Filters
     $status = isset($_GET['status']) ? $_GET['status'] : '';

@@ -82,7 +82,7 @@ $_SESSION['user_id'] = (int)$argv[3]; $_SESSION['role_id'] = 1; $_SESSION['is_ad
 $_SERVER['REQUEST_METHOD'] = 'GET';
 $_SERVER['SCRIPT_NAME'] = '/bms/index.php';
 $_SERVER['HTTP_HOST'] = 'localhost';
-parse_str($argv[2] ?? '', $_GET);
+parse_str(base64_decode($argv[2] ?? ''), $_GET);   // base64: Windows escapeshellarg() turns % into spaces
 ob_start(); ob_start();
 include $argv[1];
 while (ob_get_level() > 1) ob_end_flush();
@@ -91,7 +91,7 @@ PHP;
     $tmp = sys_get_temp_dir() . '/bms_dtlen_' . getmypid() . '.php';
     file_put_contents($tmp, $stub);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($tmp) . ' ' . escapeshellarg("$root/$rel") . ' '
-         . escapeshellarg(http_build_query($get)) . ' ' . (int)$uid . ' 2>' . (DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null');
+         . escapeshellarg(base64_encode(http_build_query($get))) . ' ' . (int)$uid . ' 2>' . (DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null');
     $out = (string)shell_exec($cmd);
     @unlink($tmp);
     $p = strpos($out, '{');

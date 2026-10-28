@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-28 — security: list APIs no longer put raw `start` / sort direction into SQL; list API tests work on Windows
+
+**New:** `tests/test_list_sql_input_cli.php`.
+**Changed:** `api/get_campaigns.php`, `api/get_compliance.php`, `api/get_templates.php`, `api/get_leads.php`, `api/document/get_documents.php`, `tests/test_dt_page_length_cli.php`, `tests/test_dt_header_sort_cli.php`.
+
+- **SQL injection closed:** Campaigns, Compliance and Templates put `start` into `LIMIT` as raw request text; Campaigns, Leads and the Document Library put the sort direction into `ORDER BY` as raw text. A request could rewrite the query (proved on the old code: `start=0,1 -- ` cut the list to 1 row; a subquery in the direction ran — `SLEEP(2)` delayed the reply 2 s). Now `start` is cast to a number (never below 0) and the direction is only `ASC` or `DESC`. One line per value; nothing else changed. Swept every API / ajax / app file for the same pattern — no others.
+- **Tests:** the list-API tests passed the request to a child PHP process as a URL-encoded argument; on Windows `escapeshellarg()` turns every `%` into a space, so `order[...]`, `search[...]` and `columns[...]` never arrived. Now passed as base64. `test_dt_header_sort_cli` goes from 65 failures to 3 — header sorting works; the 3 left are the test comparing differently from MySQL (status ENUMs sort in their defined order pending → reviewed → approved…, and MySQL's collation puts `__test` usernames after letters), not bugs.
+- **Checked:** `test_list_sql_input_cli` 25 checks on the fixed code; on the old code 12 fail (injections change the query). `test_dt_page_length_cli` 83 checks. `test_dt_header_sort_cli` 129 / 132 (3 above).
+
 ## 2026-10-28 — fix: page size "All" no longer breaks server-side lists (DataTables "Ajax error")
 
 **New:** `dt_page_length()` in `helpers.php`, `tests/test_dt_page_length_cli.php`.
