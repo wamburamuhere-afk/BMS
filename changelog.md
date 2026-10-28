@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-28 — feat(dashboard): Add Product opens a menu — Receive Stock / New Product (also on the phone Products tab)
+
+**Changed:** `app/dashboard.php`, `header.php`, `lang/sw.php`.
+
+- **Why:** receiving stock for an existing product is the most common job, but it was only reachable inside the POS. Option B ("menu at the button") chosen from a clickable trial of five popup styles.
+- **Dashboard → Quick Links → Add Product:** now opens a small menu at the tile: **Receive Stock** ("Add stock to a product you already have") → the POS Receive Stock form (`pos?restock=1`, the same link the header menu and Products list already use), and **New Product** ("Create a product you don't have yet") → `product_create`. Receive Stock is shown first and highlighted.
+- **Phone bottom bar → Products** (Simple POS): opens the same menu above the tab, plus **View Products** (the product list it used to open directly).
+- **Permissions:** Receive Stock needs `pos` + `pos_restock` (same gate as the Products page's Receive Stock); New Product needs create on `products`. With only one of them the tile stays a plain link to that one; the phone menu lists only what the user may open, View Products always. Users who saw no Add Product / Products before still see none.
+- **Names** follow Square / Lightspeed ("Receive Stock") and the POS's own labels; Swahili uses the existing **Pokea Mzigo** / **Bidhaa Mpya** plus three new lines (descriptions, **Angalia Bidhaa**).
+- **Checked:** dashboard rendered as admin (EN + SW): both menus, links `pos?restock=1` / `product_create` / `products`, Swahili text. Rendered as 5 non-admin users: two with create-products but no receive-stock get a plain Add Product link and a phone menu with New Product + View Products only; three without product access see neither, as before. Not yet clicked in a browser (extension not connected).
+
 ## 2026-10-28 — security: list APIs no longer put raw `start` / sort direction into SQL; list API tests work on Windows
 
 **New:** `tests/test_list_sql_input_cli.php`.
