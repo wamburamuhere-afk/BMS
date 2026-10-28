@@ -74,24 +74,43 @@ elseif ($lat === null && (!$existing || $existing['latitude'] !== null) && !isse
 
 if ($errors) frJson(['success' => false, 'message' => reset($errors), 'errors' => $errors], 422);
 
+// A new visit recorded from "To follow up" closes that follow-up (customer_visit_followups_plan.md
+// D5) — only one the user may change; otherwise the visit is still saved, the follow-up stays open.
+$fromFu = null;
+$fromFuId = !$existing ? (int)($_POST['from_follow_up_id'] ?? 0) : 0;
+if ($fromFuId > 0 && canEdit('field_visits') && ($f = frFuGet($pdo, $fromFuId)) && $f['status'] === 'pending') {
+    $fv = frGetVisit($pdo, (int)$f['visit_id']);
+    if ($fv && frCanTouch($fv)) $fromFu = $f;
+}
+
 $vals = [
     $date, $time !== '' ? $time . ':00' : null, $location, $lat, $lng, $lat === null ? null : $acc,
     $name, $phone, frNormalizePhone($phone), $btype, $btype === 'other' ? $bother : null,
     $flag('gave_business_card'), $flag('gave_trial_link'), $flag('gave_training'),
-    $interest !== '' ? $interest : null, $notes !== '' ? $notes : null, $followUp !== '' ? $followUp : null,
+    $interest !== '' ? $interest : null, $notes !== '' ? $notes : null,
 ];
+$newDue = $followUp !== '' ? $followUp : null;
 
 try {
-    $pdo->beginTransaction();   // the visit and its services are saved together
+    $pdo->beginTransaction();   // the visit, its services and its follow-up are saved together
     if ($existing) {
         $pdo->prepare("UPDATE field_visits SET visit_date = ?, visit_time = ?, location = ?, latitude = ?, longitude = ?, gps_accuracy_m = ?,
                 client_name = ?, client_phone = ?, phone_normalized = ?, business_type = ?, business_other = ?,
-                gave_business_card = ?, gave_trial_link = ?, gave_training = ?, interest = ?, notes = ?, follow_up_date = ?, follow_up_done_at = ?, updated_by = ?
-            WHERE visit_id = ?")->execute(array_merge($vals, [
-            // A changed follow-up date is a new follow-up: its "done" mark is cleared.
-            ($existing['follow_up_date'] ?? null) === ($followUp !== '' ? $followUp : null) ? ($existing['follow_up_done_at'] ?? null) : null,
-            $me, $id]));
+                gave_business_card = ?, gave_trial_link = ?, gave_training = ?, interest = ?, notes = ?, updated_by = ?
+            WHERE visit_id = ?")->execute(array_merge($vals, [$me, $id]));
         if ($servicesSent) frSaveVisitServices($pdo, $id, $services);
+        // "Follow up on" drives the pending follow-up (D4): a new date adds or moves it, a
+        // cleared date cancels it, the same date changes nothing (a done one stays done).
+        frFuLockVisit($pdo, $id);
+        $pending = frFuPending($pdo, $id);
+        if ($pending) {
+            if ($newDue === null)                      frFuCancel($pdo, (int)$pending['follow_up_id'], $me);
+            elseif ($newDue !== $pending['due_date'])  frFuReschedule($pdo, (int)$pending['follow_up_id'], $newDue, null, false, $me);
+        } elseif ($newDue !== null) {
+            $last = frFuLatestDone($pdo, $id);
+            if (!$last || $last['due_date'] !== $newDue) frFuAdd($pdo, $id, $newDue, null, $me);
+        }
+        frSyncVisitFollowUp($pdo, $id);
         $owner = (int)$existing['user_id'];
         frMarkChanged($pdo, $owner, $date);
         if ($existing['visit_date'] !== $date) frMarkChanged($pdo, $owner, $existing['visit_date']);
@@ -101,15 +120,29 @@ try {
     }
     $pdo->prepare("INSERT INTO field_visits (visit_date, visit_time, location, latitude, longitude, gps_accuracy_m,
             client_name, client_phone, phone_normalized, business_type, business_other,
-            gave_business_card, gave_trial_link, gave_training, interest, notes, follow_up_date, user_id, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")->execute(array_merge($vals, [$me, $me]));
+            gave_business_card, gave_trial_link, gave_training, interest, notes, user_id, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")->execute(array_merge($vals, [$me, $me]));
     $newId = (int)$pdo->lastInsertId();
     if ($servicesSent) frSaveVisitServices($pdo, $newId, $services);
+    if ($newDue !== null) frFuAdd($pdo, $newId, $newDue, null, $me);
+    frSyncVisitFollowUp($pdo, $newId);
+    $closed = false;
+    if ($fromFu) {
+        $fromVisitId = (int)$fromFu['visit_id'];
+        frFuLockVisit($pdo, $fromVisitId);
+        $again = frFuGet($pdo, (int)$fromFu['follow_up_id']);   // re-read under the lock: a double tap closes it once
+        if ($again && $again['status'] === 'pending') {
+            frFuComplete($pdo, (int)$fromFu['follow_up_id'], 'visit', null, $me, $newId);
+            frSyncVisitFollowUp($pdo, $fromVisitId);
+            $closed = true;
+        }
+    }
     frMarkChanged($pdo, $me, $date);
     $pdo->commit();
-    logActivity($pdo, $me, 'Add field visit', "Recorded field visit #$newId ($name, $location)");
-    frJson(['success' => true, 'message' => t('Visit saved.'), 'visit_id' => $newId]);
-} catch (PDOException $e) {
+    logActivity($pdo, $me, 'Add field visit', "Recorded field visit #$newId ($name, $location)"
+        . ($closed ? " — follow-up #{$fromFu['follow_up_id']} of visit #{$fromFu['visit_id']} done" : ''));
+    frJson(['success' => true, 'message' => t('Visit saved.'), 'visit_id' => $newId, 'follow_up_closed' => $closed]);
+} catch (PDOException | RuntimeException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('field_reports/save: ' . $e->getMessage());
     frJson(['success' => false, 'message' => t('Server error')], 500);

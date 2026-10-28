@@ -11,11 +11,17 @@ if (!frCanTouch($v)) frJson(['success' => false, 'message' => t('Permission deni
 
 try {
     $me = (int)$_SESSION['user_id'];
+    $pdo->beginTransaction();
     $pdo->prepare("UPDATE field_visits SET status = 'deleted', updated_by = ? WHERE visit_id = ?")->execute([$me, $id]);
+    // A deleted visit has nobody left to follow up: its open follow-up is cancelled.
+    frFuCancelAllPending($pdo, $id, $me);
+    frSyncVisitFollowUp($pdo, $id);
     frMarkChanged($pdo, (int)$v['user_id'], $v['visit_date']);
+    $pdo->commit();
     logActivity($pdo, $me, 'Delete field visit', "Deleted field visit #$id ({$v['client_name']}, {$v['location']})");
     frJson(['success' => true, 'message' => t('Visit deleted.')]);
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('field_reports/delete: ' . $e->getMessage());
     frJson(['success' => false, 'message' => t('Server error')], 500);
 }
