@@ -916,7 +916,7 @@ function initDashboardTables() {
     dtLowStock = $('#lowStockTable').DataTable({
         responsive: false, pageLength: 10, dom: 'tip', order: [[2,'asc']],
         columns: [
-            { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
+            BMSSerial.column({ className: 'text-center text-muted' }),
             { data: 'name', render: d => caseFormatJs(d) },
             { data: 'current', className: 'text-end fw-bold',
               render: (d,t,r) => `<span class="${d<=0?'text-danger':'text-primary'}">${(+d).toLocaleString()}</span>` },
@@ -928,7 +928,7 @@ function initDashboardTables() {
     dtRecent = $('#recentSalesTable').DataTable({
         responsive: false, pageLength: 8, dom: 'tip', order: [],
         columns: [
-            { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
+            BMSSerial.column({ className: 'text-center text-muted' }),
             { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
             { data: 'party', render: d => caseFormatJs(d) },
             { data: 'grand_total', className: 'text-end fw-bold', render: d => money(d) },
@@ -1002,7 +1002,7 @@ function initHistoryTable() {
             }
         ],
         columns: [
-            { data: null,             orderable: false, className: 'text-muted', render: (d,t,r,m) => m.row+1 },
+            BMSSerial.column({ className: 'text-muted' }),
             { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
             { data: 'sale_date',      render: d => fmt(d) },
             { data: 'party',          render: d => caseFormatJs(d) },

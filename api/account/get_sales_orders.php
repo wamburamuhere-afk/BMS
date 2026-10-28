@@ -5,6 +5,22 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../../core/dt_order.php';
+
+// Header sorting; S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'order_number'   => 'so.order_number',
+    'order_date'     => 'so.order_date',
+    'customer_name'  => 'customer_name',
+    'project_name'   => 'project_name',
+    'warehouse_name' => 'warehouse_name',
+    'order_type'     => 'order_type',
+    'total_items'    => 'total_items',
+    'grand_total'    => 'so.grand_total',
+    'display_status' => 'display_status',
+], 'so.order_date DESC, so.created_at DESC, so.sales_order_id DESC',
+   'so.order_date ASC, so.created_at ASC, so.sales_order_id ASC', 'so.sales_order_id');
+
 if (!isAuthenticated()) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -237,7 +253,7 @@ try {
         WHERE $where_sql $scopeSO
         GROUP BY so.sales_order_id
         $having_sql
-        ORDER BY so.order_date DESC, so.created_at DESC
+        ORDER BY $order_sql
         LIMIT ? OFFSET ?
     ";
 

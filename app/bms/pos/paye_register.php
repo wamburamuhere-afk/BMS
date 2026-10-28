@@ -140,7 +140,7 @@ $statusBadge = function ($s) {
         <div class="card-header bg-white py-3 border-bottom d-print-none"><h5 class="mb-0 fw-bold">PAYE by Employee — <?= caseFormat($rangeLabel) ?></h5></div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover align-middle" style="width:100%">
+                <table id="payeTable" class="table table-hover align-middle" style="width:100%">
                     <thead class="table-light">
                         <tr>
                             <th class="ps-3" style="width:60px;"><?= t('S/NO') ?></th>
@@ -162,17 +162,15 @@ $statusBadge = function ($s) {
                             <td class="ps-3"><?= $i++ ?></td>
                             <td><div class="fw-semibold"><?= caseFormat($r['first_name'].' '.$r['last_name']) ?></div><div class="small text-muted">#<?= caseFormat($r['employee_number'] ?: '—') ?></div></td>
                             <td><?= caseFormat($r['department_name'] ?: '—') ?></td>
-                            <td><?= caseFormat(date('M Y', strtotime($r['payroll_period'].'-01'))) ?></td>
-                            <td class="text-end"><?= number_format((float)$r['gross_salary'],0) ?></td>
-                            <td class="text-end text-muted"><?= number_format((float)$r['nssf_employee'],0) ?></td>
-                            <td class="text-end"><?= number_format($taxable,0) ?></td>
-                            <td class="text-end fw-bold" style="color:#052c65;"><?= number_format((float)$r['tax_amount'],0) ?></td>
-                            <td class="text-end"><?= number_format((float)$r['net_salary'],0) ?></td>
+                            <td data-order="<?= htmlspecialchars($r['payroll_period']) ?>"><?= caseFormat(date('M Y', strtotime($r['payroll_period'].'-01'))) ?></td>
+                            <td class="text-end" data-order="<?= (float)$r['gross_salary'] ?>"><?= number_format((float)$r['gross_salary'],0) ?></td>
+                            <td class="text-end text-muted" data-order="<?= (float)$r['nssf_employee'] ?>"><?= number_format((float)$r['nssf_employee'],0) ?></td>
+                            <td class="text-end" data-order="<?= $taxable ?>"><?= number_format($taxable,0) ?></td>
+                            <td class="text-end fw-bold" style="color:#052c65;" data-order="<?= (float)$r['tax_amount'] ?>"><?= number_format((float)$r['tax_amount'],0) ?></td>
+                            <td class="text-end" data-order="<?= (float)$r['net_salary'] ?>"><?= number_format((float)$r['net_salary'],0) ?></td>
                             <td class="text-center"><?= $statusBadge($r['payment_status'] ?? 'pending') ?></td>
                         </tr>
-                    <?php endforeach; else: ?>
-                        <tr><td colspan="10" class="text-center text-muted py-4">No payroll records for this range.</td></tr>
-                    <?php endif; ?>
+                    <?php endforeach; endif; ?>
                     </tbody>
                     <?php if ($rows): ?>
                     <tfoot>
@@ -192,5 +190,17 @@ $statusBadge = function ($s) {
         </div>
     </div>
 </div>
+
+<script>
+// A register: every row stays on one page so Print and the Totals footer cover it all.
+$(function () {
+    $('#payeTable').DataTable({
+        responsive: false, autoWidth: false, paging: false, info: false, order: [],
+        dom: '<"d-print-none"f>rt',
+        columnDefs: [{ type: 'num', targets: [0, 4, 5, 6, 7, 8] }],
+        language: { emptyTable: 'No payroll records for this range.' }
+    });
+});
+</script>
 
 <?php require_once dirname(__DIR__, 3) . '/footer.php'; ?>

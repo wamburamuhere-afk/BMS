@@ -215,7 +215,7 @@ function renderSalesOrdersFull(orders) {
 
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#salesOrdersDT')) $('#salesOrdersDT').DataTable().destroy();
-    $('#salesOrdersDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: [0, 8] }] });
+    $('#salesOrdersDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: 8 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 }
 
 function renderInvoices(invoices) {
@@ -300,7 +300,7 @@ function renderInvoicesFull(invoices) {
 
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#invoicesDT')) $('#invoicesDT').DataTable().destroy();
-    $('#invoicesDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: [0, 9] }] });
+    $('#invoicesDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: 9 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 }
 
 // The Sales-section DataTables are built while their tab is hidden, so their
@@ -571,7 +571,7 @@ function renderVouchersFull(vouchers) {
 
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#projVouchersDT')) $('#projVouchersDT').DataTable().destroy();
-    $('#projVouchersDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: [0, 7] }] });
+    $('#projVouchersDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: 7 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 }
 
 function renderPurchases(purchases) {
@@ -609,7 +609,7 @@ function renderPurchases(purchases) {
     html += '</tbody></table></div>';
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#procPOInnerTable')) $('#procPOInnerTable').DataTable().destroy();
-    $('#procPOInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
+    $('#procPOInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: 7 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 }
 
 function renderPurchasesFull(purchases) {
@@ -650,7 +650,7 @@ function renderPurchasesFull(purchases) {
     html += '</tbody></table></div>';
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#procPOFullInnerTable')) $('#procPOFullInnerTable').DataTable().destroy();
-    $('#procPOFullInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
+    $('#procPOFullInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: 7 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 }
 
 function renderDNs(dns) {
@@ -905,7 +905,7 @@ function renderGRNs(grns) {
     
     $grnList.html(grnHtml);
     if ($.fn.DataTable.isDataTable('#procGRNInnerTable')) $('#procGRNInnerTable').DataTable().destroy();
-    $('#procGRNInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
+    $('#procGRNInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: 7 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 
     if (dnsCount === 0) {
         $dnList.html('<div class="py-5 text-center text-muted"><i class="bi bi-truck-flatbed fs-1 mb-3"></i><p>No delivery notes (DN) found for this project.</p></div>');

@@ -42,6 +42,7 @@ $budget_id_for_action = $budget['budget_id'] ?? null;
 
 if (!$budget) {
     echo "<div class='container mt-5'><div class='alert alert-danger'>Budget not found. <a href='" . getUrl('budget') . "'>Return to list</a></div></div>";
+    includeFooter();
     exit();
 }
 

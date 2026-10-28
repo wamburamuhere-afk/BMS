@@ -460,7 +460,7 @@ $(document).ready(function() {
         serverSide: true, // Enable server-side processing
         processing: true,
         pageLength: 10, // Show 10 entries per page
-        order: [[1, 'desc']],
+        order: [[0, 'asc']],   // S/No = the normal newest-first order
         ajax: {
             // Using absolute .php path as fallback for systems without robust routing
             url: '<?= buildUrl('api/account/get_invoices.php') ?>',
@@ -497,14 +497,7 @@ $(document).ready(function() {
             }
         },
         columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'ps-4 text-center text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            BMSSerial.column({ width: '50px', className: 'ps-4 text-center text-muted small fw-bold' }),
             {
                 data: 'invoice_number',
                 className: 'ps-4',

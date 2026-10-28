@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/dt_order.php';
 
 // Ensure no output before JSON
 ob_clean(); 
@@ -26,6 +27,19 @@ try {
     $start = isset($_GET['start']) ? intval($_GET['start']) : 0;
     $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
     $search_value = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
+    // Header sorting; S/No = the normal A→Z order (core/dt_order.php).
+    $order_sql = dtOrderSql($_GET, [
+        'customer_code'  => 'c.customer_code',
+        'customer_name'  => 'c.customer_name',
+        'contact_person' => 'c.contact_person',
+        'address'        => 'c.address',
+        'category_name'  => 'cc.category_name',
+        'total_orders'   => 'total_orders',
+        'total_invoices' => 'total_invoices',
+        'pending_orders' => 'pending_orders',
+        'total_unpaid'   => 'total_unpaid',
+        'status'         => 'c.status',
+    ], 'c.customer_name ASC, c.customer_id ASC', 'c.customer_name DESC, c.customer_id DESC', 'c.customer_id');
 
     // Base query conditions
     $where_conditions = ["c.status != 'deleted'"];
@@ -131,7 +145,7 @@ try {
             GROUP BY customer_id
         ) inv_stats ON c.customer_id = inv_stats.customer_id
         WHERE $where_sql
-        ORDER BY c.customer_name ASC
+        ORDER BY $order_sql
         LIMIT ? OFFSET ?
     ";
 

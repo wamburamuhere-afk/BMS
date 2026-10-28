@@ -46,22 +46,25 @@ try {
     
     // Order parameters
     $orderColumnIndex = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : 0;
-    $orderDir = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'asc';
+    $orderDir = strtolower((string)($_GET['order'][0]['dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
     
-    // Column mapping for ordering
+    // Column mapping for ordering — page column N shows data index N-1
+    // (column 0 is S/No, assets/js/bms-serial.js), so look up N-1. S/No itself
+    // is the normal by-name order, reversed when descending.
     $columns = [
         0 => 'e.employee_number',
         1 => 'e.first_name',
         2 => 'd.department_name',
         3 => 'des.designation_name',
-        4 => 'e.employment_status',
-        5 => 'attendance_count', // Alias for count
-        6 => 'leaves_count',
-        7 => 'payrolls_count',
-        8 => 'e.created_at'
+        4 => 'pr.project_name',
+        5 => 'e.employment_status',
+        6 => 'total_attendance',
+        7 => 'total_leaves',
+        8 => 'total_payrolls',
+        9 => 'e.hire_date',
     ];
     
-    $sortCol = isset($columns[$orderColumnIndex]) ? $columns[$orderColumnIndex] : 'e.first_name';
+    $sortCol = ($orderColumnIndex > 0 && isset($columns[$orderColumnIndex - 1])) ? $columns[$orderColumnIndex - 1] : 'e.first_name';
     
     // Phase D — project-scope filter (nullable: global employees visible to all assigned users)
     $scopeE = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'e') : '';
@@ -133,7 +136,7 @@ try {
             COALESCE(l.leaves_count, 0) as total_leaves,
             COALESCE(p.payrolls_count, 0) as total_payrolls
         " . $baseFrom . $searchQuery . "
-        ORDER BY $sortCol $orderDir
+        ORDER BY $sortCol $orderDir, e.employee_id $orderDir
         LIMIT :res_limit OFFSET :res_offset
     ";
     

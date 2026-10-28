@@ -26,7 +26,7 @@ try {
     $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
     $search = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
     $order_column_index = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : 0;
-    $order_dir = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'desc';
+    $order_dir = strtolower((string)($_GET['order'][0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
 
     // Filters
     $status = isset($_GET['status']) ? $_GET['status'] : '';
@@ -34,20 +34,28 @@ try {
     $dateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : '';
     $dateTo = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
-    // Columns for ordering
-    $columns = [
-        0 => 'pr.return_number',
-        1 => 'pr.return_date',
-        2 => 's.supplier_name',
-        3 => 'grn.receipt_number',
-        4 => 'total_items', // Calculated column, handling in ORDER BY might be tricky without subquery or view
-        5 => 'total_value', // Calculated column
-        6 => 'pr.reason',
-        7 => 'pr.status',
-        8 => 'pr.purchase_return_id'
+    // Ordering — by the column's DATA name (DataTables sends columns[i][data]),
+    // so hidden columns on a host page never shift the mapping. S/No (no data
+    // name) and anything unknown fall back to the normal newest-first order,
+    // reversed when S/No is sorted descending (assets/js/bms-serial.js).
+    $sortable = [
+        'return_number'  => 'pr.return_number',
+        'return_date'    => 'pr.return_date',
+        'supplier_name'  => 's.supplier_name',
+        'receipt_number' => 'grn.receipt_number',
+        'total_items'    => 'total_items',
+        'total_amount'   => 'total_value',
+        'reason'         => 'pr.reason',
+        'status'         => 'pr.status',
     ];
-    
-    $order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'pr.created_at';
+    $order_data = (string)($_GET['columns'][$order_column_index]['data'] ?? '');
+    if (isset($sortable[$order_data])) {
+        $order_column = $sortable[$order_data] . " $order_dir, pr.purchase_return_id";
+    } else {
+        $normal = $order_dir === 'ASC' ? 'DESC' : 'ASC';   // S/No asc = newest first
+        $order_column = "pr.return_date $normal, pr.purchase_return_id";
+        $order_dir = $normal;
+    }
 
     // Base Query
     $query = "

@@ -2824,7 +2824,8 @@ $(document).ready(function () {
         order: [[2, 'desc']],
         responsive: false,
         columnDefs: [
-            { orderable: false, targets: [0, -1] },
+            { orderable: false, targets: -1 },
+            $.extend({ targets: 0 }, BMSSerial.column()),
         ],
         language: { emptyTable: 'No purchase orders found.' }
     });

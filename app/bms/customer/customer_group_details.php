@@ -3,19 +3,18 @@
 // Start the buffer
 ob_start();
 
-// Include the header
-require_once HEADER_FILE;
-
-// Phase 5a — enforce permission on customer group detail view
+// Phase 5a — enforce permission on customer group detail view (before any output)
 autoEnforcePermission('customer_groups');
+require_once ROOT_DIR . '/core/customer_groups.php';
 
 // Check if group ID is provided
-if (!isset($_GET['id']) || empty($_GET['id'])) {
+$group_id = (int)($_GET['id'] ?? 0);
+if ($group_id <= 0) {
     header('Location: ' . getUrl('customers/groups'));
     exit;
 }
-
-$group_id = $_GET['id'];
+$can_edit   = canEdit('customer_groups');
+$can_delete = canDelete('customer_groups');
 
 // Fetch group data with member count
 $stmt = $pdo->prepare("
@@ -29,7 +28,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN customers gc ON gc.customer_id = cgc.customer_id AND gc.status != 'deleted'
     LEFT JOIN users u ON cg.created_by = u.user_id
     LEFT JOIN users u2 ON cg.updated_by = u2.user_id
-    WHERE cg.group_id = ?
+    WHERE cg.group_id = ? AND cg.status != 'deleted'
     GROUP BY cg.group_id
 ");
 $stmt->execute([$group_id]);
@@ -41,23 +40,26 @@ if (!$group) {
     exit;
 }
 
+// Include the header (after the redirects above)
+require_once HEADER_FILE;
+
 // Fetch group members with customer details
 $stmt = $pdo->prepare("
     SELECT 
         c.customer_id,
-        c.entity_type,
-        c.first_name,
-        c.middle_name,
-        c.last_name,
-        c.company_name,
-        c.phone_number,
-        c.email_address,
+        CASE WHEN LOWER(COALESCE(c.customer_type,'')) IN ('company','business','corporate','organization','organisation') THEN 'company' ELSE 'individual' END AS entity_type,
+        c.customer_name AS first_name,
+        '' AS middle_name,
+        '' AS last_name,
+        COALESCE(NULLIF(c.company_name, ''), c.customer_name) AS company_name,
+        COALESCE(NULLIF(c.phone, ''), c.mobile) AS phone_number,
+        c.email AS email_address,
         c.occupation_business,
         c.created_at,
         cgc.added_at,
         u.username as added_by_name
     FROM customer_group_customers cgc
-    INNER JOIN customers c ON cgc.customer_id = c.customer_id
+    INNER JOIN customers c ON cgc.customer_id = c.customer_id AND c.status != 'deleted'
     LEFT JOIN users u ON cgc.added_by = u.user_id
     WHERE cgc.group_id = ?
     ORDER BY cgc.added_at DESC
@@ -75,6 +77,8 @@ $rules = null;
 if (!empty($group['rules'])) {
     $rules = json_decode($group['rules'], true);
 }
+$rule_field_key   = ($rules['field'] ?? '') === 'entity_type' ? 'customer_type' : (string)($rules['field'] ?? '');
+$rule_field_label = customerGroupRuleFields()[$rule_field_key][0] ?? ucwords(str_replace('_', ' ', $rule_field_key));
 
 
 // Format group type display
@@ -107,9 +111,11 @@ $operator_display = [
                     <a href="<?= getUrl('customers/group_members') ?>?id=<?= $group_id ?>" class="btn btn-primary btn-sm">
                         <i class="bi bi-people"></i> Manage Members
                     </a>
-                    <button type="button" class="btn btn-warning btn-sm" onclick="editGroup(<?= $group_id ?>)">
+                    <?php if ($can_edit): ?>
+                    <a href="<?= getUrl('customers/groups') ?>?edit=<?= $group_id ?>" class="btn btn-warning btn-sm">
                         <i class="bi bi-pencil"></i> Edit Group
-                    </button>
+                    </a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -152,10 +158,12 @@ $operator_display = [
                         <a href="<?= getUrl('customers/group_members') ?>?id=<?= $group_id ?>" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-people"></i> Manage Members
                         </a>
-                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="editGroup(<?= $group_id ?>)">
+                        <?php if ($can_edit): ?>
+                        <a href="<?= getUrl('customers/groups') ?>?edit=<?= $group_id ?>" class="btn btn-outline-warning btn-sm">
                             <i class="bi bi-pencil"></i> Edit Group
-                        </button>
-                        <?php if ($group['group_type'] === 'dynamic' && $rules): ?>
+                        </a>
+                        <?php endif; ?>
+                        <?php if ($group['group_type'] === 'dynamic' && $rules && $can_edit): ?>
                         <button type="button" class="btn btn-outline-info btn-sm" onclick="refreshDynamicGroup(<?= $group_id ?>)">
                             <i class="bi bi-arrow-clockwise"></i> Refresh Members
                         </button>
@@ -163,9 +171,11 @@ $operator_display = [
                         <button type="button" class="btn btn-outline-success btn-sm" onclick="exportGroupMembers(<?= $group_id ?>)">
                             <i class="bi bi-download"></i> Export Members
                         </button>
+                        <?php if ($can_delete): ?>
                         <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmDelete(<?= $group_id ?>)">
                             <i class="bi bi-trash"></i> Delete Group
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -226,7 +236,7 @@ $operator_display = [
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Field') ?></label>
-                            <p class="mb-0 fw-semibold text-capitalize"><?= str_replace('_', ' ', $rules['field']) ?></p>
+                            <p class="mb-0 fw-semibold"><?= htmlspecialchars($rule_field_label) ?></p>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Operator') ?></label>
@@ -239,9 +249,9 @@ $operator_display = [
                     </div>
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-info-circle"></i> This group automatically includes customers where 
-                        <strong><?= $rules['field'] ?></strong> 
-                        <?= $rules['operator'] ?> 
-                        "<strong><?= $rules['value'] ?></strong>"
+                        <strong><?= htmlspecialchars($rule_field_label) ?></strong>
+                        <?= htmlspecialchars(strtolower($operator_display[$rules['operator'] ?? ''] ?? (string)($rules['operator'] ?? ''))) ?>
+                        "<strong><?= htmlspecialchars((string)($rules['value'] ?? '')) ?></strong>"
                     </div>
                 </div>
             </div>
@@ -291,7 +301,7 @@ $operator_display = [
                 <div class="card-header bg-secondary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0"><i class="bi bi-people"></i> Recent Members</h6>
-                        <a href="customer_group_members.php?id=<?= $group_id ?>" class="btn btn-sm btn-light">
+                        <a href="<?= getUrl('customers/group_members') ?>?id=<?= $group_id ?>" class="btn btn-sm btn-light">
                             View All Members
                         </a>
                     </div>
@@ -347,16 +357,16 @@ $operator_display = [
                                         <td><?= caseFormat($member['added_by_name']) ?></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <a href="customer_details.php?id=<?= $member['customer_id'] ?>" 
+                                                <a href="<?= getUrl('customers/details') ?>?id=<?= (int)$member['customer_id'] ?>" 
                                                    class="btn btn-outline-primary" 
                                                    title="View Customer">
                                                     <i class="bi bi-eye"></i>
                                                 </a>
-                                                <?php if ($group['group_type'] === 'static'): ?>
+                                                <?php if ($group['group_type'] === 'static' && $can_edit): ?>
                                                 <button type="button" 
                                                         class="btn btn-outline-danger" 
                                                         title="Remove from Group"
-                                                        onclick="removeMember(<?= $group_id ?>, <?= $member['customer_id'] ?>, '<?= addslashes($customer_name) ?>')">
+                                                        onclick="removeMember(<?= $group_id ?>, <?= (int)$member['customer_id'] ?>, <?= htmlspecialchars(json_encode(html_entity_decode($customer_name, ENT_QUOTES)), ENT_QUOTES) ?>)">
                                                     <i class="bi bi-person-dash"></i>
                                                 </button>
                                                 <?php endif; ?>
@@ -369,7 +379,7 @@ $operator_display = [
                         </div>
                         <?php if ($group['customer_count'] > 10): ?>
                         <div class="text-center mt-3">
-                            <a href="customer_group_members.php?id=<?= $group_id ?>" class="btn btn-sm btn-outline-primary">
+                            <a href="<?= getUrl('customers/group_members') ?>?id=<?= $group_id ?>" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-list-ul"></i> View All <?= $group['customer_count'] ?> Members
                             </a>
                         </div>
@@ -385,7 +395,7 @@ $operator_display = [
                                     This group doesn't have any members yet.
                                 <?php endif; ?>
                             </p>
-                            <a href="customer_group_members.php?id=<?= $group_id ?>" class="btn btn-primary">
+                            <a href="<?= getUrl('customers/group_members') ?>?id=<?= $group_id ?>" class="btn btn-primary">
                                 <i class="bi bi-person-plus"></i> Add Members
                             </a>
                         </div>
@@ -425,32 +435,13 @@ $operator_display = [
     </div>
 </div>
 
-<!-- Include jQuery, Bootstrap JS, and Bootstrap Icons -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-
 <script>
-function editGroup(groupId) {
-    // Load group data and open edit modal
-    $.ajax({
-        url: 'api/get_customer_group.php',
-        type: 'GET',
-        data: { id: groupId },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                // Redirect to edit page or open modal
-                window.location.href = '<?= getUrl('customers/groups') ?>?edit=' + groupId;
-            } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Error loading group data: ' + response.message });
-            }
-        },
-        error: function() {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'Error loading group data. Please try again.' });
-        }
-    });
-}
+const GROUP_URLS = {
+    refresh:   <?= json_encode(buildUrl('api/refresh_dynamic_group.php')) ?>,
+    exportCsv: <?= json_encode(buildUrl('api/export_group_members.php')) ?>,
+    remove:    <?= json_encode(buildUrl('api/remove_group_member.php')) ?>,
+    del:       <?= json_encode(buildUrl('api/delete_customer_group.php')) ?>
+};
 
 function refreshDynamicGroup(groupId) {
     Swal.fire({
@@ -465,7 +456,7 @@ function refreshDynamicGroup(groupId) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: 'api/refresh_dynamic_group.php',
+                url: GROUP_URLS.refresh,
                 type: 'POST',
                 data: { group_id: groupId },
                 dataType: 'json',
@@ -491,7 +482,7 @@ function refreshDynamicGroup(groupId) {
 
 function exportGroupMembers(groupId) {
     // Trigger export
-    window.location.href = 'api/export_group_members.php?group_id=' + groupId;
+    window.location.href = GROUP_URLS.exportCsv + '?group_id=' + encodeURIComponent(groupId);
 }
 
 function removeMember(groupId, customerId, customerName) {
@@ -507,7 +498,7 @@ function removeMember(groupId, customerId, customerName) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: 'api/remove_group_member.php',
+                url: GROUP_URLS.remove,
                 type: 'POST',
                 data: { 
                     group_id: groupId,
@@ -537,7 +528,7 @@ function removeMember(groupId, customerId, customerName) {
 function confirmDelete(groupId) {
     Swal.fire({
         title: 'Delete Group?',
-        text: 'Are you sure you want to delete this customer group? This action cannot be undone.',
+        text: 'Are you sure you want to delete this customer group?',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc3545',
@@ -547,7 +538,7 @@ function confirmDelete(groupId) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: 'api/delete_customer_group.php',
+                url: GROUP_URLS.del,
                 method: 'POST',
                 data: { group_id: groupId },
                 dataType: 'json',

@@ -225,10 +225,8 @@ if (isAdmin()) {
     }
 }
 
-// Audit trail for the System Info tab.
-// NOTE: audit_logs rows for suppliers are currently written without entity_id,
-// so this comes back empty for most suppliers until logAudit() is passed the
-// supplier id at the write sites. The join is correct; the data is the gap.
+// Audit trail for the System Info tab — written by logAudit() at every supplier
+// write site (web + mobile create/update/status/delete, import) with the supplier id.
 $audit_stmt = $pdo->prepare("
     SELECT al.action, al.activity_type, al.description, al.created_at,
            TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS user_name,
@@ -1547,7 +1545,7 @@ global $company_name, $company_logo;
                                         <tr>
                                             <td class="text-muted"><?= $i + 1 ?></td>
                                             <td><?= !empty($a['created_at']) ? date('d M Y H:i', strtotime($a['created_at'])) : '—' ?></td>
-                                            <td><span class="badge bg-light text-dark border"><?= caseFormat($a['action'] ?: $a['activity_type'], '—') ?></span></td>
+                                            <td><span class="badge bg-light text-dark border"><?= caseFormat(str_replace('_', ' ', (string)($a['action'] ?: $a['activity_type'])), '—') ?></span></td>
                                             <td><?= caseFormat($a['user_name'] ?: $a['username'], '—') ?></td>
                                             <td><?= caseFormat($a['description'], '—') ?></td>
                                         </tr>
@@ -1581,7 +1579,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No projects found for this supplier.', zeroRecords: 'No matching projects found.' }
     });
 
@@ -1596,7 +1594,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No purchase orders found.', zeroRecords: 'No matching purchase orders found.' }
     });
 
@@ -1604,7 +1602,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No payment history found.', zeroRecords: 'No matching payments found.' }
     });
 
@@ -1612,7 +1610,7 @@ $(document).ready(function() {
         pageLength: 10,
         responsive: false,
         order: [[1, 'desc']],
-        columnDefs: [{ orderable: false, targets: [0] }],
+        columnDefs: [$.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No audit entries recorded for this supplier yet.', zeroRecords: 'No matching audit entries.' }
     });
 });
@@ -2330,7 +2328,7 @@ function initRiTable() {
     riDt = $('#riTable').DataTable({
         data: [], pageLength: 10, order: [[2, 'desc']], autoWidth: false,
         columns: [
-            { data: null, orderable: false, className: 'text-muted', render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
+            BMSSerial.column({ className: 'text-muted' }),
             { data: 'invoice_ref', render: v => `<span class="fw-bold">${safeOutput(v)}</span>` },
             { data: 'date_raised' },
             { data: 'date_recorded' },

@@ -11,6 +11,8 @@ includeHeader();
 
 // Permission flags
 $can_manage_categories = isAdmin() || canEdit('categories');
+$can_create_categories = canCreate('categories');
+$can_delete_categories = canDelete('categories');
 
 
 // Get categories
@@ -18,8 +20,9 @@ $stmt = $pdo->query("
     SELECT sc.*, u.username as created_by_name, 
            COUNT(s.supplier_id) as supplier_count
     FROM supplier_categories sc
-    LEFT JOIN suppliers s ON sc.category_id = s.category_id
+    LEFT JOIN suppliers s ON sc.category_id = s.category_id AND s.status != 'deleted'
     LEFT JOIN users u ON sc.created_by = u.user_id
+    WHERE sc.status != 'deleted'
     GROUP BY sc.category_id
     ORDER BY sc.category_name ASC
 ");
@@ -36,9 +39,11 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <h2><i class="bi bi-tags"></i> Supplier Categories</h2>
                     <p class="text-muted mb-0">Manage supplier categories for better organization</p>
                 </div>
+                <?php if ($can_create_categories): ?>
                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                     <i class="bi bi-plus-circle"></i> Add Category
                 </button>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -87,11 +92,13 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <small class="text-muted"><?= date('M d, Y', strtotime($category['created_at'])) ?></small>
                                 </td>
                                 <td>
+                                    <?php if ($can_manage_categories || ($can_delete_categories && $category['supplier_count'] == 0)): ?>
                                     <div class="dropdown action-dropdown">
                                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                             <i class="bi bi-gear"></i>
                                         </button>
                                         <ul class="dropdown-menu">
+                                            <?php if ($can_manage_categories): ?>
                                             <li>
                                                 <a class="dropdown-item" href="#" onclick="editCategory(<?= $category['category_id'] ?>)">
                                                     <i class="bi bi-pencil"></i> Edit
@@ -110,8 +117,9 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 </a>
                                             </li>
                                             <?php endif; ?>
-                                            <?php if ($category['supplier_count'] == 0): ?>
-                                            <li><hr class="dropdown-divider"></li>
+                                            <?php endif; ?>
+                                            <?php if ($can_delete_categories && $category['supplier_count'] == 0): ?>
+                                            <?php if ($can_manage_categories): ?><li><hr class="dropdown-divider"></li><?php endif; ?>
                                             <li>
                                                 <a class="dropdown-item text-danger" href="#" onclick="confirmDeleteCategory(<?= $category['category_id'] ?>)">
                                                     <i class="bi bi-trash"></i> Delete
@@ -120,6 +128,7 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <?php endif; ?>
                                         </ul>
                                     </div>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -131,9 +140,11 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <i class="bi bi-tags" style="font-size: 4rem; color: #6c757d;"></i>
                     <h4 class="mt-3 text-muted">No Categories Found</h4>
                     <p class="text-muted">Get started by adding your first category.</p>
+                    <?php if ($can_create_categories): ?>
                     <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                         <i class="bi bi-plus-circle"></i> Add Your First Category
                     </button>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </div>
@@ -252,7 +263,7 @@ $(document).ready(function() {
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
 
         $.ajax({
-            url: 'api/add_supplier_category.php',
+            url: '<?= buildUrl('api/add_supplier_category.php') ?>',
             type: 'POST',
             data: formData,
             dataType: 'json',
@@ -284,7 +295,7 @@ $(document).ready(function() {
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...');
 
         $.ajax({
-            url: 'api/update_supplier_category.php',
+            url: '<?= buildUrl('api/update_supplier_category.php') ?>',
             type: 'POST',
             data: formData,
             dataType: 'json',
@@ -320,11 +331,82 @@ $(document).ready(function() {
     });
 });
 
+// Rows as loaded, so Edit fills its form without another request.
+const SUPPLIER_CATEGORIES = <?= json_encode(array_column(array_map(fn($c) => [
+    'category_id' => (int)$c['category_id'], 'category_name' => $c['category_name'],
+    'description' => $c['description'], 'status' => $c['status'],
+], $categories), null, 'category_id'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
 function editCategory(categoryId) {
-    // Load category data
-    $.ajax({
+    const c = SUPPLIER_CATEGORIES[categoryId];
+    if (!c) return;
+    $('#edit_category_id').val(c.category_id);
+    $('#edit_category_name').val(c.category_name);
+    $('#edit_description').val(c.description || '');
+    $('#edit_status').val(c.status);
+    new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
 }
 
+function updateCategoryStatus(categoryId, status) {
+    const c = SUPPLIER_CATEGORIES[categoryId];
+    const verb = status === 'active' ? 'Activate' : 'Deactivate';
+    Swal.fire({
+        title: verb + ' category?',
+        text: c ? c.category_name : '',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, ' + verb
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/update_supplier_category_status.php') ?>',
+            type: 'POST',
+            data: { category_id: categoryId, status: status },
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Updated', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }); }
+        });
+    });
+}
+
+function confirmDeleteCategory(categoryId) {
+    const c = SUPPLIER_CATEGORIES[categoryId];
+    Swal.fire({
+        title: 'Delete category?',
+        text: (c ? c.category_name + ' — ' : '') + 'This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/delete_supplier_category.php') ?>',
+            type: 'POST',
+            data: { category_id: categoryId },
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }); }
+        });
+    });
+}
+</script>
+
+<style>
 .action-dropdown .btn-sm {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
@@ -339,7 +421,6 @@ function editCategory(categoryId) {
     font-size: 0.75em;
 }
 
-<style>
 .custom-stat-card {
     background-color: #d1e7dd !important;
     border-color: #badbcc !important;
@@ -362,7 +443,6 @@ function editCategory(categoryId) {
 .table thead th {
     background-color: #f8f9fa !important;
 }
-</style>
 </style>
 
 <?php

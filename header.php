@@ -260,6 +260,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <!-- jQuery first — deliberately NOT deferred: page markup contains inline
          <script> blocks that use $ during parsing, which would break. -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- S/No column helper for every DataTable (BMSSerial) — needs only jQuery. -->
+    <script src="<?= getUrl('assets/js/bms-serial.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/bms-serial.js') ?>"></script>
     <!-- Select2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   

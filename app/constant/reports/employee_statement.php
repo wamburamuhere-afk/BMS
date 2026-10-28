@@ -211,24 +211,25 @@ $(function () {
                 $('#sc-closing').text(fmt(res.closing_balance));
                 $('#summaryCards').removeClass('d-none');
 
-                let body = `<tr class="row-opening"><td class="ps-3" colspan="7">Opening Payable as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
-                if (!res.lines.length) {
-                    body += `<tr><td colspan="8" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
-                } else {
-                    res.lines.forEach((l, i) => {
-                        const rowCls = (TYPE_META[l.type] || {}).rowCls || '';
-                        body += `<tr class="${rowCls}">
-                            <td class="ps-3">${i + 1}</td>
-                            <td>${dt(l.date)}</td>
-                            <td>${typeBadge(l.type)}</td>
-                            <td>${esc(l.ref)}</td>
-                            <td>${esc(l.description)}</td>
-                            <td class="text-end">${l.charge ? fmt(l.charge) : ''}</td>
-                            <td class="text-end">${l.payment ? fmt(l.payment) : ''}</td>
-                            <td class="text-end pe-3">${fmt(l.balance)}</td>
-                        </tr>`;
-                    });
-                }
+                // Full-width rows (no colspan) so the table can be a DataTable; the
+                // opening row sorts as S/No 0, i.e. always at the oldest end.
+                let body = `<tr class="row-opening"><td class="ps-3" data-order="0"></td><td></td><td></td><td></td>
+                    <td>Opening Payable as of ${dt(res.date_from)}${res.lines.length ? '' : ' — no transactions in this period.'}</td>
+                    <td></td><td></td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
+                res.lines.forEach((l, i) => {
+                    const rowCls = (TYPE_META[l.type] || {}).rowCls || '';
+                    body += `<tr class="${rowCls}">
+                        <td class="ps-3" data-order="${i + 1}">${i + 1}</td>
+                        <td>${dt(l.date)}</td>
+                        <td>${typeBadge(l.type)}</td>
+                        <td>${esc(l.ref)}</td>
+                        <td>${esc(l.description)}</td>
+                        <td class="text-end">${l.charge ? fmt(l.charge) : ''}</td>
+                        <td class="text-end">${l.payment ? fmt(l.payment) : ''}</td>
+                        <td class="text-end pe-3">${fmt(l.balance)}</td>
+                    </tr>`;
+                });
+                if ($.fn.DataTable.isDataTable('#stmtTable')) $('#stmtTable').DataTable().destroy();
                 $('#stmtTable tbody').html(body);
                 $('#stmtTable tfoot').html(
                     `<tr><td class="ps-3" colspan="5">Totals</td>
@@ -236,6 +237,13 @@ $(function () {
                          <td class="text-end">${fmt(res.totals.payment)}</td>
                          <td class="text-end pe-3">${fmt(res.closing_balance)}</td></tr>`
                 );
+                // A statement: one page (Print covers it all), search, and only S/No
+                // sorts — flipping oldest/newest first; each row keeps its own balance.
+                $('#stmtTable').DataTable({
+                    responsive: false, autoWidth: false, paging: false, info: false, order: [],
+                    dom: '<"d-print-none px-3 pt-2"f>rt',
+                    columnDefs: [{ orderable: false, targets: [1, 2, 3, 4, 5, 6, 7] }, { type: 'num', targets: 0 }]
+                });
 
                 $('#emptyState').hide();
                 $('#statementDoc').show();

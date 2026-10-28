@@ -6,7 +6,9 @@
 // (from the latest posted depreciation_entries, falling back to a live
 // DepreciationService calc), custodian name, condition, and a location filter.
 header('Content-Type: application/json');
+
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/dt_order.php';
 require_once __DIR__ . '/../../core/asset_depreciation_service.php';
 require_once __DIR__ . '/../../core/asset_settings.php';
 
@@ -51,6 +53,25 @@ try {
     $filtered_stmt->execute($params);
     $filtered_records = $filtered_stmt->fetchColumn();
 
+    // Header sorting; S/No = the normal newest-first order (core/dt_order.php).
+    // Book accumulated depreciation / NBV are computed per page, so not sortable.
+    $order_sql = dtOrderSql($_GET, [
+        'asset_name'          => 'a.asset_name',
+        'asset_code'          => 'a.asset_code',
+        'make'                => 'a.make',
+        'category'            => 'a.category',
+        'purchase_date'       => 'a.purchase_date',
+        'capitalization_date' => 'a.capitalization_date',
+        'cost'                => 'a.cost',
+        'useful_life_years'   => 'a.useful_life_years',
+        'depreciation_method' => 'a.depreciation_method',
+        'condition'           => 'a.`condition`',
+        'location'            => 'a.location',
+        'custodian_name'      => 'custodian_name',
+        'status'              => 'a.status',
+        'disposal_date'       => 'a.disposal_date',
+    ], 'a.created_at DESC, a.asset_id DESC', 'a.created_at ASC, a.asset_id ASC', 'a.asset_id');
+
     $data_stmt = $pdo->prepare("
         SELECT a.*,
                TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS custodian_name,
@@ -58,7 +79,7 @@ try {
           FROM assets a
           LEFT JOIN users u ON u.user_id = a.custodian_id
          WHERE $where_clause
-      ORDER BY a.created_at DESC
+      ORDER BY $order_sql
          LIMIT $start, $length
     ");
     $data_stmt->execute($params);

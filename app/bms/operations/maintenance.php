@@ -444,17 +444,11 @@ $(document).ready(function() {
             }
         },
         columns: [
-            { 
-                data: null, 
-                title: 'S/NO', 
-                orderable: false, 
-                searchable: false,
-                render: function (data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                },
+            BMSSerial.column({
+                title: 'S/NO',
                 className: 'ps-4',
                 createdCell: (td) => $(td).attr('data-label', 'S/NO')
-            },
+            }),
             { 
                 data: 'asset_name', 
                 render: (data, t, row) => `<strong>${data}</strong><br><small class="text-muted">${row.asset_code || ''}</small>`,

@@ -234,7 +234,12 @@ $company_vrn = get_setting('company_vrn', '');
                     3 => 'description', 4 => 'ip_address', 5 => 'username'];
         $ocol = isset($_GET['order'][0]['column']) ? (int) $_GET['order'][0]['column'] : 1;
         $odir = (strtolower($_GET['order'][0]['dir'] ?? '') === 'asc') ? 'ASC' : 'DESC';
-        $orderBy = ($dt_cols[$ocol] ?? 'created_at') . ' ' . $odir;
+        if ($ocol === 0) {
+            // S/No = the normal newest-first order, reversed when descending (assets/js/bms-serial.js).
+            $orderBy = 'created_at ' . ($odir === 'DESC' ? 'ASC' : 'DESC') . ', id ' . ($odir === 'DESC' ? 'ASC' : 'DESC');
+        } else {
+            $orderBy = ($dt_cols[$ocol] ?? 'created_at') . ' ' . $odir;
+        }
 
         $dstart  = max(0, (int) ($_GET['start'] ?? 0));
         $dlength = (int) ($_GET['length'] ?? 10);
@@ -1463,7 +1468,7 @@ $(function () {
             }
         },
         columns: [
-            { orderable: false, className: 'text-center', width: '5%'  }, // S/NO
+            BMSSerial.column({ className: 'text-center', width: '5%' }), // S/NO
             { width: '15%' },                                            // Time
             { width: '15%' },                                            // Type
             { width: '35%' },                                            // Description (widest)

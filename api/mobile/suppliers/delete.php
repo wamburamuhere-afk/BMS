@@ -25,6 +25,11 @@ try {
         ->execute([$_SESSION['user_id'], $supplier_id]);
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: deleted supplier #$supplier_id ($name)");
+    logAudit($pdo, $_SESSION['user_id'], 'delete_supplier', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => $supplier_id,
+        'description'   => "Deleted supplier $name from mobile",
+        'new_values'    => ['status' => 'deleted'],
+    ]);
     echo json_encode(['success'=>true,'message'=>'Supplier deleted successfully']);
 } catch (Throwable $e) {
     error_log('mobile/suppliers/delete.php: ' . $e->getMessage());

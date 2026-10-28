@@ -244,6 +244,11 @@ try {
     
     // Log the action using standard helper
     logActivity($pdo, $_SESSION['user_id'], 'Create supplier', "User created a new supplier: $supplier_name (ID $supplier_id)");
+    logAudit($pdo, $_SESSION['user_id'], 'create_supplier', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$supplier_id,
+        'description'   => "Created supplier $supplier_name ($supplier_code)",
+        'new_values'    => ['supplier_name' => $supplier_name, 'supplier_code' => $supplier_code],
+    ]);
     
     header('Content-Type: application/json');
     echo json_encode([

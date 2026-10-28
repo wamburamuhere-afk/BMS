@@ -446,7 +446,7 @@ global $company_name, $company_logo;
 <script>
 $(document).ready(function() {
     // Log page view
-    logReportAction('Viewed Expense Details', 'User viewed expense voucher #<?= str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT) ?> (<?= addslashes($expense['description']) ?>)');
+    logReportAction('Viewed Expense Details', <?= json_encode('User viewed expense voucher #' . str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT) . ' (' . ($expense['description'] ?? '') . ')', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>);
 
     window.printVoucher = function() {
         logReportAction('Printed Expense Voucher', 'User generated a printed report for expense voucher #<?= str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT) ?>');
@@ -471,25 +471,26 @@ $(document).ready(function() {
         const fmtAmt    = amount.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
         const voucherNo = 'PV-<?= str_pad($expense['expense_id'], 5, '0', STR_PAD_LEFT) ?>';
         const date      = '<?= date('d F Y', strtotime($expense['expense_date'])) ?>';
-        const paidTo    = '<?= addslashes(htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? '-')) ?>';
-        const paidType  = '<?= addslashes(htmlspecialchars(($expense['paid_to_type'] ?? '') === 'other' ? ($expense['payee_manual_role'] ?? 'other') : ($expense['paid_to_type'] ?? ''))) ?>';
-        const desc      = '<?= addslashes(htmlspecialchars($expense['description'] ?? '-')) ?>';
-        const expType   = '<?= addslashes(htmlspecialchars($expense['expense_type'] ?? '-')) ?>';
-        const project   = '<?= addslashes(htmlspecialchars($expense['project_name'] ?? '')) ?>';
-        const categories = <?= json_encode($expense['categories'] ?? []) ?>;
-        const items     = <?= !empty($expense['expense_items']) ? $expense['expense_items'] : '[]' ?>;
-        const expAcct   = '<?= addslashes(htmlspecialchars($expense['expense_account_name'] ?? '-')) ?>';
-        const bankAcct  = '<?= addslashes(htmlspecialchars($expense['bank_account_name'] ?? '')) ?>';
-        const refNo     = '<?= addslashes(htmlspecialchars($expense['reference_number'] ?? '')) ?>';
-        const notes     = '<?= addslashes(htmlspecialchars($expense['notes'] ?? '')) ?>';
-        const status    = '<?= addslashes($expense['status']) ?>';
-        const preparedBy= '<?= addslashes(htmlspecialchars($expense['created_by_name'] ?? '-')) ?>';
-        const reviewedBy= '<?= addslashes(htmlspecialchars($expense['reviewed_by_name'] ?? '')) ?>';
-        const approvedBy= '<?= addslashes(htmlspecialchars($expense['approved_by_name'] ?? '')) ?>';
+        const paidTo    = <?= json_encode((string)(htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? '-')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const paidType  = <?= json_encode((string)(htmlspecialchars(($expense['paid_to_type'] ?? '') === 'other' ? ($expense['payee_manual_role'] ?? 'other') : ($expense['paid_to_type'] ?? ''))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const desc      = <?= json_encode((string)(htmlspecialchars($expense['description'] ?? '-')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const expType   = <?= json_encode((string)(htmlspecialchars($expense['expense_type'] ?? '-')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const project   = <?= json_encode((string)(htmlspecialchars($expense['project_name'] ?? '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const categories = <?= json_encode($expense['categories'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        // Stored as JSON text — decode and re-encode so malformed or hostile content can't break out of the script.
+        const items     = <?php $ei = json_decode((string)($expense['expense_items'] ?? ''), true); echo json_encode(is_array($ei) ? $ei : [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+        const expAcct   = <?= json_encode((string)(htmlspecialchars($expense['expense_account_name'] ?? '-')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const bankAcct  = <?= json_encode((string)(htmlspecialchars($expense['bank_account_name'] ?? '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const refNo     = <?= json_encode((string)(htmlspecialchars($expense['reference_number'] ?? '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const notes     = <?= json_encode((string)(htmlspecialchars($expense['notes'] ?? '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const status    = <?= json_encode((string)($expense['status']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const preparedBy= <?= json_encode((string)(htmlspecialchars($expense['created_by_name'] ?? '-')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const reviewedBy= <?= json_encode((string)(htmlspecialchars($expense['reviewed_by_name'] ?? '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const approvedBy= <?= json_encode((string)(htmlspecialchars($expense['approved_by_name'] ?? '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         const logoHtml  = '<?= $_pv_logo_js ?>';
-        const cName     = '<?= addslashes(htmlspecialchars($_c_name)) ?>';
-        const printedBy = '<?= addslashes(htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))) ?>';
-        const printedRole = '<?= addslashes(htmlspecialchars($_SESSION['user_role'] ?? 'User')) ?>';
+        const cName     = <?= json_encode((string)(htmlspecialchars($_c_name)), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const printedBy = <?= json_encode((string)(htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const printedRole = <?= json_encode((string)(htmlspecialchars($_SESSION['user_role'] ?? 'User')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         const now       = new Date();
         const printDate = now.getDate().toString().padStart(2,'0') + ' ' +
             ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()] +
@@ -694,7 +695,7 @@ function deleteExpense() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    logReportAction('Deleted Expense Voucher', 'User deleted expense voucher #<?= $expense_id ?> (<?= addslashes($expense['description']) ?>)');
+                    logReportAction('Deleted Expense Voucher', <?= json_encode('User deleted expense voucher #' . $expense_id . ' (' . ($expense['description'] ?? '') . ')', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>);
                     Swal.fire({
                         title: <?= json_encode(t('Deleted!')) ?>,
                         text: <?= json_encode(t('Expense has been deleted.')) ?>,

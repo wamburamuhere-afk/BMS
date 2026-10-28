@@ -58,11 +58,7 @@
 
     function columns(cfg) {
         var all = [
-            { key: 'sno', col: {
-                data: null, orderable: false, searchable: false, width: '40px',
-                className: 'text-center text-muted small fw-bold',
-                render: function (d, t, r, meta) { return meta.row + meta.settings._iDisplayStart + 1; }
-            }},
+            { key: 'sno', col: BMSSerial.column({ width: '40px', className: 'text-center text-muted small fw-bold' })},
             { key: 'product', col: {
                 data: 'product_name',
                 render: function (d, t, row) {

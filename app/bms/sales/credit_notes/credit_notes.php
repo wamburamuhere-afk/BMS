@@ -263,7 +263,7 @@ $(document).ready(function () {
         dom: 'rtip',
         language: { emptyTable: 'No credit notes found.', zeroRecords: 'No matching credit notes.' },
         columns: [
-            { data: null, orderable: false, render: (d, t, r, meta) => meta.row + 1 },
+            BMSSerial.column(),
             { data: 'number' },
             { data: 'date' },
             { data: 'customer', render: (d, t, r) => t === 'display'
