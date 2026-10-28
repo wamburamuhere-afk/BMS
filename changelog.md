@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-28 — fix(pos): Products window — X instead of Cancel, no row arrows; Receive Stock opens straight to its form
+
+**New:** `app/bms/pos/receive_stock.php` (route `receive_stock`), `app/bms/pos/restock_modal.php`, `app/bms/pos/restock_modal_js.php`, `tests/test_receive_stock_page_cli.php`.
+**Changed:** `header.php`, `app/dashboard.php`, `app/bms/product/products.php`, `core/help_nav.php`, `core/permissions.php`, `roots.php`, `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`; tests `test_pos_restock_batch_dates_cli`, `test_pos_simple_ux_cli`, `test_supplier_access_simple_pos_cli`, `test_support_center_phase3_cli`, `test_text_display_case_refs_cli` (they read the form from its new file / expect the new page).
+
+- **Products window** (phone bottom bar "Products" and the dashboard Add Product tile, Smart POS): the large Cancel button at the bottom is replaced by an **X** at the top right, and the ">" arrow on each row (Receive Stock, New Product, View Products) is removed.
+- **Receive Stock opened the whole POS first** (confirmed): every Receive Stock link went to `pos?restock=1`, so the till, categories, product grid, cart and shift bar loaded before the form appeared, and the user was left on the POS afterwards. Now the links open a **Receive Stock page** that shows only the form, already open (about 0.6 s in the test browser). Saving keeps the form open and empty for the next product; X / Cancel returns to the screen the user came from (the dashboard if none). The Products list's per-product Receive Stock still pre-selects that product and loads its last prices.
+- **Links moved to the page:** the Products window, the Shop menu, the side menu, the dashboard tile, the Products list and the help article's "take me there" link (the help button recognises the new page as Receive Stock).
+- **One form, not two:** the form's markup and script moved out of the POS into `restock_modal.php` + `restock_modal_js.php`, used by both the POS button and the new page. Same fields, permission (`pos` + `pos_restock`), shops, price lookup, price warnings and save as before. Old `pos?restock=1` links still open the form on the POS.
+- **Checked:** browser at phone size — window has the X at the top right, no Cancel, no arrows, 3 rows; X closes it; Receive Stock opens its page with the form open and no POS loaded; a restock saved from the page (stock +3), form cleared for the next one; X goes back to the dashboard; `?product_id` pre-selects; POS button still opens and saves (window closes, product grid reloads); old POS link still works; no JS errors — 16 checks. New test 30 checks (24 of them fail on the old code). 32 related suites before / after: same failures.
+
 ## 2026-10-28 — feat: Add Product opens a centred window (Smart POS), page inactive until a choice
 
 **Changed:** `header.php`, `app/dashboard.php`.

@@ -1177,7 +1177,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                              no products/services/categories (those are accessible via core). -->
                         <?php
                         $__simple_can_restock = canView('pos') && canView('pos_restock');
-                        $__restock_url = getUrl('pos') . '?restock=1'; // POS opens its Receive Stock window
+                        $__restock_url = getUrl('receive_stock'); // the Receive Stock window on its own page
                         ?>
                         <?php if(canView('warehouses') && $__simple_can_restock): ?>
                         <li class="nav-item dropdown">
@@ -1640,11 +1640,11 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         #bmsAddProductModal .apm-item:hover, #bmsAddProductModal .apm-item:focus-visible { background: <?= $__bn_dark ? '#343a40' : '#f4f6f9' ?>; }
         #bmsAddProductModal .apm-item strong { display: block; font-size: 1rem; }
         #bmsAddProductModal .apm-item small { display: block; color: <?= $__bn_dark ? '#aab3bd' : '#6c757d' ?>; line-height: 1.35; }
-        #bmsAddProductModal .apm-item .apm-chev { margin-left: auto; color: #adb5bd; }
         #bmsAddProductModal .apm-ico { flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
         #bmsAddProductModal .apm-new { background: #fff4d6; color: #8a5a00; }
         #bmsAddProductModal .apm-list { background: <?= $__bn_dark ? '#3a3f45' : '#f1f3f5' ?>; color: <?= $__bn_dark ? '#e1e7ec' : '#495057' ?>; }
-        #bmsAddProductModal .modal-footer { border-top: 1px solid <?= $__bn_dark ? '#3a3f45' : '#edf0f2' ?>; }
+        #bmsAddProductModal .apm-head { display: flex; justify-content: flex-end; padding: 10px 12px 0; }
+        #bmsAddProductModal .apm-head .btn-close { <?= $__bn_dark ? 'filter: invert(1);' : '' ?> }
         .bms-sheet { height: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0;
             <?= $__bn_dark ? 'background:#24282d;color:#e1e7ec;' : '' ?> }
         .bms-sheet .list-group-item { display: flex; align-items: center; gap: 10px; padding: 0.8rem 0.25rem; font-size: 0.95rem;
@@ -1724,31 +1724,28 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
     <div class="modal fade d-print-none" id="bmsAddProductModal" tabindex="-1" data-bs-backdrop="static" aria-label="<?= htmlspecialchars(t('Add Product')) ?>" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
-                <div class="modal-body p-2 pt-3">
+                <div class="apm-head">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
+                </div>
+                <div class="modal-body p-2 pt-0">
                     <?php if ($__bn_receive_stock): ?>
-                    <a class="apm-item" href="<?= getUrl('pos') ?>?restock=1">
+                    <a class="apm-item" href="<?= getUrl('receive_stock') ?>">
                         <span class="apm-ico bg-primary text-white"><i class="bi bi-box-arrow-in-down"></i></span>
                         <span><strong><?= t('Receive Stock') ?></strong><small><?= t('Add stock to a product you already have') ?></small></span>
-                        <i class="bi bi-chevron-right apm-chev"></i>
                     </a>
                     <?php endif; ?>
                     <?php if ($__bn_new_product): ?>
                     <a class="apm-item" href="<?= getUrl('product_create') ?>">
                         <span class="apm-ico apm-new"><i class="bi bi-plus-square"></i></span>
                         <span><strong><?= t('New Product') ?></strong><small><?= t("Create a product you don't have yet") ?></small></span>
-                        <i class="bi bi-chevron-right apm-chev"></i>
                     </a>
                     <?php endif; ?>
                     <?php if (canView('products')): ?>
                     <a class="apm-item apm-from-tab" href="<?= getUrl('products') ?>">
                         <span class="apm-ico apm-list"><i class="bi bi-list-ul"></i></span>
                         <span><strong><?= t('View Products') ?></strong></span>
-                        <i class="bi bi-chevron-right apm-chev"></i>
                     </a>
                     <?php endif; ?>
-                </div>
-                <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                 </div>
             </div>
         </div>
@@ -1803,7 +1800,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
                 <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
-                <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? (getUrl('pos') . '?restock=1') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
+                <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? getUrl('receive_stock') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
                 <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Customer Visits') ?></a><?php endif; ?>
             </div>
             <?php endif; ?>
