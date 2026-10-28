@@ -195,17 +195,8 @@ try {
     $stmt->bindValue($param_index++, (int)$length, PDO::PARAM_INT);
     $stmt->bindValue($param_index++, (int)$start, PDO::PARAM_INT);
     
-    // Debug SQL and Params
-    file_put_contents('debug_grn_log.txt', date('Y-m-d H:i:s') . " - SQL: " . $query . "\nParams: " . json_encode($params) . "\n", FILE_APPEND);
-
     $stmt->execute();
     $grns = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Debug Results
-    file_put_contents('debug_grn_log.txt', date('Y-m-d H:i:s') . " - Count: " . count($grns) . "\n", FILE_APPEND);
-    if (count($grns) > 0) {
-        file_put_contents('debug_grn_log.txt', "First Row: " . json_encode($grns[0]) . "\n", FILE_APPEND);
-    }
 
     echo json_encode([
         'success' => true,
