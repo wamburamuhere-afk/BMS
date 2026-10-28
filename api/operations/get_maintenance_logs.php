@@ -2,12 +2,31 @@
 // api/operations/get_maintenance_logs.php
 header('Content-Type: application/json');
 
-// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
-$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
-$sn_d = $sn_rev ? 'ASC' : 'DESC';
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/dt_order.php';
 
 global $pdo;
+
+if (!isAuthenticated()) {
+    http_response_code(401);
+    echo json_encode(["error" => "Unauthorized"]);
+    exit;
+}
+if (!canView('assets')) {   // same key app/bms/operations/maintenance.php enforces
+    http_response_code(403);
+    echo json_encode(["error" => "Permission denied"]);
+    exit;
+}
+
+// Header sorting; S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'asset_name'       => 'a.asset_name',
+    'maintenance_date' => 'm.maintenance_date',
+    'maintenance_type' => 'm.maintenance_type',
+    'performed_by'     => 'm.performed_by',
+    'cost'             => 'm.cost',
+    'status'           => 'm.status',
+], 'm.maintenance_date DESC, m.log_id DESC', 'm.maintenance_date ASC, m.log_id ASC', 'm.log_id');
 
 try {
     $draw = isset($_GET['draw']) ? (int)$_GET['draw'] : 1;
@@ -44,7 +63,7 @@ try {
                            FROM maintenance_logs m 
                            JOIN assets a ON m.asset_id = a.asset_id 
                            WHERE $where_clause 
-                           ORDER BY m.maintenance_date $sn_d, m.log_id $sn_d 
+                           ORDER BY $order_sql 
                            LIMIT $start, $length");
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);

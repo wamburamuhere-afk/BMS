@@ -203,7 +203,7 @@
             processing: true,
             serverSide: true,
             pageLength: cfg.pageLength || 25,
-            order: cfg.order || [[1, 'desc']],
+            order: cfg.order || [[0, 'asc']],   // S/No = the normal newest-first order
             dom: cfg.dom || 'rtp',
             ajax: {
                 url: cfg.apiUrl,

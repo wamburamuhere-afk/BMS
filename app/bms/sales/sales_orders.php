@@ -994,7 +994,7 @@ function initTable() {
                 }
             }
         ],
-        order: [[1, 'desc']],
+        order: [[0, 'asc']],   // S/No = the normal newest-first order
         pageLength: 10,
         language: {
             processing: '<div class="spinner-border text-primary" role="status"><span></span></div>'

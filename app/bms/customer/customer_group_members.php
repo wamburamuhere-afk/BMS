@@ -43,17 +43,15 @@ if (!$group) {
 $stmt = $pdo->prepare("
     SELECT 
         c.customer_id,
-        c.entity_type,
-        c.first_name,
-        c.middle_name,
-        c.last_name,
-        c.company_name,
-        c.phone_number,
-        c.email_address,
+        CASE WHEN LOWER(COALESCE(c.customer_type,'')) IN ('company','business','corporate','organization','organisation') THEN 'company' ELSE 'individual' END AS entity_type,
+        c.customer_name AS first_name,
+        '' AS middle_name,
+        '' AS last_name,
+        COALESCE(NULLIF(c.company_name, ''), c.customer_name) AS company_name,
+        COALESCE(NULLIF(c.phone, ''), c.mobile) AS phone_number,
+        c.email AS email_address,
         c.occupation_business,
-        c.office_business_location,
-        c.level_of_education,
-        c.marital_status,
+        c.address AS office_business_location,
         c.created_at as customer_since,
         cgc.added_at,
         u.username as added_by_name
@@ -72,21 +70,22 @@ if ($group['group_type'] === 'static') {
     $stmt = $pdo->prepare("
         SELECT 
             c.customer_id,
-            c.entity_type,
-            c.first_name,
-            c.middle_name,
-            c.last_name,
-            c.company_name,
-            c.phone_number,
-            c.email_address,
+            CASE WHEN LOWER(COALESCE(c.customer_type,'')) IN ('company','business','corporate','organization','organisation') THEN 'company' ELSE 'individual' END AS entity_type,
+            c.customer_name AS first_name,
+            '' AS middle_name,
+            '' AS last_name,
+            COALESCE(NULLIF(c.company_name, ''), c.customer_name) AS company_name,
+            COALESCE(NULLIF(c.phone, ''), c.mobile) AS phone_number,
+            c.email AS email_address,
             c.occupation_business
         FROM customers c
-        WHERE c.customer_id NOT IN (
+        WHERE c.status != 'deleted'
+          AND c.customer_id NOT IN (
             SELECT customer_id 
             FROM customer_group_customers 
             WHERE group_id = ?
         )
-        ORDER BY c.first_name, c.last_name, c.company_name
+        ORDER BY c.customer_name
     ");
     $stmt->execute([$group_id]);
     $available_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);

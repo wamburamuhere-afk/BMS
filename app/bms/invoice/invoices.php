@@ -460,7 +460,7 @@ $(document).ready(function() {
         serverSide: true, // Enable server-side processing
         processing: true,
         pageLength: 10, // Show 10 entries per page
-        order: [[1, 'desc']],
+        order: [[0, 'asc']],   // S/No = the normal newest-first order
         ajax: {
             // Using absolute .php path as fallback for systems without robust routing
             url: '<?= buildUrl('api/account/get_invoices.php') ?>',

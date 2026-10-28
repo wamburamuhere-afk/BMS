@@ -3,9 +3,18 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 if (!isAuthenticated()) { http_response_code(401); header('Content-Type: application/json'); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 
-// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
-$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
-$sn_d = $sn_rev ? 'ASC' : 'DESC';
+require_once __DIR__ . '/../core/dt_order.php';
+
+// Header sorting; S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'user_id'    => 'u.user_id',
+    'username'   => 'u.username',
+    'full_name'  => "CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))",
+    'email'      => 'u.email',
+    'role_name'  => 'role_name',
+    'is_active'  => 'u.is_active',
+    'last_login' => 'u.last_login',
+], 'u.user_id DESC', 'u.user_id ASC', 'u.user_id');
 if (!isAdmin()) { http_response_code(403); header('Content-Type: application/json'); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../helpers.php';
@@ -62,7 +71,7 @@ try {
             u.role_id,
             COALESCE(r.role_name, u.role, u.user_role) as role_name
         " . $base_query . "
-        ORDER BY u.user_id $sn_d
+        ORDER BY $order_sql
         LIMIT :start, :length
     ";
 

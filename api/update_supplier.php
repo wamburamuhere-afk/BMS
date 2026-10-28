@@ -272,6 +272,24 @@ try {
     }
 
     logActivity($pdo, $_SESSION['user_id'], 'Edit supplier', "User edited supplier: $supplier_name (ID $supplier_id)");
+
+    // Supplier audit trail (System Info tab): only the fields that changed.
+    $after = $pdo->prepare("SELECT * FROM suppliers WHERE supplier_id = ?");
+    $after->execute([$supplier_id]);
+    $after = $after->fetch(PDO::FETCH_ASSOC) ?: [];
+    $old_values = $new_values = [];
+    foreach ($after as $col => $val) {
+        if (in_array($col, ['updated_at', 'updated_by'], true)) continue;
+        if (array_key_exists($col, $existing_supplier) && (string)$existing_supplier[$col] !== (string)$val) {
+            $old_values[$col] = $existing_supplier[$col];
+            $new_values[$col] = $val;
+        }
+    }
+    logAudit($pdo, $_SESSION['user_id'], 'update_supplier', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$supplier_id,
+        'description'   => $new_values ? 'Edited ' . implode(', ', array_keys($new_values)) : 'Saved with no changes',
+        'old_values'    => $old_values, 'new_values' => $new_values,
+    ]);
     
     header('Content-Type: application/json');
     echo json_encode([

@@ -5,13 +5,31 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/warehouse_scope.php';
 header('Content-Type: application/json');
 
-// S/No (column 0) descending = the normal order reversed (assets/js/bms-serial.js).
-$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
+require_once __DIR__ . '/../core/dt_order.php';
 
 if (!isAuthenticated()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+// Same gate as the pages that show this list (delivery_notes.php, supplier DN tab).
+if (!canView('dn') && !canView('grn')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Permission denied']);
+    exit;
+}
+
+// Header sorting by data name (columns can be hidden, so indexes shift);
+// S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'dn_number'      => 'd.dn_number',
+    'dn_type'        => 'd.dn_type',
+    'delivery_date'  => 'd.delivery_date',
+    'supplier_name'  => 'supplier_name',
+    'project_name'   => 'p.project_name',
+    'total_items'    => 'total_items',
+    'warehouse_name' => 'w.warehouse_name',
+    'status'         => 'd.status',
+], 'd.created_at DESC, d.delivery_id DESC', 'd.created_at ASC, d.delivery_id ASC', 'd.delivery_id');
 
 try {
     global $pdo;
@@ -135,7 +153,7 @@ try {
             (SELECT COUNT(*) FROM delivery_items di WHERE di.delivery_id = d.delivery_id) AS total_items
         $join_sql
         WHERE $full_sql
-        ORDER BY d.created_at " . ($sn_rev ? 'ASC' : 'DESC') . ", d.delivery_id " . ($sn_rev ? 'ASC' : 'DESC') . "
+        ORDER BY $order_sql
         LIMIT ? OFFSET ?
     ");
     $idx = 1;

@@ -1188,6 +1188,7 @@ $(document).ready(function() {
                 },
                 {
                     data: null,
+                    name: 'contact_person',
                     render: (data, t, row) => `
                         <div class="small text-muted" style="line-height: 1.1;">
                             ${row.contact_person ? '<span class="text-dark fw-bold">' + caseFormatJs(row.contact_person) + '</span><br>' : ''}
@@ -1233,6 +1234,7 @@ $(document).ready(function() {
                 },
                 {
                     data: null,
+                    name: 'total_unpaid',
                     render: (data, t, row) => `
                         <div class="p-1 px-2 rounded bg-light border border-opacity-10">
                             <div class="d-flex justify-content-between align-items-center gap-3">
@@ -1312,7 +1314,7 @@ $(document).ready(function() {
             ],
             pageLength: 25,
             lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-            order: [[1, 'asc']],
+            order: [[0, 'asc']],   // S/No = the normal A→Z order
             drawCallback: function(settings) {
                 // Update Card View
                 const data = this.api().rows({ page: 'current' }).data();

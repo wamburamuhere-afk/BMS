@@ -20,8 +20,18 @@ global $pdo;
 
 header('Content-Type: application/json');
 
-// S/No (column 0) descending = the normal newest-first order reversed (assets/js/bms-serial.js).
-$sn_d = ((int)($_GET['order'][0]['column'] ?? -1) === 0 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc') ? 'ASC' : 'DESC';
+require_once __DIR__ . '/../../core/dt_order.php';
+
+// Header sorting; S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'entry_date'       => 'je.entry_date',
+    'description'      => 'je.description',
+    'total_debits'     => "(SELECT COALESCE(SUM(s.amount), 0) FROM journal_entry_items s WHERE s.entry_id = je.entry_id AND s.type = 'debit')",
+    'total_credits'    => "(SELECT COALESCE(SUM(s.amount), 0) FROM journal_entry_items s WHERE s.entry_id = je.entry_id AND s.type = 'credit')",
+    'reference_number' => 'je.reference_number',
+    'status'           => 'je.status',
+    'created_by_name'  => 'created_by_name',
+], 'je.entry_date DESC, je.entry_id DESC', 'je.entry_date ASC, je.entry_id ASC', 'je.entry_id');
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['error' => 'Unauthorized']); exit; }
 if (!canView('journals')) { http_response_code(403); echo json_encode(['error' => 'Permission denied']); exit; }
@@ -61,14 +71,14 @@ try {
     $cntStmt->execute($params);
     $recordsFiltered = (int)$cntStmt->fetchColumn();
 
-    // Page of entries (newest first).
+    // Page of entries (newest first unless a header sort is chosen).
     $sql = "SELECT je.entry_id, je.entry_date, je.description, je.notes, je.reference_number,
                    je.status, je.created_at, je.created_by,
                    COALESCE(u.username, CONCAT('User #', je.created_by)) AS created_by_name
               FROM journal_entries je
               LEFT JOIN users u ON u.user_id = je.created_by
              WHERE $whereSql
-             ORDER BY je.entry_date $sn_d, je.entry_id $sn_d
+             ORDER BY $order_sql
              LIMIT $start, $length";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

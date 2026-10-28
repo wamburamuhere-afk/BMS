@@ -48,4 +48,4 @@ if ($template_id > 0) {
 } else {
     echo '<div class="alert alert-danger">Template ID required.</div>';
 }
-?>
+?><?php includeFooter(); ?>

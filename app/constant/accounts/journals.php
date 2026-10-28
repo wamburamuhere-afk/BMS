@@ -458,6 +458,7 @@ function escapeHtml(t) { return $('<div>').text(t).html(); }
 
 <?php
 // Include the modal
+$journal_modal_partial = true;
 include __DIR__ . '/add_journal.php';
 
 // Include the footer

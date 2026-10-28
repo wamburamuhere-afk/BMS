@@ -225,7 +225,7 @@
             responsive: false,
             autoWidth: false,
             pageLength: cfg.pageLength || 10,
-            order: cfg.order || [[2, 'desc']],
+            order: cfg.order || [[0, 'asc']],   // S/No = the normal newest-first order
             columnDefs: [{ className: 'text-center', targets: '_all' }],
             drawCallback: function () {
                 renderCards(cfg, this.api().rows({ page: 'current' }).data());

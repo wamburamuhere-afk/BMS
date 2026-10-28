@@ -935,12 +935,14 @@ $(document).ready(function() {
             },
             {
                 data: 'accum_dep_book',
+                orderable: false,   // computed per page, not sortable server-side
                 className: 'text-end',
                 render: data => `<span class="text-muted">${formatCurrency(data || 0)}</span>`,
                 createdCell: (td) => $(td).attr('data-label', 'Accum. Dep. (Book)')
             },
             {
                 data: 'nbv_book',
+                orderable: false,   // computed per page, not sortable server-side
                 className: 'text-end',
                 render: data => `<strong class="text-primary">${formatCurrency(data || 0)}</strong>`,
                 createdCell: (td) => $(td).attr('data-label', 'NBV (Book)')

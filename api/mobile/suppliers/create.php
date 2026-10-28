@@ -105,6 +105,11 @@ try {
     $supplier_id = (int)$pdo->lastInsertId();
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: created supplier $supplier_name ($supplier_code)");
+    logAudit($pdo, $_SESSION['user_id'], 'create_supplier', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => $supplier_id,
+        'description'   => "Created supplier $supplier_name ($supplier_code) from mobile",
+        'new_values'    => ['supplier_name' => $supplier_name, 'supplier_code' => $supplier_code],
+    ]);
 
     echo json_encode([
         'success'       => true,

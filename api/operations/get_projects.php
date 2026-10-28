@@ -2,12 +2,33 @@
 // api/operations/get_projects.php
 header('Content-Type: application/json');
 
-// S/No (column 1) descending = the normal order reversed (assets/js/bms-serial.js).
-$sn_rev = (int)($_GET['order'][0]['column'] ?? -1) === 1 && strtolower((string)($_GET['order'][0]['dir'] ?? '')) === 'desc';
-$sn_d = $sn_rev ? 'ASC' : 'DESC';
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/dt_order.php';
 
 global $pdo;
+
+if (!isAuthenticated()) {
+    http_response_code(401);
+    echo json_encode(["error" => "Unauthorized"]);
+    exit;
+}
+if (!canView('projects')) {   // same key app/bms/operations/projects.php enforces
+    http_response_code(403);
+    echo json_encode(["error" => "Permission denied"]);
+    exit;
+}
+
+// Header sorting; S/No (column 1) = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'project_name'     => 'p.project_name',
+    'deadline'         => 'p.deadline',
+    'total_revenue'    => 'total_revenue',
+    'total_expense'    => 'total_expense',
+    'budget'           => 'budget',
+    'profit'           => '(total_revenue - total_expense)',
+    'progress_percent' => 'p.progress_percent',
+    'status'           => 'p.status',
+], 'p.start_date DESC, p.project_id DESC', 'p.start_date ASC, p.project_id ASC', 'p.project_id', 1);
 
 if (!projectsModuleActive()) {
     echo json_encode(["draw" => (int)($_GET['draw'] ?? 1), "recordsTotal" => 0, "recordsFiltered" => 0, "data" => [], "stats" => []]);
@@ -70,7 +91,7 @@ try {
             ) as budget
         FROM projects p
         WHERE $where_clause $scopeAliasedP
-        ORDER BY p.start_date $sn_d, p.project_id $sn_d
+        ORDER BY $order_sql
         LIMIT $start, $length
     ");
     $stmt->execute($params);

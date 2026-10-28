@@ -13,9 +13,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View Stock History', 'Viewed stock move
 // Get filter parameters
 $product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 0;
 $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
-$movement_type = isset($_GET['movement_type']) ? $_GET['movement_type'] : '';
-$date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
-$date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
+// Filters come from the URL: accept only known values so nothing else is echoed back.
+$movement_type = (string)($_GET['movement_type'] ?? '');
+if (!in_array($movement_type, ['purchase_in', 'sale_out', 'adjustment_in', 'adjustment_out', 'stock_transfer'], true)) $movement_type = '';
+$date_from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_from'] ?? '')) ? $_GET['date_from'] : '';
+$date_to   = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_to'] ?? '')) ? $_GET['date_to'] : '';
 
 if ($warehouse_id > 0 && !userCan('warehouse', $warehouse_id)) {
     $warehouse_id = 0; // ignore an out-of-scope filter rather than error on a list page
@@ -114,12 +116,12 @@ if ($product_id > 0) {
                 
                 <div class="col-md-2">
                     <label class="form-label small fw-bold"><?= t('From') ?></label>
-                    <input type="date" class="form-control form-control-sm" name="date_from" value="<?= $date_from ?>">
+                    <input type="date" class="form-control form-control-sm" name="date_from" value="<?= htmlspecialchars($date_from) ?>">
                 </div>
                 
                 <div class="col-md-2">
                     <label class="form-label small fw-bold"><?= t('To') ?></label>
-                    <input type="date" class="form-control form-control-sm" name="date_to" value="<?= $date_to ?>">
+                    <input type="date" class="form-control form-control-sm" name="date_to" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
                 
                 <div class="col-md-3 d-flex gap-2">

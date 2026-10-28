@@ -211,6 +211,10 @@ while (($row = fgetcsv($handle)) !== false) {
                     $bank_account, $bank_address, $description, $status,
                     $_SESSION['user_id'], $supplier_name
                 ]);
+                logAudit($pdo, $_SESSION['user_id'], 'update_supplier', [
+                    'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$existing_supplier['supplier_id'],
+                    'description'   => 'Updated by supplier import',
+                ]);
                 $results['successful']++;
             } else {
                 $results['skipped']++;
@@ -224,6 +228,10 @@ while (($row = fgetcsv($handle)) !== false) {
                     $country, $postal_code, $tax_id, $vat_number, $payment_terms,
                     $currency, $bank_name, $bank_account, $bank_address, $description,
                     $status, $supplier_code, $_SESSION['user_id']
+                ]);
+                logAudit($pdo, $_SESSION['user_id'], 'create_supplier', [
+                    'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$pdo->lastInsertId(),
+                    'description'   => "Created supplier $supplier_name ($supplier_code) by import",
                 ]);
                 $results['successful']++;
             } else {
