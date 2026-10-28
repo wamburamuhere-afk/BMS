@@ -3,19 +3,16 @@
 // Start the buffer
 ob_start();
 
-// Include the header
-require_once HEADER_FILE;
-
-// Phase 5a — enforce permission on customer group members view
+// Phase 5a — enforce permission on customer group members view (before any output)
 autoEnforcePermission('customer_groups');
 
 // Check if group ID is provided
-if (!isset($_GET['id']) || empty($_GET['id'])) {
+$group_id = (int)($_GET['id'] ?? 0);
+if ($group_id <= 0) {
     header('Location: ' . getUrl('customers/groups'));
     exit;
 }
-
-$group_id = $_GET['id'];
+$can_edit = canEdit('customer_groups');
 
 // Fetch group data
 $stmt = $pdo->prepare("
@@ -27,7 +24,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN customer_group_customers cgc ON cg.group_id = cgc.group_id
     LEFT JOIN customers gc ON gc.customer_id = cgc.customer_id AND gc.status != 'deleted'
     LEFT JOIN users u ON cg.created_by = u.user_id
-    WHERE cg.group_id = ?
+    WHERE cg.group_id = ? AND cg.status != 'deleted'
     GROUP BY cg.group_id
 ");
 $stmt->execute([$group_id]);
@@ -38,6 +35,9 @@ if (!$group) {
     header('Location: ' . getUrl('customers/groups'));
     exit;
 }
+
+// Include the header (after the redirects above)
+require_once HEADER_FILE;
 
 // Fetch group members with customer details
 $stmt = $pdo->prepare("
@@ -56,7 +56,7 @@ $stmt = $pdo->prepare("
         cgc.added_at,
         u.username as added_by_name
     FROM customer_group_customers cgc
-    INNER JOIN customers c ON cgc.customer_id = c.customer_id
+    INNER JOIN customers c ON cgc.customer_id = c.customer_id AND c.status != 'deleted'
     LEFT JOIN users u ON cgc.added_by = u.user_id
     WHERE cgc.group_id = ?
     ORDER BY cgc.added_at DESC
@@ -66,7 +66,7 @@ $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch available customers not in this group (for static groups)
 $available_customers = [];
-if ($group['group_type'] === 'static') {
+if ($group['group_type'] === 'static' && $can_edit) {
     $stmt = $pdo->prepare("
         SELECT 
             c.customer_id,
@@ -122,7 +122,7 @@ function formatCustomerName($customer) {
                     <a href="<?= getUrl('customers/group_details') ?>?id=<?= $group_id ?>" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-arrow-left"></i> Back to Group
                     </a>
-                    <?php if ($group['group_type'] === 'static'): ?>
+                    <?php if ($group['group_type'] === 'static' && $can_edit): ?>
                     <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addMembersModal">
                         <i class="bi bi-person-plus"></i> Add Members
                     </button>
@@ -194,7 +194,7 @@ function formatCustomerName($customer) {
                 </h5>
                 <div class="d-flex">
                     <input type="text" id="searchMembers" class="form-control form-control-sm me-2" placeholder="Search members..." style="width: 200px;">
-                    <?php if ($group['group_type'] === 'dynamic'): ?>
+                    <?php if ($group['group_type'] === 'dynamic' && $can_edit): ?>
                     <button type="button" class="btn btn-sm btn-light me-2" onclick="refreshDynamicGroup()">
                         <i class="bi bi-arrow-clockwise"></i> Refresh
                     </button>
@@ -210,6 +210,7 @@ function formatCustomerName($customer) {
                     <table id="membersTable" class="table table-striped table-hover">
                         <thead>
                             <tr>
+                                <th style="width:50px;">S/NO</th>
                                 <th>Customer</th>
                                 <th>Contact Information</th>
                                 <th>Occupation/Business</th>
@@ -224,6 +225,7 @@ function formatCustomerName($customer) {
                                 $customer_name = formatCustomerName($member);
                             ?>
                             <tr>
+                                <td></td>
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="me-3">
@@ -284,11 +286,11 @@ function formatCustomerName($customer) {
                                            title="View Customer Details">
                                             <i class="bi bi-eye"></i>
                                         </a>
-                                        <?php if ($group['group_type'] === 'static'): ?>
+                                        <?php if ($group['group_type'] === 'static' && $can_edit): ?>
                                         <button type="button" 
                                                 class="btn btn-outline-danger" 
                                                 title="Remove from Group"
-                                                onclick="removeMember(<?= $member['customer_id'] ?>, '<?= addslashes($customer_name) ?>')">
+                                                onclick="removeMember(<?= (int)$member['customer_id'] ?>, <?= htmlspecialchars(json_encode(html_entity_decode($customer_name, ENT_QUOTES)), ENT_QUOTES) ?>)">
                                             <i class="bi bi-person-dash"></i>
                                         </button>
                                         <?php endif; ?>
@@ -310,7 +312,7 @@ function formatCustomerName($customer) {
                             This group doesn't have any members yet.
                         <?php endif; ?>
                     </p>
-                    <?php if ($group['group_type'] === 'static' && count($available_customers) > 0): ?>
+                    <?php if ($group['group_type'] === 'static' && $can_edit && count($available_customers) > 0): ?>
                     <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addMembersModal">
                         <i class="bi bi-person-plus"></i> Add Members
                     </button>
@@ -324,7 +326,7 @@ function formatCustomerName($customer) {
 </div>
 
 <!-- Add Members Modal (for static groups) -->
-<?php if ($group['group_type'] === 'static'): ?>
+<?php if ($group['group_type'] === 'static' && $can_edit): ?>
 <div class="modal fade" id="addMembersModal" tabindex="-1" aria-labelledby="addMembersModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -368,7 +370,7 @@ function formatCustomerName($customer) {
                                     ?>
                                     <tr class="customer-row">
                                         <td>
-                                            <input type="checkbox" name="customer_ids[]" value="<?= $customer['customer_id'] ?>" class="customer-checkbox">
+                                            <input type="checkbox" name="customer_ids[]" value="<?= (int)$customer['customer_id'] ?>" class="customer-checkbox">
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
@@ -418,14 +420,19 @@ function formatCustomerName($customer) {
 </div>
 <?php endif; ?>
 
-<!-- Include jQuery, Bootstrap JS, and Bootstrap Icons -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-
 <script>
+const GROUP_URLS = {
+    add:     <?= json_encode(buildUrl('api/add_group_members.php')) ?>,
+    remove:  <?= json_encode(buildUrl('api/remove_group_member.php')) ?>,
+    refresh: <?= json_encode(buildUrl('api/refresh_dynamic_group.php')) ?>
+};
+const EXPORT_TITLE = <?= json_encode('Group_Members_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $group['group_name']) . '_') ?> + new Date().toISOString().slice(0,10);
+
 $(document).ready(function() {
     // Initialize DataTable for members
     $('#membersTable').DataTable({
+        order: [[0, 'asc']],
+        columnDefs: [$.extend({ targets: 0 }, BMSSerial.column()), { targets: -1, orderable: false }],
         language: {
             search: "Search members:",
             lengthMenu: "Show _MENU_ members per page",
@@ -449,13 +456,15 @@ $(document).ready(function() {
                 extend: 'excelHtml5',
                 text: '<i class="bi bi-file-excel"></i> Excel',
                 titleAttr: 'Export to Excel',
-                title: 'Group_Members_<?= caseFormat($group['group_name']) ?>_' + new Date().toISOString().slice(0,10)
+                exportOptions: { columns: ':not(:last-child)' },
+                title: EXPORT_TITLE
             },
             {
                 extend: 'csvHtml5',
                 text: '<i class="bi bi-file-text"></i> CSV',
                 titleAttr: 'Export to CSV',
-                title: 'Group_Members_<?= caseFormat($group['group_name']) ?>_' + new Date().toISOString().slice(0,10)
+                exportOptions: { columns: ':not(:last-child)' },
+                title: EXPORT_TITLE
             }
         ]
     });
@@ -495,18 +504,18 @@ $(document).ready(function() {
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...');
 
         $.ajax({
-            url: 'api/add_group_members.php',
+            url: GROUP_URLS.add,
             type: 'POST',
             data: formData,
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    $('#add-members-message').html('<div class="alert alert-success">' + response.message + '</div>');
+                    $('#add-members-message').empty().append($('<div class="alert alert-success"></div>').text(response.message));
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    $('#add-members-message').html('<div class="alert alert-danger">' + response.message + '</div>');
+                    $('#add-members-message').empty().append($('<div class="alert alert-danger"></div>').text(response.message));
                     submitBtn.prop('disabled', false).html('<i class="bi bi-person-plus"></i> Add Selected Members');
                 }
             },
@@ -550,7 +559,7 @@ function removeMember(customerId, customerName) {
     }
 
     $.ajax({
-        url: 'api/remove_group_member.php',
+        url: GROUP_URLS.remove,
         type: 'POST',
         data: { 
             group_id: <?= $group_id ?>,
@@ -577,7 +586,7 @@ function refreshDynamicGroup() {
     }
 
     $.ajax({
-        url: 'api/refresh_dynamic_group.php',
+        url: GROUP_URLS.refresh,
         type: 'POST',
         data: { group_id: <?= $group_id ?> },
         dataType: 'json',
