@@ -41,6 +41,21 @@ try {
     foreach ($custVisits as $cv) $byId[(int)$cv['visit_id']] = $cv;
     $followUps = array_map(fn($f) => frFollowUpOut($f, $today, $canEdit && isset($byId[(int)$f['visit_id']]) && frCanTouch($byId[(int)$f['visit_id']])),
         frFollowUpsForVisits($pdo, array_keys($byId)));
+    // Re-open is offered only where followup_done.php allows it: the visit's last finished
+    // follow-up, and only while that visit has none open.
+    $lastDone = []; $hasPending = [];
+    foreach ($followUps as $f) {
+        if ($f['status'] === 'pending') $hasPending[$f['visit_id']] = true;
+        if ($f['status'] === 'done') {
+            $cur = $lastDone[$f['visit_id']] ?? null;
+            if (!$cur || [$f['done_at'], $f['follow_up_id']] > [$cur['done_at'], $cur['follow_up_id']]) $lastDone[$f['visit_id']] = $f;
+        }
+    }
+    foreach ($followUps as &$f) {
+        $f['can_reopen'] = $f['can_reopen'] && empty($hasPending[$f['visit_id']])
+            && ($lastDone[$f['visit_id']]['follow_up_id'] ?? 0) === $f['follow_up_id'];
+    }
+    unset($f);
 
     $pending = frFuPending($pdo, $id);
     $interest = frInterestLabels();

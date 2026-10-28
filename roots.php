@@ -548,6 +548,7 @@ $routes = [
     // Field Reports (marketing) module — 2026-10-03
     'field_reports'       => BMS_DIR . '/field_reports/field_visits.php',
     'field_reports/print' => BMS_DIR . '/field_reports/field_report_print.php',
+    'field_reports/details' => BMS_DIR . '/field_reports/field_visit_details.php',
 
     // ========================================================================
     // SALES MODULE

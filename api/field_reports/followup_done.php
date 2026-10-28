@@ -59,10 +59,16 @@ try {
         $pdo->rollBack();
         frJson(['success' => false, 'message' => t('This visit already has an open follow-up.')], 422);
     }
-    $target = $fu ? frFuGet($pdo, (int)$fu['follow_up_id']) : frFuLatestDone($pdo, $id);
-    if (!$target || $target['status'] !== 'done') {
+    // Only the visit's last finished follow-up — re-opening an older one would put it
+    // "open" ahead of the history that came after it.
+    $target = frFuLatestDone($pdo, $id);
+    if (!$target) {
         $pdo->rollBack();
         frJson(['success' => false, 'message' => t('There is no finished follow-up to re-open.')], 422);
+    }
+    if ($fu && (int)$fu['follow_up_id'] !== (int)$target['follow_up_id']) {
+        $pdo->rollBack();
+        frJson(['success' => false, 'message' => t('Only the last finished follow-up can be re-opened.')], 422);
     }
     frFuReopen($pdo, (int)$target['follow_up_id'], $me);
     frSyncVisitFollowUp($pdo, $id);
