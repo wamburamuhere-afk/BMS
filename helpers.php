@@ -742,3 +742,17 @@ if (!function_exists('format_bytes')) {
     }
 }
 
+/**
+ * DataTables page size for a server-side list. "All" sends -1, which would
+ * build LIMIT x, -1 (invalid SQL) — any value below 1 means every row.
+ */
+if (!function_exists('dt_page_length')) {
+    function dt_page_length($length, $default = 10) {
+        if ($length === null || $length === '') {
+            return (int)$default;
+        }
+        $n = (int)$length;
+        return $n < 1 ? 1000000000 : $n;
+    }
+}
+

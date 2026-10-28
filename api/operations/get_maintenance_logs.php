@@ -31,7 +31,7 @@ $order_sql = dtOrderSql($_GET, [
 try {
     $draw = isset($_GET['draw']) ? (int)$_GET['draw'] : 1;
     $start = isset($_GET['start']) ? (int)$_GET['start'] : 0;
-    $length = isset($_GET['length']) ? (int)$_GET['length'] : 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     
     $status = $_GET['status'] ?? '';
     $search_term = $_GET['search_term'] ?? '';

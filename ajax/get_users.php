@@ -25,7 +25,7 @@ try {
     // 1. Parameters
     $draw = $_GET['draw'] ?? 1;
     $start = $_GET['start'] ?? 0;
-    $length = $_GET['length'] ?? 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search_value = $_GET['search']['value'] ?? '';
 
     // 2. Base Query
