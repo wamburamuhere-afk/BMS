@@ -5918,4 +5918,6 @@ return [
     // Notification Rules — targets resolved per record (customer_visit_followups_plan.md D8)
     'The person who recorded it' => 'Aliyeirekodi',
     'All admins' => 'Wasimamizi wote',
+    'Worked out for each record when the alert goes out — e.g. the staff member who recorded that customer visit. Everyone gets only their own.' => 'Hupatikana kwa kila kumbukumbu taarifa inapotumwa — mfano mfanyakazi aliyerekodi ziara hiyo ya mteja. Kila mtu anapata zake tu.',
+    'Plus the person who recorded each record — a different person each time, so not listed here.' => 'Pamoja na aliyerekodi kila kumbukumbu — ni mtu tofauti kila mara, kwa hiyo hawaonyeshwi hapa.',
 ];

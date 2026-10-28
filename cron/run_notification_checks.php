@@ -26,7 +26,7 @@ if (!function_exists('run_notification_checks')) {
     function run_notification_checks(PDO $pdo): array
     {
         $isCli = (php_sapi_name() === 'cli');
-        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0, 'pos_credit_due' => 0];
+        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0, 'pos_credit_due' => 0, 'field_visit_follow_up' => 0];
 
         // ── Invoice overdue ────────────────────────────────────────────────
         try {
@@ -360,6 +360,62 @@ if (!function_exists('run_notification_checks')) {
             }
         } catch (Throwable $e) {
             error_log('run_notification_checks pos_credit due: ' . $e->getMessage());
+        }
+
+        // ── Customer visit follow-ups (customer_visit_followups_plan.md D7/D9) ──
+        // 2 days before, 1 day before, on the day, and once the day after a pending
+        // follow-up — each stage once per follow-up (the due date is part of the dedupe
+        // key, so a moved date starts again). Not for joined clients or deleted visits.
+        // To the staff member who recorded the visit (and whoever set the follow-up) plus
+        // admins, through the event's rules; private to them — an admin only when the
+        // admin may open that visit (its day was submitted), like the visits page itself.
+        try {
+            if (!function_exists('tenantFeatureEnabled') || tenantFeatureEnabled('field_reports')) {
+                $fuRows = $pdo->query("
+                    SELECT f.follow_up_id, f.due_date, f.purpose, f.created_by, DATEDIFF(f.due_date, CURDATE()) AS days_left,
+                           v.visit_id, v.user_id, v.visit_date, v.client_name, v.client_phone, v.location,
+                           u.first_name, u.last_name, u.username,
+                           EXISTS (SELECT 1 FROM field_report_days d WHERE d.user_id = v.user_id AND d.report_date = v.visit_date) AS day_submitted
+                      FROM field_visit_follow_ups f
+                      JOIN field_visits v ON v.visit_id = f.visit_id
+                      LEFT JOIN users u ON u.user_id = v.user_id
+                     WHERE f.status = 'pending' AND v.status = 'active' AND v.joined = 0
+                       AND f.due_date BETWEEN DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+                ")->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($fuRows as $f) {
+                    $d = (int)$f['days_left'];
+                    $dueOn = date('d M Y', strtotime($f['due_date']));
+                    $staff = trim(($f['first_name'] ?? '') . ' ' . ($f['last_name'] ?? '')) ?: (string)($f['username'] ?? '');
+                    $who   = $f['client_name'] . ((string)$f['client_phone'] !== '' ? ' (' . $f['client_phone'] . ')' : '');
+                    [$title, $when] = [
+                        2  => ['Follow-up in 2 days: ',  "is due in 2 days ($dueOn)"],
+                        1  => ['Follow-up tomorrow: ',   "is due tomorrow ($dueOn)"],
+                        0  => ['Follow-up today: ',      "is due today ($dueOn)"],
+                        -1 => ['Follow-up missed: ',     "was due yesterday ($dueOn) and is not marked done"],
+                    ][$d];
+                    $message = "The follow-up with {$who} at {$f['location']} {$when}."
+                             . ((string)$f['purpose'] !== '' ? " Reason: {$f['purpose']}." : '')
+                             . " Visit recorded by {$staff} on " . date('d M Y', strtotime($f['visit_date'])) . '.';
+
+                    $res = dispatchEvent($pdo, 'field_visit.follow_up_due', [
+                        'entity_type'       => 'field_visit_follow_up',
+                        'entity_id'         => (int)$f['follow_up_id'],
+                        'title'             => $title . $f['client_name'],
+                        'message'           => $message,
+                        'action_url'        => 'field_reports/details?id=' . (int)$f['visit_id'],
+                        'severity'          => $d <= 0 ? 'high' : 'medium',
+                        'dedupe_suffix'     => $f['due_date'] . '|d' . $d,
+                        'owner_user_ids'    => array_values(array_unique(array_filter([(int)$f['user_id'], (int)$f['created_by']]))),
+                        'private_to_owners' => true,
+                        'admins_may_see'    => (bool)$f['day_submitted'],
+                    ]);
+                    if (!empty($res['dispatched'])) $sum['field_visit_follow_up'] += (int)$res['created'] + (int)$res['emailed'];
+                }
+                if ($isCli) echo "  field_visit.follow_up_due: scanned " . count($fuRows) . " follow-up(s).\n";
+            }
+        } catch (Throwable $e) {
+            error_log('run_notification_checks field_visit.follow_up_due: ' . $e->getMessage());
         }
 
         return $sum;
