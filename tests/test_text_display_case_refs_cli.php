@@ -144,7 +144,7 @@ if ($uid) {
 section('Batch B — POS screen (grid, cart, credit aging, customer display, receipt)');
 
 $touchedB = [
-    'app/bms/pos/pos_scripts_new.php', 'app/bms/pos/pos_modals_new.php',
+    'app/bms/pos/pos_scripts_new.php', 'app/bms/pos/pos_modals_new.php', 'app/bms/pos/restock_modal.php',
     'assets/js/pos-credit-aging.js', 'app/bms/pos/customer_display.php',
     'app/bms/pos/price_groups.php', 'api/pos/print_receipt.php',
 ];
@@ -173,7 +173,7 @@ has(src($root, 'app/bms/pos/pos_scripts_new.php'), "'<span><strong>' + caseForma
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'product_name:      product.product_name,', 'POS scanAddToCart: raw product_name preserved as the cart-line snapshot (never case-transformed at storage time)');
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'product_name: currentProduct.product_name,', 'POS addToCart: raw product_name preserved as the cart-line snapshot (never case-transformed at storage time)');
 
-has(src($root, 'app/bms/pos/pos_modals_new.php'), 'caseFormat($_sup[\'supplier_name\'])', 'POS restock-modal supplier dropdown uses caseFormat()');
+has(src($root, 'app/bms/pos/restock_modal.php'), 'caseFormat($_sup[\'supplier_name\'])', 'POS restock-modal supplier dropdown uses caseFormat()');
 
 has(src($root, 'assets/js/pos-credit-aging.js'), "window.caseFormatJs(d) : '-'", 'Credit-aging table column: customer name uses caseFormatJs()');
 has(src($root, 'assets/js/pos-credit-aging.js'), 'window.caseFormatJs(row.customer_name) : \'-\'', 'Credit-aging mobile card: customer name uses caseFormatJs()');
