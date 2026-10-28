@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-28 — feat: Add Product opens a centred window (Smart POS), page inactive until a choice
+
+**Changed:** `header.php`, `app/dashboard.php`.
+
+- **Why:** the small menu opened at the edge of the screen (top right on desktop); the owner wants it in the centre with the rest of the page inactive until a choice is made (design 2 of a clickable trial, without its title, "Most used" badge or highlight).
+- **What:** one Bootstrap modal `#bmsAddProductModal` (centred, `data-bs-backdrop="static"` — a click outside does nothing; Cancel or Esc closes) in the Smart POS block of `header.php`: **Receive Stock** → `pos?restock=1`, **New Product** → `product_create`, and **View Products** → `products` only when opened from the phone's Products tab. Same icons, colours, wording and permissions as the menu it replaces; no heading.
+- **Opened by:** the dashboard's Add Product tile (Smart POS, both permissions) and the phone bottom bar's Products tab. The dropdown markup, its z-index workarounds and their scripts are removed.
+- **Smart BMS unchanged:** no modal; the dashboard keeps the original plain Add Product link.
+- **Checked:** the rendered modal, CSS and buttons placed into the live shop.demo dashboard in the browser — desktop: Add Product opens the window centred over a dimmed page, Receive Stock / New Product only, a click outside and on the cards behind does nothing, Cancel closes it cleanly (no backdrop left), Receive Stock opens `/pos?restock=1` with the Restock form open; phone width (400 px): Products opens it with View Products as well, bar and chat button dimmed behind it, outside tap ignored, View Products → `/products`. Local render: Smart POS EN + SW (Pokea Mzigo) has the modal; Smart BMS has no modal and the plain tile (setting restored).
+
 ## 2026-10-28 — fix: Add Product / Products menus did nothing when clicked; Smart POS only
 
 **Changed:** `app/dashboard.php`, `header.php`.
