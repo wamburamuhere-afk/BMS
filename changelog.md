@@ -11,6 +11,14 @@
 - **Names** follow Square / Lightspeed ("Receive Stock") and the POS's own labels; Swahili uses the existing **Pokea Mzigo** / **Bidhaa Mpya** plus three new lines (descriptions, **Angalia Bidhaa**).
 - **Checked:** dashboard rendered as admin (EN + SW): both menus, links `pos?restock=1` / `product_create` / `products`, Swahili text. Rendered as 5 non-admin users: two with create-products but no receive-stock get a plain Add Product link and a phone menu with New Product + View Products only; three without product access see neither, as before. Not yet clicked in a browser (extension not connected).
 
+## 2026-10-28 — fix: Expenses list "Ajax error" on databases missing the payee columns
+
+**New:** `migrations/tenant/2026_10_28_expenses_payee_columns.php`, `tests/test_expenses_payee_columns_migration_cli.php`.
+
+- **Cause:** `api/account/get_expenses.php` selects `expenses.paid_to_type`, `paid_to_id`, `payee_manual_role` and `payee_manual_name`. `paid_to_type` / `paid_to_id` were only ever added by a hand-run one-off (`scripts/legacy/migrate_expenses_paid_to.php`) — no migration created them — so a database that never ran it (demo.bjptechnologies.co.tz) fails the list query → HTTP 500 → "DataTables warning: table id=expensesTable - Ajax error". `2026_09_15_expenses_simple_pos.php` could not repair it: it skips a missing `paid_to_type` and adds `payee_manual_role` `AFTER paid_to_id`, which errors.
+- **Fix:** new tenant migration adds whichever of the four columns are missing (no `AFTER`, so no dependency on another optional column) and widens a legacy `paid_to_type ENUM('supplier','staff')` to include `sub_contractor` and `other`. Idempotent; existing data kept. No app code changed.
+- **Checked:** `test_expenses_payee_columns_migration_cli` 17 checks — a scratch DB without the columns reproduces the failing SELECT; the real migration (run through `tenant_migration_bootstrap.php` like the runner) adds them, a second run is a no-op, a legacy-enum table is widened with its rows intact, and the real `api/get_expenses.php` returns valid DataTables JSON.
+
 ## 2026-10-28 — security: list APIs no longer put raw `start` / sort direction into SQL; list API tests work on Windows
 
 **New:** `tests/test_list_sql_input_cli.php`.
