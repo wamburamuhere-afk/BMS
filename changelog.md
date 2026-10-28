@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-28 — chore: remove `NUL` and debug log from the repo; GRN list stops writing a debug log
+
+**Removed:** `NUL`, `debug_grn_log.txt` (both added by mistake in `de20875e`).
+**Changed:** `api/get_grns.php`, `.gitignore`.
+
+- **`NUL`** (empty file) made `develop` / `main` impossible to check out or pull on Windows (`error: invalid path 'NUL'`) — removed.
+- **`debug_grn_log.txt`** (176 KB of GRN SQL + rows from a local run) removed from the repo; root `debug_grn_log.txt` added to `.gitignore` next to `api/debug_grn_log.txt`.
+- **`api/get_grns.php`:** leftover debug code wrote the full SQL, parameters and the first GRN row to `debug_grn_log.txt` on every GRN list load (on the server: `api/debug_grn_log.txt`, growing forever) — the three `file_put_contents` calls removed. No other change to the endpoint.
+- **After deploy:** delete `api/debug_grn_log.txt` on the live server(s).
+
 ## 2026-10-28 — feat(customers): Customer Groups work end to end; CSV supplier import uses company codes
 
 **New:** `core/customer_groups.php`, `api/create_customer_group.php`, `api/update_customer_group.php`, `api/get_customer_group.php`, `api/delete_customer_group.php`, `api/add_group_members.php`, `api/remove_group_member.php`, `api/refresh_dynamic_group.php`, `api/export_group_members.php`, `migrations/tenant/2026_10_28_customer_groups_soft_delete.php` + `migrations/2026_10_28_customer_groups_soft_delete_legacy_db.php`, `tests/test_customer_groups_cli.php`.
