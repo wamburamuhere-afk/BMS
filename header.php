@@ -1633,6 +1633,11 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         /* Products tab menu (Receive Stock / New Product / View Products) */
         .bms-bnav .bn-drop { flex: 1 1 0; min-width: 0; display: flex; }
         .bms-bnav .bn-drop > .bn-item { width: 100%; }
+        /* .dropdown-toggle keeps the menu open (header.php closes menus on any click
+           not on a .dropdown-toggle); Bootstrap's caret hidden. */
+        .bms-bnav .bn-drop > .bn-item.dropdown-toggle::after { display: none; }
+        /* While the menu is open the bar sits above the Ask BMS button (z 1040). */
+        .bms-bnav.bn-menu-open { z-index: 1041; }
         .bms-bnav .bn-drop > .bn-item[aria-expanded="true"] { color: #0d6efd; font-weight: 700; }
         .bms-bnav .bn-prod-menu { width: 290px; max-width: calc(100vw - 24px); border-radius: 14px; margin-bottom: 10px !important;
             <?= $__bn_dark ? 'background:#2b3035;' : '' ?> }
@@ -1702,7 +1707,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         ?>
         <?php if (canView('products') && ($__bn_new_product || $__bn_receive_stock)): ?>
         <div class="dropup bn-drop">
-            <button type="button" class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-box"></i><span><?= t('Products') ?></span></button>
+            <button type="button" class="bn-item dropdown-toggle<?= $__bn_on('products') ? ' active' : '' ?>" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-box"></i><span><?= t('Products') ?></span></button>
             <ul class="dropdown-menu shadow border-0 p-1 bn-prod-menu">
                 <?php if ($__bn_receive_stock): ?>
                 <li><a class="dropdown-item bn-pm-main" href="<?= getUrl('pos') ?>?restock=1">
@@ -1723,6 +1728,14 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 </a></li>
             </ul>
         </div>
+        <script>
+        document.addEventListener('show.bs.dropdown', function (e) {
+            if (e.target.closest('.bn-drop')) e.target.closest('.bms-bnav').classList.add('bn-menu-open');
+        });
+        document.addEventListener('hidden.bs.dropdown', function (e) {
+            if (e.target.closest('.bn-drop')) e.target.closest('.bms-bnav').classList.remove('bn-menu-open');
+        });
+        </script>
         <?php elseif (canView('products')): ?>
         <a class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" href="<?= getUrl('products') ?>"><i class="bi bi-box"></i><span><?= t('Products') ?></span></a>
         <?php endif; ?>

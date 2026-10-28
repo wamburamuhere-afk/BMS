@@ -1525,17 +1525,24 @@ function get_progress_color($percentage) {
 
     <!-- Quick Links Section -->
     <?php
-    // Add Product opens a small menu: Receive Stock (POS form, same gate as the
-    // Products page's own Receive Stock action) + New Product. With only one of
-    // the two permissions it stays a plain link to that one.
+    // Smart POS only: Add Product opens a small menu — Receive Stock (POS form,
+    // same gate as the Products page's own Receive Stock action) + New Product.
+    // With only one of the two permissions it stays a plain link to that one.
+    // Smart BMS keeps the plain Add Product link ($ql_receive_stock is false).
     $ql_new_product   = canCreate('products');
-    $ql_receive_stock = canView('pos') && canView('pos_restock');
+    $ql_receive_stock = $pos_simple_mode && canView('pos') && canView('pos_restock');
     $ql_has_links = canView('pos') || canCreate('invoices') || canCreate('customers')
                  || ($pos_simple_mode && canCreate('warehouses'))
                  || canCreate('suppliers') || $ql_new_product || $ql_receive_stock
                  || (projectsModuleActive() && canView('projects'));
     ?>
     <style>
+        /* .dropdown-toggle is required: header.php closes any open menu on a click
+           that is not on a .dropdown-toggle. Hide Bootstrap's caret (own chevron). */
+        .bms-add-product-btn.dropdown-toggle::after { display: none; }
+        /* The Quick Links card is a stacking context (hover transform), so the KPI
+           cards below would cover the open menu: lift the card while it's open. */
+        .card.apm-open { position: relative; z-index: 1060; }
         .bms-add-product-menu { width: 300px; max-width: calc(100vw - 24px); border-radius: 12px; }
         .bms-add-product-menu .dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 9px; white-space: normal; }
         .bms-add-product-menu .dropdown-item strong { display: block; font-size: 0.95rem; }
@@ -1602,7 +1609,7 @@ function get_progress_color($percentage) {
 
                         <?php if ($ql_new_product && $ql_receive_stock): ?>
                         <div class="flex-fill dropdown" style="min-width: 130px;">
-                            <button type="button" class="btn btn-outline-warning w-100 h-100 py-3" data-bs-toggle="dropdown" aria-expanded="false">
+                            <button type="button" class="btn btn-outline-warning w-100 h-100 py-3 dropdown-toggle bms-add-product-btn" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-plus-circle display-6"></i>
                                 <div class="mt-2"><?= t('Add Product') ?> <i class="bi bi-chevron-down small"></i></div>
                             </button>
@@ -1617,6 +1624,14 @@ function get_progress_color($percentage) {
                                 </a></li>
                             </ul>
                         </div>
+                        <script>
+                        document.addEventListener('show.bs.dropdown', function (e) {
+                            if (e.target.classList.contains('bms-add-product-btn')) e.target.closest('.card').classList.add('apm-open');
+                        });
+                        document.addEventListener('hidden.bs.dropdown', function (e) {
+                            if (e.target.classList.contains('bms-add-product-btn')) e.target.closest('.card').classList.remove('apm-open');
+                        });
+                        </script>
                         <?php elseif ($ql_new_product || $ql_receive_stock): ?>
                         <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= $ql_new_product ? getUrl('product_create') : getUrl('pos') . '?restock=1' ?>" class="btn btn-outline-warning w-100 h-100 py-3">
