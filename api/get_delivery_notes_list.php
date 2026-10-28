@@ -51,7 +51,7 @@ try {
     // DataTables params
     $draw   = isset($_GET['draw'])   ? intval($_GET['draw'])   : 1;
     $start  = isset($_GET['start'])  ? intval($_GET['start'])  : 0;
-    $length = isset($_GET['length']) ? intval($_GET['length']) : 25;
+    $length = dt_page_length($_GET['length'] ?? null, 25);
     $search = isset($_GET['search']['value']) ? trim($_GET['search']['value']) : '';
 
     // Common filters (everything EXCEPT dn_type) — used for the tab counts

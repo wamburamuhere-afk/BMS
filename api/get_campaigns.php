@@ -13,7 +13,7 @@ if (!hasPermission('view_campaigns')) {
 try {
     $draw = $_GET['draw'] ?? 1;
     $start = $_GET['start'] ?? 0;
-    $length = $_GET['length'] ?? 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = $_GET['search']['value'] ?? '';
     
     // Columns

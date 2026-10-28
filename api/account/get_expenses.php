@@ -18,7 +18,7 @@ try {
 // Get parameters from DataTables
 $draw = $_GET['draw'] ?? 1;
 $start = $_GET['start'] ?? 0;
-$length = $_GET['length'] ?? 10;
+$length = dt_page_length($_GET['length'] ?? null, 10);
 $searchValue = $_GET['search']['value'] ?? '';
 
 // Custom filters
