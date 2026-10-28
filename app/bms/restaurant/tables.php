@@ -210,6 +210,7 @@ function loadFloorsThenTables() {
 function loadTables() {
     const wid = currentWarehouseId();
     if (!wid) return;
+    if ($.fn.DataTable.isDataTable('#tablesTable')) $('#tablesTable').DataTable().destroy();
     $('#tablesTbody').html('<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>');
     $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid }, function (res) {
         TABLES_CACHE = res.success ? res.data : [];
@@ -226,10 +227,9 @@ function renderTables() {
     $('#stat-occupied').text(TABLES_CACHE.filter(t => t.status === 'occupied').length);
     $('#stat-reserved').text(TABLES_CACHE.filter(t => t.status === 'reserved').length);
 
+    if ($.fn.DataTable.isDataTable('#tablesTable')) $('#tablesTable').DataTable().destroy();
     if (!rows.length) {
-        $('#tablesTbody').html(`<tr><td colspan="5" class="text-center text-muted py-4">${STRINGS.noTables}</td></tr>`);
         $('#tablesCards').html(`<div class="text-center text-muted py-4">${STRINGS.noTables}</div>`);
-        return;
     }
 
     let tbody = '', cards = '';
@@ -248,7 +248,7 @@ function renderTables() {
             <td class="fw-bold">${safeOutput(t.table_number)}</td>
             <td>${safeOutput(t.floor_name)}</td>
             <td>${t.seats}</td>
-            <td>${statusSelect}</td>
+            <td data-order="${safeOutput(label)}" data-search="${safeOutput(label)}">${statusSelect}</td>
             <td class="text-end">
                 ${CAN_EDIT ? `<button class="btn btn-sm btn-outline-primary" onclick="editTable(${t.table_id}, ${t.floor_id}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')}, ${t.seats})"><i class="bi bi-pencil"></i></button>` : ''}
             </td>
@@ -261,7 +261,13 @@ function renderTables() {
         </div></div>`;
     });
     $('#tablesTbody').html(tbody);
-    $('#tablesCards').html(cards);
+    if (rows.length) $('#tablesCards').html(cards);
+    $('#tablesTable').DataTable({
+        responsive: false, autoWidth: false, pageLength: 25, order: [],
+        dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
+        columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+        language: { emptyTable: STRINGS.noTables }
+    });
 }
 
 function openTableModal() {

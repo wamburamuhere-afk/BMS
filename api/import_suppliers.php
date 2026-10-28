@@ -2,6 +2,8 @@
 // scope-audit: skip — bulk import utility; supplier data is global
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/code_generator.php';
+require_once __DIR__ . '/../core/actor_account.php';
 global $pdo;
 
 // Check if user is logged in
@@ -191,9 +193,6 @@ while (($row = fgetcsv($handle)) !== false) {
         }
     }
     
-    // Generate supplier code
-    $supplier_code = 'SUP' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT) . date('ym');
-    
     try {
         // Check if supplier exists
         $check_stmt = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_name = ? AND status != 'deleted'");
@@ -211,6 +210,19 @@ while (($row = fgetcsv($handle)) !== false) {
                     $bank_account, $bank_address, $description, $status,
                     $_SESSION['user_id'], $supplier_name
                 ]);
+                // Same as editing a supplier: upgrade a legacy "SUPxxxxYYMM" code to the company format.
+                $sid = (int)$existing_supplier['supplier_id'];
+                $scur = $pdo->prepare("SELECT supplier_code FROM suppliers WHERE supplier_id = ?");
+                $scur->execute([$sid]);
+                $oldSupCode = (string)$scur->fetchColumn();
+                $newSupCode = codeForEdit($pdo, 'SUP', $oldSupCode, 'SUP\\d+', 'suppliers', $sid);
+                if ($newSupCode !== $oldSupCode) {
+                    $pdo->prepare("UPDATE suppliers SET supplier_code = ? WHERE supplier_id = ?")->execute([$newSupCode, $sid]);
+                }
+                logAudit($pdo, $_SESSION['user_id'], 'update_supplier', [
+                    'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$existing_supplier['supplier_id'],
+                    'description'   => 'Updated by supplier import',
+                ]);
                 $results['successful']++;
             } else {
                 $results['skipped']++;
@@ -218,6 +230,11 @@ while (($row = fgetcsv($handle)) !== false) {
         } else {
             // Insert new supplier
             if ($import_action === 'add_new' || $import_action === 'add_update') {
+                // Same as Add Supplier: the company-format code (security.md §18) is
+                // allocated in the insert's transaction, so a failed row burns no number,
+                // and the supplier gets its own payables sub-account.
+                $pdo->beginTransaction();
+                $supplier_code = nextCode($pdo, 'SUP');
                 $insert_stmt->execute([
                     $supplier_name, $company_name, $contact_person, $contact_title,
                     $email, $phone, $mobile, $fax, $website, $address, $city, $state,
@@ -225,13 +242,21 @@ while (($row = fgetcsv($handle)) !== false) {
                     $currency, $bank_name, $bank_account, $bank_address, $description,
                     $status, $supplier_code, $_SESSION['user_id']
                 ]);
+                $new_supplier_id = (int)$pdo->lastInsertId();
+                ensureActorLedgerAccount($pdo, 'supplier', $new_supplier_id, $supplier_name);
+                $pdo->commit();
+                logAudit($pdo, $_SESSION['user_id'], 'create_supplier', [
+                    'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => $new_supplier_id,
+                    'description'   => "Created supplier $supplier_name ($supplier_code) by import",
+                ]);
                 $results['successful']++;
             } else {
                 $results['skipped']++;
             }
         }
         
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         $error = "Row $row_number: Database error - " . $e->getMessage();
         $results['errors'][] = $error;
         $results['failed']++;

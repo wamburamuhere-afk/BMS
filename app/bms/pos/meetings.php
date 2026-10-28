@@ -251,7 +251,7 @@ function meetingAction(id, action){
 }
 
 $(function(){
-    mtTable=$('#meetingsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[2,'desc']],dom:'rtip',columnDefs:[{targets:0,orderable:false,searchable:false,className:'text-center',render:(d,t,row,meta)=>meta.row+1+meta.settings._iDisplayStart}],language:{emptyTable:'No meetings yet.'},drawCallback:function(){ mtCards(this.api().rows({page:'current'})[0].map(i=>MT_ROWS[i]).filter(Boolean)); } });
+    mtTable=$('#meetingsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[2,'desc']],dom:'rtip',columnDefs:[$.extend({ targets: 0, className: 'text-center' }, BMSSerial.column())],language:{emptyTable:'No meetings yet.'},drawCallback:function(){ mtCards(this.api().rows({page:'current'})[0].map(i=>MT_ROWS[i]).filter(Boolean)); } });
     $('#mf_status').on('change', loadMeetings);
     function mv(){ if (window.innerWidth<768){$('#mtTableView').addClass('d-none');$('#mtCardView').removeClass('d-none');}else{$('#mtTableView').removeClass('d-none');$('#mtCardView').addClass('d-none');} }
     mv(); $(window).on('resize', mv);

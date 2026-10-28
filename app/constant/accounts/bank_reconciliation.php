@@ -495,16 +495,7 @@ $(document).ready(function() {
             type: 'POST'
         },
         columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'text-center text-muted small fw-bold ps-4',
-                render: function(data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                }
-            },
+            BMSSerial.column({ width: '50px', className: 'text-center text-muted small fw-bold ps-4' }),
             { data: 'reconciliation_id' },
             { data: 'account_name' },
             { 
@@ -585,7 +576,7 @@ $(document).ready(function() {
         responsive: true,
         dom: 'rtip',
         pageLength: 25,
-        order: [[0, 'desc']]
+        order: [[0, 'asc']]   // S/No ascending = newest first (api/account/get_bank_reconciliations.php)
     });
 
     // Reconciliation form submission (New & Edit)

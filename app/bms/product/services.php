@@ -2467,7 +2467,7 @@ $(function () {
             pageLength: 25,
             order: [[2, 'asc']],
             columnDefs: [
-                { targets: 0, width: '50px',  orderable: false, searchable: false },
+                $.extend({ targets: 0, width: '50px' }, BMSSerial.column()),
                 { targets: 1, width: '110px' },  // Item Code
                 { targets: 2, width: '35%'   },  // Product Name — widest, text wraps
                 { targets: 3, width: '120px' },

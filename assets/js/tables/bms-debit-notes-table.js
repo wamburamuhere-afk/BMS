@@ -38,7 +38,7 @@
     function columns(cfg) {
         var esc = window.BMSTbl.esc;
         var all = [
-            { key: 'sno',      col: { data: null, orderable: false, render: function (d, t, r, m) { return m.row + 1; } } },
+            { key: 'sno',      col: BMSSerial.column() },
             { key: 'number',   col: { data: 'number' } },
             { key: 'date',     col: { data: 'date' } },
             { key: 'supplier', col: {

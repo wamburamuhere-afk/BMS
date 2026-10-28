@@ -718,8 +718,7 @@ $(function () {
 
     apTable = $('#appraisalsTable').DataTable({
         responsive:false, scrollX:true, pageLength:25, order:[[1,'desc']], dom:'rtip',
-        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
-            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
+        columnDefs: [$.extend({ targets: 0, className: 'text-center' }, BMSSerial.column())],
         language:{ emptyTable:'No appraisals yet.', zeroRecords:'No matching records.' },
         drawCallback: function () { apCards(this.api().rows({page:'current'})[0].map(i=>AP_ROWS[i]).filter(Boolean)); }
     });
@@ -893,8 +892,7 @@ function gCards(rows) {
 $(function () {
     gTable = $('#goalsTable').DataTable({
         responsive:false, scrollX:true, pageLength:25, order:[[4,'asc']], dom:'rtip',
-        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
-            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
+        columnDefs: [$.extend({ targets: 0, className: 'text-center' }, BMSSerial.column())],
         language:{ emptyTable:'No goals yet.', zeroRecords:'No matching records.' },
         drawCallback: function () { gCards(this.api().rows({page:'current'})[0].map(i=>G_ROWS[i]).filter(Boolean)); }
     });

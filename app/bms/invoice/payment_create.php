@@ -6,9 +6,7 @@ require_once __DIR__ . '/../../../core/payment_source.php';
 // Enforce permission BEFORE any output
 autoEnforcePermission('invoices');
 
-includeHeader();
-
-// Get Invoice ID
+// Get Invoice ID — the checks below redirect, so they run before any output.
 $invoice_id = isset($_GET['invoice']) ? intval($_GET['invoice']) : 0;
 
 if ($invoice_id <= 0) {
@@ -40,6 +38,8 @@ if (!in_array($invoice['status'], ['approved', 'overdue', 'partial'], true)) {
     header("Location: " . getUrl('invoice_view') . "?id={$invoice_id}&error=Payment can only be recorded on open invoices");
     exit();
 }
+
+includeHeader();
 
 // Generate Payment Reference
 function generate_payment_ref() {

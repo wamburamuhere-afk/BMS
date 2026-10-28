@@ -521,15 +521,7 @@ $(document).ready(function() {
                 defaultContent: '',
                 targets: 0
             },
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'text-center fw-bold text-dark',
-                responsivePriority: 1,
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            BMSSerial.column({ width: '50px', className: 'text-center fw-bold text-dark', responsivePriority: 1 }),
             {
                 data: 'project_name',
                 responsivePriority: 1,

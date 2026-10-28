@@ -12,11 +12,12 @@
  */
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/payment_source.php';
-includeHeader();
 
+// Permission first — a refusal must happen before any page output.
 if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('financial_reports');
 }
+includeHeader();
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 $from   = (!empty($_GET['from'])) ? $_GET['from'] : date('Y-m-01');

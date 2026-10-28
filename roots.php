@@ -2221,6 +2221,11 @@ function redirectTo($page) {
  */
 function includeHeader() {
     global $pdo, $pdo_accounts, $username, $user_role, $role_id, $company_type, $company_name, $company_logo;
+    // Once per request: report partials (reps/cash_flow.php, reps/trial_balance.php)
+    // call it themselves and are also embedded in wrapper pages that already did.
+    static $done = false;
+    if ($done) return;
+    $done = true;
     if (file_exists(HEADER_FILE)) {
         require HEADER_FILE;
     }
@@ -2231,6 +2236,9 @@ function includeHeader() {
  */
 function includeFooter() {
     global $pdo, $pdo_accounts, $username, $user_role, $role_id, $company_type;
+    static $done = false;   // once per request — see includeHeader()
+    if ($done) return;
+    $done = true;
     if (file_exists(FOOTER_FILE)) {
         require FOOTER_FILE;
     }

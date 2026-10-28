@@ -1046,11 +1046,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
             dataSrc: 'data'
         },
         columns: [
-            {
-                data: null, orderable: false, searchable: false,
-                className: 'text-center text-muted fw-bold', style: 'font-size:0.78rem;',
-                render: (d, t, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            BMSSerial.column({ className: 'text-center text-muted fw-bold', style: 'font-size:0.78rem;' }),
             { data: 'tender_no', render: d => `<strong class="tender-no-text">${safeOutput(d)}</strong>` },
             {
                 data: 'nest_reference', className: 'd-none d-md-table-cell',

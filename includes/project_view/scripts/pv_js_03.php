@@ -36,7 +36,7 @@ function renderReturns(returns) {
     html += '</tbody></table></div>';
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#procReturnsInnerTable')) $('#procReturnsInnerTable').DataTable().destroy();
-    $('#procReturnsInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 8] }] });
+    $('#procReturnsInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: 8 }, $.extend({ targets: 0 }, BMSSerial.column())] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procReturnsInnerTable');
 }
 
@@ -86,7 +86,7 @@ function renderProjectDebitNotes(notes) {
     html += '</tbody></table></div>';
     $list.html(html);
     if ($.fn.DataTable.isDataTable('#procDebitNotesInnerTable')) $('#procDebitNotesInnerTable').DataTable().destroy();
-    $('#procDebitNotesInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 8] }] });
+    $('#procDebitNotesInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: 8 }, $.extend({ targets: 0 }, BMSSerial.column())] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procDebitNotesInnerTable');
 }
 
@@ -287,7 +287,7 @@ function renderExpenses(expenses) {
 
     $c.html(html);
     if ($.fn.DataTable.isDataTable('#projExpensesDT')) $('#projExpensesDT').DataTable().destroy();
-    $('#projExpensesDT').DataTable({ pageLength: 25, autoWidth: false, order: [[4, 'desc']], columnDefs: [{ orderable: false, targets: [0, 7] }] });
+    $('#projExpensesDT').DataTable({ pageLength: 25, autoWidth: false, order: [[4, 'desc']], columnDefs: [{ orderable: false, targets: 7 }, $.extend({ targets: 0 }, BMSSerial.column())] });
 }
 
 function renderBudgets(budgets, paginationInfo) {

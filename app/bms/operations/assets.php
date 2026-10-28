@@ -888,17 +888,11 @@ $(document).ready(function() {
             }
         },
         columns: [
-            { 
-                data: null, 
-                title: 'S/NO', 
-                orderable: false, 
-                searchable: false,
-                render: function (data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                },
+            BMSSerial.column({
+                title: 'S/NO',
                 className: 'ps-4',
                 createdCell: (td) => $(td).attr('data-label', 'S/NO')
-            },
+            }),
             { 
                 data: 'asset_name',
                 render: function(data, type, row) {
@@ -941,12 +935,14 @@ $(document).ready(function() {
             },
             {
                 data: 'accum_dep_book',
+                orderable: false,   // computed per page, not sortable server-side
                 className: 'text-end',
                 render: data => `<span class="text-muted">${formatCurrency(data || 0)}</span>`,
                 createdCell: (td) => $(td).attr('data-label', 'Accum. Dep. (Book)')
             },
             {
                 data: 'nbv_book',
+                orderable: false,   // computed per page, not sortable server-side
                 className: 'text-end',
                 render: data => `<strong class="text-primary">${formatCurrency(data || 0)}</strong>`,
                 createdCell: (td) => $(td).attr('data-label', 'NBV (Book)')

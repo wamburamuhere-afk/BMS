@@ -1,0 +1,2430 @@
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:31 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:31 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:32 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:32 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:39 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:39 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:40 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:40 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:40 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:40 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:40 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:40 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:53 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:53 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:53 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:53 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:53 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:53 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:28:54 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:28:54 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY supplier_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY order_number DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY project_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY warehouse_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_items DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY total_value DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY received_by_name DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:29:09 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status ASC, pr.receipt_id ASC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:09 - Count: 5
+First Row: {"receipt_id":1,"receipt_number":"T1-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 1","delivery_id":1,"received_by":1,"reviewed_by":1,"reviewed_by_name":"Test reviewed_by_name 1","reviewed_by_role":"Test reviewed_by_role 1","reviewed_at":"2026-10-27 10:00:00","approved_by":1,"approved_by_name":"Test approved_by_name 1","approved_by_role":"Test approved_by_role 1","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 1","total_received":"100.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":1,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":5,"total_value":"1096693.0000","product_names":"Test product_name 1"}
+2026-10-28 06:29:10 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.status DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:29:10 - Count: 5
+First Row: {"receipt_id":5,"receipt_number":"T5-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-09-22","delivery_note":"Test delivery_note 5","delivery_id":1,"received_by":5,"reviewed_by":5,"reviewed_by_name":"Test reviewed_by_name 5","reviewed_by_role":"Test reviewed_by_role 5","reviewed_at":"2026-09-22 13:00:00","approved_by":5,"approved_by_name":"Test approved_by_name 5","approved_by_role":"Test approved_by_role 5","approved_at":"2026-09-22 13:00:00","warehouse_id":1,"notes":"Test notes 5","total_received":"559.00","status":"approved","created_at":"2026-10-27 23:12:13","created_by":5,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}
+2026-10-28 06:33:20 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date DESC, pr.created_at DESC, pr.receipt_id DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-10-28 06:33:20 - Count: 5
+First Row: {"receipt_id":2,"receipt_number":"T2-purcha","purchase_order_id":1,"project_id":1,"supplier_id":1,"receipt_date":"2026-10-27","delivery_note":"Test delivery_note 2","delivery_id":1,"received_by":2,"reviewed_by":2,"reviewed_by_name":"Test reviewed_by_name 2","reviewed_by_role":"Test reviewed_by_role 2","reviewed_at":"2026-10-27 10:00:00","approved_by":2,"approved_by_name":"Test approved_by_name 2","approved_by_role":"Test approved_by_role 2","approved_at":"2026-10-27 10:00:00","warehouse_id":1,"notes":"Test notes 2","total_received":"200.00","status":"approved","created_at":"2026-10-27 21:36:28","created_by":2,"supplier_name":"Test supplier_name 1","company_name":"Test company_name 1","warehouse_name":"Test warehouse_name 1","order_number":"T1-purcha","project_name":"Test project_name 1","received_by_name":null,"created_by_name":null,"total_items":0,"total_value":"0.0000","product_names":null}

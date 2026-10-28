@@ -1377,15 +1377,7 @@ $(document).ready(function() {
             }
         },
         columns: [
-            { 
-                data: null, 
-                title: 'S/NO', 
-                orderable: false, 
-                searchable: false,
-                render: function (data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                }
-            },
+            BMSSerial.column({ title: 'S/NO' }),
             { data: 0, title: 'Employee #' },
             { data: 1, title: 'Name' },
             { data: 2, title: 'Department' },

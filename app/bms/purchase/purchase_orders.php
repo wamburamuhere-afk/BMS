@@ -351,14 +351,7 @@ $(document).ready(function() {
             }
         },
         columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'ps-4 text-center text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            BMSSerial.column({ width: '50px', className: 'ps-4 text-center text-muted small fw-bold' }),
             { 
                 data: 'order_number',
                 className: 'ps-4',
@@ -443,7 +436,9 @@ $(document).ready(function() {
                 }
             }
         ],
-        order: [[0, 'desc']],
+        // Same rows as before (the API's newest-first list, reversed = oldest first),
+        // now numbered 1..N by Order Date instead of counting down on S/No.
+        order: [[<?= $enable_projects ? 4 : 3 ?>, 'asc']],
         drawCallback: function(settings) {
             const api = this.api();
             const data = api.rows({ page: 'current' }).data();

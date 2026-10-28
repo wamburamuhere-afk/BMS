@@ -51,12 +51,17 @@ $specs = [
         'keep' => ["bindWarehouseToProject", "loadCustomerInfo", "saveQuotationFinal"],
     ],
     'app/bms/sales/sales_returns/sales_returns.php' => [
-        'has'  => ["filter_customer').select2"],
-        'keep' => ["get_returns_paged.php", "function renderTable", "function loadDisplayData"],
+        // 2026-10-28: converted to a SERVER-SIDE DataTable over the same
+        // get_returns_paged.php (its `draw` mode) — still server-paged, now sortable
+        // and searchable. Supersedes the original Group A "no DataTable" call.
+        'has'  => ["filter_customer').select2", "returnsTable').DataTable", "serverSide: true"],
+        'keep' => ["get_returns_paged.php", "function loadDisplayData", "function deleteReturn"],
     ],
     'app/bms/stock/stock_movements.php' => [
-        'has'  => ["smWarehouseFilter').select2", "id=\"smWarehouseFilter\""],
-        'keep' => ["LIMIT \$per_page OFFSET"],
+        // 2026-10-28: rows moved to api/stock/get_stock_movements.php behind a
+        // SERVER-SIDE DataTable (same filters/scope, now sortable + searchable).
+        'has'  => ["smWarehouseFilter').select2", "id=\"smWarehouseFilter\"", "movementsTable').DataTable", "get_stock_movements.php"],
+        'keep' => ["name=\"movement_type\"", "name=\"date_from\""],
     ],
     'app/bms/Suppliers/supplier_categories.php' => [
         'has'  => ["id=\"supplierCategoriesTable\"", "supplierCategoriesTable').DataTable"],
@@ -73,7 +78,7 @@ $specs = [
         'has'  => ["voucher_expense_account", "voucher_project", "get_vouchers.php"],   // expense "category" is now a real expense account
         'keep' => ["function renderTable", "loadVouchers"],
     ],
-    'app/constant/accounts/petty_cash.php' => [ // already compliant
+    'app/constant/accounts/petty_cash.php' => [ // 2026-10-28: server-side DataTable over get_transactions.php
         // expense "category" is a real expense account; filter is by expense account;
         // the meaningless deposit category was removed (account_categories retired).
         'has'  => ["filter_expense_account_id').select2", "expense_account_id').select2"],
@@ -131,10 +136,12 @@ $ajaxPaged = [
 ];
 foreach ($ajaxPaged as $rel) {
     $src = file_get_contents("$root/" . str_replace('/', DIRECTORY_SEPARATOR, $rel));
-    // these pages legitimately may have NO DataTable on the main list
-    strpos($src, "renderTable") !== false || strpos($src, "loadTenders") !== false
-        ? pass("$rel keeps its AJAX renderer")
-        : fail("$rel lost its AJAX renderer");
+    // these pages page on the server: either their own AJAX renderer, or (since
+    // 2026-10-28 for sales_returns / petty_cash) a SERVER-SIDE DataTable — never
+    // a client-side DataTable over one loaded page.
+    strpos($src, "renderTable") !== false || strpos($src, "loadTenders") !== false || strpos($src, "serverSide: true") !== false
+        ? pass("$rel keeps server-side paging (AJAX renderer or serverSide DataTable)")
+        : fail("$rel lost its server-side paging");
 }
 
 // profile.php — intentionally untouched (placeholder login table)

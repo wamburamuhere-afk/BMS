@@ -121,16 +121,14 @@ $fmtc = fn($n) => htmlspecialchars($currency) . ' ' . number_format((float)$n, 2
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($advances)): ?>
-                            <tr><td colspan="7" class="text-center text-muted py-5">No customer advances recorded yet. Click <strong>Record Advance</strong> to add one.</td></tr>
-                        <?php else: foreach ($advances as $a): ?>
+                        <?php foreach ($advances as $a): ?>
                             <tr>
                                 <td class="ps-3 fw-semibold"><?= htmlspecialchars($a['payment_number']) ?></td>
                                 <td><?= htmlspecialchars($a['customer_name']) ?></td>
                                 <td><?= htmlspecialchars($a['payment_date']) ?></td>
-                                <td class="text-end"><?= $fmtc($a['gross']) ?></td>
-                                <td class="text-end text-muted"><?= $fmtc($a['applied']) ?></td>
-                                <td class="text-end fw-bold <?= $a['available'] > 0.005 ? 'text-primary' : 'text-muted' ?>"><?= $fmtc($a['available']) ?></td>
+                                <td class="text-end" data-order="<?= (float)$a['gross'] ?>"><?= $fmtc($a['gross']) ?></td>
+                                <td class="text-end text-muted" data-order="<?= (float)$a['applied'] ?>"><?= $fmtc($a['applied']) ?></td>
+                                <td class="text-end fw-bold <?= $a['available'] > 0.005 ? 'text-primary' : 'text-muted' ?>" data-order="<?= (float)$a['available'] ?>"><?= $fmtc($a['available']) ?></td>
                                 <td class="text-end pe-3">
                                     <div class="dropdown d-flex justify-content-end">
                                         <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill"></i></button>
@@ -145,7 +143,7 @@ $fmtc = fn($n) => htmlspecialchars($currency) . ' ' . number_format((float)$n, 2
                                     </div>
                                 </td>
                             </tr>
-                        <?php endforeach; endif; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -272,6 +270,13 @@ $(function () {
     const fmt = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const esc = s => $('<div>').text(s == null ? '' : s).html();
     let applyAvailable = 0;
+
+    $('#advTable').DataTable({
+        responsive: false, autoWidth: false, pageLength: 25, order: [],
+        dom: '<"px-3 pt-3"f>rt<"d-flex justify-content-between align-items-center px-3 pb-3"ip>',
+        columnDefs: [{ orderable: false, searchable: false, targets: -1 }, { type: 'num', targets: [3, 4, 5] }],
+        language: { emptyTable: 'No customer advances recorded yet. Click Record Advance to add one.' }
+    });
 
     // ── Record Advance ────────────────────────────────────────────────────
     $('#btnRecordAdvance').on('click', () => new bootstrap.Modal(document.getElementById('recordModal')).show());
