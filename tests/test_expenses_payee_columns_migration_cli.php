@@ -19,6 +19,10 @@
  *   D. LEGACY   — a table with the legacy ENUM('supplier','staff') gets widened
  *                 to allow sub_contractor/other, and the manual columns added.
  *   E. RUNTIME  — the real api/get_expenses.php returns valid DataTables JSON.
+ *   F. ROOT     — the legacy-DB mirror (migrations/…_legacy_db.php, the one the
+ *                 root install bms / demo actually runs) repairs the same
+ *                 broken table and is idempotent. Run from a temp folder whose
+ *                 roots.php connects to the scratch DB.
  *
  * The scratch DB and temporary MySQL user are always dropped at the end.
  */
@@ -152,3 +156,33 @@ $json = json_decode(trim($out), true);
 (is_array($json) && ($json['draw'] ?? null) === 3 && isset($json['data']) && !isset($json['error']))
     ? pass('valid JSON, draw echoed, ' . count($json['data']) . ' row(s), no error')
     : fail('endpoint did not return valid DataTables JSON: ' . substr($out, 0, 300));
+
+// ─────────────────────────────────────────────────────────────────────────
+section('F. Legacy-DB mirror (root install) repairs the same table');
+$mirror = "$root/migrations/2026_10_28_expenses_payee_columns_legacy_db.php";
+is_file($mirror) ? pass('mirror file exists') : fail('mirror file missing');
+// The mirror loads __DIR__/../roots.php; give a temp copy a roots.php that
+// connects to the scratch DB so the real file's code runs there, not on bms.
+$tdir = sys_get_temp_dir() . '/exp_payee_mirror_' . bin2hex(random_bytes(3));
+@mkdir("$tdir/migrations", 0777, true);
+file_put_contents("$tdir/roots.php", "<?php\n\$pdo = new PDO(" . var_export('mysql:host=' . DB_SERVER . ";dbname=$scratchDb;charset=utf8mb4", true) . ', '
+    . var_export($migUser, true) . ', ' . var_export($migPass, true) . ", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n");
+copy($mirror, "$tdir/migrations/" . basename($mirror));
+$runMirror = function () use ($tdir, $mirror): string {
+    return (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg("$tdir/migrations/" . basename($mirror)) . ' 2>&1');
+};
+$pdo->exec("DROP TABLE `$scratchDb`.expenses");
+$pdo->exec("CREATE TABLE `$scratchDb`.expenses LIKE `" . DB_NAME . "`.expenses");
+$have = _cols($pdo, $scratchDb);
+$drop = array_values(array_filter($payeeCols, fn($c) => isset($have[$c])));
+if ($drop) $pdo->exec("ALTER TABLE `$scratchDb`.expenses " . implode(', ', array_map(fn($c) => "DROP COLUMN `$c`", $drop)));
+!_select_ok($pdo, sprintf($payeeSelect, $scratchDb)) ? pass('broken table reproduced (payee SELECT fails)') : fail('could not reproduce the broken table');
+$m1 = $runMirror();
+strpos($m1, 'Migration complete.') !== false ? pass('mirror first run completes') : fail("mirror first run did not complete:\n$m1");
+$have = _cols($pdo, $scratchDb);
+count(array_intersect($payeeCols, array_keys($have))) === 4 ? pass('mirror added all 4 payee columns') : fail('mirror left columns missing');
+_select_ok($pdo, sprintf($payeeSelect, $scratchDb)) ? pass('payee SELECT succeeds after the mirror') : fail('payee SELECT still fails after the mirror');
+$m2 = $runMirror();
+(strpos($m2, 'Migration complete.') !== false && substr_count($m2, 'already exists') === 4 && strpos($m2, '+ ') === false)
+    ? pass('mirror second run is a no-op') : fail("mirror second run not idempotent:\n$m2");
+@unlink("$tdir/migrations/" . basename($mirror)); @unlink("$tdir/roots.php"); @rmdir("$tdir/migrations"); @rmdir($tdir);

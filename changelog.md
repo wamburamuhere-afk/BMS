@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-28 — fix: Expenses payee-columns repair now also runs on the root install (bms / demo)
+
+**New:** `migrations/2026_10_28_expenses_payee_columns_legacy_db.php`.
+**Changed:** `tests/test_expenses_payee_columns_migration_cli.php`.
+
+- **Why:** the payee-columns fix shipped only as a tenant migration. The root install (BJP's books on bms / demo) runs on the legacy DB and only runs `migrations/*.php`, so the repair never reached demo, the site where the Expenses "Ajax error" was reported. CI's PHP Lint Check also failed on every PR (`test_legacy_migration_mirrors_cli`: ❌ `2026_10_28_expenses_payee_columns`).
+- **Fix:** the legacy-DB mirror, same repair: adds whichever of `paid_to_type` / `paid_to_id` / `payee_manual_role` / `payee_manual_name` are missing, widens an old `paid_to_type` ENUM. Idempotent.
+- **Checked:** new section F of `test_expenses_payee_columns_migration_cli` runs the real mirror file against a scratch DB with the columns removed: it adds all four, the list's payee SELECT then works, a second run is a no-op (23 checks, scratch DB dropped). `test_legacy_migration_mirrors_cli` 24/24. Run on the local DB: all four already exist, nothing changed.
+
 ## 2026-10-28 — feat(dashboard): Add Product opens a menu — Receive Stock / New Product (also on the phone Products tab)
 
 **Changed:** `app/dashboard.php`, `header.php`, `lang/sw.php`.
