@@ -114,6 +114,43 @@ if (!function_exists('fieldReportsEnsureSchema')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
 
+        // Every follow-up of a visit, done or not (customer_visit_followups_plan.md D1).
+        // At most one 'pending' row per visit (enforced in core/field_visit_followups.php).
+        // field_visits.follow_up_* mirror the visit's current one (D3).
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `field_visit_follow_ups` (
+                `follow_up_id`    INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `visit_id`        INT UNSIGNED NOT NULL,
+                `due_date`        DATE NOT NULL,
+                `purpose`         VARCHAR(255) NULL DEFAULT NULL,
+                `status`          ENUM('pending','done','cancelled') NOT NULL DEFAULT 'pending',
+                `method`          ENUM('visit','call','whatsapp','sms','other') NULL DEFAULT NULL,
+                `outcome`         TEXT NULL DEFAULT NULL,
+                `done_at`         DATETIME NULL DEFAULT NULL,
+                `done_by`         INT UNSIGNED NULL DEFAULT NULL,
+                `result_visit_id` INT UNSIGNED NULL DEFAULT NULL,
+                `created_by`      INT UNSIGNED NULL DEFAULT NULL,
+                `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_by`      INT UNSIGNED NULL DEFAULT NULL,
+                `updated_at`      DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`follow_up_id`),
+                KEY `idx_fvf_visit` (`visit_id`, `status`),
+                KEY `idx_fvf_due` (`status`, `due_date`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        // Follow-ups recorded before the table existed (one date per visit): copied once,
+        // done or not. A visit that already has rows is skipped, so re-running copies nothing.
+        $pdo->exec("
+            INSERT INTO field_visit_follow_ups (visit_id, due_date, status, done_at, done_by, created_by, created_at)
+            SELECT v.visit_id, v.follow_up_date,
+                   IF(v.follow_up_done_at IS NULL, 'pending', 'done'), v.follow_up_done_at, v.follow_up_done_by,
+                   v.created_by, v.created_at
+              FROM field_visits v
+             WHERE v.follow_up_date IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM field_visit_follow_ups f WHERE f.visit_id = v.visit_id)
+        ");
+        fieldReportsEnsureFollowUpEvent($pdo);
+
         $pdo->prepare("
             INSERT IGNORE INTO permissions (page_key, page_name, description, module_name)
             VALUES (?, ?, ?, ?)
@@ -127,5 +164,36 @@ if (!function_exists('fieldReportsEnsureSchema')) {
         // the name this module first shipped with; a custom name is left alone.
         $pdo->exec("UPDATE permissions SET page_name = 'Customer Visits' WHERE page_key = 'field_visits' AND page_name = 'Field Visits'");
         $pdo->exec("UPDATE permissions SET module_name = 'Customer Visits' WHERE page_key = 'field_visits' AND module_name = 'Field Reports'");
+    }
+}
+
+if (!function_exists('fieldReportsEnsureFollowUpEvent')) {
+    /**
+     * The "follow-up due" reminder (customer_visit_followups_plan.md D7/D8). Its two
+     * default rules — the staff member who recorded the visit, and all admins, both
+     * in-app + email — are added only when the event itself is first created, so a
+     * rule an admin later removes on Notification Rules is never put back by a re-run.
+     */
+    function fieldReportsEnsureFollowUpEvent(PDO $pdo): void
+    {
+        if (!$pdo->query("SHOW TABLES LIKE 'notification_events'")->fetch()) return;
+        $ev = $pdo->prepare("
+            INSERT IGNORE INTO notification_events
+                (event_key, title, description, module, page_key, required_verb, default_severity, scope_aware)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $ev->execute([
+            'field_visit.follow_up_due',
+            'Customer visit follow-up due',
+            'A customer visit follow-up is due in 2 days, tomorrow, today, or was missed yesterday',
+            'Customer Visits', 'field_visits', 'view', 'medium', 0,
+        ]);
+        if ($ev->rowCount() === 0 || !$pdo->query("SHOW TABLES LIKE 'notification_rules'")->fetch()) return;
+        $rule = $pdo->prepare("
+            INSERT INTO notification_rules (event_key, target_type, target_id, channel_email, channel_inapp, is_active, created_at)
+            VALUES ('field_visit.follow_up_due', ?, NULL, 1, 1, 1, NOW())
+        ");
+        $rule->execute(['record_owner']);
+        $rule->execute(['admins']);
     }
 }

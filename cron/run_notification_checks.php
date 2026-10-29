@@ -26,7 +26,7 @@ if (!function_exists('run_notification_checks')) {
     function run_notification_checks(PDO $pdo): array
     {
         $isCli = (php_sapi_name() === 'cli');
-        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0, 'pos_credit_due' => 0];
+        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0, 'pos_credit_due' => 0, 'field_visit_follow_up' => 0];
 
         // ── Invoice overdue ────────────────────────────────────────────────
         try {
@@ -360,6 +360,19 @@ if (!function_exists('run_notification_checks')) {
             }
         } catch (Throwable $e) {
             error_log('run_notification_checks pos_credit due: ' . $e->getMessage());
+        }
+
+        // ── Customer visit follow-ups (customer_visit_followups_plan.md D7/D9) ──
+        // 2 / 1 / 0 days before and once the day after — core/field_visit_followups.php.
+        try {
+            if (!function_exists('tenantFeatureEnabled') || tenantFeatureEnabled('field_reports')) {
+                require_once __DIR__ . '/../core/field_visit_followups.php';
+                $fr = frRunFollowUpReminders($pdo);
+                $sum['field_visit_follow_up'] += $fr['sent'];
+                if ($isCli) echo "  field_visit.follow_up_due: scanned {$fr['scanned']} follow-up(s).\n";
+            }
+        } catch (Throwable $e) {
+            error_log('run_notification_checks field_visit.follow_up_due: ' . $e->getMessage());
         }
 
         return $sum;

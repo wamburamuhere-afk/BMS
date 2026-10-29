@@ -57,6 +57,7 @@ if (isset($p['__fake_mail'])) {
 }
 if ($method === 'POST') { $_POST = $p + ['_csrf' => 'test-csrf']; $_GET = []; }
 else                    { $_GET = $p; $_POST = []; }
+$_REQUEST = $_GET + $_POST;   // as PHP builds it for a real request (e.g. rules_api.php reads $_REQUEST)
 
 register_shutdown_function(function () { fwrite(STDERR, "\nHTTP_CODE=" . (http_response_code() ?: 200)); });
 include $root . '/' . $endpoint;

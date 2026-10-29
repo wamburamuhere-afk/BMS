@@ -264,6 +264,22 @@ if (!function_exists('resolveRecipients')) {
             }
         }
 
+        // ── Record owners (customer_visit_followups_plan.md D8/D9) ─────────
+        // $ctx['owner_user_ids'] = the people one record belongs to (e.g. the staff
+        // member who recorded a customer visit). They are who a 'record_owner' rule
+        // matches. With $ctx['private_to_owners'] the record is private to them: any
+        // non-admin outside that list is dropped HERE, before rules, so no rule can
+        // widen it; admins stay unless $ctx['admins_may_see'] === false.
+        $owners = array_flip(array_map('intval', (array)($ctx['owner_user_ids'] ?? [])));
+        if (!empty($ctx['private_to_owners'])) {
+            $adminsOk = ($ctx['admins_may_see'] ?? true) !== false;
+            foreach ($recipients as $uid => $u) {
+                if (isset($owners[(int)$uid])) continue;
+                if (!empty($u['is_admin']) && $adminsOk) continue;
+                unset($recipients[$uid]);
+            }
+        }
+
         // ── Admin-configured rules: narrow the audience + decide channels ──
         // The set above is the SECURITY CEILING (RBAC ∩ scope − mutes). Rules can
         // only narrow WITHIN it, so a rule pointing at someone without access is
@@ -300,7 +316,9 @@ if (!function_exists('resolveRecipients')) {
                 $tid = isset($r['target_id']) ? (int)$r['target_id'] : 0;
                 $hit = ($tt === 'permission')                                    // everyone with access
                     || ($tt === 'role' && (int)$u['role_id'] === $tid)          // a specific role
-                    || ($tt === 'user' && (int)$uid === $tid);                  // a specific user
+                    || ($tt === 'user' && (int)$uid === $tid)                   // a specific user
+                    || ($tt === 'record_owner' && isset($owners[(int)$uid]))    // whoever the record belongs to
+                    || ($tt === 'admins' && !empty($u['is_admin']));            // every admin, however made admin
                 if ($hit) {
                     $matched = true;
                     if (!empty($r['channel_inapp'])) $inapp = true;
