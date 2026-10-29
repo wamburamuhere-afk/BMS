@@ -51,8 +51,10 @@ try {
         foreach ($ruleRows as $r) {
             $tt = $r['target_type'];
             $label = $tt === 'permission' ? 'Everyone with access'
+                   : ($tt === 'record_owner' ? 'The person who recorded it'
+                   : ($tt === 'admins' ? 'All admins'
                    : ($tt === 'role' ? ('Role: ' . ($roleMap[(int)$r['target_id']] ?? ('#' . $r['target_id'])))
-                   : ('User: ' . ($userMap[(int)$r['target_id']] ?? ('#' . $r['target_id']))));
+                   : ('User: ' . ($userMap[(int)$r['target_id']] ?? ('#' . $r['target_id']))))));
             $chans = [];
             if ((int)$r['channel_inapp']) $chans[] = 'In-app';
             if ((int)$r['channel_email']) $chans[] = 'Email';
@@ -88,7 +90,11 @@ try {
         $eventKey = trim($_GET['event_key'] ?? '');
         if ($eventKey === '') { echo json_encode(['success' => false, 'message' => 'event_key required']); exit; }
         $list = previewRecipients($pdo, $eventKey);
-        echo json_encode(['success' => true, 'recipients' => $list, 'count' => count($list)]);
+        // "The person who recorded it" differs for every record, so it cannot be listed
+        // here — the screen says it is added on top of the people shown.
+        $own = $pdo->prepare("SELECT 1 FROM notification_rules WHERE event_key = ? AND target_type = 'record_owner' AND is_active = 1 LIMIT 1");
+        $own->execute([$eventKey]);
+        echo json_encode(['success' => true, 'recipients' => $list, 'count' => count($list), 'record_owner' => (bool)$own->fetchColumn()]);
         exit;
     }
 
@@ -101,8 +107,10 @@ try {
         $cInapp = !empty($_POST['channel_inapp']) ? 1 : 0;
 
         if ($eventKey === '') throw new Exception('event_key is required');
-        if (!in_array($tt, ['permission', 'role', 'user'], true)) throw new Exception('Invalid target type');
+        // record_owner / admins are worked out when the event fires — they take no id.
+        if (!in_array($tt, ['permission', 'role', 'user', 'record_owner', 'admins'], true)) throw new Exception('Invalid target type');
         if (($tt === 'role' || $tt === 'user') && !$tid) throw new Exception('Pick a ' . $tt);
+        if (!in_array($tt, ['role', 'user'], true)) $tid = null;
         if (!$cEmail && !$cInapp) throw new Exception('Select at least one channel');
 
         $ok = $pdo->prepare("SELECT 1 FROM notification_events WHERE event_key = ?");

@@ -273,26 +273,31 @@ if (!function_exists('frBusinessTypes')) {
     }
 
     /**
-     * Follow-ups due by $asOf (today or overdue), not done, client not joined — for
+     * Pending follow-ups due by $asOf (today or overdue), client not joined — for
      * $userId (null = every staff member; callers pass frScopeUserId()).
+     * Read from field_visit_follow_ups (customer_visit_followups_plan.md).
      */
     function frDueFollowUps(PDO $pdo, ?int $userId, string $asOf): array
     {
-        $sql = "SELECT v.visit_id, v.user_id, v.client_name, v.client_phone, v.location, v.visit_date, v.follow_up_date,
+        $sql = "SELECT f.follow_up_id, f.due_date AS follow_up_date, f.purpose,
+                       v.visit_id, v.user_id, v.client_name, v.client_phone, v.location, v.visit_date,
                        v.business_type, v.business_other, u.first_name, u.last_name, u.username
-                  FROM field_visits v LEFT JOIN users u ON u.user_id = v.user_id
-                 WHERE v.status = 'active' AND v.follow_up_date IS NOT NULL AND v.follow_up_date <= ?
-                   AND v.follow_up_done_at IS NULL AND v.joined = 0";
+                  FROM field_visit_follow_ups f
+                  JOIN field_visits v ON v.visit_id = f.visit_id
+                  LEFT JOIN users u ON u.user_id = v.user_id
+                 WHERE f.status = 'pending' AND f.due_date <= ? AND v.status = 'active' AND v.joined = 0";
         $params = [$asOf];
         if ($userId !== null) { $sql .= " AND v.user_id = ?"; $params[] = $userId; }
         $sql .= frSubmittedOnlySql('v', $params);
-        $sql .= " ORDER BY v.follow_up_date ASC, v.visit_id ASC LIMIT 200";
+        $sql .= " ORDER BY f.due_date ASC, v.visit_id ASC LIMIT 200";
         $s = $pdo->prepare($sql);
         $s->execute($params);
         $out = [];
         foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $out[] = [
+                'follow_up_id'   => (int)$r['follow_up_id'],
                 'visit_id'       => (int)$r['visit_id'],
+                'purpose'        => $r['purpose'] ?? '',
                 'client_name'    => $r['client_name'],
                 'client_phone'   => $r['client_phone'],
                 'location'       => $r['location'],
