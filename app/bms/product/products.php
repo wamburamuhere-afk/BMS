@@ -526,6 +526,9 @@ function get_quick_actions($product) {
                         <i class="bi bi-plus-circle"></i> <span class="d-none d-sm-inline"><?= t('Add New Product') ?></span><span class="d-inline d-sm-none text-uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Add New') ?></span>
                     </button>
                     <?php endif; ?>
+                    <a href="<?= getUrl('product_import.php') ?>" class="btn btn-outline-primary btn-sm px-1 px-md-2 shadow-sm ms-1" style="border-radius: 6px;" title="<?= t('Import Products') ?>">
+                        <i class="bi bi-file-earmark-arrow-up"></i> <span class="d-none d-sm-inline"><?= t('Import') ?></span>
+                    </a>
                     <?php endif; ?>
                 </div>
             </div>
