@@ -161,8 +161,11 @@ try {
     [$c, , $j] = done($A, ['follow_up_id' => $p['follow_up_id'], 'method' => 'call', 'next_date' => $plus(-1)]);
     ok($c === 422 && isset($j['errors']['next_date']), 'a next date in the past → 422');
     ok(fu((int)$p['follow_up_id'])['status'] === 'pending', '...and nothing was changed by the rejected calls');
+    $pdo->prepare("UPDATE field_visits SET updated_at = '2026-01-01 10:00:00' WHERE visit_id = ?")->execute([$v1]);
     [$c, , $j] = done($A, ['follow_up_id' => $p['follow_up_id'], 'method' => 'call', 'outcome' => "Talked $tag", 'next_date' => $plus(10), 'next_purpose' => "Prices $tag"]);
     $was = fu((int)$p['follow_up_id']);
+    $upd = $pdo->prepare("SELECT updated_at FROM field_visits WHERE visit_id = ?"); $upd->execute([$v1]);
+    ok($upd->fetchColumn() === '2026-01-01 10:00:00', 'a follow-up does not count as an edit of the visit ("last changed" untouched)');
     ok($c === 200 && $was['status'] === 'done' && $was['method'] === 'call' && $was['outcome'] === "Talked $tag" && (int)$was['done_by'] === $A && $was['done_at'] !== null,
         'done: method, what happened, who and when are kept');
     $next = pendingOf($v1);

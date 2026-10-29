@@ -100,6 +100,13 @@ if ($allowed) logActivity($pdo, (int)$_SESSION['user_id'], 'View field visit', "
 @media (max-width: 767.98px) { .fvd-sticky { position: sticky; top: 0; z-index: 1020; background: #fff; padding: 6px 0; } }
 .fvd-kv th { width: 40%; color: #6c757d; font-weight: 600; padding-left: 12px; white-space: nowrap; }
 .fvd-kv td { word-break: break-word; padding-right: 12px; }
+.fvd-kv .btn { min-width: 0; }   /* global .btn{min-width:85px} pushed Call/WhatsApp off a phone screen */
+@media (max-width: 575.98px) {   /* phones: label above its value, nothing wider than the screen */
+    .fvd-kv tr { display: block; padding: 4px 12px; border-bottom: 1px solid #f1f3f5; }
+    .fvd-kv th, .fvd-kv td { display: block; width: 100%; padding: 0; white-space: normal; }
+    .fvd-kv th { font-size: .78rem; }
+    #fvdPage .fu-actions .btn { flex: 1 1 auto; }
+}
 .fvd-thead th { background: #fff !important; color: #212529; border-bottom: 2px solid #dee2e6; font-weight: 600; }
 .fr-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:600; }
 .fr-yes { background:#0d6efd; color:#fff; } .fr-no { background:#e9ecef; color:#495057; } .fr-svc { background:#cfe2ff; color:#084298; }
@@ -140,7 +147,7 @@ $(function () {
         'dueToday' => t('Follow up today'), 'dueTomorrow' => t('Follow up tomorrow'), 'dueIn' => t('Follow up in %d days'), 'daysLate' => t('%d days late'),
         'pending' => t('Not done yet'), 'done' => t('Done'), 'cancelled' => t('Cancelled'), 'noHistory' => t('No follow-ups yet.'),
         'by' => t('by %name%'), 'setBy' => t('Set by %name% on %date%'), 'newVisitRec' => t('New visit recorded'), 'openVisit' => t('Open that visit'),
-        'onVisit' => t('On the visit of %date%'), 'thisVisit' => t('this visit'), 'reason' => t('Reason'), 'what' => t('What happened'),
+        'onVisit' => t('On the visit of %date%'), 'reason' => t('Reason'), 'what' => t('What happened'),
         'viewDetails' => t('View details'), 'current' => t('This visit'), 'followUp' => t('Follow-up'), 'noRecords' => t('No visits recorded for this period.'),
         'interest' => array_map('t', frInterestLabels()), 'subdomainQ' => t('Company web address'),
         'subdomainHint' => t('The address they log in at, e.g. dukalajuma — leave blank if you do not know it yet.'), 'save' => t('Save'),
@@ -267,7 +274,7 @@ $(function () {
             return `<li class="list-group-item fu-item${f.status === 'pending' && !other ? ' fu-current' : ''}">
                 <div class="d-flex justify-content-between gap-2 flex-wrap">
                     <div class="fw-bold">${esc(dmy(f.due_date))} <span class="fu-st fu-st-${f.status}">${esc(L[f.status])}</span>${f.status === 'pending' ? ' ' + dueBadge(f.days_left) : ''}</div>
-                    <small class="text-muted">${other ? `<a href="${DETAILS_URL}?id=${f.visit_id}">${esc(L.onVisit.replace('%date%', dmy(f.visit_date)))}</a>` : esc(L.onVisit.replace('%date%', L.thisVisit))}</small>
+                    <small class="text-muted">${other ? `<a href="${DETAILS_URL}?id=${f.visit_id}">${esc(L.onVisit.replace('%date%', dmy(f.visit_date)))}</a>` : esc(L.current)}</small>
                 </div>
                 <div class="small mt-1">${lines.join('')}</div>
                 ${acts.length ? `<div class="d-flex gap-1 mt-2 fu-actions no-print">${acts.join('')}</div>` : ''}

@@ -5882,7 +5882,6 @@ return [
     'New visit recorded' => 'Ziara mpya imerekodiwa',
     'Open that visit' => 'Fungua ziara hiyo',
     'On the visit of %date%' => 'Kwenye ziara ya %date%',
-    'this visit' => 'ziara hii',
     'This visit' => 'Ziara hii',
     'What happened' => 'Kilichotokea',
     'What happened?' => 'Kilitokea nini?',

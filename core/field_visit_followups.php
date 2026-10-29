@@ -159,7 +159,9 @@ if (!function_exists('frFollowUpMethods')) {
         $cur = frFuPending($pdo, $visitId);
         $vals = $cur ? [$cur['due_date'], null, null] : [null, null, null];
         if (!$cur && ($done = frFuLatestDone($pdo, $visitId))) $vals = [$done['due_date'], $done['done_at'], $done['done_by']];
-        $pdo->prepare("UPDATE field_visits SET follow_up_date = ?, follow_up_done_at = ?, follow_up_done_by = ? WHERE visit_id = ?")
+        // updated_at kept as it is: a follow-up is not an edit of the visit (its
+        // ON UPDATE CURRENT_TIMESTAMP would otherwise show "last changed" with nobody).
+        $pdo->prepare("UPDATE field_visits SET follow_up_date = ?, follow_up_done_at = ?, follow_up_done_by = ?, updated_at = updated_at WHERE visit_id = ?")
             ->execute(array_merge($vals, [$visitId]));
     }
 
