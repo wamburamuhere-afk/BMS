@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-29 — feat: Import Products from CSV works again (Smart POS) — preview, then all-or-nothing import
+
+**New:** `core/product_import.php`, `tests/test_product_import_cli.php`, `tests/helpers/product_import_request.php`.
+**Changed:** `api/import_products.php` (rewritten), `app/bms/product/product_import.php` (rewritten), `app/bms/product/products.php` (Import button), `lang/sw.php`.
+
+- **Before:** the import page had no link anywhere, and its API wrote only `products.stock_quantity` — no shop stock, no batch, no ledger entry, no CSRF check, category ignored. An imported product showed 0 stock and the Balance Sheet missed its value.
+- **Now:** every row goes through the same steps as Add Product — a name that already exists (case/space-insensitive) is skipped, never duplicated; category matched by name or created once; SKU and barcode generated unique against the database and the rest of the file (the old `time()+rand(100,999)` collided when many were made in one second); opening stock received as a batch in the chosen shop and posted Dr Inventory / Cr Opening Balance; wholesale price written to the Wholesale price group.
+- **Check, then import:** "Check the file" shows what happens to every row (will be added / already exists / repeated in file / error) and which categories will be created, saving nothing. The import re-validates the uploaded file and saves all new rows in one transaction — one bad row and nothing is saved. Excel CSVs with a BOM, `;` separators and `2,600`-style numbers are read.
+- **Checked:** `test_product_import_cli` 30 checks (guards, preview writes nothing, all-or-nothing, categories, unique codes, shop stock + batch, ledger Dr = Cr, wholesale group, re-import creates nothing; all rows removed). `test_login_and_product_errors_cli` 19/0. `test_pos_detail_pages_cli` 6 and `test_activity_log_permission_and_sell_label_cli` 3 failures — identical on `develop`.
+
 ## 2026-10-28 — feat: Customer Visits — follow up as many times as needed, View details, reminders (owner + admins)
 
 **Plan:** `customer_visit_followups_plan.md`.
