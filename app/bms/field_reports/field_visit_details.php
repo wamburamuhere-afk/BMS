@@ -17,6 +17,7 @@ $allowed   = $visit && frCanSee($pdo, $visit);
 $is_admin  = isAdmin();   // fresh call, after header.php
 $isVendor  = isPlatformVendorContext();
 $listUrl   = getUrl('field_reports');
+if ($allowed) logActivity($pdo, (int)$_SESSION['user_id'], 'View field visit', "Viewed field visit #$visitId ({$visit['client_name']})");
 ?>
 <div class="container-fluid mt-3" id="fvdPage">
 <?php if (!$allowed): ?>
