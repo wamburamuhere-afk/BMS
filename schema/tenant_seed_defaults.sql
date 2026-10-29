@@ -1291,6 +1291,15 @@ LOCK TABLES `field_report_shares` WRITE;
 UNLOCK TABLES;
 
 --
+-- Dumping data for table `field_visit_follow_ups`
+--
+
+LOCK TABLES `field_visit_follow_ups` WRITE;
+/*!40000 ALTER TABLE `field_visit_follow_ups` DISABLE KEYS */;
+/*!40000 ALTER TABLE `field_visit_follow_ups` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Dumping data for table `field_visit_services`
 --
 
@@ -1889,6 +1898,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `notification_events` WRITE;
 /*!40000 ALTER TABLE `notification_events` DISABLE KEYS */;
+INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('field_visit.follow_up_due','Customer visit follow-up due','A customer visit follow-up is due in 2 days, tomorrow, today, or was missed yesterday','Customer Visits','field_visits','view','medium',0,1,'2026-10-28 23:37:52');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('module_request_decided','Module request approved or declined','Notifies company admins when a superadmin decides a module access request.','Settings','available_modules','view','high',0,1,'2026-10-27 04:33:27');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('pos_credit.due_soon','Credit sale due soon','A POS credit sale is due for repayment within 3 days, or is due today.','POS','pos','view','medium',1,1,'2026-10-27 04:33:35');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('pos_credit.overdue','Credit sale overdue','A POS credit sale is past its due date and still not fully repaid.','POS','pos','view','high',1,1,'2026-10-27 04:33:35');
@@ -1923,6 +1933,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `notification_rules` WRITE;
 /*!40000 ALTER TABLE `notification_rules` DISABLE KEYS */;
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (5,'field_visit.follow_up_due','record_owner',NULL,1,1,'immediate',1,NULL,'2026-10-28 23:37:52','2026-10-28 23:37:52');
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (6,'field_visit.follow_up_due','admins',NULL,1,1,'immediate',1,NULL,'2026-10-28 23:37:52','2026-10-28 23:37:52');
 /*!40000 ALTER TABLE `notification_rules` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -3668,6 +3680,10 @@ INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (8
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (89,'2026_10_26_ledger_warehouse_backfill.php','2026-10-27 04:33:53');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (90,'2026_10_26_pos_void_drawer_cash_fix.php','2026-10-27 04:33:53');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (91,'2026_10_27_pos_record_old_sale.php','2026-10-27 04:33:54');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (92,'2026_10_28_customer_groups_soft_delete.php','2026-10-28 23:37:52');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (93,'2026_10_28_customer_visit_follow_ups.php','2026-10-28 23:37:52');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (94,'2026_10_28_expenses_payee_columns.php','2026-10-28 23:37:52');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (95,'2026_10_28_supplier_categories_soft_delete.php','2026-10-28 23:37:53');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
