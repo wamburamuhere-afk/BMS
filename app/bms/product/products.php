@@ -898,7 +898,7 @@ function get_quick_actions($product) {
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
                                                 <!-- POS "Receive Stock" with this product pre-selected (pos_detail_pages_plan.md A2) -->
-                                                <a class="dropdown-item" href="<?= getUrl('pos') ?>?restock=1&amp;product_id=<?= (int)$product['product_id'] ?>">
+                                                <a class="dropdown-item" href="<?= getUrl('receive_stock') ?>?product_id=<?= (int)$product['product_id'] ?>">
                                                     <i class="bi bi-box-arrow-in-down text-primary"></i> <?= t('Receive Stock') ?>
                                                 </a>
                                             </li>

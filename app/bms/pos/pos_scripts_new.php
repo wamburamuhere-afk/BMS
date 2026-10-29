@@ -200,12 +200,7 @@ const PT = {
     nextPage: <?= json_encode(t('Next')) ?>,
     productPages: <?= json_encode(t('Product pages')) ?>,
     pageOfTotal: <?= json_encode(t('%from%–%to% of %total% products')) ?>,
-    addedToCart: <?= json_encode(t('Added to cart')) ?>,
-    // "Add Product" shortcut — Restock Product modal.
-    restockSaving: <?= json_encode(t('Saving...')) ?>,
-    restockSaved: <?= json_encode(t('Product restocked successfully!')) ?>,
-    restockFailed: <?= json_encode(t('Restock Failed')) ?>,
-    restockSelectProductFirst: <?= json_encode(t('Select a product first.')) ?>
+    addedToCart: <?= json_encode(t('Added to cart')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -238,16 +233,8 @@ function openNewProductPage() {
     window.location.href = <?= json_encode(getUrl('product_create')) ?> + '?return=' + encodeURIComponent(returnUrl);
 }
 
-// "Add Product" shortcut — Restock Product modal. Pre-selects the modal's own
-// shop field (when shown, i.e. the cashier is scoped to more than one shop)
-// to whatever is currently active at the till, so the common single-shop case
-// needs no extra click at all.
-function openRestockProductModal() {
-    if ($('#restock_warehouse_id').length) {
-        $('#restock_warehouse_id').val($('#posWarehouseId').val());
-    }
-    new bootstrap.Modal(document.getElementById('restockProductModal')).show();
-}
+// "Add Product" shortcut — the Receive Stock window (shared with the Receive Stock page).
+<?php include __DIR__ . '/restock_modal_js.php'; ?>
 
 // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search. $parent is
 // set only while the field sits inside the phone cart sheet: the sheet's focus
@@ -272,81 +259,13 @@ $(document).ready(function() {
     // the old plain <select> hard-limited to 50 rows with no search at all.
     initCustomerSelect();
 
-    // "Add Product" shortcut — Restock Product modal (only rendered when the
-    // cashier has adjust_stock permission; pos_modals_new.php's own PHP gate).
-    if ($('#restockProductModal').length) {
-        $('#restock_product_id').select2({
-            theme: 'bootstrap-5', width: '100%', dropdownParent: $('#restockProductModal'),
-            placeholder: <?= json_encode(t('Search product by name or SKU')) ?>,
-            ajax: {
-                url: '<?= buildUrl('/api/pos/search_products_for_restock.php') ?>',
-                dataType: 'json', delay: 300, cache: true,
-                data: p => ({ q: p.term })
-            }
-        });
-
-        // Prefill buying/wholesale/retail price from the product's most recent
-        // batch in the currently-relevant shop (falls back to the product's
-        // own purchase/selling price when it has never been batch-tracked here).
-        $('#restock_product_id').on('select2:select', function () {
-            const pid = $(this).val();
-            const wid = $('#restock_warehouse_id').length ? $('#restock_warehouse_id').val() : $('#posWarehouseId').val();
-            if (!pid || !wid) return;
-            $.getJSON('<?= buildUrl('/api/pos/get_restock_defaults.php') ?>', { product_id: pid, warehouse_id: wid }, function (res) {
-                if (res.success) {
-                    $('#restock_buying_price').val(res.data.buying_price || '');
-                    $('#restock_wholesale_price').val(res.data.wholesale_price || '');
-                    $('#restock_selling_price').val(res.data.selling_price || '');
-                }
-            });
-        });
-
-        $('#restockProductModal').on('hidden.bs.modal', function () {
-            $('#restockProductForm')[0].reset();
-            $('#restock_product_id').val(null).trigger('change');
-            $('#restock_date').val(<?= json_encode(date('Y-m-d')) ?>);
-            $('#restock-message').html('');
-        });
-
-        $('#restockProductForm').on('submit', function (e) {
-            e.preventDefault();
-            if (!$('#restock_product_id').val()) {
-                Swal.fire({ icon: 'warning', title: PT.restockSelectProductFirst });
-                return;
-            }
-            const btn = $(this).find('[type="submit"]');
-            const orig = btn.html();
-            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.restockSaving);
-            $.ajax({
-                url: '<?= buildUrl('/api/pos/quick_restock.php') ?>',
-                type: 'POST',
-                data: $(this).serialize(),
-                dataType: 'json',
-                success: function (res) {
-                    if (res.success) {
-                        Swal.fire({ icon: 'success', title: PT.restockSaved, timer: 1800, showConfirmButton: false })
-                            .then(() => {
-                                $('#restockProductModal').modal('hide');
-                                if (typeof loadProducts === 'function') loadProducts();
-                            });
-                    } else {
-                        $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message) + '</div>');
-                    }
-                },
-                error: function (xhr) {
-                    // A caught server-side exception still replies with real
-                    // JSON (success:false, message:<reason>) but a non-2xx
-                    // status code — jQuery routes that to error(), not
-                    // success(), so the actual reason was silently discarded
-                    // and only the generic "Restock Failed" ever showed.
-                    let msg = PT.restockFailed;
-                    try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
-                    $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(msg) + '</div>');
-                },
-                complete: function () { btn.prop('disabled', false).html(orig); }
-            });
-        });
-    }
+    // "Add Product" shortcut — the Receive Stock window (only rendered when the
+    // cashier holds pos_restock; restock_modal.php's own PHP gate). After a save
+    // it closes and the product grid reloads with the new stock.
+    initRestockModal(function () {
+        $('#restockProductModal').modal('hide');
+        if (typeof loadProducts === 'function') loadProducts();
+    });
 
     // Phase 11 (pos_upgrade_plan.md §7) — show the selected customer's loyalty
     // balance and cap how many points they can redeem. Walk-in (no selection)
@@ -514,32 +433,10 @@ $(document).ready(function() {
         $(window).on('resize', syncPosTop);
     }
 
-    // "Receive Stock" menu link lands here as ?restock=1.
-    // The modal is only rendered for users holding pos_restock (pos_modals_new.php).
-    // &product_id=N (Products list "Receive Stock", pos_detail_pages_plan.md A3)
-    // pre-selects that product — looked up below with the same filter and label
-    // as api/pos/search_products_for_restock.php; an unknown id / service just
-    // opens the modal empty, as before.
+    // Older links (?restock=1) still open the Receive Stock window here;
+    // the menus now go to the Receive Stock page instead.
     if (new URLSearchParams(location.search).get('restock') === '1' && document.getElementById('restockProductModal')) {
         openRestockProductModal();
-        <?php
-        $__restockPre = null;
-        if (!empty($_GET['restock']) && ctype_digit((string)($_GET['product_id'] ?? ''))) {
-            try {
-                $__rp = $pdo->prepare("SELECT product_id, product_name, sku FROM products WHERE product_id = ? AND status != 'deleted' AND is_service != 1");
-                $__rp->execute([(int)$_GET['product_id']]);
-                if ($__r = $__rp->fetch(PDO::FETCH_ASSOC)) {
-                    $__n = applyCaseMode($__r['product_name']);
-                    $__restockPre = ['id' => (int)$__r['product_id'], 'text' => $__r['sku'] ? ($__r['sku'] . ' — ' . $__n) : $__n];
-                }
-            } catch (Throwable $e) { $__restockPre = null; }
-        }
-        ?>
-        const restockPre = <?= json_encode($__restockPre) ?>;
-        if (restockPre) {
-            $('#restock_product_id').append(new Option(restockPre.text, restockPre.id, true, true)).trigger('change')
-                .trigger({ type: 'select2:select', params: { data: restockPre } });   // loads its last prices
-        }
     }
 
     // Load initial data

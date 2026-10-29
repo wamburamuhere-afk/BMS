@@ -1525,25 +1525,18 @@ function get_progress_color($percentage) {
 
     <!-- Quick Links Section -->
     <?php
-    // Add Product opens a small menu: Receive Stock (POS form, same gate as the
-    // Products page's own Receive Stock action) + New Product. With only one of
-    // the two permissions it stays a plain link to that one.
+    // Smart POS only: Add Product opens the centred Add Product window
+    // (#bmsAddProductModal in header.php) — Receive Stock (POS form, same gate
+    // as the Products page's own Receive Stock action) + New Product.
+    // With only one of the two permissions it stays a plain link to that one.
+    // Smart BMS keeps the plain Add Product link ($ql_receive_stock is false).
     $ql_new_product   = canCreate('products');
-    $ql_receive_stock = canView('pos') && canView('pos_restock');
+    $ql_receive_stock = $pos_simple_mode && canView('pos') && canView('pos_restock');
     $ql_has_links = canView('pos') || canCreate('invoices') || canCreate('customers')
                  || ($pos_simple_mode && canCreate('warehouses'))
                  || canCreate('suppliers') || $ql_new_product || $ql_receive_stock
                  || (projectsModuleActive() && canView('projects'));
     ?>
-    <style>
-        .bms-add-product-menu { width: 300px; max-width: calc(100vw - 24px); border-radius: 12px; }
-        .bms-add-product-menu .dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 9px; white-space: normal; }
-        .bms-add-product-menu .dropdown-item strong { display: block; font-size: 0.95rem; }
-        .bms-add-product-menu .dropdown-item small { display: block; color: var(--bs-secondary-color, #6c757d); line-height: 1.35; }
-        .bms-add-product-menu .apm-ico { flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; }
-        .bms-add-product-menu .apm-ico-new { background: #fff4d6; color: #8a5a00; }
-        .bms-add-product-menu li:first-child .dropdown-item { background: rgba(13, 110, 253, 0.08); }
-    </style>
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
@@ -1601,25 +1594,16 @@ function get_progress_color($percentage) {
                         <?php endif; ?>
 
                         <?php if ($ql_new_product && $ql_receive_stock): ?>
-                        <div class="flex-fill dropdown" style="min-width: 130px;">
-                            <button type="button" class="btn btn-outline-warning w-100 h-100 py-3" data-bs-toggle="dropdown" aria-expanded="false">
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <!-- Opens the centred Add Product window (header.php, Smart POS block) -->
+                            <button type="button" class="btn btn-outline-warning w-100 h-100 py-3" data-bs-toggle="modal" data-bs-target="#bmsAddProductModal">
                                 <i class="bi bi-plus-circle display-6"></i>
-                                <div class="mt-2"><?= t('Add Product') ?> <i class="bi bi-chevron-down small"></i></div>
+                                <div class="mt-2"><?= t('Add Product') ?></div>
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1 bms-add-product-menu">
-                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>?restock=1">
-                                    <span class="apm-ico bg-primary text-white"><i class="bi bi-box-arrow-in-down"></i></span>
-                                    <span><strong><?= t('Receive Stock') ?></strong><small><?= t('Add stock to a product you already have') ?></small></span>
-                                </a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('product_create') ?>">
-                                    <span class="apm-ico apm-ico-new"><i class="bi bi-plus-square"></i></span>
-                                    <span><strong><?= t('New Product') ?></strong><small><?= t("Create a product you don't have yet") ?></small></span>
-                                </a></li>
-                            </ul>
                         </div>
                         <?php elseif ($ql_new_product || $ql_receive_stock): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= $ql_new_product ? getUrl('product_create') : getUrl('pos') . '?restock=1' ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                            <a href="<?= $ql_new_product ? getUrl('product_create') : getUrl('receive_stock') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
                                 <i class="bi <?= $ql_new_product ? 'bi-plus-circle' : 'bi-box-arrow-in-down' ?> display-6"></i>
                                 <div class="mt-2"><?= $ql_new_product ? t('Add Product') : t('Receive Stock') ?></div>
                             </a>

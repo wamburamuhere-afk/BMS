@@ -133,10 +133,10 @@ foreach (['warehouses', 'pos', 'help', 'expenses', 'customers', 'invoices'] as $
     $u = (string)getUrl($k);
     ok("request to getUrl('$k') → $k", helpCurrentPageKey($u) === $k, var_export(helpCurrentPageKey($u), true) . " for $u");
 }
-ok('pos?restock=1 → restock (more specific wins)', helpCurrentPageKey(getUrl('pos') . '?restock=1') === 'restock');
+ok('the Receive Stock page → restock', helpCurrentPageKey(getUrl('receive_stock')) === 'restock');
 ok('sub-path → its page', helpCurrentPageKey(rtrim(getUrl('warehouses'), '/') . '/5') === 'warehouses');
 ok('unknown path → null', helpCurrentPageKey('/no/such/page-xyz') === null);
-ok('helpNavUrl(restock) carries the restock query', str_ends_with((string)helpNavUrl('restock'), 'restock=1'));
+ok('helpNavUrl(restock) opens the Receive Stock page', str_ends_with((string)helpNavUrl('restock'), 'receive_stock'));
 ok('my_settings is permission-gated in the mirror (link shows, page may not open)', !helpKeyAllowed('my_settings', ['can' => fn() => false] + helpPreviewContext('pos', 'staff')));
 
 // ─────────────────────────────────────────────────────────────────────────────

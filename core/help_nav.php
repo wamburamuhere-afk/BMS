@@ -376,7 +376,7 @@ if (!function_exists('helpNavRoute')) {
     function helpNavRoute(string $helpKey): array
     {
         $map = [
-            'restock' => ['pos', 'restock=1'], 'dn' => ['delivery_notes', 'type=outbound'], 'lpo' => ['lpos', ''],
+            'restock' => ['receive_stock', ''], 'dn' => ['delivery_notes', 'type=outbound'], 'lpo' => ['lpos', ''],
             'crm_dashboard' => ['crm/dashboard', ''], 'crm_leads' => ['crm/leads', ''], 'crm_pipeline' => ['crm/pipeline', ''],
             'crm_pipeline_stages' => ['crm/pipeline_stages', ''], 'employee_lifecycle' => ['hr_actions', ''],
             'document_library' => ['library', ''], 'document_templates' => ['templates', ''], 'field_visits' => ['field_reports', ''],

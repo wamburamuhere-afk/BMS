@@ -77,7 +77,7 @@ function _prd_run_endpoint(string $root, int $uid, array $post): string {
 
 // ─────────────────────────────────────────────────────────────────────────
 section('1. Files exist + lint clean');
-foreach (['app/bms/pos/pos_modals_new.php', 'api/pos/quick_restock.php'] as $f) {
+foreach (['app/bms/pos/pos_modals_new.php', 'app/bms/pos/restock_modal.php', 'api/pos/quick_restock.php'] as $f) {
     $full = "$root/$f";
     if (!file_exists($full)) { fail("MISSING: $f"); continue; }
     $rc = 0; $out = [];
@@ -87,8 +87,8 @@ foreach (['app/bms/pos/pos_modals_new.php', 'api/pos/quick_restock.php'] as $f) 
 
 // ─────────────────────────────────────────────────────────────────────────
 section('2. Source wiring');
-has(src($root, 'app/bms/pos/pos_modals_new.php'), 'id="restock_manufacturing_date" name="manufacturing_date"', 'modal has Manufacturing Date field');
-has(src($root, 'app/bms/pos/pos_modals_new.php'), 'id="restock_expiry_date" name="expiry_date"', 'modal has Expiry Date field');
+has(src($root, 'app/bms/pos/restock_modal.php'), 'id="restock_manufacturing_date" name="manufacturing_date"', 'modal has Manufacturing Date field');
+has(src($root, 'app/bms/pos/restock_modal.php'), 'id="restock_expiry_date" name="expiry_date"', 'modal has Expiry Date field');
 $quickRestockSrc = src($root, 'api/pos/quick_restock.php');
 has($quickRestockSrc, "\$manufacturing_date     = !empty(\$_POST['manufacturing_date'])", 'endpoint reads manufacturing_date from POST (optional)');
 has($quickRestockSrc, "\$expiry_date            = !empty(\$_POST['expiry_date'])", 'endpoint reads expiry_date from POST (optional)');

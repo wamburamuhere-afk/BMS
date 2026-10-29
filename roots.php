@@ -658,6 +658,7 @@ $routes = [
     'print_credit_note_horizon' => SALES_DIR . '/credit_notes/print_credit_note_horizon.php',
     'print_credit_note_ember' => SALES_DIR . '/credit_notes/print_credit_note_ember.php',
     'pos' => POS_DIR . '/pos.php',
+    'receive_stock' => POS_DIR . '/receive_stock.php',   // Receive Stock window on its own (no till behind it)
 
     // ========================================================================
     // PURCHASES (BMS Directory)

@@ -12,6 +12,36 @@
 - **Reminders:** event `field_visit.follow_up_due` — 2 days before, the day before, on the day, and once the day after if missed; once per stage per follow-up (a moved date starts again); not for joined clients or deleted visits. In-app + email to the staff member who recorded the visit and all admins. **Notification Rules** gains two targets worked out when the alert fires — "The person who recorded it" and "All admins" — seeded as this event's default rules (editable; a removed rule is never put back). Private: a non-admin only ever gets their own visits' reminders whatever rules say; an admin only for a visit they may open.
 - **Checked:** `test_customer_visit_followups_cli` 98 checks (reminders run in a rolled-back transaction — no email queued); `test_field_reports_cli` 282/0; `test_customer_visit_link_cli` 40/0; `test_notification_engine_cli` 76 + 1 pre-existing failure (same on `develop`); `test_security_coverage_cli` identical to `develop`. Browser: mark done + next date, details page desktop + 390 px phone, no console errors. Tenant template rebuilt (also records three other 2026-10-28 tenant migrations).
 
+## 2026-10-28 — fix(pos): Products window — X instead of Cancel, no row arrows; Receive Stock opens straight to its form
+
+**New:** `app/bms/pos/receive_stock.php` (route `receive_stock`), `app/bms/pos/restock_modal.php`, `app/bms/pos/restock_modal_js.php`, `tests/test_receive_stock_page_cli.php`.
+**Changed:** `header.php`, `app/dashboard.php`, `app/bms/product/products.php`, `core/help_nav.php`, `core/permissions.php`, `roots.php`, `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`; tests `test_pos_restock_batch_dates_cli`, `test_pos_simple_ux_cli`, `test_supplier_access_simple_pos_cli`, `test_support_center_phase3_cli`, `test_text_display_case_refs_cli` (they read the form from its new file / expect the new page).
+
+- **Products window** (phone bottom bar "Products" and the dashboard Add Product tile, Smart POS): the large Cancel button at the bottom is replaced by an **X** at the top right, and the ">" arrow on each row (Receive Stock, New Product, View Products) is removed.
+- **Receive Stock opened the whole POS first** (confirmed): every Receive Stock link went to `pos?restock=1`, so the till, categories, product grid, cart and shift bar loaded before the form appeared, and the user was left on the POS afterwards. Now the links open a **Receive Stock page** that shows only the form, already open (about 0.6 s in the test browser). Saving keeps the form open and empty for the next product; X / Cancel returns to the screen the user came from (the dashboard if none). The Products list's per-product Receive Stock still pre-selects that product and loads its last prices.
+- **Links moved to the page:** the Products window, the Shop menu, the side menu, the dashboard tile, the Products list and the help article's "take me there" link (the help button recognises the new page as Receive Stock).
+- **One form, not two:** the form's markup and script moved out of the POS into `restock_modal.php` + `restock_modal_js.php`, used by both the POS button and the new page. Same fields, permission (`pos` + `pos_restock`), shops, price lookup, price warnings and save as before. Old `pos?restock=1` links still open the form on the POS.
+- **Checked:** browser at phone size — window has the X at the top right, no Cancel, no arrows, 3 rows; X closes it; Receive Stock opens its page with the form open and no POS loaded; a restock saved from the page (stock +3), form cleared for the next one; X goes back to the dashboard; `?product_id` pre-selects; POS button still opens and saves (window closes, product grid reloads); old POS link still works; no JS errors — 16 checks. New test 30 checks (24 of them fail on the old code). 32 related suites before / after: same failures.
+
+## 2026-10-28 — feat: Add Product opens a centred window (Smart POS), page inactive until a choice
+
+**Changed:** `header.php`, `app/dashboard.php`.
+
+- **Why:** the small menu opened at the edge of the screen (top right on desktop); the owner wants it in the centre with the rest of the page inactive until a choice is made (design 2 of a clickable trial, without its title, "Most used" badge or highlight).
+- **What:** one Bootstrap modal `#bmsAddProductModal` (centred, `data-bs-backdrop="static"` — a click outside does nothing; Cancel or Esc closes) in the Smart POS block of `header.php`: **Receive Stock** → `pos?restock=1`, **New Product** → `product_create`, and **View Products** → `products` only when opened from the phone's Products tab. Same icons, colours, wording and permissions as the menu it replaces; no heading.
+- **Opened by:** the dashboard's Add Product tile (Smart POS, both permissions) and the phone bottom bar's Products tab. The dropdown markup, its z-index workarounds and their scripts are removed.
+- **Smart BMS unchanged:** no modal; the dashboard keeps the original plain Add Product link.
+- **Checked:** the rendered modal, CSS and buttons placed into the live shop.demo dashboard in the browser — desktop: Add Product opens the window centred over a dimmed page, Receive Stock / New Product only, a click outside and on the cards behind does nothing, Cancel closes it cleanly (no backdrop left), Receive Stock opens `/pos?restock=1` with the Restock form open; phone width (400 px): Products opens it with View Products as well, bar and chat button dimmed behind it, outside tap ignored, View Products → `/products`. Local render: Smart POS EN + SW (Pokea Mzigo) has the modal; Smart BMS has no modal and the plain tile (setting restored).
+
+## 2026-10-28 — fix: Add Product / Products menus did nothing when clicked; Smart POS only
+
+**Changed:** `app/dashboard.php`, `header.php`.
+
+- **Bug (from #2610):** clicking Add Product (dashboard) or Products (phone bottom bar) did nothing. `header.php` closes every open dropdown on any click that is not on a `.dropdown-toggle`; the two new buttons lacked that class, so the click that opened the menu closed it at once. Both buttons now carry `dropdown-toggle` (Bootstrap's caret hidden).
+- **Menu covered:** on the dashboard the open menu sat behind the KPI cards (the Quick Links card is a stacking context) — the card is lifted (`.apm-open`, z 1060) while the menu is open. On the phone the Ask BMS button (z 1040) covered View Products — the bar is lifted to 1041 while the menu is open.
+- **Smart POS only:** the dashboard menu now appears only when `pos_simple_mode` is on. Smart BMS keeps the original plain Add Product link to `product_create` (the bottom bar already exists only in Smart POS).
+- **Checked:** on shop.demo.bjptechnologies.co.tz with the fix applied in the browser — desktop: Add Product opens the menu above the cards; phone width (400 px): Products opens Receive Stock / New Product / View Products above the chat button, the dashboard tile opens its menu; Receive Stock → `/pos?restock=1` opens the Restock form, New Product → `/product_create`, View Products → `/products`. Local render with `pos_simple_mode` 1 vs 0: menu + bottom bar vs the original plain tile and no bar (setting restored).
+
 ## 2026-10-28 — fix: Expenses payee-columns repair now also runs on the root install (bms / demo)
 
 **New:** `migrations/2026_10_28_expenses_payee_columns_legacy_db.php`.
