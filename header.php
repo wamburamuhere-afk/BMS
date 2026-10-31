@@ -1013,6 +1013,11 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= wLabel('Inventory Products', 'Shop Products') ?></a></li>
                                 <?php endif; ?>
+                                <?php if(posSimpleModeEnabled() && canView('categories')): ?>
+                                <!-- Smart POS: Categories has no Inventory menu, so it sits next to Shop Products
+                                     (full ERP keeps it in the Inventory dropdown). Page does View/Add/Edit/Delete by permission. -->
+                                <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags text-warning"></i> <?= t('Categories') ?></a></li>
+                                <?php endif; ?>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Service') ?></a></li>
                                 <?php endif; ?>
@@ -1849,6 +1854,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             if (canView('warehouses'))                    $__side_shop[] = [getUrl('warehouses'), 'bi-shop', wLabel('Warehouses', 'Shops')];
             if (canView('pos') && canView('pos_restock')) $__side_shop[] = [$__restock_url ?? getUrl('receive_stock'), 'bi-box-arrow-in-down', t('Receive Stock')];
             if (canView('products'))                      $__side_shop[] = [getUrl('services'), 'bi-box-seam', t('Service')];
+            if (canView('categories'))                    $__side_shop[] = [getUrl('categories'), 'bi-tags', t('Categories')];
             $__side_people = [];
             if (canView('customers'))    $__side_people[] = [getUrl('customers'), 'bi-people', t('Customers')];
             if (canView('suppliers'))    $__side_people[] = [getUrl('suppliers'), 'bi-truck', t('Suppliers')];

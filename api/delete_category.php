@@ -23,6 +23,19 @@ try {
         throw new Exception("Category ID is required");
     }
 
+    // No FK links products/sub-categories to categories, so a plain DELETE would leave
+    // them pointing at a category that no longer exists. Refuse instead, with a clear reason.
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM products WHERE category_id = ?");
+    $stmt->execute([$category_id]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        throw new Exception("This category is used by products. Move those products to another category first (or make the category Inactive instead).");
+    }
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM categories WHERE parent_id = ?");
+    $stmt->execute([$category_id]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        throw new Exception("This category has sub-categories. Delete or move them first.");
+    }
+
     $stmt = $pdo->prepare("DELETE FROM categories WHERE category_id = ?");
     $stmt->execute([$category_id]);
 

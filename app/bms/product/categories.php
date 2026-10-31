@@ -6,9 +6,13 @@
 ob_start();
 require_once 'header.php';
 
-// Check user role for permissions
-requireViewPermission('products');
-$can_manage_categories = canEdit('products');
+// Viewing: the Categories permission, or (as before) Products. Each action is then gated
+// by its own Categories permission — the same ones api/create|update|delete_category.php
+// enforce — so a user only sees the buttons they can really use (Smart POS included).
+if (!canView('categories')) requireViewPermission('products');
+$can_create = canCreate('categories');
+$can_edit   = canEdit('categories');
+$can_delete = canDelete('categories');
 
 // Get categories tree
 try {
@@ -35,7 +39,7 @@ function get_category_tree($categories, $parent_id = 0, $depth = 0) {
 $category_tree = get_category_tree($all_categories);
 ?>
 
-<div class="product-categories-dashboard p-4 p-md-5" style="background: #ffffff; min-height: 100vh;">
+<div class="product-categories-dashboard p-3 p-md-5" style="background: #ffffff; min-height: 100vh;">
     <!-- Print Only Header -->
     <div class="d-none d-print-block">
         <div style="text-align:center; padding: 20px 0; border-bottom: 3px solid #0d6efd; margin-bottom: 20px;">
@@ -55,22 +59,24 @@ $category_tree = get_category_tree($all_categories);
     </nav>
 
     <!-- Page Header -->
-    <div class="row mb-5 d-print-none">
+    <div class="row mb-3 mb-md-5 d-print-none">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="fw-bold mb-1">
+            <div class="d-flex justify-content-between align-items-center gap-2 cat-head">
+                <div class="min-w-0">
+                    <h2 class="fw-bold mb-1 cat-title">
                         <i class="bi bi-tags text-primary me-2"></i><?= t('Product Categories') ?>
                     </h2>
-                    <p class="text-muted mb-0"><?= t('Manage product categories and hierarchy') ?></p>
+                    <p class="text-muted mb-0 d-none d-md-block"><?= t('Manage product categories and hierarchy') ?></p>
                 </div>
-                <div class="d-flex gap-2">
-                    <a href="<?= getUrl('products') ?>" class="btn btn-outline-secondary btn-sm px-3 shadow-sm d-flex align-items-center">
-                        <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Inventory') ?>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <a href="<?= getUrl('products') ?>" class="btn btn-outline-secondary btn-sm px-3 shadow-sm d-flex align-items-center text-nowrap">
+                        <i class="bi bi-arrow-left me-1"></i> <span class="d-none d-sm-inline"><?= t('Back to Inventory') ?></span><span class="d-sm-none"><?= t('Back') ?></span>
                     </a>
-                    <button type="button" class="btn btn-primary btn-sm shadow-sm px-4 fw-bold" onclick="openAddModal()">
+                    <?php if ($can_create): ?>
+                    <button type="button" class="btn btn-primary btn-sm shadow-sm px-3 px-md-4 fw-bold text-nowrap" onclick="openAddModal()">
                         <i class="bi bi-plus-circle me-1"></i> <?= t('New Category') ?>
                     </button>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -111,26 +117,34 @@ $category_tree = get_category_tree($all_categories);
                                             </span>
                                         </td>
                                         <td class="text-end pe-3">
+                                            <?php if ($can_edit || $can_delete): ?>
                                             <div class="btn-group">
                                                 <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-                                                    <i class="bi bi-gear"></i>
+                                                    <i class="bi bi-gear"></i> <span class="d-none d-sm-inline"><?= t('Actions') ?></span>
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end shadow">
+                                                    <?php if ($can_edit): ?>
                                                     <li>
                                                         <a class="dropdown-item btn-edit-cat" href="javascript:void(0)"
                                                            data-cat='<?= htmlspecialchars(json_encode($cat), ENT_QUOTES, 'UTF-8') ?>'>
                                                             <i class="bi bi-pencil text-info me-2"></i> <?= t('Edit Category') ?>
                                                         </a>
                                                     </li>
-                                                    <li><hr class="dropdown-divider"></li>
+                                                    <?php endif; ?>
+                                                    <?php if ($can_edit && $can_delete): ?><li><hr class="dropdown-divider"></li><?php endif; ?>
+                                                    <?php if ($can_delete): ?>
                                                     <li>
                                                         <a class="dropdown-item text-danger btn-delete-cat" href="javascript:void(0)"
                                                            data-id="<?= $cat['category_id'] ?>">
                                                             <i class="bi bi-trash me-2"></i> <?= t('Delete Category') ?>
                                                         </a>
                                                     </li>
+                                                    <?php endif; ?>
                                                 </ul>
                                             </div>
+                                            <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -142,7 +156,7 @@ $category_tree = get_category_tree($all_categories);
         </div>
 
         <!-- Help/Summary -->
-        <div class="col-md-3 d-print-none">
+        <div class="col-md-3 d-none d-md-block d-print-none">
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-bottom py-3">
                     <h5 class="mb-0 fw-bold"><i class="bi bi-lightbulb text-warning me-2"></i><?= t('Quick Tips') ?></h5>
@@ -331,6 +345,10 @@ $(document).on('click', '.btn-delete-cat', function() {
 </script>
 
 <style>
+.min-w-0 { min-width: 0; }
+@media (max-width: 767.98px) {
+    .cat-title { font-size: 1.15rem; margin-bottom: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 .card {
     background-color: white !important;
     border: 1px solid #dee2e6 !important;
