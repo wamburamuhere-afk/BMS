@@ -512,7 +512,10 @@ if (!function_exists('renderExpenseCatRows')) {
             // dates) feed it through filters_js; the stat cards through on_stats.
             $tbl = [
                 'id'           => 'expensesTable',
-                'card'         => '#mobile-expense-cards',
+                // No page-owned card list: the global mobile cards (bms-mobile-cards.js)
+                // render the phone view, so it is not listed twice.
+                'card'         => null,
+                'actions_dropdown' => true,
                 'page_length'  => 25,
                 // Simple POS doesn't use Expense Categories at all.
                 'hide'         => $posSimple ? ['categories'] : [],
@@ -547,9 +550,6 @@ if (!function_exists('renderExpenseCatRows')) {
     </div><!-- /col-lg-9 -->
     </div><!-- /row -->
 </div>
-
-<!-- Mobile Card View (auto-rendered on screens <= 768px) -->
-<div id="mobile-expense-cards" class="px-2" style="display:none;"></div>
 
 <!-- Add/Edit Expense Modal -->
 <div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" data-bs-focus="false">
