@@ -66,7 +66,9 @@ if (empty($productIds)) {
     exit;
 }
 $placeholders = str_repeat('?,', count($productIds) - 1) . '?';
-$prodStmt = $pdo->prepare("SELECT product_id, product_name, kitchen_station_id, is_service FROM products WHERE product_id IN ($placeholders)");
+// restaurant_plan.md Phase 2 — is_menu_item marks a restaurant Menu dish (when the column exists).
+$menuCol  = restaurantMenuSchemaReady($pdo) ? ', is_menu_item' : ', 0 AS is_menu_item';
+$prodStmt = $pdo->prepare("SELECT product_id, product_name, kitchen_station_id, is_service$menuCol FROM products WHERE product_id IN ($placeholders)");
 $prodStmt->execute($productIds);
 $productsMap = [];
 foreach ($prodStmt->fetchAll(PDO::FETCH_ASSOC) as $p) { $productsMap[(int)$p['product_id']] = $p; }
@@ -77,14 +79,20 @@ $byStation = [];
 foreach ($items as $item) {
     $pid = (int)($item['product_id'] ?? 0);
     $prod = $productsMap[$pid] ?? null;
-    if (!$prod || !empty($prod['is_service']) || empty($prod['kitchen_station_id'])) continue;
+    // A Menu dish is stored as a no-stock (service) item so it always sells —
+    // it still goes to its kitchen area. Other service lines never do.
+    if (!$prod || empty($prod['kitchen_station_id'])) continue;
+    if (!empty($prod['is_service']) && empty($prod['is_menu_item'])) continue;
     $sid = (int)$prod['kitchen_station_id'];
+    $parts = is_array($item['modifiers'] ?? null)
+        ? array_filter(array_map(fn($m) => (string)($m['option_name'] ?? ''), $item['modifiers']))
+        : [];
+    $note = trim((string)($item['note'] ?? ''));          // "less salt" from the till (Phase 2)
+    if ($note !== '') $parts[] = $note;
     $byStation[$sid][] = [
         'product_id' => $pid,
         'quantity'   => (float)($item['quantity'] ?? 1),
-        'modifiers'  => is_array($item['modifiers'] ?? null)
-            ? implode(', ', array_map(fn($m) => (string)($m['option_name'] ?? ''), $item['modifiers']))
-            : null,
+        'modifiers'  => $parts ? mb_substr(implode(', ', $parts), 0, 500) : null,
     ];
 }
 
@@ -97,17 +105,21 @@ $pdo->beginTransaction();
 try {
     $ticketIds = [];
     foreach ($byStation as $stationId => $lines) {
+        // Same order re-sent → update its open ticket instead of adding a second
+        // one. A table's order is one open ticket per area even though each save
+        // creates a new held row (hold_sale.php keeps one open order per table).
         $existing = $pdo->prepare("
             SELECT ticket_id FROM kitchen_tickets
-            WHERE hold_id = ? AND station_id = ? AND status IN ('queued','preparing')
-            LIMIT 1
+            WHERE station_id = ? AND status IN ('queued','preparing')
+              AND (hold_id = ? OR (? IS NOT NULL AND table_id = ?))
+            ORDER BY ticket_id DESC LIMIT 1
         ");
-        $existing->execute([$hold_id, $stationId]);
+        $existing->execute([$stationId, $hold_id, $hold['table_id'], $hold['table_id']]);
         $ticketId = $existing->fetchColumn();
 
         if ($ticketId) {
             $pdo->prepare("DELETE FROM kitchen_ticket_items WHERE ticket_id = ?")->execute([$ticketId]);
-            $pdo->prepare("UPDATE kitchen_tickets SET updated_at = NOW() WHERE ticket_id = ?")->execute([$ticketId]);
+            $pdo->prepare("UPDATE kitchen_tickets SET hold_id = ?, updated_at = NOW() WHERE ticket_id = ?")->execute([$hold_id, $ticketId]);
         } else {
             $pdo->prepare("
                 INSERT INTO kitchen_tickets (hold_id, warehouse_id, station_id, table_id, status, created_at, updated_at)

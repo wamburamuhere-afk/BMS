@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 2 — Take Order on the till + live Tables screen
+
+**New:** `app/bms/restaurant/tables_board.php` (route `restaurant/tables-board`), `api/restaurant/get_tables_board.php`, `api/restaurant/move_table_order.php`, `tests/test_restaurant_phase2_cli.php`.
+**Changed:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/hold_sale.php`, `api/pos/process_sale.php`, `api/restaurant/send_to_kitchen.php`, `core/pos_nav.php`, `header.php`, `roots.php`, `lang/sw.php`.
+
+- **Bug fixed:** Menu dishes (no-stock items) were never sent to the kitchen — `send_to_kitchen.php` skipped every service line. Dishes now route by their kitchen area; item notes go on the ticket.
+- **Bug fixed:** every table save/Send to Kitchen added another held order and paid orders stayed 'held'. Now one open order per table (a new save replaces the old one, in one transaction) and paying closes it. Re-sending updates the same kitchen ticket (no duplicates).
+- **Till (restaurant/hybrid shops only):** Dine in / Take away / Delivery bar, table picker in the cart, **Save to table**, per-item kitchen note, dish tiles show 'made to order', add-ons now offered on dishes. Opens a table straight from `?table=` and Take away from `?ot=`. Retail shops: unchanged (bar not rendered without Restaurant POS; hidden on retail shops).
+- **Tables screen:** live board per shop (free / has order, amount, items, minutes open), tap to open the order on the till, Move order to a free table, refreshes every 20 s. Menu link 'Tables' now opens it; setup stays on Floors.
+- **Checked:** new test 32/0 (real endpoints in a rolled-back transaction: dish+note to kitchen, one order per table, board, move, pay the table — dish with no recipe sells, note on sale line, table freed, ledger balanced; take away; retail hold untouched; till renders + every inline script parses); phone/desktop previews of the Tables board, Move window and till bar (fixed: status pill overflow).
+
 ## 2026-10-31 — feat(restaurant): Phase 1 — Menu page, Getting started checklist, restaurant menus
 
 **New:** `app/bms/restaurant/menu.php` (route `restaurant/menu`), `api/restaurant/{get_menu_items,save_menu_item,update_menu_item,search_products_for_menu,quick_setup}.php`, `includes/restaurant/getting_started.php`, `migrations/tenant/2026_10_31_restaurant_menu_columns.php` + `migrations/2026_10_31_restaurant_menu_columns_legacy_db.php`, `tests/test_restaurant_phase1_cli.php`.

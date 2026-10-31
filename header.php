@@ -1181,7 +1181,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="restaurantDropdown">
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i> <?= t('Menu') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/floors') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Modifier Group') ?></a></li>
@@ -1840,7 +1840,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('restaurant_pos')): ?>
                 <?php if (!empty($__rest_on)): ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i><?= t('Menu') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/floors') ?>"><i class="bi bi-grid-3x3-gap"></i><?= t('Tables') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i><?= t('Tables') ?></a>
                 <?php endif; ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant') ?></a>
                 <?php endif; ?>

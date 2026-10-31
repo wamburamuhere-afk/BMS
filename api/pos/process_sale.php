@@ -706,6 +706,15 @@ try {
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
 
+        // restaurant_plan.md Phase 2 — a restaurant line's kitchen note ("less salt")
+        // is kept on the sale line. Only runs when a note was sent; a retail sale
+        // never carries one, so its insert above is unchanged.
+        $item_note = trim((string)($item['note'] ?? ''));
+        if ($item_note !== '') {
+            $pdo->prepare("UPDATE pos_sale_items SET description = ? WHERE sale_item_id = ?")
+                ->execute([mb_substr($item_note, 0, 200), $sale_item_id]);
+        }
+
         // Phase 30 (pos_upgrade_plan.md §9) — persist the modifier choices
         // already resolved server-side above (same $modOptions — no second
         // query) now that $sale_item_id exists.
@@ -1001,6 +1010,11 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     if ($table_id) {
         try {
             $pdo->prepare("UPDATE restaurant_tables SET status = 'available', updated_at = NOW() WHERE table_id = ?")
+                ->execute([$table_id]);
+            // restaurant_plan.md Phase 2 — the bill is paid, so the table's open order
+            // is closed too (the old comment above assumed the browser deleted it; it
+            // never did, which left paid orders showing on the table).
+            $pdo->prepare("UPDATE pos_held_sales SET status = 'loaded', loaded_at = NOW() WHERE table_id = ? AND status = 'held'")
                 ->execute([$table_id]);
         } catch (Throwable $e) {
             error_log("POS Phase 30 table-release warning for table_id={$table_id}: " . $e->getMessage());

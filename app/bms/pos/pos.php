@@ -161,6 +161,11 @@ $cashier_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_na
 // per warehouse-change; the JS layer just looks up the selected id.
 const POS_WAREHOUSE_MODES = <?= json_encode($_pos_warehouse_modes ?? []) ?>;
 const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
+// restaurant_plan.md Phase 2 — the Tables screen opens a table's order here (?table=ID&wid=ID&tlabel=T3).
+const POS_OPEN_TABLE = <?= json_encode(($restaurant_pos_enabled && !empty($_GET['table']))
+    ? ['id' => (int)$_GET['table'], 'wid' => (int)($_GET['wid'] ?? 0), 'label' => mb_substr((string)($_GET['tlabel'] ?? ''), 0, 50)]
+    : null) ?>;
+const POS_OPEN_ORDER_TYPE = <?= json_encode(($restaurant_pos_enabled && in_array($_GET['ot'] ?? '', ['take_away', 'delivery'], true)) ? $_GET['ot'] : null) ?>;
 // Shop scope (2026-09-16) — non-null when the active shift was opened on a
 // shop-assigned register; the Shop dropdown gets locked to this value so a
 // cashier can never sell against a different shop mid-shift (see the lock
@@ -577,6 +582,28 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                     </div>
                 </div>
                 <div class="alert alert-primary py-2 px-2 small mb-2 d-none" id="oldSaleCartNote" role="status"></div>
+                <?php if ($restaurant_pos_enabled): ?>
+                <!-- restaurant_plan.md Phase 2 — order type + table, restaurant/hybrid shops only
+                     (shown by applyPosModeUi(); a retail shop never sees it). -->
+                <div class="d-none mb-2" id="restaurantOrderBar">
+                    <div class="btn-group w-100 rs-order-type" role="group" aria-label="<?= htmlspecialchars(t('Order type')) ?>">
+                        <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDine" value="dine_in">
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDine"><i class="bi bi-cup-hot me-1"></i><?= t('Dine in') ?></label>
+                        <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeTake" value="take_away">
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeTake"><i class="bi bi-bag me-1"></i><?= t('Take away') ?></label>
+                        <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDelivery" value="delivery">
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDelivery"><i class="bi bi-scooter me-1"></i><?= t('Delivery') ?></label>
+                    </div>
+                    <div class="d-flex gap-2 mt-2" id="rsTableRow">
+                        <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-truncate" id="rsTableBtn" onclick="openTablePicker()">
+                            <i class="bi bi-grid-3x3-gap me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary d-none text-nowrap" id="rsSaveTableBtn" onclick="saveOrderToTable()">
+                            <i class="bi bi-bookmark-check me-1"></i><?= t('Save to table') ?>
+                        </button>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <div class="row g-2 small">
                     <div class="col-6">
                         <div class="text-muted"><?= t('Receipt #') ?></div>

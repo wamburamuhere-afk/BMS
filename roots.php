@@ -1175,6 +1175,7 @@ $routes = [
     'restaurant/reservations'       => RESTAURANT_DIR . '/reservations.php',
     'restaurant/menu-type'          => RESTAURANT_DIR . '/menu_type.php',
     'restaurant/menu'               => RESTAURANT_DIR . '/menu.php',   // restaurant_plan.md Phase 1
+    'restaurant/tables-board'       => RESTAURANT_DIR . '/tables_board.php', // restaurant_plan.md Phase 2
 
 
     // ========================================================================
