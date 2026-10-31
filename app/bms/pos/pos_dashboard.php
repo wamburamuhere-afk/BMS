@@ -40,7 +40,9 @@ $company_logo = getSetting('company_logo', '');
             <button id="btnToggleDash" class="btn btn-primary btn-sm pos-workspace-action">
                 <i class="bi bi-speedometer2 me-1"></i> <?= t('Sales Dashboard') ?>
             </button>
-            <a id="posWorkspaceShiftHistory" href="<?= getUrl('pos/shifts') ?>" class="btn btn-primary btn-sm pos-workspace-action">
+            <!-- Phones/tablets (<lg): Shift History lives in the ☰ side menu (My Business) so this
+                 row stays just Sales Dashboard + Start Selling. Still in the DOM, shown from lg up. -->
+            <a id="posWorkspaceShiftHistory" href="<?= getUrl('pos/shifts') ?>" class="btn btn-primary btn-sm pos-workspace-action d-none d-lg-inline-block">
                 <i class="bi bi-clock-history me-1"></i> <?= t('Shift History') ?>
             </a>
             <a id="posWorkspaceOpenPos" href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm pos-workspace-action">
@@ -60,7 +62,9 @@ $company_logo = getSetting('company_logo', '');
         'settings'          => 'bi-gear',
     ];
     ?>
-    <div class="row g-3 mb-4">
+    <!-- Hub cards: shown from lg up. On phones/tablets (<lg) the same destinations
+         (Who Owes Me, Catalog Setup, Restaurant, Settings) are in the ☰ side menu instead. -->
+    <div class="row g-3 mb-4 d-none d-lg-flex">
         <?php foreach ($pos_nav_groups as $navCard): ?>
         <div class="col-6 col-md-4 col-lg">
             <?php
