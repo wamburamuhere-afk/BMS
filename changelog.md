@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(pos): Create Product — remove redundant top buttons on phones
+
+**Changed:** `app/bms/product/product_create.php`.
+
+- The top "Add New Product" button duplicated "Save Product" at the bottom of the form, so it is removed (Smart POS simple form).
+- On phones nothing is shown above the form; "Back" remains on desktop only.
+
 ## 2026-10-31 — ui(expenses): phone layout polish on Expenses Management
 
 **Changed:** `app/constant/accounts/expenses.php`.
