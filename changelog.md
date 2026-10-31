@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-31 — fix(products): creating a product failed on the legacy database — missing product_batches.manufacturing_date
+
+**New:** `migrations/2026_10_31_product_batches_manufacturing_date_legacy_db.php`.
+
+- **Bug:** Add Product with opening stock failed with `Unknown column 'manufacturing_date' in 'field list'`. The column was only added to tenant databases (`migrations/tenant/2026_09_15_...`); the legacy / non-tenant database never got its mirror.
+- **Fix:** idempotent migration adds the nullable `product_batches.manufacturing_date DATE` after `expiry_date`. No application code changed; Smart POS is untouched.
+
 ## 2026-10-29 — feat: Import Products from CSV works again (Smart POS) — preview, then all-or-nothing import
 
 **New:** `core/product_import.php`, `tests/test_product_import_cli.php`, `tests/helpers/product_import_request.php`.
