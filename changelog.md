@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — fix(restaurant): till now sees the shop's Restaurant mode; Restaurant choice only exists when superadmin enables it
+
+**New:** `tests/test_restaurant_mode_gating_cli.php`.
+**Changed:** `app/bms/pos/pos.php`, `header.php`, `app/bms/stock/warehouses.php`, `api/mobile/warehouses/create.php`, `api/mobile/warehouses/update.php`.
+
+- **Bug (confirmed live on shop.demo):** `pos.php` printed `POS_WAREHOUSE_MODES` near the top but built it later inside the shop `<select>`, so it was always `{}` — every shop behaved as retail and Select Table / Send to Kitchen / dish add-ons never appeared, since Phase 30. The shop list and mode map are now built before the `<script>`; the dropdown markup is unchanged.
+- **Retail untouched:** the mode map is only looked up when Restaurant POS is on; with it off the till is exactly today's (map empty → every shop retail).
+- **Restaurant choice only when enabled:** with Restaurant POS off, a new shop is always saved as retail and a posted POS Mode is ignored on update (stored value kept) — web Shops page and mobile create/update. The form field was already hidden.
+- **Menu:** "Restaurant" link in the top menu and phone side menu, only when Restaurant POS is on (`canView('restaurant_pos')` checks the tenant entitlement first, even for admins).
+- **Checked:** new test 22/0 (real renders of the till + header with the module on/off, real Shops update POSTs; fails on the old `pos.php`); `test_restaurant_pos_mode_setup_cli` 36/0, `test_pos_simple_ux_cli` 94/0, `test_warehouse_project_filter_cli` 84/0; `test_restaurant_pos_cli` 152/1 — the 1 is a sibling suite `test_pos_phase8_registers_cli` failing on open/close_shift.php (pre-existing, files not touched).
+
 ## 2026-10-31 — fix(backup): old backups are thinned by a schedule that never empties a folder; backups/ no longer world-readable
 
 **Plan:** `backup_plan.md` (Phase 4 of PR 1).
