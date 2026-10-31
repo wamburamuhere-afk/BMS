@@ -220,7 +220,7 @@ try {
         ok(($sw[$k] ?? null) === $v, "shared retail key '$k' unchanged ('$v')");
     }
     // Every changed key must only appear in restaurant-context files.
-    $restaurantFiles = '#^(app/bms/restaurant/|api/restaurant/|core/pos_nav\.php|core/restaurant_scope\.php|app/bms/pos/pos\.php|app/bms/pos/pos_scripts_new\.php|app/bms/pos/pos_modals_new\.php|app/bms/pos/pos_dashboard\.php|app/bms/stock/warehouses\.php|ajax_get_warehouse\.php|app/bms/product/product_edit\.php|header\.php|app/superadmin/tenant_view\.php)#';
+    $restaurantFiles = '#^(app/bms/restaurant/|api/restaurant/|core/pos_nav\.php|core/restaurant_scope\.php|app/bms/pos/pos\.php|app/bms/pos/pos_scripts_new\.php|app/bms/pos/pos_modals_new\.php|app/bms/pos/pos_dashboard\.php|app/bms/stock/warehouses\.php|ajax_get_warehouse\.php|app/bms/product/product_edit\.php|header\.php|app/superadmin/tenant_view\.php|app/constant/settings/pos_config_settings\.php)#'; // pos_config_settings: only inside its restaurant-only section (Phase 3)
     $changed = ['Restaurant', 'Restaurant Hub', 'Floors & Tables', 'Floor', 'Add Floor', 'Edit Floor', 'All Floors', 'Kitchen Display',
         'Kitchen Stations', 'Add Station', 'Edit Station', 'Station', 'Modifier Group', 'Menu Type', 'No active kitchen tickets.',
         'Back to POS Hub', 'Occupied', 'Preparing', 'Dine-in: Table %s', 'Reservations', 'New Reservation'];

@@ -194,6 +194,8 @@ const PT = {
     savedToTable: <?= json_encode(t('Saved to table %s.')) ?>,
     addNote: <?= json_encode(t('Add note')) ?>,
     madeToOrder: <?= json_encode(t('made to order')) ?>,
+    kitchenSlipReady: <?= json_encode(t('Kitchen slip ready')) ?>,
+    printKitchenSlip: <?= json_encode(t('Print kitchen slip')) ?>,
     itemNoteTitle: <?= json_encode(t('Note for the kitchen')) ?>,
     itemNotePlaceholder: <?= json_encode(t('e.g. less salt, no chilli')) ?>,
     save: <?= json_encode(t('Save')) ?>,
@@ -1746,6 +1748,11 @@ function submitPayment(paymentData) {
                 // a plain wa.me deep-link the cashier's own device opens).
                 // The server's number is the real one (an old sale is numbered on its own day).
                 const savedReceipt = response.receipt_number || currentReceiptNumber;
+                // restaurant_plan.md Phase 3 — a paid take-away / delivery order goes to the kitchen.
+                if (posRestaurantActive() && POS_KITCHEN_MODE !== 'none' && response.sale_id
+                    && (paymentData.sale_type === 'take_away' || paymentData.sale_type === 'delivery')) {
+                    sendSaleToKitchen(response.sale_id, parseInt(paymentData.warehouse_id, 10));
+                }
                 const whatsappReceiptText = buildWhatsAppReceiptText(savedReceipt);
                 const oldSaleMsg = response.is_old_sale ? ' ' + OLD_SALE_T.recordedFor.replace('%s', oldSaleLongDate(response.sale_date)) : '';
 
@@ -1975,7 +1982,12 @@ function applyPosModeUi() {
         // never ride along on the next sale.
         clearTableSelection();
     } else {
-        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId);
+        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId || POS_KITCHEN_MODE === 'none');
+        // Order types switched off in Selling Settings are not offered.
+        ['take_away', 'delivery'].forEach(function (t) {
+            const on = POS_ORDER_TYPES.indexOf(t) > -1;
+            $(`input[name="rsOrderType"][value="${t}"]`).toggleClass('d-none', !on).next('label').toggleClass('d-none', !on);
+        });
     }
 }
 
@@ -2023,6 +2035,20 @@ $(function () {
     };
     setTimeout(function () { tryOpen(0); }, 300);
 });
+
+// restaurant_plan.md Phase 3 — kitchen slip (printer mode). Uses an already-open window when
+// given (opened inside a click); otherwise opens one and offers a link if the browser blocks it.
+function openKitchenSlip(params, win) {
+    const url = '<?= buildUrl('api/restaurant/kitchen_slip.php') ?>?' + $.param(params);
+    if (win && !win.closed) { win.location.href = url; return; }
+    const w = window.open(url, '_blank', 'width=420,height=640');
+    if (!w) Swal.fire({ icon: 'info', title: PT.kitchenSlipReady, html: `<a href="${url}" target="_blank" class="btn btn-primary"><i class="bi bi-printer me-1"></i>${PT.printKitchenSlip}</a>` });
+}
+function sendSaleToKitchen(saleId, warehouseId) {
+    $.post('<?= buildUrl('api/restaurant/send_to_kitchen.php') ?>', { sale_id: saleId, warehouse_id: warehouseId, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+        if (res.success && POS_KITCHEN_MODE === 'printer') openKitchenSlip({ sale_id: saleId, warehouse_id: warehouseId });
+    }, 'json');
+}
 
 // Kitchen note per item ("less salt, extra chilli") — restaurant shops only.
 function editItemNote(index) {
@@ -2149,7 +2175,7 @@ function selectTable(tableId, warehouseId, tableNumber) {
         saveCartToStorage();
         $('#restaurantTableIndicatorText').text(PT.dineInTable.replace('%s', tableNumber));
         $('#restaurantTableIndicator').removeClass('d-none');
-        $('#sendToKitchenBtn').removeClass('d-none');
+        $('#sendToKitchenBtn').toggleClass('d-none', POS_KITCHEN_MODE === 'none');
         // restaurant_plan.md Phase 2 — the order bar shows the table and offers "Save to table".
         if (currentOrderType !== 'dine_in') setOrderType('dine_in');
         $('#rsTableLabel').text(PT.tableLabel + ' ' + tableNumber + (existing ? ' · ' + PT.openOrder : ''));
@@ -2177,6 +2203,8 @@ function sendCurrentOrderToKitchen() {
     const wid = parseInt($('#posWarehouseId').val() || 0, 10);
     const btn = $('#sendToKitchenBtn');
     const origHtml = btn.html();
+    // restaurant_plan.md Phase 3 — printer mode: open the slip window now, inside the click.
+    const slipWin = (POS_KITCHEN_MODE === 'printer') ? window.open('', '_blank', 'width=420,height=640') : null;
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
     // Every "Send to Kitchen" press re-persists the table's current cart as a
@@ -2215,8 +2243,10 @@ function sendCurrentOrderToKitchen() {
                 hold_id: currentHoldId, warehouse_id: wid, _csrf: <?= json_encode(csrf_token()) ?>
             }, function (res) {
                 if (res.success) {
+                    if (POS_KITCHEN_MODE === 'printer') openKitchenSlip({ hold_id: currentHoldId, warehouse_id: wid }, slipWin);
                     Swal.fire({ icon: 'success', title: PT.sentToKitchen, timer: 1500, showConfirmButton: false });
                 } else {
+                    if (slipWin) slipWin.close();
                     Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: res.message });
                 }
             }, 'json').fail(function () {

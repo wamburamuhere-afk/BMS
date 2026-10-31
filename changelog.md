@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 3 — how orders reach the kitchen (by mouth / screen / printer)
+
+**New:** `api/restaurant/kitchen_slip.php`, `migrations/tenant/2026_10_31_restaurant_kitchen_ticket_label.php` + `migrations/2026_10_31_restaurant_kitchen_ticket_label_legacy_db.php`, `tests/test_restaurant_phase3_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `api/restaurant/send_to_kitchen.php`, `api/restaurant/get_kitchen_tickets.php`, `app/bms/restaurant/kitchen_dashboard.php`, `app/constant/settings/pos_config_settings.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `schema/*` (template rebuilt), `tests/test_restaurant_phase0_cli.php`.
+
+- **Selling Settings → Restaurant** (only when the restaurant module is on; ignored otherwise): *How do orders reach the kitchen?* **By mouth** (default — no kitchen step), **Kitchen screen**, **Printer**; order types Take away / Delivery on/off (Dine in always on).
+- **Till:** Send to Kitchen only shows in screen/printer mode; printer mode opens a kitchen slip (window opened inside the click so pop-up blockers allow it); a paid take-away/delivery order is sent to the kitchen automatically. Disabled order types are hidden. Advanced-POS restaurant tenants keep today's behaviour.
+- **Kitchen slip:** receipt-width page (58/80 mm from Selling Settings), order label, time, waiter, only items that need preparing grouped by Kitchen/Bar with add-ons/notes; prints itself. Works with any receipt printer set as the device's default.
+- **Schema:** `kitchen_tickets.order_label` + `sale_id` (nullable) — the kitchen screen shows "Table T3" / "Take away · RCP-…"; a paid sale is sent once (repeat refreshes, no duplicate).
+- **Checked:** new test 23/0 (settings shown/saved only with the module on and ignored when off, safe default, take-away ticket + label + note, no duplicate, table label, kitchen screen labels, slip content/width, retail refused, till receives the settings); restaurant phases 0–2 + POS/i18n suites green. Pre-existing: `test_pos_old_sale_flow_cli` fails on local fixture data ('Bread Loaf' below its minimum price).
+
 ## 2026-10-31 — feat(restaurant): Phase 2 — Take Order on the till + live Tables screen
 
 **New:** `app/bms/restaurant/tables_board.php` (route `restaurant/tables-board`), `api/restaurant/get_tables_board.php`, `api/restaurant/move_table_order.php`, `tests/test_restaurant_phase2_cli.php`.

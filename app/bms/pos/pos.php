@@ -166,6 +166,10 @@ const POS_OPEN_TABLE = <?= json_encode(($restaurant_pos_enabled && !empty($_GET[
     ? ['id' => (int)$_GET['table'], 'wid' => (int)($_GET['wid'] ?? 0), 'label' => mb_substr((string)($_GET['tlabel'] ?? ''), 0, 50)]
     : null) ?>;
 const POS_OPEN_ORDER_TYPE = <?= json_encode(($restaurant_pos_enabled && in_array($_GET['ot'] ?? '', ['take_away', 'delivery'], true)) ? $_GET['ot'] : null) ?>;
+// restaurant_plan.md Phase 3 — Selling Settings: how orders reach the kitchen + order types offered.
+<?php require_once ROOT_DIR . '/core/restaurant_scope.php'; $_rest_mod = $restaurant_pos_enabled && restaurantModuleOn($pdo); ?>
+const POS_KITCHEN_MODE = <?= json_encode($_rest_mod ? restaurantKitchenMode() : 'screen') ?>;
+const POS_ORDER_TYPES = <?= json_encode($_rest_mod ? restaurantOrderTypes() : ['dine_in', 'take_away', 'delivery']) ?>;
 // Shop scope (2026-09-16) — non-null when the active shift was opened on a
 // shop-assigned register; the Shop dropdown gets locked to this value so a
 // cashier can never sell against a different shop mid-shift (see the lock

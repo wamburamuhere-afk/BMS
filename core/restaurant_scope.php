@@ -166,7 +166,9 @@ if (!function_exists('restaurantMenuSchemaReady')) {
         if ($ready !== null) return $ready;
         try {
             $ready = (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'is_available'")->fetch()
-                  && (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'is_menu_item'")->fetch();
+                  && (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'is_menu_item'")->fetch()
+                  // Phase 3 — kitchen_tickets.order_label (2026_10_31_restaurant_kitchen_ticket_label)
+                  && (bool)$pdo->query("SHOW COLUMNS FROM kitchen_tickets LIKE 'order_label'")->fetch();
         } catch (Throwable $e) {
             $ready = false;
         }
@@ -301,5 +303,34 @@ if (!function_exists('restaurantGettingStarted')) {
             ['key' => 'menu',   'label' => t('Add dishes and drinks'),         'done' => $items > 0,  'url' => 'restaurant/menu'],
             ['key' => 'order',  'label' => t('Take your first order'),         'done' => $sales > 0,  'url' => 'pos'],
         ];
+    }
+}
+
+if (!function_exists('restaurantKitchenMode')) {
+    /**
+     * restaurant_plan.md Phase 3 — "How do orders reach the kitchen?" (Selling Settings):
+     *   none    = by mouth (default — most small restaurants): no kitchen step on the till
+     *   screen  = a phone/tablet in the kitchen shows orders (Kitchen screen)
+     *   printer = a kitchen slip prints on Send to Kitchen (the screen still lists it)
+     */
+    function restaurantKitchenMode(): string
+    {
+        $m = (string)get_setting('restaurant_kitchen_mode', 'none');
+        return in_array($m, ['none', 'screen', 'printer'], true) ? $m : 'none';
+    }
+}
+
+if (!function_exists('restaurantOrderTypes')) {
+    /**
+     * restaurant_plan.md Phase 3 — order types offered on the till. Dine in is always on;
+     * Take away and Delivery default on and can be switched off in Selling Settings.
+     * @return string[]
+     */
+    function restaurantOrderTypes(): array
+    {
+        $types = ['dine_in'];
+        if (get_setting('restaurant_order_take_away', '1') === '1') $types[] = 'take_away';
+        if (get_setting('restaurant_order_delivery', '1') === '1') $types[] = 'delivery';
+        return $types;
     }
 }
