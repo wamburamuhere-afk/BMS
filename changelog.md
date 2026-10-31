@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-31 — fix(backup): old backups are thinned by a schedule that never empties a folder; backups/ no longer world-readable
+
+**Plan:** `backup_plan.md` (Phase 4 of PR 1).
+**New:** `tests/test_backup_retention_cli.php`.
+**Changed:** `core/backup.php` (`bms_prune_backups()` removed; new `bms_backup_file_info()`, `bms_apply_retention()`), `core/tenant_backups.php` (retention after each successful backup; `tenant-audit: skip` with reason), `cron/auto_backup.php`, `app/constant/settings/backup_restore.php`, `lang/sw.php`, `.github/workflows/deploy.yml`, `tests/test_backup_zip_cli.php`, `tests/test_tenant_backups_cli.php`.
+
+- **Before:** every automatic backup older than 7 days was deleted, with no minimum — on production on 2026-10-31 a manual run deleted both older BJP backups and left one. Uploaded restore files were never deleted (≈325 MB in one company's folder). `deploy.yml` ran `chmod -R 777 backups/`, so every user and every other system on the shared server could read every company's database dump.
+- **Retention now:** snapshots kept 48 h; nightly 7 days; the first nightly of each week 4 weeks; the first of each month 12 months; `pre_restore_*` and `uploaded_*` 30 days; the 3 newest nightly and 3 newest snapshots are **always** kept, whatever their age, so a folder whose backups stopped is never emptied. Manual backups (`bms_backup_*`) and unrecognised files are never touched. The date is read from the file name (copying changes a file's time, not its name). Applied by the scheduled run only after a new backup succeeded (a failing company keeps its old files), by the Backup page's daily fallback and by `cron/auto_backup.php`. Each company's folder settles at about 28–29 files.
+- **Permissions now:** `backups/` is owned by the deploy user (git can still update its `.htaccess`), group `www-data` (PHP and the backup cron write), mode `2770` (setgid keeps new files in the group); existing files `0660`, folders `2770`; nobody else can list or read it. Guarded with `|| echo` — never stops a deploy.
+- **Page:** the Backup page's note describes the schedule and what is kept (English + Swahili).
+- **`cron/auto_backup.php`:** docblock now says it is a manual main-install-only tool and must not be scheduled alongside `backup_all_tenants.php`.
+- **Checked:** `test_backup_retention_cli` 32 checks (name parsing incl. real production names, a year of history in one run, stopped backups keep 3, the production 13/17 Oct case keeps everything, mtime ignored, a 400-night simulation peaks at 29 files and keeps one per month for 12 months, a failing target keeps its files, all callers wired, old function gone). `test_tenant_backups_cli` 60 (adds deploy permission checks). Other backup suites 35/73/31/62 all 0 failures. Real Backup page rendered as admin in English and Swahili: HTTP 200, snapshot row "DB only", full row "Full backup", new note, no PHP warnings. 30 other suites that read the changed files run against a clean `develop`: `test_tenant_resource_audit_cli` flagged `core/tenant_backups.php` (fleet-wide job, like the exempt migration runner) → marked `tenant-audit: skip` with the reason, now identical to `develop`; every other failure identical to `develop`.
+
 ## 2026-10-31 — feat(backup): deploy installs the backup schedule — no manual step, never forgotten
 
 **Plan:** `backup_plan.md` (Phase 3 of PR 1).

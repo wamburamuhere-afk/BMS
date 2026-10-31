@@ -45,7 +45,7 @@ function runAutoBackup($pdo, $backupsDir) {
     try {
         bms_write_zip_backup($pdo, $filepath, $uploadsDir, bmsTenantPathPrefix());
         file_put_contents($markerFile, time());
-        bms_prune_backups($backupsDir, 7);
+        bms_apply_retention($backupsDir);
         return $filename;
     } catch (Exception $e) {
         if (file_exists($filepath)) @unlink($filepath);
@@ -152,7 +152,7 @@ $apiUrl  = getUrl('api/backup_actions.php');
                         <li class="mb-2"><strong><?= t('.sql backups') ?></strong> <?= t('include database only — uploaded files are NOT restored.') ?></li>
                         <li class="mb-2"><?= t('Restoring a backup will') ?> <strong><?= t('overwrite') ?></strong> <?= t('all current data.') ?></li>
                         <li class="mb-2"><?= t('A safety snapshot of the current database is created automatically before every restore.') ?></li>
-                        <li class="mb-2"><?= t('Auto backups run daily and keep the last 7 files.') ?></li>
+                        <li class="mb-2"><?= t('Automatic backups: full backup every night, database snapshot every 6 hours. Kept: snapshots 2 days, nightly 7 days, weekly 4 weeks, monthly 12 months — the 3 newest are never deleted.') ?></li>
                         <li><?= t('Large restores may take a few minutes — do not close the page.') ?></li>
                     </ul>
                 </div>

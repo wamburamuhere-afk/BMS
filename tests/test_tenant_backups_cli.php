@@ -314,3 +314,10 @@ ok((bool)preg_match('/install_backup_cron\.php[^;]*\|\| echo/', $body), 'guarded
 ok(strpos($body, 'install_backup_cron.php') > strpos($body, 'tenant_migration_runner.php'), 'runs after the tenant migrations (last step per host)');
 ok(str_contains($yml, 'BACKUP_OFFSET=0') && str_contains($body, 'BACKUP_OFFSET=$((BACKUP_OFFSET + 30))'), 'each next host is staggered by 30 minutes');
 ok(str_contains($yml, 'script_stop: true'), 'script_stop: true is still in place');
+ok(!preg_match('/chmod\s+-R\s+777\s+backups/', $body), 'backups/ is no longer made world-readable (chmod -R 777 gone)');
+ok(str_contains($body, 'sudo chown "$(id -un):www-data" backups') && str_contains($body, 'sudo chmod 2770 backups'),
+   'backups/ = SSH user (git can update .htaccess) + group www-data (PHP and the cron write), mode 2770');
+ok(str_contains($body, '-type f -exec chmod 0660') && str_contains($body, '-type d -exec chmod 2770'),
+   'existing backup files and folders lose their world access too');
+ok((bool)preg_match('/chmod 0660 \{\} \+ ; \} \|\| echo/', $body), 'the permission step is guarded — it can never stop a deploy');
+ok(strpos($body, 'chmod 2770 backups') < strpos($body, 'php migrations/runner.php'), 'permissions are fixed before migrations run');

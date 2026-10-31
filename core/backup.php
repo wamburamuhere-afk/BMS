@@ -316,25 +316,98 @@ if (!function_exists('bms_write_dump')) {
     }
 
     /**
-     * Delete auto/pre-restore backups older than $days days (by file mtime).
-     * Manual ("bms_backup_*") and uploaded ("uploaded_*") files are NEVER
-     * touched — only "auto_backup_*" and "pre_restore_*" are auto-pruned.
-     * Handles both .sql and .zip formats.
+     * When a backup file was taken, read from its NAME (copying or restoring a
+     * file changes its mtime; the name never lies). Times are Africa/Dar_es_Salaam,
+     * the zone every writer names files in.
      *
-     * @return string[]  filenames deleted
+     * @return array{kind:string, ts:int}|null  null = not an automatic file → never deleted
      */
-    function bms_prune_backups(string $dir, int $days = 7): array {
-        $dir = rtrim($dir, '/\\') . '/';
-        $cutoff  = time() - ($days * 86400);
-        $deleted = [];
-
-        foreach (['auto_backup_*.sql', 'pre_restore_*.sql', 'auto_backup_*.zip', 'pre_restore_*.zip'] as $pattern) {
-            foreach ((glob($dir . $pattern) ?: []) as $file) {
-                if (is_file($file) && filemtime($file) < $cutoff) {
-                    if (@unlink($file)) $deleted[] = basename($file);
-                }
-            }
+    function bms_backup_file_info(string $name): ?array
+    {
+        $tz = new DateTimeZone('Africa/Dar_es_Salaam');
+        if (preg_match('/^(auto_backup|auto_snapshot|pre_restore)_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.(zip|sql)$/', $name, $m)) {
+            $d = DateTime::createFromFormat('!Y-m-d_H-i-s', $m[2], $tz);
+            return $d ? ['kind' => $m[1], 'ts' => $d->getTimestamp()] : null;
         }
+        if (preg_match('/^uploaded_(\d{8}_\d{6})_.+\.(zip|sql)$/', $name, $m)) {
+            $d = DateTime::createFromFormat('!Ymd_His', $m[1], $tz);
+            return $d ? ['kind' => 'uploaded', 'ts' => $d->getTimestamp()] : null;
+        }
+        return null;
+    }
+
+    /**
+     * Apply the retention policy (backup_plan.md §3) to one backup folder.
+     *
+     * A file is KEPT if any rule holds:
+     *   auto_snapshot_*  newer than 48 h
+     *   auto_backup_*    newer than 7 days; or the first of its ISO week, newer
+     *                    than 4 weeks; or the first of its month, newer than 12 months
+     *   pre_restore_*, uploaded_*  newer than 30 days
+     *   the 3 newest auto_backup_* and the 3 newest auto_snapshot_* — ALWAYS,
+     *   whatever their age, so a folder whose backups stopped is never emptied
+     *
+     * Manual backups (bms_backup_*) and any name not recognised are never
+     * touched. Weekly and monthly are the same daily file kept longer — no
+     * extra copies. Replaces the old age-only rule, which on 2026-10-31 deleted
+     * BOTH older BJP backups and left a single one.
+     *
+     * @param int|null $now  for tests; default time()
+     * @return string[] file names deleted
+     */
+    function bms_apply_retention(string $dir, ?int $now = null): array
+    {
+        $dir = rtrim($dir, '/\\') . '/';
+        $now = $now ?? time();
+        $tz  = new DateTimeZone('Africa/Dar_es_Salaam');
+
+        $files = [];
+        // Two globs, not GLOB_BRACE — that flag is missing on some platforms.
+        foreach (array_merge(glob($dir . '*.zip') ?: [], glob($dir . '*.sql') ?: []) as $path) {
+            if (!is_file($path)) continue;
+            $info = bms_backup_file_info(basename($path));
+            if ($info !== null) $files[basename($path)] = $info;
+        }
+
+        // Newest-first per kind for the safety floor; oldest-first per
+        // week/month to find "the first of" each.
+        $keep = [];
+        foreach (['auto_backup', 'auto_snapshot'] as $kind) {
+            $ofKind = array_filter($files, fn($f) => $f['kind'] === $kind);
+            uasort($ofKind, fn($a, $b) => $b['ts'] <=> $a['ts']);
+            foreach (array_slice(array_keys($ofKind), 0, 3) as $n) $keep[$n] = true;
+        }
+
+        $firstOfWeek = $firstOfMonth = [];
+        $dailies = array_filter($files, fn($f) => $f['kind'] === 'auto_backup');
+        uasort($dailies, fn($a, $b) => $a['ts'] <=> $b['ts']);
+        foreach ($dailies as $n => $f) {
+            $d = (new DateTime('@' . $f['ts']))->setTimezone($tz);
+            $firstOfWeek[$d->format('o-W')]  ??= $n;
+            $firstOfMonth[$d->format('Y-m')] ??= $n;
+        }
+        $weekly  = array_flip($firstOfWeek);
+        $monthly = array_flip($firstOfMonth);
+
+        $deleted = [];
+        foreach ($files as $n => $f) {
+            if (isset($keep[$n])) continue;
+            $age = $now - $f['ts'];
+            switch ($f['kind']) {
+                case 'auto_snapshot':
+                    $retain = $age <= 2 * 86400;
+                    break;
+                case 'auto_backup':
+                    $retain = $age <= 7 * 86400
+                        || (isset($weekly[$n])  && $age <= 28 * 86400)
+                        || (isset($monthly[$n]) && $age <= 365 * 86400);
+                    break;
+                default:   // pre_restore, uploaded
+                    $retain = $age <= 30 * 86400;
+            }
+            if (!$retain && @unlink($dir . $n)) $deleted[] = $n;
+        }
+        sort($deleted);
         return $deleted;
     }
 

@@ -2,25 +2,19 @@
 /**
  * cron/auto_backup.php
  * --------------------
- * Scheduled nightly database backup. Runs independently of the UI so a backup
- * is GUARANTEED even if no admin ever opens the Backup & Restore page.
+ * One full backup of the MAIN install only (no tenants). Kept as a manual tool.
+ *
+ * NOT THE SCHEDULED BACKUP. The schedule runs cron/backup_all_tenants.php
+ * (main install + every tenant + control DB), installed into /etc/cron.d by
+ * scripts/install_backup_cron.php on every deploy. Do not also schedule this
+ * file — it would duplicate the main install's nightly backup.
  *
  * What it does:
- *   1. Writes backups/auto_backup_<date>.sql (schema + data + views) via the
- *      shared bms_write_dump() helper.
- *   2. Prunes auto_backup_* and pre_restore_* files older than 7 days
- *      (manual/uploaded backups are never auto-deleted).
+ *   1. Writes backups/auto_backup_<date>.zip (database + the main install's
+ *      own uploads) via bms_write_zip_backup().
+ *   2. Applies the retention policy (bms_apply_retention, backup_plan.md §3).
  *   3. Updates the .last_auto_backup marker (so the page's on-load auto-backup
  *      doesn't double-run the same day) and logs to cron/backup.log + activity_logs.
- *
- * SCHEDULING
- *   Windows (this WAMP box) — Task Scheduler, daily at 00:00:
- *     schtasks /create /tn "BMS Daily Backup" /sc daily /st 00:00 /ru SYSTEM ^
- *       /tr "C:\wamp64\bin\php\php8.2.12\php.exe C:\wamp64\www\bms\cron\auto_backup.php"
- *     (adjust the php.exe path to your installed version)
- *
- *   Linux (production) — crontab:
- *     0 0 * * * /usr/bin/php /var/www/bms/cron/auto_backup.php >> /var/www/bms/cron/backup.log 2>&1
  *
  * Safe to run manually any time:  php cron/auto_backup.php
  */
@@ -39,7 +33,6 @@ if (!$isCli) {
     }
 }
 
-$retentionDays = 7;
 // bmsBackupDir() rather than the shared literal. This cron runs from the CLI,
 // where no tenant is resolved, so it returns the unprefixed path exactly as
 // before — the call is what keeps it correct if this is ever invoked in a
@@ -66,10 +59,10 @@ try {
     $sizeLabel = $bytes >= 1048576 ? round($bytes / 1048576, 2) . ' MB' : round($bytes / 1024, 2) . ' KB';
     bms_cron_log($logFile, "Full backup created: $filename ($sizeLabel, DB: {$stats['db_size_mb']} MB, Files: {$stats['files_count']})");
 
-    // Prune auto/pre_restore backups older than the retention window.
-    $deleted = bms_prune_backups($backupsDir, $retentionDays);
+    // Retention policy — never empties the folder (3 newest always kept).
+    $deleted = bms_apply_retention($backupsDir);
     if (!empty($deleted)) {
-        bms_cron_log($logFile, "Pruned " . count($deleted) . " file(s) older than {$retentionDays} days: " . implode(', ', $deleted));
+        bms_cron_log($logFile, "Retention removed " . count($deleted) . " file(s): " . implode(', ', $deleted));
     }
 
     // Keep the page's daily throttle in sync so it won't duplicate today's run.

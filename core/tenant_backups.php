@@ -24,6 +24,14 @@
  *   full     — database + the owner's uploads → auto_backup_<ts>.zip   (daily)
  *   snapshot — database only                  → auto_snapshot_<ts>.zip (6-hourly)
  *
+ * tenant-audit: skip — a fleet-wide job like core/tenant_migration_runner.php:
+ * it runs from the CLI with no request tenant and must connect to EVERY
+ * database by name (main install via DB_*, each tenant via its decrypted
+ * credentials, the control DB via controlDbSettings()). The per-request
+ * accessors (bmsCurrentDbConfig/bmsCurrentDbName) answer "this request's
+ * database" and cannot serve that. Uploads/backup paths are still scoped per
+ * owner through bms_write_zip_backup() + bms_upload_in_scope().
+ *
  * Public API:
  *   bmsBackupTargets(?int $onlyTenantId = null): array
  *   bmsBackupRunTarget(array $target, string $kind): array
@@ -383,6 +391,10 @@ if (!function_exists('bmsBackupRunAll')) {
                 $out['ok']++;
                 $size = $r['bytes'] >= 1048576 ? round($r['bytes'] / 1048576, 2) . ' MB' : round($r['bytes'] / 1024, 1) . ' KB';
                 $log("OK     {$t['key']} — {$t['label']}: {$r['file']} ($size, files: {$r['files_count']}, {$r['ms']} ms)");
+                // Retention only after a NEW backup exists — a failing target
+                // never loses its old files.
+                $removed = bms_apply_retention($t['dir']);
+                if ($removed) $log("       {$t['key']} retention removed " . count($removed) . ': ' . implode(', ', $removed));
             } else {
                 $out['failed']++;
                 $log("FAILED {$t['key']} — {$t['label']}: {$r['error']}");
