@@ -100,6 +100,17 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
 
 <div class="container-fluid mt-4">
     <!-- Page Header -->
+    <?php if ($simpleProductForm): ?>
+    <!-- Smart POS: compact header — no title/subtitle, just small buttons on the left -->
+    <div class="d-flex justify-content-start align-items-center gap-2 mb-3">
+        <a href="<?= getUrl('products') ?>" class="btn btn-light border btn-sm" title="<?= t('Back') ?>">
+            <i class="bi bi-arrow-left"></i> <?= t('Back') ?>
+        </a>
+        <button type="submit" form="productForm" class="btn btn-primary btn-sm shadow-sm">
+            <i class="bi bi-plus-circle"></i> <?= t('Add New Product') ?>
+        </button>
+    </div>
+    <?php else: ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center bg-primary p-3 rounded shadow-sm">
@@ -118,6 +129,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Main Navigation Tabs -->
     <div class="card border-0 shadow-sm overflow-hidden mb-4">
