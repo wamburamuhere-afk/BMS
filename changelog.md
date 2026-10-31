@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(expenses): phone layout polish on Expenses Management
+
+**Changed:** `app/constant/accounts/expenses.php`.
+
+- **Before (phone):** "Add New Expense" wrapped onto 3 lines beside a 2-line title + subtitle; stat cards were large green blocks; every filter field took a full row.
+- **Now (phone only, <768px):** header is one row (short title + small Add button, subtitle hidden); stat cards are compact white 2x2 with a green accent bar; Status is full width, Date From/To sit side by side, Apply/Clear share one row. Desktop layout unchanged.
+
 ## 2026-10-31 — ui(pos): Create Product page — compact header in Smart POS mode
 
 **Changed:** `app/bms/product/product_create.php`.
