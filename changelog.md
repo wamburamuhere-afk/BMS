@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 4 — split the bill, join tables
+
+**New:** `api/restaurant/join_table_orders.php`, `tests/test_restaurant_phase4_cli.php`, `tests/helpers/restaurant_inproc.php` (shared in-process test harness).
+**Changed:** `api/pos/process_sale.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/tables_board.php`, `lang/sw.php`.
+
+- **Split bill (till, table orders):** choose what is paid now (− / + per item); the rest stays on the table. The part payment is sent with `keep_table` so the table and its open order stay; the remaining items are saved straight back as the table's one open order; the final payment frees the table. *Cancel split* restores the full order. (Paying one bill with several payment methods = the existing Split Payment.)
+- **Join tables (Tables screen):** the Move window also lists tables that have an order — joining adds this table's items to that table's open order (total recalculated), closes this order, moves its open kitchen tickets and frees this table.
+- **UI standard:** the table picker's header is now blue (was green).
+- **Not built:** service charge — it needs a server-side price for a charge line inside the shared sale engine; left out on purpose to keep retail sales untouched (optional in the plan).
+- **Checked:** new test 22/0 (part payment keeps table/order, remainder = one open order, final payment frees, both sales on the table, ledger balanced; join merges items/total, frees the first table, moves its ticket, refuses bad targets; keep_table without a table harmless; till renders split only with the module on; all inline scripts parse); restaurant phases 2–3 + POS/i18n suites green.
+
 ## 2026-10-31 — feat(restaurant): Phase 3 — how orders reach the kitchen (by mouth / screen / printer)
 
 **New:** `api/restaurant/kitchen_slip.php`, `migrations/tenant/2026_10_31_restaurant_kitchen_ticket_label.php` + `migrations/2026_10_31_restaurant_kitchen_ticket_label_legacy_db.php`, `tests/test_restaurant_phase3_cli.php`.

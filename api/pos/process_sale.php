@@ -207,6 +207,9 @@ try {
     // belong to $warehouse_id) before being trusted for the post-commit
     // status flip.
     $table_id = $toNullableInt($input['table_id'] ?? null);
+    // restaurant_plan.md Phase 4 — split bill: paying PART of a table's order keeps the table and
+    // its open order (the till saves the remaining items back to it right after).
+    $keep_table = $table_id && !empty($input['keep_table']);
     $sale_type_in = in_array($input['sale_type'] ?? '', ['walk_in', 'customer', 'online', 'delivery', 'dine_in', 'take_away'], true)
         ? $input['sale_type'] : 'walk_in';
     $assigned_to = $toNullableInt($input['assigned_to'] ?? null);
@@ -1007,7 +1010,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     // (pos_held_sales) is cleared by the existing client-side call to
     // delete_held_sale.php once it sees this response's success=true —
     // unchanged by this phase.
-    if ($table_id) {
+    if ($table_id && !$keep_table) {
         try {
             $pdo->prepare("UPDATE restaurant_tables SET status = 'available', updated_at = NOW() WHERE table_id = ?")
                 ->execute([$table_id]);

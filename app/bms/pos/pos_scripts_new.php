@@ -36,6 +36,8 @@ let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetch
 // restaurant_plan.md Phase 2 — dine_in / take_away / delivery; '' = not chosen (sent as nothing,
 // exactly like before). Only a restaurant/hybrid shop ever sets it.
 let currentOrderType = '';
+// restaurant_plan.md Phase 4 — split bill in progress: { original: [...], remainder: [...] }.
+let rsSplit = null;
 
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
 // True for admins / users granted every shop: they may load products with no shop chosen.
@@ -195,6 +197,9 @@ const PT = {
     addNote: <?= json_encode(t('Add note')) ?>,
     madeToOrder: <?= json_encode(t('made to order')) ?>,
     kitchenSlipReady: <?= json_encode(t('Kitchen slip ready')) ?>,
+    splitPickOne: <?= json_encode(t('Choose at least one item to pay now.')) ?>,
+    splitNote: <?= json_encode(t('Paying part of the bill — %d item(s) stay on the table.')) ?>,
+    splitKept: <?= json_encode(t('The rest of the bill stays on table %s.')) ?>,
     printKitchenSlip: <?= json_encode(t('Print kitchen slip')) ?>,
     itemNoteTitle: <?= json_encode(t('Note for the kitchen')) ?>,
     itemNotePlaceholder: <?= json_encode(t('e.g. less salt, no chilli')) ?>,
@@ -1695,6 +1700,8 @@ function processPayment() {
         table_id: currentTableId || undefined,
         // restaurant_plan.md Phase 2 — take_away / delivery from the order bar (restaurant shops only).
         sale_type: currentTableId ? 'dine_in' : ((posRestaurantActive() && currentOrderType) ? currentOrderType : undefined),
+        // restaurant_plan.md Phase 4 — paying part of a table's bill keeps the table open.
+        keep_table: (currentTableId && rsSplit && rsSplit.remainder.length) ? 1 : undefined,
         // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales
         // only; undefined/null for every other sale, which process_sale.php
         // treats identically to how it behaved before this phase.
@@ -1748,6 +1755,11 @@ function submitPayment(paymentData) {
                 // a plain wa.me deep-link the cashier's own device opens).
                 // The server's number is the real one (an old sale is numbered on its own day).
                 const savedReceipt = response.receipt_number || currentReceiptNumber;
+                // restaurant_plan.md Phase 4 — split bill: the unpaid items go straight back on the table.
+                if (paymentData.keep_table && rsSplit && rsSplit.remainder.length) {
+                    saveRemainderToTable(rsSplit.remainder, paymentData.table_id, currentTableLabel, parseInt(paymentData.warehouse_id, 10));
+                }
+                rsSplit = null;
                 // restaurant_plan.md Phase 3 — a paid take-away / delivery order goes to the kitchen.
                 if (posRestaurantActive() && POS_KITCHEN_MODE !== 'none' && response.sale_id
                     && (paymentData.sale_type === 'take_away' || paymentData.sale_type === 'delivery')) {
@@ -2000,6 +2012,10 @@ function clearTableSelection() {
     $('#rsTableLabel').text(PT.chooseTable);
     $('#rsTableBtn').removeClass('btn-primary text-white').addClass('btn-outline-primary');
     $('#rsSaveTableBtn').addClass('d-none');
+    $('#rsSplitRow').addClass('d-none');
+    rsSplit = null;
+    $('#rsSplitNote').addClass('d-none');
+    $('#rsSplitBtn').removeClass('d-none');
 }
 
 // restaurant_plan.md Phase 2 — Dine in / Take away / Delivery.
@@ -2035,6 +2051,85 @@ $(function () {
     };
     setTimeout(function () { tryOpen(0); }, 300);
 });
+
+// restaurant_plan.md Phase 4 — split bill by items.
+function openSplitBill() {
+    if (!currentTableId || !cart.length) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
+    if (rsSplit) return;
+    let html = '';
+    cart.forEach((it, i) => {
+        html += `<div class="d-flex align-items-center gap-2 py-2 border-bottom">
+            <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${caseFormatJs(it.product_name)}</div>
+                <div class="small text-muted">${it.quantity} × ${Number(it.discounted_price).toLocaleString()}</div></div>
+            <div class="input-group input-group-sm flex-shrink-0" style="width:120px;">
+                <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, -1)">−</button>
+                <input type="number" class="form-control text-center rs-split-qty" data-i="${i}" min="0" max="${it.quantity}" value="0" oninput="rsSplitTotal()">
+                <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, 1)">+</button>
+            </div></div>`;
+    });
+    $('#rsSplitLines').html(html);
+    rsSplitTotal();
+    new bootstrap.Modal(document.getElementById('rsSplitModal')).show();
+}
+function rsSplitStep(i, d) {
+    const el = $(`.rs-split-qty[data-i="${i}"]`);
+    el.val(Math.max(0, Math.min(cart[i].quantity, (parseFloat(el.val()) || 0) + d)));
+    rsSplitTotal();
+}
+function rsSplitTotal() {
+    let t = 0;
+    $('.rs-split-qty').each(function () {
+        const it = cart[$(this).data('i')];
+        const q = Math.max(0, Math.min(it.quantity, parseFloat($(this).val()) || 0));
+        t += q * it.discounted_price;
+    });
+    $('#rsSplitTotal').text(POS_CURRENCY + ' ' + t.toLocaleString());
+}
+function applySplitBill() {
+    const original = JSON.parse(JSON.stringify(cart));
+    const payNow = [], remainder = [];
+    $('.rs-split-qty').each(function () {
+        const it = original[$(this).data('i')];
+        const q = Math.max(0, Math.min(it.quantity, parseFloat($(this).val()) || 0));
+        if (q > 0) payNow.push(Object.assign({}, it, { quantity: q }));
+        if (it.quantity - q > 0) remainder.push(Object.assign({}, it, { quantity: it.quantity - q }));
+    });
+    if (!payNow.length) { Swal.fire({ icon: 'info', title: PT.splitPickOne }); return; }
+    bootstrap.Modal.getInstance(document.getElementById('rsSplitModal'))?.hide();
+    if (!remainder.length) return; // everything chosen = a normal full payment
+    rsSplit = { original: original, remainder: remainder };
+    cart = payNow;
+    updateCartDisplay();
+    saveCartToStorage();
+    $('#rsSplitNoteText').text(PT.splitNote.replace('%d', remainder.reduce((n, i) => n + i.quantity, 0)));
+    $('#rsSplitNote').removeClass('d-none');
+    $('#rsSplitBtn, #rsSaveTableBtn').addClass('d-none');
+}
+function cancelSplitBill() {
+    if (!rsSplit) return;
+    cart = rsSplit.original;
+    rsSplit = null;
+    updateCartDisplay();
+    saveCartToStorage();
+    $('#rsSplitNote').addClass('d-none');
+    $('#rsSplitBtn, #rsSaveTableBtn').removeClass('d-none');
+}
+function saveRemainderToTable(items, tableId, label, warehouseId) {
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/hold_sale.php') ?>', type: 'POST', contentType: 'application/json', dataType: 'json',
+        data: JSON.stringify({
+            reference: PT.tableLabel + ' ' + label, customer_id: null, items: items,
+            subtotal: items.reduce((s, i) => s + (i.price * i.quantity), 0),
+            tax: items.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
+            warehouse_id: warehouseId, table_id: tableId
+        }),
+        success: function (res) {
+            if (res.success) Swal.fire({ toast: true, position: 'top', icon: 'info', title: PT.splitKept.replace('%s', label), timer: 2600, showConfirmButton: false });
+            else Swal.fire({ icon: 'error', title: PT.error, text: res.message });
+        },
+        error: () => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError })
+    });
+}
 
 // restaurant_plan.md Phase 3 — kitchen slip (printer mode). Uses an already-open window when
 // given (opened inside a click); otherwise opens one and offers a link if the browser blocks it.
@@ -2181,6 +2276,7 @@ function selectTable(tableId, warehouseId, tableNumber) {
         $('#rsTableLabel').text(PT.tableLabel + ' ' + tableNumber + (existing ? ' · ' + PT.openOrder : ''));
         $('#rsTableBtn').removeClass('btn-outline-primary').addClass('btn-primary text-white');
         $('#rsSaveTableBtn').removeClass('d-none');
+        $('#rsSplitRow').removeClass('d-none');
 
         $.post('<?= buildUrl('api/restaurant/update_table_status.php') ?>', {
             table_id: tableId, status: 'occupied', _csrf: <?= json_encode(csrf_token()) ?>

@@ -75,7 +75,7 @@ $can_sell   = canCreate('pos');
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><?= t('Move order') ?> — <span id="moveFrom"></span></h5>
+                <h5 class="modal-title"><?= t('Move or join') ?> — <span id="moveFrom"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -120,6 +120,11 @@ const TB = {
     noTables: <?= json_encode(t('No tables yet.')) ?>,
     addTables: <?= json_encode(t('Add tables')) ?>,
     noFree: <?= json_encode(t('No free table right now.')) ?>,
+    joinWith: <?= json_encode(t('Or join with a table that has an order:')) ?>,
+    joinQ: <?= json_encode(t('Join table %1$s into table %2$s?')) ?>,
+    joinNote: <?= json_encode(t('Both orders become one bill on the second table. The first table becomes free.')) ?>,
+    join: <?= json_encode(t('Join')) ?>,
+    cancel: <?= json_encode(t('Cancel')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     serverError: <?= json_encode(t('Server error. Please try again.')) ?>,
     floorsUrl: <?= json_encode(getUrl('restaurant/floors')) ?>,
@@ -197,10 +202,31 @@ function openMove(fromId) {
     if (!from) return;
     $('#moveFrom').text(from.table_number);
     const free = TB_DATA.filter(t => !t.hold_id && t.table_id !== fromId && t.status !== 'cleaning');
-    $('#moveTargets').html(free.length ? free.map(t =>
+    let html = free.length ? free.map(t =>
         `<div class="col-4"><button type="button" class="btn btn-outline-primary w-100 py-3 fw-bold" onclick="doMove(${fromId}, ${t.table_id})">${safeOutput(t.table_number)}</button></div>`).join('')
-        : `<div class="col-12 text-muted text-center py-3">${TB.noFree}</div>`);
+        : `<div class="col-12 text-muted text-center py-3">${TB.noFree}</div>`;
+    // restaurant_plan.md Phase 4 — join this order into another table that already has one.
+    const busy = TB_DATA.filter(t => t.hold_id && t.table_id !== fromId);
+    if (busy.length) {
+        html += `<div class="col-12 small text-muted mt-3">${TB.joinWith}</div>` + busy.map(t =>
+            `<div class="col-6"><button type="button" class="btn btn-outline-danger w-100 py-2" onclick="doJoin(${fromId}, ${t.table_id}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')})"><span class="fw-bold">${safeOutput(t.table_number)}</span><br><small>${tbFmt(t.total)}</small></button></div>`).join('');
+    }
+    $('#moveTargets').html(html);
     new bootstrap.Modal(document.getElementById('moveModal')).show();
+}
+
+function doJoin(fromId, toId, toNumber) {
+    const from = TB_DATA.find(t => t.table_id === fromId);
+    Swal.fire({ icon: 'question', title: TB.joinQ.replace('%1$s', from ? from.table_number : '').replace('%2$s', toNumber),
+        text: TB.joinNote, showCancelButton: true, confirmButtonText: TB.join, cancelButtonText: TB.cancel, confirmButtonColor: '#0d6efd' })
+    .then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/restaurant/join_table_orders.php') ?>', { _csrf: TB.csrf, warehouse_id: tbWid(), from_table_id: fromId, to_table_id: toId }, function (res) {
+            bootstrap.Modal.getInstance(document.getElementById('moveModal'))?.hide();
+            if (res.success) { loadBoard(); Swal.fire({ icon: 'success', title: res.message, timer: 1600, showConfirmButton: false }); }
+            else Swal.fire({ icon: 'error', title: TB.error, text: res.message });
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: TB.error, text: TB.serverError }));
+    });
 }
 
 function doMove(fromId, toId) {

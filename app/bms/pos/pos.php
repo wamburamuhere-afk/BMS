@@ -606,6 +606,16 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                             <i class="bi bi-bookmark-check me-1"></i><?= t('Save to table') ?>
                         </button>
                     </div>
+                    <!-- restaurant_plan.md Phase 4 — split the table's bill (pay some items now). -->
+                    <div class="mt-2 d-none" id="rsSplitRow">
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="rsSplitBtn" onclick="openSplitBill()">
+                            <i class="bi bi-scissors me-1"></i><?= t('Split bill') ?>
+                        </button>
+                        <div class="alert alert-primary py-1 px-2 small mb-0 mt-1 d-none d-flex justify-content-between align-items-center gap-2" id="rsSplitNote">
+                            <span id="rsSplitNoteText"></span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-nowrap" onclick="cancelSplitBill()"><?= t('Cancel split') ?></button>
+                        </div>
+                    </div>
                 </div>
                 <?php endif; ?>
                 <div class="row g-2 small">
