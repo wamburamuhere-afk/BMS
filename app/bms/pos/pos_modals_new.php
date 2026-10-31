@@ -28,12 +28,35 @@ if ($can_restock_product ?? false) {
 <div class="modal fade" id="tablePickerModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-grid-3x3-gap me-1"></i> <?= t('Select Table') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="tablePickerBody" style="max-height:65vh;overflow-y:auto;">
                 <!-- Populated by openTablePicker() in pos_scripts_new.php -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Split bill — restaurant_plan.md Phase 4 (restaurant/hybrid shops only). -->
+<div class="modal fade" id="rsSplitModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-scissors me-1"></i> <?= t('Split bill') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-2"><?= t('Choose what is paid now. Everything else stays on the table.') ?></div>
+                <div id="rsSplitLines"></div>
+                <div class="d-flex justify-content-between border-top pt-2 mt-2 fw-bold">
+                    <span><?= t('Pay now') ?></span><span id="rsSplitTotal">0</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="button" class="btn btn-primary" onclick="applySplitBill()"><i class="bi bi-check-circle me-1"></i><?= t('Continue to payment') ?></button>
             </div>
         </div>
     </div>

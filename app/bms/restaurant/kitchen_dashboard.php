@@ -151,7 +151,7 @@ function loadTickets() {
                             <span class="fw-bold small">${safeOutput(t.station_name)}</span>
                             <span class="badge" style="background:${color};color:#fff;">${STAGE_LABELS[t.status]}</span>
                         </div>
-                        ${t.table_number ? `<div class="small text-muted mb-1">${STRINGS.table}: ${safeOutput(t.table_number)}</div>` : ''}
+                        ${t.order_label ? `<div class="fw-bold mb-1">${safeOutput(t.order_label)}</div>` : (t.table_number ? `<div class="small text-muted mb-1">${STRINGS.table}: ${safeOutput(t.table_number)}</div>` : '')}
                         <div class="small">${items}</div>
                         ${nextStage ? `<button class="btn btn-sm btn-primary w-100 mt-2" onclick="advance(${t.ticket_id}, '${nextStage}')">${STRINGS.advance} → ${STAGE_LABELS[nextStage]}</button>` : ''}
                     </div>

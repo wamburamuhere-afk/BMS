@@ -3684,6 +3684,8 @@ INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (9
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (93,'2026_10_28_customer_visit_follow_ups.php','2026-10-28 23:37:52');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (94,'2026_10_28_expenses_payee_columns.php','2026-10-28 23:37:52');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (95,'2026_10_28_supplier_categories_soft_delete.php','2026-10-28 23:37:53');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (96,'2026_10_31_restaurant_menu_columns.php','2026-10-31 06:37:16');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (97,'2026_10_31_restaurant_kitchen_ticket_label.php','2026-10-31 09:24:42');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 

@@ -2257,6 +2257,8 @@ function openPosMoreModal() {
             }
         }).then(function (result) {
             if (!result.isConfirmed) return;
+            // Switching Restaurant POS on: show shops already set to Restaurant/Hybrid first.
+            confirmRestaurantShops(result.value.restaurantPos && !RESTAURANT_POS.enabled, function () {
             $.when(
                 $.ajax({
                     url: '/actions/superadmin_tenant_features.php',
@@ -2345,11 +2347,43 @@ function openPosMoreModal() {
             }).fail(function () {
                 Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save.' });
             });
+            });
         });
     }).fail(function (xhr) {
         let msg = 'Could not read Simple Mode status for this tenant.';
         try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    });
+}
+
+// restaurant_plan.md Phase 0.1 — when Restaurant POS is being switched ON, list
+// the tenant's shops whose stored POS Mode is already Restaurant/Hybrid (they
+// change behaviour the moment the module is on) and ask before saving.
+// Read-only lookup; no shop is changed. Any other save goes straight through.
+function confirmRestaurantShops(turningOn, proceed) {
+    if (!turningOn) { proceed(); return; }
+    $.ajax({
+        url: '/actions/superadmin_tenant_restaurant_shops.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }
+    }).done(function (res) {
+        const shops = (res && res.success && res.shops) ? res.shops : [];
+        if (!shops.length) { proceed(); return; }
+        const list = shops.map(function (s) {
+            return $('<div>').text(s.warehouse_name).html() + ' — <strong>' + (s.pos_mode === 'hybrid' ? 'Hybrid' : 'Restaurant') + '</strong>';
+        }).join('<br>');
+        Swal.fire({
+            icon: 'warning',
+            title: 'These shops are already set to Restaurant/Hybrid',
+            html: '<div class="text-start">Once Restaurant POS is on, they will show restaurant features straight away:<br><br>'
+                + list + '<br><br>Other shops stay Retail. You can change a shop\'s POS Mode later on its Shops page.</div>',
+            showCancelButton: true,
+            confirmButtonColor: '#0d6efd',
+            confirmButtonText: 'Continue and save'
+        }).then(function (r) { if (r.isConfirmed) proceed(); });
+    }).fail(function () {
+        // Lookup failed — never block the save over a warning.
+        proceed();
     });
 }
 
