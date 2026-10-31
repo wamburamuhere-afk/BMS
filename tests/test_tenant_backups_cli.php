@@ -270,10 +270,12 @@ section('9. Schedule (cron file)');
 $app = '/var/www/bms.bjptechnologies.co.tz/public_html';
 $utc = bmsBackupCronFile('bms.bjptechnologies.co.tz', $app, '/usr/bin/php', 0, 0);
 $jobs = array_values(array_filter(explode("\n", $utc), fn($l) => (bool)preg_match('/^\d/', $l)));
-ok(count($jobs) === 2, 'two job lines: one full, one snapshot');
+ok(count($jobs) === 3, 'three job lines: full, off-site, snapshot');
 ok(str_starts_with($jobs[0] ?? '', '30 21 * * * www-data /usr/bin/php ' . $app . '/cron/backup_all_tenants.php --kind=full'),
    'UTC server: full backup at 21:30 UTC = 00:30 Dar es Salaam, as www-data');
-ok(str_starts_with($jobs[1] ?? '', '30 3,9,15 * * * www-data ') && str_contains($jobs[1], '--kind=snapshot'),
+ok(($jobs[1] ?? '') === '30 22 * * * root /usr/bin/php ' . $app . '/cron/offsite_backup.php --host=bms.bjptechnologies.co.tz >/dev/null 2>&1',
+   'UTC server: off-site upload at 22:30 UTC = 01:30 Dar es Salaam, one hour after the full backup, as root');
+ok(str_starts_with($jobs[2] ?? '', '30 3,9,15 * * * www-data ') && str_contains($jobs[2], '--kind=snapshot'),
    'UTC server: snapshots at 03:30/09:30/15:30 UTC = 06:30/12:30/18:30 Dar es Salaam');
 
 $eat = bmsBackupCronFile('h', $app, '/usr/bin/php', 180, 0);
@@ -281,8 +283,9 @@ ok(str_contains($eat, "\n30 0 * * * www-data") && str_contains($eat, "\n30 6,12,
    'a server already on Dar es Salaam time gets 00:30 and 06:30/12:30/18:30 unchanged');
 
 $demo = bmsBackupCronFile('demo.bjptechnologies.co.tz', $app, '/usr/bin/php', 0, 30);
-ok(str_contains($demo, "\n0 22 * * * www-data") && str_contains($demo, "\n0 4,10,16 * * * www-data"),
-   'second host staggered by 30 minutes (22:00 full, 04:00/10:00/16:00 snapshots)');
+ok(str_contains($demo, "\n0 22 * * * www-data") && str_contains($demo, "\n0 4,10,16 * * * www-data")
+   && str_contains($demo, "\n0 23 * * * root /usr/bin/php {$app}/cron/offsite_backup.php --host=demo.bjptechnologies.co.tz "),
+   'second host staggered by 30 minutes (22:00 full, 23:00 off-site, 04:00/10:00/16:00 snapshots)');
 
 $odd = bmsBackupCronFile('h', $app, '/usr/bin/php', 0, 0);
 ok(substr_count($odd, '--kind=snapshot') === 1 && substr_count($odd, '--kind=full') === 1, 'exactly one full and one snapshot line');
@@ -290,7 +293,9 @@ ok(substr_count($odd, '--kind=snapshot') === 1 && substr_count($odd, '--kind=ful
 ok(str_contains($utc, "MAILTO=\"\"\n"), 'MAILTO="" — cron never mails output');
 ok(!preg_match('/>>?\s*(?!\/dev\/null|&\d)\S/', preg_replace('/^#.*$/m', '', $utc)),
    'no redirect to any file except /dev/null (a redirect cron cannot open would skip the backup entirely)');
-ok(!str_contains($utc, '/root/') && substr_count($utc, ' www-data ') === 2, 'both jobs run as www-data, never root');
+ok(!str_contains($utc, '/root/') && substr_count($utc, ' www-data ') === 2, 'both backup jobs run as www-data');
+ok(substr_count($utc, ' root ') === 1 && str_contains($utc, ' root /usr/bin/php ' . $app . '/cron/offsite_backup.php '),
+   'only the off-site upload runs as root (the one job that must read the root-only rclone config)');
 ok(bmsBackupCronFileName('bms.bjptechnologies.co.tz') === 'bms-backup-bms-bjptechnologies-co-tz',
    "cron file name has no dots (cron silently ignores /etc/cron.d names containing '.')");
 

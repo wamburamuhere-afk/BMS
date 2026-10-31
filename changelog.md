@@ -101,6 +101,19 @@
 - **Menu:** "Restaurant" link in the top menu and phone side menu, only when Restaurant POS is on (`canView('restaurant_pos')` checks the tenant entitlement first, even for admins).
 - **Checked:** new test 22/0 (real renders of the till + header with the module on/off, real Shops update POSTs; fails on the old `pos.php`); `test_restaurant_pos_mode_setup_cli` 36/0, `test_pos_simple_ux_cli` 94/0, `test_warehouse_project_filter_cli` 84/0; `test_restaurant_pos_cli` 152/1 — the 1 is a sibling suite `test_pos_phase8_registers_cli` failing on open/close_shift.php (pre-existing, files not touched).
 
+## 2026-10-31 — feat(backup): nightly backups copied off the server, encrypted, to Google Drive (rclone)
+
+**Plan:** `backup_plan.md` §4 (PR 2).
+**New:** `core/offsite_backup.php`, `cron/offsite_backup.php`, `tests/test_offsite_backup_cli.php`.
+**Changed:** `core/tenant_backups.php` (`bmsBackupCronFile()` adds the off-site line), `tests/test_tenant_backups_cli.php`, `backup_plan.md`.
+
+- **Before:** every company was backed up, but only onto the same server. Server lost = every backup lost.
+- **Now:** at 01:30 Dar es Salaam (an hour after the full backup; waits if a backup is still running) each night's `auto_backup_*.zip` of the main install, every tenant and the control database is uploaded to Google Drive (`bjptechnologieslimited@gmail.com`) through rclone. Only files of the last 7 days that are not already there; an existing copy is never overwritten; each upload is verified with `rclone cryptcheck`. Snapshots, manual, pre-restore and uploaded files never leave the server.
+- **Encryption:** the rclone remote must be type `crypt` (contents and file/folder names encrypted on the server before upload); a plain remote is refused. The job runs as root — the one root line in `/etc/cron.d/bms-backup-<host>` — because only root can read the rclone config holding the Drive token and the encryption password; it loads no database or app bootstrap. Its lock lives in the temp dir and it opens the backup lock read-only, so it can never block the www-data backup run.
+- **Retention on Drive:** after a fully successful upload only — 30 days of nightlies, the first of each month for 12 months (+5 days), and the 3 newest per folder always. Always a superset of what the server keeps, so nothing is deleted then re-uploaded. Only `auto_backup_*.zip` in main / `t{id}` / `_platform` folders is ever deleted.
+- **Visibility:** `backups/_platform/offsite.log` and `offsite_status.json` (files created as root are handed back to www-data). Until the one-time rclone setup (§4) is done on the server, the job logs `NOT CONFIGURED` and changes nothing. Exit 0 ok / 1 failed / 2 bad args or running / 3 not configured. `--check` tests the setup.
+- **Checked:** `test_offsite_backup_cli` 40 checks — retention rules incl. a 400-night simulation (off-site always ⊇ server, no re-upload loop, ≤ 42 files per folder), which files are chosen, script guards, and a REAL rclone 1.75.2 run against a crypt remote: 5 nightlies uploaded and nothing else, names and contents encrypted at rest, decrypted copies byte-identical, second run uploads nothing, existing copy never overwritten, retention deletes exactly the expected 2 and never touches manual files or unknown folders, unreachable destination → FAILED / exit 1. Also a real run on two freshly made local tenant backups: uploaded, downloaded back, MD5 identical. `test_tenant_backups_cli` 62 (third cron line; only the off-site job runs as root). Audit suites (`tenant_resource_audit`, `security_coverage`, `project_scope`) do not flag any new file.
+
 ## 2026-10-31 — fix(backup): old backups are thinned by a schedule that never empties a folder; backups/ no longer world-readable
 
 **Plan:** `backup_plan.md` (Phase 4 of PR 1).
