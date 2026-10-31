@@ -87,8 +87,12 @@ Revisit when tenants or file sizes grow.
    Uses the existing BMS dumper inside `START TRANSACTION WITH CONSISTENT SNAPSHOT`, not
    `mysqldump` — the UI restore is built and tested around that dump format. Every file is
    re-opened and verified. Results → `bms_control.tenant_backup_log`.
-3. **Schedule** ✅ — `deploy.yml` writes `/etc/cron.d/bms-backup` (§2).
-4. **Retention + permissions** ✅ — §3 rules with the 3-newest floor; `750` instead of `777`.
+3. **Schedule** ✅ — `deploy.yml` runs `scripts/install_backup_cron.php`, which writes
+   `/etc/cron.d/bms-backup-<host>` (§2), run as www-data; demo staggered +30 min.
+4. **Retention + permissions** ✅ — §3 rules with the 3-newest floor. `backups/` = deploy
+   user + group www-data, mode `2770` (not `750`: git, running as the deploy user, must still
+   update `backups/.htaccess`, and www-data must write). Other server users get nothing.
+   Residual: another app running PHP as www-data could still read dumps — PR 2 encrypts copies.
 
 ### PR 2 — Email off-site (§4)
 
