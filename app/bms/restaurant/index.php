@@ -26,10 +26,23 @@ $sub_hub_cards = restaurantSubHubCards();
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h4 class="mb-0 text-primary"><i class="bi bi-shop-window me-2"></i><?= t('Restaurant') ?></h4>
-        <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left me-1"></i> <?= t('Back to POS Hub') ?>
-        </a>
+        <div class="d-flex gap-2">
+            <?php require_once ROOT_DIR . '/core/restaurant_scope.php';
+            if (restaurantModuleOn($pdo) && canCreate('expenses')): // restaurant_plan.md Phase 5 ?>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="rbiOpen()"><i class="bi bi-basket me-1"></i><?= t('Buy Ingredients') ?></button>
+            <?php endif; ?>
+            <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> <?= t('Back to POS Hub') ?>
+            </a>
+        </div>
     </div>
+
+    <?php
+    // restaurant_plan.md Phase 1c — Getting started checklist (renders nothing once every step is done).
+    require_once ROOT_DIR . '/core/restaurant_scope.php';
+    $rgsWarehouses = restaurantWarehousesForSelect($pdo);
+    require ROOT_DIR . '/includes/restaurant/getting_started.php';
+    ?>
 
     <div class="row g-3">
         <?php foreach ($sub_hub_cards as $card): ?>
@@ -52,6 +65,8 @@ $sub_hub_cards = restaurantSubHubCards();
     .pos-hub-card { transition: transform .15s ease, box-shadow .15s ease; }
     .pos-hub-card:hover { transform: translateY(-2px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important; }
 </style>
+
+<?php require ROOT_DIR . '/includes/restaurant/buy_ingredients_modal.php'; // renders nothing unless the module is on ?>
 
 <?php
 require_once 'footer.php';

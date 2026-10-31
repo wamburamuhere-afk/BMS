@@ -207,6 +207,9 @@ try {
     // belong to $warehouse_id) before being trusted for the post-commit
     // status flip.
     $table_id = $toNullableInt($input['table_id'] ?? null);
+    // restaurant_plan.md Phase 4 — split bill: paying PART of a table's order keeps the table and
+    // its open order (the till saves the remaining items back to it right after).
+    $keep_table = $table_id && !empty($input['keep_table']);
     $sale_type_in = in_array($input['sale_type'] ?? '', ['walk_in', 'customer', 'online', 'delivery', 'dine_in', 'take_away'], true)
         ? $input['sale_type'] : 'walk_in';
     $assigned_to = $toNullableInt($input['assigned_to'] ?? null);
@@ -466,6 +469,11 @@ try {
         $pid = (int)$item['product_id'];
         $db_product = $products_map[$pid] ?? null;
         if (!$db_product || empty($db_product['is_combo'])) continue;
+        // restaurant_plan.md Phase 7 — a dish with a recipe (no-stock item + recipe) is never
+        // blocked by ingredient stock: kitchens rarely count every gram, so a missing record
+        // must not stop lunch from selling. Its ingredients are still used up below and may
+        // go under zero (shown as running low). Retail combos keep this check exactly.
+        if (!empty($db_product['is_service'])) continue;
         $qty = floatval($item['quantity'] ?? 0);
         $shortfalls = checkComboAvailability($pdo, $pid, $qty, (int)$warehouse_id);
         if (!empty($shortfalls)) {
@@ -705,6 +713,15 @@ try {
             $sold_unit_qty,
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
+
+        // restaurant_plan.md Phase 2 — a restaurant line's kitchen note ("less salt")
+        // is kept on the sale line. Only runs when a note was sent; a retail sale
+        // never carries one, so its insert above is unchanged.
+        $item_note = trim((string)($item['note'] ?? ''));
+        if ($item_note !== '') {
+            $pdo->prepare("UPDATE pos_sale_items SET description = ? WHERE sale_item_id = ?")
+                ->execute([mb_substr($item_note, 0, 200), $sale_item_id]);
+        }
 
         // Phase 30 (pos_upgrade_plan.md §9) — persist the modifier choices
         // already resolved server-side above (same $modOptions — no second
@@ -998,9 +1015,14 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     // (pos_held_sales) is cleared by the existing client-side call to
     // delete_held_sale.php once it sees this response's success=true —
     // unchanged by this phase.
-    if ($table_id) {
+    if ($table_id && !$keep_table) {
         try {
             $pdo->prepare("UPDATE restaurant_tables SET status = 'available', updated_at = NOW() WHERE table_id = ?")
+                ->execute([$table_id]);
+            // restaurant_plan.md Phase 2 — the bill is paid, so the table's open order
+            // is closed too (the old comment above assumed the browser deleted it; it
+            // never did, which left paid orders showing on the table).
+            $pdo->prepare("UPDATE pos_held_sales SET status = 'loaded', loaded_at = NOW() WHERE table_id = ? AND status = 'held'")
                 ->execute([$table_id]);
         } catch (Throwable $e) {
             error_log("POS Phase 30 table-release warning for table_id={$table_id}: " . $e->getMessage());

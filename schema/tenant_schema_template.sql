@@ -3531,10 +3531,10 @@ CREATE TABLE `field_visit_follow_ups` (
   `follow_up_id` int unsigned NOT NULL AUTO_INCREMENT,
   `visit_id` int unsigned NOT NULL,
   `due_date` date NOT NULL,
-  `purpose` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('pending','done','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
-  `method` enum('visit','call','whatsapp','sms','other') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `outcome` text COLLATE utf8mb4_unicode_ci,
+  `purpose` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('pending','done','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `method` enum('visit','call','whatsapp','sms','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `outcome` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `done_at` datetime DEFAULT NULL,
   `done_by` int unsigned DEFAULT NULL,
   `result_visit_id` int unsigned DEFAULT NULL,
@@ -4180,9 +4180,12 @@ CREATE TABLE `kitchen_tickets` (
   `status` enum('queued','preparing','ready','served') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `order_label` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sale_id` int DEFAULT NULL,
   PRIMARY KEY (`ticket_id`),
   KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
-  KEY `idx_kt_hold` (`hold_id`)
+  KEY `idx_kt_hold` (`hold_id`),
+  KEY `idx_kt_sale` (`sale_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -6555,6 +6558,8 @@ CREATE TABLE `products` (
   `parent_product_id` int DEFAULT NULL,
   `variant_attributes` json DEFAULT NULL,
   `client_uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_menu_item` tinyint(1) NOT NULL DEFAULT '0',
+  `is_available` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `product_code` (`product_code`),
   UNIQUE KEY `ux_products_client_uuid` (`client_uuid`),
@@ -8076,7 +8081,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=96 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=98 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -8592,7 +8597,7 @@ CREATE TABLE `supplier_categories` (
   `category_id` int NOT NULL AUTO_INCREMENT,
   `category_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `status` enum('active','inactive','deleted') COLLATE utf8mb4_unicode_ci DEFAULT 'active',
+  `status` enum('active','inactive','deleted') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'active',
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
