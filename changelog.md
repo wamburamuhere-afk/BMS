@@ -45,6 +45,13 @@
 - **Now:** new `bms_upload_in_scope()` — a tenant owns only `uploads/t{id}/`; the original install (BJP) owns everything except the `t{id}/` folders (`tenders/`, `training_certs/`, `trips/` stay BJP's). `bms_write_zip_backup()` takes the owner's prefix as a required argument (a caller cannot forget it) and records it in `manifest.json`. New `bms_restore_uploads()` replaces `bms_copy_dir()` on both restore paths and writes only in-scope files — older ZIPs that hold every company's folders restore safely, the rest is skipped.
 - **Checked:** `test_backup_tenant_scope_cli` 35 checks (scope rules, tenant/BJP ZIP contents, hostile old ZIP restore, round trip, negative control proving the old call overwrote, call-site guards). `test_backup_zip_cli` 73/0, `test_backup_isolation_cli` 31/0. Real `cron/auto_backup.php` run: 0 tenant files in the ZIP. Real `api/backup_actions.php` as a simulated tenant on a scratch DB: create → only own file; restore → DB + file back; hostile ZIP → other company's and BJP's files untouched, own folder guard present.
 
+## 2026-10-31 — fix(products): creating a product failed on the legacy database — missing product_batches.manufacturing_date
+
+**New:** `migrations/2026_10_31_product_batches_manufacturing_date_legacy_db.php`.
+
+- **Bug:** Add Product with opening stock failed with `Unknown column 'manufacturing_date' in 'field list'`. The column was only added to tenant databases (`migrations/tenant/2026_09_15_...`); the legacy / non-tenant database never got its mirror.
+- **Fix:** idempotent migration adds the nullable `product_batches.manufacturing_date DATE` after `expiry_date`. No application code changed; Smart POS is untouched.
+
 ## 2026-10-29 — feat: Import Products from CSV works again (Smart POS) — preview, then all-or-nothing import
 
 **New:** `core/product_import.php`, `tests/test_product_import_cli.php`, `tests/helpers/product_import_request.php`.
