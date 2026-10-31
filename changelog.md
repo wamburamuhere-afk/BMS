@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(pos): Sales History — named actions (one "Actions" dropdown) instead of icon-only buttons
+
+**Changed:** `app/bms/pos/pos_dashboard.php`.
+
+- **Before:** on phones each Sales History card had 1–4 icon-only buttons (receipt / cash / return arrow / void) with no names; the desktop table's menu button was a bare gear icon.
+- **Now:** one **Actions** dropdown on both the desktop table and the phone cards, listing the real names: **View Receipt**, **Receive Payment**, **Return / Refund**, **Void Sale**. Same permission and sale-status rules as before (an item only appears when the user may do it and the sale allows it). Both views build the menu from one function, `actionItems()`, so they cannot drift apart.
+
 ## 2026-10-31 — ui(pos): Sales Overview — phones keep only Sales Dashboard + Start Selling; the rest moves into the ☰ side menu
 
 **Changed:** `app/bms/pos/pos_dashboard.php`, `header.php`.

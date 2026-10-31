@@ -758,6 +758,7 @@ const T = {
     noSalesThisMonth: <?= json_encode(t('No sales this month')) ?>,
     netSalesLabel: <?= json_encode(t('Net Sales')) ?>,
     salesHistoryPrintTitle: <?= json_encode(wLabel('POS Sales History', 'Sales History')) ?>,
+    actions: <?= json_encode(t('Actions')) ?>,
     viewReceipt: <?= json_encode(t('View Receipt')) ?>,
     receivePayment: <?= json_encode(t('Receive Payment')) ?>,
     returnRefund: <?= json_encode(t('Return / Refund')) ?>,
@@ -953,14 +954,23 @@ function payBadge(row) {
     return html;
 }
 
-function actionMenu(row) {
+// One source for the row's named actions — used by the desktop table AND the phone cards,
+// so both show the same real names (View Receipt / Receive Payment / Return-Refund / Void Sale).
+function actionItems(row) {
     let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> ${T.viewReceipt}</a></li>`;
     if (CAN_EDIT   && row.can_receive) items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> ${T.receivePayment}</button></li>`;
     if (CAN_CREATE && row.can_return)  items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> ${T.returnRefund}</button></li>`;
     if (CAN_DELETE && row.can_void)    items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')"><i class="bi bi-x-octagon text-danger me-2"></i> ${T.voidSaleLabel}</button></li>`;
-    return `<div class="dropdown d-flex justify-content-end">
-        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill me-1"></i></button>
-        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
+    return items;
+}
+
+// The toggle carries the word "Actions" (not just a gear) so it is clear what it is.
+// block=true → full-width button for the phone cards. strategy:fixed keeps the menu
+// from being clipped by the card / bottom bar.
+function actionMenu(row, block) {
+    return `<div class="dropdown ${block ? 'w-100' : 'd-flex justify-content-end'}">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2${block ? ' w-100' : ''}" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear-fill me-1"></i> ${T.actions}</button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${actionItems(row)}</ul>
     </div>`;
 }
 
@@ -1249,10 +1259,7 @@ function renderCards(rows) {
     if (!rows.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted">' + T.noRecordsFound + '</div>'); return; }
     let html = '';
     rows.forEach((row, i) => {
-        let actions = `<a class="btn btn-sm btn-outline-primary" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-receipt"></i></a>`;
-        if (CAN_EDIT   && row.can_receive) actions += `<button class="btn btn-sm btn-outline-primary" onclick="openReceive(${row.sale_id})" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-cash-coin"></i></button>`;
-        if (CAN_CREATE && row.can_return)  actions += `<button class="btn btn-sm btn-outline-primary" onclick="openReturn(${row.sale_id})" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-arrow-return-left"></i></button>`;
-        if (CAN_DELETE && row.can_void)    actions += `<button class="btn btn-sm btn-outline-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-x-octagon"></i></button>`;
+        const actions = actionMenu(row, true);
         html += `
         <div class="col-12">
             <div class="card border-0 shadow-sm">
@@ -1265,7 +1272,7 @@ function renderCards(rows) {
                     <div class="fw-bold text-primary mt-1">${CURRENCY} ${money(row.grand_total)}</div>
                 </div>
                 <div class="card-footer bg-white border-top p-0">
-                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${actions}</div>
+                    <div style="padding:8px;">${actions}</div>
                 </div>
             </div>
         </div>`;
