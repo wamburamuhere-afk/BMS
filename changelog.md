@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(categories): Categories reachable in Smart POS with full CRUD by permission; phone-friendly
+
+**Changed:** `app/bms/product/categories.php`, `api/delete_category.php`, `header.php`.
+
+- **Problem:** in Smart POS a user could only *create* a category (the quick-add inside product registration). The Categories page existed but had no menu entry in Smart POS, and its New/Edit/Delete buttons were always shown (gated only by Products permissions) while the APIs check the Categories permissions.
+- **Menu:** Smart POS desktop — **Categories** next to Shop Products in the My Business menu. Phones — ☰ → **Shop** → **Categories**. Needs `canView('categories')`; the full-ERP Inventory menu is unchanged.
+- **Page:** view needs the Categories view permission (or Products view, as before). **New Category** needs `canCreate('categories')`, **Edit** `canEdit('categories')`, **Delete** `canDelete('categories')` — the same permissions the create/update/delete APIs enforce — so a user only sees what they can do; no actions → "—".
+- **Phone layout:** compact one-row header (short Back button, shorter title, no subtitle), tips card hidden, row menu button reads "Actions".
+- **Safety (gap found):** `api/delete_category.php` did a plain DELETE although nothing links products/sub-categories to categories by FK. It now refuses, with a clear message, when products use the category or it has sub-categories (Inactive is offered as the alternative).
+
 ## 2026-10-31 — ui(menu): phone ☰ side menu regrouped (Sales / Shop / My Business / Restaurant); Shops added
 
 **Changed:** `header.php` (☰ side menu only; the desktop nav is untouched).
