@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(products): phone layout polish on Product Management; Import label always visible
+
+**Changed:** `app/bms/product/products.php`.
+
+- **Import:** the button now always shows the word "Import" (was icon-only on phones).
+- **Phone only (<768px):** header is one row (short title + small Add New / Import buttons); stat cards are compact white 2x2 with a green accent bar; the Filters header no longer stacks (a global `max-width:768px` rule forced it into a column, which centred an oversized chevron); Supplier is full width, Category/Brand and Status/Stock Status sit in pairs, and Filter/Reset share one labelled row. Desktop unchanged.
+
 ## 2026-10-31 — ui(pos): Create Product — remove redundant top buttons on phones
 
 **Changed:** `app/bms/product/product_create.php`.
