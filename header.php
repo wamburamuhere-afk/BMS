@@ -1831,9 +1831,22 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             <button type="button" class="bms-side-close" data-bs-dismiss="offcanvas" aria-label="<?= htmlspecialchars(t('Close menu')) ?>"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="offcanvas-body">
-            <?php if (canView('customers') || canView('suppliers') || canView('products') || (canView('pos') && canView('pos_restock')) || canView('field_visits') || canView('restaurant_pos')): ?>
+            <?php if (canView('customers') || canView('suppliers') || canView('products') || canView('pos') || canView('field_visits') || canView('restaurant_pos')): ?>
             <div class="bn-group"><?= t('My Business') ?></div>
             <div class="list-group list-group-flush">
+                <?php if(canView('pos')): ?>
+                <!-- Moved here from the Sales Overview page's top row/hub cards on phones. -->
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('pos/shifts') ?>"><i class="bi bi-clock-history"></i><?= t('Shift History') ?></a>
+                <?php endif; ?>
+                <?php
+                // Who Owes Me / Catalog Setup come from the same gated source as the hub cards
+                // (core/pos_nav.php::posNavGroups) so the two never drift. Restaurant and Settings
+                // already have their own entries in this menu.
+                $__side_nav_icons = ['credit_customers' => 'bi-cash-coin', 'catalog_setup' => 'bi-tags'];
+                foreach (posNavGroups() as $__sg):
+                    if (!isset($__side_nav_icons[$__sg['key']])) continue; ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl($__sg['url']) ?>"><i class="bi <?= $__side_nav_icons[$__sg['key']] ?>"></i><?= htmlspecialchars($__sg['label']) ?></a>
+                <?php endforeach; ?>
                 <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
                 <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>

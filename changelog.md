@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(pos): Sales Overview — phones keep only Sales Dashboard + Start Selling; the rest moves into the ☰ side menu
+
+**Changed:** `app/bms/pos/pos_dashboard.php`, `header.php`.
+
+- **Before (phone):** the top had 3 buttons (Sales Dashboard / Shift History / Start Selling) plus a block of hub cards (Who Owes Me, Settings, …) before the real content.
+- **Now (<lg, i.e. wherever the ☰ side menu exists):** the top row is only **Sales Dashboard** and **Start Selling**; the hub-card block is hidden. Everything that was hidden is reachable from ☰ → **My Business**: **Shift History**, **Who Owes Me** (Smart POS only), **Catalog Setup** (pos_advanced only). Restaurant and Selling Settings already had entries in that menu. The extra entries reuse `posNavGroups()` so the gates match the hub cards exactly.
+- **Desktop (lg and up):** unchanged — the elements are still in the page, just hidden below lg with Bootstrap display classes.
+
 ## 2026-10-31 — ui(expenses): phone view — one list, one Actions dropdown with every action
 
 **Changed:** `app/constant/accounts/expenses.php`, `includes/tables/expenses_table.php`, `assets/js/bms-mobile-cards.js`.
