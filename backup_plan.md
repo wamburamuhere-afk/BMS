@@ -79,11 +79,14 @@ Revisit when tenants or file sizes grow.
 ## 5. Phases
 
 ### PR 1 — Safety now
-1. **Close the leak** — tenant backup zips only `uploads/tNN/`; restore writes only there;
+1. **Close the leak** ✅ — tenant backup zips only `uploads/tNN/`; restore writes only there;
    BJP backup excludes `t*/` folders. Tests: tenant A cannot see or overwrite B's files.
-2. **Back up every tenant** — `cron/backup_all_tenants.php`: BJP + `bms_control` + every
-   active/trial tenant, each into its own folder. One failure never stops the others.
-   `mysqldump --single-transaction` + gzip (PHP dump as fallback). Results → `tenant_backup_log`.
+2. **Back up every tenant** ✅ — `cron/backup_all_tenants.php`: BJP + `bms_control` + every
+   non-deleted provisioned tenant (suspended/archived included), each into its own
+   `backups/t{id}/` (the folder its Backup page lists). One failure never stops the others.
+   Uses the existing BMS dumper inside `START TRANSACTION WITH CONSISTENT SNAPSHOT`, not
+   `mysqldump` — the UI restore is built and tested around that dump format. Every file is
+   re-opened and verified. Results → `bms_control.tenant_backup_log`.
 3. **Schedule** — `deploy.yml` writes `/etc/cron.d/bms-backup` (§2).
 4. **Retention + permissions** — §3 rules with the 3-newest floor; `750` instead of `777`.
 

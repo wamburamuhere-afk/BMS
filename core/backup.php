@@ -417,10 +417,12 @@ if (!function_exists('bms_write_dump')) {
      * @param  string $uploadPrefix bmsTenantPathPrefix() of the owner — see
      *                              bms_upload_in_scope(). Required on purpose: a
      *                              caller that forgot it would leak files.
+     * @param  bool   $includeUploads false = database only (the scheduled 6-hourly
+     *                              snapshots); the ZIP stays restorable as usual.
      * @return array{files_count:int, db_size_mb:float, files_size_mb:float}
      * @throws Exception on failure (partial .zip is deleted before throwing).
      */
-    function bms_write_zip_backup(PDO $pdo, string $zipPath, string $uploadsDir, string $uploadPrefix): array
+    function bms_write_zip_backup(PDO $pdo, string $zipPath, string $uploadsDir, string $uploadPrefix, bool $includeUploads = true): array
     {
         @set_time_limit(0);
 
@@ -461,7 +463,7 @@ if (!function_exists('bms_write_dump')) {
             $scanDir    = $uploadPrefix === ''
                 ? $uploadsDir
                 : rtrim($uploadsDir, '/\\') . '/' . rtrim($uploadPrefix, '/');
-            if (is_dir($scanDir)) {
+            if ($includeUploads && is_dir($scanDir)) {
                 $realUploads = realpath($uploadsDir);
                 $realScan    = realpath($scanDir);
                 if ($realUploads !== false && $realScan !== false) {
@@ -501,6 +503,7 @@ if (!function_exists('bms_write_dump')) {
                 'files_count'       => $filesCount,
                 'files_size_mb'     => $filesSizeMb,
                 'uploads_prefix'    => $uploadPrefix,
+                'includes_uploads'  => $includeUploads,
             ], JSON_PRETTY_PRINT));
 
             // Finalize the archive — ZipArchive reads addFile() sources here

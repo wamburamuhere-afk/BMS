@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(backup): scheduled backup of every company, not just the main install
+
+**Plan:** `backup_plan.md` (Phase 2 of PR 1).
+**New:** `core/tenant_backups.php`, `cron/backup_all_tenants.php`, `tests/test_tenant_backups_cli.php`.
+**Changed:** `core/backup.php` (`bms_write_zip_backup()` gains `$includeUploads`; manifest records it), `scripts/setup_control_db.php` (table `tenant_backup_log`), `app/constant/settings/backup_restore.php` (snapshots labelled "DB only").
+
+- **Before:** `cron/auto_backup.php` runs from the command line where no company is resolved, so it only ever backed up the main database. On production 23 of 25 live companies had never been backed up.
+- **Now:** `php cron/backup_all_tenants.php --kind=full|snapshot` backs up the main install, every company that is not deleted (suspended and archived included — their data is kept and can come back; rows that never finished provisioning are skipped) and the control database. Full = database + that company's own uploads → `auto_backup_<ts>.zip`; snapshot = database only → `auto_snapshot_<ts>.zip`. Each company's files go into its own `backups/t{id}/`, the folder its Backup & Restore page already lists, so its admin can download or restore them. The control database goes to `backups/_platform/`, which no company's page lists.
+- **Safety:** each dump runs inside `START TRANSACTION WITH CONSISTENT SNAPSHOT` (a coherent copy while shops keep selling); every file is re-opened and checked (ZIP consistency, manifest, dump ends with its closing line) before it counts as OK; one company failing — wrong password, missing encryption key — never stops the others and leaves no half-written file (found during testing: a missing key used to throw and would have stopped the whole run); one run at a time (lock file); every attempt recorded in `bms_control.tenant_backup_log`; `--tenant=ID` retries one company, `--list` shows what would be backed up. A scheduled full backup updates `.last_auto_backup` so the page's own once-a-day fallback does not run a duplicate.
+- **Checked:** `test_tenant_backups_cli` 38 checks (target list vs the registry, full/snapshot contents, the dump loads into an empty DB with generated column + view intact, truncated and cut-off files rejected, failure isolation, password never in errors, audit rows, CLI arguments, lock). Real local run: 38 of 38 databases backed up, 0 failed. A real cron backup of a full company database (349 tables and views) restored through `api/backup_actions.php` into a scratch DB: every table present, every row count equal (bar the one "Restored Backup" log row the restore itself writes). `test_backup_tenant_scope_cli` 35/0, `test_backup_zip_cli` 73/0, `test_backup_isolation_cli` 31/0, `test_backup_restore_csrf_cli` 62/0.
+
 ## 2026-10-31 — fix(backup): a company's backup holds and restores only its own files
 
 **Plan:** `backup_plan.md` (Phase 1 of PR 1).

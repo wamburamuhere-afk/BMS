@@ -188,7 +188,9 @@ $apiUrl  = getUrl('api/backup_actions.php');
                                             : round($bytes / 1024, 2) . ' KB';
                                         $fdate   = date('d M Y, h:i A', filemtime($backup));
                                         $fnJs    = addslashes($fn);
-                                        $isZip   = strtolower(pathinfo($fn, PATHINFO_EXTENSION)) === 'zip';
+                                        // Scheduled 6-hourly snapshots are ZIPs too, but database only.
+                                        $isZip   = strtolower(pathinfo($fn, PATHINFO_EXTENSION)) === 'zip'
+                                                && strpos($fn, 'auto_snapshot_') !== 0;
                                     ?>
                                         <tr id="row-<?= md5($fn) ?>">
                                             <td class="ps-4 fw-bold text-dark">
@@ -330,7 +332,8 @@ function createBackup() {
 
 // ── RESTORE FROM EXISTING BACKUP ────────────────────────────────
 function restoreBackup(filename) {
-    const isZip = filename.toLowerCase().endsWith('.zip');
+    // Scheduled 6-hourly snapshots (auto_snapshot_*.zip) hold the database only.
+    const isZip = filename.toLowerCase().endsWith('.zip') && !filename.startsWith('auto_snapshot_');
     const scopeNote = isZip
         ? <?= json_encode(t('This will restore the database AND all uploaded files.')) ?>
         : <?= json_encode(t('This will restore the database only (uploaded files are not included in .sql backups).')) ?>;
