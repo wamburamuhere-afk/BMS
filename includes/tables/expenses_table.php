@@ -29,6 +29,9 @@ $tbl = array_merge([
     'page_length'  => 25,
     'dom'          => 'rtip',
     'defer_pane'   => null,
+    // true → the global mobile cards (bms-mobile-cards.js) show ONE "Actions"
+    // dropdown with every action, instead of only the first 3 as icon buttons.
+    'actions_dropdown' => false,
 ], $tbl ?? []);
 
 // projectsModuleActive() (core/project_scope.php) — NOT the raw
@@ -78,7 +81,7 @@ $exp_tbl_columns = [
 ];
 ?>
 <div class="table-responsive">
-    <table id="<?= htmlspecialchars($tbl['id']) ?>" class="table table-hover align-middle" style="width:100%">
+    <table id="<?= htmlspecialchars($tbl['id']) ?>" class="table table-hover align-middle" style="width:100%"<?= !empty($tbl['actions_dropdown']) ? ' data-actions-dropdown="1"' : '' ?>>
         <thead class="bg-light text-muted small uppercase">
             <tr>
                 <?php foreach ($exp_tbl_columns as $key => $col): ?>
