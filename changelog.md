@@ -1,5 +1,106 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 7 — simple recipes, ingredient stock, profit per plate
+
+**New:** `api/restaurant/recipe.php`, `tests/test_restaurant_phase7_cli.php`.
+**Changed:** `api/pos/process_sale.php`, `core/sales_posting.php`, `api/pos/void_sale.php`, `api/restaurant/get_menu_items.php`, `app/bms/restaurant/menu.php`, `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `lang/sw.php`.
+
+- **Recipe** (Menu → dish → gear → Recipe): what goes into ONE plate (ingredient + quantity per plate, e.g. rice 0.30 kg, meat 0.15 kg), live cost / price / profit per plate, quick *New ingredient* (a stock item off the menu; stock arrives with Receive Stock). The Menu shows "Recipe · cost … · profit …" under each dish that has one. An empty recipe = the dish sells without stock again.
+- **A dish with a recipe** (no-stock item + recipe — a kind of item that did not exist before) reuses the combo engine: selling uses up its ingredients; **its cost (Σ ingredient qty × cost) is posted to Cost of Sales** (`posSaleCogs`, added only for this kind); **a short ingredient never blocks the sale** (stock may go under zero and shows as running low); **a void puts the ingredients back** to match the reversed cost entry. A return of cooked food does not restock ingredients (consistent with its cost staying booked).
+- **Retail combos unchanged:** short components still block, cost still uses the combo's own cost price; NIP products are not combos and are unaffected.
+- **Dashboard:** "Drinks and ingredients running low" includes recipe ingredients.
+- **Checked:** new test 26/0 (ingredients, recipe validation/merge, plate cost, ingredients used up, cost of sales = Σ qty × cost, short ingredient never blocks, void restores ingredients and nets the cost to 0, ledger balanced, retail combo still blocked and costed as before, Menu/dashboard data, Menu page + scripts parse); combo, batch-COGS, void, returns, void-drawer, invoice-COGS and profit-report suites green.
+
+## 2026-10-31 — feat(restaurant): Phase 6 — dashboard and reports follow what the company has
+
+**New:** `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/today_strip.php`, `app/bms/restaurant/sales_report.php` (route `restaurant/sales-report`), `tests/test_restaurant_phase6_cli.php`.
+**Changed:** `app/dashboard.php`, `header.php`, `core/pos_nav.php`, `roots.php`, `lang/sw.php`.
+
+- **Restaurant-only company** (every active shop a Restaurant, Restaurant POS + Smart POS on): the dashboard is the restaurant dashboard — Take order / Tables / Menu / Buy Ingredients / Expenses, Sales today, Orders today, Tables with order (unpaid amount), Food profit this month (sales − ingredients) and profit after expenses, Recent orders, Best sellers today, Drinks running low, Getting started. Picked at the top of `app/dashboard.php` with an early exit — the shop dashboard code is untouched.
+- **Shops + restaurant company:** the shop dashboard unchanged plus one "Restaurant today" row (orders, tables with order, unpaid amount, Tables / Take order).
+- **Money figures from the one ledger** (`glProfitLoss`, project + warehouse scope); counts and lists from operational tables, restaurant shops only.
+- **Restaurant Sales report:** sales by order type (Dine in / Take away / Delivery) from posted revenue lines of POS sale entries (same classification as the Income Statement), plus dishes/drinks sold (quantities). Links to the existing By waiter and Profit reports. Added to the Reports menu, the phone Reports sheet and the restaurant hub — only when the restaurant module is on.
+- **Checked:** new test 18/0 (real dine-in + take-away sales and an open table: ledger sales today, orders, open tables/amount, best seller, low drink, food profit; by-order-type totals = ledger; restaurant-only → restaurant dashboard, mixed → shop dashboard + strip, module off → nothing restaurant; report + menu link only when on). Phone checks (390px): restaurant dashboard and Restaurant settings fit with no sideways scroll (quick-action rows evened out).
+
+## 2026-10-31 — feat(restaurant): Phase 5 — Buy Ingredients (Cost of Sales)
+
+**New:** `includes/restaurant/buy_ingredients_modal.php`, `tests/test_restaurant_phase5_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `app/constant/accounts/expenses.php`, `app/bms/restaurant/index.php`, `lang/sw.php`.
+
+- **Buy Ingredients** window (Expenses page + restaurant hub; only when the restaurant module is on): *What did you buy?*, amount, date, shop. Saved through the existing Expenses engine (`api/add_expense.php`) as a paid expense from cash on the restaurant shop, debited to **Cost of Sales — 5-2000 Purchases** (`restaurantIngredientsAccountId()`: setting → 5-2000 → 5-1000 → normal expense fallback). So it shows in Expenses, posts through the one ledger, and the Income Statement counts it as the cost of the food sold (Sales − Ingredients = food profit), not as an operating expense.
+- **Retail:** the Expenses page is unchanged when the restaurant module is off (no button, window or script).
+- **Checked:** new test 11/0 (account = 5-2000; real save → paid expense on the shop, ledger debit posted, Cost of Sales up by exactly the amount, operating expenses unchanged, ledger balanced; renders on/off).
+
+## 2026-10-31 — feat(restaurant): Phase 4 — split the bill, join tables
+
+**New:** `api/restaurant/join_table_orders.php`, `tests/test_restaurant_phase4_cli.php`, `tests/helpers/restaurant_inproc.php` (shared in-process test harness).
+**Changed:** `api/pos/process_sale.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/tables_board.php`, `lang/sw.php`.
+
+- **Split bill (till, table orders):** choose what is paid now (− / + per item); the rest stays on the table. The part payment is sent with `keep_table` so the table and its open order stay; the remaining items are saved straight back as the table's one open order; the final payment frees the table. *Cancel split* restores the full order. (Paying one bill with several payment methods = the existing Split Payment.)
+- **Join tables (Tables screen):** the Move window also lists tables that have an order — joining adds this table's items to that table's open order (total recalculated), closes this order, moves its open kitchen tickets and frees this table.
+- **UI standard:** the table picker's header is now blue (was green).
+- **Not built:** service charge — it needs a server-side price for a charge line inside the shared sale engine; left out on purpose to keep retail sales untouched (optional in the plan).
+- **Checked:** new test 22/0 (part payment keeps table/order, remainder = one open order, final payment frees, both sales on the table, ledger balanced; join merges items/total, frees the first table, moves its ticket, refuses bad targets; keep_table without a table harmless; till renders split only with the module on; all inline scripts parse); restaurant phases 2–3 + POS/i18n suites green.
+
+## 2026-10-31 — feat(restaurant): Phase 3 — how orders reach the kitchen (by mouth / screen / printer)
+
+**New:** `api/restaurant/kitchen_slip.php`, `migrations/tenant/2026_10_31_restaurant_kitchen_ticket_label.php` + `migrations/2026_10_31_restaurant_kitchen_ticket_label_legacy_db.php`, `tests/test_restaurant_phase3_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `api/restaurant/send_to_kitchen.php`, `api/restaurant/get_kitchen_tickets.php`, `app/bms/restaurant/kitchen_dashboard.php`, `app/constant/settings/pos_config_settings.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `schema/*` (template rebuilt), `tests/test_restaurant_phase0_cli.php`.
+
+- **Selling Settings → Restaurant** (only when the restaurant module is on; ignored otherwise): *How do orders reach the kitchen?* **By mouth** (default — no kitchen step), **Kitchen screen**, **Printer**; order types Take away / Delivery on/off (Dine in always on).
+- **Till:** Send to Kitchen only shows in screen/printer mode; printer mode opens a kitchen slip (window opened inside the click so pop-up blockers allow it); a paid take-away/delivery order is sent to the kitchen automatically. Disabled order types are hidden. Advanced-POS restaurant tenants keep today's behaviour.
+- **Kitchen slip:** receipt-width page (58/80 mm from Selling Settings), order label, time, waiter, only items that need preparing grouped by Kitchen/Bar with add-ons/notes; prints itself. Works with any receipt printer set as the device's default.
+- **Schema:** `kitchen_tickets.order_label` + `sale_id` (nullable) — the kitchen screen shows "Table T3" / "Take away · RCP-…"; a paid sale is sent once (repeat refreshes, no duplicate).
+- **Checked:** new test 23/0 (settings shown/saved only with the module on and ignored when off, safe default, take-away ticket + label + note, no duplicate, table label, kitchen screen labels, slip content/width, retail refused, till receives the settings); restaurant phases 0–2 + POS/i18n suites green. Pre-existing: `test_pos_old_sale_flow_cli` fails on local fixture data ('Bread Loaf' below its minimum price).
+
+## 2026-10-31 — feat(restaurant): Phase 2 — Take Order on the till + live Tables screen
+
+**New:** `app/bms/restaurant/tables_board.php` (route `restaurant/tables-board`), `api/restaurant/get_tables_board.php`, `api/restaurant/move_table_order.php`, `tests/test_restaurant_phase2_cli.php`.
+**Changed:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/hold_sale.php`, `api/pos/process_sale.php`, `api/restaurant/send_to_kitchen.php`, `core/pos_nav.php`, `header.php`, `roots.php`, `lang/sw.php`.
+
+- **Bug fixed:** Menu dishes (no-stock items) were never sent to the kitchen — `send_to_kitchen.php` skipped every service line. Dishes now route by their kitchen area; item notes go on the ticket.
+- **Bug fixed:** every table save/Send to Kitchen added another held order and paid orders stayed 'held'. Now one open order per table (a new save replaces the old one, in one transaction) and paying closes it. Re-sending updates the same kitchen ticket (no duplicates).
+- **Till (restaurant/hybrid shops only):** Dine in / Take away / Delivery bar, table picker in the cart, **Save to table**, per-item kitchen note, dish tiles show 'made to order', add-ons now offered on dishes. Opens a table straight from `?table=` and Take away from `?ot=`. Retail shops: unchanged (bar not rendered without Restaurant POS; hidden on retail shops).
+- **Tables screen:** live board per shop (free / has order, amount, items, minutes open), tap to open the order on the till, Move order to a free table, refreshes every 20 s. Menu link 'Tables' now opens it; setup stays on Floors.
+- **Checked:** new test 32/0 (real endpoints in a rolled-back transaction: dish+note to kitchen, one order per table, board, move, pay the table — dish with no recipe sells, note on sale line, table freed, ledger balanced; take away; retail hold untouched; till renders + every inline script parses); phone/desktop previews of the Tables board, Move window and till bar (fixed: status pill overflow).
+
+## 2026-10-31 — feat(restaurant): Phase 1 — Menu page, Getting started checklist, restaurant menus
+
+**New:** `app/bms/restaurant/menu.php` (route `restaurant/menu`), `api/restaurant/{get_menu_items,save_menu_item,update_menu_item,search_products_for_menu,quick_setup}.php`, `includes/restaurant/getting_started.php`, `migrations/tenant/2026_10_31_restaurant_menu_columns.php` + `migrations/2026_10_31_restaurant_menu_columns_legacy_db.php`, `tests/test_restaurant_phase1_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `core/pos_nav.php`, `header.php`, `roots.php`, `api/pos/simple_products.php`, `app/bms/restaurant/index.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql` (template rebuilt).
+
+- **Schema:** `products.is_menu_item` (default 0) and `products.is_available` (default 1) — existing products unchanged. Until the migration runs the restaurant gate stays off (retail behaviour, no crash).
+- **Menu page** (Smart POS + Restaurant POS, Restaurant/Hybrid shops only): one list of dishes and drinks per shop — stat cards, group chips, search, phone cards, desktop DataTable, gear actions. Add Item asks *What is this?*: **Dish (cooked here)** = no-stock item that always sells, no recipe needed; **Bought item (has stock)** = water/soda with opening stock through the same batch + ledger path as Add Product; **Already in my products** = only the menu flags change, never price (a retail shop selling it is unaffected). Each item: group, price, *Prepared at* Kitchen / Bar / No preparation, **Available today** switch.
+- **Sold out today:** the till's product list hides `is_available = 0` items **only for a restaurant shop**; retail shops never get the clause.
+- **Getting started** on the restaurant hub: ticks itself from real data (tables, menu items, first sale); *Add tables* ("How many tables?" → T1…Tn) and *Quick add* (tick chai, mandazi, lunch, soup, water, soda + prices; existing names skipped).
+- **Menus:** Restaurant becomes a dropdown (Menu, Tables, Kitchen, Reservations, Add-ons) when the restaurant module is on; phone side menu gets Menu + Tables; a restaurant-only company's bottom bar shows Menu instead of Products. Retail tenants: no change.
+- **Swahili:** 85 new restaurant strings (each checked unused on retail screens).
+- **Checked:** new test 47/0 (real POSTs, opening stock batch + ledger balanced, existing-product price untouched, sold-out hidden only on restaurant till, retail shop never filtered, module/Smart POS off refuse, quick start idempotent, renders); restaurant/POS/i18n suites green; phone (390px) + desktop previews of Menu, Add Item, hub checklist, Quick add — found and fixed: opening-stock field showing for dishes, group chips clipped on phones. Pre-existing unrelated failures: `test_feature_gating_cli` (78 local tenant_features rows), `test_project_scope_cli` (22 older unscoped files).
+
+## 2026-10-31 — feat(restaurant): Phase 0 — safety finish, tables without floors, plain Swahili words
+
+**Plan:** `restaurant_plan.md` (Smart POS restaurant, v2 after the Levanda review).
+**New:** `actions/superadmin_tenant_restaurant_shops.php`, `tests/test_restaurant_phase0_cli.php`, `restaurant_plan.md`.
+**Changed:** `core/restaurant_scope.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `api/restaurant/save_table.php`, `app/bms/restaurant/floors.php`, `app/bms/restaurant/tables.php`, `lang/sw.php`.
+
+- **Gate helpers:** `restaurantModuleOn()` (Restaurant POS + Smart POS + schema), `restaurantShopActive()`, `restaurantOnlyCompany()` — every later restaurant change sits behind them; with Restaurant POS off they are false and retail is unchanged.
+- **Superadmin warning:** switching Restaurant POS from off to on first lists the tenant's shops already stored as Restaurant/Hybrid (read-only lookup; a failed lookup never blocks the save).
+- **Tables without floors:** the area is optional; no area chosen = the shop's default area ("Main Area", created on first use). Add Table no longer breaks on a shop with no floors. No schema change.
+- **Floors page:** the empty-area text no longer says "No floors yet" under an existing floor; phone table cards have a full-width status picker and a corner edit button; Tables page filters no longer scroll sideways on phones.
+- **Swahili:** restaurant-only keys reworded (Mgahawa, Eneo, Skrini ya Jikoni, Vikundi vya Nyongeza, Ina Oda, Inapikwa, Kulia Hapa, Rudi Mauzo, Kuhifadhi Meza…); a free table shows "Wazi" via its own key. A test proves none of the changed keys is used on a retail screen; shared keys (Available, Reserved, optional) untouched.
+- **Checked:** new test 44/0 (gate truth table, real save_table POSTs, default-area creation, renders, real tenant-DB lookup, superadmin JS parse, wording leak guard); restaurant/POS/i18n suites green; phone (390px) and desktop previews of Floors and Tables.
+
+## 2026-10-31 — fix(restaurant): till now sees the shop's Restaurant mode; Restaurant choice only exists when superadmin enables it
+
+**New:** `tests/test_restaurant_mode_gating_cli.php`.
+**Changed:** `app/bms/pos/pos.php`, `header.php`, `app/bms/stock/warehouses.php`, `api/mobile/warehouses/create.php`, `api/mobile/warehouses/update.php`.
+
+- **Bug (confirmed live on shop.demo):** `pos.php` printed `POS_WAREHOUSE_MODES` near the top but built it later inside the shop `<select>`, so it was always `{}` — every shop behaved as retail and Select Table / Send to Kitchen / dish add-ons never appeared, since Phase 30. The shop list and mode map are now built before the `<script>`; the dropdown markup is unchanged.
+- **Retail untouched:** the mode map is only looked up when Restaurant POS is on; with it off the till is exactly today's (map empty → every shop retail).
+- **Restaurant choice only when enabled:** with Restaurant POS off, a new shop is always saved as retail and a posted POS Mode is ignored on update (stored value kept) — web Shops page and mobile create/update. The form field was already hidden.
+- **Menu:** "Restaurant" link in the top menu and phone side menu, only when Restaurant POS is on (`canView('restaurant_pos')` checks the tenant entitlement first, even for admins).
+- **Checked:** new test 22/0 (real renders of the till + header with the module on/off, real Shops update POSTs; fails on the old `pos.php`); `test_restaurant_pos_mode_setup_cli` 36/0, `test_pos_simple_ux_cli` 94/0, `test_warehouse_project_filter_cli` 84/0; `test_restaurant_pos_cli` 152/1 — the 1 is a sibling suite `test_pos_phase8_registers_cli` failing on open/close_shift.php (pre-existing, files not touched).
+
 ## 2026-10-31 — feat(backup): nightly backups copied off the server, encrypted, to Google Drive (rclone)
 
 **Plan:** `backup_plan.md` §4 (PR 2).

@@ -154,6 +154,12 @@ try {
                     ps.warehouse_id IS NOT NULL
                     OR (p.is_service = 1 AND p.warehouse_id = :warehouse_svc)
                   )";
+        // restaurant_plan.md Phase 1 — a restaurant shop hides items marked
+        // "sold out today" on its Menu. Retail shops never get this clause.
+        require_once __DIR__ . '/../../core/restaurant_scope.php';
+        if (restaurantShopActive($pdo, $warehouse_id)) {
+            $sqlSuffix .= " AND p.is_available = 1";
+        }
     }
 
     $params = [];

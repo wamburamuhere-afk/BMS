@@ -17,6 +17,11 @@ $error_msg = '';
 // loyalty program are the 'pos_advanced' upsell tier on top of base POS.
 $pos_advanced_entitled = canView('pos_advanced');
 
+// restaurant_plan.md Phase 3 — the Restaurant section exists only when the
+// restaurant module is on (Restaurant POS + Smart POS). Retail: never shown, never saved.
+require_once __DIR__ . '/../../../core/restaurant_scope.php';
+$restaurant_on = restaurantModuleOn($pdo);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     try {
@@ -39,6 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_setting('pos_loyalty_enabled', isset($_POST['pos_loyalty_enabled']) ? '1' : '0');
             save_setting('pos_loyalty_spend_per_point', max(1, (float)($_POST['pos_loyalty_spend_per_point'] ?? 1000)));
             save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
+        }
+        if ($restaurant_on) {
+            save_setting('restaurant_kitchen_mode', in_array($_POST['restaurant_kitchen_mode'] ?? '', ['none', 'screen', 'printer'], true) ? $_POST['restaurant_kitchen_mode'] : 'none');
+            save_setting('restaurant_order_take_away', isset($_POST['restaurant_order_take_away']) ? '1' : '0');
+            save_setting('restaurant_order_delivery', isset($_POST['restaurant_order_delivery']) ? '1' : '0');
         }
         $success_msg = wLabel('POS settings updated successfully', 'Selling settings updated successfully');
     } catch (Exception $e) {
@@ -144,6 +154,32 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                             <input type="number" class="form-control" id="pos_old_sale_max_days" name="pos_old_sale_max_days" min="1" max="365" step="1" value="<?= (int)$pos_old_sale_max_days ?: 30 ?>" style="max-width: 160px;">
                             <div class="form-text"><?= t('People with the "POS Record Old Sale" permission can record a sale made up to this many days ago (1 to 365). Admins have it; give it to other roles in Roles & Permissions.') ?></div>
                         </div>
+
+                        <?php if ($restaurant_on):
+                            $rk_mode = restaurantKitchenMode();
+                            $rk_types = restaurantOrderTypes(); ?>
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><i class="bi bi-cup-hot text-primary me-1"></i><?= t('Restaurant') ?></h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><?= t('How do orders reach the kitchen?') ?></label>
+                            <?php foreach ([
+                                'none'    => [t('By mouth'), t('No kitchen step on the till. The waiter tells the cook; the order stays on its table.')],
+                                'screen'  => [t('Kitchen screen'), t('A phone or tablet in the kitchen shows each order (Restaurant → Kitchen).')],
+                                'printer' => [t('Printer'), t('"Send to Kitchen" prints a kitchen slip on your receipt printer.')],
+                            ] as $val => [$lbl, $hint]): ?>
+                            <div class="form-check border rounded p-2 ps-5 mb-2">
+                                <input class="form-check-input" type="radio" name="restaurant_kitchen_mode" id="rk_<?= $val ?>" value="<?= $val ?>" <?= $rk_mode === $val ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="rk_<?= $val ?>"><?= $lbl ?></label>
+                                <div class="form-text mt-0"><?= $hint ?></div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><?= t('Order types on the Sell screen') ?></label>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" checked disabled id="rt_dine"><label class="form-check-label" for="rt_dine"><?= t('Dine in') ?> <span class="text-muted small">(<?= t('always on') ?>)</span></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="restaurant_order_take_away" id="rt_take" value="1" <?= in_array('take_away', $rk_types, true) ? 'checked' : '' ?>><label class="form-check-label" for="rt_take"><?= t('Take away') ?></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="restaurant_order_delivery" id="rt_del" value="1" <?= in_array('delivery', $rk_types, true) ? 'checked' : '' ?>><label class="form-check-label" for="rt_del"><?= t('Delivery') ?></label></div>
+                        </div>
+                        <?php endif; ?>
 
                         <?php if ($pos_advanced_entitled): ?>
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Loyalty Program') ?></h6>

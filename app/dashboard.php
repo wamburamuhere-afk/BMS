@@ -11,6 +11,17 @@ require_once ROOT_DIR . '/core/financial_reports.php';   // glProfitLoss() — l
 require_once ROOT_DIR . '/core/pos_nav.php';              // posSimpleModeEnabled()
 require_once ROOT_DIR . '/header.php';
 
+// restaurant_plan.md Phase 6 — a restaurant-only company (every active shop is a
+// Restaurant, Restaurant POS + Smart POS on) gets the restaurant dashboard instead.
+// Everyone else continues to the shop dashboard below, unchanged.
+require_once ROOT_DIR . '/core/restaurant_scope.php';
+if (restaurantOnlyCompany($pdo)) {
+    require ROOT_DIR . '/includes/restaurant/dashboard.php';
+    include("footer.php");
+    ob_end_flush();
+    return;
+}
+
 // Simple Mode (POS Settings) — swaps the Performance Overview chart below for
 // a plain Bought-vs-Sold view sourced from pos_sales, not the ledger. See
 // core/pos_nav.php::posSimpleModeEnabled() and .claude/reporting-source.md.
@@ -1522,6 +1533,12 @@ function get_progress_color($percentage) {
         }
     </style>
     <?php endif; ?>
+
+    <?php
+    // restaurant_plan.md Phase 6 — shops + restaurant company: one "Restaurant today" row
+    // (renders nothing unless the restaurant module is on and a restaurant shop exists).
+    require ROOT_DIR . '/includes/restaurant/today_strip.php';
+    ?>
 
     <!-- Quick Links Section -->
     <?php

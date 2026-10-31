@@ -33,6 +33,11 @@ let currentTableId = null;
 let currentTableLabel = '';
 let currentHoldId = null;         // the pos_held_sales row backing the open table order, once one exists
 let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetched once and reused
+// restaurant_plan.md Phase 2 — dine_in / take_away / delivery; '' = not chosen (sent as nothing,
+// exactly like before). Only a restaurant/hybrid shop ever sets it.
+let currentOrderType = '';
+// restaurant_plan.md Phase 4 — split bill in progress: { original: [...], remainder: [...] }.
+let rsSplit = null;
 
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
 // True for admins / users granted every shop: they may load products with no shop chosen.
@@ -185,6 +190,21 @@ const PT = {
     sendToKitchenFailed: <?= json_encode(t('Could not send this order to the kitchen.')) ?>,
     addItemsBeforeKitchen: <?= json_encode(t('Add items to the order before sending to the kitchen.')) ?>,
     selectTableFirst: <?= json_encode(t('Select a table first.')) ?>,
+    // restaurant_plan.md Phase 2
+    chooseTable: <?= json_encode(t('Choose table')) ?>,
+    openOrder: <?= json_encode(t('open order')) ?>,
+    savedToTable: <?= json_encode(t('Saved to table %s.')) ?>,
+    addNote: <?= json_encode(t('Add note')) ?>,
+    madeToOrder: <?= json_encode(t('made to order')) ?>,
+    kitchenSlipReady: <?= json_encode(t('Kitchen slip ready')) ?>,
+    splitPickOne: <?= json_encode(t('Choose at least one item to pay now.')) ?>,
+    splitNote: <?= json_encode(t('Paying part of the bill — %d item(s) stay on the table.')) ?>,
+    splitKept: <?= json_encode(t('The rest of the bill stays on table %s.')) ?>,
+    printKitchenSlip: <?= json_encode(t('Print kitchen slip')) ?>,
+    itemNoteTitle: <?= json_encode(t('Note for the kitchen')) ?>,
+    itemNotePlaceholder: <?= json_encode(t('e.g. less salt, no chilli')) ?>,
+    save: <?= json_encode(t('Save')) ?>,
+    tableNotInShop: <?= json_encode(t('This table belongs to a different shop than the one you are selling in.')) ?>,
     modifiersLabel: <?= json_encode(t('Options')) ?>,
     modifierRequired: <?= json_encode(t('"%s" is required.')) ?>,
     modifierMinMax: <?= json_encode(t('Choose between %min% and %max% option(s) for "%group%".')) ?>,
@@ -735,6 +755,8 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
 // One product tile (shared by the full grid and the phone pager).
 function posProductTileHtml(product) {
     const isService = product.is_service == 1 || product.is_service == '1';
+    // restaurant_plan.md Phase 2 — on a restaurant shop a no-stock item is a dish.
+    const isDish = isService && posRestaurantActive();
     const projectStock = parseFloat(product.project_stock) || 0;
     
     // Determine image content
@@ -746,7 +768,7 @@ function posProductTileHtml(product) {
         }
         imageContent = `<img src="${imgPath}" alt="${caseFormatJs(product.product_name)}" style="height: 100%; max-width: 100%; object-fit: contain;">`;
     } else {
-        imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
+        imageContent = `<i class="bi ${isDish ? 'bi-egg-fried' : (isService ? 'bi-briefcase' : 'bi-box-seam')}" style="font-size: 3rem; color: #0d6efd;"></i>`;
     }
 
     // Phase 31 (pos_upgrade_plan.md §8) — a variant parent (variant_count > 0)
@@ -769,13 +791,13 @@ function posProductTileHtml(product) {
                         ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
                         ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
                     </div>
-                    ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
+                    ${isDish ? '' : (isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : '')}
                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}</h6>
                     ${POS_SIMPLE_MODE ? '' : `<p class="card-text text-muted small mb-1">${product.sku || ''}</p>`}
                     <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
                         ${PT.qtyLabel} ${product.stock_quantity}
-                    </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
+                    </p>` : (isDish ? '<p class="card-text small text-muted">' + PT.madeToOrder + '</p>' : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>')}
                 </div>
             </div>
         </div>
@@ -936,7 +958,9 @@ function showProductQuickView(productId) {
     // Phase 30 (pos_upgrade_plan.md §9) — only a restaurant/hybrid warehouse
     // with the entitlement ever fetches/shows modifier groups; a plain retail
     // sale never triggers the extra lookups below.
-    const showModifiers = POS_RESTAURANT_ENABLED && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail' && currentProduct.is_service != 1;
+    // restaurant_plan.md Phase 2 — dishes are no-stock items, so on a restaurant shop
+    // they get add-ons too (before, is_service excluded every dish).
+    const showModifiers = posRestaurantActive();
 
     const html = `
         <h6>${caseFormatJs(currentProduct.product_name)}</h6>
@@ -1327,6 +1351,7 @@ function updateCartDisplay() {
                         <strong class="small">${caseFormatJs(item.product_name)}</strong>
                         ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
                         ${item.modifiers && item.modifiers.length ? `<br><span class="small text-muted">${item.modifiers.map(m => safeOutput(m.option_name)).join(', ')}</span>` : ''}
+                        ${posRestaurantActive() ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none rs-note" onclick="editItemNote(${index})"><i class="bi bi-chat-left-text me-1"></i>${item.note ? safeOutput(item.note) : PT.addNote}</button>` : ''}
                         ${discountBadge}
                     </td>
                     <td class="text-end">
@@ -1673,7 +1698,10 @@ function processPayment() {
         // every plain retail sale, which process_sale.php treats identically
         // to how it behaved before this phase.
         table_id: currentTableId || undefined,
-        sale_type: currentTableId ? 'dine_in' : undefined,
+        // restaurant_plan.md Phase 2 — take_away / delivery from the order bar (restaurant shops only).
+        sale_type: currentTableId ? 'dine_in' : ((posRestaurantActive() && currentOrderType) ? currentOrderType : undefined),
+        // restaurant_plan.md Phase 4 — paying part of a table's bill keeps the table open.
+        keep_table: (currentTableId && rsSplit && rsSplit.remainder.length) ? 1 : undefined,
         // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales
         // only; undefined/null for every other sale, which process_sale.php
         // treats identically to how it behaved before this phase.
@@ -1727,6 +1755,16 @@ function submitPayment(paymentData) {
                 // a plain wa.me deep-link the cashier's own device opens).
                 // The server's number is the real one (an old sale is numbered on its own day).
                 const savedReceipt = response.receipt_number || currentReceiptNumber;
+                // restaurant_plan.md Phase 4 — split bill: the unpaid items go straight back on the table.
+                if (paymentData.keep_table && rsSplit && rsSplit.remainder.length) {
+                    saveRemainderToTable(rsSplit.remainder, paymentData.table_id, currentTableLabel, parseInt(paymentData.warehouse_id, 10));
+                }
+                rsSplit = null;
+                // restaurant_plan.md Phase 3 — a paid take-away / delivery order goes to the kitchen.
+                if (posRestaurantActive() && POS_KITCHEN_MODE !== 'none' && response.sale_id
+                    && (paymentData.sale_type === 'take_away' || paymentData.sale_type === 'delivery')) {
+                    sendSaleToKitchen(response.sale_id, parseInt(paymentData.warehouse_id, 10));
+                }
                 const whatsappReceiptText = buildWhatsAppReceiptText(savedReceipt);
                 const oldSaleMsg = response.is_old_sale ? ' ' + OLD_SALE_T.recordedFor.replace('%s', oldSaleLongDate(response.sale_date)) : '';
 
@@ -1759,6 +1797,8 @@ function submitPayment(paymentData) {
                     // terminal starts as an ordinary walk-in, not still
                     // pinned to the table that was just paid out.
                     clearTableSelection();
+                    // restaurant_plan.md Phase 2 — next order starts on the shop's default type.
+                    if (posRestaurantActive()) { setOrderType(''); applyPosModeUi(); }
 
                     // 2. Clear Payment Inputs
                     $('#amountTendered').val('0');
@@ -1930,18 +1970,36 @@ function printReceipt(saleId) {
 // separate "Choose POS Mode" step for hybrid warehouses: the same end state
 // (both modes available) with materially less new UI-state-machine surface.
 
+function posShopMode() {
+    return POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail';
+}
+// True only on a Restaurant/Hybrid shop of a Restaurant POS tenant — every
+// restaurant_plan.md Phase 2 addition below is behind this.
+function posRestaurantActive() {
+    return POS_RESTAURANT_ENABLED && posShopMode() !== 'retail';
+}
+
 function applyPosModeUi() {
-    const wid = parseInt($('#posWarehouseId').val() || 0, 10);
-    const mode = POS_WAREHOUSE_MODES[wid] || 'retail';
-    const show = POS_RESTAURANT_ENABLED && mode !== 'retail';
-    $('#restaurantTableBtn').toggleClass('d-none', !show);
+    const mode = posShopMode();
+    const show = posRestaurantActive();
+    // The order bar (Dine in / Take away / Delivery + table) replaces the small table icon.
+    const hasBar = $('#restaurantOrderBar').length > 0;
+    $('#restaurantTableBtn').toggleClass('d-none', !show || hasBar);
+    $('#restaurantOrderBar').toggleClass('d-none', !show);
+    if (show && !currentOrderType && mode === 'restaurant') setOrderType('dine_in');
     if (!show) {
+        setOrderType('');
         // Warehouse changed away from a restaurant/hybrid one — drop any
         // selected table so a stale table_id from a different warehouse can
         // never ride along on the next sale.
         clearTableSelection();
     } else {
-        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId);
+        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId || POS_KITCHEN_MODE === 'none');
+        // Order types switched off in Selling Settings are not offered.
+        ['take_away', 'delivery'].forEach(function (t) {
+            const on = POS_ORDER_TYPES.indexOf(t) > -1;
+            $(`input[name="rsOrderType"][value="${t}"]`).toggleClass('d-none', !on).next('label').toggleClass('d-none', !on);
+        });
     }
 }
 
@@ -1951,6 +2009,189 @@ function clearTableSelection() {
     currentHoldId = null;
     $('#restaurantTableIndicator').addClass('d-none');
     $('#sendToKitchenBtn').addClass('d-none');
+    $('#rsTableLabel').text(PT.chooseTable);
+    $('#rsTableBtn').removeClass('btn-primary text-white').addClass('btn-outline-primary');
+    $('#rsSaveTableBtn').addClass('d-none');
+    $('#rsSplitRow').addClass('d-none');
+    rsSplit = null;
+    $('#rsSplitNote').addClass('d-none');
+    $('#rsSplitBtn').removeClass('d-none');
+}
+
+// restaurant_plan.md Phase 2 — Dine in / Take away / Delivery.
+function setOrderType(type) {
+    currentOrderType = type || '';
+    $('input[name="rsOrderType"]').prop('checked', false);
+    if (currentOrderType) $(`input[name="rsOrderType"][value="${currentOrderType}"]`).prop('checked', true);
+    // A table only belongs to a dine-in order.
+    $('#rsTableRow').toggleClass('d-none', !!currentOrderType && currentOrderType !== 'dine_in');
+    if (currentOrderType && currentOrderType !== 'dine_in' && currentTableId) clearTableSelection();
+}
+$(document).on('change', 'input[name="rsOrderType"]', function () { setOrderType(this.value); });
+
+// restaurant_plan.md Phase 2 — arriving from the Tables screen (?table=ID): open that
+// table's order once the till knows its shop. Never crosses shops.
+$(function () {
+    // ?ot=take_away|delivery from the Tables screen's Take away button.
+    if (POS_OPEN_ORDER_TYPE) {
+        const applyOt = function (n) {
+            if (!parseInt($('#posWarehouseId').val() || 0, 10) && n < 20) { setTimeout(function () { applyOt(n + 1); }, 250); return; }
+            if (posRestaurantActive()) setOrderType(POS_OPEN_ORDER_TYPE);
+        };
+        setTimeout(function () { applyOt(0); }, 400);
+    }
+    if (!POS_OPEN_TABLE || !POS_OPEN_TABLE.id) return;
+    const tryOpen = function (attempt) {
+        const wid = parseInt($('#posWarehouseId').val() || 0, 10);
+        if (!wid && attempt < 20) { setTimeout(function () { tryOpen(attempt + 1); }, 250); return; }
+        if (!wid) return;
+        if (POS_OPEN_TABLE.wid && wid !== POS_OPEN_TABLE.wid) { Swal.fire({ icon: 'warning', title: PT.tableNotInShop }); return; }
+        if (!posRestaurantActive()) return;
+        selectTable(POS_OPEN_TABLE.id, wid, POS_OPEN_TABLE.label || ('#' + POS_OPEN_TABLE.id));
+    };
+    setTimeout(function () { tryOpen(0); }, 300);
+});
+
+// restaurant_plan.md Phase 4 — split bill by items.
+function openSplitBill() {
+    if (!currentTableId || !cart.length) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
+    if (rsSplit) return;
+    let html = '';
+    cart.forEach((it, i) => {
+        html += `<div class="d-flex align-items-center gap-2 py-2 border-bottom">
+            <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${caseFormatJs(it.product_name)}</div>
+                <div class="small text-muted">${it.quantity} × ${Number(it.discounted_price).toLocaleString()}</div></div>
+            <div class="input-group input-group-sm flex-shrink-0" style="width:120px;">
+                <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, -1)">−</button>
+                <input type="number" class="form-control text-center rs-split-qty" data-i="${i}" min="0" max="${it.quantity}" value="0" oninput="rsSplitTotal()">
+                <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, 1)">+</button>
+            </div></div>`;
+    });
+    $('#rsSplitLines').html(html);
+    rsSplitTotal();
+    new bootstrap.Modal(document.getElementById('rsSplitModal')).show();
+}
+function rsSplitStep(i, d) {
+    const el = $(`.rs-split-qty[data-i="${i}"]`);
+    el.val(Math.max(0, Math.min(cart[i].quantity, (parseFloat(el.val()) || 0) + d)));
+    rsSplitTotal();
+}
+function rsSplitTotal() {
+    let t = 0;
+    $('.rs-split-qty').each(function () {
+        const it = cart[$(this).data('i')];
+        const q = Math.max(0, Math.min(it.quantity, parseFloat($(this).val()) || 0));
+        t += q * it.discounted_price;
+    });
+    $('#rsSplitTotal').text(POS_CURRENCY + ' ' + t.toLocaleString());
+}
+function applySplitBill() {
+    const original = JSON.parse(JSON.stringify(cart));
+    const payNow = [], remainder = [];
+    $('.rs-split-qty').each(function () {
+        const it = original[$(this).data('i')];
+        const q = Math.max(0, Math.min(it.quantity, parseFloat($(this).val()) || 0));
+        if (q > 0) payNow.push(Object.assign({}, it, { quantity: q }));
+        if (it.quantity - q > 0) remainder.push(Object.assign({}, it, { quantity: it.quantity - q }));
+    });
+    if (!payNow.length) { Swal.fire({ icon: 'info', title: PT.splitPickOne }); return; }
+    bootstrap.Modal.getInstance(document.getElementById('rsSplitModal'))?.hide();
+    if (!remainder.length) return; // everything chosen = a normal full payment
+    rsSplit = { original: original, remainder: remainder };
+    cart = payNow;
+    updateCartDisplay();
+    saveCartToStorage();
+    $('#rsSplitNoteText').text(PT.splitNote.replace('%d', remainder.reduce((n, i) => n + i.quantity, 0)));
+    $('#rsSplitNote').removeClass('d-none');
+    $('#rsSplitBtn, #rsSaveTableBtn').addClass('d-none');
+}
+function cancelSplitBill() {
+    if (!rsSplit) return;
+    cart = rsSplit.original;
+    rsSplit = null;
+    updateCartDisplay();
+    saveCartToStorage();
+    $('#rsSplitNote').addClass('d-none');
+    $('#rsSplitBtn, #rsSaveTableBtn').removeClass('d-none');
+}
+function saveRemainderToTable(items, tableId, label, warehouseId) {
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/hold_sale.php') ?>', type: 'POST', contentType: 'application/json', dataType: 'json',
+        data: JSON.stringify({
+            reference: PT.tableLabel + ' ' + label, customer_id: null, items: items,
+            subtotal: items.reduce((s, i) => s + (i.price * i.quantity), 0),
+            tax: items.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
+            warehouse_id: warehouseId, table_id: tableId
+        }),
+        success: function (res) {
+            if (res.success) Swal.fire({ toast: true, position: 'top', icon: 'info', title: PT.splitKept.replace('%s', label), timer: 2600, showConfirmButton: false });
+            else Swal.fire({ icon: 'error', title: PT.error, text: res.message });
+        },
+        error: () => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError })
+    });
+}
+
+// restaurant_plan.md Phase 3 — kitchen slip (printer mode). Uses an already-open window when
+// given (opened inside a click); otherwise opens one and offers a link if the browser blocks it.
+function openKitchenSlip(params, win) {
+    const url = '<?= buildUrl('api/restaurant/kitchen_slip.php') ?>?' + $.param(params);
+    if (win && !win.closed) { win.location.href = url; return; }
+    const w = window.open(url, '_blank', 'width=420,height=640');
+    if (!w) Swal.fire({ icon: 'info', title: PT.kitchenSlipReady, html: `<a href="${url}" target="_blank" class="btn btn-primary"><i class="bi bi-printer me-1"></i>${PT.printKitchenSlip}</a>` });
+}
+function sendSaleToKitchen(saleId, warehouseId) {
+    $.post('<?= buildUrl('api/restaurant/send_to_kitchen.php') ?>', { sale_id: saleId, warehouse_id: warehouseId, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+        if (res.success && POS_KITCHEN_MODE === 'printer') openKitchenSlip({ sale_id: saleId, warehouse_id: warehouseId });
+    }, 'json');
+}
+
+// Kitchen note per item ("less salt, extra chilli") — restaurant shops only.
+function editItemNote(index) {
+    const item = cart[index];
+    if (!item) return;
+    Swal.fire({
+        title: PT.itemNoteTitle, input: 'text', inputValue: item.note || '',
+        inputPlaceholder: PT.itemNotePlaceholder, inputAttributes: { maxlength: 200 },
+        showCancelButton: true, confirmButtonText: PT.save, cancelButtonText: PT.cancel, confirmButtonColor: '#0d6efd'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        item.note = (r.value || '').trim();
+        updateCartDisplay();
+        saveCartToStorage();
+    });
+}
+
+// Keep the order open on its table (pay later). One open order per table:
+// hold_sale.php replaces the table's previous held order.
+function saveOrderToTable() {
+    if (!currentTableId) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
+    if (cart.length === 0) { Swal.fire({ icon: 'warning', title: PT.emptyCartTitle, text: PT.addItemsBeforeHold }); return; }
+    const btn = $('#rsSaveTableBtn'); const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    const label = currentTableLabel;
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/hold_sale.php') ?>', type: 'POST', contentType: 'application/json', dataType: 'json',
+        data: JSON.stringify({
+            reference: PT.tableLabel + ' ' + label,
+            customer_id: $('#customerSelect').val() || null,
+            items: cart,
+            subtotal: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+            tax: cart.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
+            warehouse_id: parseInt($('#posWarehouseId').val(), 10),
+            table_id: currentTableId
+        }),
+        success: function (res) {
+            if (!res.success) { Swal.fire({ icon: 'error', title: PT.error, text: res.message }); return; }
+            cart = [];
+            updateCartDisplay();
+            clearCartStorage();
+            clearTableSelection();
+            setCustomerSelection('', '');
+            Swal.fire({ icon: 'success', title: PT.savedToTable.replace('%s', label), timer: 1600, showConfirmButton: false });
+        },
+        error: () => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError }),
+        complete: () => btn.prop('disabled', false).html(orig)
+    });
 }
 
 function openTablePicker() {
@@ -2029,7 +2270,13 @@ function selectTable(tableId, warehouseId, tableNumber) {
         saveCartToStorage();
         $('#restaurantTableIndicatorText').text(PT.dineInTable.replace('%s', tableNumber));
         $('#restaurantTableIndicator').removeClass('d-none');
-        $('#sendToKitchenBtn').removeClass('d-none');
+        $('#sendToKitchenBtn').toggleClass('d-none', POS_KITCHEN_MODE === 'none');
+        // restaurant_plan.md Phase 2 — the order bar shows the table and offers "Save to table".
+        if (currentOrderType !== 'dine_in') setOrderType('dine_in');
+        $('#rsTableLabel').text(PT.tableLabel + ' ' + tableNumber + (existing ? ' · ' + PT.openOrder : ''));
+        $('#rsTableBtn').removeClass('btn-outline-primary').addClass('btn-primary text-white');
+        $('#rsSaveTableBtn').removeClass('d-none');
+        $('#rsSplitRow').removeClass('d-none');
 
         $.post('<?= buildUrl('api/restaurant/update_table_status.php') ?>', {
             table_id: tableId, status: 'occupied', _csrf: <?= json_encode(csrf_token()) ?>
@@ -2052,6 +2299,8 @@ function sendCurrentOrderToKitchen() {
     const wid = parseInt($('#posWarehouseId').val() || 0, 10);
     const btn = $('#sendToKitchenBtn');
     const origHtml = btn.html();
+    // restaurant_plan.md Phase 3 — printer mode: open the slip window now, inside the click.
+    const slipWin = (POS_KITCHEN_MODE === 'printer') ? window.open('', '_blank', 'width=420,height=640') : null;
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
     // Every "Send to Kitchen" press re-persists the table's current cart as a
@@ -2090,8 +2339,10 @@ function sendCurrentOrderToKitchen() {
                 hold_id: currentHoldId, warehouse_id: wid, _csrf: <?= json_encode(csrf_token()) ?>
             }, function (res) {
                 if (res.success) {
+                    if (POS_KITCHEN_MODE === 'printer') openKitchenSlip({ hold_id: currentHoldId, warehouse_id: wid }, slipWin);
                     Swal.fire({ icon: 'success', title: PT.sentToKitchen, timer: 1500, showConfirmButton: false });
                 } else {
+                    if (slipWin) slipWin.close();
                     Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: res.message });
                 }
             }, 'json').fail(function () {

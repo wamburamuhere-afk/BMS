@@ -76,7 +76,18 @@ try {
 
     // Generate hold reference
     $hold_reference = $reference ?: 'HOLD-' . date('Ymd-His');
-    
+
+    // restaurant_plan.md Phase 2 — ONE open order per table. A table's new
+    // held order replaces its previous one, so the Tables screen and the till
+    // always load the current order (before, every save/Send to Kitchen added
+    // another 'held' row and stale ones piled up). Table orders only — a plain
+    // retail hold (no table_id) is never touched.
+    if ($table_id) {
+        $pdo->beginTransaction(); // replace + insert + occupy succeed or fail together
+        $pdo->prepare("UPDATE pos_held_sales SET status = 'cancelled' WHERE table_id = ? AND status = 'held'")
+            ->execute([$table_id]);
+    }
+
     // Insert held sale
     $stmt = $pdo->prepare("
         INSERT INTO pos_held_sales (
@@ -109,6 +120,7 @@ try {
         $pdo->prepare("UPDATE restaurant_tables SET status = 'occupied', updated_at = NOW() WHERE table_id = ?")
             ->execute([$table_id]);
     }
+    if ($pdo->inTransaction()) $pdo->commit();
 
     require_once __DIR__ . '/../../helpers.php';
     $username = $_SESSION['username'] ?? 'User';
@@ -122,6 +134,7 @@ try {
     ]);
     
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage()

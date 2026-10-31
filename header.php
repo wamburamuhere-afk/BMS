@@ -1170,7 +1170,34 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             </a>
                         </li>
                         <?php endif; ?>
-                        
+                        <?php // Restaurant — only when superadmin enabled Restaurant POS for this tenant (canView checks the entitlement first, even for admins). ?>
+                        <?php if(canView('restaurant_pos')):
+                            require_once __DIR__ . '/core/restaurant_scope.php';
+                            $__rest_on = restaurantModuleOn($pdo); // Smart POS restaurant: show its daily pages directly ?>
+                        <?php if ($__rest_on): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="restaurantDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-cup-hot"></i> <?= t('Restaurant') ?>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="restaurantDropdown">
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i> <?= t('Menu') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Modifier Group') ?></a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant') ?>"><i class="bi bi-cup-hot"></i> <?= t('All restaurant pages') ?></a></li>
+                            </ul>
+                        </li>
+                        <?php else: ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('restaurant') ?>">
+                                <i class="bi bi-cup-hot"></i> <?= t('Restaurant') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php endif; ?>
+
                         <!-- Inventory / Shop -->
                         <?php if(posSimpleModeEnabled()): ?>
                         <!-- Simple POS: "Shop" links directly to warehouses — no dropdown,
@@ -1452,6 +1479,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <?php if(canView('pos') && canView('pos_user_sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i> <?= t('Sales by User Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('pos') && canView('pos_profit_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Profit Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('product_analysis')): ?><li><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>?view=profit"><i class="bi bi-trophy"></i> <?= t('Most Profitable Products') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__rest_on)): // restaurant_plan.md Phase 6 ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
                             </ul>
                             <?php else: ?>
                             <div class="dropdown-menu mega-dropdown-menu" aria-labelledby="reportsDropdown">
@@ -1701,7 +1729,15 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         $__bn_new_product   = canCreate('products');
         $__bn_receive_stock = canView('pos') && canView('pos_restock');
         ?>
-        <?php if (canView('products') && ($__bn_new_product || $__bn_receive_stock)): ?>
+        <?php
+        // restaurant_plan.md Phase 1 — a restaurant-only company sells from its Menu,
+        // so this tab opens the Menu instead. Mixed/retail companies: unchanged.
+        require_once __DIR__ . '/core/restaurant_scope.php';
+        $__bn_rest_only = canView('restaurant_pos') && restaurantOnlyCompany($pdo);
+        ?>
+        <?php if ($__bn_rest_only): ?>
+        <a class="bn-item<?= $__bn_on('restaurant/menu') ? ' active' : '' ?>" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i><span><?= t('Menu') ?></span></a>
+        <?php elseif (canView('products') && ($__bn_new_product || $__bn_receive_stock)): ?>
         <button type="button" class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" data-bs-toggle="modal" data-bs-target="#bmsAddProductModal" data-apm-from="tab"><i class="bi bi-box"></i><span><?= t('Products') ?></span></button>
         <?php elseif (canView('products')): ?>
         <a class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" href="<?= getUrl('products') ?>"><i class="bi bi-box"></i><span><?= t('Products') ?></span></a>
@@ -1773,6 +1809,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('expense_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i><?= t('Expense Report') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_user_sales_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i><?= t('Sales by User Report') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_profit_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i><?= t('Profit Report') ?></a><?php endif; ?>
+                <?php if (!empty($__rest_on)): // restaurant_plan.md Phase 6 ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant Sales') ?></a><?php endif; ?>
             </div>
         </div>
     </div>
@@ -1794,7 +1831,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             <button type="button" class="bms-side-close" data-bs-dismiss="offcanvas" aria-label="<?= htmlspecialchars(t('Close menu')) ?>"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="offcanvas-body">
-            <?php if (canView('customers') || canView('suppliers') || canView('products') || (canView('pos') && canView('pos_restock')) || canView('field_visits')): ?>
+            <?php if (canView('customers') || canView('suppliers') || canView('products') || (canView('pos') && canView('pos_restock')) || canView('field_visits') || canView('restaurant_pos')): ?>
             <div class="bn-group"><?= t('My Business') ?></div>
             <div class="list-group list-group-flush">
                 <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
@@ -1802,6 +1839,13 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? getUrl('receive_stock') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
                 <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Customer Visits') ?></a><?php endif; ?>
+                <?php if(canView('restaurant_pos')): ?>
+                <?php if (!empty($__rest_on)): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i><?= t('Menu') ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i><?= t('Tables') ?></a>
+                <?php endif; ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant') ?></a>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
             <?php if (!empty($_billing_visible)): ?>
