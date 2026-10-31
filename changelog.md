@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(backup): deploy installs the backup schedule — no manual step, never forgotten
+
+**Plan:** `backup_plan.md` (Phase 3 of PR 1).
+**New:** `scripts/install_backup_cron.php`.
+**Changed:** `.github/workflows/deploy.yml`, `core/tenant_backups.php` (`bmsBackupCronFile()`, `bmsBackupCronFileName()`), `cron/backup_all_tenants.php` (log location, fatal-error logging), `tests/test_tenant_backups_cli.php`.
+
+- **Before:** the only schedule was a comment in `cron/auto_backup.php` telling someone to add a crontab line. Nobody did: production had no backup schedule.
+- **Now:** every deploy runs `sudo php scripts/install_backup_cron.php --host=<host>` per host, which (re)writes `/etc/cron.d/bms-backup-<host>`: full backup 00:30, database snapshots 06:30 / 12:30 / 18:30 Africa/Dar_es_Salaam, run as `www-data` so the Backup page can list, download and delete the files. Times are converted to the server clock (production runs on UTC; Ubuntu cron ignores `CRON_TZ`). The second host (demo) is staggered 30 minutes later. Only its own file is written — other systems' cron entries on the server are never read or changed. Unchanged file → left alone. `--print` shows the schedule without installing.
+- **Safety:** guarded with `|| echo` in `deploy.yml` — a schedule problem warns in the deploy log and can never stop a deploy. The cron lines redirect only to `/dev/null`: if cron cannot open a redirect target it never starts the command, which would silently skip every backup. So the run writes its own log to `backups/_platform/backup.log` (www-data can write there, and no company's page lists that folder), including fatal PHP errors. File name has no dots (cron ignores `/etc/cron.d` names with dots). Works without the php-posix extension.
+- **Checked:** `test_tenant_backups_cli` now 55 checks (adds: UTC and Dar es Salaam server clocks, 30-minute stagger, www-data only, no file redirects, MAILTO off, dot-free name, `--print`, bad `--host` refused, deploy wiring inside the host loop after tenant migrations with its guard, `script_stop: true` intact). `deploy.yml` parses as YAML; the host loop simulated in bash with a failing installer: warning printed, second host and the rest of the deploy still run.
+
 ## 2026-10-31 — feat(backup): scheduled backup of every company, not just the main install
 
 **Plan:** `backup_plan.md` (Phase 2 of PR 1).

@@ -284,6 +284,76 @@ if (!function_exists('bmsBackupLogWrite')) {
     }
 }
 
+if (!function_exists('bmsBackupCronFile')) {
+    /**
+     * Content of the /etc/cron.d file that schedules this host's backups.
+     *
+     * The schedule is written in Africa/Dar_es_Salaam time (what the business
+     * thinks in) and converted to the server clock, which is UTC on production
+     * (a file PHP named 11-52 showed 08:52 in `ls`). Debian/Ubuntu cron ignores
+     * CRON_TZ, so the conversion has to happen here.
+     *
+     *   full     00:30            (DB + each owner's uploads)
+     *   snapshot 06:30 12:30 18:30 (DB only — 00:30 is already the full run)
+     *
+     * $offsetMinutes staggers a second host on the same server so two runs never
+     * compete for the disk and database at the same moment.
+     *
+     * No output redirection to a file: if cron's shell cannot open a redirect
+     * target the command never starts, silently skipping every backup. The
+     * script writes its own log (backups/_platform/backup.log).
+     */
+    function bmsBackupCronFile(string $host, string $appRoot, string $phpBin, int $serverUtcOffsetMinutes, int $offsetMinutes = 0): string
+    {
+        $eatOffset = 180;   // Africa/Dar_es_Salaam is UTC+03:00, no DST
+        $toServer  = function (int $eatMinuteOfDay) use ($eatOffset, $serverUtcOffsetMinutes, $offsetMinutes): array {
+            $m = ($eatMinuteOfDay - $eatOffset + $serverUtcOffsetMinutes + $offsetMinutes) % 1440;
+            if ($m < 0) $m += 1440;
+            return [intdiv($m, 60), $m % 60];
+        };
+
+        [$fh, $fm] = $toServer(30);                       // 00:30
+        $snaps = array_map($toServer, [390, 750, 1110]);  // 06:30 12:30 18:30
+        $snapMinutes = array_unique(array_column($snaps, 1));
+        $snapHours   = array_column($snaps, 0);
+        sort($snapHours);
+
+        $script = rtrim($appRoot, '/') . '/cron/backup_all_tenants.php';
+        $sign   = $serverUtcOffsetMinutes < 0 ? '-' : '+';
+        $abs    = abs($serverUtcOffsetMinutes);
+        $tzText = sprintf('UTC%s%02d:%02d', $sign, intdiv($abs, 60), $abs % 60);
+
+        $lines = [
+            "# BMS scheduled backups for {$host}.",
+            '# Written by scripts/install_backup_cron.php on every deploy — edits here are overwritten.',
+            "# Times are server time ({$tzText}); in Africa/Dar_es_Salaam: full 00:30, snapshots 06:30 12:30 18:30"
+                . ($offsetMinutes ? " (+{$offsetMinutes} min stagger)." : '.'),
+            '# Log: backups/_platform/backup.log  ·  History: bms_control.tenant_backup_log',
+            'MAILTO=""',
+            'SHELL=/bin/sh',
+            "{$fm} {$fh} * * * www-data {$phpBin} {$script} --kind=full >/dev/null 2>&1",
+        ];
+        // The three snapshot times share one minute unless the offsets are odd;
+        // fall back to one line each so no time is ever dropped.
+        if (count($snapMinutes) === 1) {
+            $lines[] = $snapMinutes[0] . ' ' . implode(',', $snapHours) . " * * * www-data {$phpBin} {$script} --kind=snapshot >/dev/null 2>&1";
+        } else {
+            foreach ($snaps as [$h, $m]) {
+                $lines[] = "{$m} {$h} * * * www-data {$phpBin} {$script} --kind=snapshot >/dev/null 2>&1";
+            }
+        }
+        return implode("\n", $lines) . "\n";
+    }
+}
+
+if (!function_exists('bmsBackupCronFileName')) {
+    /** /etc/cron.d file name for a host. Cron skips names containing '.', so dots become '-'. */
+    function bmsBackupCronFileName(string $host): string
+    {
+        return 'bms-backup-' . preg_replace('/[^A-Za-z0-9_-]/', '-', $host);
+    }
+}
+
 if (!function_exists('bmsBackupRunAll')) {
     /**
      * Back up every target, one after another. Never throws for a single

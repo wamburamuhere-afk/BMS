@@ -12,10 +12,15 @@
  *   php cron/backup_all_tenants.php --list             # show targets, back up nothing
  *
  * Must run as the web server user (www-data) so the Backup & Restore page can
- * list, download and delete the files it writes.
+ * list, download and delete the files it writes. Scheduled by
+ * scripts/install_backup_cron.php (run on every deploy).
  *
- * Exit 0 = every target backed up; 1 = one or more failed (see cron/backup.log
- * and the control table tenant_backup_log); 2 = bad arguments or already running.
+ * Log: backups/_platform/backup.log — inside backups/ because www-data can
+ * write there (it cannot write cron/, which deploy owns), and _platform/ is a
+ * folder no company's Backup page lists or serves.
+ *
+ * Exit 0 = every target backed up; 1 = one or more failed (see the log and the
+ * control table tenant_backup_log); 2 = bad arguments or already running.
  */
 
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
@@ -26,7 +31,19 @@ require_once __DIR__ . '/../core/tenant_backups.php';
 $opts     = getopt('', ['kind:', 'tenant:', 'list']);
 $kind     = $opts['kind'] ?? null;
 $tenantId = isset($opts['tenant']) ? (int)$opts['tenant'] : null;
-$logFile  = __DIR__ . '/backup.log';
+
+$platformDir = (defined('ROOT_DIR') ? ROOT_DIR : dirname(__DIR__)) . '/backups/_platform/';
+bmsEnsureDirGuard($platformDir);
+$logFile = $platformDir . 'backup.log';
+
+// Cron discards output, so a fatal error (memory, timeout, missing extension)
+// would vanish. Record it where the rest of the run is logged.
+register_shutdown_function(function () use ($logFile) {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] FATAL {$e['message']} in {$e['file']}:{$e['line']}\n", FILE_APPEND | LOCK_EX);
+    }
+});
 
 function backup_cli_log(string $logFile, string $msg): void
 {

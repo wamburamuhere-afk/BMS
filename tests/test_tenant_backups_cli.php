@@ -262,3 +262,55 @@ exec("$php $cron --kind=snapshot --tenant=0 2>&1", $o3, $c3);
 flock($held, LOCK_UN); fclose($held);
 ok($c3 === 2 && str_contains(implode("\n", $o3), 'another backup run is still in progress'),
    'a second run while one is in progress is refused (exit 2)');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('9. Schedule (cron file)');
+// ═══════════════════════════════════════════════════════════════════════════
+
+$app = '/var/www/bms.bjptechnologies.co.tz/public_html';
+$utc = bmsBackupCronFile('bms.bjptechnologies.co.tz', $app, '/usr/bin/php', 0, 0);
+$jobs = array_values(array_filter(explode("\n", $utc), fn($l) => (bool)preg_match('/^\d/', $l)));
+ok(count($jobs) === 2, 'two job lines: one full, one snapshot');
+ok(str_starts_with($jobs[0] ?? '', '30 21 * * * www-data /usr/bin/php ' . $app . '/cron/backup_all_tenants.php --kind=full'),
+   'UTC server: full backup at 21:30 UTC = 00:30 Dar es Salaam, as www-data');
+ok(str_starts_with($jobs[1] ?? '', '30 3,9,15 * * * www-data ') && str_contains($jobs[1], '--kind=snapshot'),
+   'UTC server: snapshots at 03:30/09:30/15:30 UTC = 06:30/12:30/18:30 Dar es Salaam');
+
+$eat = bmsBackupCronFile('h', $app, '/usr/bin/php', 180, 0);
+ok(str_contains($eat, "\n30 0 * * * www-data") && str_contains($eat, "\n30 6,12,18 * * * www-data"),
+   'a server already on Dar es Salaam time gets 00:30 and 06:30/12:30/18:30 unchanged');
+
+$demo = bmsBackupCronFile('demo.bjptechnologies.co.tz', $app, '/usr/bin/php', 0, 30);
+ok(str_contains($demo, "\n0 22 * * * www-data") && str_contains($demo, "\n0 4,10,16 * * * www-data"),
+   'second host staggered by 30 minutes (22:00 full, 04:00/10:00/16:00 snapshots)');
+
+$odd = bmsBackupCronFile('h', $app, '/usr/bin/php', 0, 0);
+ok(substr_count($odd, '--kind=snapshot') === 1 && substr_count($odd, '--kind=full') === 1, 'exactly one full and one snapshot line');
+
+ok(str_contains($utc, "MAILTO=\"\"\n"), 'MAILTO="" — cron never mails output');
+ok(!preg_match('/>>?\s*(?!\/dev\/null|&\d)\S/', preg_replace('/^#.*$/m', '', $utc)),
+   'no redirect to any file except /dev/null (a redirect cron cannot open would skip the backup entirely)');
+ok(!str_contains($utc, '/root/') && substr_count($utc, ' www-data ') === 2, 'both jobs run as www-data, never root');
+ok(bmsBackupCronFileName('bms.bjptechnologies.co.tz') === 'bms-backup-bms-bjptechnologies-co-tz',
+   "cron file name has no dots (cron silently ignores /etc/cron.d names containing '.')");
+
+exec("$php " . escapeshellarg("$root/scripts/install_backup_cron.php") . ' --host=bms.bjptechnologies.co.tz --print 2>&1', $po, $pc);
+ok($pc === 0 && str_contains(implode("\n", $po), '--kind=full') && str_contains(implode("\n", $po), '--kind=snapshot'),
+   'install_backup_cron.php --print shows the schedule without installing');
+exec("$php " . escapeshellarg("$root/scripts/install_backup_cron.php") . ' --host="bad host;rm" --print 2>&1', $bo, $bc);
+ok($bc === 1, 'a malformed --host is refused');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('10. Deploy wiring');
+// ═══════════════════════════════════════════════════════════════════════════
+
+$yml = file_get_contents("$root/.github/workflows/deploy.yml");
+// The host loop is one line; greedy to its end so the inner uploads loop's
+// "; done" is not mistaken for the host loop's.
+preg_match('/for h in \$HOSTS; do (.*); done[ \t]*\r?$/m', $yml, $loop);
+$body = $loop[1] ?? '';
+ok(str_contains($body, 'sudo php scripts/install_backup_cron.php --host="$h"'), 'deploy installs the schedule for every host in the loop');
+ok((bool)preg_match('/install_backup_cron\.php[^;]*\|\| echo/', $body), 'guarded with || echo — a schedule problem can never abort the deploy');
+ok(strpos($body, 'install_backup_cron.php') > strpos($body, 'tenant_migration_runner.php'), 'runs after the tenant migrations (last step per host)');
+ok(str_contains($yml, 'BACKUP_OFFSET=0') && str_contains($body, 'BACKUP_OFFSET=$((BACKUP_OFFSET + 30))'), 'each next host is staggered by 30 minutes');
+ok(str_contains($yml, 'script_stop: true'), 'script_stop: true is still in place');

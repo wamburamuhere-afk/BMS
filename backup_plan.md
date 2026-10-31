@@ -87,7 +87,7 @@ Revisit when tenants or file sizes grow.
    Uses the existing BMS dumper inside `START TRANSACTION WITH CONSISTENT SNAPSHOT`, not
    `mysqldump` — the UI restore is built and tested around that dump format. Every file is
    re-opened and verified. Results → `bms_control.tenant_backup_log`.
-3. **Schedule** — `deploy.yml` writes `/etc/cron.d/bms-backup` (§2).
+3. **Schedule** ✅ — `deploy.yml` writes `/etc/cron.d/bms-backup` (§2).
 4. **Retention + permissions** — §3 rules with the 3-newest floor; `750` instead of `777`.
 
 ### PR 2 — Email off-site (§4)
