@@ -30,10 +30,10 @@ Code references:
 
 ## 2. Schedule
 
-| What | When | Kept on server | Emailed |
+| What | When | Kept on server | Off-site |
 |---|---|---|---|
 | **DB snapshot** (each tenant + BJP + `bms_control`) | Every 6 h — 00:30, 06:30, 12:30, 18:30 | 48 h | No |
-| **Full backup** (DB + that tenant's own `uploads/tNN/`) | Daily 00:30 | see §3 | **Yes** |
+| **Full backup** (DB + that tenant's own `uploads/tNN/`) | Daily 00:30 | see §3 | **Yes** — Google Drive, encrypted, 01:30 (§4) |
 
 00:30 avoids Vikundi's 02:15 job. Installed by `deploy.yml` as `/etc/cron.d/bms-backup`
 (idempotent, survives every deploy — never a manual step again).
@@ -58,21 +58,52 @@ Weekly/monthly are the same daily file kept longer — no extra copies. ≈ 23 f
 Example on 2026-12-15: dailies 9–15 Dec; weeklies of 23 Nov, 30 Nov, 7 Dec; monthlies
 1 Nov, 1 Dec; plus the snapshots from the last 48 h.
 
-## 4. Off-site copy — email (phase 1 of off-site)
+## 4. Off-site copy — Google Drive via rclone (encrypted)
 
-- Dedicated mailbox (e.g. `backups@…`, Google Workspace/Gmail) with 2FA, used for nothing else.
-- Daily, **one email per tenant**: subject `BMS Backup | <company> | bms_tNN | 2026-10-31`.
-  Sent via the existing `sendEmail()` (`core/mailer.php`, attachments supported) + platform SMTP.
-- Attachment = **AES-256 encrypted zip** (opens in 7-Zip / WinRAR with the password).
-  Password lives only in server config (env), never in an email.
-- Size guard: attachment > 20 MB → email sends DB only + a note; files stay on the server.
-- Mailbox cleanup: script deletes backup emails older than 30 days over IMAP (needs `php-imap`;
-  otherwise manual), so the mailbox stays ≈ 1.5 GB.
-- Destinations are pluggable: moving later to Google Drive / Backblaze B2 / GCS is a config
-  change, not a rewrite.
+Decided 2026-10-31: **rclone → Google Drive of `bjptechnologieslimited@gmail.com`** instead of
+email (no 25 MB attachment cap, no mailbox clutter, proper sync tool).
 
-**Limits accepted for now:** 25 MB attachment cap, mailbox storage cap, email is not a vault.
-Revisit when tenants or file sizes grow.
+- **What goes:** each night's full backups only (`auto_backup_*.zip` of the main install, every
+  tenant and `bms_control`). Snapshots, manual, pre-restore and uploaded files stay on the server.
+- **When:** 01:30 Dar es Salaam (one hour after the full backup; waits if a backup is still
+  running). `cron/offsite_backup.php`, installed in the same `/etc/cron.d/bms-backup-<host>`.
+- **Encrypted before upload:** the rclone remote must be type `crypt` — file contents AND
+  file/folder names are encrypted on the server. A plain remote is refused. Google never sees
+  the data.
+- **Runs as root:** only root can read `/root/.config/rclone/rclone.conf` (Drive token +
+  encryption password), so no web app on this shared server can read them.
+- **Safe upload:** never overwrites a file already on Drive; every uploaded file is verified
+  (`rclone cryptcheck`).
+- **Layout on Drive:** `BMS-Backups/<encrypted>/…` → decrypted: `<host>/auto_backup_….zip`,
+  `<host>/t29/…`, `<host>/_platform/…`.
+- **Retention on Drive** (runs only after a successful upload): 30 days of nightlies + the first
+  of each month for 12 months + **the 3 newest per folder always**. Always a superset of what
+  the server keeps. Est. ≈ 42 files per company ≈ 2–3 GB total — within the free 15 GB.
+  Deleted files go to Drive's trash for 30 days first (Google default).
+- **Visibility:** `backups/_platform/offsite.log` + `offsite_status.json` (read by PR 3's
+  health page).
+
+### One-time server setup (root)
+
+1. Install rclone: `sudo -v ; curl https://rclone.org/install.sh | sudo bash`
+2. `sudo rclone config` → `n` new remote **`gdrive`**, storage `drive`, client id/secret blank,
+   scope **`drive.file`** (rclone sees only the files it creates), advanced `n`,
+   auto config **`n`** (headless) → on a PC with a browser, run the `rclone authorize "drive" …`
+   command it prints, sign in as `bjptechnologieslimited@gmail.com`, paste the token back.
+   Shared drive `n`.
+3. `n` new remote **`bms-offsite`**, storage `crypt`, remote `gdrive:BMS-Backups`,
+   filename encryption `standard`, directory names `true`, password: `g` (generate, 128+ bits),
+   salt password: `g` (generate). **Write both generated passwords down and store them off the
+   server (password manager + paper).** Without them the Drive copies can never be opened.
+4. Test: `sudo php /var/www/bms.bjptechnologies.co.tz/cron/offsite_backup.php --host=bms.bjptechnologies.co.tz --check`
+5. First upload now: same command without `--check`.
+
+### Restore from Drive (server lost)
+
+On any machine: install rclone, recreate `gdrive` (sign in again) and `bms-offsite` with the
+**same two passwords** (`rclone config` → crypt → enter them, not generate), then
+`rclone copy bms-offsite:bms.bjptechnologies.co.tz/t29/auto_backup_<date>.zip .` and restore that
+ZIP through Settings → Backup & Restore → upload.
 
 ---
 
@@ -92,9 +123,14 @@ Revisit when tenants or file sizes grow.
 4. **Retention + permissions** ✅ — §3 rules with the 3-newest floor. `backups/` = deploy
    user + group www-data, mode `2770` (not `750`: git, running as the deploy user, must still
    update `backups/.htaccess`, and www-data must write). Other server users get nothing.
-   Residual: another app running PHP as www-data could still read dumps — PR 2 encrypts copies.
+   Residual: another app running PHP as www-data could still read dumps on the server — the
+   off-site copies (PR 2) are encrypted and their keys are root-only.
 
-### PR 2 — Email off-site (§4)
+### PR 2 — Off-site to Google Drive (§4) ✅
+`core/offsite_backup.php` + `cron/offsite_backup.php`, scheduled by the same install script.
+Test `tests/test_offsite_backup_cli.php` (real rclone run against a crypt remote when rclone
+is available). Needs the one-time server setup in §4 before the first upload; until then the
+nightly job logs `NOT CONFIGURED` and changes nothing.
 
 ### PR 3 — Monitoring + restore drills
 - Superadmin "Backup Health" page: per tenant last backup, size, ✅/❌, last email sent.
@@ -105,6 +141,6 @@ Revisit when tenants or file sizes grow.
 ---
 
 ## 6. Open decisions
-- [ ] Mailbox address for backup emails.
+- [x] Off-site destination: Google Drive of `bjptechnologieslimited@gmail.com` via rclone (not email).
 - [ ] 6-hourly DB snapshots OK, or more frequent?
 - [ ] Whether to clean the ~325 MB of old `uploaded_*` / `pre_restore_*` clutter in `backups/t29/` once PR 1 ships.
