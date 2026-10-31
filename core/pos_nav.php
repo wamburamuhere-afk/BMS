@@ -195,6 +195,7 @@ if (!function_exists('restaurantSubHubCards')) {
         if (isset($GLOBALS['pdo']) && $GLOBALS['pdo'] instanceof PDO && restaurantModuleOn($GLOBALS['pdo'])) {
             $cards[] = ['icon' => 'bi-journal-richtext', 'label' => t('Menu'), 'description' => t('Dishes and drinks you sell, prices, and what is available today.'), 'url' => 'restaurant/menu'];
             $cards[] = ['icon' => 'bi-grid-3x3-gap', 'label' => t('Tables'), 'description' => t('Every table at a glance — open orders, amounts, move a table.'), 'url' => 'restaurant/tables-board'];
+            $cards[] = ['icon' => 'bi-bar-chart', 'label' => t('Restaurant Sales'), 'description' => t('Sales by Dine in, Take away and Delivery, and dishes sold.'), 'url' => 'restaurant/sales-report'];
         }
         return array_merge($cards, [
             ['icon' => 'bi-diagram-3',      'label' => t('Floors & Tables'), 'description' => t('Define dining floors and their tables.'), 'url' => 'restaurant/floors'],

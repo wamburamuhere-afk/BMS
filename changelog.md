@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 6 — dashboard and reports follow what the company has
+
+**New:** `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/today_strip.php`, `app/bms/restaurant/sales_report.php` (route `restaurant/sales-report`), `tests/test_restaurant_phase6_cli.php`.
+**Changed:** `app/dashboard.php`, `header.php`, `core/pos_nav.php`, `roots.php`, `lang/sw.php`.
+
+- **Restaurant-only company** (every active shop a Restaurant, Restaurant POS + Smart POS on): the dashboard is the restaurant dashboard — Take order / Tables / Menu / Buy Ingredients / Expenses, Sales today, Orders today, Tables with order (unpaid amount), Food profit this month (sales − ingredients) and profit after expenses, Recent orders, Best sellers today, Drinks running low, Getting started. Picked at the top of `app/dashboard.php` with an early exit — the shop dashboard code is untouched.
+- **Shops + restaurant company:** the shop dashboard unchanged plus one "Restaurant today" row (orders, tables with order, unpaid amount, Tables / Take order).
+- **Money figures from the one ledger** (`glProfitLoss`, project + warehouse scope); counts and lists from operational tables, restaurant shops only.
+- **Restaurant Sales report:** sales by order type (Dine in / Take away / Delivery) from posted revenue lines of POS sale entries (same classification as the Income Statement), plus dishes/drinks sold (quantities). Links to the existing By waiter and Profit reports. Added to the Reports menu, the phone Reports sheet and the restaurant hub — only when the restaurant module is on.
+- **Checked:** new test 18/0 (real dine-in + take-away sales and an open table: ledger sales today, orders, open tables/amount, best seller, low drink, food profit; by-order-type totals = ledger; restaurant-only → restaurant dashboard, mixed → shop dashboard + strip, module off → nothing restaurant; report + menu link only when on). Phone checks (390px): restaurant dashboard and Restaurant settings fit with no sideways scroll (quick-action rows evened out).
+
 ## 2026-10-31 — feat(restaurant): Phase 5 — Buy Ingredients (Cost of Sales)
 
 **New:** `includes/restaurant/buy_ingredients_modal.php`, `tests/test_restaurant_phase5_cli.php`.
