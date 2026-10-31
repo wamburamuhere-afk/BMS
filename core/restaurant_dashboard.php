@@ -64,7 +64,12 @@ if (!function_exists('restaurantDashboardData')) {
 
             $out['low_drinks'] = $pdo->query("SELECT p.product_name, COALESCE(SUM(ps.stock_quantity),0) AS stock
                 FROM products p LEFT JOIN product_stocks ps ON ps.product_id = p.product_id AND ps.warehouse_id IN ($in)
-                WHERE p.is_menu_item = 1 AND p.is_service = 0 AND p.status = 'active'
+                WHERE p.status = 'active' AND p.is_service = 0
+                  AND (p.is_menu_item = 1
+                       -- restaurant_plan.md Phase 7 — ingredients used in a dish's recipe
+                       OR p.product_id IN (SELECT ac.component_product_id FROM product_assembly_components ac
+                                             JOIN products d ON d.product_id = ac.parent_product_id
+                                            WHERE d.is_menu_item = 1 AND d.is_service = 1 AND d.is_combo = 1))
                 GROUP BY p.product_id, p.product_name, p.min_stock_level
                 HAVING stock <= GREATEST(COALESCE(p.min_stock_level,0), 5)
                 ORDER BY stock ASC LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);

@@ -469,6 +469,11 @@ try {
         $pid = (int)$item['product_id'];
         $db_product = $products_map[$pid] ?? null;
         if (!$db_product || empty($db_product['is_combo'])) continue;
+        // restaurant_plan.md Phase 7 — a dish with a recipe (no-stock item + recipe) is never
+        // blocked by ingredient stock: kitchens rarely count every gram, so a missing record
+        // must not stop lunch from selling. Its ingredients are still used up below and may
+        // go under zero (shown as running low). Retail combos keep this check exactly.
+        if (!empty($db_product['is_service'])) continue;
         $qty = floatval($item['quantity'] ?? 0);
         $shortfalls = checkComboAvailability($pdo, $pid, $qty, (int)$warehouse_id);
         if (!empty($shortfalls)) {

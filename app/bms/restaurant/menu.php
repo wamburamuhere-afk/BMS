@@ -211,6 +211,38 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 </div>
 <?php endif; ?>
 
+<?php if ($can_edit && $warehouses): ?>
+<!-- Recipe — restaurant_plan.md Phase 7 -->
+<div class="modal fade" id="recipeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-list-check me-1"></i> <?= t('Recipe') ?> — <span id="rcpDish"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-2"><?= t('What goes into ONE plate. Selling it uses up these ingredients from stock. A dish without a recipe still sells normally.') ?></div>
+                <div id="rcpLines"></div>
+                <div class="d-flex gap-2 mt-2">
+                    <div class="flex-grow-1" style="min-width:0;"><select id="rcpPick" class="form-select"></select></div>
+                    <button type="button" class="btn btn-outline-primary flex-shrink-0" onclick="rcpNewIngredient()" title="<?= htmlspecialchars(t('New ingredient')) ?>"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <div class="card rm-stat mt-3 p-2">
+                    <div class="d-flex justify-content-between"><span><?= t('Cost of one plate') ?></span><strong id="rcpCost">0</strong></div>
+                    <div class="d-flex justify-content-between"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
+                    <div class="d-flex justify-content-between"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
+                </div>
+                <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With recipes, bring ingredients in with Receive Stock (not Buy Ingredients), so they are not counted twice.') ?></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="button" class="btn btn-primary" onclick="rcpSave()"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <style>
 .rm-stat { background:#e7f0ff; border:1px solid #b6ccfe; }
 .rm-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -249,11 +281,23 @@ const RM = {
     removeNote: <?= json_encode(t('The item is kept in your products; it just stops showing on the menu.')) ?>,
     yesRemove: <?= json_encode(t('Yes, remove')) ?>,
     cancel: <?= json_encode(t('Cancel')) ?>,
+    save: <?= json_encode(t('Save')) ?>,
     chooseProduct: <?= json_encode(t('Type to search your products...')) ?>,
     saving: <?= json_encode(t('Saving...')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     serverError: <?= json_encode(t('Server error. Please try again.')) ?>,
     stockLeft: <?= json_encode(t('stock')) ?>,
+    recipe: <?= json_encode(t('Recipe')) ?>,
+    cost: <?= json_encode(t('cost')) ?>,
+    profit: <?= json_encode(t('profit')) ?>,
+    perPlate: <?= json_encode(t('per plate')) ?>,
+    inStock: <?= json_encode(t('in stock')) ?>,
+    pickIngredient: <?= json_encode(t('Add an ingredient (type to search)...')) ?>,
+    newIngredient: <?= json_encode(t('New ingredient')) ?>,
+    ingName: <?= json_encode(t('Name (e.g. Rice)')) ?>,
+    ingUnit: <?= json_encode(t('Unit (kg, litre, pcs)')) ?>,
+    ingCost: <?= json_encode(t('Buying price per unit')) ?>,
+    noIngredients: <?= json_encode(t('No ingredients yet — this dish sells without stock.')) ?>,
 };
 let MENU = [];
 let ACTIVE_CAT = 'all';
@@ -341,11 +385,18 @@ function actionMenu(it) {
         <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i></button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
             <li><button class="dropdown-item py-2 rounded" onclick="editItem(${it.product_id})"><i class="bi bi-pencil text-primary me-2"></i>${RM.edit}</button></li>
+            ${it.is_service ? `<li><button class="dropdown-item py-2 rounded" onclick="openRecipe(${it.product_id})"><i class="bi bi-list-check text-primary me-2"></i>${RM.recipe}</button></li>` : ''}
             <li><hr class="dropdown-divider"></li>
             <li><button class="dropdown-item py-2 rounded text-danger" onclick="removeItem(${it.product_id})"><i class="bi bi-x-circle text-danger me-2"></i>${RM.remove}</button></li>
         </ul></div>`;
 }
 function typeLabel(it) { return it.is_service ? RM.dish : RM.stockItem; }
+// restaurant_plan.md Phase 7 — "Recipe · cost 1,200 · profit 3,800" under a dish that has one.
+function recipeLine(it) {
+    if (!it.has_recipe) return '';
+    const profit = it.selling_price - it.recipe_cost;
+    return `<div class="small text-muted"><i class="bi bi-list-check text-primary"></i> ${RM.recipe} · ${RM.cost} ${fmt(it.recipe_cost)} · ${RM.profit} <span class="${profit < 0 ? 'text-danger' : 'text-primary'} fw-semibold">${fmt(profit)}</span></div>`;
+}
 function prepLabel(it) { return it.station_name || RM.noPrep; }
 function stockLabel(it) { return it.is_service ? `<span class="text-muted">${RM.madeToOrder}</span>` : fmt(it.stock); }
 
@@ -357,7 +408,7 @@ function render() {
 
     menuTable.clear();
     rows.forEach(it => menuTable.row.add([
-        `<span class="fw-semibold">${safeOutput(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}`,
+        `<span class="fw-semibold">${safeOutput(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}${recipeLine(it)}`,
         safeOutput(it.category_name || RM.noGroup),
         `<span class="badge rm-badge">${typeLabel(it)}</span>`,
         safeOutput(prepLabel(it)),
@@ -381,6 +432,7 @@ function render() {
                         <div class="min-w-0">
                             <div class="rm-name">${safeOutput(it.product_name)}</div>
                             <div class="small text-muted">${safeOutput(it.category_name || RM.noGroup)} · ${safeOutput(prepLabel(it))}</div>
+                            ${recipeLine(it)}
                         </div>
                         <div class="rm-price">${fmt(it.selling_price)}</div>
                     </div>
@@ -397,6 +449,70 @@ function render() {
         </div>`;
     });
     $('#cardView').html(html);
+}
+
+// ───────── restaurant_plan.md Phase 7 — recipes ─────────
+let RCP = { id: 0, price: 0, lines: [] };
+function openRecipe(id) {
+    $.getJSON('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'get', product_id: id, warehouse_id: whId() }, function (res) {
+        if (!res.success) { Swal.fire({ icon: 'error', title: RM.error, text: res.message }); return; }
+        RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, lines: res.components.map(c => ({ product_id: c.product_id, name: c.product_name, unit: c.unit, qty: c.qty, cost: c.cost_price, stock: c.stock })) };
+        $('#rcpDish').text(res.dish.product_name);
+        rcpRender();
+        const m = $('#recipeModal');
+        if (!$('#rcpPick').hasClass('select2-hidden-accessible')) {
+            $('#rcpPick').select2({ theme: 'bootstrap-5', dropdownParent: m, width: '100%', placeholder: RM.pickIngredient, allowClear: true, minimumInputLength: 1,
+                ajax: { url: '<?= buildUrl('api/restaurant/recipe.php') ?>', dataType: 'json', delay: 300,
+                        data: p => ({ action: 'search', q: p.term, warehouse_id: whId() }), processResults: d => ({ results: d.results }), cache: true } })
+            .on('select2:select', function (e) { rcpAdd(e.params.data); $(this).val(null).trigger('change'); });
+        }
+        new bootstrap.Modal(document.getElementById('recipeModal')).show();
+    }).fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));
+}
+function rcpAdd(d) {
+    if (!d || !d.id || RCP.lines.some(l => l.product_id === d.id)) return;
+    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: d.unit || 'pcs', qty: 1, cost: parseFloat(d.cost_price) || null, stock: null });
+    rcpRender();
+}
+function rcpRender() {
+    if (!RCP.lines.length) { $('#rcpLines').html(`<div class="text-muted small py-2">${RM.noIngredients}</div>`); }
+    else {
+        $('#rcpLines').html(RCP.lines.map((l, i) => `
+            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
+                <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${safeOutput(l.name)}</div>
+                    <div class="small text-muted">${l.cost !== null ? fmt(l.cost) + ' / ' + safeOutput(l.unit) : ''}${l.stock !== null ? ' · ' + fmt(l.stock) + ' ' + RM.inStock : ''}</div></div>
+                <div class="input-group input-group-sm flex-shrink-0" style="width:132px;">
+                    <input type="number" class="form-control text-end" min="0.01" step="0.01" value="${l.qty}" inputmode="decimal" onchange="RCP.lines[${i}].qty = parseFloat(this.value) || 0; rcpTotals();">
+                    <span class="input-group-text">${safeOutput(l.unit)}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 flex-shrink-0" onclick="RCP.lines.splice(${i}, 1); rcpRender();"><i class="bi bi-x-circle fs-5"></i></button>
+            </div>`).join(''));
+    }
+    rcpTotals();
+}
+function rcpTotals() {
+    const cost = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
+    $('#rcpCost').text(fmt(cost)); $('#rcpPrice').text(fmt(RCP.price));
+    $('#rcpProfit').text(fmt(RCP.price - cost)).toggleClass('text-danger', RCP.price - cost < 0);
+}
+function rcpNewIngredient() {
+    Swal.fire({ title: RM.newIngredient, confirmButtonText: RM.save || 'OK', showCancelButton: true, cancelButtonText: RM.cancel, confirmButtonColor: '#0d6efd',
+        html: `<input id="ingN" class="swal2-input" placeholder="${RM.ingName}"><input id="ingU" class="swal2-input" placeholder="${RM.ingUnit}" value="kg"><input id="ingC" type="number" min="0" step="any" class="swal2-input" placeholder="${RM.ingCost}">`,
+        preConfirm: () => ({ name: $('#ingN').val().trim(), unit: $('#ingU').val().trim(), cost_price: $('#ingC').val() })
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', Object.assign({ action: 'new_ingredient', warehouse_id: whId(), _csrf: CSRF_FIELD }, r.value), function (res) {
+            if (res.success) { rcpAdd({ id: res.id, text: res.text, unit: res.unit, cost_price: res.cost_price }); new bootstrap.Modal(document.getElementById('recipeModal')).show(); }
+            else Swal.fire({ icon: 'error', title: RM.error, text: res.message }).then(() => new bootstrap.Modal(document.getElementById('recipeModal')).show());
+        }, 'json');
+    });
+}
+function rcpSave() {
+    const comps = RCP.lines.filter(l => l.qty > 0).map(l => ({ product_id: l.product_id, qty: l.qty }));
+    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'save', product_id: RCP.id, warehouse_id: whId(), components: JSON.stringify(comps), _csrf: CSRF_FIELD }, function (res) {
+        if (res.success) { bootstrap.Modal.getInstance(document.getElementById('recipeModal'))?.hide(); loadMenu(); Swal.fire({ icon: 'success', title: res.message, timer: 1600, showConfirmButton: false }); }
+        else Swal.fire({ icon: 'error', title: RM.error, text: res.message });
+    }, 'json').fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));
 }
 
 function setAvailable(id, on) {

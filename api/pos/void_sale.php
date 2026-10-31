@@ -80,7 +80,10 @@ try {
                                  WHERE product_id = ? AND warehouse_id = ?");
 
     foreach ($lines as $ln) {
-        if ((int)($ln['is_service'] ?? 0) === 1) continue;   // services hold no stock
+        // services hold no stock — except a dish with a recipe (no-stock item + recipe,
+        // restaurant_plan.md Phase 7): its ingredients were used up, so a void puts them back,
+        // matching the reversed cost entry below.
+        if ((int)($ln['is_service'] ?? 0) === 1 && empty($ln['is_combo'])) continue;
         $pid = (int)$ln['product_id'];
         $qty = (float)$ln['quantity'];
         if ($pid <= 0 || $qty <= 0) continue;

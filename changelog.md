@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 7 — simple recipes, ingredient stock, profit per plate
+
+**New:** `api/restaurant/recipe.php`, `tests/test_restaurant_phase7_cli.php`.
+**Changed:** `api/pos/process_sale.php`, `core/sales_posting.php`, `api/pos/void_sale.php`, `api/restaurant/get_menu_items.php`, `app/bms/restaurant/menu.php`, `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `lang/sw.php`.
+
+- **Recipe** (Menu → dish → gear → Recipe): what goes into ONE plate (ingredient + quantity per plate, e.g. rice 0.30 kg, meat 0.15 kg), live cost / price / profit per plate, quick *New ingredient* (a stock item off the menu; stock arrives with Receive Stock). The Menu shows "Recipe · cost … · profit …" under each dish that has one. An empty recipe = the dish sells without stock again.
+- **A dish with a recipe** (no-stock item + recipe — a kind of item that did not exist before) reuses the combo engine: selling uses up its ingredients; **its cost (Σ ingredient qty × cost) is posted to Cost of Sales** (`posSaleCogs`, added only for this kind); **a short ingredient never blocks the sale** (stock may go under zero and shows as running low); **a void puts the ingredients back** to match the reversed cost entry. A return of cooked food does not restock ingredients (consistent with its cost staying booked).
+- **Retail combos unchanged:** short components still block, cost still uses the combo's own cost price; NIP products are not combos and are unaffected.
+- **Dashboard:** "Drinks and ingredients running low" includes recipe ingredients.
+- **Checked:** new test 26/0 (ingredients, recipe validation/merge, plate cost, ingredients used up, cost of sales = Σ qty × cost, short ingredient never blocks, void restores ingredients and nets the cost to 0, ledger balanced, retail combo still blocked and costed as before, Menu/dashboard data, Menu page + scripts parse); combo, batch-COGS, void, returns, void-drawer, invoice-COGS and profit-report suites green.
+
 ## 2026-10-31 — feat(restaurant): Phase 6 — dashboard and reports follow what the company has
 
 **New:** `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/today_strip.php`, `app/bms/restaurant/sales_report.php` (route `restaurant/sales-report`), `tests/test_restaurant_phase6_cli.php`.

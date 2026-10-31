@@ -104,9 +104,9 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
                 </div>
             </div>
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-cup-straw text-primary me-1"></i><?= t('Drinks running low') ?></h6></div>
+                <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-cup-straw text-primary me-1"></i><?= t('Drinks and ingredients running low') ?></h6></div>
                 <div class="list-group list-group-flush">
-                    <?php if (!$rd['low_drinks']): ?><div class="list-group-item text-muted small"><?= t('All drinks have enough stock.') ?></div><?php endif; ?>
+                    <?php if (!$rd['low_drinks']): ?><div class="list-group-item text-muted small"><?= t('Everything has enough stock.') ?></div><?php endif; ?>
                     <?php foreach ($rd['low_drinks'] as $d): ?>
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         <span class="text-truncate"><?= safe_output($d['product_name']) ?></span>

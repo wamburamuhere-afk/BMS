@@ -35,6 +35,11 @@ try {
         SELECT p.product_id, p.product_name, p.category_id, c.category_name,
                p.selling_price, p.cost_price, p.is_service, p.is_available, p.image_url,
                p.kitchen_station_id, ks.name AS station_name,
+               p.is_combo,
+               -- restaurant_plan.md Phase 7 — cost of one dish from its recipe (Σ ingredient qty × cost)
+               (SELECT COALESCE(SUM(ac.qty_per_unit * COALESCE(cp.cost_price, 0)), 0)
+                  FROM product_assembly_components ac JOIN products cp ON cp.product_id = ac.component_product_id
+                 WHERE ac.parent_product_id = p.product_id) AS recipe_cost,
                COALESCE((SELECT SUM(ps.stock_quantity) FROM product_stocks ps
                           WHERE ps.product_id = p.product_id AND ps.warehouse_id = :w1), 0) AS stock
           FROM products p
@@ -53,6 +58,8 @@ try {
         $r['is_available']  = (int)$r['is_available'];
         $r['selling_price'] = (float)$r['selling_price'];
         $r['cost_price']    = (float)$r['cost_price'];
+        $r['has_recipe']    = (int)$r['is_service'] === 1 && (int)$r['is_combo'] === 1;
+        $r['recipe_cost']   = round((float)$r['recipe_cost'], 2);
         $r['stock']         = (float)$r['stock'];
         $r['kitchen_station_id'] = $r['kitchen_station_id'] !== null ? (int)$r['kitchen_station_id'] : null;
         // Auto-created areas are stored in English: give the form a stable key and show them translated.
