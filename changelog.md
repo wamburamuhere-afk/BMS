@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 5 — Buy Ingredients (Cost of Sales)
+
+**New:** `includes/restaurant/buy_ingredients_modal.php`, `tests/test_restaurant_phase5_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `app/constant/accounts/expenses.php`, `app/bms/restaurant/index.php`, `lang/sw.php`.
+
+- **Buy Ingredients** window (Expenses page + restaurant hub; only when the restaurant module is on): *What did you buy?*, amount, date, shop. Saved through the existing Expenses engine (`api/add_expense.php`) as a paid expense from cash on the restaurant shop, debited to **Cost of Sales — 5-2000 Purchases** (`restaurantIngredientsAccountId()`: setting → 5-2000 → 5-1000 → normal expense fallback). So it shows in Expenses, posts through the one ledger, and the Income Statement counts it as the cost of the food sold (Sales − Ingredients = food profit), not as an operating expense.
+- **Retail:** the Expenses page is unchanged when the restaurant module is off (no button, window or script).
+- **Checked:** new test 11/0 (account = 5-2000; real save → paid expense on the shop, ledger debit posted, Cost of Sales up by exactly the amount, operating expenses unchanged, ledger balanced; renders on/off).
+
 ## 2026-10-31 — feat(restaurant): Phase 4 — split the bill, join tables
 
 **New:** `api/restaurant/join_table_orders.php`, `tests/test_restaurant_phase4_cli.php`, `tests/helpers/restaurant_inproc.php` (shared in-process test harness).

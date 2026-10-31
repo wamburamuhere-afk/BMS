@@ -209,6 +209,15 @@ if (!function_exists('renderExpenseCatRows')) {
                             </a>
                             <?php endif; ?>
                             <?php if (canCreate('expenses')): ?>
+                            <?php
+                            // restaurant_plan.md Phase 5 — restaurant shops record ingredient purchases
+                            // (Cost of Sales) here too. Never shown when the restaurant module is off.
+                            require_once ROOT_DIR . '/core/restaurant_scope.php';
+                            if (restaurantModuleOn($pdo)): ?>
+                            <button type="button" class="btn btn-outline-primary" onclick="rbiOpen()">
+                                <i class="bi bi-basket"></i> <?= t('Buy Ingredients') ?>
+                            </button>
+                            <?php endif; ?>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> <?= t('Add New Expense') ?>
                             </button>
@@ -1849,6 +1858,13 @@ function showToast(type, msg) {
 }
 </style>
 
+<?php
+// restaurant_plan.md Phase 5 — Buy Ingredients window (renders nothing unless the restaurant module is on).
+require_once ROOT_DIR . '/core/restaurant_scope.php';
+require ROOT_DIR . '/includes/restaurant/buy_ingredients_modal.php';
+if (restaurantModuleOn($pdo)): ?>
+<script>window.rbiSaved = function () { if ($.fn.DataTable.isDataTable('#expensesTable')) $('#expensesTable').DataTable().ajax.reload(); };</script>
+<?php endif; ?>
 <?php includeFooter(); 
 ob_end_flush();
 ?>

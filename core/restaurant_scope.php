@@ -334,3 +334,21 @@ if (!function_exists('restaurantOrderTypes')) {
         return $types;
     }
 }
+
+if (!function_exists('restaurantIngredientsAccountId')) {
+    /**
+     * restaurant_plan.md Phase 5 — where "Buy Ingredients" is debited: Cost of Sales,
+     * not an operating expense, so the profit report shows
+     * Sales − Ingredients = food profit, then − Expenses.
+     * Setting 'restaurant_ingredients_account_id' → 5-2000 Purchases → 5-1000 Cost of
+     * Goods Sold → the normal expense fallback (miscExpenseAccountId) as a last resort.
+     */
+    function restaurantIngredientsAccountId(PDO $pdo): ?int
+    {
+        require_once __DIR__ . '/gl_accounts.php';
+        $v = gl_setting_account($pdo, 'restaurant_ingredients_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '5-2000');                           if ($v) return $v;
+        $v = gl_account_by_code($pdo, '5-1000');                           if ($v) return $v;
+        return miscExpenseAccountId($pdo);
+    }
+}

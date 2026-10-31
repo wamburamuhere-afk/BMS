@@ -5981,6 +5981,14 @@ return [
     'They are added with their opening stock in the chosen shop. Products that already exist are not touched.' => 'Zitaongezwa pamoja na stock yake ya kuanzia kwenye duka ulilochagua. Bidhaa zilizopo tayari haziguswi.',
     'Yes, import' => 'Ndiyo, ingiza',
     'Open Products' => 'Fungua Bidhaa',
+    // restaurant_plan.md Phase 5 (2026-10-31)
+    'Buy Ingredients' => 'Nunua Viungo',
+    'What did you buy?' => 'Umenunua nini?',
+    'e.g. Meat 5 kg, fish, wheat flour' => 'mf. Nyama kilo 5, samaki, unga wa ngano',
+    'Amount paid' => 'Kiasi ulicholipa',
+    'Paid from cash. Counted as the cost of the food you sell, so your profit is correct.' => 'Imelipwa kutoka kwenye pesa taslimu. Inahesabiwa kama gharama ya chakula unachouza, ili faida yako iwe sahihi.',
+    'Ingredients' => 'Viungo',
+    'Ingredients purchase saved.' => 'Ununuzi wa viungo umehifadhiwa.',
     // restaurant_plan.md Phase 4 (2026-10-31)
     'Split bill' => 'Gawa bili',
     'Cancel split' => 'Acha kugawa',
