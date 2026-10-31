@@ -2907,7 +2907,7 @@ return [
     'overwrite' => 'kufuta na kuandika upya',
     'all current data.' => 'data yote ya sasa.',
     'Create a new backup before restoring an old one.' => 'Unda hifadhi mpya kabla ya kurejesha ya zamani.',
-    'Auto backups run daily and keep the last 7 files.' => 'Hifadhi kiotomatiki hufanyika kila siku na kuhifadhi faili 7 za mwisho.',
+    'Automatic backups: full backup every night, database snapshot every 6 hours. Kept: snapshots 2 days, nightly 7 days, weekly 4 weeks, monthly 12 months — the 3 newest are never deleted.' => 'Hifadhi kiotomatiki: hifadhi kamili kila usiku, nakala ya hifadhidata kila saa 6. Zinahifadhiwa: nakala za saa 6 siku 2, za kila usiku siku 7, za kila wiki wiki 4, za kila mwezi miezi 12 — 3 za mwisho hazifutwi kamwe.',
     'Large restores may take a few minutes.' => 'Kurejesha kwa data kubwa kunaweza kuchukua dakika chache.',
     'Existing Backups' => 'Hifadhi Zilizopo',
     'Files' => 'Faili',

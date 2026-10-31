@@ -223,10 +223,17 @@ jobs:
           #
           # backups/ is git-tracked (its .htaccess must ship so *.sql dumps are
           # never web-reachable), so `git reset --hard` recreates it on every
-          # deploy owned by the SSH user, not www-data. Without the chmod below,
-          # backup_restore.php's mkdir() self-heal never fires (the dir already
-          # exists) and "Generate Backup" fails with "Cannot open file for
-          # writing" — reproduced on bms.bjptechnologies.co.tz on 2026-08-31.
+          # deploy owned by the SSH user, not www-data. Without the permission
+          # step below, backup_restore.php's mkdir() self-heal never fires (the
+          # dir already exists) and "Generate Backup" fails with "Cannot open file
+          # for writing" — reproduced on bms.bjptechnologies.co.tz on 2026-08-31.
+          #
+          # It used to be `chmod -R 777`, which let every user and every other
+          # system on this shared server read every company's database dump.
+          # Now: owner = the SSH user (so git can still update .htaccess), group
+          # = www-data (so PHP and the www-data backup cron can write), mode 2770
+          # (setgid keeps new files in group www-data), nothing for anyone else.
+          # Guarded with `|| echo` — a permission problem must never stop a deploy.
           #
           # CONTROL DB SETUP RUNS NEXT, AND MAY NEVER ABORT THE DEPLOY EITHER.
           # `php scripts/setup_control_db.php` creates/upgrades bms_control (or
@@ -291,11 +298,21 @@ jobs:
           # Never allowed to fail the deploy: a stale-opcache window is a
           # transient staleness issue, not a correctness break, and must not be
           # able to veto a release the same way tenant migrations must not.
+          #
+          # BACKUP SCHEDULE, LAST PER HOST, AND MAY NEVER ABORT THE DEPLOY.
+          # `scripts/install_backup_cron.php` (re)writes /etc/cron.d/bms-backup-<host>:
+          # full backup 00:30, DB snapshots 06:30/12:30/18:30 Africa/Dar_es_Salaam,
+          # run as www-data (backup_plan.md). Written on every deploy so the
+          # schedule can never be forgotten — production had no backup cron at
+          # all until 2026-10-31. Each next host is staggered by 30 minutes
+          # (BACKUP_OFFSET) so two hosts never back up at the same moment. Only
+          # its own file is touched; other systems' cron entries are left alone.
           script: |
             set -e
             HOSTS="bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz"
+            BACKUP_OFFSET=0
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
-            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; sudo systemctl reload apache2 || echo "⚠️  Apache reload failed on $h"; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; { sudo chown "$(id -un):www-data" backups && sudo chgrp -R www-data backups && sudo chmod 2770 backups && sudo find backups -mindepth 1 -type d -exec chmod 2770 {} + && sudo find backups -mindepth 1 -type f -exec chmod 0660 {} + ; } || echo "⚠️  Could not tighten backups/ permissions on $h — backups still work; re-run by hand: sudo chown \$(id -un):www-data backups && sudo chmod 2770 backups"; php migrations/runner.php; sudo systemctl reload apache2 || echo "⚠️  Apache reload failed on $h"; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; sudo php scripts/install_backup_cron.php --host="$h" --offset="$BACKUP_OFFSET" || echo "⚠️  BACKUP SCHEDULE NOT INSTALLED on $h — the app deploy still succeeded. Re-run by hand: sudo php scripts/install_backup_cron.php --host=$h --offset=$BACKUP_OFFSET"; BACKUP_OFFSET=$((BACKUP_OFFSET + 30)); done
             sudo systemctl reload apache2 || echo "⚠️  Apache reload failed — some workers may keep serving pre-deploy PHP (stale opcache) until the next manual reload or worker recycle. Run: sudo systemctl reload apache2"
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"

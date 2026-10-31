@@ -1040,6 +1040,12 @@ try {
     foreach (aiPlatformSchema($admin, $controlDb) as $t) {
         say("  · table {$t} ready");
     }
+
+    // Scheduled backups (backup_plan.md) — one row per backup attempt per database.
+    require_once __DIR__ . '/../core/tenant_backups.php';
+    foreach (bmsBackupLogSchema($admin, $controlDb) as $t) {
+        say("  · table {$t} ready");
+    }
 } catch (PDOException $e) {
     die_with('Creating the control tables failed: ' . $e->getMessage());
 }
