@@ -36,6 +36,11 @@ if ($table_number === '') {
     echo json_encode(['success' => false, 'message' => t('Table number is required.')]);
     exit;
 }
+// restaurant_plan.md Phase 0.2 — a floor is optional: no floor chosen = the
+// shop's default area (created on first use).
+if ($floor_id <= 0) {
+    $floor_id = restaurantDefaultFloorId($pdo, $warehouse_id);
+}
 $floorChk = $pdo->prepare("SELECT 1 FROM restaurant_floors WHERE floor_id = ? AND warehouse_id = ?");
 $floorChk->execute([$floor_id, $warehouse_id]);
 if (!$floorChk->fetchColumn()) {

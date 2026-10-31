@@ -128,8 +128,8 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="table-message" class="mb-2"></div>
                     <div class="mb-3">
-                        <label class="form-label"><?= t('Floor') ?> <span class="text-danger">*</span></label>
-                        <select class="form-select" name="floor_id" id="f-table-floor" required></select>
+                        <label class="form-label"><?= t('Floor') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                        <select class="form-select" name="floor_id" id="f-table-floor"></select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><?= t('Table Number') ?> <span class="text-danger">*</span></label>
@@ -153,13 +153,16 @@ $warehouses = restaurantWarehousesForSelect($pdo);
 const CAN_EDIT = <?= json_encode($can_edit) ?>;
 const CSRF_FIELD = <?= json_encode(csrf_token()) ?>;
 const STRINGS = {
-    noFloors: <?= json_encode(t('No floors yet. Add one to start placing tables.')) ?>,
+    noFloors: <?= json_encode(t('No tables yet. Tap "Add Table" to add your first table.')) ?>,
+    noTablesOnFloor: <?= json_encode(t('No tables in this area yet.')) ?>,
+    mainArea: <?= json_encode(t('Main Area')) ?>,
     tables: <?= json_encode(t('table(s)')) ?>,
-    statusAvailable: <?= json_encode(t('Available')) ?>,
+    statusAvailable: <?= json_encode(t('Free table')) ?>,
     statusOccupied: <?= json_encode(t('Occupied')) ?>,
     statusReserved: <?= json_encode(t('Reserved')) ?>,
     statusCleaning: <?= json_encode(t('Cleaning')) ?>,
     seats: <?= json_encode(t('seats')) ?>,
+    edit: <?= json_encode(t('Edit')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     serverError: <?= json_encode(t('Server error.')) ?>,
     processing: <?= json_encode(t('Processing...')) ?>,
@@ -185,20 +188,26 @@ function loadFloors() {
     $.getJSON('<?= buildUrl('api/restaurant/get_floors.php') ?>', { warehouse_id: wid }, function (res) {
         if (!res.success) { $('#floorsContainer').html('<div class="alert alert-danger">' + safeOutput(res.message) + '</div>'); return; }
         FLOORS_CACHE = res.data;
+        // Always fill the area picker — with no floors yet it offers the default
+        // area, which save_table.php creates on first use (Phase 0.2).
+        renderFloorSelect(res.data);
         if (!res.data.length) {
-            $('#floorsContainer').html('<div class="text-center text-muted py-5">' + STRINGS.noFloors + '</div>');
+            $('#floorsContainer').html('<div class="text-center text-muted py-5"><i class="bi bi-grid-3x3-gap fs-2 d-block mb-2 text-primary"></i>' + STRINGS.noFloors + '</div>');
             return;
         }
-        renderFloorSelect(res.data);
         renderFloors(res.data, wid);
     });
 }
 
 function renderFloorSelect(floors) {
     let opts = '';
-    floors.forEach(f => { opts += `<option value="${f.floor_id}">${safeOutput(f.name)}</option>`; });
+    if (!floors.length) opts = `<option value="">${STRINGS.mainArea}</option>`;
+    floors.forEach(f => { opts += `<option value="${f.floor_id}">${safeOutput(floorName(f.name))}</option>`; });
     $('#f-table-floor').html(opts);
 }
+
+// The auto-created default area is stored as 'Main Area'; show it translated.
+function floorName(name) { return name === 'Main Area' ? STRINGS.mainArea : name; }
 
 function renderFloors(floors, wid) {
     let html = '';
@@ -224,31 +233,27 @@ function renderFloorSection(floor, tables) {
         const label = STATUS_LABELS[t.status] || t.status;
         cards += `
         <div class="col-6 col-md-3 col-lg-2">
-            <div class="card border-0 shadow-sm text-center p-2" style="border-top:4px solid ${color} !important;">
-                <div class="fw-bold">${safeOutput(t.table_number)}</div>
+            <div class="card border-0 shadow-sm text-center p-2 h-100 position-relative" style="border-top:4px solid ${color} !important;">
+                ${CAN_EDIT ? `<button class="btn btn-link btn-sm text-primary position-absolute top-0 end-0 p-1" title="${STRINGS.edit}" onclick="editTable(${t.table_id}, ${t.floor_id}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')}, ${t.seats})"><i class="bi bi-pencil"></i></button>` : ''}
+                <div class="fw-bold text-truncate" style="padding:0 26px;">${safeOutput(t.table_number)}</div>
                 <div class="small text-muted">${t.seats} ${STRINGS.seats}</div>
-                <span class="badge mt-1" style="background:${color};color:#fff;">${safeOutput(label)}</span>
                 ${CAN_EDIT ? `
-                <div class="d-flex gap-1 mt-2 justify-content-center">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="editTable(${t.table_id}, ${t.floor_id}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')}, ${t.seats})" style="padding:2px 6px;"><i class="bi bi-pencil"></i></button>
-                    <select class="form-select form-select-sm" style="width:auto;font-size:.7rem;" onchange="setTableStatus(${t.table_id}, this.value)">
-                        <option value="">${STRINGS.statusAvailable}/...</option>
-                        <option value="available">${STRINGS.statusAvailable}</option>
-                        <option value="occupied">${STRINGS.statusOccupied}</option>
-                        <option value="reserved">${STRINGS.statusReserved}</option>
-                        <option value="cleaning">${STRINGS.statusCleaning}</option>
-                    </select>
-                </div>` : ''}
+                <select class="form-select form-select-sm mt-2 w-100 fw-semibold text-white" style="background-color:${color};font-size:.75rem;" onchange="setTableStatus(${t.table_id}, this.value)">
+                    <option value="available" ${t.status === 'available' ? 'selected' : ''}>${STRINGS.statusAvailable}</option>
+                    <option value="occupied" ${t.status === 'occupied' ? 'selected' : ''}>${STRINGS.statusOccupied}</option>
+                    <option value="reserved" ${t.status === 'reserved' ? 'selected' : ''}>${STRINGS.statusReserved}</option>
+                    <option value="cleaning" ${t.status === 'cleaning' ? 'selected' : ''}>${STRINGS.statusCleaning}</option>
+                </select>` : `<span class="badge mt-2" style="background:${color};color:#fff;">${safeOutput(label)}</span>`}
             </div>
         </div>`;
     });
     return `
     <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0"><i class="bi bi-layers me-1"></i> ${safeOutput(floor.name)} <span class="text-muted small">(${tables.length} ${STRINGS.tables})</span></h6>
+            <h6 class="mb-0"><i class="bi bi-layers me-1"></i> ${safeOutput(floorName(floor.name))} <span class="text-muted small">(${tables.length} ${STRINGS.tables})</span></h6>
             ${CAN_EDIT ? `<button class="btn btn-sm btn-outline-primary" onclick="editFloor(${floor.floor_id}, ${JSON.stringify(floor.name).replace(/"/g, '&quot;')}, ${floor.sort_order})"><i class="bi bi-pencil"></i></button>` : ''}
         </div>
-        <div class="row g-2">${cards || '<div class="col-12 text-muted small">' + STRINGS.noFloors + '</div>'}</div>
+        <div class="row g-2">${cards || '<div class="col-12 text-muted small">' + STRINGS.noTablesOnFloor + '</div>'}</div>
     </div>`;
 }
 

@@ -1648,6 +1648,47 @@ if (!function_exists('tenantShopModeStatus')) {
     }
 }
 
+if (!function_exists('tenantRestaurantModeShops')) {
+    /**
+     * Read-only: ONE tenant's active shops whose stored POS Mode is already
+     * Restaurant/Hybrid. Shown as a warning before superadmin switches
+     * Restaurant POS on (restaurant_plan.md Phase 0.1) — those shops start
+     * behaving as restaurant shops the moment the module is on, so the
+     * operator should see them first. Same narrow tenant-DB read exception
+     * as tenantShopModeStatus() above; never writes.
+     *
+     * @return array<int, array{warehouse_name:string, pos_mode:string}>|null null if unreachable.
+     */
+    function tenantRestaurantModeShops(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            // A tenant whose DB never had the Phase 30 migration has no pos_mode — nothing to warn about.
+            if (!$tPdo->query("SHOW COLUMNS FROM warehouses LIKE 'pos_mode'")->fetch()) return [];
+
+            return $tPdo->query("SELECT warehouse_name, pos_mode FROM warehouses
+                                  WHERE status = 'active' AND pos_mode IN ('restaurant','hybrid')
+                                  ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('tenantRestaurantModeShops(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
 if (!function_exists('setTenantShopMode')) {
     /**
      * Writes 'shop_mode' into ONE tenant's own database — an explicit

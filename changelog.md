@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 0 — safety finish, tables without floors, plain Swahili words
+
+**Plan:** `restaurant_plan.md` (Smart POS restaurant, v2 after the Levanda review).
+**New:** `actions/superadmin_tenant_restaurant_shops.php`, `tests/test_restaurant_phase0_cli.php`, `restaurant_plan.md`.
+**Changed:** `core/restaurant_scope.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `api/restaurant/save_table.php`, `app/bms/restaurant/floors.php`, `app/bms/restaurant/tables.php`, `lang/sw.php`.
+
+- **Gate helpers:** `restaurantModuleOn()` (Restaurant POS + Smart POS + schema), `restaurantShopActive()`, `restaurantOnlyCompany()` — every later restaurant change sits behind them; with Restaurant POS off they are false and retail is unchanged.
+- **Superadmin warning:** switching Restaurant POS from off to on first lists the tenant's shops already stored as Restaurant/Hybrid (read-only lookup; a failed lookup never blocks the save).
+- **Tables without floors:** the area is optional; no area chosen = the shop's default area ("Main Area", created on first use). Add Table no longer breaks on a shop with no floors. No schema change.
+- **Floors page:** the empty-area text no longer says "No floors yet" under an existing floor; phone table cards have a full-width status picker and a corner edit button; Tables page filters no longer scroll sideways on phones.
+- **Swahili:** restaurant-only keys reworded (Mgahawa, Eneo, Skrini ya Jikoni, Vikundi vya Nyongeza, Ina Oda, Inapikwa, Kulia Hapa, Rudi Mauzo, Kuhifadhi Meza…); a free table shows "Wazi" via its own key. A test proves none of the changed keys is used on a retail screen; shared keys (Available, Reserved, optional) untouched.
+- **Checked:** new test 44/0 (gate truth table, real save_table POSTs, default-area creation, renders, real tenant-DB lookup, superadmin JS parse, wording leak guard); restaurant/POS/i18n suites green; phone (390px) and desktop previews of Floors and Tables.
+
 ## 2026-10-31 — fix(restaurant): till now sees the shop's Restaurant mode; Restaurant choice only exists when superadmin enables it
 
 **New:** `tests/test_restaurant_mode_gating_cli.php`.
