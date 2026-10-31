@@ -59,6 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // enum, never trusted verbatim from POST.
         $pos_mode = in_array($_POST['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)
             ? $_POST['pos_mode'] : 'retail';
+        // Restaurant POS off for this tenant → a new shop is always retail,
+        // whatever was posted (the form doesn't even show the field then).
+        if (!(tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos'))) {
+            $pos_mode = 'retail';
+        }
 
         // Validate input
         $errors = [];
@@ -242,6 +247,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!array_key_exists('pos_mode', $_POST) && in_array($keep_row['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)) {
                 $pos_mode = $keep_row['pos_mode'];
             }
+        }
+        // Restaurant POS off for this tenant → a posted pos_mode is ignored
+        // and the stored value kept, so only an entitled tenant can change it.
+        if (array_key_exists('pos_mode', $_POST) && !(tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos'))) {
+            $keep_mode_stmt = $pdo->prepare("SELECT pos_mode FROM warehouses WHERE warehouse_id = ?");
+            $keep_mode_stmt->execute([$warehouse_id]);
+            $stored_mode = $keep_mode_stmt->fetchColumn();
+            $pos_mode = in_array($stored_mode, ['retail', 'restaurant', 'hybrid'], true) ? $stored_mode : 'retail';
         }
 
         // Validate input

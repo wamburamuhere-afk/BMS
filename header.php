@@ -1170,7 +1170,15 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             </a>
                         </li>
                         <?php endif; ?>
-                        
+                        <?php // Restaurant — only when superadmin enabled Restaurant POS for this tenant (canView checks the entitlement first, even for admins). ?>
+                        <?php if(canView('restaurant_pos')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('restaurant') ?>">
+                                <i class="bi bi-cup-hot"></i> <?= t('Restaurant') ?>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+
                         <!-- Inventory / Shop -->
                         <?php if(posSimpleModeEnabled()): ?>
                         <!-- Simple POS: "Shop" links directly to warehouses — no dropdown,
@@ -1794,7 +1802,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             <button type="button" class="bms-side-close" data-bs-dismiss="offcanvas" aria-label="<?= htmlspecialchars(t('Close menu')) ?>"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="offcanvas-body">
-            <?php if (canView('customers') || canView('suppliers') || canView('products') || (canView('pos') && canView('pos_restock')) || canView('field_visits')): ?>
+            <?php if (canView('customers') || canView('suppliers') || canView('products') || (canView('pos') && canView('pos_restock')) || canView('field_visits') || canView('restaurant_pos')): ?>
             <div class="bn-group"><?= t('My Business') ?></div>
             <div class="list-group list-group-flush">
                 <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
@@ -1802,6 +1810,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? getUrl('receive_stock') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
                 <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Customer Visits') ?></a><?php endif; ?>
+                <?php if(canView('restaurant_pos')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant') ?></a><?php endif; ?>
             </div>
             <?php endif; ?>
             <?php if (!empty($_billing_visible)): ?>
