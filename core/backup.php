@@ -339,7 +339,67 @@ if (!function_exists('bms_write_dump')) {
     }
 
     /**
-     * Write a full backup ZIP: database dump + uploads/ folder + manifest.json.
+     * Does a file under uploads/ belong to the backup scope of $prefix?
+     *
+     * Every tenant subdomain shares ONE uploads/ root: the legacy install owns the
+     * unprefixed paths and each provisioned tenant owns uploads/t{id}/. A backup
+     * used to zip the whole root, so each tenant's download carried every other
+     * company's files, and a restore copied them all back into the shared root.
+     *
+     *   $prefix 't29/' → only paths under t29/
+     *   $prefix ''     → everything EXCEPT the t{id}/ folders of other tenants
+     *
+     * @param string $relPath Path relative to the uploads root, e.g. 't29/contracts/a.pdf'.
+     * @param string $prefix  bmsTenantPathPrefix() of the owner: '' or 't{id}/'.
+     */
+    function bms_upload_in_scope(string $relPath, string $prefix): bool
+    {
+        $relPath = ltrim(str_replace('\\', '/', $relPath), '/');
+        if ($relPath === '' || preg_match('#(^|/)\.\.(/|$)#', $relPath)) return false;
+        if ($prefix !== '') {
+            return strncmp($relPath, $prefix, strlen($prefix)) === 0;
+        }
+        return !preg_match('#^t\d+/#', $relPath);
+    }
+
+    /**
+     * Copy the uploads/ tree extracted from a backup ZIP back into the live
+     * uploads root — but ONLY the files inside $prefix's scope.
+     *
+     * Replaces bms_copy_dir() on the restore path: that copied the whole tree
+     * into the shared root, so a tenant restoring a ZIP could overwrite another
+     * company's files. Older ZIPs that hold every tenant's folders restore
+     * safely too — out-of-scope entries are skipped, never written.
+     *
+     * @param  string $srcUploads  Extracted uploads/ directory (temp).
+     * @param  string $uploadsRoot Live uploads root (ROOT_DIR/uploads).
+     * @param  string $prefix      bmsTenantPathPrefix() of the restoring request.
+     * @return int Number of files copied.
+     */
+    function bms_restore_uploads(string $srcUploads, string $uploadsRoot, string $prefix): int
+    {
+        if (!is_dir($srcUploads)) return 0;
+        $uploadsRoot = rtrim($uploadsRoot, '/\\');
+
+        $count = 0;
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($srcUploads, RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+        foreach ($it as $file) {
+            if ($file->isLink() || !$file->isFile()) continue;
+            $rel = str_replace('\\', '/', $it->getSubPathname());
+            if (!bms_upload_in_scope($rel, $prefix)) continue;
+
+            $dest    = $uploadsRoot . '/' . $rel;
+            $destDir = dirname($dest);
+            if (!is_dir($destDir)) @mkdir($destDir, 0755, true);
+            if (@copy($file->getPathname(), $dest)) $count++;
+        }
+        return $count;
+    }
+
+    /**
+     * Write a full backup ZIP: database dump + the owner's uploads + manifest.json.
      *
      * This is the canonical full-backup writer used by the UI, the cron, and the
      * pre-restore safety snapshot. A .zip backup can be restored to recover BOTH
@@ -347,16 +407,20 @@ if (!function_exists('bms_write_dump')) {
      *
      * ZIP layout:
      *   database.sql        — full SQL dump (same as bms_write_dump output)
-     *   uploads/<path>      — every file under $uploadsDir, relative structure kept
+     *   uploads/<path>      — the owner's files, path relative to the uploads root
+     *                         (so a tenant's entries read uploads/t{id}/…)
      *   manifest.json       — metadata for integrity checks on restore
      *
-     * @param  PDO    $pdo         Connected, tenant-scoped PDO handle.
-     * @param  string $zipPath     Absolute path for the output .zip file.
-     * @param  string $uploadsDir  Absolute path to the uploads root (ROOT_DIR/uploads).
+     * @param  PDO    $pdo          Connected, tenant-scoped PDO handle.
+     * @param  string $zipPath      Absolute path for the output .zip file.
+     * @param  string $uploadsDir   Absolute path to the uploads root (ROOT_DIR/uploads).
+     * @param  string $uploadPrefix bmsTenantPathPrefix() of the owner — see
+     *                              bms_upload_in_scope(). Required on purpose: a
+     *                              caller that forgot it would leak files.
      * @return array{files_count:int, db_size_mb:float, files_size_mb:float}
      * @throws Exception on failure (partial .zip is deleted before throwing).
      */
-    function bms_write_zip_backup(PDO $pdo, string $zipPath, string $uploadsDir): array
+    function bms_write_zip_backup(PDO $pdo, string $zipPath, string $uploadsDir, string $uploadPrefix): array
     {
         @set_time_limit(0);
 
@@ -389,15 +453,21 @@ if (!function_exists('bms_write_dump')) {
             // Queue the SQL dump — ZipArchive reads this file on close()
             $zip->addFile($tempSql, 'database.sql');
 
-            // Add every file under uploads/, preserving the relative path
+            // Add the owner's files under uploads/, preserving the relative path.
+            // A tenant only walks its own t{id}/ folder; the legacy install walks
+            // the root and skips every t{id}/ folder (bms_upload_in_scope).
             $filesCount = 0;
             $filesSize  = 0;
-            if (is_dir($uploadsDir)) {
+            $scanDir    = $uploadPrefix === ''
+                ? $uploadsDir
+                : rtrim($uploadsDir, '/\\') . '/' . rtrim($uploadPrefix, '/');
+            if (is_dir($scanDir)) {
                 $realUploads = realpath($uploadsDir);
-                if ($realUploads !== false) {
+                $realScan    = realpath($scanDir);
+                if ($realUploads !== false && $realScan !== false) {
                     $it = new RecursiveIteratorIterator(
                         new RecursiveDirectoryIterator(
-                            $uploadsDir,
+                            $scanDir,
                             RecursiveDirectoryIterator::SKIP_DOTS
                         )
                     );
@@ -405,13 +475,15 @@ if (!function_exists('bms_write_dump')) {
                         if (!$file->isFile()) continue;
                         $realFile = realpath($file->getPathname());
                         if ($realFile === false) continue;
-                        // Symlink guard — only files physically under uploadsDir
-                        $prefix = $realUploads . DIRECTORY_SEPARATOR;
+                        // Symlink guard — only files physically under the scanned dir
+                        $prefix = $realScan . DIRECTORY_SEPARATOR;
                         if (strpos($realFile, $prefix) !== 0) continue;
-                        $relPath = 'uploads/' . str_replace(
+                        $rel = str_replace(
                             DIRECTORY_SEPARATOR, '/',
-                            substr($realFile, strlen($prefix))
+                            substr($realFile, strlen($realUploads . DIRECTORY_SEPARATOR))
                         );
+                        if (!bms_upload_in_scope($rel, $uploadPrefix)) continue;
+                        $relPath = 'uploads/' . $rel;
                         $zip->addFile($realFile, $relPath);
                         $filesCount++;
                         $filesSize += $file->getSize();
@@ -428,6 +500,7 @@ if (!function_exists('bms_write_dump')) {
                 'db_size_mb'        => $dbSizeMb,
                 'files_count'       => $filesCount,
                 'files_size_mb'     => $filesSizeMb,
+                'uploads_prefix'    => $uploadPrefix,
             ], JSON_PRETTY_PRINT));
 
             // Finalize the archive — ZipArchive reads addFile() sources here

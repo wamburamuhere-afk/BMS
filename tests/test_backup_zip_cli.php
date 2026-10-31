@@ -190,9 +190,9 @@ check(
     'restore_backup does not call bms_extract_zip_backup() — .zip restores will fail'
 );
 check(
-    str_contains($api, "bms_copy_dir("),
-    'restore_backup calls bms_copy_dir() to restore uploaded files',
-    'restore_backup does not call bms_copy_dir() — files will not be restored from ZIP'
+    str_contains($api, "bms_restore_uploads("),
+    'restore_backup calls bms_restore_uploads() to restore uploaded files (tenant-scoped)',
+    'restore_backup does not call bms_restore_uploads() — files will not be restored from ZIP, or not scoped to the tenant'
 );
 check(
     str_contains($api, "bms_delete_dir("),

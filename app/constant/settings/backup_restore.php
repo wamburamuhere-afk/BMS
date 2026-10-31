@@ -43,7 +43,7 @@ function runAutoBackup($pdo, $backupsDir) {
     $filepath = $backupsDir . $filename;
     $uploadsDir = defined('ROOT_DIR') ? ROOT_DIR . '/uploads' : dirname(__DIR__, 3) . '/uploads';
     try {
-        bms_write_zip_backup($pdo, $filepath, $uploadsDir);
+        bms_write_zip_backup($pdo, $filepath, $uploadsDir, bmsTenantPathPrefix());
         file_put_contents($markerFile, time());
         bms_prune_backups($backupsDir, 7);
         return $filename;

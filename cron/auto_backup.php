@@ -61,7 +61,7 @@ try {
     $filepath   = $backupsDir . $filename;
     $uploadsDir = (defined('ROOT_DIR') ? ROOT_DIR : dirname(__DIR__)) . '/uploads';
 
-    $stats  = bms_write_zip_backup($pdo, $filepath, $uploadsDir);
+    $stats  = bms_write_zip_backup($pdo, $filepath, $uploadsDir, bmsTenantPathPrefix());
     $bytes  = filesize($filepath);
     $sizeLabel = $bytes >= 1048576 ? round($bytes / 1048576, 2) . ' MB' : round($bytes / 1024, 2) . ' KB';
     bms_cron_log($logFile, "Full backup created: $filename ($sizeLabel, DB: {$stats['db_size_mb']} MB, Files: {$stats['files_count']})");
