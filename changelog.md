@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(pos): Create Product page — compact header in Smart POS mode
+
+**Changed:** `app/bms/product/product_create.php`.
+
+- **Before:** on a phone the blue banner wrapped "Create New Product" + subtitle onto 5 lines and squeezed the Back / Create Product buttons beside it.
+- **Now (Smart POS simple form only):** no banner/title/subtitle — just a small Back button and a small "Add New Product" button on one row at the left. Shop mode / advanced product form keep the existing header.
+
 ## 2026-10-31 — feat(restaurant): Phase 7 — simple recipes, ingredient stock, profit per plate
 
 **New:** `api/restaurant/recipe.php`, `tests/test_restaurant_phase7_cli.php`.
