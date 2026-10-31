@@ -107,8 +107,28 @@ if (typeof window.safeOutput !== 'function') {
         return '<button type="button" class="btn btn-sm btn-outline-' + color + '" onclick="' + safeClick + '" title="' + safeTitle + '" ' + BTN_STYLE + '><i class="' + iconClass + '"></i></button>';
     }
 
-    function buildActionButtons(actionCell) {
+    // Opt-in per table (<table data-actions-dropdown>): one "Actions" dropdown that
+    // keeps EVERY item of the row's own menu (same as the desktop gear), instead of
+    // the first 3 as icon buttons. strategy:fixed so the card's overflow:hidden
+    // cannot clip the menu.
+    function buildActionDropdown(actionCell, label) {
+        var menu = actionCell.querySelector('.dropdown-menu');
+        if (!menu) return actionCell.innerHTML;
+        return '<div class="dropdown w-100">' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" ' +
+            'data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false" style="min-height:36px;">' +
+            '<i class="bi bi-gear me-1"></i>' + (label || '') + '</button>' +
+            '<ul class="dropdown-menu dropdown-menu-end shadow-sm">' + menu.innerHTML + '</ul>' +
+            '</div>';
+    }
+
+    function buildActionButtons(actionCell, actionsLabel) {
         if (!actionCell) return '';
+
+        var tbl = actionCell.closest ? actionCell.closest('table') : null;
+        if (tbl && tbl.hasAttribute('data-actions-dropdown')) {
+            return buildActionDropdown(actionCell, actionsLabel);
+        }
 
         var items = Array.prototype.slice.call(
             actionCell.querySelectorAll('.dropdown-item')
@@ -158,7 +178,7 @@ if (typeof window.safeOutput !== 'function') {
                 '</div>';
         }
 
-        var actionBtns = buildActionButtons(actionCell);
+        var actionBtns = buildActionButtons(actionCell, actionsCol >= 0 ? headers[actionsCol] : '');
 
         // Raw status text stored as data-status for pill filtering
         var statusText = (statusCol >= 0 && statusCol < cells.length)

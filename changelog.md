@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(expenses): phone view — one list, one Actions dropdown with every action
+
+**Changed:** `app/constant/accounts/expenses.php`, `includes/tables/expenses_table.php`, `assets/js/bms-mobile-cards.js`.
+
+- **Before (phone):** the expense list appeared twice — the global mobile cards (3 icon buttons only: first 3 menu items, so Edit/Approve/Delete etc. were unreachable) and then the page's own second card list below it.
+- **Now:** one list. Each card has a single **Actions** dropdown with the same full menu as the desktop gear (view, print, edit, status changes, delete — still gated by the same permissions/status rules). The page-owned second list is removed.
+- **Scope:** opt-in via `'actions_dropdown' => true` on the shared expenses table (`data-actions-dropdown` on the `<table>`); other pages and the supplier Expenses tab are unchanged.
+
 ## 2026-10-31 — ui(products): phone layout polish on Product Management; Import label always visible
 
 **Changed:** `app/bms/product/products.php`.
