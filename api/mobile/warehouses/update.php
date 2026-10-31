@@ -38,7 +38,9 @@ try {
     if (isset($body['email']))   { $sets[] = 'email = ?';   $params[] = trim($body['email'])   ?: null; }
     if (isset($body['contact_person'])) { $sets[] = 'contact_person = ?'; $params[] = trim($body['contact_person']) ?: null; }
     if (isset($body['notes']))   { $sets[] = 'notes = ?';   $params[] = trim($body['notes'])   ?: null; }
-    if (in_array($body['pos_mode'] ?? '', ['retail','restaurant','hybrid'], true)) {
+    // Restaurant POS off for this tenant → pos_mode is ignored, stored value kept.
+    if (in_array($body['pos_mode'] ?? '', ['retail','restaurant','hybrid'], true)
+        && tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos')) {
         $sets[] = 'pos_mode = ?'; $params[] = $body['pos_mode'];
     }
     if (in_array($body['status'] ?? '', ['active','inactive'], true)) {

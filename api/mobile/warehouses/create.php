@@ -52,6 +52,10 @@ $contact_person = trim($body['contact_person'] ?? '');
 $notes          = trim($body['notes']    ?? '');
 $_pm            = $body['pos_mode'] ?? 'retail';
 $pos_mode       = in_array($_pm, ['retail','restaurant','hybrid'], true) ? $_pm : 'retail';
+// Restaurant POS off for this tenant → a new shop is always retail.
+if (!(tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos'))) {
+    $pos_mode = 'retail';
+}
 $_st            = $body['status'] ?? 'active';
 $status         = in_array($_st, ['active','inactive','maintenance'], true) ? $_st : 'active';
 
