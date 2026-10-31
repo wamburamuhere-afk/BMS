@@ -1,6 +1,22 @@
 # Smart POS — Restaurant Plan
 
-Status: **DRAFT v2 — updated after reviewing apps.levanda.co.tz (2026-10-31). Awaiting approval.**
+Status: **BUILT (2026-10-31) — Phases 0–7 done on branch `feat/restaurant-phase0`, one commit + one test per phase.**
+
+| Phase | Commit | Test | Notes |
+|---|---|---|---|
+| 0 Safety finish, tables without floors, wording | `130ae310` | `test_restaurant_phase0_cli` | |
+| 1 Menu, Getting started, restaurant menus | `94b7b485` | `test_restaurant_phase1_cli` | |
+| 2 Take order on the till, Tables screen | `2e4d6c87` | `test_restaurant_phase2_cli` | also fixed: dishes never reached the kitchen; stale held orders per table |
+| 3 Kitchen by mouth / screen / printer | `eaea1d4e` | `test_restaurant_phase3_cli` | |
+| 4 Split bill, join tables | `177dfd81` | `test_restaurant_phase4_cli` | **service charge NOT built** — needs a server-priced charge line inside the shared sale engine; left out to keep retail sales untouched |
+| 5 Buy Ingredients → Cost of Sales | `90a9c599` | `test_restaurant_phase5_cli` | |
+| 6 Dashboard, Restaurant today, Restaurant Sales report | `135a44c7` | `test_restaurant_phase6_cli` | |
+| 7 Recipes, ingredient stock, profit per plate | `93936e80` | `test_restaurant_phase7_cli` | |
+
+Not built from this plan: service charge (Phase 4, optional); the Notification Rules / Roles &
+Permissions wording fixes discussed alongside (a decision on scope is still open).
+
+(Original draft v2 below — written after reviewing apps.levanda.co.tz.)
 
 Decisions already confirmed by the owner:
 1. Phase order OK.
