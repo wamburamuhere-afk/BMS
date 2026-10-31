@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-31 — ui(menu): phone ☰ side menu regrouped (Sales / Shop / My Business / Restaurant); Shops added
+
+**Changed:** `header.php` (☰ side menu only; the desktop nav is untouched).
+
+- **Before:** everything sat under one "My Business" heading — Shift History and Who Owes Me (selling side) mixed with Customers, Suppliers, Receive Stock, Service, Restaurant, and Subscription floating under it with no heading.
+- **Now, grouped by what each item is:**
+  - **Sales:** Shift History, Who Owes Me, Catalog Setup.
+  - **Shop** (named "Inventory" when not in Smart POS): **Shops** (new — opens `warehouses.php`, so the user sees all their shops there), Receive Stock, Service.
+  - **My Business:** Customers, Suppliers, Customer Visits.
+  - **Restaurant:** Menu, Tables, Restaurant (only when the restaurant module is allowed).
+  - **Subscription** moved into **My Account**.
+- Same `canView()` gates as before; an empty group is not shown. "Shops" needs `canView('warehouses')`, same as the desktop Shop menu.
+
 ## 2026-10-31 — ui(pos): Sales History — named actions (one "Actions" dropdown) instead of icon-only buttons
 
 **Changed:** `app/bms/pos/pos_dashboard.php`.
