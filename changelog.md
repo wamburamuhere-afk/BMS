@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-10-31 — feat(restaurant): Phase 1 — Menu page, Getting started checklist, restaurant menus
+
+**New:** `app/bms/restaurant/menu.php` (route `restaurant/menu`), `api/restaurant/{get_menu_items,save_menu_item,update_menu_item,search_products_for_menu,quick_setup}.php`, `includes/restaurant/getting_started.php`, `migrations/tenant/2026_10_31_restaurant_menu_columns.php` + `migrations/2026_10_31_restaurant_menu_columns_legacy_db.php`, `tests/test_restaurant_phase1_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `core/pos_nav.php`, `header.php`, `roots.php`, `api/pos/simple_products.php`, `app/bms/restaurant/index.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql` (template rebuilt).
+
+- **Schema:** `products.is_menu_item` (default 0) and `products.is_available` (default 1) — existing products unchanged. Until the migration runs the restaurant gate stays off (retail behaviour, no crash).
+- **Menu page** (Smart POS + Restaurant POS, Restaurant/Hybrid shops only): one list of dishes and drinks per shop — stat cards, group chips, search, phone cards, desktop DataTable, gear actions. Add Item asks *What is this?*: **Dish (cooked here)** = no-stock item that always sells, no recipe needed; **Bought item (has stock)** = water/soda with opening stock through the same batch + ledger path as Add Product; **Already in my products** = only the menu flags change, never price (a retail shop selling it is unaffected). Each item: group, price, *Prepared at* Kitchen / Bar / No preparation, **Available today** switch.
+- **Sold out today:** the till's product list hides `is_available = 0` items **only for a restaurant shop**; retail shops never get the clause.
+- **Getting started** on the restaurant hub: ticks itself from real data (tables, menu items, first sale); *Add tables* ("How many tables?" → T1…Tn) and *Quick add* (tick chai, mandazi, lunch, soup, water, soda + prices; existing names skipped).
+- **Menus:** Restaurant becomes a dropdown (Menu, Tables, Kitchen, Reservations, Add-ons) when the restaurant module is on; phone side menu gets Menu + Tables; a restaurant-only company's bottom bar shows Menu instead of Products. Retail tenants: no change.
+- **Swahili:** 85 new restaurant strings (each checked unused on retail screens).
+- **Checked:** new test 47/0 (real POSTs, opening stock batch + ledger balanced, existing-product price untouched, sold-out hidden only on restaurant till, retail shop never filtered, module/Smart POS off refuse, quick start idempotent, renders); restaurant/POS/i18n suites green; phone (390px) + desktop previews of Menu, Add Item, hub checklist, Quick add — found and fixed: opening-stock field showing for dishes, group chips clipped on phones. Pre-existing unrelated failures: `test_feature_gating_cli` (78 local tenant_features rows), `test_project_scope_cli` (22 older unscoped files).
+
 ## 2026-10-31 — feat(restaurant): Phase 0 — safety finish, tables without floors, plain Swahili words
 
 **Plan:** `restaurant_plan.md` (Smart POS restaurant, v2 after the Levanda review).

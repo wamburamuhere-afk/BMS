@@ -188,12 +188,19 @@ if (!function_exists('restaurantSubHubCards')) {
      */
     function restaurantSubHubCards(): array
     {
-        return [
+        $cards = [];
+        // restaurant_plan.md Phase 1 — the Menu card, only where the Menu page
+        // works (Smart POS + Restaurant POS, schema ready).
+        require_once __DIR__ . '/restaurant_scope.php';
+        if (isset($GLOBALS['pdo']) && $GLOBALS['pdo'] instanceof PDO && restaurantModuleOn($GLOBALS['pdo'])) {
+            $cards[] = ['icon' => 'bi-journal-richtext', 'label' => t('Menu'), 'description' => t('Dishes and drinks you sell, prices, and what is available today.'), 'url' => 'restaurant/menu'];
+        }
+        return array_merge($cards, [
             ['icon' => 'bi-diagram-3',      'label' => t('Floors & Tables'), 'description' => t('Define dining floors and their tables.'), 'url' => 'restaurant/floors'],
             ['icon' => 'bi-egg-fried',      'label' => t('Kitchen Display'), 'description' => t('Live kitchen queue — advance tickets as they cook.'), 'url' => 'restaurant/kitchen-dashboard'],
             ['icon' => 'bi-list-check',     'label' => t('Modifier Group'),  'description' => t('Add-on/option groups linked to menu items.'), 'url' => 'restaurant/modifier-group'],
             ['icon' => 'bi-calendar-check', 'label' => t('Reservations'),    'description' => t('Book and manage table reservations.'), 'url' => 'restaurant/reservations'],
             ['icon' => 'bi-tags',           'label' => t('Menu Type'),       'description' => t('Categorize menu items (uses the shared product categories).'), 'url' => 'restaurant/menu-type'],
-        ];
+        ]);
     }
 }

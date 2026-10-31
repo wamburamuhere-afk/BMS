@@ -31,6 +31,13 @@ $sub_hub_cards = restaurantSubHubCards();
         </a>
     </div>
 
+    <?php
+    // restaurant_plan.md Phase 1c — Getting started checklist (renders nothing once every step is done).
+    require_once ROOT_DIR . '/core/restaurant_scope.php';
+    $rgsWarehouses = restaurantWarehousesForSelect($pdo);
+    require ROOT_DIR . '/includes/restaurant/getting_started.php';
+    ?>
+
     <div class="row g-3">
         <?php foreach ($sub_hub_cards as $card): ?>
         <div class="col-6 col-md-4 col-lg-3">

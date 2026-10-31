@@ -1174,6 +1174,7 @@ $routes = [
     'restaurant/modifier-group'     => RESTAURANT_DIR . '/modifier_group.php',
     'restaurant/reservations'       => RESTAURANT_DIR . '/reservations.php',
     'restaurant/menu-type'          => RESTAURANT_DIR . '/menu_type.php',
+    'restaurant/menu'               => RESTAURANT_DIR . '/menu.php',   // restaurant_plan.md Phase 1
 
 
     // ========================================================================
