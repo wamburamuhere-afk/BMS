@@ -666,7 +666,7 @@ function get_primary_badge($is_primary) {
         .custom-stat-card.wh-stat h4 { color: #12326b !important; }
         .custom-stat-card.wh-stat p {
             color: #6c7a89 !important; font-size: .72rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: .03em;
+            letter-spacing: .03em;
         }
         .custom-stat-card.wh-stat i { color: #0d6efd !important; opacity: .8; }
         .custom-stat-card.wh-stat-active i { color: #198754 !important; }

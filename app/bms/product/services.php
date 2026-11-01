@@ -198,7 +198,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 .svc-stat-inactive { border-left-color: #d97706 !important; }
 .svc-stat-cats     { border-left-color: #0f766e !important; }
 .svc-stat .text-info { color: #0f766e !important; }
-.svc-stat small { font-weight: 600; text-transform: uppercase; letter-spacing: .03em; font-size: .68rem; }
+.svc-stat small { font-weight: 600; letter-spacing: .03em; font-size: .68rem; }
 .table-hover tbody tr:hover { background:#f0f4ff; }
 @media screen { .print-footer { display:none !important; } }
 @media print {
