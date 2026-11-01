@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-11-01 — ui: Customers & Suppliers — edge-bar summary cards, one named Actions menu on the record cards
+
+**Changed:** `assets/css/responsive.css`, `app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`.
+
+- **Shared card look (new, `responsive.css`):** `.custom-stat-card.stat-edge` = white card + coloured edge bar, with one colour per meaning — blue (totals, default), green (active / good), amber (caution: suspended, pending), slate (blocked / blacklisted), gray (inactive). Any page can opt in by adding the class; red stays reserved for errors and destructive actions. Cards without `stat-edge` are unchanged.
+- **Customers:** the four summary cards (Customers, Active, Inactive, Blacklisted) use it.
+- **Suppliers:** Suppliers, Active, Suspended / Blacklisted (or Inactive) use it. When only three cards show, the first spans the row on a phone so nothing hangs half-empty.
+- **Record cards (phone / card view):** the row of 3–4 icon-only buttons on each customer and supplier card is replaced by one small **Actions** button at the right with a compact menu of written-out options. Customers: View Details, Edit, View Account, Delete. Suppliers: View Details, Edit, View Orders, New Order. Same permissions and conditions as before.
+
 ## 2026-11-01 — ui: summary-card labels follow the company's Text Display Case setting (system-wide)
 
 **New:** `assets/js/bms-card-case.js` (loaded from `footer.php` on every page).
