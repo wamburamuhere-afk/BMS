@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-11-01 — feat(currency): "Other country (USD)" at registration
+
+**Changed:** `core/currency.php`, `register.php`, `app/superadmin/tenant_new.php`.
+
+- The country list on public sign-up and superadmin New Company now ends with **Other country (USD)** (Swahili: *Nchi nyingine (USD)*). Choosing it seeds the new company's currency as **USD**; the five countries keep their own currency and Tanzania (TZS) stays the default.
+- Only that explicit choice maps to USD: an empty country (mobile sign-up sends none) or any other value still gives TZS, exactly as before. Existing companies are untouched (the currency is only seeded when a company is created).
+
 ## 2026-11-01 — feat(currency): one operating currency per company — Tanzania (default), Kenya, Burundi, Rwanda, South Sudan, USD
 
 **New:** `core/currency.php` (single source: supported list, company currency, symbols, country → currency, document-currency rules).

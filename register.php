@@ -721,6 +721,8 @@ $icons = [
                                 foreach (bmsRegistrationCountries() as $__ctry): ?>
                                 <option value="<?= htmlspecialchars($__ctry) ?>"<?= $__ctry === 'Tanzania' ? ' selected' : '' ?>><?= htmlspecialchars($__ctry) ?></option>
                                 <?php endforeach; ?>
+                                <?php // Any other country → the company starts on USD (core/currency.php). ?>
+                                <option value="<?= BMS_OTHER_COUNTRY ?>"><?= $sw ? 'Nchi nyingine (USD)' : 'Other country (USD)' ?></option>
                             </select>
                         </div>
                         <div class="col-md-6">
