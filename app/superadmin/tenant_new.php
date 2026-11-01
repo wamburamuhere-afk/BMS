@@ -178,8 +178,9 @@ $startingPlans = planTablesReady()
                                     foreach (bmsRegistrationCountries() as $__ctry): ?>
                                     <option value="<?= htmlspecialchars($__ctry) ?>"<?= $__ctry === 'Tanzania' ? ' selected' : '' ?>><?= htmlspecialchars($__ctry) ?></option>
                                     <?php endforeach; ?>
+                                    <option value="<?= BMS_OTHER_COUNTRY ?>">Other country (USD)</option>
                                 </select>
-                                <div class="form-text">Sets the company's currency: Tanzania TZS, Kenya KES, Burundi BIF, Rwanda RWF, South Sudan SSP. USD can be chosen later in the company's Settings.</div>
+                                <div class="form-text">Sets the company's currency: Tanzania TZS, Kenya KES, Burundi BIF, Rwanda RWF, South Sudan SSP, any other country USD. It can be changed later in the company's Settings.</div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Industry</label>
