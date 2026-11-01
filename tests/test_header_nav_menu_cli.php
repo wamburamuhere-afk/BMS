@@ -51,7 +51,7 @@ register_shutdown_function(function () {
  * Render the nav <ul> of $headerFile in a fresh process for a temp user.
  * $roleId 1 = admin; otherwise a temp role is created with $grants (page_keys).
  */
-function renderNav(string $headerFile, array $grants, bool $admin, bool $simple): string
+function renderNav(string $headerFile, array $grants, bool $admin, bool $simple, array $featureOverrides = []): string
 {
     global $root;
     $tpl = <<<'PHP'
@@ -75,7 +75,7 @@ function get_setting($key, $default = '') {
 }
 require '__ROOT__/roots.php';
 global $pdo;
-$GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);   // "all modules on"
+$GLOBALS['__bms_features'] = array_merge(array_fill_keys(allFeatureKeys(), true), __FEATOVR__);   // "all modules on" (+ per-case overrides)
 $pdo->beginTransaction();
 try {
     if (__ADMIN__) {
@@ -100,8 +100,8 @@ try {
 echo preg_match('/<ul class="navbar-nav me-auto">(.*?)<!-- User Account/s', $html, $m) ? $m[1] : 'NO_NAV';
 PHP;
     $code = str_replace(
-        ['__ROOT__', '__HEADER__', '__SIMPLE__', '__ADMIN__', '__GRANTS__'],
-        [addslashes($root), addslashes($headerFile), var_export($simple ? '1' : '0', true), $admin ? 'true' : 'false', var_export($grants, true)],
+        ['__ROOT__', '__HEADER__', '__SIMPLE__', '__ADMIN__', '__GRANTS__', '__FEATOVR__'],
+        [addslashes($root), addslashes($headerFile), var_export($simple ? '1' : '0', true), $admin ? 'true' : 'false', var_export($grants, true), var_export($featureOverrides, true)],
         $tpl
     );
     $tmp = tempnam(sys_get_temp_dir(), 'navtest_');
@@ -213,9 +213,14 @@ if (!is_string($oldSrc) || strpos($oldSrc, '<?php') !== 0) {
             ['admin, Simple POS mode', [], true, true],
             ['limited role (pos, quotations, invoices, expenses, products), Simple POS mode', ['pos', 'quotations', 'invoices', 'expenses', 'products'], false, true],
         ];
+        // Restaurant POS off (the default for every tenant) — the nav must be byte-identical.
+        // With it on, restaurant_plan.md deliberately turns the Restaurant link into a dropdown;
+        // that case is checked separately below.
+        $noRestaurant = ['restaurant_pos' => false];
         foreach ($cases as [$label, $grants, $admin, $simple]) {
-            $new = normNav(renderNav($hdr, $grants, $admin, $simple));
-            $old = normNav(renderNav($oldHdr, $grants, $admin, $simple));
+            $label .= ', Restaurant POS off';
+            $new = normNav(renderNav($hdr, $grants, $admin, $simple, $noRestaurant));
+            $old = normNav(renderNav($oldHdr, $grants, $admin, $simple, $noRestaurant));
             if ($simple) {
                 ok(strpos($new, 'My Business') !== false || strpos($new, 'Biashara') !== false || $grants !== [],
                     "$label: render really ran in Simple POS mode (guard against a vacuous comparison)");
@@ -228,6 +233,12 @@ if (!is_string($oldSrc) || strpos($oldSrc, '<?php') !== 0) {
                 echo "      first diff @$i\n      new: " . substr($new, max(0, $i - 80), 240) . "\n      old: " . substr($old, max(0, $i - 80), 240) . "\n";
             }
         }
+        // Restaurant POS on: the ONLY difference allowed is the Restaurant menu item itself.
+        $cut = fn(string $h) => preg_replace('#<li class="nav-item( dropdown)?">\s*<a class="nav-link[^"]*"[^>]*(href="[^"]*/restaurant"|id="restaurantDropdown")[^>]*>.*?</li>(\s*</ul>\s*</li>)?#s', '', $h, 1);
+        $newR = normNav(renderNav($hdr, [], true, true));
+        $oldR = normNav(renderNav($oldHdr, [], true, true));
+        ok(strpos($newR, 'id="restaurantDropdown"') !== false, 'admin, Simple POS mode, Restaurant POS on: Restaurant is a dropdown (Menu, Tables, Kitchen…)');
+        ok($cut($newR) === $cut($oldR), 'admin, Simple POS mode, Restaurant POS on: everything else in the nav identical');
     } finally {
         @unlink($oldHdr);
     }
