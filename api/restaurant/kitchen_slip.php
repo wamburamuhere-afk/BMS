@@ -14,6 +14,7 @@ if (isset($_SESSION['user_lang'])) {
 require_once __DIR__ . '/../../core/restaurant_scope.php';
 
 if (!isAuthenticated() || !canView('restaurant_pos') || !canCreate('pos')) { http_response_code(403); exit(t('Permission denied')); }
+if (!restaurantSchemaReady($pdo)) { exit(t('Restaurant module is being set up for your account — please check back shortly.')); }
 
 global $pdo;
 $warehouse_id = (int)($_GET['warehouse_id'] ?? 0);
