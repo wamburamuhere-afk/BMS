@@ -190,6 +190,15 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
 <style>
 .svc-header { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); }
+/* Summary cards: white with a coloured edge bar (same look as Expenses / Who Owes Me), left-aligned,
+   so they stand out from the page instead of fading into it. */
+.svc-stat { border: 1px solid #e6e9ef !important; border-left: 4px solid #0d6efd !important; }
+.svc-stat .card-body { text-align: left !important; padding-left: 1rem !important; }
+.svc-stat-active   { border-left-color: #198754 !important; }
+.svc-stat-inactive { border-left-color: #d97706 !important; }
+.svc-stat-cats     { border-left-color: #0f766e !important; }
+.svc-stat .text-info { color: #0f766e !important; }
+.svc-stat small { font-weight: 600; text-transform: uppercase; letter-spacing: .03em; font-size: .68rem; }
 .table-hover tbody tr:hover { background:#f0f4ff; }
 @media screen { .print-footer { display:none !important; } }
 @media print {
@@ -270,7 +279,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     <!-- Stats row -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-total">
                 <div class="card-body p-3 text-center">
                     <div class="text-primary fw-bold fs-4"><?= $total_count ?></div>
                     <small class="text-muted"><?= wLabel('Total Products', 'Total Services') ?></small>
@@ -278,7 +287,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-active">
                 <div class="card-body p-3 text-center">
                     <?php
                     $active_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='active'" . $scope_sql)->fetchColumn();
@@ -289,18 +298,18 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-inactive">
                 <div class="card-body p-3 text-center">
                     <?php
                     $inactive_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='inactive'" . $scope_sql)->fetchColumn();
                     ?>
-                    <div class="text-danger fw-bold fs-4"><?= $inactive_count ?></div>
+                    <div class="fw-bold fs-4" style="color:#d97706;"><?= $inactive_count ?></div>
                     <small class="text-muted"><?= t('Inactive') ?></small>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-cats">
                 <div class="card-body p-3 text-center">
                     <?php
                     $cat_count = $pdo->query("SELECT COUNT(DISTINCT p.category_id) FROM products p WHERE p.is_service=1 AND p.category_id IS NOT NULL" . $scope_sql)->fetchColumn();
