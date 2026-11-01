@@ -190,6 +190,15 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
 <style>
 .svc-header { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); }
+/* Summary cards: white with a coloured edge bar (same look as Expenses / Who Owes Me), left-aligned,
+   so they stand out from the page instead of fading into it. */
+.svc-stat { border: 1px solid #e6e9ef !important; border-left: 4px solid #0d6efd !important; }
+.svc-stat .card-body { text-align: left !important; padding-left: 1rem !important; }
+.svc-stat-active   { border-left-color: #198754 !important; }
+.svc-stat-inactive { border-left-color: #d97706 !important; }
+.svc-stat-cats     { border-left-color: #0f766e !important; }
+.svc-stat .text-info { color: #0f766e !important; }
+.svc-stat small { font-weight: 600; letter-spacing: .03em; font-size: .68rem; }
 .table-hover tbody tr:hover { background:#f0f4ff; }
 @media screen { .print-footer { display:none !important; } }
 @media print {
@@ -270,7 +279,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     <!-- Stats row -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-total">
                 <div class="card-body p-3 text-center">
                     <div class="text-primary fw-bold fs-4"><?= $total_count ?></div>
                     <small class="text-muted"><?= wLabel('Total Products', 'Total Services') ?></small>
@@ -278,7 +287,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-active">
                 <div class="card-body p-3 text-center">
                     <?php
                     $active_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='active'" . $scope_sql)->fetchColumn();
@@ -289,18 +298,18 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-inactive">
                 <div class="card-body p-3 text-center">
                     <?php
                     $inactive_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='inactive'" . $scope_sql)->fetchColumn();
                     ?>
-                    <div class="text-danger fw-bold fs-4"><?= $inactive_count ?></div>
+                    <div class="fw-bold fs-4" style="color:#d97706;"><?= $inactive_count ?></div>
                     <small class="text-muted"><?= t('Inactive') ?></small>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 svc-stat svc-stat-cats">
                 <div class="card-body p-3 text-center">
                     <?php
                     $cat_count = $pdo->query("SELECT COUNT(DISTINCT p.category_id) FROM products p WHERE p.is_service=1 AND p.category_id IS NOT NULL" . $scope_sql)->fetchColumn();
@@ -714,14 +723,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
                                 <label class="form-label fw-bold small text-success"><?= $simpleServiceForm ? t('Amount to Sell') : t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <span class="input-group-text border-0 bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="svc_sell" value="0.00" step="0.01" required onkeyup="calcSvcMargin()" onchange="calcSvcMargin()">
                                 </div>
                             </div>
                             <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <span class="input-group-text border-0 bg-light"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="svc_cost" value="0.00" step="0.01" readonly>
                                 </div>
                             </div>
@@ -918,14 +927,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
                                 <label class="form-label fw-bold small text-success"><?= $simpleServiceForm ? t('Amount to Sell') : t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <span class="input-group-text border-0 bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="edit_svc_sell" step="0.01" required onkeyup="calcSvcMarginEdit()" onchange="calcSvcMarginEdit()">
                                 </div>
                             </div>
                             <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <span class="input-group-text border-0 bg-light"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="edit_svc_cost" step="0.01" readonly>
                                 </div>
                             </div>
@@ -1308,7 +1317,7 @@ function searchInventoryProduct(input, index) {
                                         </div>
                                         <div class="text-end ms-2" style="white-space: nowrap;">
                                             <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">${SVC_I18N.stock_label} ${parseFloat(prod.current_stock) || 0}</span>
-                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;">TZS ${price.toLocaleString()}</span>
+                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${price.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </button>
@@ -1550,7 +1559,7 @@ function searchInventoryProductEdit(input, index) {
                                         </div>
                                         <div class="text-end ms-2" style="white-space: nowrap;">
                                             <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">${SVC_I18N.stock_label} ${parseFloat(prod.current_stock) || 0}</span>
-                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;">TZS ${price.toLocaleString()}</span>
+                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${price.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </button>
@@ -2310,7 +2319,7 @@ function calcSvcMargin() {
     // element threw on every Add/Edit open (pos_detail_pages_plan.md C4).
     const mBadge = document.getElementById('svc_margin_badge'), pBadge = document.getElementById('svc_profit_badge');
     if (mBadge) mBadge.textContent = margin + '%';
-    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
+    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + profit.toLocaleString();
 }
 
 function calcSvcMarginEdit() {
@@ -2322,7 +2331,7 @@ function calcSvcMarginEdit() {
     // element threw on every Add/Edit open (pos_detail_pages_plan.md C4).
     const mBadge = document.getElementById('edit_svc_margin_badge'), pBadge = document.getElementById('edit_svc_profit_badge');
     if (mBadge) mBadge.textContent = margin + '%';
-    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
+    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + profit.toLocaleString();
 }
 
 function submitSvcForm(addAnother) {

@@ -844,7 +844,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Credit Limit') ?></label>
-                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
+                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? bmsCompanyCurrency()) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Status') ?></label>
@@ -1029,7 +1029,7 @@ global $company_name, $company_logo;
                     <div class="row">
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Credit Limit') ?></label>
-                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
+                            <p class="mb-0 fw-semibold text-primary fs-7"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> <?= caseFormat($customer['currency'] ?? bmsCompanyCurrency()) ?></p>
                         </div>
                         <?php if (!$simpleCustomerForm): ?>
                         <div class="col-6 col-md-4 mb-3">
@@ -1038,7 +1038,7 @@ global $company_name, $company_logo;
                         </div>
                         <div class="col-6 col-md-4 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Currency') ?></label>
-                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['currency'] ?? 'TZS') ?></p>
+                            <p class="mb-0 fw-semibold fs-7"><?= caseFormat($customer['currency'] ?? bmsCompanyCurrency()) ?></p>
                         </div>
                         <div class="col-6 col-md-6 mb-3">
                             <label class="form-label text-muted small mb-1"><?= t('Bank Name') ?></label>
@@ -2164,6 +2164,7 @@ global $company_name, $company_logo;
                         success: <?= json_encode(t('Success!')) ?>,
                         error: <?= json_encode(t('Error')) ?>,
                         view: <?= json_encode(t('View')) ?>,
+                        actions: <?= json_encode(t('Actions')) ?>,
                         repay: <?= json_encode(t('Repay')) ?>,
                         edit: <?= json_encode(t('Edit')) ?>,
                         delete: <?= json_encode(t('Delete')) ?>,
@@ -3137,11 +3138,15 @@ function deleteLpo(lpoId, lpoNumber) {
                                 <div class="col-6 mb-3">
                                     <label for="edit_currency" class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="edit_currency" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="TZS">Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
                                         <option value="EUR">Euro (EUR)</option>
                                         <option value="GBP">British Pound (GBP)</option>
                                         <option value="KES">Kenyan Shilling (KES)</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">

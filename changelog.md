@@ -1,5 +1,158 @@
 # BMS Changelog
 
+## 2026-11-01 — fix: shared CSS/JS reach the browser immediately (cache-busting for responsive.css and bms-mobile-cards.js)
+
+**Changed:** `header.php`.
+
+- **Problem:** `.htaccess` lets browsers keep CSS/JS for 1 hour, and `responsive.css` and `bms-mobile-cards.js` were the only two local assets linked without a `?v=` version. After a deploy, a browser that already had the old copy showed the NEW page markup (e.g. the `stat-edge` classes on the Customers/Suppliers cards) with the OLD stylesheet, so the coloured edge bars did not appear and the cards stayed green until the cache expired.
+- **Fix:** both links now carry `?v=<file modification time>`, exactly like every other asset in the header, so any edit to them is picked up on the next page load.
+
+## 2026-11-01 — ui: Customers & Suppliers — edge-bar summary cards, one named Actions menu on the record cards
+
+**Changed:** `assets/css/responsive.css`, `app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`.
+
+- **Shared card look (new, `responsive.css`):** `.custom-stat-card.stat-edge` = white card + coloured edge bar, with one colour per meaning — blue (totals, default), green (active / good), amber (caution: suspended, pending), slate (blocked / blacklisted), gray (inactive). Any page can opt in by adding the class; red stays reserved for errors and destructive actions. Cards without `stat-edge` are unchanged.
+- **Customers:** the four summary cards (Customers, Active, Inactive, Blacklisted) use it.
+- **Suppliers:** Suppliers, Active, Suspended / Blacklisted (or Inactive) use it. When only three cards show, the first spans the row on a phone so nothing hangs half-empty.
+- **Record cards (phone / card view):** the row of 3–4 icon-only buttons on each customer and supplier card is replaced by one small **Actions** button at the right with a compact menu of written-out options. Customers: View Details, Edit, View Account, Delete. Suppliers: View Details, Edit, View Orders, New Order. Same permissions and conditions as before.
+
+## 2026-11-01 — ui: summary-card labels follow the company's Text Display Case setting (system-wide)
+
+**New:** `assets/js/bms-card-case.js` (loaded from `footer.php` on every page).
+**Changed:** `footer.php`, `app/bms/product/services.php`, `app/bms/pos/pos_credit_customers.php`, `app/bms/stock/warehouses.php`.
+
+- **Problem:** summary-card labels were typed straight in the page and many were forced to CAPITALS (a `text-uppercase` class or a CSS rule), so they ignored Settings → General → *Display Text Format*. The cards I restyled (Services, Who Owes Me, Shops) added the same forced capitals.
+- **Fix, once for the whole system:** a small script finds the label of each summary card (`.custom-stat-card`, `.stat-card`, `.stat-mini-card`, `.dn-stat-card`, `.cn-stat-card`, `.rm-stat`, `.rd-stat`, `.tb-stat`, `.summary-card`, `.planning-summary-card`, `.svc-stat`, `.wh-stat`, `.stat-card-green`) and applies the company's mode — *Each Word Capitalised* (default), *Sentence*, *lower*, *UPPER*, *tOGGLE* or *As typed* — and switches off any forced capitals. In "as typed" the label shows exactly as written.
+- **Safe by construction:** it only touches label elements (`p`, `small`, `h6`, `.stat-label` …) inside those cards; never the headline number (h1–h5), never any text that contains a digit (figures, dates, "TSh 12,000"); runs once per element (so "toggle" cannot flip twice); display-only, nothing stored or written back. In a mixed-case label a 2–3 letter ALL-CAPS word (VAT, TIN, POS) is kept as an acronym.
+- **Removed** the forced-capitals CSS I had added on the Services, Who Owes Me and Shops cards.
+- **Not changed:** print summary blocks and table headers (they keep their own style), and the customer/record cards.
+
+## 2026-11-01 — ui: Receive Stock closes to Products; Shops page cards, filters and toolbar tidied
+
+**Changed:** `app/bms/pos/receive_stock.php`, `app/bms/stock/warehouses.php`.
+
+- **Receive Stock (Pokea Mzigo):** closing the window (X / Cancel) now always goes to the **Products** list (users without Products access go to the dashboard). It used to rely on the browser's "referrer", which could be missing — and a page restored from the back/forward cache never ran the redirect — leaving an empty page with only a title. It now uses `location.replace` (so the shell page does not stay in history) and a `pageshow` guard sends a restored empty page to Products.
+- **Shops page, summary cards:** the four green blocks (full-width, one per row on a phone) are now white cards with a coloured edge bar — blue for totals, green for Active — laid out 2 x 2 on a phone.
+- **Shops page, filters:** Apply and Reset share one full-width row on a phone (they were pushed right and unevenly sized).
+- **Shops page, toolbar:** Print / Export on the left and "Show: N" on the right on one row (they were centred boxes of different widths). The green "18 shops" pill is hidden on phones because the table header right below already says "Showing 18 of 18 results".
+
+## 2026-11-01 — ui(pos): Who Owes Me — Actions button is small and right-aligned; menu is a compact floating panel
+
+**Changed:** `assets/js/pos-credit-aging.js`, `app/bms/pos/pos_credit_customers.php`.
+
+- The phone card's **Actions** button was full-width and took too much room; it is now a normal small button at the right of the card.
+- Its menu was stretched across the whole screen; it is now a compact rounded panel (min-width 200px, soft shadow, padded rows, icons aligned) that opens under the button, right-aligned. Same options and permissions (View / Repay / Edit / Delete).
+
+## 2026-11-01 — ui(services): Huduma / Services — summary cards get a coloured edge bar
+
+**Changed:** `app/bms/product/services.php`.
+
+- The four summary cards (Total, Active, Inactive, Categories) were plain white with a faint shadow and faded into the page. They now have a thin border and a coloured left edge bar — blue / green / amber / teal — with left-aligned text and small uppercase labels, the same look as Expenses and Who Owes Me.
+- "Inactive" count is amber instead of red.
+- Same text and counts as before (only classes and CSS added), on all screen sizes.
+
+## 2026-11-01 — ui(pos): Who Owes Me (Wanaodaiwa) — phone summary cards, no red, one labelled Actions menu
+
+**Changed:** `app/bms/pos/pos_credit_customers.php`, `assets/js/pos-credit-aging.js`, `app/bms/customer/customer_details.php` (one i18n key for the Madeni tab, which shares the JS).
+
+- **Summary cards (phone only, <768px):** the three cards were half-width, so the third sat alone with an empty space beside it. The first ("Total Owed") now spans the row and the other two share the next row; all three are white with a coloured edge bar (blue / amber / teal), like the Expenses page. Desktop keeps the green cards unchanged.
+- **No red:** overdue is a deep amber badge (was `bg-danger` red) and the amount owed is navy (was `text-danger`). Shared code, so the desktop table and the customer "Madeni" tab follow.
+- **Card actions:** the row of four icon-only buttons (it also ran past the card edge) is replaced by ONE full-width **Actions** button whose menu lists the written-out options — View, Repay, Edit, Delete — with the same permissions as the desktop gear (`canEdit` → Repay/Edit, `canDelete` → Delete; view-only users get just View). The menu uses a fixed position so the card or bottom bar never clips it.
+
+## 2026-11-01 — feat(currency): "Other country (USD)" at registration
+
+**Changed:** `core/currency.php`, `register.php`, `app/superadmin/tenant_new.php`.
+
+- The country list on public sign-up and superadmin New Company now ends with **Other country (USD)** (Swahili: *Nchi nyingine (USD)*). Choosing it seeds the new company's currency as **USD**; the five countries keep their own currency and Tanzania (TZS) stays the default.
+- Only that explicit choice maps to USD: an empty country (mobile sign-up sends none) or any other value still gives TZS, exactly as before. Existing companies are untouched (the currency is only seeded when a company is created).
+
+## 2026-11-01 — feat(currency): one operating currency per company — Tanzania (default), Kenya, Burundi, Rwanda, South Sudan, USD
+
+**New:** `core/currency.php` (single source: supported list, company currency, symbols, country → currency, document-currency rules).
+**Changed (main):** `helpers.php` (`format_currency()`), `header.php`, `app/constant/settings/system_settings.php`, `app/constant/settings/company_profile.php`, `register.php`, `app/superadmin/tenant_new.php`, `core/tenant_provisioner.php`, `api/mobile/{me,tenant_info,register_status,company/profile}.php`, document forms (quotation, sales order, LPO, PO, invoice, customers, suppliers, sub-contractors, supplier/project payments, employees), the APIs that save them, print templates, and display labels across Smart POS and Smart BMS pages (171 files in total). `lang/sw.php` (currency names).
+
+- **Safety rule — a TZS company sees and behaves exactly as before.** Every new helper returns the old hard-coded value for TZS. Verified: `format_currency()` old vs new = 315 checks, 0 differences; 151 of the changed files render byte-for-byte / semantically identical for a TZS company after substituting the helper output; the other 21 are the intended changes (settings, registration, mobile key, form currency lists that return the same 5 options for TZS).
+- **Supported operating currencies:** TZS (default), KES, BIF, RWF, SSP, USD. Chosen in Settings → System Settings (and Company Profile). A company still on a legacy code (e.g. EUR) keeps it listed and selected, so saving never changes it by accident; an empty post no longer blanks the currency (before, a never-configured company saving General settings was silently set to USD — the first option).
+- **One key:** `currency` (what ~50 web pages read) is the source of truth; `company_currency` (Company Profile / mobile app) is written alongside it on every save, and the mobile app now reads the same value.
+- **Registration:** country list = Tanzania (default), Kenya, Burundi, Rwanda, South Sudan; the country sets the new company's currency (Tanzania writes nothing → TZS as before). Works for Smart POS and Smart BMS (both go through `provisionTenant()`), public sign-up and superadmin New Company.
+- **Everywhere money is shown:** `format_currency()` (245 call sites that passed no currency) now uses the company currency; hard-coded "TZS"/"TSh" labels, input prefixes, JS formatters, Intl formatters, print templates, CSV sample rows, log messages and "Shillings Only" (→ Shillings / Francs / Pounds / Dollars) follow it.
+- **No foreign exchange in the ledger:** a non-TZS company can only issue documents in its own currency (forms show only that currency; every save API enforces it server-side). A TZS company keeps today's document currency list (TZS, USD, EUR, GBP, KES) unchanged.
+- **Deliberately left as TZS:** platform billing / subscription prices (BJP's own TZS pricing), Tenders' bid-currency choice (Tshs / USD / both), Tanzania tax-law amounts (PAYE bands, TRA penalties) and fallbacks used only when a stored field is empty. Decimals stay at 2 for every currency.
+
+## 2026-10-31 — feat(categories): Categories reachable in Smart POS with full CRUD by permission; phone-friendly
+
+**Changed:** `app/bms/product/categories.php`, `api/delete_category.php`, `header.php`.
+
+- **Problem:** in Smart POS a user could only *create* a category (the quick-add inside product registration). The Categories page existed but had no menu entry in Smart POS, and its New/Edit/Delete buttons were always shown (gated only by Products permissions) while the APIs check the Categories permissions.
+- **Menu:** Smart POS desktop — **Categories** next to Shop Products in the My Business menu. Phones — ☰ → **Shop** → **Categories**. Needs `canView('categories')`; the full-ERP Inventory menu is unchanged.
+- **Page:** view needs the Categories view permission (or Products view, as before). **New Category** needs `canCreate('categories')`, **Edit** `canEdit('categories')`, **Delete** `canDelete('categories')` — the same permissions the create/update/delete APIs enforce — so a user only sees what they can do; no actions → "—".
+- **Phone layout:** compact one-row header (short Back button, shorter title, no subtitle), tips card hidden, row menu button reads "Actions".
+- **Safety (gap found):** `api/delete_category.php` did a plain DELETE although nothing links products/sub-categories to categories by FK. It now refuses, with a clear message, when products use the category or it has sub-categories (Inactive is offered as the alternative).
+
+## 2026-10-31 — ui(menu): phone ☰ side menu regrouped (Sales / Shop / My Business / Restaurant); Shops added
+
+**Changed:** `header.php` (☰ side menu only; the desktop nav is untouched).
+
+- **Before:** everything sat under one "My Business" heading — Shift History and Who Owes Me (selling side) mixed with Customers, Suppliers, Receive Stock, Service, Restaurant, and Subscription floating under it with no heading.
+- **Now, grouped by what each item is:**
+  - **Sales:** Shift History, Who Owes Me, Catalog Setup.
+  - **Shop** (named "Inventory" when not in Smart POS): **Shops** (new — opens `warehouses.php`, so the user sees all their shops there), Receive Stock, Service.
+  - **My Business:** Customers, Suppliers, Customer Visits.
+  - **Restaurant:** Menu, Tables, Restaurant (only when the restaurant module is allowed).
+  - **Subscription** moved into **My Account**.
+- Same `canView()` gates as before; an empty group is not shown. "Shops" needs `canView('warehouses')`, same as the desktop Shop menu.
+
+## 2026-10-31 — ui(pos): Sales History — named actions (one "Actions" dropdown) instead of icon-only buttons
+
+**Changed:** `app/bms/pos/pos_dashboard.php`.
+
+- **Before:** on phones each Sales History card had 1–4 icon-only buttons (receipt / cash / return arrow / void) with no names; the desktop table's menu button was a bare gear icon.
+- **Now:** one **Actions** dropdown on both the desktop table and the phone cards, listing the real names: **View Receipt**, **Receive Payment**, **Return / Refund**, **Void Sale**. Same permission and sale-status rules as before (an item only appears when the user may do it and the sale allows it). Both views build the menu from one function, `actionItems()`, so they cannot drift apart.
+
+## 2026-10-31 — ui(pos): Sales Overview — phones keep only Sales Dashboard + Start Selling; the rest moves into the ☰ side menu
+
+**Changed:** `app/bms/pos/pos_dashboard.php`, `header.php`.
+
+- **Before (phone):** the top had 3 buttons (Sales Dashboard / Shift History / Start Selling) plus a block of hub cards (Who Owes Me, Settings, …) before the real content.
+- **Now (<lg, i.e. wherever the ☰ side menu exists):** the top row is only **Sales Dashboard** and **Start Selling**; the hub-card block is hidden. Everything that was hidden is reachable from ☰ → **My Business**: **Shift History**, **Who Owes Me** (Smart POS only), **Catalog Setup** (pos_advanced only). Restaurant and Selling Settings already had entries in that menu. The extra entries reuse `posNavGroups()` so the gates match the hub cards exactly.
+- **Desktop (lg and up):** unchanged — the elements are still in the page, just hidden below lg with Bootstrap display classes.
+
+## 2026-10-31 — ui(expenses): phone view — one list, one Actions dropdown with every action
+
+**Changed:** `app/constant/accounts/expenses.php`, `includes/tables/expenses_table.php`, `assets/js/bms-mobile-cards.js`.
+
+- **Before (phone):** the expense list appeared twice — the global mobile cards (3 icon buttons only: first 3 menu items, so Edit/Approve/Delete etc. were unreachable) and then the page's own second card list below it.
+- **Now:** one list. Each card has a single **Actions** dropdown with the same full menu as the desktop gear (view, print, edit, status changes, delete — still gated by the same permissions/status rules). The page-owned second list is removed.
+- **Scope:** opt-in via `'actions_dropdown' => true` on the shared expenses table (`data-actions-dropdown` on the `<table>`); other pages and the supplier Expenses tab are unchanged.
+
+## 2026-10-31 — ui(products): phone layout polish on Product Management; Import label always visible
+
+**Changed:** `app/bms/product/products.php`.
+
+- **Import:** the button now always shows the word "Import" (was icon-only on phones).
+- **Phone only (<768px):** header is one row (short title + small Add New / Import buttons); stat cards are compact white 2x2 with a green accent bar; the Filters header no longer stacks (a global `max-width:768px` rule forced it into a column, which centred an oversized chevron); Supplier is full width, Category/Brand and Status/Stock Status sit in pairs, and Filter/Reset share one labelled row. Desktop unchanged.
+
+## 2026-10-31 — ui(pos): Create Product — remove redundant top buttons on phones
+
+**Changed:** `app/bms/product/product_create.php`.
+
+- The top "Add New Product" button duplicated "Save Product" at the bottom of the form, so it is removed (Smart POS simple form).
+- On phones nothing is shown above the form; "Back" remains on desktop only.
+
+## 2026-10-31 — ui(expenses): phone layout polish on Expenses Management
+
+**Changed:** `app/constant/accounts/expenses.php`.
+
+- **Before (phone):** "Add New Expense" wrapped onto 3 lines beside a 2-line title + subtitle; stat cards were large green blocks; every filter field took a full row.
+- **Now (phone only, <768px):** header is one row (short title + small Add button, subtitle hidden); stat cards are compact white 2x2 with a green accent bar; Status is full width, Date From/To sit side by side, Apply/Clear share one row. Desktop layout unchanged.
+
+## 2026-10-31 — ui(pos): Create Product page — compact header in Smart POS mode
+
+**Changed:** `app/bms/product/product_create.php`.
+
+- **Before:** on a phone the blue banner wrapped "Create New Product" + subtitle onto 5 lines and squeezed the Back / Create Product buttons beside it.
+- **Now (Smart POS simple form only):** no banner/title/subtitle — just a small Back button and a small "Add New Product" button on one row at the left. Shop mode / advanced product form keep the existing header.
+
 ## 2026-10-31 — feat(restaurant): Phase 7 — simple recipes, ingredient stock, profit per plate
 
 **New:** `api/restaurant/recipe.php`, `tests/test_restaurant_phase7_cli.php`.
@@ -100,6 +253,19 @@
 - **Restaurant choice only when enabled:** with Restaurant POS off, a new shop is always saved as retail and a posted POS Mode is ignored on update (stored value kept) — web Shops page and mobile create/update. The form field was already hidden.
 - **Menu:** "Restaurant" link in the top menu and phone side menu, only when Restaurant POS is on (`canView('restaurant_pos')` checks the tenant entitlement first, even for admins).
 - **Checked:** new test 22/0 (real renders of the till + header with the module on/off, real Shops update POSTs; fails on the old `pos.php`); `test_restaurant_pos_mode_setup_cli` 36/0, `test_pos_simple_ux_cli` 94/0, `test_warehouse_project_filter_cli` 84/0; `test_restaurant_pos_cli` 152/1 — the 1 is a sibling suite `test_pos_phase8_registers_cli` failing on open/close_shift.php (pre-existing, files not touched).
+
+## 2026-10-31 — feat(backup): nightly backups copied off the server, encrypted, to Google Drive (rclone)
+
+**Plan:** `backup_plan.md` §4 (PR 2).
+**New:** `core/offsite_backup.php`, `cron/offsite_backup.php`, `tests/test_offsite_backup_cli.php`.
+**Changed:** `core/tenant_backups.php` (`bmsBackupCronFile()` adds the off-site line), `tests/test_tenant_backups_cli.php`, `backup_plan.md`.
+
+- **Before:** every company was backed up, but only onto the same server. Server lost = every backup lost.
+- **Now:** at 01:30 Dar es Salaam (an hour after the full backup; waits if a backup is still running) each night's `auto_backup_*.zip` of the main install, every tenant and the control database is uploaded to Google Drive (`bjptechnologieslimited@gmail.com`) through rclone. Only files of the last 7 days that are not already there; an existing copy is never overwritten; each upload is verified with `rclone cryptcheck`. Snapshots, manual, pre-restore and uploaded files never leave the server.
+- **Encryption:** the rclone remote must be type `crypt` (contents and file/folder names encrypted on the server before upload); a plain remote is refused. The job runs as root — the one root line in `/etc/cron.d/bms-backup-<host>` — because only root can read the rclone config holding the Drive token and the encryption password; it loads no database or app bootstrap. Its lock lives in the temp dir and it opens the backup lock read-only, so it can never block the www-data backup run.
+- **Retention on Drive:** after a fully successful upload only — 30 days of nightlies, the first of each month for 12 months (+5 days), and the 3 newest per folder always. Always a superset of what the server keeps, so nothing is deleted then re-uploaded. Only `auto_backup_*.zip` in main / `t{id}` / `_platform` folders is ever deleted.
+- **Visibility:** `backups/_platform/offsite.log` and `offsite_status.json` (files created as root are handed back to www-data). Until the one-time rclone setup (§4) is done on the server, the job logs `NOT CONFIGURED` and changes nothing. Exit 0 ok / 1 failed / 2 bad args or running / 3 not configured. `--check` tests the setup.
+- **Checked:** `test_offsite_backup_cli` 40 checks — retention rules incl. a 400-night simulation (off-site always ⊇ server, no re-upload loop, ≤ 42 files per folder), which files are chosen, script guards, and a REAL rclone 1.75.2 run against a crypt remote: 5 nightlies uploaded and nothing else, names and contents encrypted at rest, decrypted copies byte-identical, second run uploads nothing, existing copy never overwritten, retention deletes exactly the expected 2 and never touches manual files or unknown folders, unreachable destination → FAILED / exit 1. Also a real run on two freshly made local tenant backups: uploaded, downloaded back, MD5 identical. `test_tenant_backups_cli` 62 (third cron line; only the off-site job runs as root). Audit suites (`tenant_resource_audit`, `security_coverage`, `project_scope`) do not flag any new file.
 
 ## 2026-10-31 — fix(backup): old backups are thinned by a schedule that never empties a folder; backups/ no longer world-readable
 

@@ -111,6 +111,8 @@ require_once __DIR__ . '/../../../core/form_lookups.php';
 $lk_sc_type       = formLookupOptions($pdo, 'sub_contractor_type');
 $lk_payment_terms = formLookupOptions($pdo, 'payment_terms');
 $lk_currency      = formLookupOptions($pdo, 'currency');
+// Non-TZS company: documents use only the company's own currency (core/currency.php).
+if (!bmsIsDefaultCurrency()) { $lk_currency = [['value' => bmsCompanyCurrency(), 'label' => bmsCompanyCurrency()]]; }
 $lk_categories    = array_map(fn($c) => ['value' => (string)$c['category_id'], 'label' => $c['category_name']], $categories);
 $lk_years = [];
 for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (string)$y, 'label' => (string)$y]; }
@@ -700,7 +702,7 @@ function sc_status_label($status) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label"><?= t('Currency') ?></label>
-                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', t('Select Currency')) ?>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, bmsCompanyCurrency(), 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>

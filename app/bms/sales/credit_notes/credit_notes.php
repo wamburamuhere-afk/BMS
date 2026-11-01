@@ -138,7 +138,7 @@ sort($filter_customers);
         <div class="col-6 col-md-3">
             <div class="card cn-stat-card text-center p-3 h-100">
                 <div class="stat-num" style="color:#052c65"><?= number_format($stat_value, 0) ?></div>
-                <div class="small text-muted">TZS Value (<?= number_format($stat_paid) ?> paid)</div>
+                <div class="small text-muted"><?= htmlspecialchars(bmsCompanyCurrency()) ?> Value (<?= number_format($stat_paid) ?> paid)</div>
             </div>
         </div>
     </div>
@@ -190,7 +190,7 @@ sort($filter_customers);
                         <th>Date</th>
                         <th>Customer</th>
                         <th>Origin</th>
-                        <th class="text-end">Amount (TZS)</th>
+                        <th class="text-end">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                         <th class="text-center">Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -319,7 +319,7 @@ function cnRenderCards(rows) {
                         ${cnBadge(r.status)}
                     </div>
                     <div class="mt-2 fw-semibold">${esc(r.customer)}</div>
-                    <div class="fw-bold">TZS ${cnMoney(r.amount)}</div>
+                    <div class="fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${cnMoney(r.amount)}</div>
                 </div>
                 <div class="card-footer bg-white border-top p-0">
                     <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">

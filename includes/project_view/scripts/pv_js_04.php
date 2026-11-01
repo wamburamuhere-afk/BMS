@@ -781,7 +781,7 @@ function createVoucher() {
         if (projectData.expenses && projectData.expenses.length > 0) {
             const $grp = $('<optgroup label="── Registered Project Expenses ──"></optgroup>');
             projectData.expenses.forEach(ex => {
-                $grp.append(`<option value="exp_${ex.expense_id}" data-type="expense" data-id="${ex.expense_id}" data-amount="${ex.amount}" data-cat="${ex.category_id || ''}" data-expaccount="${ex.expense_account_id || ''}">${ex.description || 'Unnamed Expense'} (${formatMoney(ex.amount)} TZS)</option>`);
+                $grp.append(`<option value="exp_${ex.expense_id}" data-type="expense" data-id="${ex.expense_id}" data-amount="${ex.amount}" data-cat="${ex.category_id || ''}" data-expaccount="${ex.expense_account_id || ''}">${ex.description || 'Unnamed Expense'} (${formatMoney(ex.amount)} <?= htmlspecialchars(bmsCompanyCurrency()) ?>)</option>`);
             });
             $expSel.append($grp);
         }
@@ -833,9 +833,9 @@ function vcOnExpenseChange(val) {
             
         const remaining = Math.max(0, totalAmount - paidSoFar);
         
-        $('#vc_total_exp').text(formatMoney(totalAmount) + ' TZS');
-        $('#vc_already_paid').text(formatMoney(paidSoFar) + ' TZS');
-        $('#vc_remaining').text(formatMoney(remaining) + ' TZS');
+        $('#vc_total_exp').text(formatMoney(totalAmount) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+        $('#vc_already_paid').text(formatMoney(paidSoFar) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+        $('#vc_remaining').text(formatMoney(remaining) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
         
         // Update amount field with remaining if it's 0 or empty
         if (!$('#vc_amount').val() || $('#vc_amount').val() == 0) {

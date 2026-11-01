@@ -413,7 +413,7 @@ try {
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Opening Balance</label>
                             <div class="input-group">
-                                <span class="input-group-text">TSh</span>
+                                <span class="input-group-text"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                                 <input type="number" class="form-control" name="opening_balance" step="0.01" value="0.00">
                             </div>
                         </div>
@@ -506,7 +506,7 @@ try {
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Opening Balance</label>
                             <div class="input-group">
-                                <span class="input-group-text">TSh</span>
+                                <span class="input-group-text"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                                 <input type="number" class="form-control" id="edit_opening_balance" name="opening_balance" step="0.01">
                             </div>
                         </div>
@@ -852,7 +852,7 @@ function viewAccountDetails(accountId) {
 }
 
 function formatCurrency(amount) {
-    return 'TSh ' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 </script>
 

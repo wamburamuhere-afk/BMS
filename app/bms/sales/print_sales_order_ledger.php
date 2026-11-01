@@ -73,7 +73,7 @@ try {
     die("Error: " . $e->getMessage());
 }
 
-$currency = $order['currency'] ?? 'TZS';
+$currency = $order['currency'] ?? bmsCompanyCurrency();
 
 $wf_status = $order['status'] ?? 'pending';
 $creator_name = trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? ''));

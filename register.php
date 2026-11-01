@@ -716,11 +716,13 @@ $icons = [
                         <div class="col-md-6">
                             <label for="country" class="form-label"><?= htmlspecialchars($T['country']) ?> <span class="req">*</span></label>
                             <select class="form-select" id="country" name="country" required>
-                                <option value="Tanzania">Tanzania</option>
-                                <option value="Kenya">Kenya</option>
-                                <option value="Uganda">Uganda</option>
-                                <option value="Rwanda">Rwanda</option>
-                                <option value="Other"><?= $sw ? 'Nyingine' : 'Other' ?></option>
+                                <?php // Supported countries (core/currency.php). Tanzania first = the default; the
+                                      // country chosen sets the new company's currency (TZS/KES/BIF/RWF/SSP).
+                                foreach (bmsRegistrationCountries() as $__ctry): ?>
+                                <option value="<?= htmlspecialchars($__ctry) ?>"<?= $__ctry === 'Tanzania' ? ' selected' : '' ?>><?= htmlspecialchars($__ctry) ?></option>
+                                <?php endforeach; ?>
+                                <?php // Any other country → the company starts on USD (core/currency.php). ?>
+                                <option value="<?= BMS_OTHER_COUNTRY ?>"><?= $sw ? 'Nchi nyingine (USD)' : 'Other country (USD)' ?></option>
                             </select>
                         </div>
                         <div class="col-md-6">

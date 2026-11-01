@@ -59,7 +59,8 @@
 
     function statusBadge(cfg, row) {
         if (row.is_overdue) {
-            return '<span class="badge bg-danger">' + sprintf(cfg.i18n.overdueBy, row.days_overdue) + '</span>';
+            // Deep amber, not red — easier on the eye for a list that is mostly overdue sales.
+            return '<span class="badge" style="background:#d97706;color:#fff;">' + sprintf(cfg.i18n.overdueBy, row.days_overdue) + '</span>';
         }
         if (!row.due_date) {
             return '<span class="badge bg-secondary">' + esc(cfg.i18n.noDueDate) + '</span>';
@@ -84,20 +85,29 @@
     }
 
     /**
-     * Individual outline icon buttons (not a gear dropdown) for the mobile
-     * card — matches the icon-row convention used on other card views in
-     * this app, easier to tap on a phone than opening a menu first.
+     * Phone card actions: ONE small "Actions" button (right-aligned) that opens a compact menu with every
+     * option written out (View / Repay / Edit / Delete — same items and permissions as the
+     * desktop gear). Replaces the row of four icon-only buttons, which nobody could tell
+     * apart and which ran past the edge of the card. strategy:fixed so the menu is never
+     * clipped by the card or the bottom bar.
      */
     function cardRowActions(cfg, row) {
-        var id = cfg._id, sid = row.sale_id, html = '';
-        html += '<button type="button" class="btn btn-sm btn-outline-info" title="' + esc(cfg.i18n.view) + '" onclick="PosCreditAging.view(\'' + id + '\',' + sid + ')"><i class="bi bi-eye"></i></button>';
+        var id = cfg._id, sid = row.sale_id;
+        // Small button on the right; the menu is a compact floating panel under it (not full-width).
+        var html = '<div class="dropdown d-flex justify-content-end">' +
+            '<button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle px-3" data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false">' +
+            '<i class="bi bi-gear me-1"></i>' + esc(cfg.i18n.actions || 'Actions') + '</button>' +
+            '<ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width:200px;border-radius:12px;">' +
+            '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.view(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-eye text-info me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.view) + '</a></li>';
         if (cfg.canEdit) {
-            html += '<button type="button" class="btn btn-sm btn-outline-success" title="' + esc(cfg.i18n.repay) + '" onclick="PosCreditAging.repay(\'' + id + '\',' + sid + ')"><i class="bi bi-cash"></i></button>';
-            html += '<button type="button" class="btn btn-sm btn-outline-warning" title="' + esc(cfg.i18n.edit) + '" onclick="PosCreditAging.edit(\'' + id + '\',' + sid + ')"><i class="bi bi-pencil"></i></button>';
+            html += '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.repay(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-cash text-success me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.repay) + '</a></li>' +
+                    '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.edit(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-pencil text-warning me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.edit) + '</a></li>';
         }
         if (cfg.canDelete) {
-            html += '<button type="button" class="btn btn-sm btn-outline-danger" title="' + esc(cfg.i18n.delete) + '" onclick="PosCreditAging.remove(\'' + id + '\',' + sid + ')"><i class="bi bi-trash"></i></button>';
+            html += '<li><hr class="dropdown-divider opacity-50 my-1"></li>' +
+                    '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center text-danger" href="#" onclick="PosCreditAging.remove(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-trash me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.delete) + '</a></li>';
         }
+        html += '</ul></div>';
         return html;
     }
 
@@ -132,7 +142,7 @@
             }},
             { key: 'owed', col: {
                 data: 'balance_due', className: 'text-end',
-                render: function (d, t, row) { return '<strong class="text-danger">' + money(d) + '</strong> ' + paidBadge(cfg, row); }
+                render: function (d, t, row) { return '<strong style="color:#12326b;">' + money(d) + '</strong> ' + paidBadge(cfg, row); }
             }},
             { key: 'sale_date', col: {
                 data: 'sale_date',
@@ -192,7 +202,7 @@
                     '</div>' +
                   '</div>' +
                   '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.phone) + '</span><span class="cag-value">' + esc(row.customer_phone || '-') + '</span></div>' +
-                  '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.owed) + '</span><span class="cag-value fw-bold text-danger">' + money(row.balance_due) + ' ' + paidBadge(cfg, row) + '</span></div>' +
+                  '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.owed) + '</span><span class="cag-value fw-bold" style="color:#12326b;">' + money(row.balance_due) + ' ' + paidBadge(cfg, row) + '</span></div>' +
                   '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.saleDate).replace(':', '') + '</span><span class="cag-value">' + fmtDate(row.sale_date) + '</span></div>' +
                   '<div class="cag-row"><span class="cag-label">' + esc(cfg.i18n.dueDate).replace(':', '') + '</span><span class="cag-value">' + fmtDate(row.due_date) + '</span></div>' +
                   '<div class="cag-actions">' + cardRowActions(cfg, row) + '</div>' +

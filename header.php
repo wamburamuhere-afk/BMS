@@ -275,6 +275,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     const BMS_COMPANY_NAME = '<?= htmlspecialchars($company_name ?? '', ENT_QUOTES) ?>';
     const BMS_COMPANY_LOGO = '<?= htmlspecialchars($company_logo ? getUrl($company_logo) : '', ENT_QUOTES) ?>';
     const CSRF_TOKEN = '<?= csrf_token() ?>';
+    // Company operating currency (core/currency.php) for plain .js files that cannot run PHP.
+    window.BMS_COMPANY_CURRENCY = <?= json_encode(bmsCompanyCurrency()) ?>;
+    window.BMS_CURRENCY_SYMBOL  = <?= json_encode(bmsCurrencySymbol()) ?>;
     $.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
 
     // Text Display Case (2026-09-18) — JS twin of core/text_display_case.php's
@@ -517,7 +520,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </style>
     
     <link rel="stylesheet" href="<?= getUrl('style.css') ?>">
-    <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
+    <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/responsive.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/loading.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/loading.css') ?>">
 
     <style>
@@ -900,7 +903,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
     </style>
 
-<script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>"></script>
+<script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/bms-mobile-cards.js') ?>"></script>
 <script>
 window.BMS_PRICE_CHECK_T = <?= json_encode([
     'title' => t('Wholesale price is higher than retail'),
@@ -1012,6 +1015,11 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= wLabel('Inventory Products', 'Shop Products') ?></a></li>
+                                <?php endif; ?>
+                                <?php if(posSimpleModeEnabled() && canView('categories')): ?>
+                                <!-- Smart POS: Categories has no Inventory menu, so it sits next to Shop Products
+                                     (full ERP keeps it in the Inventory dropdown). Page does View/Add/Edit/Delete by permission. -->
+                                <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags text-warning"></i> <?= t('Categories') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Service') ?></a></li>
@@ -1831,29 +1839,52 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             <button type="button" class="bms-side-close" data-bs-dismiss="offcanvas" aria-label="<?= htmlspecialchars(t('Close menu')) ?>"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="offcanvas-body">
-            <?php if (canView('customers') || canView('suppliers') || canView('products') || (canView('pos') && canView('pos_restock')) || canView('field_visits') || canView('restaurant_pos')): ?>
-            <div class="bn-group"><?= t('My Business') ?></div>
+            <?php
+            // ☰ side menu groups (phones). Grouped by what each item IS, not by where it was added:
+            //   Sales        = selling-side pages (shift history, who owes me, catalog setup)
+            //   Shop         = the places and the stock (shops/warehouses, receive stock, services)
+            //   My Business  = the people (customers, suppliers, customer visits)
+            //   Restaurant   = restaurant pages (own group, only when the module is allowed)
+            // Same canView() gates as before; "Who Owes Me" / "Catalog Setup" still come from
+            // core/pos_nav.php::posNavGroups() so they match the Sales Overview hub cards.
+            $__side_nav_icons = ['credit_customers' => 'bi-cash-coin', 'catalog_setup' => 'bi-tags'];
+            $__side_sales = [];
+            if (canView('pos')) $__side_sales[] = [getUrl('pos/shifts'), 'bi-clock-history', t('Shift History')];
+            foreach (posNavGroups() as $__sg) {
+                if (isset($__side_nav_icons[$__sg['key']])) $__side_sales[] = [getUrl($__sg['url']), $__side_nav_icons[$__sg['key']], $__sg['label']];
+            }
+            $__side_shop = [];
+            if (canView('warehouses'))                    $__side_shop[] = [getUrl('warehouses'), 'bi-shop', wLabel('Warehouses', 'Shops')];
+            if (canView('pos') && canView('pos_restock')) $__side_shop[] = [$__restock_url ?? getUrl('receive_stock'), 'bi-box-arrow-in-down', t('Receive Stock')];
+            if (canView('products'))                      $__side_shop[] = [getUrl('services'), 'bi-box-seam', t('Service')];
+            if (canView('categories'))                    $__side_shop[] = [getUrl('categories'), 'bi-tags', t('Categories')];
+            $__side_people = [];
+            if (canView('customers'))    $__side_people[] = [getUrl('customers'), 'bi-people', t('Customers')];
+            if (canView('suppliers'))    $__side_people[] = [getUrl('suppliers'), 'bi-truck', t('Suppliers')];
+            if (canView('field_visits')) $__side_people[] = [getUrl('field_reports'), 'bi-geo-alt', t('Customer Visits')];
+            $__side_rest = [];
+            if (canView('restaurant_pos')) {
+                if (!empty($__rest_on)) {
+                    $__side_rest[] = [getUrl('restaurant/menu'), 'bi-journal-richtext', t('Menu')];
+                    $__side_rest[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
+                }
+                $__side_rest[] = [getUrl('restaurant'), 'bi-cup-hot', t('Restaurant')];
+            }
+            $__side_groups = [
+                [t('Sales'),                   $__side_sales],
+                [wLabel('Inventory', 'Shop'),  $__side_shop],
+                [t('My Business'),             $__side_people],
+                [t('Restaurant'),              $__side_rest],
+            ];
+            foreach ($__side_groups as [$__side_gl, $__side_items]):
+                if (!$__side_items) continue; ?>
+            <div class="bn-group"><?= htmlspecialchars($__side_gl) ?></div>
             <div class="list-group list-group-flush">
-                <?php if(canView('customers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i><?= t('Customers') ?></a><?php endif; ?>
-                <?php if(canView('suppliers')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i><?= t('Suppliers') ?></a><?php endif; ?>
-                <?php if(canView('products')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam"></i><?= t('Service') ?></a><?php endif; ?>
-                <?php if(canView('pos') && canView('pos_restock')): ?><a class="list-group-item list-group-item-action" href="<?= $__restock_url ?? getUrl('receive_stock') ?>"><i class="bi bi-box-arrow-in-down"></i><?= t('Receive Stock') ?></a><?php endif; ?>
-                <?php if(canView('field_visits')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('field_reports') ?>"><i class="bi bi-geo-alt"></i><?= t('Customer Visits') ?></a><?php endif; ?>
-                <?php if(canView('restaurant_pos')): ?>
-                <?php if (!empty($__rest_on)): ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i><?= t('Menu') ?></a>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i><?= t('Tables') ?></a>
-                <?php endif; ?>
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant') ?></a>
-                <?php endif; ?>
+                <?php foreach ($__side_items as [$__side_u, $__side_i, $__side_l]): ?>
+                <a class="list-group-item list-group-item-action" href="<?= $__side_u ?>"><i class="bi <?= htmlspecialchars(preg_replace('/^bi /', '', $__side_i)) ?>"></i><?= htmlspecialchars($__side_l) ?></a>
+                <?php endforeach; ?>
             </div>
-            <?php endif; ?>
-            <?php if (!empty($_billing_visible)): ?>
-            <div class="list-group list-group-flush">
-                <a class="list-group-item list-group-item-action" href="<?= getUrl('subscription') ?>"><i class="bi bi-credit-card-2-front"></i><?= t('Subscription') ?>
-                    <span class="badge rounded-pill d-none bms-billing-badge ms-1" style="background:#0d6efd;color:#fff">0</span></a>
-            </div>
-            <?php endif; ?>
+            <?php endforeach; ?>
             <?php if ($_set_sys_visible): ?>
             <div class="bn-group"><?= t('Settings') ?></div>
             <div class="list-group list-group-flush">
@@ -1863,6 +1894,10 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             <?php endif; ?>
             <div class="bn-group"><?= t('My Account') ?></div>
             <div class="list-group list-group-flush">
+                <?php if (!empty($_billing_visible)): ?>
+                <a class="list-group-item list-group-item-action" href="<?= getUrl('subscription') ?>"><i class="bi bi-credit-card-2-front"></i><?= t('Subscription') ?>
+                    <span class="badge rounded-pill d-none bms-billing-badge ms-1" style="background:#0d6efd;color:#fff">0</span></a>
+                <?php endif; ?>
                 <?php if (!empty($_SESSION['employee_id'])): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace"></i><?= t('My HR') ?></a><?php endif; ?>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('my_settings') ?>"><i class="bi bi-person-gear"></i><?= t('My Profile & Settings') ?></a>
                 <a class="list-group-item list-group-item-action" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle"></i><?= t('Help') ?></a>

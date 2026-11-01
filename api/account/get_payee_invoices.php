@@ -45,8 +45,8 @@ try {
         $isPartial = $paid > 0.005;
         $label = $r['invoice_ref']
                . ($isPartial
-                   ? ' — TZS ' . number_format($remaining, 2) . ' remaining of ' . number_format($total, 2)
-                   : ' — TZS ' . number_format($total, 2));
+                   ? ' — ' . bmsCompanyCurrency() . ' ' . number_format($remaining, 2) . ' remaining of ' . number_format($total, 2)
+                   : ' — ' . bmsCompanyCurrency() . ' ' . number_format($total, 2));
         return [
             'id'        => $r['id'],
             'label'     => $label,

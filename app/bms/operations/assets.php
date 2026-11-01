@@ -317,9 +317,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                     <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-cart-check me-1"></i> Acquisition</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Cost (TZS) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Cost (<?= htmlspecialchars(bmsCompanyCurrency()) ?>) <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text font-monospace">TZS</span>
+                                <span class="input-group-text font-monospace"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control" name="cost" id="cost" step="0.01" required placeholder="0.00" oninput="updatePreview()">
                             </div>
                         </div>
@@ -401,7 +401,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
                                             <input type="number" class="form-control form-control-sm" name="book_rate" id="book_rate" step="0.01" min="0" max="100" oninput="updatePreview()">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label small fw-semibold mb-0"><?= t('Salvage (TZS)') ?></label>
+                                            <label class="form-label small fw-semibold mb-0"><?= str_replace('TZS', bmsCompanyCurrency(), t('Salvage (TZS)')) ?></label>
                                             <input type="number" class="form-control form-control-sm" name="book_salvage" id="book_salvage" step="0.01" min="0" value="0" oninput="updatePreview()">
                                         </div>
                                         <div class="col-6">
@@ -1140,7 +1140,7 @@ $(document).ready(function() {
 });
 
 function formatCurrency(v) {
-    return parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' TZS';
+    return parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>';
 }
 
 function refreshTable() {

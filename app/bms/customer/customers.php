@@ -86,6 +86,8 @@ require_once __DIR__ . '/../../../core/form_lookups.php';
 $lk_customer_type = formLookupOptions($pdo, 'customer_type');
 $lk_payment_terms = formLookupOptions($pdo, 'payment_terms');
 $lk_currency      = formLookupOptions($pdo, 'currency');
+// Non-TZS company: documents use only the company's own currency (core/currency.php).
+if (!bmsIsDefaultCurrency()) { $lk_currency = [['value' => bmsCompanyCurrency(), 'label' => bmsCompanyCurrency()]]; }
 $lk_categories    = array_map(fn($c) => ['value' => (string)$c['category_id'], 'label' => $c['category_name']], $categories);
 $lk_years = [];
 for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (string)$y, 'label' => (string)$y]; }
@@ -241,7 +243,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
     </script>
 
     <style>
-        .custom-stat-card { background-color: #d1e7dd !important; }
+        .custom-stat-card { background-color: #d1e7dd !important; }   /* cards without .stat-edge keep the old green */
     </style>
 
     <?php if ($attention): ?>
@@ -258,7 +260,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
     <!-- Statistics Cards -->
     <div class="row mb-4" id="print-stats-cards">
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -273,7 +275,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-green shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -288,7 +290,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-gray shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -303,7 +305,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-slate shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -733,7 +735,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label"><?= t('Currency') ?></label>
-                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', t('Select Currency')) ?>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, bmsCompanyCurrency(), 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>
@@ -1239,11 +1241,11 @@ $(document).ready(function() {
                         <div class="p-1 px-2 rounded bg-light border border-opacity-10">
                             <div class="d-flex justify-content-between align-items-center gap-3">
                                 <small class="text-muted fw-bold" style="font-size: 0.6rem;"><?= t('PAID') ?></small>
-                                <span class="text-success fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_paid).replace('TZS ', '')}</span>
+                                <span class="text-success fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_paid).replace('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ', '')}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center gap-3 mt-1 border-top pt-1">
                                 <small class="text-muted fw-bold" style="font-size: 0.6rem;"><?= t('DUE') ?></small>
-                                <span class="text-danger fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_unpaid).replace('TZS ', '')}</span>
+                                <span class="text-danger fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_unpaid).replace('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ', '')}</span>
                             </div>
                         </div>
                     `,
@@ -1341,18 +1343,22 @@ $(document).ready(function() {
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
-                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('customers/details') ?>?id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View') ?>"><i class="bi bi-eye"></i></a>
-                                        <?php if ($can_edit_customers): ?>
-                                        <button class="btn btn-sm btn-outline-warning" onclick="editCustomer(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Edit') ?>"><i class="bi bi-pencil"></i></button>
-                                        <?php endif; ?>
-                                        <?php if (!$simpleCustomerForm): ?>
-                                        ${customer.total_invoices > 0 && <?= json_encode(canView('financial_reports')) ?> ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View Account') ?>"><i class="bi bi-file-earmark-text"></i></a>` : ''}
-                                        <?php endif; ?>
-                                        <?php if ($can_delete_customers): ?>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Delete') ?>"><i class="bi bi-trash"></i></button>
-                                        <?php endif; ?>
+                                <div class="card-footer bg-white border-top px-3 py-2 d-flex justify-content-end" style="border-radius:0 0 10px 10px;">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear me-1"></i><?= t('Actions') ?></button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width:200px;border-radius:12px;">
+                                            <li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('customers/details') ?>?id=${customer.customer_id}"><i class="bi bi-eye text-info me-3" style="width:1.1rem;"></i><?= t('View Details') ?></a></li>
+                                            <?php if ($can_edit_customers): ?>
+                                            <li><button type="button" class="dropdown-item py-2 px-3 rounded d-flex align-items-center" onclick="editCustomer(${customer.customer_id})"><i class="bi bi-pencil text-warning me-3" style="width:1.1rem;"></i><?= t('Edit') ?></button></li>
+                                            <?php endif; ?>
+                                            <?php if (!$simpleCustomerForm): ?>
+                                            ${customer.total_invoices > 0 && <?= json_encode(canView('financial_reports')) ?> ? `<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}"><i class="bi bi-file-earmark-text text-primary me-3" style="width:1.1rem;"></i><?= t('View Account') ?></a></li>` : ''}
+                                            <?php endif; ?>
+                                            <?php if ($can_delete_customers): ?>
+                                            <li><hr class="dropdown-divider opacity-50 my-1"></li>
+                                            <li><button type="button" class="dropdown-item py-2 px-3 rounded d-flex align-items-center text-danger" onclick="confirmDelete(${customer.customer_id})"><i class="bi bi-trash me-3" style="width:1.1rem;"></i><?= t('Delete') ?></button></li>
+                                            <?php endif; ?>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -1660,7 +1666,7 @@ function safeOutput(str) {
 }
 
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(amount);
+    return new Intl.NumberFormat('en-TZ', { style: 'currency', currency: '<?= htmlspecialchars(bmsCompanyCurrency()) ?>' }).format(amount);
 }
 
 function editCustomer(customerId) {
@@ -1891,7 +1897,7 @@ function downloadTemplate() {
         'payment_terms', 'credit_limit', 'currency', 'bank_name', 'bank_account',
         'bank_address', 'description', 'status'
     ];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nJohn Doe,ABC Company,JD,business,John Doe,Manager,john@abc.com,+255123456789,+255987654321,,http://abc.com,123 Street,Dar es Salaam,Dar es Salaam,Tanzania,12345,TIN123,VAT123,30_days,1000000,TZS,Example Bank,123456789,123 Bank Street,Good customer,active";
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nJohn Doe,ABC Company,JD,business,John Doe,Manager,john@abc.com,+255123456789,+255987654321,,http://abc.com,123 Street,Dar es Salaam,Dar es Salaam,Tanzania,12345,TIN123,VAT123,30_days,1000000,<?= htmlspecialchars(bmsCompanyCurrency()) ?>,Example Bank,123456789,123 Bank Street,Good customer,active";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);

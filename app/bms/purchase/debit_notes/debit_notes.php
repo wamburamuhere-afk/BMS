@@ -52,7 +52,7 @@ $can_delete = canDelete('debit_notes');
         <div class="col-6 col-md-3"><div class="card dn-stat-card text-center p-3 h-100"><div class="stat-num text-primary" id="dnStatTotal">0</div><div class="small text-muted">Total Notes</div></div></div>
         <div class="col-6 col-md-3"><div class="card dn-stat-card text-center p-3 h-100"><div class="stat-num text-secondary" id="dnStatPending">0</div><div class="small text-muted">Pending</div></div></div>
         <div class="col-6 col-md-3"><div class="card dn-stat-card text-center p-3 h-100"><div class="stat-num text-primary" id="dnStatApproved">0</div><div class="small text-muted">Approved</div></div></div>
-        <div class="col-6 col-md-3"><div class="card dn-stat-card text-center p-3 h-100"><div class="stat-num" style="color:#052c65" id="dnStatValue">0</div><div class="small text-muted">TZS Value (<span id="dnStatPaid">0</span> settled)</div></div></div>
+        <div class="col-6 col-md-3"><div class="card dn-stat-card text-center p-3 h-100"><div class="stat-num" style="color:#052c65" id="dnStatValue">0</div><div class="small text-muted"><?= htmlspecialchars(bmsCompanyCurrency()) ?> Value (<span id="dnStatPaid">0</span> settled)</div></div></div>
     </div>
 
     <div class="card border-0 shadow-sm mb-3">

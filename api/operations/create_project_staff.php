@@ -119,7 +119,7 @@ try {
         trim($_POST['work_location'] ?? ''),
         floatval($_POST['basic_salary'] ?? 0),
         floatval($_POST['hourly_rate'] ?? 0),
-        $_POST['currency'] ?? 'TZS',
+        bmsEnforceDocCurrency($_POST['currency'] ?? bmsCompanyCurrency()),   // core/currency.php
         $_POST['payment_frequency'] ?? 'monthly',
         $_POST['payment_method'] ?? 'bank',
         trim($_POST['bank_name'] ?? ''),

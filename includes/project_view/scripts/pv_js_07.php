@@ -4,9 +4,9 @@ function openPayVoucher(v) {
     $('#pay_voucher_id').val(v.id);
     $('#pay_voucher_no').text(v.voucher_number || ('#' + v.id));
     $('#pay_payee').text(v.payee_name || '—');
-    $('#pay_amount').text(formatMoney(v.amount) + ' TZS');
-    $('#pay_already_paid').text(formatMoney(alreadyPaid) + ' TZS');
-    $('#pay_balance_due').text(formatMoney(balance) + ' TZS');
+    $('#pay_amount').text(formatMoney(v.amount) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#pay_already_paid').text(formatMoney(alreadyPaid) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#pay_balance_due').text(formatMoney(balance) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     $('#pay_payment_amount').val(balance.toFixed(2)).attr('max', balance.toFixed(2));
     $('#pay_reference').val(v.reference_number || '');
     $('#pay_date').val(new Date().toISOString().split('T')[0]);
@@ -111,7 +111,7 @@ function vcUpdateAmountWords(val) {
     const cents = Math.round((num - intPart) * 100);
     let result = words(intPart).trim();
     if (cents > 0) result += ' and ' + words(cents).trim() + ' Cents';
-    $('#vc_amount_words').val(result + ' Shillings Only');
+    $('#vc_amount_words').val(result + ' <?= htmlspecialchars(bmsCurrencyUnitWord()) ?> Only');
 }
 
 // ===== PROGRESS & MILESTONES LOGIC =====

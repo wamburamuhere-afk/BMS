@@ -233,9 +233,9 @@ includeHeader();
                             <input type="text" class="form-control" name="performed_by" placeholder="Person or Company name">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Cost (TZS)</label>
+                            <label class="form-label fw-semibold">Cost (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</label>
                             <div class="input-group">
-                                <span class="input-group-text font-monospace">TZS</span>
+                                <span class="input-group-text font-monospace"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control" name="cost" step="0.01" value="0.00">
                             </div>
                         </div>
@@ -439,7 +439,7 @@ $(document).ready(function() {
                 $('#stat-progress').text(json.stats.progress || 0);
                 $('#stat-completed').text(json.stats.completed || 0);
                 $('#stat-paid').text(json.stats.paid || 0);
-                $('#stat-total-cost').text(parseFloat(json.stats.total_cost || 0).toLocaleString() + ' TZS');
+                $('#stat-total-cost').text(parseFloat(json.stats.total_cost || 0).toLocaleString() + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
                 return json.data;
             }
         },
@@ -469,7 +469,7 @@ $(document).ready(function() {
             },
             { 
                 data: 'cost', 
-                render: data => `<strong>${parseFloat(data).toLocaleString()} TZS</strong>`,
+                render: data => `<strong>${parseFloat(data).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>`,
                 createdCell: (td) => $(td).attr('data-label', 'Cost')
             },
             { 
@@ -567,7 +567,7 @@ function viewDetails(id) {
             const s = statusMap[d.status] || { cls: 'secondary', label: d.status.toUpperCase() };
             const paymentBlock = d.status === 'paid'
                 ? `<div class="col-6"><small class="text-muted d-block">Payment Date</small><strong>${d.payment_date || 'N/A'}</strong></div>
-                   <div class="col-6"><small class="text-muted d-block">Paid Amount</small><strong class="text-success">${parseFloat(d.paid_amount || d.cost).toLocaleString()} TZS</strong></div>`
+                   <div class="col-6"><small class="text-muted d-block">Paid Amount</small><strong class="text-success">${parseFloat(d.paid_amount || d.cost).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong></div>`
                 : '';
 
             const html = `
@@ -578,7 +578,7 @@ function viewDetails(id) {
                     <div class="col-12"><small class="text-muted d-block">Asset</small><strong>${d.asset_name || 'Asset ID: '+d.asset_id}</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Log Date</small><strong>${d.maintenance_date}</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Type</small><strong>${d.maintenance_type.toUpperCase()}</strong></div>
-                    <div class="col-6"><small class="text-muted d-block">Cost</small><strong class="text-danger">${parseFloat(d.cost).toLocaleString()} TZS</strong></div>
+                    <div class="col-6"><small class="text-muted d-block">Cost</small><strong class="text-danger">${parseFloat(d.cost).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong></div>
                     <div class="col-6"><small class="text-muted d-block">Performed By</small><strong>${d.performed_by || 'N/A'}</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Completion Date</small><strong>${d.completion_date || 'N/A'}</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Next Due Date</small><strong>${d.next_due_date || 'N/A'}</strong></div>

@@ -655,6 +655,22 @@ function get_primary_badge($is_primary) {
             border-radius: 4px;
         }
 
+        /* Summary cards: white with a coloured edge bar (blue = totals, green = good) — the
+           same look as the other list pages instead of a full green block. */
+        .custom-stat-card.wh-stat {
+            background-color: #fff !important;
+            border: 1px solid #e6e9ef !important;
+            border-left: 4px solid #0d6efd !important;
+        }
+        .custom-stat-card.wh-stat-active { border-left-color: #198754 !important; }
+        .custom-stat-card.wh-stat h4 { color: #12326b !important; }
+        .custom-stat-card.wh-stat p {
+            color: #6c7a89 !important; font-size: .72rem; font-weight: 600;
+            letter-spacing: .03em;
+        }
+        .custom-stat-card.wh-stat i { color: #0d6efd !important; opacity: .8; }
+        .custom-stat-card.wh-stat-active i { color: #198754 !important; }
+
 .table thead th {
     background-color: #f8f9fa !important;
 }
@@ -767,22 +783,32 @@ function get_primary_badge($is_primary) {
        right) previously forced onto one un-wrapped flex line — wider than
        any phone viewport, dragging the whole page left/right. Let it wrap
        and stack instead of scrolling. */
-    #warehousesActionsBar {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-    #warehousesActionsBar > div {
+    /* Print/Export on the left and "Show: N" on the right, on ONE row (was: centred boxes
+       stacked at different widths). */
+    #warehousesActionsBar { margin-bottom: 1rem !important; }
+    #warehousesActionsBar .wh-toolbar {
         width: 100%;
-        justify-content: center;
+        flex-wrap: nowrap !important;
+        justify-content: space-between;
+        gap: 0.5rem !important;
     }
     #warehousesActionsBar .btn-group .btn {
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-        font-size: 0.8rem;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        font-size: 0.85rem;
     }
+    #warehousesActionsBar .wh-toolbar > div:last-child { padding-left: .6rem !important; padding-right: .6rem !important; }
 
+    /* Filters: both fields full width, then Apply + Reset side by side filling the row. */
+    .wh-filter-card .card-body { padding: .85rem; }
+    .wh-filter-card .form-label { font-size: .75rem; margin-bottom: .2rem; color: #6c757d; font-weight: 600; }
+    .wh-filter-actions .btn { flex: 1 1 0; }
+
+    /* Summary cards: 2 x 2, compact */
     .custom-stat-card h4 { font-size: 1.35rem; }
-    .custom-stat-card .card-body { padding: 0.85rem; }
+    .custom-stat-card .card-body { padding: 0.7rem 0.85rem; }
+    .custom-stat-card.wh-stat p { font-size: .66rem; line-height: 1.25; }
+    .custom-stat-card.wh-stat i { font-size: 1.4rem !important; }
 }
 </style>
 </style>
@@ -867,8 +893,8 @@ function get_primary_badge($is_primary) {
 
         <!-- Statistics Cards -->
         <div class="row mb-4 d-print-none">
-            <div class="col-md-3 mb-3">
-                <div class="card custom-stat-card">
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card custom-stat-card wh-stat wh-stat-total">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
@@ -883,8 +909,8 @@ function get_primary_badge($is_primary) {
                 </div>
             </div>
             
-            <div class="col-md-3 mb-3">
-                <div class="card custom-stat-card">
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card custom-stat-card wh-stat wh-stat-active">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
@@ -899,8 +925,8 @@ function get_primary_badge($is_primary) {
                 </div>
             </div>
             
-            <div class="col-md-3 mb-3">
-                <div class="card custom-stat-card">
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card custom-stat-card wh-stat wh-stat-areas">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
@@ -915,8 +941,8 @@ function get_primary_badge($is_primary) {
                 </div>
             </div>
             
-            <div class="col-md-3 mb-3">
-                <div class="card custom-stat-card">
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card custom-stat-card wh-stat wh-stat-primary">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
@@ -968,7 +994,7 @@ function get_primary_badge($is_primary) {
         <!-- Warehouses Grid View -->
         
         <!-- Filter Section -->
-        <div class="card border-0 shadow-sm mb-4 d-print-none">
+        <div class="card border-0 shadow-sm mb-4 d-print-none wh-filter-card">
             <div class="card-header bg-light">
                 <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters & Parameters') ?></h6>
             </div>
@@ -991,8 +1017,8 @@ function get_primary_badge($is_primary) {
                             <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= warehouseStatusLabel('maintenance') ?></option>
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end justify-content-end">
-                        <button type="submit" class="btn btn-primary me-2">
+                    <div class="col-12 col-md-4 d-flex align-items-end justify-content-md-end gap-2 wh-filter-actions">
+                        <button type="submit" class="btn btn-primary">
                             <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                         </button>
                         <a href="warehouses.php" class="btn btn-outline-secondary">
@@ -1005,7 +1031,7 @@ function get_primary_badge($is_primary) {
 
         <!-- Actions Bar -->
         <div id="warehousesActionsBar" class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-            <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3 flex-wrap wh-toolbar">
                 <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                     <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed Warehouse List', 'User generated a printed list of warehouses'); window.print()" style="background: #fff; color: #444;">
                         <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
@@ -1027,7 +1053,7 @@ function get_primary_badge($is_primary) {
                     </select>
                 </div>
             </div>
-            <div>
+            <div class="d-none d-md-block">
                 <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
                     <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> <?= wLabel('warehouses', 'shops') ?>
                 </span>

@@ -506,9 +506,9 @@ function get_quick_actions($product) {
     <!-- Page Header -->
     <div class="row mb-3 mb-md-4 d-print-none">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-start flex-nowrap gap-2">
-                <div>
-                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> <?= t('Product Management') ?></h2>
+            <div class="d-flex justify-content-between align-items-start flex-nowrap gap-2 prod-head">
+                <div class="min-w-0">
+                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold prod-title"><i class="bi bi-box"></i> <?= t('Product Management') ?></h2>
                     <p class="text-muted mb-0 d-none d-md-block small mt-1"><?= t('Manage your inventory, prices, and stock levels') ?></p>
                 </div>
                 <div class="ms-auto flex-shrink-0 pt-1 pt-md-2">
@@ -527,7 +527,7 @@ function get_quick_actions($product) {
                     </button>
                     <?php endif; ?>
                     <a href="<?= getUrl('product_import.php') ?>" class="btn btn-outline-primary btn-sm px-1 px-md-2 shadow-sm ms-1" style="border-radius: 6px;" title="<?= t('Import Products') ?>">
-                        <i class="bi bi-file-earmark-arrow-up"></i> <span class="d-none d-sm-inline"><?= t('Import') ?></span>
+                        <i class="bi bi-file-earmark-arrow-up"></i> <span><?= t('Import') ?></span>
                     </a>
                     <?php endif; ?>
                 </div>
@@ -676,8 +676,8 @@ function get_quick_actions($product) {
     </div>
 
     <!-- Filters Card -->
-    <div class="card mb-4">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+    <div class="card mb-4 prod-filter-card">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center prod-filter-head">
             <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters') ?></h6>
             <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                 <i class="bi bi-chevron-down"></i>
@@ -712,7 +712,7 @@ function get_quick_actions($product) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-12 col-md-2">
                         <label class="form-label small fw-bold"><?= t('Supplier') ?></label>
                         <select class="form-select form-select-sm select2-static" name="supplier">
                             <option value=""><?= t('All Suppliers') ?></option>
@@ -740,12 +740,12 @@ function get_quick_actions($product) {
                             <option value="yes" <?= $low_stock == 'yes' ? 'selected' : '' ?>><?= t('Low Stock Only') ?></option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-2 d-flex align-items-end gap-1">
+                    <div class="col-12 col-md-2 d-flex align-items-end gap-1 prod-filter-actions">
                         <button type="submit" class="btn btn-primary btn-sm flex-grow-1" style="height: 31px;" title="<?= t('Apply Filters') ?>">
                             <i class="bi bi-funnel"></i> <?= t('Filter') ?>
                         </button>
                         <a href="products.php" class="btn btn-outline-secondary btn-sm" style="height: 31px;" title="<?= t('Reset Filters') ?>">
-                            <i class="bi bi-arrow-clockwise"></i>
+                            <i class="bi bi-arrow-clockwise"></i><span class="d-md-none ms-1"><?= t('Reset') ?></span>
                         </a>
                     </div>
                 </form>
@@ -1780,6 +1780,40 @@ $(document).keydown(function(e) {
     }
 }
 
+/* ── Phone polish (<768px only; desktop untouched): header, stat cards, filters ── */
+.min-w-0 { min-width: 0; }
+@media (max-width: 767.98px) {
+    /* Header: one row — title left, "Add New" + "Import" small buttons right */
+    .prod-head { align-items: center !important; flex-direction: row !important; gap: .5rem !important; }
+    .prod-title { font-size: 1rem !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prod-title i { display: none; }
+    .prod-head .btn { font-size: .72rem; padding: .35rem .55rem !important; white-space: nowrap; }
+    .prod-head .btn i { margin-right: .15rem; }
+
+    /* Stat cards: compact white 2x2 with a green accent bar */
+    #print-stats-cards { --bs-gutter-x: .6rem; margin-bottom: .5rem !important; }
+    #print-stats-cards > div { margin-bottom: .6rem !important; }
+    #print-stats-cards .custom-stat-card {
+        background-color: #fff !important;
+        border: 1px solid #e6eee9 !important;
+        border-left: 4px solid #198754 !important;
+        border-radius: 10px;
+    }
+    #print-stats-cards .custom-stat-card .card-body { padding: .5rem .75rem !important; }
+    #print-stats-cards .custom-stat-card p { color: #6c7a73 !important; font-weight: 600; font-size: .62rem !important; letter-spacing: .03em; }
+    #print-stats-cards .custom-stat-card h4 { color: #0f5132 !important; font-weight: 700; }
+
+    /* Filters: header stays on one row (the global rule above stacks it), compact fields */
+    .prod-filter-card { border-radius: 12px; overflow: hidden; }
+    .card-header.prod-filter-head { flex-direction: row !important; gap: .5rem !important; padding: .5rem .85rem; }
+    .prod-filter-head .btn { padding: .15rem .5rem; }
+    .prod-filter-card .card-body { padding: .75rem .85rem; }
+    .prod-filter-card .form-label { font-size: .72rem !important; margin-bottom: .2rem; color: #6c757d; }
+    .prod-filter-actions { margin-top: .75rem; }
+    .prod-filter-actions .btn { font-size: .85rem; height: auto !important; padding: .45rem .6rem; }
+    .prod-filter-actions .btn[type="submit"] { flex: 1 1 auto; }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Mobile view — desktop layout above is completely untouched by this block.
    Fixes a white/unreadable toolbar + dropdown controls reported on Android
@@ -2019,7 +2053,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Cost Price') ?> <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <span class="input-group-text">TZS</span>
+                                        <span class="input-group-text"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" name="cost_price" id="modal_cost_price" value="0.00" step="0.01" required onkeyup="modalCalcMarkup()">
                                     </div>
                                     <small class="text-muted"><?= t('The price you paid for this product') ?></small>
@@ -2027,7 +2061,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-success text-white">TZS</span>
+                                        <span class="input-group-text bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control fw-bold" name="selling_price" id="modal_selling_price" value="0.00" step="0.01" required onkeyup="modalCalcMarkup(); modalCalcMinPrice();">
                                     </div>
                                     <small class="text-muted"><?= t('Final price at which you sell to customers') ?></small>
@@ -2036,7 +2070,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-info text-white">TZS</span>
+                                        <span class="input-group-text bg-info text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" name="wholesale_price" value="0.00" step="0.01">
                                     </div>
                                     <small class="text-muted"><?= t('Price for bulk/wholesale buyers') ?></small>
@@ -2052,7 +2086,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Min Selling Price') ?></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-danger text-white">TZS</span>
+                                        <span class="input-group-text bg-danger text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" name="min_selling_price" id="modal_min_selling_price" value="0.00" step="0.01">
                                     </div>
                                     <small class="text-muted"><?= t('Auto-calculated but can be overridden') ?></small>
@@ -2082,7 +2116,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <div class="p-3 bg-light rounded text-center h-100 d-flex flex-column justify-content-center">
                                         <small class="text-muted text-uppercase fw-bold d-block mb-1"><?= t('Estimated Profit') ?></small>
-                                        <h5 class="fw-bold text-success mb-0" id="modal_profit_badge">TZS 0.00</h5>
+                                        <h5 class="fw-bold text-success mb-0" id="modal_profit_badge"><?= htmlspecialchars(bmsCompanyCurrency()) ?> 0.00</h5>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -2318,7 +2352,7 @@ function removeModalImage() {
 function modalCalcMarkup() { 
     let cost = parseFloat(document.getElementById('modal_cost_price').value) || 0, selling = parseFloat(document.getElementById('modal_selling_price').value) || 0; 
     let profit = selling - cost, markup = cost > 0 ? (profit / cost) * 100 : 0; 
-    document.getElementById('modal_profit_badge').innerText = 'TZS ' + profit.toLocaleString(undefined, {minimumFractionDigits: 2}); 
+    document.getElementById('modal_profit_badge').innerText = '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + profit.toLocaleString(undefined, {minimumFractionDigits: 2}); 
     document.getElementById('modal_markup_badge').innerText = markup.toFixed(2) + '%'; 
 }
 function modalCalcMinPrice() {

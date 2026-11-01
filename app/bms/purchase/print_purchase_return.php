@@ -68,7 +68,7 @@ $stmtItems = $pdo->prepare("
     die("Error: " . $e->getMessage());
 }
 
-$currency = $return['currency'] ?? 'TZS';
+$currency = $return['currency'] ?? bmsCompanyCurrency();
 
 // Company Settings
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];

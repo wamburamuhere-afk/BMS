@@ -6197,4 +6197,12 @@ return [
     'Free table' => 'Wazi',
     'No tables yet. Tap "Add Table" to add your first table.' => 'Hakuna meza bado. Bonyeza "Ongeza Meza" kuongeza meza ya kwanza.',
     'No tables in this area yet.' => 'Hakuna meza kwenye eneo hili bado.',
+    // Company currency — East Africa + USD (core/currency.php, 2026-11-01)
+    'Tanzanian Shilling' => 'Shilingi ya Tanzania',
+    'Kenyan Shilling' => 'Shilingi ya Kenya',
+    'Burundian Franc' => 'Faranga ya Burundi',
+    'Rwandan Franc' => 'Faranga ya Rwanda',
+    'South Sudanese Pound' => 'Pauni ya Sudan Kusini',
+    'US Dollar' => 'Dola ya Marekani',
+    'Every price, receipt and report uses this currency. A company that is not on TZS issues all its documents in this one currency.' => 'Kila bei, risiti na ripoti hutumia sarafu hii. Kampuni isiyotumia TZS hutoa hati zake zote kwa sarafu hii moja.',
 ];

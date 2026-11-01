@@ -196,13 +196,13 @@ if (!function_exists('renderExpenseCatRows')) {
     <div class="row mb-4 d-print-none">
         <div class="col-12">
             <div class="card shadow-sm border-0 bg-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> <?= t('Expenses Management') ?></h2>
-                            <p class="mb-0 text-muted"><?= t('Track and manage all expenses') ?></p>
+                <div class="card-body p-4 exp-head-body">
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <div class="min-w-0">
+                            <h2 class="mb-1 fw-bold text-primary exp-page-title"><i class="bi bi-cash-coin"></i> <?= t('Expenses Management') ?></h2>
+                            <p class="mb-0 text-muted exp-page-sub"><?= t('Track and manage all expenses') ?></p>
                         </div>
-                        <div class="d-flex gap-2 flex-wrap">
+                        <div class="d-flex gap-2 flex-wrap justify-content-end exp-head-actions">
                             <?php if (!$posSimple): ?>
                             <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
                                 <i class="bi bi-diagram-3-fill"></i> <?= t('Expense Types & Categories') ?>
@@ -218,7 +218,7 @@ if (!function_exists('renderExpenseCatRows')) {
                                 <i class="bi bi-basket"></i> <?= t('Buy Ingredients') ?>
                             </button>
                             <?php endif; ?>
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+                            <button type="button" class="btn btn-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> <?= t('Add New Expense') ?>
                             </button>
                             <?php endif; ?>
@@ -362,7 +362,7 @@ if (!function_exists('renderExpenseCatRows')) {
     <!-- RIGHT: filters + table -->
     <div class="<?= $posSimple ? 'col-lg-12' : 'col-lg-9' ?>">
     <!-- Filters Card -->
-    <div class="card mb-4">
+    <div class="card mb-4 exp-filter-card">
         <div class="card-header bg-light">
             <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters & Search') ?></h6>
         </div>
@@ -379,7 +379,7 @@ if (!function_exists('renderExpenseCatRows')) {
                     </select>
                 </div>
                 <?php endif; ?>
-                <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
+                <div class="col-12 <?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Status') ?></label>
                     <?php
                     // Deep-link support (e.g. dashboard.php's pending-expenses
@@ -412,16 +412,16 @@ if (!function_exists('renderExpenseCatRows')) {
                 $exp_date_from_qs = $exp_valid_ymd($_GET['date_from'] ?? '');
                 $exp_date_to_qs   = $exp_valid_ymd($_GET['date_to'] ?? '');
                 ?>
-                <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
+                <div class="col-6 <?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Date From') ?></label>
                     <input type="date" class="form-control" id="dateFromFilter" value="<?= htmlspecialchars($exp_date_from_qs) ?>">
                 </div>
-                <div class="<?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
+                <div class="col-6 <?= $posSimple ? 'col-md-4' : 'col-md-3' ?>">
                     <label class="form-label"><?= t('Date To') ?></label>
                     <input type="date" class="form-control" id="dateToFilter" value="<?= htmlspecialchars($exp_date_to_qs) ?>">
                 </div>
-                <div class="col-md-12 d-flex justify-content-end">
-                    <button type="button" class="btn btn-primary me-2" onclick="applyFilters()">
+                <div class="col-md-12 d-flex justify-content-end gap-2 exp-filter-actions">
+                    <button type="button" class="btn btn-primary" onclick="applyFilters()">
                         <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                     </button>
                     <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
@@ -512,7 +512,10 @@ if (!function_exists('renderExpenseCatRows')) {
             // dates) feed it through filters_js; the stat cards through on_stats.
             $tbl = [
                 'id'           => 'expensesTable',
-                'card'         => '#mobile-expense-cards',
+                // No page-owned card list: the global mobile cards (bms-mobile-cards.js)
+                // render the phone view, so it is not listed twice.
+                'card'         => null,
+                'actions_dropdown' => true,
                 'page_length'  => 25,
                 // Simple POS doesn't use Expense Categories at all.
                 'hide'         => $posSimple ? ['categories'] : [],
@@ -547,9 +550,6 @@ if (!function_exists('renderExpenseCatRows')) {
     </div><!-- /col-lg-9 -->
     </div><!-- /row -->
 </div>
-
-<!-- Mobile Card View (auto-rendered on screens <= 768px) -->
-<div id="mobile-expense-cards" class="px-2" style="display:none;"></div>
 
 <!-- Add/Edit Expense Modal -->
 <div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" data-bs-focus="false">
@@ -1855,6 +1855,38 @@ function showToast(type, msg) {
         padding: 8px 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
+}
+
+/* ── Phone polish (<768px only; desktop untouched): compact header, stat cards, filters ── */
+.min-w-0 { min-width: 0; }
+@media (max-width: 767.98px) {
+    /* Header: one tidy row — short title left, small button right, no subtitle */
+    .exp-head-body { padding: .75rem 1rem !important; }
+    .exp-page-title { font-size: 1.05rem; margin-bottom: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .exp-page-sub { display: none; }
+    .exp-head-actions .btn { font-size: .8rem; padding: .4rem .7rem; }
+
+    /* Stat cards: compact 2x2, white with a green accent bar */
+    #print-stats-cards { --bs-gutter-x: .6rem; margin-bottom: .5rem !important; }
+    #print-stats-cards > div { margin-bottom: .6rem !important; }
+    #print-stats-cards .custom-stat-card {
+        background-color: #fff !important;
+        border: 1px solid #e6eee9 !important;
+        border-left: 4px solid #198754 !important;
+        border-radius: 10px;
+    }
+    #print-stats-cards .custom-stat-card .card-body { padding: .5rem .75rem !important; }
+    #print-stats-cards .custom-stat-card p { color: #6c7a73 !important; font-weight: 600; font-size: .62rem !important; letter-spacing: .03em; }
+    #print-stats-cards .custom-stat-card h4 { color: #0f5132 !important; font-weight: 700; }
+
+    /* Filters: Status full width, dates side by side, buttons share one row */
+    .exp-filter-card { border-radius: 12px; overflow: hidden; }
+    .exp-filter-card .card-header { padding: .5rem .85rem; }
+    .exp-filter-card .card-body { padding: .75rem .85rem; }
+    .exp-filter-card .row { --bs-gutter-y: .6rem; --bs-gutter-x: .6rem; }
+    .exp-filter-card .form-label { font-size: .75rem; margin-bottom: .2rem; color: #6c757d; font-weight: 600; }
+    .exp-filter-card .form-control, .exp-filter-card .form-select { font-size: .9rem; padding: .4rem .6rem; }
+    .exp-filter-actions .btn { flex: 1 1 0; font-size: .85rem; padding: .45rem .5rem; }
 }
 </style>
 

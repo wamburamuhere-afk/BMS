@@ -303,6 +303,12 @@ if (!function_exists('bmsBackupCronFile')) {
      *
      *   full     00:30            (DB + each owner's uploads)
      *   snapshot 06:30 12:30 18:30 (DB only — 00:30 is already the full run)
+     *   off-site 01:30            (encrypted upload of the night's full backups)
+     *
+     * The off-site job is the one line that runs as root: only root can read the
+     * rclone config holding the Google Drive token and the encryption password,
+     * so no web app on this shared server can. It loads no app code beyond
+     * core/offsite_backup.php and core/backup.php (cron/offsite_backup.php).
      *
      * $offsetMinutes staggers a second host on the same server so two runs never
      * compete for the disk and database at the same moment.
@@ -321,6 +327,7 @@ if (!function_exists('bmsBackupCronFile')) {
         };
 
         [$fh, $fm] = $toServer(30);                       // 00:30
+        [$oh, $om] = $toServer(90);                       // 01:30
         $snaps = array_map($toServer, [390, 750, 1110]);  // 06:30 12:30 18:30
         $snapMinutes = array_unique(array_column($snaps, 1));
         $snapHours   = array_column($snaps, 0);
@@ -334,12 +341,13 @@ if (!function_exists('bmsBackupCronFile')) {
         $lines = [
             "# BMS scheduled backups for {$host}.",
             '# Written by scripts/install_backup_cron.php on every deploy — edits here are overwritten.',
-            "# Times are server time ({$tzText}); in Africa/Dar_es_Salaam: full 00:30, snapshots 06:30 12:30 18:30"
-                . ($offsetMinutes ? " (+{$offsetMinutes} min stagger)." : '.'),
-            '# Log: backups/_platform/backup.log  ·  History: bms_control.tenant_backup_log',
+            "# Times are server time ({$tzText}); in Africa/Dar_es_Salaam: full 00:30, snapshots 06:30 12:30 18:30,"
+                . ' off-site 01:30' . ($offsetMinutes ? " (+{$offsetMinutes} min stagger)." : '.'),
+            '# Logs: backups/_platform/backup.log, offsite.log  ·  History: bms_control.tenant_backup_log',
             'MAILTO=""',
             'SHELL=/bin/sh',
             "{$fm} {$fh} * * * www-data {$phpBin} {$script} --kind=full >/dev/null 2>&1",
+            "{$om} {$oh} * * * root {$phpBin} " . rtrim($appRoot, '/') . "/cron/offsite_backup.php --host={$host} >/dev/null 2>&1",
         ];
         // The three snapshot times share one minute unless the offsets are odd;
         // fall back to one line each so no time is ever dropped.

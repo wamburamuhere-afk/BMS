@@ -252,7 +252,7 @@ try {
         $_POST['basic_salary'] ?? 0,
         $_POST['hourly_rate'] ?? 0,
         $_POST['standard_working_hours'] ?? 8,
-        $_POST['currency'] ?? 'TZS',
+        bmsEnforceDocCurrency($_POST['currency'] ?? bmsCompanyCurrency()),   // core/currency.php
         ($_POST['payment_frequency'] === 'other') ? ($_POST['payment_frequency_other'] ?? 'other') : ($_POST['payment_frequency'] ?? 'monthly'),
         $_POST['bank_name'] ?? null,
         $_POST['account_holder_name'] ?? null,

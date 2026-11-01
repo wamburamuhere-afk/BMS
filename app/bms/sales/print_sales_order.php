@@ -83,7 +83,7 @@ $is_quote    = ($order['is_quote'] ?? 0) == 1;
 $doc_title   = $is_quote ? 'QUOTATION' : 'SALES ORDER';
 $doc_label   = $is_quote ? 'Quote #:' : 'SO #:';
 $date_label  = $is_quote ? 'Quote Date:' : 'Order Date:';
-$currency    = $order['currency'] ?? 'TZS';
+$currency    = $order['currency'] ?? bmsCompanyCurrency();
 
 // ── Three-approval workflow data for signature row + DRAFT watermark ──
 $wf_status = $order['status'] ?? 'pending';

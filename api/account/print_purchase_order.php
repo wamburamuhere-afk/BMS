@@ -48,7 +48,7 @@ $stmtItems = $pdo->prepare("
 $stmtItems->execute([$order_id]);
 $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
-$currency = $order['currency'] ?? 'TZS';
+$currency = $order['currency'] ?? bmsCompanyCurrency();
 $order['expected_delivery_date'] = $order['expected_delivery_date'] ?? $order['expected_date'] ?? null;
 $order['subtotal']        = $order['subtotal']        ?? $order['total_amount'] ?? 0;
 $order['tax_amount']      = $order['tax_amount']      ?? 0;

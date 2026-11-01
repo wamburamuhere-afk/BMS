@@ -391,7 +391,7 @@ if ($method === 'GET') {
         // scope filters here were previously CLIENT-OPTIONAL — a user who
         // didn't pick a project/warehouse saw every supplier's PO company-wide.
         $sql = "SELECT purchase_order_id AS id,
-                       CONCAT(order_number, ' — TZS ', FORMAT(grand_total, 0)) AS text,
+                       CONCAT(order_number, ' — " . bmsCompanyCurrency() . " ', FORMAT(grand_total, 0)) AS text,
                        order_number, grand_total, order_date
                 FROM purchase_orders
                 WHERE supplier_id = ? AND status NOT IN ('cancelled')"
@@ -1065,7 +1065,7 @@ if ($action === 'record_payment') {
         $wht_note = $wht_amt > 0
             ? " WHT " . number_format($wht_amt, 2) . " withheld; net paid " . number_format($payment_amount - $wht_amt, 2) . "."
             : "";
-        $status_note = $new_status === 'paid' ? 'Invoice fully paid.' : 'Remaining balance: TZS ' . number_format($remaining - $payment_amount, 2) . '.';
+        $status_note = $new_status === 'paid' ? 'Invoice fully paid.' : 'Remaining balance: ' . bmsCompanyCurrency() . ' ' . number_format($remaining - $payment_amount, 2) . '.';
         logActivity($pdo, $_SESSION['user_id'],
             "Payment of " . number_format($payment_amount, 2) . " recorded for invoice #{$inv['invoice_ref']} — method: {$payment_method}. {$status_note}{$wht_note}");
         $warn_note = $funds_warn ? ' ' . $funds_warn : '';
