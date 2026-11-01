@@ -243,7 +243,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
     </script>
 
     <style>
-        .custom-stat-card { background-color: #d1e7dd !important; }
+        .custom-stat-card { background-color: #d1e7dd !important; }   /* cards without .stat-edge keep the old green */
     </style>
 
     <?php if ($attention): ?>
@@ -260,7 +260,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
     <!-- Statistics Cards -->
     <div class="row mb-4" id="print-stats-cards">
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -275,7 +275,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-green shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -290,7 +290,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-gray shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -305,7 +305,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-slate shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -1343,18 +1343,22 @@ $(document).ready(function() {
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
-                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('customers/details') ?>?id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View') ?>"><i class="bi bi-eye"></i></a>
-                                        <?php if ($can_edit_customers): ?>
-                                        <button class="btn btn-sm btn-outline-warning" onclick="editCustomer(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Edit') ?>"><i class="bi bi-pencil"></i></button>
-                                        <?php endif; ?>
-                                        <?php if (!$simpleCustomerForm): ?>
-                                        ${customer.total_invoices > 0 && <?= json_encode(canView('financial_reports')) ?> ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View Account') ?>"><i class="bi bi-file-earmark-text"></i></a>` : ''}
-                                        <?php endif; ?>
-                                        <?php if ($can_delete_customers): ?>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Delete') ?>"><i class="bi bi-trash"></i></button>
-                                        <?php endif; ?>
+                                <div class="card-footer bg-white border-top px-3 py-2 d-flex justify-content-end" style="border-radius:0 0 10px 10px;">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear me-1"></i><?= t('Actions') ?></button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width:200px;border-radius:12px;">
+                                            <li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('customers/details') ?>?id=${customer.customer_id}"><i class="bi bi-eye text-info me-3" style="width:1.1rem;"></i><?= t('View Details') ?></a></li>
+                                            <?php if ($can_edit_customers): ?>
+                                            <li><button type="button" class="dropdown-item py-2 px-3 rounded d-flex align-items-center" onclick="editCustomer(${customer.customer_id})"><i class="bi bi-pencil text-warning me-3" style="width:1.1rem;"></i><?= t('Edit') ?></button></li>
+                                            <?php endif; ?>
+                                            <?php if (!$simpleCustomerForm): ?>
+                                            ${customer.total_invoices > 0 && <?= json_encode(canView('financial_reports')) ?> ? `<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('customer_statement') ?>?customer_id=${customer.customer_id}"><i class="bi bi-file-earmark-text text-primary me-3" style="width:1.1rem;"></i><?= t('View Account') ?></a></li>` : ''}
+                                            <?php endif; ?>
+                                            <?php if ($can_delete_customers): ?>
+                                            <li><hr class="dropdown-divider opacity-50 my-1"></li>
+                                            <li><button type="button" class="dropdown-item py-2 px-3 rounded d-flex align-items-center text-danger" onclick="confirmDelete(${customer.customer_id})"><i class="bi bi-trash me-3" style="width:1.1rem;"></i><?= t('Delete') ?></button></li>
+                                            <?php endif; ?>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
