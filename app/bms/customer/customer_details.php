@@ -2164,6 +2164,7 @@ global $company_name, $company_logo;
                         success: <?= json_encode(t('Success!')) ?>,
                         error: <?= json_encode(t('Error')) ?>,
                         view: <?= json_encode(t('View')) ?>,
+                        actions: <?= json_encode(t('Actions')) ?>,
                         repay: <?= json_encode(t('Repay')) ?>,
                         edit: <?= json_encode(t('Edit')) ?>,
                         delete: <?= json_encode(t('Delete')) ?>,
