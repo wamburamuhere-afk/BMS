@@ -25,7 +25,7 @@ require_once __DIR__ . '/module_requests.php';
 
 if (!function_exists('renderSuperadminHeader')) {
     /**
-     * @param string $active  'dashboard' | 'tenants' | 'features' | 'profile'
+     * @param string $active  'dashboard' | 'tenants' | 'features' | 'profile' | 'backups' | …
      *                        (tenant_new.php / tenant_view.php pass 'tenants' —
      *                        they are reached FROM the tenant list and have no
      *                        nav slot of their own; each shows its own contextual
@@ -141,6 +141,7 @@ if (!function_exists('renderSuperadminHeader')) {
                             </li>
                             <?php
                             $navItem('ai',        saUrl('ai'),       'bi-stars',        'AI');
+                            $navItem('backups',   saUrl('backups'),  'bi-hdd-stack',    'Backups');
                             $navItem('settings',  saUrl('settings'), 'bi-gear-wide-connected', 'Settings');
                             ?>
                             <li class="nav-item ms-lg-2 my-1">
@@ -188,6 +189,8 @@ if (!function_exists('renderSuperadminHeader')) {
                                                    : date('d M', strtotime((string)$n['created_at'])));
                                         $tenantUrl = saUrl('tenants/view') . '?id=' . (int)($n['tenant_id'] ?? 0)
                                                    . '&from=notif&notif_type=' . urlencode($nType);
+                                        // Platform-wide, not one company's: goes to the Backups page.
+                                        if ($nType === 'backup_problem') { $tenantUrl = saUrl('backups'); $iconBi = 'bi-hdd-stack'; }
                                     ?>
                                     <a href="<?= htmlspecialchars($tenantUrl, ENT_QUOTES) ?>"
                                        class="d-flex align-items-start gap-2 text-decoration-none text-dark sa-notif-item<?= $isUnread ? ' unread' : '' ?>">
