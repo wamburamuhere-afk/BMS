@@ -462,8 +462,8 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-currency-dollar"></i></div>
                             <div class="flex-grow-1 overflow-hidden">
-                                <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Refunded (TZS)</small>
-                                <h5 class="mb-0 fw-bold" id="stat-refunded" style="font-size: 1rem;">TZS <?= number_format($stats['total_refunded'], 0) ?></h5>
+                                <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Refunded (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</small>
+                                <h5 class="mb-0 fw-bold" id="stat-refunded" style="font-size: 1rem;"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($stats['total_refunded'], 0) ?></h5>
                             </div>
                         </div>
                     </div>
@@ -634,7 +634,7 @@ $(document).ready(function() {
             { data: 'customer_name', render: (d, t, r) => `<div class="fw-bold">${safeOutput(d || 'Walk-in Customer')}</div>`
                 + (r.company_name ? `<small class="text-muted text-truncate d-block" style="max-width: 200px;">${safeOutput(r.company_name)}</small>` : '') },
             { data: 'total_items', className: 'text-center', render: d => `<span class="badge bg-light text-dark border rounded-pill">${parseInt(d) || 0}</span>` },
-            { data: 'formatted_total', className: 'text-end fw-bold', render: d => 'TZS ' + safeOutput(d) },
+            { data: 'formatted_total', className: 'text-end fw-bold', render: d => '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + safeOutput(d) },
             { data: 'status', className: 'text-center', render: d => {
                 const label = String(d || '').toUpperCase();
                 return `<span class="badge rounded-pill ${RETURN_STATUS_CLASSES[d] || 'status-secondary'} bg-opacity-10 py-2 px-3" style="min-width: 100px; color: currentcolor !important;">${safeOutput(label)}</span>`;
@@ -690,7 +690,7 @@ function renderStats(s) {
     $('#stat-pending').text(Number(s.pending || 0).toLocaleString());
     $('#stat-approved').text(Number(s.approved || 0).toLocaleString());
     $('#stat-rejected').text(Number(s.rejected || 0).toLocaleString());
-    $('#stat-refunded').text('TZS ' + Number(s.refunded_amount || 0).toLocaleString('en', {minimumFractionDigits: 0, maximumFractionDigits: 0}));
+    $('#stat-refunded').text('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + Number(s.refunded_amount || 0).toLocaleString('en', {minimumFractionDigits: 0, maximumFractionDigits: 0}));
 }
 
 function returnActions(r) {

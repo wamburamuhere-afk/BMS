@@ -97,7 +97,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm stat-card text-center p-3">
                 <div class="fs-4 fw-bold text-primary" id="stat-amount">0</div>
-                <div class="small text-muted">Total Amount (TZS)</div>
+                <div class="small text-muted">Total Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -174,7 +174,7 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                                 <th><?= t('Date Raised') ?></th>
                                 <th><?= t('Due Date') ?></th>
                                 <th><?= t('PO / Project') ?></th>
-                                <th class="text-end"><?= t('Amount (TZS)') ?></th>
+                                <th class="text-end"><?= str_replace('TZS', bmsCompanyCurrency(), t('Amount (TZS)')) ?></th>
                                 <th><?= t('Status') ?></th>
                                 <th class="text-end pe-3"><?= t('Actions') ?></th>
                             </tr>
@@ -454,11 +454,11 @@ $ri_pay_id     = intval($_GET['pay'] ?? 0);
                         <input type="text" class="form-control" id="pay-ref" readonly>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold"><?= t('Remaining Balance (TZS)') ?></label>
+                        <label class="form-label fw-bold"><?= str_replace('TZS', bmsCompanyCurrency(), t('Remaining Balance (TZS)')) ?></label>
                         <input type="text" class="form-control" id="pay-balance" readonly>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Amount to Pay (TZS) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold">Amount to Pay (<?= htmlspecialchars(bmsCompanyCurrency()) ?>) <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" name="payment_amount" id="pay-amount-input"
                                min="0.01" step="0.01" required>
                         <small class="text-muted" id="pay-amount-hint">Enter the amount you are paying now. Can be less than the full balance.</small>
@@ -1079,7 +1079,7 @@ function viewRow(id) {
                     ${typeBadge}
                 </div>
                 <div class="col-md-6"><div class="text-muted small">From</div><div class="fw-bold">${safeOutput(d.party_name)}</div></div>
-                <div class="col-md-6"><div class="text-muted small">Amount (TZS)</div><div class="fw-bold text-primary fs-5">TZS ${formatCurrency(d.amount)}</div></div>
+                <div class="col-md-6"><div class="text-muted small">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div><div class="fw-bold text-primary fs-5"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${formatCurrency(d.amount)}</div></div>
                 <div class="col-md-6"><div class="text-muted small">Date Raised</div><div class="fw-bold">${safeOutput(d.date_raised)}</div></div>
                 <div class="col-md-6"><div class="text-muted small">Date Recorded</div><div class="fw-bold">${safeOutput(d.date_recorded)}</div></div>
                 ${refRow}
@@ -1187,13 +1187,13 @@ function checkDuplicate() {
                     <strong>Duplicate reference —</strong>
                     <a href="${RI_VIEW_URL}?id=${e.id}" target="_blank" class="alert-link fw-bold">${safeOutput(e.invoice_ref)}</a>
                     already exists for this supplier
-                    (TZS ${formatCurrency(e.amount)}&ensp;&bull;&ensp;${safeOutput(e.date_raised)}&ensp;&bull;&ensp;<em>${safeOutput(e.status)}</em>).
+                    (<?= htmlspecialchars(bmsCompanyCurrency()) ?> ${formatCurrency(e.amount)}&ensp;&bull;&ensp;${safeOutput(e.date_raised)}&ensp;&bull;&ensp;<em>${safeOutput(e.status)}</em>).
                 </div>`;
             }
             if (res.fuzzy && res.fuzzy.length) {
                 const rows = res.fuzzy.map(function (f) {
                     return `<a href="${RI_VIEW_URL}?id=${f.id}" target="_blank" class="alert-link">${safeOutput(f.invoice_ref)}</a>
-                            (TZS ${formatCurrency(f.amount)}, ${safeOutput(f.date_raised)})`;
+                            (<?= htmlspecialchars(bmsCompanyCurrency()) ?> ${formatCurrency(f.amount)}, ${safeOutput(f.date_raised)})`;
                 }).join('; &ensp;');
                 html += `<div class="alert alert-warning py-2 px-3 mb-0${res.exact ? ' mt-1' : ''}">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i>
@@ -1327,7 +1327,7 @@ let _poSummaryCache = null;
 
 function formatTZS(n) {
     n = parseFloat(n) || 0;
-    return 'TZS ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function hidePoSummary() {
@@ -1525,7 +1525,7 @@ function openPaymentModal(id, ref, amount, subtotal, defaultWht, amountPaid) {
     payRemaining = Math.max(0, +(payGross - amountPaid).toFixed(2));
     // Ratio used to compute proportional WHT base for partial payments
     paySubtotalRatio = (parseFloat(subtotal) > 0 && payGross > 0) ? parseFloat(subtotal) / payGross : 1;
-    $('#pay-balance').val('TZS ' + formatCurrency(payRemaining));
+    $('#pay-balance').val('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + formatCurrency(payRemaining));
     $('#pay-amount-input').val(payRemaining.toFixed(2)).attr('max', payRemaining);
     // Auto-fill supplier default WHT category; user can still change.
     $('#pay-wht-rate').val(defaultWht ? String(defaultWht) : '');
@@ -1540,7 +1540,7 @@ function recalcPayNet() {
     const rate     = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
     const wht      = +(whtBase * rate / 100).toFixed(2);
     $('#pay-wht-amount').val(formatCurrency(wht));
-    $('#pay-net').val('TZS ' + formatCurrency(entered - wht));
+    $('#pay-net').val('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + formatCurrency(entered - wht));
 }
 
 // Recompute WHT whenever the payment amount changes
@@ -1591,7 +1591,7 @@ function renderCards(rows) {
                     <div style="font-size:0.8rem" class="text-muted">${typeLabel} &nbsp; ${safeOutput(row.party_name)}</div>
                     <div style="font-size:0.8rem" class="text-muted">Raised: ${row.date_raised} &nbsp;|&nbsp; ${safeOutput(ref)}</div>
                     ${(()=>{ const today=new Date().toISOString().split('T')[0]; const overdue=row.status==='approved'&&row.due_date&&row.due_date<today; return row.due_date ? `<div style="font-size:0.78rem" class="${overdue?'text-danger fw-bold':'text-muted'}">Due: ${row.due_date}${overdue?' <span class=\'badge bg-danger\' style=\'font-size:.6rem\'>Overdue</span>':''}</div>` : ''; })()}
-                    <div class="fw-bold text-primary" style="font-size:0.85rem">TZS ${formatCurrency(row.amount)}</div>
+                    <div class="fw-bold text-primary" style="font-size:0.85rem"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${formatCurrency(row.amount)}</div>
                 </div>
                 <div class="card-footer bg-white p-2 border-top d-flex justify-content-end">
                     <div class="dropdown">

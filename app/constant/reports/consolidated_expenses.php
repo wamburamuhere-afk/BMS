@@ -143,7 +143,7 @@ if (function_exists('logActivity')) {
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                 <div class="fs-4 fw-bold text-primary"><?= ce_money($grand) ?></div>
-                <div class="small text-muted">Total Out (TZS)</div>
+                <div class="small text-muted">Total Out (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">

@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-11-01 — feat(currency): one operating currency per company — Tanzania (default), Kenya, Burundi, Rwanda, South Sudan, USD
+
+**New:** `core/currency.php` (single source: supported list, company currency, symbols, country → currency, document-currency rules).
+**Changed (main):** `helpers.php` (`format_currency()`), `header.php`, `app/constant/settings/system_settings.php`, `app/constant/settings/company_profile.php`, `register.php`, `app/superadmin/tenant_new.php`, `core/tenant_provisioner.php`, `api/mobile/{me,tenant_info,register_status,company/profile}.php`, document forms (quotation, sales order, LPO, PO, invoice, customers, suppliers, sub-contractors, supplier/project payments, employees), the APIs that save them, print templates, and display labels across Smart POS and Smart BMS pages (171 files in total). `lang/sw.php` (currency names).
+
+- **Safety rule — a TZS company sees and behaves exactly as before.** Every new helper returns the old hard-coded value for TZS. Verified: `format_currency()` old vs new = 315 checks, 0 differences; 151 of the changed files render byte-for-byte / semantically identical for a TZS company after substituting the helper output; the other 21 are the intended changes (settings, registration, mobile key, form currency lists that return the same 5 options for TZS).
+- **Supported operating currencies:** TZS (default), KES, BIF, RWF, SSP, USD. Chosen in Settings → System Settings (and Company Profile). A company still on a legacy code (e.g. EUR) keeps it listed and selected, so saving never changes it by accident; an empty post no longer blanks the currency (before, a never-configured company saving General settings was silently set to USD — the first option).
+- **One key:** `currency` (what ~50 web pages read) is the source of truth; `company_currency` (Company Profile / mobile app) is written alongside it on every save, and the mobile app now reads the same value.
+- **Registration:** country list = Tanzania (default), Kenya, Burundi, Rwanda, South Sudan; the country sets the new company's currency (Tanzania writes nothing → TZS as before). Works for Smart POS and Smart BMS (both go through `provisionTenant()`), public sign-up and superadmin New Company.
+- **Everywhere money is shown:** `format_currency()` (245 call sites that passed no currency) now uses the company currency; hard-coded "TZS"/"TSh" labels, input prefixes, JS formatters, Intl formatters, print templates, CSV sample rows, log messages and "Shillings Only" (→ Shillings / Francs / Pounds / Dollars) follow it.
+- **No foreign exchange in the ledger:** a non-TZS company can only issue documents in its own currency (forms show only that currency; every save API enforces it server-side). A TZS company keeps today's document currency list (TZS, USD, EUR, GBP, KES) unchanged.
+- **Deliberately left as TZS:** platform billing / subscription prices (BJP's own TZS pricing), Tenders' bid-currency choice (Tshs / USD / both), Tanzania tax-law amounts (PAYE bands, TRA penalties) and fallbacks used only when a stored field is empty. Decimals stay at 2 for every currency.
+
 ## 2026-10-31 — feat(categories): Categories reachable in Smart POS with full CRUD by permission; phone-friendly
 
 **Changed:** `app/bms/product/categories.php`, `api/delete_category.php`, `header.php`.

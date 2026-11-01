@@ -619,7 +619,7 @@ function get_pending_approvals($pdo, $permissions = []) {
                 'expense' as type,
                 expense_id as id,
                 reference_number as reference,
-                CONCAT('Expense claim - TSh ', FORMAT(amount, 2)) as description,
+                CONCAT('Expense claim - " . bmsCurrencySymbol() . "', FORMAT(amount, 2)) as description,
                 created_at as timestamp,
                 e.description as details
             FROM expenses e
@@ -641,7 +641,7 @@ function get_pending_approvals($pdo, $permissions = []) {
                 'purchase' as type,
                 purchase_order_id as id,
                 order_number as reference,
-                CONCAT('Purchase order - TSh ', FORMAT(grand_total, 2)) as description,
+                CONCAT('Purchase order - " . bmsCurrencySymbol() . "', FORMAT(grand_total, 2)) as description,
                 po.created_at as timestamp,
                 s.supplier_name
             FROM purchase_orders po
@@ -2228,9 +2228,9 @@ function fmtAbbrev(n) {
     const v = Number(n) || 0;
     const sign = v < 0 ? '-' : '';
     const av = Math.abs(v);
-    if (av >= 1000000) return sign + 'TSh ' + (av / 1000000).toFixed(2) + 'M';
-    if (av >= 1000) return sign + 'TSh ' + (av / 1000).toFixed(1) + 'K';
-    return sign + 'TSh ' + av.toLocaleString();
+    if (av >= 1000000) return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (av / 1000000).toFixed(2) + 'M';
+    if (av >= 1000) return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (av / 1000).toFixed(1) + 'K';
+    return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + av.toLocaleString();
 }
 
 // Full figure — TSh 165,500 — for every number a person reads (summary boxes,
@@ -2239,7 +2239,7 @@ function fmtFull(n) {
     const v = Math.round((Number(n) || 0) * 100) / 100;
     const sign = v < 0 ? '-' : '';
     const dp = Number.isInteger(v) ? 0 : 2;   // 165,500 — or 12,345,678.50, never ".5"
-    return sign + 'TSh ' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
 // Phones: no tooltip box over the chart (it covers the bars) and nothing
@@ -2357,9 +2357,9 @@ function renderNormalChart(data) {
                             let label = context.dataset.label || '';
                             if (label) label += ': ';
                             const val = context.parsed.y;
-                            if (val >= 1000000) label += 'TSh ' + (val/1000000).toFixed(2) + 'M';
-                            else if (val >= 1000) label += 'TSh ' + (val/1000).toFixed(1) + 'K';
-                            else label += 'TSh ' + val.toLocaleString();
+                            if (val >= 1000000) label += '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (val/1000000).toFixed(2) + 'M';
+                            else if (val >= 1000) label += '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (val/1000).toFixed(1) + 'K';
+                            else label += '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + val.toLocaleString();
                             return label;
                         },
                         afterBody: function(items) {
@@ -2373,7 +2373,7 @@ function renderNormalChart(data) {
                                     : Math.abs(profit) >= 1000
                                         ? (profit/1000).toFixed(1) + 'K'
                                         : profit.toLocaleString();
-                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + `: ${sign}TSh ` + formatted];
+                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + `: ${sign}<?= htmlspecialchars(bmsCurrencySymbol()) ?>` + formatted];
                             }
                             return [];
                         }
@@ -2388,9 +2388,9 @@ function renderNormalChart(data) {
                         color: '#6b7280',
                         font: { size: 11 },
                         callback: function(value) {
-                            if (value >= 1000000) return 'TSh ' + (value/1000000).toFixed(1) + 'M';
-                            if (value >= 1000) return 'TSh ' + (value/1000).toFixed(0) + 'K';
-                            return 'TSh ' + value;
+                            if (value >= 1000000) return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (value/1000000).toFixed(1) + 'M';
+                            if (value >= 1000) return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (value/1000).toFixed(0) + 'K';
+                            return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + value;
                         },
                         maxTicksLimit: 7
                     },
@@ -2438,21 +2438,21 @@ function renderNormalChart(data) {
                     <div class="col-md-4 border-end">
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
                         <div class="d-flex align-items-center flex-wrap gap-2 mt-1">
-                            <span class="badge bg-primary"><?= t('Sales') ?>: TSh ${last.revenue.toLocaleString()}</span>
-                            <span class="badge bg-success"><?= t('Cash In') ?>: TSh ${(last.collected || 0).toLocaleString()}</span>
+                            <span class="badge bg-primary"><?= t('Sales') ?>: <?= htmlspecialchars(bmsCurrencySymbol()) ?>${last.revenue.toLocaleString()}</span>
+                            <span class="badge bg-success"><?= t('Cash In') ?>: <?= htmlspecialchars(bmsCurrencySymbol()) ?>${(last.collected || 0).toLocaleString()}</span>
                         </div>
                     </div>
                     <div class="col-md-4 border-end text-center py-2 py-md-0">
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Cash Flow') ?></span>
                         <strong class="h5 mb-0 text-${netCash >= 0 ? 'success' : 'danger'}">
-                            <?= t('Net Cash') ?>: ${netCash >= 0 ? '+' : ''}TSh ${netCash.toLocaleString()}
+                            <?= t('Net Cash') ?>: ${netCash >= 0 ? '+' : ''}<?= htmlspecialchars(bmsCurrencySymbol()) ?>${netCash.toLocaleString()}
                         </strong>
                         <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('(Cash In − Cash Out)') ?></small>
                     </div>
                     <div class="col-md-4 text-end">
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Net Profit') ?></span>
                         <strong class="h6 mb-0 text-${netProfit >= 0 ? 'primary' : 'danger'}">
-                            TSh ${netProfit.toLocaleString()}
+                            <?= htmlspecialchars(bmsCurrencySymbol()) ?>${netProfit.toLocaleString()}
                         </strong>
                         <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('(Revenue − Expenses)') ?></small>
                     </div>
@@ -2620,7 +2620,7 @@ function updateDashboardMetrics(data) {
         // Update revenue
         const todayRevenue = $('#todayRevenue');
         const currentRevenue = parseFloat(todayRevenue.text().replace(/[^0-9.]/g, '')) || 0;
-        todayRevenue.text('TSh ' + (currentRevenue + data.amount).toLocaleString());
+        todayRevenue.text('<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (currentRevenue + data.amount).toLocaleString());
     }
 }
 

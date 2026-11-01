@@ -866,7 +866,7 @@ $(function () {
             $('#srCards').html(list.length ? list.map(x => `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
                 <div class="d-flex justify-content-between"><span class="fw-bold">${esc(x.number)}</span><small class="text-muted">${dmy(x.date)}</small></div>
                 ${who(x)}${x.phone ? `<div class="small"><i class="bi bi-telephone text-primary me-1"></i><a href="tel:${esc(x.phone)}">${esc(x.phone)}</a></div>` : ''}
-                <div class="small mt-1">${asked(x)}</div><div class="fw-bold text-primary mt-1">${money(x.total)} TZS</div></div>
+                <div class="small mt-1">${asked(x)}</div><div class="fw-bold text-primary mt-1">${money(x.total)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></div></div>
                 ${canCreate ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
                     <a class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px;font-size:0.72rem" href="${SR_CREATE}?request=${x.id}" title="${esc(SL.create)}"><i class="bi bi-file-earmark-plus"></i></a>
                     <button type="button" class="btn btn-sm btn-outline-danger sr-decline" style="flex:1;padding:3px 4px;font-size:0.72rem" data-id="${x.id}" title="${esc(SL.decline)}"><i class="bi bi-x-circle"></i></button>

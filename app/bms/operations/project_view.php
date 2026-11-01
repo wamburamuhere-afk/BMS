@@ -2400,7 +2400,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <th><?= t('Period') ?></th>
                                                 <th><?= t('Customer') ?></th>
                                                 <th><?= t('Sales Order') ?></th>
-                                                <th class="text-end"><?= t('Net Payable (TZS)') ?></th>
+                                                <th class="text-end"><?= str_replace('TZS', bmsCompanyCurrency(), t('Net Payable (TZS)')) ?></th>
                                                 <th><?= t('Status') ?></th>
                                                 <th class="d-print-none"><?= t('Actions') ?></th>
                                             </tr>
@@ -2708,7 +2708,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="col-6 col-md-3">
                                 <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
                                     <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Total Payout</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="prStatTotal" style="color:#0f5132; font-size:0.85rem !important;">0 TZS</h5>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatTotal" style="color:#0f5132; font-size:0.85rem !important;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h5>
                                 </div>
                             </div>
                         </div>
@@ -3583,7 +3583,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">REVENUE (EXPECTED)</p>
-                                    <h6 class="fw-bold mb-0" id="expectedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="expectedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3599,7 +3599,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">REVENUE (EXECUTED)</p>
-                                    <h6 class="fw-bold mb-0" id="executedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="executedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3615,7 +3615,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Revenue (Billed)</p>
-                                    <h6 class="fw-bold mb-0" id="revenueDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="revenueDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3631,7 +3631,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Revenue (Un-Billed)</p>
-                                    <h6 class="fw-bold mb-0" id="revenueUnbilledDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="revenueUnbilledDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3650,7 +3650,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Paid</p>
-                                    <h6 class="fw-bold mb-0" id="paidDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="paidDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3666,7 +3666,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Budget</p>
-                                    <h6 class="fw-bold mb-0" id="budgetDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="budgetDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3682,7 +3682,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Expenses</p>
-                                    <h6 class="fw-bold mb-0" id="expenseDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="expenseDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                 </div>
                             </div>
                         </div>
@@ -3698,7 +3698,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="w-100">
                                     <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Profit</p>
-                                    <h6 class="fw-bold mb-0" id="profitDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                    <h6 class="fw-bold mb-0" id="profitDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h6>
                                     <small class="d-block" id="profitMarginDisplay" style="font-size:clamp(0.4rem,0.8vw,0.5rem); color:#0f5132 !important; opacity:0.8; word-break:break-word;">0% margin</small>
                                 </div>
                             </div>
@@ -3762,15 +3762,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="row g-3 mb-3">
                             <div class="col-md-4">
                                 <small class="text-muted d-block mb-1">Budget Allocated</small>
-                                <h5 class="fw-bold mb-0 text-primary" id="budgetAllocated">0 TZS</h5>
+                                <h5 class="fw-bold mb-0 text-primary" id="budgetAllocated">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h5>
                             </div>
                             <div class="col-md-4">
                                 <small class="text-muted d-block mb-1">Amount Spent</small>
-                                <h5 class="fw-bold mb-0 text-danger" id="budgetSpent">0 TZS</h5>
+                                <h5 class="fw-bold mb-0 text-danger" id="budgetSpent">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h5>
                             </div>
                             <div class="col-md-4">
                                 <small class="text-muted d-block mb-1">Remaining</small>
-                                <h5 class="fw-bold mb-0" id="budgetRemaining">0 TZS</h5>
+                                <h5 class="fw-bold mb-0" id="budgetRemaining">0 <?= htmlspecialchars(bmsCompanyCurrency()) ?></h5>
                             </div>
                         </div>
                         
@@ -4111,9 +4111,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>) <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light fw-bold text-primary">TZS</span>
+                                <span class="input-group-text bg-light fw-bold text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control fw-bold border-primary" name="amount" id="edit_ex_amount" step="0.01" required placeholder="0.00">
                             </div>
                         </div>
@@ -4204,9 +4204,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label for="ex_amount" class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
+                            <label for="ex_amount" class="form-label fw-bold">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>) <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light fw-bold text-primary">TZS</span>
+                                <span class="input-group-text bg-light fw-bold text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control fw-bold border-primary" name="amount" id="ex_amount" step="0.01" required placeholder="0.00">
                             </div>
                         </div>
@@ -4295,7 +4295,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="text-end">
                                     <span class="small fw-bold">REMAINING:</span> 
-                                    <span id="vc_remaining" class="badge bg-primary fs-6">0.00 TZS</span>
+                                    <span id="vc_remaining" class="badge bg-primary fs-6">0.00 <?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                             </div>
                         </div>
@@ -4317,9 +4317,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <!-- Amount -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Payment Amount (TZS) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Payment Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>) <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text fw-bold text-primary">TZS</span>
+                                <span class="input-group-text fw-bold text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control fw-bold border-primary" name="amount" id="vc_amount" step="0.01" min="0.01" required placeholder="0.00" oninput="vcUpdateAmountWords(this.value)">
                             </div>
                             <small id="vc_amount_validation" class="text-danger fw-bold small mt-1 d-block" style="display:none;"></small>
@@ -4521,7 +4521,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-muted">Amount to Pay Now <span class="text-danger">*</span></label>
                         <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0">TZS</span>
+                            <span class="input-group-text bg-light border-end-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                             <input type="number" class="form-control border-start-0 fw-bold" name="payment_amount"
                                    id="pay_payment_amount" step="0.01" min="0.01" required>
                         </div>
@@ -4723,14 +4723,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Selling Price <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm">
-                                <span class="input-group-text">TZS</span>
+                                <span class="input-group-text"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control fw-bold" name="selling_price" id="editProcNipSell" step="0.01" required>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small"><?= t('Cost Price (Auto-Sum)') ?></label>
                             <div class="input-group input-group-sm">
-                                <span class="input-group-text">TZS</span>
+                                <span class="input-group-text"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control bg-light" name="cost_price" id="editProcNipCost" step="0.01" readonly>
                             </div>
                         </div>
@@ -4903,14 +4903,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="col-md-4">
                                 <label class="form-label fw-bold small text-success">Selling Price <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <span class="input-group-text border-0 bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="projNipAddSell" value="0" step="0.01" required>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <span class="input-group-text border-0 bg-light"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="projNipAddCostSum" value="0" step="0.01" readonly>
                                 </div>
                             </div>
@@ -5063,14 +5063,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="col-md-4">
                                 <label class="form-label fw-bold small text-success">Selling Price <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <span class="input-group-text border-0 bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="projNipEditSell" step="0.01" required>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <span class="input-group-text border-0 bg-light"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="projNipEditCost" step="0.01" readonly>
                                 </div>
                             </div>
@@ -5562,7 +5562,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-12">
                             <div class="p-3 rounded-3 bg-white shadow-sm border d-flex justify-content-between align-items-center">
                                 <span class="fw-bold text-muted small text-uppercase">Computed Net Salary</span>
-                                <span class="fw-bold fs-5 text-success" id="ep_net_preview">0.00 TZS</span>
+                                <span class="fw-bold fs-5 text-success" id="ep_net_preview">0.00 <?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                             </div>
                         </div>
                     </div>
@@ -5666,9 +5666,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-bold"><?= t('Grand Total Allocated (TZS)') ?></label>
+                            <label class="form-label fw-bold"><?= str_replace('TZS', bmsCompanyCurrency(), t('Grand Total Allocated (TZS)')) ?></label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light fw-bold text-success">TZS</span>
+                                <span class="input-group-text bg-light fw-bold text-success"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control fw-bold fs-5 text-success" name="allocated_amount" id="budget_allocated_amount" readonly value="0.00">
                             </div>
                             <small class="text-muted">Automatically calculated from the items above.</small>
@@ -5842,11 +5842,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="col-6 mb-3">
                                     <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="TZS" selected>TZS</option>
                                         <option value="USD">USD</option>
                                         <option value="KES">KES</option>
                                         <option value="EUR">EUR</option>
                                         <option value="GBP">GBP</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Name') ?></label><input type="text" class="form-control" name="bank_name"></div>
@@ -5981,11 +5985,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="col-6 mb-3">
                                     <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="pesc_currency" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="TZS">TZS</option>
                                         <option value="USD">USD</option>
                                         <option value="KES">KES</option>
                                         <option value="EUR">EUR</option>
                                         <option value="GBP">GBP</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3"><label class="form-label"><?= t('Bank Name') ?></label><input type="text" class="form-control" id="pesc_bank_name" name="bank_name"></div>
@@ -6526,7 +6534,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <hr class="my-1">
                                 <div class="d-flex justify-content-between fw-bold">
-                                    <span>Net Payable (TZS)</span>
+                                    <span>Net Payable (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</span>
                                     <span class="text-primary" id="ipc_add_net">0.00</span>
                                 </div>
                             </div>
@@ -6645,7 +6653,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <hr class="my-1">
                                 <div class="d-flex justify-content-between fw-bold">
-                                    <span>Net Payable (TZS)</span>
+                                    <span>Net Payable (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</span>
                                     <span class="text-primary" id="ipc_edit_net">0.00</span>
                                 </div>
                             </div>
@@ -6904,12 +6912,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
                                         <option value="EUR">Euro (EUR)</option>
                                         <option value="GBP">British Pound (GBP)</option>
                                         <option value="KES">Kenyan Shilling (KES)</option>
                                         <option value="other">Other...</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -7108,9 +7120,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="eps_currency" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="TZS">Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
                                         <option value="EUR">Euro (EUR)</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">

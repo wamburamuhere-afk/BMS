@@ -43,7 +43,7 @@ $tax_id = trim($_POST['tax_id'] ?? '');
 $vat_number = trim($_POST['vat_number'] ?? '');
 $default_wht_rate_id = !empty($_POST['default_wht_rate_id']) ? (int)$_POST['default_wht_rate_id'] : null;
 $payment_terms = trim($_POST['payment_terms'] ?? '');
-$currency = trim($_POST['currency'] ?? 'TZS');
+$currency = trim($_POST['currency'] ?? bmsCompanyCurrency());
 $bank_name = trim($_POST['bank_name'] ?? '');
 $bank_account = trim($_POST['bank_account'] ?? '');
 $bank_address = trim($_POST['bank_address'] ?? '');
@@ -62,8 +62,9 @@ if (empty($payment_terms) || $payment_terms === 'other') {
     $payment_terms = trim($_POST['payment_terms_other'] ?? '');
 }
 if (empty($currency) || $currency === 'other') {
-    $currency = trim($_POST['currency_other'] ?? 'TZS');
+    $currency = trim($_POST['currency_other'] ?? bmsCompanyCurrency());
 }
+$currency = bmsEnforceDocCurrency($currency);   // non-TZS company: always its own currency (core/currency.php)
 if ($supplier_type === 'other') {
     $supplier_type = trim($_POST['supplier_type_other'] ?? '');
 }

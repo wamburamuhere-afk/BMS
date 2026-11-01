@@ -354,7 +354,7 @@ try {
                     <div class="mb-3">
                         <label class="form-label fw-bold">Amount <span class="text-danger">*</span></label>
                         <div class="input-group">
-                            <span class="input-group-text">TSh</span>
+                            <span class="input-group-text"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                             <input type="number" class="form-control" name="amount" id="deposit_amount" step="0.01" required>
                         </div>
                     </div>
@@ -412,7 +412,7 @@ try {
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Amount <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text">TSh</span>
+                                <span class="input-group-text"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                                 <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" required>
                             </div>
                         </div>
@@ -654,7 +654,7 @@ try {
             amountClass: isDeposit ? 'text-success' : 'text-danger',
             badgeClass: isDeposit ? 'success' : 'danger',
             sign: isDeposit ? '+' : '-',
-            amount: new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(t.amount).replace('TZS', '').trim(),
+            amount: new Intl.NumberFormat('en-TZ', { style: 'currency', currency: '<?= htmlspecialchars(bmsCompanyCurrency()) ?>' }).format(t.amount).replace('<?= htmlspecialchars(bmsCompanyCurrency()) ?>', '').trim(),
             dateStr: new Date(t.transaction_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}),
             jsonT: JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;")
         };
@@ -851,7 +851,7 @@ try {
     }
 
     function updateStats(stats) {
-        const fmt = (amt) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(amt);
+        const fmt = (amt) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: '<?= htmlspecialchars(bmsCompanyCurrency()) ?>' }).format(amt);
         document.getElementById('stat_balance').innerText = fmt(stats.balance);
         document.getElementById('stat_expenses').innerText = fmt(stats.monthly_expenses);
         document.getElementById('stat_count').innerText = stats.total_transactions;
@@ -1006,7 +1006,7 @@ function editTransaction(data) {
 
 function viewTransactionDetails(data) {
     const isDeposit = data.type === 'deposit';
-    const amount = new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(data.amount);
+    const amount = new Intl.NumberFormat('en-TZ', { style: 'currency', currency: '<?= htmlspecialchars(bmsCompanyCurrency()) ?>' }).format(data.amount);
     const dateStr = new Date(data.transaction_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'});
     const badgeClass = isDeposit ? 'success' : 'danger';
     

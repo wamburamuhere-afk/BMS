@@ -59,7 +59,7 @@ try {
             VALUES (?,?,?,?,?,0,0,0,?,0,?,?,?,?,?,?)");
         $ins->execute([
             $invoice_number, $ipc['customer_id'], $invoice_date, $due_date,
-            $subtotal, $subtotal, $subtotal, 'TZS', $notes, 'unpaid',
+            $subtotal, $subtotal, $subtotal, bmsCompanyCurrency(), $notes, 'unpaid',
             $ipc['project_id'], $_SESSION['user_id']
         ]);
         $invoice_id = $pdo->lastInsertId();

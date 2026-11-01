@@ -1281,7 +1281,7 @@ global $company_name, $company_logo;
                                             <th><?= t('Date Raised') ?></th>
                                             <th><?= t('Date Recorded') ?></th>
                                             <th><?= t('PO Reference') ?></th>
-                                            <th class="text-end"><?= t('Amount (TZS)') ?></th>
+                                            <th class="text-end"><?= str_replace('TZS', bmsCompanyCurrency(), t('Amount (TZS)')) ?></th>
                                             <th><?= t('Status') ?></th>
                                             <th class="text-end"><?= t('Actions') ?></th>
                                         </tr>
@@ -1437,7 +1437,7 @@ global $company_name, $company_logo;
                                             <td><?= format_date($payment['payment_date']) ?></td>
                                             <td><?= htmlspecialchars($payment['reference_number']) ?></td>
                                             <td><?= format_currency($payment['amount']) ?></td>
-                                            <td><?= htmlspecialchars($payment['currency'] ?? 'TZS') ?></td>
+                                            <td><?= htmlspecialchars($payment['currency'] ?? bmsCompanyCurrency()) ?></td>
                                             <td><?= ucfirst(str_replace('_', ' ', $payment['payment_method'])) ?></td>
                                             <td class="text-end">
                                                 <div class="dropdown">
@@ -2144,7 +2144,7 @@ window.addEventListener('resize', resizeTextToFit);
                             <input type="date" class="form-control" name="date_recorded" id="ri-recorded" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>) <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="ri-amount" min="1" step="0.01" placeholder="0.00" required>
                         </div>
                         <div class="col-md-6">
@@ -2263,7 +2263,7 @@ $(document).ready(function () {
 // ── PO Summary live panel (mirror of received_invoices.php) ──────────────
 function formatRiTZS(n) {
     n = parseFloat(n) || 0;
-    return 'TZS ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function hideRiPoSummary() {
@@ -2375,7 +2375,7 @@ function riViewDetails(id) {
                 <div class="text-start">
                     <div class="row g-2 mb-3">
                         <div class="col-6"><p class="text-muted small mb-0">Status</p>${badge}</div>
-                        <div class="col-6"><p class="text-muted small mb-0">Amount (TZS)</p><strong>${new Intl.NumberFormat('en-TZ',{minimumFractionDigits:2}).format(d.amount)}</strong></div>
+                        <div class="col-6"><p class="text-muted small mb-0">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</p><strong>${new Intl.NumberFormat('en-TZ',{minimumFractionDigits:2}).format(d.amount)}</strong></div>
                         <div class="col-6"><p class="text-muted small mb-0">Date Raised</p><strong>${safeOutput(d.date_raised)||'—'}</strong></div>
                         <div class="col-6"><p class="text-muted small mb-0">Date Recorded</p><strong>${safeOutput(d.date_recorded)||'—'}</strong></div>
                         <div class="col-6"><p class="text-muted small mb-0">PO Reference</p><strong>${safeOutput(d.po_number)||'—'}</strong></div>

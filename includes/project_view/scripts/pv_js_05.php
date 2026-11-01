@@ -741,7 +741,7 @@ $('#nipMatProductId').on('change', function() {
     const opt = $(this).find('option:selected');
     const cost = parseFloat(opt.data('cost')) || 0;
     const sku  = opt.data('sku') || '';
-    $('#nipMatProductInfo').text(sku ? 'SKU: ' + sku + ' | Current Cost: TSh ' + cost.toLocaleString() : '');
+    $('#nipMatProductInfo').text(sku ? 'SKU: ' + sku + ' | Current Cost: <?= htmlspecialchars(bmsCurrencySymbol()) ?>' + cost.toLocaleString() : '');
 });
 
 // Tax rate custom toggle
@@ -814,7 +814,7 @@ function searchNipMatProduct(input, idx) {
                         <div class="d-flex justify-content-between align-items-center">
                             <div><div class="fw-bold small">${p.product_name}</div>
                             <div class="text-muted" style="font-size:11px;">${p.sku || ''}</div></div>
-                            <span class="fw-bold text-primary small">TZS ${cost.toLocaleString()}</span>
+                            <span class="fw-bold text-primary small"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${cost.toLocaleString()}</span>
                         </div></button>`;
                 }).join('');
                 $results.html(`<div class="list-group list-group-flush rounded-3">${rows}</div>`).removeClass('d-none');

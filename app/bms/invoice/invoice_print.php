@@ -79,7 +79,7 @@ try {
     die("Error: " . $e->getMessage());
 }
 
-$currency = $invoice['currency'] ?? 'TZS';
+$currency = $invoice['currency'] ?? bmsCompanyCurrency();
 
 // De-duplicate postal_address vs address (same guard as print_quotation.php)
 $inv_postal  = trim($invoice['c_postal_address'] ?? '');

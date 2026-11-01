@@ -81,7 +81,7 @@ try {
 $doc_title  = 'QUOTATION';
 $doc_label  = 'Quote #:';
 $date_label = 'Quote Date:';
-$currency   = $order['currency'] ?? 'TZS';
+$currency   = $order['currency'] ?? bmsCompanyCurrency();
 
 $order['subtotal']        = $order['subtotal']        ?? $order['total_amount'] ?? 0;
 $order['tax_amount']      = $order['tax_amount']      ?? 0;

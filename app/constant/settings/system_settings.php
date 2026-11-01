@@ -31,7 +31,18 @@ if ($_POST) {
                 'company_email' => $_POST['company_email'] ?? '',
                 'company_website' => $_POST['company_website'] ?? '',
                 'company_type' => $_POST['company_type'] ?? '',
-                'currency' => $_POST['currency'] ?? '',
+                // One of the supported operating currencies (core/currency.php), or the value
+                // already stored (a legacy code such as EUR re-saves unchanged). Anything else,
+                // or an empty post, keeps the current currency instead of blanking it.
+                'currency' => (function () {
+                    $posted  = strtoupper(trim((string)($_POST['currency'] ?? '')));
+                    $current = (string)get_setting('currency', 'TZS');
+                    $allowed = array_keys(bmsSupportedCurrencies());
+                    if ($posted !== '' && (in_array($posted, $allowed, true) || $posted === strtoupper(trim($current)))) {
+                        return $posted;
+                    }
+                    return $current;
+                })(),
                 'timezone' => $_POST['timezone'] ?? '',
                 'date_format' => $_POST['date_format'] ?? '',
                 'items_per_page' => $_POST['items_per_page'] ?? '',
@@ -99,6 +110,8 @@ if ($_POST) {
                 }
             }
 
+            // Keep Company Profile / the mobile app's key in step with the web's.
+            $settings['company_currency'] = $settings['currency'];
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
@@ -320,11 +333,20 @@ if ($_POST) {
                                                 <div class="mb-3">
                                                     <label for="currency" class="form-label"><?= t('Currency') ?> *</label>
                                                     <select class="form-control" id="currency" name="currency" required>
-                                                        <option value="USD" <?= get_setting('currency') == 'USD' ? 'selected' : '' ?>><?= t('US Dollar ($)') ?></option>
-                                                        <option value="TZS" <?= get_setting('currency') == 'TZS' ? 'selected' : '' ?>><?= t('Tanzanian Shilling (TSh)') ?></option>
-                                                        <option value="KES" <?= get_setting('currency') == 'KES' ? 'selected' : '' ?>><?= t('Kenyan Shilling (KSh)') ?></option>
-                                                        <option value="EUR" <?= get_setting('currency') == 'EUR' ? 'selected' : '' ?>><?= t('Euro (€)') ?></option>
+                                                        <?php
+                                                        // Supported operating currencies (core/currency.php). A company still on a
+                                                        // legacy code (e.g. EUR) keeps it listed and selected, so saving this form
+                                                        // never changes its currency by accident.
+                                                        $__cur_now = strtoupper(trim((string)get_setting('currency', 'TZS'))) ?: 'TZS';
+                                                        $__cur_list = bmsSupportedCurrencies();
+                                                        if (!isset($__cur_list[$__cur_now])) { ?>
+                                                        <option value="<?= htmlspecialchars($__cur_now) ?>" selected><?= htmlspecialchars($__cur_now) ?></option>
+                                                        <?php }
+                                                        foreach ($__cur_list as $__code => $__meta): ?>
+                                                        <option value="<?= $__code ?>" <?= $__cur_now === $__code ? 'selected' : '' ?>><?= t($__meta['name']) ?> (<?= htmlspecialchars(trim($__meta['symbol'])) ?>)</option>
+                                                        <?php endforeach; ?>
                                                     </select>
+                                                    <div class="form-text"><?= t('Every price, receipt and report uses this currency. A company that is not on TZS issues all its documents in this one currency.') ?></div>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">

@@ -53,7 +53,7 @@ function amountToWords($n) {
     if ($n > 0)           { $w .= $ones[$n] . ' '; }
     return trim($w);
 }
-$amount_words = amountToWords($t['amount']) . ' Shillings Only';
+$amount_words = amountToWords($t['amount']) . ' ' . bmsCurrencyUnitWord() . ' Only';   // TZS → "Shillings" as before
 
 // Prepared by full name
 $prepared_by = trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')) ?: ($t['username'] ?? 'Unknown');
@@ -268,7 +268,7 @@ $prepared_by = trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')) ?:
     <!-- ⑥ AMOUNT -->
     <div class="amount-section">
         <div class="v-label" style="color:#495057;">Total Amount</div>
-        <div class="amount-value">TSh <?= number_format($t['amount'], 2) ?></div>
+        <div class="amount-value"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($t['amount'], 2) ?></div>
         <div class="amount-words">(<?= htmlspecialchars($amount_words) ?>)</div>
     </div>
 

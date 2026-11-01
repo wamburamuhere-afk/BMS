@@ -1,6 +1,9 @@
 <?php
 // helpers.php
 
+// Company operating currency (TZS default; KES/BIF/RWF/SSP/USD) — used by format_currency() below.
+require_once __DIR__ . '/core/currency.php';
+
 function calculateTotalInterest($amount, $rate, $term, $formula) {
     switch ($formula) {
         case 'Flat Rate':
@@ -525,16 +528,11 @@ function get_variance_color($variance) {
     return 'info'; // On budget
 }
 
-function format_currency($amount, $currency = 'TZS') {
-    $symbols = [
-        'TZS' => 'TSh ',
-        'USD' => '$',
-        'EUR' => '€',
-        'GBP' => '£',
-        'KES' => 'KSh '
-    ];
-    $symbol = $symbols[$currency] ?? 'TSh ';
-    return $symbol . number_format((float)$amount, 2);
+// $currency omitted (245 of 248 call sites) → the company's operating currency, so a
+// TZS company still gets exactly "TSh 1,234.00". An explicit code keeps working as before.
+function format_currency($amount, $currency = null) {
+    return bmsCurrencySymbol($currency === null || $currency === '' ? null : (string)$currency)
+        . number_format((float)$amount, 2);
 }
 
 function safe_output($value, $default = 'N/A') {

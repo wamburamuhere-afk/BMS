@@ -192,7 +192,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                             <div class="col-md-4 mt-4">
                                 <label for="cost_price" class="form-label fw-bold"><?= t('Buying Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <span class="input-group-text bg-white border-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control bg-light border-0" id="cost_price" name="cost_price"
                                            min="0" step="0.01" value="0.00" required>
                                 </div>
@@ -200,7 +200,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                             <div class="col-md-4 mt-4">
                                 <label for="wholesale_price" class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <span class="input-group-text bg-white border-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control bg-light border-0" id="wholesale_price" name="wholesale_price"
                                            min="0" step="0.01" value="0.00">
                                 </div>
@@ -208,7 +208,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                             <div class="col-md-4 mt-4">
                                 <label for="selling_price" class="form-label fw-bold"><?= t('Retail Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group border border-primary rounded-3 overflow-hidden shadow-sm">
-                                    <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
+                                    <span class="input-group-text bg-white border-0 text-primary fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
                                            min="0" step="0.01" value="0.00" required onkeyup="calculateMinSellingPrice()">
                                 </div>
@@ -433,7 +433,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     <div class="mb-3">
                                         <label for="cost_price" class="form-label fw-bold"><?= t('Cost Price / Purchase Price') ?> <span class="text-danger">*</span></label>
                                         <div class="input-group input-group-lg">
-                                            <span class="input-group-text bg-white border-0">TZS</span>
+                                            <span class="input-group-text bg-white border-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                             <input type="number" class="form-control border-0" id="cost_price" name="cost_price"
                                                    min="0" step="0.01" value="0.00" required onkeyup="calculateMarkup()">
                                         </div>
@@ -442,7 +442,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                     <div class="mb-3">
                                         <label for="selling_price" class="form-label fw-bold"><?= t('Standard Selling Price') ?> <span class="text-danger">*</span></label>
                                         <div class="input-group input-group-lg border border-primary rounded-3 overflow-hidden shadow-sm">
-                                            <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
+                                            <span class="input-group-text bg-white border-0 text-primary fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                             <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price" 
                                                    min="0" step="0.01" value="0.00" required onkeyup="calculateMarkup(); calculateMinSellingPrice();">
                                         </div>
@@ -484,7 +484,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                             <div class="card border-0 shadow-sm rounded-4 text-center p-3">
                                                 <label class="form-label text-muted small fw-bold mb-1 uppercase"><?= t('Estimated Profit') ?></label>
                                                 <div class="d-flex align-items-center justify-content-center">
-                                                    <span class="fw-bold fs-5 me-1">TZS</span>
+                                                    <span class="fw-bold fs-5 me-1"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                                     <input type="text" class="form-control-plaintext text-center fw-bold fs-3 border-0" id="profit_margin" value="0.00" readonly style="width: 130px;">
                                                 </div>
                                             </div>
@@ -510,7 +510,7 @@ function build_category_tree($categories, $parent_id = 0, $depth = 0) {
                                         </div>
                                         <div class="d-flex align-items-baseline mt-2">
                                             <h4 class="text-dark fw-bold mb-0 me-2" id="min_selling_price_display">0.00</h4>
-                                            <span class="text-muted small">TZS</span>
+                                            <span class="text-muted small"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         </div>
                                         <input type="hidden" id="min_selling_price" name="min_selling_price" value="0.00">
                                     </div>

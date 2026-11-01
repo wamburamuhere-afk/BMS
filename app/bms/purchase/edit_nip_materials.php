@@ -134,11 +134,11 @@ $c_logo = get_setting('company_logo');
                             <div class="col-12 mt-4">
                                 <div class="p-3 bg-light rounded-3 border d-flex justify-content-between align-items-center">
                                     <div class="flex-grow-1 me-4">
-                                        <label class="form-label fw-bold small text-primary mb-1">Selling Price (TZS)</label>
+                                        <label class="form-label fw-bold small text-primary mb-1">Selling Price (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</label>
                                         <input type="number" class="form-control form-control-lg border-primary fw-bold text-primary" name="selling_price" value="<?= $row['selling_price'] ?>" step="0.01" required>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <label class="form-label fw-bold small text-muted mb-1">Estimated Cost (TZS)</label>
+                                        <label class="form-label fw-bold small text-muted mb-1">Estimated Cost (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</label>
                                         <input type="number" class="form-control form-control-lg bg-white border-0 fw-bold fs-4" id="editNipCostMain" name="cost_price" value="<?= $row['cost_price'] ?>" readonly>
                                     </div>
                                 </div>
@@ -314,7 +314,7 @@ function searchInv(input, idx) {
                     <button type="button" class="list-group-item list-group-item-action p-2" onclick='selectInv(${idx}, ${safe})'>
                         <div class="d-flex justify-content-between">
                             <span class="small fw-bold">${p.product_name}</span>
-                            <span class="small text-primary">TZS ${parseFloat(p.cost_price).toLocaleString()}</span>
+                            <span class="small text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${parseFloat(p.cost_price).toLocaleString()}</span>
                         </div>
                     </button>`;
                 });

@@ -275,7 +275,7 @@ function loadDashboard(period) {
         const k = res.kpi;
         $('#kpi-total').text(fmtNum(k.total_leads));
         $('#kpi-new').text(fmtNum(k.new_this_period));
-        $('#kpi-pipeline').text('TZS ' + fmtNum(k.pipeline_value));
+        $('#kpi-pipeline').text('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + fmtNum(k.pipeline_value));
         $('#kpi-rate').text(k.conversion_rate + '%');
         $('#kpi-today').text(fmtNum(k.activities_today));
         $('#kpi-overdue').text(fmtNum(k.overdue_activities));
@@ -366,7 +366,7 @@ function renderRecent(rows) {
             `<div class="text-muted small">${safeOutput(r.lead_code)}</div>`,
             `<span class="small text-muted">${safeOutput(r.company_name || '—')}</span>`,
             `<span class="badge rounded-pill" style="background:${safeOutput(r.stage_color||'#6c757d')}">${safeOutput(r.stage_name||'—')}</span>`,
-            `TZS ${fmtNum(r.lead_value)}`,
+            `<?= htmlspecialchars(bmsCompanyCurrency()) ?> ${fmtNum(r.lead_value)}`,
             fmtDate(r.created_at)
         ]);
     });
@@ -399,7 +399,7 @@ function renderTop(rows) {
             i + 1,
             `<span class="fw-semibold">${safeOutput(r.name)}</span>`,
             `<span class="badge bg-success">${r.won_count}</span>`,
-            `TZS ${fmtNum(r.won_value)}`
+            `<?= htmlspecialchars(bmsCompanyCurrency()) ?> ${fmtNum(r.won_value)}`
         ]);
     });
     dtTop.draw();

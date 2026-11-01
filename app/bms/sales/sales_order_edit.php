@@ -146,13 +146,8 @@ $payment_terms = [
 ];
 
 // Get currency options
-$currencies = [
-    'TZS' => 'Tanzanian Shilling',
-    'USD' => 'US Dollar',
-    'EUR' => 'Euro',
-    'GBP' => 'British Pound',
-    'KES' => 'Kenyan Shilling'
-];
+// TZS company: the same 5 currencies as before. Other company: only its own (core/currency.php).
+$currencies = bmsDocumentCurrencies();
 
 // Helper functions removed, now in helpers.php
 
@@ -256,7 +251,7 @@ $is_quote = ($sales_order['is_quote'] == 1);
                                 <option value="<?= $cust['customer_id'] ?>" 
                                     <?= ($customer_id > 0 && $cust['customer_id'] == $customer_id) ? 'selected' : '' ?>
                                     data-payment-terms="<?= $cust['payment_terms'] ?? '' ?>"
-                                    data-currency="<?= $cust['currency'] ?? 'TZS' ?>"
+                                    data-currency="<?= $cust['currency'] ?? bmsCompanyCurrency() ?>"
                                     data-credit-limit="<?= $cust['credit_limit'] ?? 0 ?>">
                                     <?= caseFormat($cust['customer_name']) ?>
                                     <?php if (!empty($cust['company_name'])): ?>
@@ -321,7 +316,7 @@ $is_quote = ($sales_order['is_quote'] == 1);
                             <?php foreach ($currencies as $code => $name): ?>
                                 <option value="<?= $code ?>" 
                                     <?= ($customer && isset($customer['currency']) && $customer['currency'] == $code) ? 'selected' : '' ?>
-                                    <?= (!$customer && $code == 'TZS') ? 'selected' : '' ?>>
+                                    <?= (!$customer && $code == bmsCompanyCurrency()) ? 'selected' : '' ?>>
                                     <?= $code ?> - <?= $name ?>
                                 </option>
                             <?php endforeach; ?>
@@ -488,12 +483,12 @@ $is_quote = ($sales_order['is_quote'] == 1);
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>Subtotal:</span>
                                     <span id="subtotal">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>VAT (18%):</span>
                                     <span id="tax-total">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>
@@ -501,12 +496,12 @@ $is_quote = ($sales_order['is_quote'] == 1);
                                         <small>(<span id="discount-percent">0</span>%)</small>:
                                     </span>
                                     <span id="discount-total">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>Shipping:</span>
                                     <div class="input-group input-group-sm" style="width: 150px;">
-                                        <span class="input-group-text currency-symbol">TZS</span>
+                                        <span class="input-group-text currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" id="shipping_cost" name="shipping_cost" 
                                                min="0" step="0.01" value="<?= $sales_order ? $sales_order['shipping_cost'] : '0' ?>" onchange="calculateTotals()">
                                     </div>
@@ -515,7 +510,7 @@ $is_quote = ($sales_order['is_quote'] == 1);
                                 <div class="d-flex justify-content-between fw-bold fs-5">
                                     <span>Grand Total:</span>
                                     <span id="grand-total">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                     <div class="mt-3">
                                         <div class="form-check">

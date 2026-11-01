@@ -425,24 +425,24 @@ function renderProject(d, fin, progress) {
     else priBadge.addClass('bg-secondary text-white');
 
     // Financial Summary
-    $('#revenueDisplay').text(formatMoney(fin.total_revenue) + ' TZS');
-    $('#expectedDisplay').text(formatMoney(d.contract_sum) + ' TZS');
-    $('#paidDisplay').text(formatMoney(fin.total_paid || 0) + ' TZS');
-    $('#expenseDisplay').text(formatMoney(fin.total_expense) + ' TZS');
-    $('#budgetDisplay').text(formatMoney(fin.budget) + ' TZS');
+    $('#revenueDisplay').text(formatMoney(fin.total_revenue) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#expectedDisplay').text(formatMoney(d.contract_sum) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#paidDisplay').text(formatMoney(fin.total_paid || 0) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#expenseDisplay').text(formatMoney(fin.total_expense) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#budgetDisplay').text(formatMoney(fin.budget) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     
     const profit = fin.profit;
     const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
     const profitIconClass = profit >= 0 ? 'text-success' : 'text-danger';
-    $('#profitDisplay').text(formatMoney(profit) + ' TZS').removeClass('text-success text-danger').addClass(profitClass);
+    $('#profitDisplay').text(formatMoney(profit) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>').removeClass('text-success text-danger').addClass(profitClass);
     $('#profitIcon').removeClass('text-success text-danger').addClass(profitIconClass);
     $('#profitMarginDisplay').text(fin.profit_margin + '% margin');
 
     const executedProgress = parseFloat(d.progress_percent) || 0;
     const executedValue = (executedProgress / 100) * parseFloat(d.form_contract_sum || 0);
-    $('#executedDisplay').text(formatMoney(executedValue) + ' TZS');
+    $('#executedDisplay').text(formatMoney(executedValue) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     const revenueUnbilled = executedValue - (parseFloat(fin.total_revenue) || 0);
-    $('#revenueUnbilledDisplay').text(formatMoney(revenueUnbilled) + ' TZS');
+    $('#revenueUnbilledDisplay').text(formatMoney(revenueUnbilled) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     
     // Budget Performance
     const budget = parseFloat(fin.budget) || 0;
@@ -450,12 +450,12 @@ function renderProject(d, fin, progress) {
     const remaining = budget - spent;
     const utilization = budget > 0 ? Math.round((spent / budget) * 100) : 0;
     
-    $('#budgetAllocated').text(formatMoney(budget) + ' TZS');
-    $('#budgetSpent').text(formatMoney(spent) + ' TZS');
+    $('#budgetAllocated').text(formatMoney(budget) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+    $('#budgetSpent').text(formatMoney(spent) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     
     // Remaining budget color
     const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
-    $('#budgetRemaining').text(formatMoney(Math.abs(remaining)) + ' TZS').removeClass('text-success text-danger').addClass(remainingClass);
+    $('#budgetRemaining').text(formatMoney(Math.abs(remaining)) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>').removeClass('text-success text-danger').addClass(remainingClass);
     
     // Progress bar
     const progressWidth = Math.min(utilization, 100);
@@ -484,7 +484,7 @@ function renderProject(d, fin, progress) {
         statusClass = 'alert-secondary';
     } else if (utilization > 100) {
         const overBudget = spent - budget;
-        statusMessage = `⚠️ Over budget by ${formatMoney(overBudget)} TZS (${utilization - 100}% over)`;
+        statusMessage = `⚠️ Over budget by ${formatMoney(overBudget)} <?= htmlspecialchars(bmsCompanyCurrency()) ?> (${utilization - 100}% over)`;
         statusClass = 'alert-danger';
         statusIcon = 'bi-exclamation-triangle-fill';
     } else if (utilization >= 90) {
@@ -647,7 +647,7 @@ function renderProject(d, fin, progress) {
                 </div>
                 <div class="min-w-0" style="min-width:0; flex:1;">
                     <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Contract Sum </small>
-                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);"><span id="contractSumDisplay">${formatMoney(d.form_contract_sum || 0)}</span> TZS</strong>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);"><span id="contractSumDisplay">${formatMoney(d.form_contract_sum || 0)}</span> <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>
                 </div>
             </div>
         </div>

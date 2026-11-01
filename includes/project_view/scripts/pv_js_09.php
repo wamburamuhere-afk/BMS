@@ -57,7 +57,7 @@ $(document).on('submit', '#createVoucherForm', function(e) {
         const inputAmount = parseFloat($('#vc_amount').val()) || 0;
         
         if (inputAmount > (remaining + 0.01)) { // Small buffer for floats
-            $('#vc_amount_validation').text(`⚠️ Overpayment alert! Maximum allowed for this item is ${formatMoney(remaining)} TZS.`).show();
+            $('#vc_amount_validation').text(`⚠️ Overpayment alert! Maximum allowed for this item is ${formatMoney(remaining)} <?= htmlspecialchars(bmsCompanyCurrency()) ?>.`).show();
             Swal.fire('Validation Error', 'The payment amount exceeds the remaining balance of the selected expense.', 'warning');
             return;
         }
