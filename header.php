@@ -998,10 +998,17 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <!-- Core Modules — every group below is rendered by bmsNavMenu()
                              (core/nav_menu.php): 0 granted links = hidden, 1 = direct header
                              link, 2+ = dropdown. Simple POS mode keeps each group's original gate. -->
+                        <?php if (posSimpleModeEnabled() && canView('dashboard')): ?>
+                        <!-- Smart POS desktop: Dashboard is its own first menu item; "My Business" below
+                             keeps the rest. Full ERP mode is unchanged (Dashboard stays in "Core"). -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></a>
+                        </li>
+                        <?php endif; ?>
                         <?php ob_start(); ?>
                             <ul class="dropdown-menu" aria-labelledby="coreDropdown">
                                 <li><h6 class="dropdown-header"><?= posSimpleModeEnabled() ? t('My Business') : t('Business Core') ?></h6></li>
-                                <?php if(canView('dashboard')): ?>
+                                <?php if(!posSimpleModeEnabled() && canView('dashboard')): // Smart POS shows it as its own item above ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('customers')): ?>
@@ -1027,7 +1034,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             </ul>
                         <?php bmsNavMenu(ob_get_clean(), 'coreDropdown',
                             '<i class="bi bi-house"></i> ' . (posSimpleModeEnabled() ? t('My Business') : t('Core')),
-                            canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')); ?>
+                            (!posSimpleModeEnabled() && canView('dashboard')) || canView('customers') || canView('suppliers') || canView('products')); ?>
 
                         <!-- Financial Modules -->
                         <?php
