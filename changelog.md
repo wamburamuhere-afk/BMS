@@ -9,6 +9,17 @@
 - **Suppliers:** Suppliers, Active, Suspended / Blacklisted (or Inactive) use it. When only three cards show, the first spans the row on a phone so nothing hangs half-empty.
 - **Record cards (phone / card view):** the row of 3–4 icon-only buttons on each customer and supplier card is replaced by one small **Actions** button at the right with a compact menu of written-out options. Customers: View Details, Edit, View Account, Delete. Suppliers: View Details, Edit, View Orders, New Order. Same permissions and conditions as before.
 
+## 2026-11-01 — ui: summary-card labels follow the company's Text Display Case setting (system-wide)
+
+**New:** `assets/js/bms-card-case.js` (loaded from `footer.php` on every page).
+**Changed:** `footer.php`, `app/bms/product/services.php`, `app/bms/pos/pos_credit_customers.php`, `app/bms/stock/warehouses.php`.
+
+- **Problem:** summary-card labels were typed straight in the page and many were forced to CAPITALS (a `text-uppercase` class or a CSS rule), so they ignored Settings → General → *Display Text Format*. The cards I restyled (Services, Who Owes Me, Shops) added the same forced capitals.
+- **Fix, once for the whole system:** a small script finds the label of each summary card (`.custom-stat-card`, `.stat-card`, `.stat-mini-card`, `.dn-stat-card`, `.cn-stat-card`, `.rm-stat`, `.rd-stat`, `.tb-stat`, `.summary-card`, `.planning-summary-card`, `.svc-stat`, `.wh-stat`, `.stat-card-green`) and applies the company's mode — *Each Word Capitalised* (default), *Sentence*, *lower*, *UPPER*, *tOGGLE* or *As typed* — and switches off any forced capitals. In "as typed" the label shows exactly as written.
+- **Safe by construction:** it only touches label elements (`p`, `small`, `h6`, `.stat-label` …) inside those cards; never the headline number (h1–h5), never any text that contains a digit (figures, dates, "TSh 12,000"); runs once per element (so "toggle" cannot flip twice); display-only, nothing stored or written back. In a mixed-case label a 2–3 letter ALL-CAPS word (VAT, TIN, POS) is kept as an acronym.
+- **Removed** the forced-capitals CSS I had added on the Services, Who Owes Me and Shops cards.
+- **Not changed:** print summary blocks and table headers (they keep their own style), and the customer/record cards.
+
 ## 2026-11-01 — ui: Receive Stock closes to Products; Shops page cards, filters and toolbar tidied
 
 **Changed:** `app/bms/pos/receive_stock.php`, `app/bms/stock/warehouses.php`.
