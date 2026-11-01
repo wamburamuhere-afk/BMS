@@ -221,6 +221,20 @@ if (!is_string($oldSrc) || strpos($oldSrc, '<?php') !== 0) {
             $label .= ', Restaurant POS off';
             $new = normNav(renderNav($hdr, $grants, $admin, $simple, $noRestaurant));
             $old = normNav(renderNav($oldHdr, $grants, $admin, $simple, $noRestaurant));
+            if ($simple && $admin) {
+                // Smart POS: Dashboard moved out of "My Business" into its own first menu item
+                // (the ONLY intended change). Check it, then compare everything else as before.
+                $ownRe  = '#<li class="nav-item"> ?<a class="nav-link" href="[^"]*dashboard"><i class="bi bi-speedometer2"></i> ?[^<]*</a> ?</li>#';
+                $dropRe = '#<li><a class="dropdown-item" href="[^"]*dashboard"><i class="bi bi-speedometer2"></i> ?[^<]*</a></li>#';
+                ok(preg_match($ownRe, $new, $m, PREG_OFFSET_CAPTURE) === 1 && strpos($new, 'id="coreDropdown"') > $m[0][1],
+                    "$label: Dashboard is its own first menu item, ahead of My Business");
+                $before = substr($new, 0, strpos($new, 'id="coreDropdown"'));
+                $dd = substr($new, strpos($new, 'id="coreDropdown"'));
+                $ddEnd = substr($dd, 0, strpos($dd, '</ul>') + 5);
+                ok(preg_match($dropRe, $ddEnd) === 0 && strpos($ddEnd, 'href="/customers"') !== false, "$label: My Business no longer lists Dashboard but still lists the rest");
+                $new = preg_replace($ownRe, '', $new, 1);
+                $old = preg_replace($dropRe, '', $old, 1);
+            }
             if ($simple) {
                 ok(strpos($new, 'My Business') !== false || strpos($new, 'Biashara') !== false || $grants !== [],
                     "$label: render really ran in Simple POS mode (guard against a vacuous comparison)");
@@ -238,6 +252,9 @@ if (!is_string($oldSrc) || strpos($oldSrc, '<?php') !== 0) {
         $newR = normNav(renderNav($hdr, [], true, true));
         $oldR = normNav(renderNav($oldHdr, [], true, true));
         ok(strpos($newR, 'id="restaurantDropdown"') !== false, 'admin, Simple POS mode, Restaurant POS on: Restaurant is a dropdown (Menu, Tables, Kitchen…)');
+        // Same Smart POS Dashboard move as above is the only other allowed difference.
+        $newR = preg_replace('#<li class="nav-item"> ?<a class="nav-link" href="[^"]*dashboard"><i class="bi bi-speedometer2"></i> ?[^<]*</a> ?</li>#', '', $newR, 1);
+        $oldR = preg_replace('#<li><a class="dropdown-item" href="[^"]*dashboard"><i class="bi bi-speedometer2"></i> ?[^<]*</a></li>#', '', $oldR, 1);
         ok($cut($newR) === $cut($oldR), 'admin, Simple POS mode, Restaurant POS on: everything else in the nav identical');
     } finally {
         @unlink($oldHdr);
