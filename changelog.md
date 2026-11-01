@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-01 — ui(nav): Smart POS desktop menu — Dashboard is its own first item, ahead of My Business
+
+**Changed:** `header.php`, `tests/test_header_nav_menu_cli.php`.
+
+- **Smart POS desktop top menu:** *Dashboard* is now a direct first item; the *My Business* dropdown keeps the rest (Customers, Suppliers, Shop Products, Categories, Service). Same label, icon, link and Swahili as before (`t('Dashboard')`); nothing about the dashboard itself changes.
+- **Only Smart POS mode:** the full ERP menu is unchanged (Dashboard stays inside *Core*). A role with only Dashboard no longer gets a one-item dropdown. Phone bottom bar and side menu untouched.
+- **Checked:** `test_header_nav_menu_cli` 22/0 — the Smart POS header equals the previous one except for exactly this move; ERP header byte-identical; other menu suites compared with `develop`.
+
 ## 2026-11-01 — feat(backup): superadmin Backups page + daily alert when any backup or the off-site copy needs attention
 
 **Plan:** `backup_plan.md` PR 3.
