@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-11-01 — feat(backup): superadmin Backups page + daily alert when any backup or the off-site copy needs attention
+
+**Plan:** `backup_plan.md` PR 3.
+**New:** `core/backup_health.php`, `app/superadmin/backups.php`, `tests/test_backup_health_cli.php`.
+**Changed:** `cron/backup_all_tenants.php` (health check + alert after each all-company run), `core/superadmin_auth.php` (route `/backups`), `core/superadmin_ui.php` (nav "Backups"; `backup_problem` bell items open the Backups page), `scripts/setup_control_db.php` (`superadmin_notifications.type` gains `backup_problem`), `backup_plan.md` (PR 3 section; production path is `/var/www/<host>/public_html`).
+
+- **Before:** backups ran on schedule, but nobody would know if one failed, stopped, or if the off-site copy was never set up — the only record was a log file on the server.
+- **Page (Platform Administration → Backups):** every database the backup run covers (main install, each company, control DB) with last good full backup (when, file, size, files), last snapshot, state and last error. States: Healthy; Failed (latest attempt failed); Overdue (no good full backup for 26 h); Never; Pending (company created < 26 h ago — not a problem). Plus counts, the off-site copy (last run, uploaded/removed, files and MB on Drive, setup hint) and failures of the last 30 days. Read-only; reads `tenant_backup_log` and `offsite_status.json`; never decrypts credentials or touches a company database.
+- **Alert:** after every scheduled all-company run, any problem (failed / overdue / never; off-site failed / overdue / never ran / not configured) → one bell notification + one email to every superadmin through the platform mail settings, at most once per day (`backups/_platform/.backup_alert_day`, claimed before sending so a failing mailer can't repeat it). The off-site job runs as root without database access, so the next www-data run reports on it. Problems are also written to `backup.log`.
+- **Not built:** an automatic weekly test-restore (reason in `backup_plan.md`).
+- **Checked:** `test_backup_health_cli` 45 checks — state rules (incl. snapshot failing after the nightly, new company pending), off-site status file cases, the real local control DB (same 59 databases as the backup run, inserted rows classified Healthy / Overdue / Failed, then removed), alert once per day and again the next day (email captured, bell row platform-wide), wiring, ENUM upgraded with earlier types kept, and the page rendered through the real router as superadmin (no PHP warnings, one row per database) and refused when signed out. Related suites (superadmin URLs, platform settings, activity alerts, control DB, plans, support, registration, migration runner, all backup suites incl. the real-rclone off-site run) match a clean `develop`; `security_coverage` counts the page under `pages_no_gate` exactly like every other `app/superadmin/` page (the scanner does not recognise `requireSuperadmin()`).
+
 ## 2026-11-01 — fix: shared CSS/JS reach the browser immediately (cache-busting for responsive.css and bms-mobile-cards.js)
 
 **Changed:** `header.php`.
