@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/restaurant_scope.php';
 
 if (!isAuthenticated() || !canView('restaurant_pos')) { http_response_code(403); echo json_encode(['results' => []]); exit; }
+if (!restaurantSchemaReady($pdo)) { echo json_encode(['results' => []]); exit; }
 
 global $pdo;
 $warehouse_id = (int)($_GET['warehouse_id'] ?? 0);
