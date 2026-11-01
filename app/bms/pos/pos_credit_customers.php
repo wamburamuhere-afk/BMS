@@ -353,7 +353,8 @@ $(function () {
         margin-top: 10px;
     }
     .credit-aging-mobile-card .cag-actions .btn { flex: 1; }
-    .credit-aging-mobile-card .cag-actions .dropdown { width: 100%; }
+    .credit-aging-mobile-card .cag-actions { justify-content: flex-end; }
+    .credit-aging-mobile-card .cag-actions .dropdown { width: auto; }
     .credit-aging-mobile-card .cag-actions .dropdown-item { font-size: 0.95rem; }
 }
 
