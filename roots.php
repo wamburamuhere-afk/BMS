@@ -208,6 +208,8 @@ $routes = [
     // to the .php form since long before this page existed.
     'forgot-password' => ROOT_DIR . '/forgot-password.php',
     'forgot_password' => ROOT_DIR . '/forgot-password.php',
+    // Public, unauthenticated — required by Google for the BMS Backups app.
+    'privacy'        => ROOT_DIR . '/privacy.php',
     // Signed in, but holding a password their provider chose for them — the
     // only page they may reach until they replace it.
     'change-password' => ROOT_DIR . '/change-password.php',
