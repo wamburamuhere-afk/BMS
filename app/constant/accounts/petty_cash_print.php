@@ -67,7 +67,7 @@ $prepared_by = trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')) ?:
     <title>Petty Cash Voucher #PCV-<?= str_pad($t['id'], 5, '0', STR_PAD_LEFT) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
+    <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>?v=<?= @filemtime(ROOT_DIR . '/assets/css/responsive.css') ?>">
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     <style>
         /* ── SCREEN STYLES ──────────────────────────────────── */
