@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-11-01 — ui: Receive Stock closes to Products; Shops page cards, filters and toolbar tidied
+
+**Changed:** `app/bms/pos/receive_stock.php`, `app/bms/stock/warehouses.php`.
+
+- **Receive Stock (Pokea Mzigo):** closing the window (X / Cancel) now always goes to the **Products** list (users without Products access go to the dashboard). It used to rely on the browser's "referrer", which could be missing — and a page restored from the back/forward cache never ran the redirect — leaving an empty page with only a title. It now uses `location.replace` (so the shell page does not stay in history) and a `pageshow` guard sends a restored empty page to Products.
+- **Shops page, summary cards:** the four green blocks (full-width, one per row on a phone) are now white cards with a coloured edge bar — blue for totals, green for Active — laid out 2 x 2 on a phone.
+- **Shops page, filters:** Apply and Reset share one full-width row on a phone (they were pushed right and unevenly sized).
+- **Shops page, toolbar:** Print / Export on the left and "Show: N" on the right on one row (they were centred boxes of different widths). The green "18 shops" pill is hidden on phones because the table header right below already says "Showing 18 of 18 results".
+
 ## 2026-11-01 — ui(pos): Who Owes Me — Actions button is small and right-aligned; menu is a compact floating panel
 
 **Changed:** `assets/js/pos-credit-aging.js`, `app/bms/pos/pos_credit_customers.php`.
