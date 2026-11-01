@@ -377,7 +377,7 @@ $(function () {
     #creditStatRow .custom-stat-card.stat-total h4 { font-size: 1.4rem; }
     #creditStatRow .custom-stat-card p {
         color: #6c7a89 !important; font-size: .68rem; font-weight: 600;
-        text-transform: uppercase; letter-spacing: .03em; margin-bottom: .1rem !important; order: 1;
+        letter-spacing: .03em; margin-bottom: .1rem !important; order: 1;
     }
     #creditStatRow .custom-stat-card { display: flex; flex-direction: column; }
 }
