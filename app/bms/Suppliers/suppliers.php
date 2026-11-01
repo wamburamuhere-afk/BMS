@@ -236,8 +236,8 @@ function supplier_status_label($status) {
 
     <!-- Statistics Cards -->
     <div class="row mb-4" id="print-stats-cards">
-        <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+        <div class="<?= $showRiskStatuses ? 'col-6' : 'col-12' ?> col-lg-3 mb-3">
+            <div class="card custom-stat-card stat-edge shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -252,7 +252,7 @@ function supplier_status_label($status) {
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-green shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -268,7 +268,7 @@ function supplier_status_label($status) {
         </div>
         <?php if ($showRiskStatuses): ?>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-amber shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -283,7 +283,7 @@ function supplier_status_label($status) {
             </div>
         </div>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-slate shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -299,7 +299,7 @@ function supplier_status_label($status) {
         </div>
         <?php else: ?>
         <div class="col-6 col-lg-3 mb-3">
-            <div class="card custom-stat-card shadow-sm border-0 h-100">
+            <div class="card custom-stat-card stat-edge stat-edge-gray shadow-sm border-0 h-100">
                 <div class="card-body py-2 px-2 px-sm-3">
                     <div class="d-flex align-items-center h-100">
                         <div class="stat-icon-circle me-2 me-sm-3 d-none d-sm-flex">
@@ -665,26 +665,21 @@ function supplier_status_label($status) {
                                 </div>
                                 <?php endif; ?>
                             </div>
-                            <div class="card-footer bg-white border-top p-0">
-                                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                                    <a href="<?= getUrl('suppliers/details') ?>?id=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-primary" title="<?= t('View Details') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <?php if ($can_edit_suppliers): ?>
-                                    <button class="btn btn-sm btn-outline-warning" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="<?= t('Edit') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <?php endif; ?>
-                                    <?php if ($can_view_orders_link): ?>
-                                    <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-success" title="<?= t('View Orders') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
-                                        <i class="bi bi-cart"></i>
-                                    </a>
-                                    <?php endif; ?>
-                                    <?php if ($company_type != 'microfinance' && $can_edit_suppliers && $can_new_order_link): ?>
-                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-info" title="<?= t('New Order') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
-                                        <i class="bi bi-plus-circle"></i>
-                                    </a>
-                                    <?php endif; ?>
+                            <div class="card-footer bg-white border-top px-3 py-2 d-flex justify-content-end">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear me-1"></i><?= t('Actions') ?></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width:200px;border-radius:12px;">
+                                        <li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('suppliers/details') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-eye text-info me-3" style="width:1.1rem;"></i><?= t('View Details') ?></a></li>
+                                        <?php if ($can_edit_suppliers): ?>
+                                        <li><button type="button" class="dropdown-item py-2 px-3 rounded d-flex align-items-center" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-pencil text-warning me-3" style="width:1.1rem;"></i><?= t('Edit') ?></button></li>
+                                        <?php endif; ?>
+                                        <?php if ($can_view_orders_link): ?>
+                                        <li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cart text-success me-3" style="width:1.1rem;"></i><?= t('View Orders') ?></a></li>
+                                        <?php endif; ?>
+                                        <?php if ($company_type != 'microfinance' && $can_edit_suppliers && $can_new_order_link): ?>
+                                        <li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-plus-circle text-primary me-3" style="width:1.1rem;"></i><?= t('New Order') ?></a></li>
+                                        <?php endif; ?>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
