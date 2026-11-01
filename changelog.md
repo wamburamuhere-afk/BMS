@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-01 — fix(legal): Privacy Policy shows the serving company's own name and contact
+
+**Changed:** `privacy.php`, `tests/test_privacy_page_cli.php`.
+
+- **Why:** `/privacy` is reachable by any tenant's staff and customers, but named only BJP and its email. It now reads the serving tenant's Company Profile (`system_settings`: `company_name`, `company_email`, `company_phone`).
+- **Behaviour:** blank values and the install placeholders ("My Company", "info@example.com") fall back to BJP's details. When the company is not BJP, a "BMS provider" line names BJP. All values are HTML-escaped. The Google backup email is not used as a contact.
+- **Checked:** `test_privacy_page_cli` — 11 passes, including a temporary Company Profile set and restored, escaping, and the placeholder fallback.
+
 ## 2026-11-01 — feat(legal): public Privacy Policy page at /privacy
 
 **Plan:** `backup_plan.md` §4 (Google Drive setup).
