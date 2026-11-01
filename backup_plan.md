@@ -154,3 +154,24 @@ nightly job logs `NOT CONFIGURED` and changes nothing.
 - [x] Off-site destination: Google Drive of `bjptechnologieslimited@gmail.com` via rclone (not email).
 - [ ] 6-hourly DB snapshots OK, or more frequent?
 - [ ] Whether to clean the ~325 MB of old `uploaded_*` / `pre_restore_*` clutter in `backups/t29/` once PR 1 ships.
+
+## 7. Google Drive setup — progress (updated 2026-11-01)
+
+**Done**
+- [x] Google Cloud project `bms-backups-513409`, OAuth app "BMS Backups" (External), **published: In production** (so the Drive token no longer expires after 7 days; no verification requested).
+- [x] Public Privacy Policy live at `https://bms.bjptechnologies.co.tz/privacy` (PR #2678 makes it show each tenant's own Company Profile name/contact; pending merge to develop → main).
+- [x] OAuth client `rclone` (Desktop app) created; `rclone config` on the server reached the `rclone authorize "drive" "eyJ..."` line.
+- [x] `rclone authorize` was run on the PC (rclone v1.75.2 for Windows).
+
+**Stopped at**
+- Google's sign-in on the PC asks to verify `bjptechnologieslimited@gmail.com` with a prompt on the Google Pixel 7, which is held by another person. Needs that person online to tap Yes / the number shown.
+
+**Remaining**
+1. Get the Pixel 7 holder to approve; finish the browser consent (Advanced → Go to BMS Backups → Allow).
+2. Copy the line between `--->` and `<---End paste` from the PC and paste it at `config_token>` on the server; Shared Drive? `n`; Keep this "gdrive" remote? `y`; stop at the `e/n/d/r/c/s/q>` menu.
+3. Verify with `rclone lsd gdrive:` on the server.
+4. Encryption: create the `crypt` remote over `gdrive:` and its two passwords (store them offline, separately from the server).
+5. Run a real backup upload and a restore test from Drive.
+6. Merge PR #2678, deploy, check `/privacy` on the BJP host and on one tenant.
+
+**Never share:** the Client secret or the `eyJ...` token (it contains the secret). If either was exposed, create a new Client secret and redo `rclone config`.
