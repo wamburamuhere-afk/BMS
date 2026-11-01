@@ -91,14 +91,23 @@ if (!function_exists('bmsCurrencyUnitWord')) {
     }
 }
 
+// Value the sign-up forms submit for a company outside the supported countries.
+if (!defined('BMS_OTHER_COUNTRY')) define('BMS_OTHER_COUNTRY', 'Other');
+
 if (!function_exists('bmsCurrencyForCountry')) {
-    /** Registration: country name → operating currency. Unknown/empty → 'TZS'. */
+    /**
+     * Registration: country name → operating currency.
+     *   Tanzania/Kenya/Burundi/Rwanda/South Sudan → their own currency.
+     *   'Other' (the "Other country" choice on the sign-up forms) → USD.
+     *   Empty or anything else (e.g. mobile sign-up, which sends no country) → 'TZS', as before.
+     */
     function bmsCurrencyForCountry(?string $country): string
     {
         $c = strtolower(trim((string)$country));
         foreach (bmsSupportedCurrencies() as $code => $meta) {
             if ($meta['country'] !== null && strtolower($meta['country']) === $c) return $code;
         }
+        if ($c === strtolower(BMS_OTHER_COUNTRY)) return 'USD';
         return 'TZS';
     }
 }
