@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-11-01 — feat(legal): public Privacy Policy page at /privacy
+
+**Plan:** `backup_plan.md` §4 (Google Drive setup).
+**New:** `privacy.php`, `tests/test_privacy_page_cli.php`.
+**Changed:** `roots.php` (route `privacy`).
+
+- **Why:** Google keeps the BMS Backups OAuth app's Publish button disabled until it has a privacy policy link. While the app stays in Testing, its Google Drive authorization expires after 7 days, which would stop the off-site backups.
+- **Page:** static and public, with no session, database or app code. Covers the information BMS handles, separation between companies, encrypted backups on Google Drive, the `drive.file` permission, Google's Limited Use requirements, sharing, retention and contact.
+- **Checked:** `test_privacy_page_cli` renders `/privacy` through the real router with no session: no PHP warnings, no login form.
+
 ## 2026-11-01 — ui(nav): Smart POS desktop menu — Dashboard is its own first item, ahead of My Business
 
 **Changed:** `header.php`, `tests/test_header_nav_menu_cli.php`.
