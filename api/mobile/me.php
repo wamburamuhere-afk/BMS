@@ -39,7 +39,7 @@ try {
     // (Language Mode = organization, core/i18n.php orgLanguage()); else the user's own.
     $orgLang  = function_exists('orgLanguage') ? orgLanguage() : null;
     $language = $orgLang ?? get_setting('user_language_' . $user_id, 'en');
-    $currency = get_setting('company_currency', 'TZS');
+    $currency = bmsCompanyCurrency();   // same currency the web uses (core/currency.php)
 
     // ── Company ───────────────────────────────────────────────────────────────
     $company = [

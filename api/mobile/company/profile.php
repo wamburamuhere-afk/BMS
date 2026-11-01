@@ -19,7 +19,7 @@ $FIELDS = ['company_name', 'company_email', 'company_phone', 'company_website', 
 $read = function () use ($FIELDS): array {
     $out = [];
     foreach ($FIELDS as $f) $out[substr($f, 0, 8) === 'company_' ? substr($f, 8) : $f] = (string)get_setting($f, '');
-    $out['currency'] = $out['currency'] ?: 'TZS';
+    $out['currency'] = bmsCompanyCurrency();   // the currency the web uses (core/currency.php)
     $out['address']  = (string)get_setting('company_address', '') ?: $out['physical_address'];
     $out['logo_url'] = (string)get_setting('company_logo', '');
     return $out;
@@ -47,6 +47,11 @@ if (isset($in['company_code_prefix'])) $in['company_code_prefix'] = substr(strto
 if (isset($in['company_currency'])) {
     $in['company_currency'] = strtoupper($in['company_currency']);
     if (!preg_match('/^[A-Z]{3}$/', $in['company_currency'])) $fail(422, 'Currency must be a 3-letter code, e.g. TZS');
+    // Supported operating currencies only (or the company's current one, unchanged).
+    if (!isset(bmsSupportedCurrencies()[$in['company_currency']]) && $in['company_currency'] !== bmsCompanyCurrency()) {
+        $fail(422, 'Currency must be one of: ' . implode(', ', array_keys(bmsSupportedCurrencies())));
+    }
+    $in['currency'] = $in['company_currency'];   // keep the web's key in step
 }
 if (isset($in['share_capital_paid_in']) && $in['share_capital_paid_in'] !== '' && !is_numeric($in['share_capital_paid_in'])) $fail(422, 'share_capital_paid_in must be a number');
 

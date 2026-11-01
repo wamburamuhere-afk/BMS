@@ -74,7 +74,7 @@ try {
     $pdo->prepare("
         INSERT INTO payments (payment_number, invoice_id, customer_id, payment_date, amount, currency,
                               payment_method, received_into_account_id, reference_number, notes, status, received_by, created_by, project_id)
-        VALUES (?, NULL, ?, ?, ?, 'TZS', ?, ?, ?, ?, 'completed', ?, ?, ?)
+        VALUES (?, NULL, ?, ?, ?, " . $pdo->quote(bmsCompanyCurrency()) . ", ?, ?, ?, ?, 'completed', ?, ?, ?)
     ")->execute([
         $payment_number, $customer_id, $payment_date, $amount, $method, $bank_acc,
         ($reference !== '' ? $reference : null),

@@ -568,7 +568,7 @@ function loadOrderDetails() {
 function renderOrder(data) {
     const o = data.order;
     const items = data.items;
-    const currency = o.currency || 'TZS';
+    const currency = o.currency || <?= json_encode(bmsCompanyCurrency()) ?>;
 
     // Header
     $('#orderNumber').text(o.order_number);
@@ -874,7 +874,7 @@ function printOrder(id, template) {
 function convertToInvoice(poId, remaining) {
     const hasRemaining = (typeof remaining === 'number' && remaining > 0);
     const remTxt = hasRemaining
-        ? 'TZS ' + Number(remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ? '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + Number(remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : null;
     Swal.fire({
         title: <?= json_encode(t('Convert to Supplier Invoice?')) ?>,

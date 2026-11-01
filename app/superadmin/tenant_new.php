@@ -173,13 +173,13 @@ $startingPlans = planTablesReady()
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Country</label>
                                 <select class="form-select" name="country">
-                                    <option value="">— Select —</option>
-                                    <option value="Tanzania">Tanzania</option>
-                                    <option value="Kenya">Kenya</option>
-                                    <option value="Uganda">Uganda</option>
-                                    <option value="Rwanda">Rwanda</option>
-                                    <option value="Other">Other</option>
+                                    <?php // Same supported list as public registration (core/currency.php); sets the
+                                          // company's currency. Tanzania (TZS) is the default.
+                                    foreach (bmsRegistrationCountries() as $__ctry): ?>
+                                    <option value="<?= htmlspecialchars($__ctry) ?>"<?= $__ctry === 'Tanzania' ? ' selected' : '' ?>><?= htmlspecialchars($__ctry) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
+                                <div class="form-text">Sets the company's currency: Tanzania TZS, Kenya KES, Burundi BIF, Rwanda RWF, South Sudan SSP. USD can be chosen later in the company's Settings.</div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Industry</label>

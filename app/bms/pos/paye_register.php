@@ -121,17 +121,17 @@ $statusBadge = function ($s) {
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-5 fw-bold text-dark">TSh <?= number_format($t_taxable,0) ?></div><div class="small text-muted">Total taxable</div>
+                <div class="fs-5 fw-bold text-dark"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($t_taxable,0) ?></div><div class="small text-muted">Total taxable</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-5 fw-bold" style="color:#052c65;">TSh <?= number_format($t_paye,0) ?></div><div class="small text-muted">Total PAYE</div>
+                <div class="fs-5 fw-bold" style="color:#052c65;"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($t_paye,0) ?></div><div class="small text-muted">Total PAYE</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
-                <div class="fs-5 fw-bold text-dark">TSh <?= number_format($t_nssf,0) ?></div><div class="small text-muted">Total NSSF</div>
+                <div class="fs-5 fw-bold text-dark"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($t_nssf,0) ?></div><div class="small text-muted">Total NSSF</div>
             </div>
         </div>
     </div>

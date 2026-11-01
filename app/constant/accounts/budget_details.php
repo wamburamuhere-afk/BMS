@@ -264,9 +264,9 @@ global $company_name, $company_logo;
                                 <th>Description</th>
                                 <th class="text-center" style="width: 90px;">Units</th>
                                 <th class="text-center" style="width: 70px;">Qty</th>
-                                <th class="text-end" style="width: 120px;">Price (TSh)</th>
+                                <th class="text-end" style="width: 120px;">Price (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</th>
                                 <th class="text-end" style="width: 75px;">Tax %</th>
-                                <th class="text-end pe-3" style="width: 130px;">Total (TSh)</th>
+                                <th class="text-end pe-3" style="width: 130px;">Total (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -444,8 +444,8 @@ global $company_name, $company_logo;
                                  style="width:<?= min($qe_pct, 100) ?>%"></div>
                         </div>
                         <div class="d-flex justify-content-between small">
-                            <span class="text-muted">Used: <strong>TSh <?= number_format((float)$total_expenses, 0) ?></strong></span>
-                            <span class="text-muted">Remaining: <strong id="qeRemaining" class="<?= (float)$remaining_budget <= 0 ? 'text-danger' : 'text-success' ?>">TSh <?= number_format((float)$remaining_budget, 0) ?></strong></span>
+                            <span class="text-muted">Used: <strong><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format((float)$total_expenses, 0) ?></strong></span>
+                            <span class="text-muted">Remaining: <strong id="qeRemaining" class="<?= (float)$remaining_budget <= 0 ? 'text-danger' : 'text-success' ?>"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format((float)$remaining_budget, 0) ?></strong></span>
                         </div>
                         <div id="qeAfterThis" class="small mt-1" style="display:none"></div>
                     </div>
@@ -472,7 +472,7 @@ global $company_name, $company_logo;
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
                         <div class="input-group">
-                            <span class="input-group-text">TSh</span>
+                            <span class="input-group-text"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                             <input type="number" class="form-control" name="amount" id="qeAmount" step="0.01" min="0" required placeholder="0.00">
                         </div>
                     </div>
@@ -594,7 +594,7 @@ $(document).ready(function() {
     const QE_BUDGET_REMAINING = <?= number_format((float)$remaining_budget, 2, '.', '') ?>;
     const QE_BUDGET_ALLOCATED = <?= number_format((float)$budget['allocated_amount'], 2, '.', '') ?>;
     const QE_BUDGET_USED      = <?= number_format((float)$total_expenses, 2, '.', '') ?>;
-    const qeFmt = v => 'TSh ' + Math.abs(v).toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const qeFmt = v => '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + Math.abs(v).toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     // Live indicator: update "remaining after this expense" as the user types
     $(document).on('input', '#qeAmount', function() {
@@ -651,7 +651,7 @@ $(document).ready(function() {
                     let html = '<p class="mb-2">Expense <strong>#' + res.id + '</strong> has been saved.</p>';
                     if (res.posted && res.ledger) {
                         html += '<table class="table table-sm table-bordered text-start mt-2 mb-0">'
-                              + '<thead class="table-light"><tr><th>Side</th><th>Account</th><th class="text-end">Amount (TSh)</th></tr></thead>'
+                              + '<thead class="table-light"><tr><th>Side</th><th>Account</th><th class="text-end">Amount (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</th></tr></thead>'
                               + '<tbody>'
                               + '<tr><td><span class="badge bg-danger">Dr</span></td><td>' + res.ledger.dr + '</td><td class="text-end fw-bold">' + res.ledger.amount + '</td></tr>'
                               + '<tr><td><span class="badge bg-success">Cr</span></td><td>' + res.ledger.cr + '</td><td class="text-end fw-bold">' + res.ledger.amount + '</td></tr>'

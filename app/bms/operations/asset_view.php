@@ -94,7 +94,7 @@ $is_disposed = in_array($asset['status'], ['disposed','written_off'], true) || $
 
 $statusColors = ['active'=>'success','maintenance'=>'warning','disposed'=>'danger','written_off'=>'danger'];
 $condColors   = ['excellent'=>'success','good'=>'info','fair'=>'warning','poor'=>'danger','eol'=>'dark'];
-function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
+function tzs($v) { return number_format((float)$v, 2) . ' ' . bmsCompanyCurrency(); }
 ?>
 
 <div class="container-fluid py-4">
@@ -326,7 +326,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                     <input type="hidden" name="status" value="completed">
                     <div class="row g-3">
                         <div class="col-md-6"><label class="form-label fw-semibold">Date <span class="text-danger">*</span></label><input type="date" name="maintenance_date" class="form-control" value="<?= date('Y-m-d') ?>" required></div>
-                        <div class="col-md-6"><label class="form-label fw-semibold">Cost (TZS)</label><input type="number" name="cost" id="qmCost" class="form-control" step="0.01" min="0" value="0"></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Cost (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</label><input type="number" name="cost" id="qmCost" class="form-control" step="0.01" min="0" value="0"></div>
                         <div class="col-12"><label class="form-label fw-semibold">Description <span class="text-danger">*</span></label><textarea name="description" class="form-control" rows="2" placeholder="What was done" required></textarea></div>
                         <div class="col-md-6"><label class="form-label fw-semibold">Performed By</label><input type="text" name="performed_by" class="form-control" placeholder="Vendor / technician"></div>
                         <div class="col-md-6"><label class="form-label fw-semibold">Next Due Date</label><input type="date" name="next_due_date" class="form-control"></div>
@@ -372,7 +372,7 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                                 <option value="written_off">Written Off</option>
                             </select>
                         </div>
-                        <div class="col-md-6"><label class="form-label fw-semibold">Proceeds (TZS)</label><input type="number" name="proceeds" class="form-control" step="0.01" min="0" value="0"></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Proceeds (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</label><input type="number" name="proceeds" class="form-control" step="0.01" min="0" value="0"></div>
                         <div class="col-12"><label class="form-label fw-semibold">Notes</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
                     </div>
                 </div>

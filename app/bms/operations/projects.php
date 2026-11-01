@@ -508,7 +508,7 @@ $(document).ready(function() {
             dataSrc: function(json) {
                 $('#stat-active').text(json.stats.active || 0);
                 $('#stat-pending').text((parseInt(json.stats.planning)||0) + (parseInt(json.stats.on_hold)||0));
-                $('#stat-budget').text(parseFloat(json.stats.total_budget || 0).toLocaleString() + ' TZS');
+                $('#stat-budget').text(parseFloat(json.stats.total_budget || 0).toLocaleString() + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
                 $('#stat-avg-progress').text(parseFloat(json.stats.avg_progress || 0).toFixed(2) + '%');
                 return json.data;
             }
@@ -544,17 +544,17 @@ $(document).ready(function() {
             { 
                 data: 'total_revenue', 
                 responsivePriority: 4,
-                render: data => `<strong class="text-success">${parseFloat(data || 0).toLocaleString()} TZS</strong>` 
+                render: data => `<strong class="text-success">${parseFloat(data || 0).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>` 
             },
             { 
                 data: 'total_expense', 
                 responsivePriority: 4,
-                render: data => `<strong class="text-danger">${parseFloat(data || 0).toLocaleString()} TZS</strong>` 
+                render: data => `<strong class="text-danger">${parseFloat(data || 0).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>` 
             },
             { 
                 data: 'budget', 
                 responsivePriority: 4,
-                render: data => `<strong class="text-primary">${parseFloat(data || 0).toLocaleString()} TZS</strong>` 
+                render: data => `<strong class="text-primary">${parseFloat(data || 0).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>` 
             },
             { 
                 data: 'profit',
@@ -566,7 +566,7 @@ $(document).ready(function() {
                     return `
                         <div>
                             <strong class="${colorClass}">
-                                <i class="bi ${icon}"></i> ${profit.toLocaleString()} TZS
+                                <i class="bi ${icon}"></i> ${profit.toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?>
                             </strong><br>
                             <small class="text-muted">${row.profit_margin}% margin</small>
                         </div>
@@ -972,11 +972,11 @@ function renderProjectCards() {
                         </div>
                         <div class="d-flex justify-content-between small mb-1">
                             <span class="text-muted">Budget:</span>
-                            <span class="fw-bold text-primary">${parseFloat(row.budget||0).toLocaleString()} TZS</span>
+                            <span class="fw-bold text-primary">${parseFloat(row.budget||0).toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                         </div>
                         <div class="d-flex justify-content-between small mb-1">
                             <span class="text-muted">Profit:</span>
-                            <span class="fw-bold ${profitColor}">${profitVal.toLocaleString()} TZS</span>
+                            <span class="fw-bold ${profitColor}">${profitVal.toLocaleString()} <?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                         </div>
                         <div class="mb-2">
                             <div class="d-flex justify-content-between small mb-1">

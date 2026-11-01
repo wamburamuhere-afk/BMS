@@ -475,7 +475,7 @@ $(document).ready(function() {
                     $('#stat-total-employees, #print-stat-total-employees').text(json.stats.total_employees);
                     $('#stat-paid-count, #print-stat-paid-count').text(json.stats.paid_count);
                     $('#stat-pending-count, #print-stat-pending-count').text(json.stats.pending_count);
-                    const formattedPayout = 'TSh ' + parseFloat(json.stats.total_payout).toLocaleString();
+                    const formattedPayout = '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + parseFloat(json.stats.total_payout).toLocaleString();
                     $('#stat-total-payout, #print-stat-total-payout').text(formattedPayout);
                 }
                 return json.data;
@@ -514,7 +514,7 @@ $(document).ready(function() {
             {
                 data: 'basic_salary',
                 className: 'text-end',
-                render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')
+                render: $.fn.dataTable.render.number(',', '.', 0, '<?= htmlspecialchars(bmsCurrencySymbol()) ?>')
             },
             {
                 data: 'allowances',
@@ -527,7 +527,7 @@ $(document).ready(function() {
             {
                 data: 'gross_salary',
                 className: 'text-end',
-                render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')
+                render: $.fn.dataTable.render.number(',', '.', 0, '<?= htmlspecialchars(bmsCurrencySymbol()) ?>')
             },
             { 
                 data: 'deductions',
@@ -540,7 +540,7 @@ $(document).ready(function() {
                 data: 'net_salary',
                 className: 'text-end',
                 render: function(data) {
-                    return `<strong class="text-dark">TSh ${parseFloat(data).toLocaleString()}</strong>`;
+                    return `<strong class="text-dark"><?= htmlspecialchars(bmsCurrencySymbol()) ?>${parseFloat(data).toLocaleString()}</strong>`;
                 }
             },
             {
@@ -670,10 +670,10 @@ function previewAndCalculatePayroll() {
                 res.data.forEach(emp => {
                     html += `<tr>
                         <td class="fw-bold text-dark">${emp.employee_name}</td>
-                        <td class="text-end">TSh ${parseFloat(emp.basic_salary).toLocaleString()}</td>
+                        <td class="text-end"><?= htmlspecialchars(bmsCurrencySymbol()) ?>${parseFloat(emp.basic_salary).toLocaleString()}</td>
                         <td class="text-end text-success">+${parseFloat(emp.allowances).toLocaleString()}</td>
                         <td class="text-end text-danger">-${parseFloat(emp.deductions).toLocaleString()}</td>
-                        <td class="text-end fw-bold text-success">TSh ${parseFloat(emp.net_salary).toLocaleString()}</td>
+                        <td class="text-end fw-bold text-success"><?= htmlspecialchars(bmsCurrencySymbol()) ?>${parseFloat(emp.net_salary).toLocaleString()}</td>
                     </tr>`;
                 });
                 previewBody.html(html);
@@ -789,8 +789,8 @@ function payRecord(payrollId, netSalary, amountPaid) {
         html: `
             <div class="text-start">
                 <div class="mb-3 p-2 bg-light rounded small">
-                    Paid so far: <strong>TSh ${parseFloat(amountPaid||0).toLocaleString()}</strong> &nbsp;|&nbsp;
-                    Remaining: <strong class="text-success">TSh ${remaining.toLocaleString()}</strong>
+                    Paid so far: <strong><?= htmlspecialchars(bmsCurrencySymbol()) ?>${parseFloat(amountPaid||0).toLocaleString()}</strong> &nbsp;|&nbsp;
+                    Remaining: <strong class="text-success"><?= htmlspecialchars(bmsCurrencySymbol()) ?>${remaining.toLocaleString()}</strong>
                 </div>
                 <label class="form-label fw-semibold">Paid From Account <span class="text-danger">*</span></label>
                 <select id="pr-swal-account" class="form-select mb-3">
@@ -800,7 +800,7 @@ function payRecord(payrollId, netSalary, amountPaid) {
                 <label class="form-label fw-semibold">Amount to Pay</label>
                 <input id="pr-swal-amount" type="number" class="form-control"
                        placeholder="Leave blank = full remaining balance" min="1" step="0.01" max="${remaining}">
-                <small class="text-muted">Leave blank to pay the full remaining balance (TSh ${remaining.toLocaleString()}).</small>
+                <small class="text-muted">Leave blank to pay the full remaining balance (<?= htmlspecialchars(bmsCurrencySymbol()) ?>${remaining.toLocaleString()}).</small>
             </div>`,
         showCancelButton: true,
         confirmButtonText: 'Pay',

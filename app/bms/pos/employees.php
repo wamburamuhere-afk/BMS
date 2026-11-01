@@ -755,10 +755,14 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 <div class="col-md-4 mb-3">
                                     <label for="currency" class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select select2-static" id="currency" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
                                         <option value="EUR">Euro (EUR)</option>
                                         <option value="GBP">British Pound (GBP)</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -2122,7 +2126,7 @@ function editEmployee(employeeId) {
                 }
 
                 $('#payment_method').val(emp.payment_method || 'bank');
-                $('#currency').val(emp.currency || 'TZS');
+                $('#currency').val(emp.currency || <?= json_encode(bmsCompanyCurrency()) ?>);
                 $('#hourly_rate').val(emp.hourly_rate || '');
                 $('#standard_working_hours').val(emp.standard_working_hours || 8);
                 $('#social_security_number').val(emp.social_security_number || '');
@@ -2479,7 +2483,7 @@ function downloadTemplate() {
         'basic_salary', 'currency', 'payment_frequency', 'payment_method'
     ];
     
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nEMP-001,John,,Doe,male,1990-01-15,john.doe@company.com,+255123456789,Emergency: +255987654321,123 Main St,Dar es Salaam,Tanzania,123456789,2023-01-01,1,1,1,active,500000,TZS,monthly,bank";
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nEMP-001,John,,Doe,male,1990-01-15,john.doe@company.com,+255123456789,Emergency: +255987654321,123 Main St,Dar es Salaam,Tanzania,123456789,2023-01-01,1,1,1,active,500000,<?= htmlspecialchars(bmsCompanyCurrency()) ?>,monthly,bank";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);

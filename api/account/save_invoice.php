@@ -72,7 +72,7 @@ try {
     $customer_id = $_POST['customer_id'] ?? 0;
     $invoice_date = $_POST['invoice_date'] ?? '';
     $due_date = $_POST['due_date'] ?? '';
-    $currency = $_POST['currency'] ?? 'TZS';
+    $currency = bmsEnforceDocCurrency($_POST['currency'] ?? bmsCompanyCurrency());   // core/currency.php: TZS company unchanged; other → own currency
     $notes = $_POST['notes'] ?? '';
     $terms = $_POST['terms_conditions'] ?? '';
     $discount = $_POST['discount_amount'] ?? 0;

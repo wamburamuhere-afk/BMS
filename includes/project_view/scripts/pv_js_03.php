@@ -260,7 +260,7 @@ function renderExpenses(expenses) {
             <td>${allocBadge(e)}</td>
             <td><div class="d-flex flex-wrap gap-1">${catBadges(e)}</div></td>
             <td>${formatDate(e.expense_date)}</td>
-            <td class="fw-bold text-danger">${formatMoney(e.amount)} TZS</td>
+            <td class="fw-bold text-danger">${formatMoney(e.amount)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></td>
             <td><span class="badge bg-${getStatusBadgeColor(e.status)}">${e.status}</span></td>
             <td class="text-end d-print-none">${exActions(e)}</td>
         </tr>`;
@@ -278,7 +278,7 @@ function renderExpenses(expenses) {
             <div class="mb-1">${allocBadge(e)} ${catBadges(e)}</div>
             <div class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>${formatDate(e.expense_date)}</div>
             <div class="d-flex justify-content-between align-items-center">
-                <span class="fw-bold text-danger">${formatMoney(e.amount)} TZS</span>
+                <span class="fw-bold text-danger">${formatMoney(e.amount)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                 ${exActions(e)}
             </div>
         </div></div></div>`;

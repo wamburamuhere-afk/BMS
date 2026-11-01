@@ -46,7 +46,7 @@ $dnote_tbl_columns = [
     'date'     => ['label' => 'Date',          'attrs' => ''],
     'supplier' => ['label' => 'Supplier',      'attrs' => ''],
     'origin'   => ['label' => 'Origin',        'attrs' => ''],
-    'amount'   => ['label' => 'Amount (TZS)',  'attrs' => 'class="text-end"'],
+    'amount'   => ['label' => 'Amount (' . bmsCompanyCurrency() . ')',  'attrs' => 'class="text-end"'],
     'status'   => ['label' => 'Status',        'attrs' => 'class="text-center"'],
     'actions'  => ['label' => 'Actions',       'attrs' => 'class="text-end d-print-none"'],
 ];

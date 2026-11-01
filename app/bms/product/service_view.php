@@ -513,7 +513,7 @@ $company_logo = getSetting('company_logo', '');
                                         <th class="ps-4 py-3" style="width:6%;"><?= t('S/No') ?></th>
                                         <th><?= t('Term') ?></th>
                                         <th><?= t('Length') ?></th>
-                                        <th class="text-end"><?= t('Price (TSh)') ?></th>
+                                        <th class="text-end"><?= str_replace('TSh', trim(bmsCurrencySymbol()), t('Price (TSh)')) ?></th>
                                         <th><?= t('Description') ?></th>
                                     </tr>
                                 </thead>
@@ -568,8 +568,8 @@ $company_logo = getSetting('company_logo', '');
                                         <th>Material Name</th>
                                         <th style="width:10%;">Unit</th>
                                         <th class="text-end" style="width:14%;">Qty / Unit</th>
-                                        <th class="text-end" style="width:18%;">Unit Cost (TSh)</th>
-                                        <th class="text-end" style="width:18%;">Total Cost (TSh)</th>
+                                        <th class="text-end" style="width:18%;">Unit Cost (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</th>
+                                        <th class="text-end" style="width:18%;">Total Cost (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="svcCompTbody">

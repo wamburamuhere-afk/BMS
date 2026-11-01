@@ -913,7 +913,7 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                     </tbody>
                                     <tfoot class="bg-light fw-bold">
                                         <tr>
-                                            <td colspan="6" class="text-end" id="budgetGrandTotalLabel">Grand Total Allocated (TZS):</td>
+                                            <td colspan="6" class="text-end" id="budgetGrandTotalLabel">Grand Total Allocated (<?= htmlspecialchars(bmsCompanyCurrency()) ?>):</td>
                                             <td class="text-end text-primary" id="budgetGrandTotal">0.00</td>
                                             <td></td>
                                         </tr>
@@ -1495,7 +1495,7 @@ function searchBudgetProducts(term) {
                 res.data.forEach(function(p) {
                     html += `<div class="px-3 py-2 border-bottom budget-product-item" style="cursor:pointer;" onmousedown="selectBudgetProduct(${p.product_id})">
                         <div class="fw-bold small">${p.product_name}</div>
-                        <div class="text-muted" style="font-size:0.75rem;">${p.unit || '—'} &bull; TZS ${parseFloat(p.selling_price || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                        <div class="text-muted" style="font-size:0.75rem;">${p.unit || '—'} &bull; <?= htmlspecialchars(bmsCompanyCurrency()) ?> ${parseFloat(p.selling_price || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</div>
                     </div>`;
                 });
                 $results.html(html).show();

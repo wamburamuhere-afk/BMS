@@ -714,14 +714,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
                                 <label class="form-label fw-bold small text-success"><?= $simpleServiceForm ? t('Amount to Sell') : t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <span class="input-group-text border-0 bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="svc_sell" value="0.00" step="0.01" required onkeyup="calcSvcMargin()" onchange="calcSvcMargin()">
                                 </div>
                             </div>
                             <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <span class="input-group-text border-0 bg-light"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="svc_cost" value="0.00" step="0.01" readonly>
                                 </div>
                             </div>
@@ -918,14 +918,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="<?= $simpleServiceForm ? 'col-12' : 'col-md-4' ?>">
                                 <label class="form-label fw-bold small text-success"><?= $simpleServiceForm ? t('Amount to Sell') : t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <span class="input-group-text border-0 bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="edit_svc_sell" step="0.01" required onkeyup="calcSvcMarginEdit()" onchange="calcSvcMarginEdit()">
                                 </div>
                             </div>
                             <div class="col-md-4<?= $simpleServiceForm ? ' d-none' : '' ?>">
                                 <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <span class="input-group-text border-0 bg-light"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="edit_svc_cost" step="0.01" readonly>
                                 </div>
                             </div>
@@ -1308,7 +1308,7 @@ function searchInventoryProduct(input, index) {
                                         </div>
                                         <div class="text-end ms-2" style="white-space: nowrap;">
                                             <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">${SVC_I18N.stock_label} ${parseFloat(prod.current_stock) || 0}</span>
-                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;">TZS ${price.toLocaleString()}</span>
+                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${price.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </button>
@@ -1550,7 +1550,7 @@ function searchInventoryProductEdit(input, index) {
                                         </div>
                                         <div class="text-end ms-2" style="white-space: nowrap;">
                                             <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">${SVC_I18N.stock_label} ${parseFloat(prod.current_stock) || 0}</span>
-                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;">TZS ${price.toLocaleString()}</span>
+                                            <span class="fw-bold text-primary d-block" style="font-size: 12px;"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${price.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </button>
@@ -2310,7 +2310,7 @@ function calcSvcMargin() {
     // element threw on every Add/Edit open (pos_detail_pages_plan.md C4).
     const mBadge = document.getElementById('svc_margin_badge'), pBadge = document.getElementById('svc_profit_badge');
     if (mBadge) mBadge.textContent = margin + '%';
-    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
+    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + profit.toLocaleString();
 }
 
 function calcSvcMarginEdit() {
@@ -2322,7 +2322,7 @@ function calcSvcMarginEdit() {
     // element threw on every Add/Edit open (pos_detail_pages_plan.md C4).
     const mBadge = document.getElementById('edit_svc_margin_badge'), pBadge = document.getElementById('edit_svc_profit_badge');
     if (mBadge) mBadge.textContent = margin + '%';
-    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
+    if (pBadge) pBadge.textContent = SVC_I18N.profit_label + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + profit.toLocaleString();
 }
 
 function submitSvcForm(addAnother) {

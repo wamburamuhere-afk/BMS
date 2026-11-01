@@ -34,7 +34,7 @@
     /** TZS 1,250,000.00 */
     BMSTbl.money = function (amount, currency) {
         var num = parseFloat(amount) || 0;
-        return (currency || 'TZS') + ' ' + num.toLocaleString('en-US', {
+        return (currency || window.BMS_COMPANY_CURRENCY || 'TZS') + ' ' + num.toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });

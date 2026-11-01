@@ -708,7 +708,7 @@ function buildUrl(path) {
 }
 
 // Format currency function
-function formatCurrency(amount, currency = 'TZS') {
+function formatCurrency(amount, currency = '<?= htmlspecialchars(bmsCompanyCurrency()) ?>') {
     const num = parseFloat(amount) || 0;
     return currency + ' ' + num.toLocaleString('en-US', {
         minimumFractionDigits: 2,
