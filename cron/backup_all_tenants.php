@@ -27,6 +27,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/tenant_backups.php';
+require_once __DIR__ . '/../core/backup_health.php';
 
 $opts     = getopt('', ['kind:', 'tenant:', 'list']);
 $kind     = $opts['kind'] ?? null;
@@ -85,4 +86,19 @@ if (!$summary['ran']) {
 
 backup_cli_log($logFile, "Finished $kind backup: {$summary['ok']} ok, {$summary['failed']} failed.");
 flock($lock, LOCK_UN);
+
+// Health check after every scheduled run of all targets: alerts the superadmins
+// (bell + email, once a day) about failed or overdue backups and about the
+// off-site copy, whose root-run job cannot reach the database itself.
+if ($tenantId === null) {
+    try {
+        $health = bmsBackupHealth();
+        if ($health['problems']) {
+            backup_cli_log($logFile, 'Health: ' . count($health['problems']) . ' problem(s) — ' . implode(' | ', $health['problems']));
+            if (bmsBackupHealthAlert($health)) backup_cli_log($logFile, 'Health: alert sent to superadmins.');
+        }
+    } catch (Throwable $e) {
+        backup_cli_log($logFile, 'Health check failed: ' . $e->getMessage());
+    }
+}
 exit($summary['failed'] === 0 ? 0 : 1);
