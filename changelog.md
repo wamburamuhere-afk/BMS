@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-01 — ui(services): Huduma / Services — summary cards get a coloured edge bar
+
+**Changed:** `app/bms/product/services.php`.
+
+- The four summary cards (Total, Active, Inactive, Categories) were plain white with a faint shadow and faded into the page. They now have a thin border and a coloured left edge bar — blue / green / amber / teal — with left-aligned text and small uppercase labels, the same look as Expenses and Who Owes Me.
+- "Inactive" count is amber instead of red.
+- Same text and counts as before (only classes and CSS added), on all screen sizes.
+
 ## 2026-11-01 — ui(pos): Who Owes Me (Wanaodaiwa) — phone summary cards, no red, one labelled Actions menu
 
 **Changed:** `app/bms/pos/pos_credit_customers.php`, `assets/js/pos-credit-aging.js`, `app/bms/customer/customer_details.php` (one i18n key for the Madeni tab, which shares the JS).
