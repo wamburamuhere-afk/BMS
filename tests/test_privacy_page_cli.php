@@ -31,8 +31,35 @@ ok(str_contains($html, 'drive.file') && str_contains($html, 'Limited Use'), 'sta
 ok(str_contains($html, 'bjptechnologieslimited@gmail.com'), 'gives a contact address');
 
 $src = (string)file_get_contents(dirname(__DIR__) . '/privacy.php');
-$code = preg_replace('~/\*.*?\*/~s', '', substr($src, 0, (int)strpos($src, '?>')));
-ok($code !== '' && !preg_match('/require|include|session_start|PDO/', $code), 'static page: no session, database or app code');
+ok(!str_contains($src, 'session_start'), 'needs no session');
+ok(str_contains($src, 'htmlspecialchars'), 'profile values are escaped before output');
+
+// Profile-driven: set this tenant's Company Profile, render, then restore it.
+require_once dirname(__DIR__) . '/includes/config.php';
+$old = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('company_name','company_email')")->fetchAll(PDO::FETCH_KEY_PAIR);
+$set = function ($k, $v) use ($pdo) {
+    $u = $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
+    $u->execute([$v, $k]);
+    if ($u->rowCount() === 0 && !$pdo->query("SELECT 1 FROM system_settings WHERE setting_key = " . $pdo->quote($k))->fetchColumn()) {
+        $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, setting_group, is_public) VALUES (?, ?, 'company', 1)")->execute([$k, $v]);
+    }
+};
+$render = fn() => (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' --route /privacy 2>&1');
+try {
+    $set('company_name', 'Acme <b>Traders</b> Ltd'); $set('company_email', 'privacy@acme.example');
+    $html = $render();
+    ok(str_contains($html, 'Acme &lt;b&gt;Traders&lt;/b&gt; Ltd'), 'shows the company name from Company Profile, escaped');
+    ok(str_contains($html, 'privacy@acme.example'), 'shows the company email from Company Profile');
+    ok(str_contains($html, 'BMS provider: BJP Technologies'), 'names BJP as provider when the company differs');
+    $set('company_name', 'My Company'); $set('company_email', 'info@example.com');
+    $html = $render();
+    ok(!str_contains($html, 'My Company') && str_contains($html, 'bjptechnologieslimited@gmail.com'), 'placeholder profile falls back to BJP');
+} finally {
+    foreach (['company_name', 'company_email'] as $k) {
+        if (array_key_exists($k, $old)) { $set($k, $old[$k]); }
+        else { $pdo->prepare("DELETE FROM system_settings WHERE setting_key = ?")->execute([$k]); }
+    }
+}
 
 echo "\nPasses:   $pass\nFailures: $fail\n";
 exit($fail === 0 ? 0 : 1);
