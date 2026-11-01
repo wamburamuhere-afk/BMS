@@ -520,7 +520,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     </style>
     
     <link rel="stylesheet" href="<?= getUrl('style.css') ?>">
-    <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
+    <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/responsive.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/loading.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/loading.css') ?>">
 
     <style>
@@ -903,7 +903,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
     </style>
 
-<script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>"></script>
+<script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/bms-mobile-cards.js') ?>"></script>
 <script>
 window.BMS_PRICE_CHECK_T = <?= json_encode([
     'title' => t('Wholesale price is higher than retail'),

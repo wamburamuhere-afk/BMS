@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-11-01 — fix: shared CSS/JS reach the browser immediately (cache-busting for responsive.css and bms-mobile-cards.js)
+
+**Changed:** `header.php`.
+
+- **Problem:** `.htaccess` lets browsers keep CSS/JS for 1 hour, and `responsive.css` and `bms-mobile-cards.js` were the only two local assets linked without a `?v=` version. After a deploy, a browser that already had the old copy showed the NEW page markup (e.g. the `stat-edge` classes on the Customers/Suppliers cards) with the OLD stylesheet, so the coloured edge bars did not appear and the cards stayed green until the cache expired.
+- **Fix:** both links now carry `?v=<file modification time>`, exactly like every other asset in the header, so any edit to them is picked up on the next page load.
+
 ## 2026-11-01 — ui: Customers & Suppliers — edge-bar summary cards, one named Actions menu on the record cards
 
 **Changed:** `assets/css/responsive.css`, `app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`.
