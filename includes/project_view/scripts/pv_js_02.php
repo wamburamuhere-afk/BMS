@@ -446,7 +446,7 @@ function renderProjectReceivedInvoices(rows) {
         + '<th>Date Raised</th>'
         + '<th>Due Date</th>'
         + '<th>PO / Project</th>'
-        + '<th class="text-end">Amount (TZS)</th>'
+        + '<th class="text-end">Amount (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>'
         + '<th>Status</th>'
         + '<th class="text-end d-print-none">Actions</th>'
         + '</tr></thead><tbody>';

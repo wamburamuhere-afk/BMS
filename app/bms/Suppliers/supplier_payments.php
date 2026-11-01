@@ -330,11 +330,15 @@ if (!empty($filter_supplier_id)) {
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Currency') ?></label>
                             <select class="form-select select2-static" name="currency">
+                                <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                 <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                 <option value="USD">US Dollar (USD)</option>
                                 <option value="EUR">Euro (EUR)</option>
                                 <option value="GBP">British Pound (GBP)</option>
                                 <option value="KES">Kenyan Shilling (KES)</option>
+                                <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                <?= bmsCompanyCurrencyOptionHtml() ?>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -437,11 +441,15 @@ if (!empty($filter_supplier_id)) {
                         <div class="col-md-6">
                             <label class="form-label"><?= t('Currency') ?></label>
                             <select class="form-select select2-static" name="currency" id="edit_currency">
+                                <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                 <option value="TZS">Tanzanian Shilling (TZS)</option>
                                 <option value="USD">US Dollar (USD)</option>
                                 <option value="EUR">Euro (EUR)</option>
                                 <option value="GBP">British Pound (GBP)</option>
                                 <option value="KES">Kenyan Shilling (KES)</option>
+                                <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                <?= bmsCompanyCurrencyOptionHtml() ?>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -763,7 +771,7 @@ function viewPayment(id) {
                 $('#slip_supplier').text(p.supplier_name || '—');
                 $('#slip_company').text(p.company_name || '');
                 $('#slip_amount').text(Number(p.amount).toLocaleString('en-US', {minimumFractionDigits: 2}));
-                $('#slip_currency').text(p.currency || 'TZS');
+                $('#slip_currency').text(p.currency || <?= json_encode(bmsCompanyCurrency()) ?>);
                 $('#slip_method').text(method);
                 $('#slip_prepared_by').text(p.created_by_name || '');
 

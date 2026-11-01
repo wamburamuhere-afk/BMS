@@ -73,13 +73,13 @@ $statusBadge = [
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
                 <div class="fs-4 fw-bold text-primary"><?= number_format($budget, 0) ?></div>
-                <div class="small text-muted">Total Budget (TZS)</div>
+                <div class="small text-muted">Total Budget (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
                 <div class="fs-4 fw-bold text-primary"><?= number_format($spent, 0) ?></div>
-                <div class="small text-muted">Total Spent (TZS)</div>
+                <div class="small text-muted">Total Spent (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
             </div>
         </div>
     </div>
@@ -100,11 +100,11 @@ $statusBadge = [
                         <th>Name</th>
                         <th>Type</th>
                         <th>Date Range</th>
-                        <th class="text-end">Budget (TZS)</th>
-                        <th class="text-end">Spent (TZS)</th>
+                        <th class="text-end">Budget (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
+                        <th class="text-end">Spent (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                         <th class="text-end">Leads</th>
                         <th class="text-end">Converted</th>
-                        <th class="text-end">Won Value (TZS)</th>
+                        <th class="text-end">Won Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                         <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -174,7 +174,7 @@ $statusBadge = [
             <input type="date" class="form-control" name="end_date" id="<?= $p ?>_end_date">
         </div>
         <div class="col-md-6">
-            <label class="form-label">Budget (TZS)</label>
+            <label class="form-label">Budget (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</label>
             <input type="number" class="form-control" name="budget" id="<?= $p ?>_budget" min="0" step="0.01" value="0">
         </div>
         <div class="col-12">
@@ -356,7 +356,7 @@ function renderCards(rows) {
                     <div class="small text-muted">${safeOutput(type)}</div>
                     <div class="d-flex justify-content-between mt-2">
                         <span>${row[8]}</span>
-                        <span class="text-primary fw-semibold">${row[7]} TZS won</span>
+                        <span class="text-primary fw-semibold">${row[7]} <?= htmlspecialchars(bmsCompanyCurrency()) ?> won</span>
                     </div>
                 </div>
             </div>

@@ -275,6 +275,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     const BMS_COMPANY_NAME = '<?= htmlspecialchars($company_name ?? '', ENT_QUOTES) ?>';
     const BMS_COMPANY_LOGO = '<?= htmlspecialchars($company_logo ? getUrl($company_logo) : '', ENT_QUOTES) ?>';
     const CSRF_TOKEN = '<?= csrf_token() ?>';
+    // Company operating currency (core/currency.php) for plain .js files that cannot run PHP.
+    window.BMS_COMPANY_CURRENCY = <?= json_encode(bmsCompanyCurrency()) ?>;
+    window.BMS_CURRENCY_SYMBOL  = <?= json_encode(bmsCurrencySymbol()) ?>;
     $.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
 
     // Text Display Case (2026-09-18) — JS twin of core/text_display_case.php's

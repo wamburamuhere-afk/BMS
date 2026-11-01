@@ -59,7 +59,7 @@ try {
     $order_date = $_POST['order_date'] ?? '';
     $expected_date = $_POST['expected_delivery_date'] ?? null;
     $warehouse_id = $_POST['warehouse_id'] ?? 0;
-    $currency = $_POST['currency'] ?? 'TZS';
+    $currency = bmsEnforceDocCurrency($_POST['currency'] ?? bmsCompanyCurrency());   // core/currency.php: TZS company unchanged; other → own currency
     $payment_terms = $_POST['payment_terms'] ?? '';
     $shipping_address = $_POST['shipping_address'] ?? '';
     $shipping_method = $_POST['shipping_method_id'] ?? '';

@@ -76,7 +76,7 @@ foreach ($items as $item) {
 }
 
 $net_payable = floatval($ipc['net_payable'] ?? 0);
-$fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
+$fmt = fn($n) => bmsCompanyCurrency() . ' ' . number_format(floatval($n), 2);
 
 $wf_sigs      = getWorkflowSignatures($pdo, 'ipc', $ipc_id);
 $ipc_creator  = trim(($ipc['creator_first']  ?? '') . ' ' . ($ipc['creator_last']  ?? '')) ?: 'System';
@@ -378,7 +378,7 @@ $wf = [
                 <th class="text-center" style="width:60px;">Unit</th>
                 <th class="text-right" style="width:120px;">Unit Price</th>
                 <th class="text-center" style="width:65px;">Tax %</th>
-                <th class="text-right" style="width:130px;">Total (TZS)</th>
+                <th class="text-right" style="width:130px;">Total (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
             </tr>
         </thead>
         <tbody>
@@ -406,17 +406,17 @@ $wf = [
     <div class="totals">
         <div class="totals-row">
             <span>Subtotal:</span>
-            <span>TZS <?= number_format($subtotal, 2) ?></span>
+            <span><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($subtotal, 2) ?></span>
         </div>
         <?php if ($tax_sum > 0): ?>
         <div class="totals-row">
             <span>Tax:</span>
-            <span>TZS <?= number_format($tax_sum, 2) ?></span>
+            <span><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($tax_sum, 2) ?></span>
         </div>
         <?php endif; ?>
         <div class="totals-row grand-total">
             <span>NET PAYABLE:</span>
-            <span>TZS <?= number_format($net_payable, 2) ?></span>
+            <span><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($net_payable, 2) ?></span>
         </div>
     </div>
 

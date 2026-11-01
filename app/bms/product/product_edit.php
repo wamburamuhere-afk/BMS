@@ -637,7 +637,7 @@ function deleteSellingUnit(id) {
                             <div class="col-md-4 mt-4">
                                 <label for="cost_price" class="form-label fw-bold"><?= t('Buying Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <span class="input-group-text bg-white border-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control bg-light border-0" id="cost_price" name="cost_price"
                                            min="0" step="0.01" value="<?= $product['cost_price'] ?>" required onkeyup="calculateMarkup()">
                                 </div>
@@ -645,7 +645,7 @@ function deleteSellingUnit(id) {
                             <div class="col-md-4 mt-4">
                                 <label for="wholesale_price" class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white border-0">TZS</span>
+                                    <span class="input-group-text bg-white border-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control bg-light border-0" id="wholesale_price" name="wholesale_price"
                                            min="0" step="0.01" value="<?= $product['wholesale_price'] ?>">
                                 </div>
@@ -653,7 +653,7 @@ function deleteSellingUnit(id) {
                             <div class="col-md-4 mt-4">
                                 <label for="selling_price" class="form-label fw-bold"><?= t('Retail Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group border border-primary rounded-3 overflow-hidden shadow-sm">
-                                    <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
+                                    <span class="input-group-text bg-white border-0 text-primary fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                     <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
                                            min="0" step="0.01" value="<?= $product['selling_price'] ?>" required onkeyup="calculateMarkup(); calculateMinSellingPrice();">
                                 </div>
@@ -957,7 +957,7 @@ function deleteSellingUnit(id) {
                                     <div class="mb-3">
                                         <label for="cost_price" class="form-label fw-bold"><?= t('Cost Price / Purchase Price') ?> <span class="text-danger">*</span></label>
                                         <div class="input-group input-group-lg">
-                                            <span class="input-group-text bg-white border-0">TZS</span>
+                                            <span class="input-group-text bg-white border-0"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                             <input type="number" class="form-control border-0" id="cost_price" name="cost_price"
                                                    min="0" step="0.01" value="<?= $product['cost_price'] ?>" required onkeyup="calculateMarkup()">
                                         </div>
@@ -966,7 +966,7 @@ function deleteSellingUnit(id) {
                                     <div class="mb-3">
                                         <label for="selling_price" class="form-label fw-bold"><?= t('Standard Selling Price') ?> <span class="text-danger">*</span></label>
                                         <div class="input-group input-group-lg">
-                                            <span class="input-group-text bg-success text-white fw-bold">TZS</span>
+                                            <span class="input-group-text bg-success text-white fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                             <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
                                                    min="0" step="0.01" value="<?= $product['selling_price'] ?>" required onkeyup="calculateMarkup(); calculateMinSellingPrice();">
                                         </div>
@@ -977,7 +977,7 @@ function deleteSellingUnit(id) {
                                         <div class="col-md-6 mb-3">
                                             <label for="wholesale_price" class="form-label fw-bold small text-muted"><?= t('Wholesale Price') ?></label>
                                             <div class="input-group">
-                                                <span class="input-group-text bg-info text-white">TZS</span>
+                                                <span class="input-group-text bg-info text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                                 <input type="number" class="form-control border-0" id="wholesale_price" name="wholesale_price"
                                                        min="0" step="0.01" value="<?= $product['wholesale_price'] ?>">
                                             </div>
@@ -1020,7 +1020,7 @@ function deleteSellingUnit(id) {
                                             <div class="card border-0 shadow-sm rounded-4 text-center p-3">
                                                 <label class="form-label text-muted small fw-bold mb-1 uppercase"><?= t('Estimated Profit') ?></label>
                                                 <div class="d-flex align-items-center justify-content-center">
-                                                    <span class="fw-bold fs-5 me-1">TZS</span>
+                                                    <span class="fw-bold fs-5 me-1"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                                     <input type="text" class="form-control-plaintext text-center fw-bold fs-3 border-0" id="profit_margin" value="0.00" readonly style="width: 130px;">
                                                 </div>
                                             </div>
@@ -1047,7 +1047,7 @@ function deleteSellingUnit(id) {
                                     <div class="mb-3 mt-4">
                                         <label class="form-label fw-bold small text-muted"><?= t('Min Selling Price') ?></label>
                                         <div class="input-group">
-                                            <span class="input-group-text bg-danger text-white">TZS</span>
+                                            <span class="input-group-text bg-danger text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                             <input type="number" class="form-control" id="min_selling_price" name="min_selling_price"
                                                    value="<?= $product['min_selling_price'] ?>" step="0.01">
                                         </div>

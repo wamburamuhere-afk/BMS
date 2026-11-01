@@ -116,7 +116,7 @@ if (function_exists('logActivity')) {
 }
 
 includeHeader();
-function tzs0($v){ return number_format((float)$v, 0) . ' TZS'; }
+function tzs0($v){ return number_format((float)$v, 0) . ' ' . bmsCompanyCurrency(); }
 $viewUrl = getUrl('asset_view');
 ?>
 

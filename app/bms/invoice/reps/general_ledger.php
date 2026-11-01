@@ -229,7 +229,7 @@ if (!function_exists('gl_fmt')) {
                 <div class="small text-muted">as of <?= date('d M Y', strtotime($start_date)) ?></div>
             </div>
             <div class="text-end">
-                <div class="fs-5 fw-bold font-monospace"><?= gl_fmt($open) ?> TZS</div>
+                <div class="fs-5 fw-bold font-monospace"><?= gl_fmt($open) ?> <?= htmlspecialchars(bmsCompanyCurrency()) ?></div>
                 <small class="text-muted">(<?= $normal === 'debit' ? 'Dr' : 'Cr' ?> natural)</small>
             </div>
         </div>
@@ -300,7 +300,7 @@ if (!function_exists('gl_fmt')) {
                 <div class="small text-muted">as of <?= date('d M Y', strtotime($end_date)) ?></div>
             </div>
             <div class="text-end">
-                <div class="fs-4 fw-bold font-monospace text-info"><?= gl_fmt($close) ?> TZS</div>
+                <div class="fs-4 fw-bold font-monospace text-info"><?= gl_fmt($close) ?> <?= htmlspecialchars(bmsCompanyCurrency()) ?></div>
                 <small class="text-muted">(<?= $normal === 'debit' ? 'Dr' : 'Cr' ?> natural)</small>
             </div>
         </div>

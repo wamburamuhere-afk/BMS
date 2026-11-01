@@ -39,11 +39,12 @@ try {
     //    are shared. Mutates $_POST so the $data array below picks up resolved values.
     $customer_type = trim($_POST['customer_type'] ?? 'business');
     $payment_terms = trim($_POST['payment_terms'] ?? '');
-    $currency      = trim($_POST['currency'] ?? 'TZS');
+    $currency      = trim($_POST['currency'] ?? bmsCompanyCurrency());
     $year          = trim($_POST['year'] ?? date('Y'));
     if ($customer_type === 'other') $customer_type = trim($_POST['customer_type_other'] ?? '');
     if ($payment_terms === 'other') $payment_terms = trim($_POST['payment_terms_other'] ?? '');
-    if ($currency === 'other')      $currency      = trim($_POST['currency_other'] ?? 'TZS');
+    if ($currency === 'other')      $currency      = trim($_POST['currency_other'] ?? bmsCompanyCurrency());
+    $currency = bmsEnforceDocCurrency($currency);   // non-TZS company: always its own currency (core/currency.php)
     if ($year === 'other')          $year          = trim($_POST['year_other'] ?? date('Y'));
 
     // Category "Other" — create the customer_categories row on the fly if typed.
@@ -112,7 +113,7 @@ try {
         'vat_number' => $_POST['vat_number'] ?? null,
         'default_wht_rate_id' => !empty($_POST['default_wht_rate_id']) ? (int)$_POST['default_wht_rate_id'] : null,
         'payment_terms' => $_POST['payment_terms'] ?? null,
-        'currency' => $_POST['currency'] ?? 'TZS',
+        'currency' => $_POST['currency'] ?? bmsCompanyCurrency(),
         'bank_name' => $_POST['bank_name'] ?? null,
         'bank_account' => $_POST['bank_account'] ?? null,
         'bank_address' => $_POST['bank_address'] ?? null,

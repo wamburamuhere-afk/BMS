@@ -123,7 +123,7 @@ if (isset($_GET['ajax'])) {
         <div id="ajax-cards">
             <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Total Period Revenue</h6><h2 class="fw-bold mb-0"><?= format_currency($final_total_grand) ?></h2></div></div></div>
             <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Total Transactions</h6><h2 class="fw-bold mb-0"><?= number_format($final_total_qty) ?></h2></div></div></div>
-            <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Avg. Value per Sale</h6><h2 class="fw-bold mb-0"><?= $final_total_qty > 0 ? format_currency($final_total_grand / $final_total_qty) : 'TZS 0.00' ?></h2></div></div></div>
+            <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Avg. Value per Sale</h6><h2 class="fw-bold mb-0"><?= $final_total_qty > 0 ? format_currency($final_total_grand / $final_total_qty) : bmsCompanyCurrency() . ' 0.00' ?></h2></div></div></div>
         </div>
 
         <!-- Part 2: Table Rows -->
@@ -236,7 +236,7 @@ if (isset($_GET['ajax'])) {
     <div class="row g-4 mb-4" id="stat-cards-area">
         <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Total Period Revenue</h6><h2 class="fw-bold mb-0"><?= format_currency($final_total_grand) ?></h2></div></div></div>
         <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Total Transactions</h6><h2 class="fw-bold mb-0"><?= number_format($final_total_qty) ?></h2></div></div></div>
-        <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Avg. Value per Sale</h6><h2 class="fw-bold mb-0"><?= $final_total_qty > 0 ? format_currency($final_total_grand / $final_total_qty) : 'TZS 0.00' ?></h2></div></div></div>
+        <div class="col-md-4"><div class="card border-0 shadow-sm stat-mini-card h-100"><div class="card-body py-4"><h6 class="text-uppercase small fw-bold mb-3 opacity-75">Avg. Value per Sale</h6><h2 class="fw-bold mb-0"><?= $final_total_qty > 0 ? format_currency($final_total_grand / $final_total_qty) : bmsCompanyCurrency() . ' 0.00' ?></h2></div></div></div>
     </div>
 
     <div class="card shadow-sm border-0 mb-4" id="main-report-card">

@@ -138,13 +138,16 @@ function regStatusBuildReadyPayload(PDO $cpdo, array $job): array
 
         $settingStmt = $tpdo->prepare("
             SELECT setting_key, setting_value FROM system_settings
-            WHERE setting_key IN (?,?,?,?,?)
+            WHERE setting_key IN (?,?,?,?,?,?)
         ");
-        $settingStmt->execute(['company_name','company_logo','company_currency','company_address','company_phone']);
+        $settingStmt->execute(['company_name','company_logo','company_currency','company_address','company_phone','currency']);
         $settings = [];
         while ($row = $settingStmt->fetch(PDO::FETCH_ASSOC)) {
             $settings[$row['setting_key']] = $row['setting_value'];
         }
+        // Same rule as core/currency.php bmsCompanyCurrency(): the web's `currency` key decides.
+        $__c = strtoupper(trim((string)($settings['currency'] ?? '')));
+        $settings['company_currency'] = preg_match('/^[A-Z]{3}$/', $__c) ? $__c : 'TZS';
 
         $base['user'] = [
             'id'         => (int)$user['user_id'],

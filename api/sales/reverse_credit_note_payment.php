@@ -64,7 +64,7 @@ try {
     require_once __DIR__ . '/../../helpers.php';
     $user_name = $_SESSION['username'] ?? 'User';
     logActivity($pdo, $_SESSION['user_id'], 'Reverse Credit Note Payment',
-        "$user_name reversed the refund for Credit Note #{$cn['credit_note_number']} (TZS " . number_format((float)$cn['grand_total'], 2) . ")");
+        "$user_name reversed the refund for Credit Note #{$cn['credit_note_number']} (" . bmsCompanyCurrency() . " " . number_format((float)$cn['grand_total'], 2) . ")");
     if (function_exists('logAudit')) {
         logAudit($pdo, $_SESSION['user_id'], 'credit_note_payment_reversed', [
             'entity_type' => 'credit_note', 'entity_id' => $id,

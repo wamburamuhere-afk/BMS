@@ -984,7 +984,7 @@ function renderStats(data) {
             <div class="card custom-stat-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><h5 class="mb-0 fw-bold" style="font-size: 1rem;">${(data.total_value).toLocaleString('en-US', {style: 'currency', currency: 'TZS'})}</h5><p class="mb-0 small">Total Value</p></div>
+                        <div><h5 class="mb-0 fw-bold" style="font-size: 1rem;">${(data.total_value).toLocaleString('en-US', {style: 'currency', currency: '<?= htmlspecialchars(bmsCompanyCurrency()) ?>'})}</h5><p class="mb-0 small">Total Value</p></div>
                         <div><i class="bi bi-cash fs-2"></i></div>
                     </div>
                 </div>
@@ -1241,7 +1241,7 @@ function loadInvoicesForReturn(supplierId, targetId) {
     $.getJSON('<?= getUrl('api/get_invoices_for_return.php') ?>', { supplier_id: supplierId }, function(res) {
         if (res.success && res.data && res.data.length) {
             res.data.forEach(inv => {
-                const label = inv.invoice_ref + ' — ' + inv.date_raised + ' (TZS ' + parseFloat(inv.amount).toLocaleString() + ')';
+                const label = inv.invoice_ref + ' — ' + inv.date_raised + ' (<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + parseFloat(inv.amount).toLocaleString() + ')';
                 sel.innerHTML += `<option value="${inv.id}">${label}</option>`;
             });
         }

@@ -86,6 +86,8 @@ require_once __DIR__ . '/../../../core/form_lookups.php';
 $lk_customer_type = formLookupOptions($pdo, 'customer_type');
 $lk_payment_terms = formLookupOptions($pdo, 'payment_terms');
 $lk_currency      = formLookupOptions($pdo, 'currency');
+// Non-TZS company: documents use only the company's own currency (core/currency.php).
+if (!bmsIsDefaultCurrency()) { $lk_currency = [['value' => bmsCompanyCurrency(), 'label' => bmsCompanyCurrency()]]; }
 $lk_categories    = array_map(fn($c) => ['value' => (string)$c['category_id'], 'label' => $c['category_name']], $categories);
 $lk_years = [];
 for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (string)$y, 'label' => (string)$y]; }
@@ -733,7 +735,7 @@ $simpleCustomerForm = posSimpleModeEnabled() && !advancedCustomerEnabled();
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label"><?= t('Currency') ?></label>
-                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', t('Select Currency')) ?>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, bmsCompanyCurrency(), 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>
@@ -1239,11 +1241,11 @@ $(document).ready(function() {
                         <div class="p-1 px-2 rounded bg-light border border-opacity-10">
                             <div class="d-flex justify-content-between align-items-center gap-3">
                                 <small class="text-muted fw-bold" style="font-size: 0.6rem;"><?= t('PAID') ?></small>
-                                <span class="text-success fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_paid).replace('TZS ', '')}</span>
+                                <span class="text-success fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_paid).replace('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ', '')}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center gap-3 mt-1 border-top pt-1">
                                 <small class="text-muted fw-bold" style="font-size: 0.6rem;"><?= t('DUE') ?></small>
-                                <span class="text-danger fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_unpaid).replace('TZS ', '')}</span>
+                                <span class="text-danger fw-bold" style="font-size: 0.85rem;">${formatCurrency(row.total_unpaid).replace('<?= htmlspecialchars(bmsCompanyCurrency()) ?> ', '')}</span>
                             </div>
                         </div>
                     `,
@@ -1660,7 +1662,7 @@ function safeOutput(str) {
 }
 
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(amount);
+    return new Intl.NumberFormat('en-TZ', { style: 'currency', currency: '<?= htmlspecialchars(bmsCompanyCurrency()) ?>' }).format(amount);
 }
 
 function editCustomer(customerId) {
@@ -1891,7 +1893,7 @@ function downloadTemplate() {
         'payment_terms', 'credit_limit', 'currency', 'bank_name', 'bank_account',
         'bank_address', 'description', 'status'
     ];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nJohn Doe,ABC Company,JD,business,John Doe,Manager,john@abc.com,+255123456789,+255987654321,,http://abc.com,123 Street,Dar es Salaam,Dar es Salaam,Tanzania,12345,TIN123,VAT123,30_days,1000000,TZS,Example Bank,123456789,123 Bank Street,Good customer,active";
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nJohn Doe,ABC Company,JD,business,John Doe,Manager,john@abc.com,+255123456789,+255987654321,,http://abc.com,123 Street,Dar es Salaam,Dar es Salaam,Tanzania,12345,TIN123,VAT123,30_days,1000000,<?= htmlspecialchars(bmsCompanyCurrency()) ?>,Example Bank,123456789,123 Bank Street,Good customer,active";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);

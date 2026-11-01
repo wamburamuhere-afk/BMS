@@ -82,11 +82,11 @@ function refreshProjectGrandTotal() {
                 const utilization = currentBudget > 0 ? Math.round((spent / currentBudget) * 100) : 0;
                 
                 // Update Budget Cards
-                $('#budgetDisplay').text(formatMoney(currentBudget) + ' TZS');
-                $('#budgetAllocated').text(formatMoney(currentBudget) + ' TZS');
+                $('#budgetDisplay').text(formatMoney(currentBudget) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
+                $('#budgetAllocated').text(formatMoney(currentBudget) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
                 
                 const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
-                $('#budgetRemaining').text(formatMoney(remaining) + ' TZS')
+                $('#budgetRemaining').text(formatMoney(remaining) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>')
                     .removeClass('text-success text-danger').addClass(remainingClass);
                 
                 const progressWidth = Math.min(utilization, 100);
@@ -108,7 +108,7 @@ function refreshProjectGrandTotal() {
                     statusMessage = 'ATTENTION: No approved budget was set for this project in Finance';
                     statusClass = 'alert-secondary';
                 } else if (utilization > 100) {
-                    statusMessage = `⚠️ Over budget by ${formatMoney(Math.abs(remaining))} TZS (${utilization - 100}% over)`;
+                    statusMessage = `⚠️ Over budget by ${formatMoney(Math.abs(remaining))} <?= htmlspecialchars(bmsCompanyCurrency()) ?> (${utilization - 100}% over)`;
                     statusClass = 'alert-danger';
                     statusIcon = 'bi-exclamation-triangle-fill';
                 } else if (utilization >= 90) {

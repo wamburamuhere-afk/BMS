@@ -38,13 +38,8 @@ $warehouses = warehousesForSelect($pdo);
 // Tax rates — same VAT-only restriction as the Purchase Order module.
 $tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' AND rate_percentage IN (0, 18) ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
-$currencies = [
-    'TZS' => 'Tanzanian Shilling',
-    'USD' => 'US Dollar',
-    'EUR' => 'Euro',
-    'GBP' => 'British Pound',
-    'KES' => 'Kenyan Shilling'
-];
+// TZS company: the same 5 currencies as before. Other company: only its own (core/currency.php).
+$currencies = bmsDocumentCurrencies();
 
 // Projects if enabled — reflects BOTH the superadmin's platform grant AND the
 // tenant's own "Enable Projects Module" setting; see projectsModuleActive()
@@ -153,7 +148,7 @@ $back_url = getUrl('lpos');
                                 ?>
                                     <option value="<?= $c['customer_id'] ?>"
                                         <?= $customer_id == $c['customer_id'] ? 'selected' : '' ?>
-                                        data-currency="<?= htmlspecialchars($c['currency'] ?? 'TZS') ?>">
+                                        data-currency="<?= htmlspecialchars($c['currency'] ?? bmsCompanyCurrency()) ?>">
                                         <?= htmlspecialchars($cname) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -264,7 +259,7 @@ $back_url = getUrl('lpos');
                                             </td>
                                             <td>
                                                 <div class="input-group">
-                                                    <span class="input-group-text bg-light cur-symbol">TSh </span>
+                                                    <span class="input-group-text bg-light cur-symbol"><?= htmlspecialchars(bmsCurrencySymbol()) ?></span>
                                                     <input type="number" class="form-control price-input" name="price" value="<?= $item['unit_price'] ?>" min="0" step="0.01" oninput="calculateRowTotal('<?= $rowId ?>')" required>
                                                 </div>
                                             </td>
@@ -293,7 +288,7 @@ $back_url = getUrl('lpos');
                             <tfoot>
                                 <tr class="bg-light">
                                     <td colspan="5" class="text-end fw-bold">Subtotal:</td>
-                                    <td class="text-end fw-bold pt-3" id="subtotal_display">TSh 0.00</td>
+                                    <td class="text-end fw-bold pt-3" id="subtotal_display"><?= htmlspecialchars(bmsCurrencySymbol()) ?>0.00</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -380,7 +375,7 @@ $back_url = getUrl('lpos');
                             <hr class="my-3">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h4 class="mb-0 fw-bold text-dark">Total Value</h4>
-                                <h4 class="mb-0 fw-bold text-primary" id="summary-grand-total">TSh 0.00</h4>
+                                <h4 class="mb-0 fw-bold text-primary" id="summary-grand-total"><?= htmlspecialchars(bmsCurrencySymbol()) ?>0.00</h4>
                             </div>
                         </div>
                     </div>
@@ -464,7 +459,7 @@ $(document).ready(function() {
     $('#customer_id').on('change', function() {
         const option = $(this).find('option:selected');
         if (option.val()) {
-            $('#currency').val(option.data('currency') || 'TZS');
+            $('#currency').val(option.data('currency') || <?= json_encode(bmsCompanyCurrency()) ?>);
             updateCurSymbols();
         }
     });
@@ -550,7 +545,7 @@ function addItemRow() {
             <td><input type="number" class="form-control qty-input" name="qty" value="1" min="0.001" step="0.001" oninput="calculateRowTotal('${rowId}')" required></td>
             <td>
                 <div class="input-group">
-                    <span class="input-group-text bg-light cur-symbol">TSh </span>
+                    <span class="input-group-text bg-light cur-symbol"><?= htmlspecialchars(bmsCurrencySymbol()) ?></span>
                     <input type="number" class="form-control price-input" name="price" value="0.00" min="0" step="0.01" oninput="calculateRowTotal('${rowId}')" required>
                 </div>
             </td>

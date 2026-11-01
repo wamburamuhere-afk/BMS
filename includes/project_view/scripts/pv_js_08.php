@@ -894,10 +894,10 @@ function updatePerformanceTotals() {
     if (projectData && projectData.data) {
         const cs = parseFloat(projectData.data.form_contract_sum) || 0;
         const execVal = (overallProgress / 100) * cs;
-        $('#executedDisplay').text(formatMoney(execVal) + ' TZS');
+        $('#executedDisplay').text(formatMoney(execVal) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
         const fin2 = projectData.financial_summary || {};
         const unBilled2 = execVal - (parseFloat(fin2.total_revenue) || 0);
-        $('#revenueUnbilledDisplay').text(formatMoney(unBilled2) + ' TZS');
+        $('#revenueUnbilledDisplay').text(formatMoney(unBilled2) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     }
 }
 

@@ -187,7 +187,7 @@ global $company_name, $company_logo;
 
                             <div class="mb-0">
                                 <label class="text-muted small d-block mb-1"><?= t('Total Amount') ?></label>
-                                <h3 class="text-primary fw-bold mb-0"><?php echo number_format($expense['amount'], 2); ?> <small class="fs-6 font-monospace">TSh</small></h3>
+                                <h3 class="text-primary fw-bold mb-0"><?php echo number_format($expense['amount'], 2); ?> <small class="fs-6 font-monospace"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></small></h3>
                             </div>
                         </div>
 

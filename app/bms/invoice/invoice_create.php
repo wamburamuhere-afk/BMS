@@ -230,7 +230,8 @@ $payment_terms = [
 ];
 
 // Get currency options
-$currencies = ['TZS' => 'Tanzanian Shilling', 'USD' => 'US Dollar', 'EUR' => 'Euro', 'GBP' => 'British Pound', 'KES' => 'Kenyan Shilling'];
+// TZS company: the same 5 currencies as before. Other company: only its own (core/currency.php).
+$currencies = bmsDocumentCurrencies();
 
 function generate_invoice_number() {
     return 'INV-' . date('Ymd') . '-' . mt_rand(100, 999);

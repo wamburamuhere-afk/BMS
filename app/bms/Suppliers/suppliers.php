@@ -126,6 +126,8 @@ require_once __DIR__ . '/../../../core/form_lookups.php';
 $lk_supplier_type = formLookupOptions($pdo, 'supplier_type');
 $lk_payment_terms = formLookupOptions($pdo, 'payment_terms');
 $lk_currency      = formLookupOptions($pdo, 'currency');
+// Non-TZS company: documents use only the company's own currency (core/currency.php).
+if (!bmsIsDefaultCurrency()) { $lk_currency = [['value' => bmsCompanyCurrency(), 'label' => bmsCompanyCurrency()]]; }
 // Category options (FK) and a wide, searchable year range for the "Other"-style pickers.
 $lk_categories = array_map(fn($c) => ['value' => (string)$c['category_id'], 'label' => $c['category_name']], $categories);
 $lk_years = [];
@@ -948,7 +950,7 @@ function supplier_status_label($status) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label"><?= t('Currency') ?></label>
-                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', t('Select Currency')) ?>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, bmsCompanyCurrency(), 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>
@@ -1900,11 +1902,11 @@ function editSupplier(supplierId) {
                 $('#edit_payment_terms').trigger('change');
 
                 // Handle custom currency
-                const curr = response.data.currency || 'TZS';
+                const curr = response.data.currency || <?= json_encode(bmsCompanyCurrency()) ?>;
                 if (curr && curr !== 'other' && $('#edit_currency option[value="' + curr + '"]').length === 0) {
                     $('#edit_currency').append(new Option(curr, curr, true, true));
                 } else {
-                    $('#edit_currency').val(curr || 'TZS');
+                    $('#edit_currency').val(curr || <?= json_encode(bmsCompanyCurrency()) ?>);
                 }
                 $('#edit_currency').trigger('change');
 
@@ -2110,7 +2112,7 @@ function downloadTemplate() {
         'bank_address', 'description', 'status'
     ];
     
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nExample Supplier,Example Corp,John Doe,Manager,john@example.com,+255123456789,+255987654321,,http://example.com,123 Street,Dar es Salaam,Dar es Salaam,Tanzania,12345,TIN123,VAT123,30_days,TZS,Example Bank,123456789,123 Bank Street,Good supplier,active";
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\nExample Supplier,Example Corp,John Doe,Manager,john@example.com,+255123456789,+255987654321,,http://example.com,123 Street,Dar es Salaam,Dar es Salaam,Tanzania,12345,TIN123,VAT123,30_days,<?= htmlspecialchars(bmsCompanyCurrency()) ?>,Example Bank,123456789,123 Bank Street,Good supplier,active";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);

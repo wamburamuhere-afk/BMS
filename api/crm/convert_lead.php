@@ -29,7 +29,7 @@ try {
         INSERT INTO customers
             (customer_code, customer_name, company_name, email, phone, mobile, address, city,
              country, currency, status, created_by, created_at, year, project_id, category_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'TZS', 'active', ?, NOW(), ?, ?, 0)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, " . $pdo->quote(bmsCompanyCurrency()) . ", 'active', ?, NOW(), ?, ?, 0)
     ")->execute([
         $cust_code, $cust_name,
         $lead['company_name'] ?? null,
@@ -52,7 +52,7 @@ try {
         INSERT INTO quotations
             (order_number, customer_id, order_date, status, total_amount, grand_total,
              currency, notes, created_by, created_at, updated_by, is_quote, project_id, salesperson_id)
-        VALUES (?, ?, CURDATE(), 'draft', ?, ?, 'TZS', ?, ?, NOW(), ?, 1, ?, ?)
+        VALUES (?, ?, CURDATE(), 'draft', ?, ?, " . $pdo->quote(bmsCompanyCurrency()) . ", ?, ?, NOW(), ?, 1, ?, ?)
     ")->execute([
         $quote_code, $customer_id,
         $lead['lead_value'] ?? 0,

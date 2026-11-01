@@ -123,7 +123,7 @@ $depLines = [
                 <table class="table table-bordered table-sm mb-0 align-middle" style="min-width:680px">
                     <thead class="table-light">
                         <tr>
-                            <th rowspan="2" class="ps-3 align-middle text-start" style="min-width:200px"><?= t('TZS') ?></th>
+                            <th rowspan="2" class="ps-3 align-middle text-start" style="min-width:200px"><?= htmlspecialchars(bmsCompanyCurrency()) ?></th>
                             <th colspan="<?= $ncat + 1 ?>" class="text-center text-uppercase">Category</th>
                         </tr>
                         <tr>

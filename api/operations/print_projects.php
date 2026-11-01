@@ -136,7 +136,7 @@ $stat_avg_progress = $total_projects > 0 ? round($stat_progress / $total_project
                 </div>
                 <div style="flex: 1; border: 1px solid #dee2e6; padding: 12px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 70px;">
                     <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">Total Budget</p>
-                    <h3 style="color: #000; font-weight: 800; margin: 0; font-size: 14pt;"><?= number_format($stat_budget, 2) ?> <small style="font-size: 0.6em;">TZS</small></h3>
+                    <h3 style="color: #000; font-weight: 800; margin: 0; font-size: 14pt;"><?= number_format($stat_budget, 2) ?> <small style="font-size: 0.6em;"><?= htmlspecialchars(bmsCompanyCurrency()) ?></small></h3>
                 </div>
                 <div style="flex: 1; border: 1px solid #dee2e6; padding: 12px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 70px;">
                     <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">Avg. Progress</p>
@@ -152,7 +152,7 @@ $stat_avg_progress = $total_projects > 0 ? round($stat_progress / $total_project
                     <th style="border: 1px solid #000 !important;" class="text-uppercase small">Project Name</th>
                     <th style="border: 1px solid #000 !important;" class="text-uppercase small">Manager</th>
                     <th style="border: 1px solid #000 !important;" class="text-uppercase small">Timeline</th>
-                    <th style="border: 1px solid #000 !important; text-align: right;" class="text-uppercase small">Budget (TZS)</th>
+                    <th style="border: 1px solid #000 !important; text-align: right;" class="text-uppercase small">Budget (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                     <th style="border: 1px solid #000 !important; text-align: center;" class="text-uppercase small">Progress</th>
                     <th style="border: 1px solid #000 !important;" class="text-uppercase small">Status</th>
                 </tr>
@@ -183,7 +183,7 @@ $stat_avg_progress = $total_projects > 0 ? round($stat_progress / $total_project
             <tfoot class="table-light">
                 <tr class="fw-bold">
                     <td colspan="4" style="text-align: right; border: 1px solid #000 !important;">AGGREGATE TOTAL BUDGET:</td>
-                    <td style="text-align: right; border: 1px solid #000 !important; font-size: 1.1em;"><?= number_format($total_budget, 2) ?> TZS</td>
+                    <td style="text-align: right; border: 1px solid #000 !important; font-size: 1.1em;"><?= number_format($total_budget, 2) ?> <?= htmlspecialchars(bmsCompanyCurrency()) ?></td>
                     <td colspan="2" style="border: 1px solid #000 !important;"></td>
                 </tr>
             </tfoot>

@@ -2053,7 +2053,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Cost Price') ?> <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <span class="input-group-text">TZS</span>
+                                        <span class="input-group-text"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" name="cost_price" id="modal_cost_price" value="0.00" step="0.01" required onkeyup="modalCalcMarkup()">
                                     </div>
                                     <small class="text-muted"><?= t('The price you paid for this product') ?></small>
@@ -2061,7 +2061,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-success text-white">TZS</span>
+                                        <span class="input-group-text bg-success text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control fw-bold" name="selling_price" id="modal_selling_price" value="0.00" step="0.01" required onkeyup="modalCalcMarkup(); modalCalcMinPrice();">
                                     </div>
                                     <small class="text-muted"><?= t('Final price at which you sell to customers') ?></small>
@@ -2070,7 +2070,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-info text-white">TZS</span>
+                                        <span class="input-group-text bg-info text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" name="wholesale_price" value="0.00" step="0.01">
                                     </div>
                                     <small class="text-muted"><?= t('Price for bulk/wholesale buyers') ?></small>
@@ -2086,7 +2086,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold"><?= t('Min Selling Price') ?></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-danger text-white">TZS</span>
+                                        <span class="input-group-text bg-danger text-white"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" name="min_selling_price" id="modal_min_selling_price" value="0.00" step="0.01">
                                     </div>
                                     <small class="text-muted"><?= t('Auto-calculated but can be overridden') ?></small>
@@ -2116,7 +2116,7 @@ function generate_barcode_local() {
                                 <div class="col-md-6 mb-3">
                                     <div class="p-3 bg-light rounded text-center h-100 d-flex flex-column justify-content-center">
                                         <small class="text-muted text-uppercase fw-bold d-block mb-1"><?= t('Estimated Profit') ?></small>
-                                        <h5 class="fw-bold text-success mb-0" id="modal_profit_badge">TZS 0.00</h5>
+                                        <h5 class="fw-bold text-success mb-0" id="modal_profit_badge"><?= htmlspecialchars(bmsCompanyCurrency()) ?> 0.00</h5>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -2352,7 +2352,7 @@ function removeModalImage() {
 function modalCalcMarkup() { 
     let cost = parseFloat(document.getElementById('modal_cost_price').value) || 0, selling = parseFloat(document.getElementById('modal_selling_price').value) || 0; 
     let profit = selling - cost, markup = cost > 0 ? (profit / cost) * 100 : 0; 
-    document.getElementById('modal_profit_badge').innerText = 'TZS ' + profit.toLocaleString(undefined, {minimumFractionDigits: 2}); 
+    document.getElementById('modal_profit_badge').innerText = '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + profit.toLocaleString(undefined, {minimumFractionDigits: 2}); 
     document.getElementById('modal_markup_badge').innerText = markup.toFixed(2) + '%'; 
 }
 function modalCalcMinPrice() {

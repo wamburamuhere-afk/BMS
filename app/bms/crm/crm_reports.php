@@ -128,7 +128,7 @@ function renderReport(report, res) {
                 </div>
                 <div class="col-lg-7">
                     <div class="table-responsive"><table class="table table-hover align-middle">
-                        <thead class="table-light"><tr><th>Stage</th><th class="text-end">Leads</th><th class="text-end">Value (TZS)</th></tr></thead>
+                        <thead class="table-light"><tr><th>Stage</th><th class="text-end">Leads</th><th class="text-end">Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th></tr></thead>
                         <tbody>`;
             data.forEach(s => {
                 html += `<tr>
@@ -155,7 +155,7 @@ function renderReport(report, res) {
         case 'agent': {
             const data = res.data || [];
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-light"><tr><th>Agent</th><th class="text-end">Leads</th><th class="text-end">Won</th><th class="text-end">Lost</th><th class="text-end">Win Rate</th><th class="text-end">Avg Won Value (TZS)</th><th class="text-end">Total Won (TZS)</th><th class="text-end">Activities</th></tr></thead>
+                <thead class="table-light"><tr><th>Agent</th><th class="text-end">Leads</th><th class="text-end">Won</th><th class="text-end">Lost</th><th class="text-end">Win Rate</th><th class="text-end">Avg Won Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th class="text-end">Total Won (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th class="text-end">Activities</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="8" class="text-center text-muted py-4">No data.</td></tr>';
             data.forEach(a => {
@@ -202,17 +202,17 @@ function renderReport(report, res) {
             const t = res.totals || {};
             html = `<div class="row g-3 mb-4">
                 <div class="col-4"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
-                    <div class="fs-5 fw-bold text-primary">${fmt(t['30d']??0)}</div><div class="small text-muted">30-Day Weighted (TZS)</div>
+                    <div class="fs-5 fw-bold text-primary">${fmt(t['30d']??0)}</div><div class="small text-muted">30-Day Weighted (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
                 </div></div>
                 <div class="col-4"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
-                    <div class="fs-5 fw-bold text-primary">${fmt(t['60d']??0)}</div><div class="small text-muted">60-Day Weighted (TZS)</div>
+                    <div class="fs-5 fw-bold text-primary">${fmt(t['60d']??0)}</div><div class="small text-muted">60-Day Weighted (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
                 </div></div>
                 <div class="col-4"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
-                    <div class="fs-5 fw-bold text-primary">${fmt(t['90d']??0)}</div><div class="small text-muted">90-Day Weighted (TZS)</div>
+                    <div class="fs-5 fw-bold text-primary">${fmt(t['90d']??0)}</div><div class="small text-muted">90-Day Weighted (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
                 </div></div>
             </div>
             <div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-light"><tr><th>Lead</th><th>Stage</th><th class="text-end">Value (TZS)</th><th class="text-end">Prob%</th><th class="text-end">Weighted (TZS)</th><th>Close Date</th><th>Assigned</th></tr></thead>
+                <thead class="table-light"><tr><th>Lead</th><th>Stage</th><th class="text-end">Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th class="text-end">Prob%</th><th class="text-end">Weighted (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th>Close Date</th><th>Assigned</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="7" class="text-center text-muted py-4">No open leads with close dates in next 90 days.</td></tr>';
             data.forEach(r => {
@@ -238,14 +238,14 @@ function renderReport(report, res) {
                     <div class="fs-4 fw-bold text-primary">${fmt(won.won_count||0)}</div><div class="small text-muted">Deals Won</div>
                 </div></div>
                 <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
-                    <div class="fs-4 fw-bold text-primary">${fmt(won.won_value||0)}</div><div class="small text-muted">Won Value (TZS)</div>
+                    <div class="fs-4 fw-bold text-primary">${fmt(won.won_value||0)}</div><div class="small text-muted">Won Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</div>
                 </div></div>
                 <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe">
                     <div class="fs-4 fw-bold text-danger">${lost.reduce((s,r)=>s+parseInt(r.count),0)}</div><div class="small text-muted">Deals Lost</div>
                 </div></div>
             </div>
             <div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-light"><tr><th>Lost Reason</th><th>Stage Lost At</th><th class="text-end">Count</th><th class="text-end">Value (TZS)</th></tr></thead>
+                <thead class="table-light"><tr><th>Lost Reason</th><th>Stage Lost At</th><th class="text-end">Count</th><th class="text-end">Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th></tr></thead>
                 <tbody>`;
             if (!lost.length) html += '<tr><td colspan="4" class="text-center text-muted py-4">No lost leads in this period.</td></tr>';
             lost.forEach(r => {
@@ -264,7 +264,7 @@ function renderReport(report, res) {
         case 'campaign': {
             const data = res.data || [];
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-light"><tr><th>Campaign</th><th>Type</th><th class="text-end">Budget (TZS)</th><th class="text-end">Leads</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Won Value (TZS)</th><th class="text-end">ROI %</th></tr></thead>
+                <thead class="table-light"><tr><th>Campaign</th><th>Type</th><th class="text-end">Budget (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th class="text-end">Leads</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Won Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th class="text-end">ROI %</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="8" class="text-center text-muted py-4">No campaign data.</td></tr>';
             data.forEach(c => {
@@ -290,7 +290,7 @@ function renderReport(report, res) {
             const sourceLabel = { website:'Website', referral:'Referral', walk_in:'Walk-in', phone_call:'Phone Call',
                 social_media:'Social Media', exhibition:'Exhibition', cold_call:'Cold Call', email_campaign:'Email Campaign', other:'Other' };
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-light"><tr><th>Source</th><th class="text-end">Total Leads</th><th class="text-end">Won</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Avg Value (TZS)</th><th class="text-end">Won Value (TZS)</th></tr></thead>
+                <thead class="table-light"><tr><th>Source</th><th class="text-end">Total Leads</th><th class="text-end">Won</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Avg Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th><th class="text-end">Won Value (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="7" class="text-center text-muted py-4">No data.</td></tr>';
             data.forEach(s => {

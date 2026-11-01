@@ -48,7 +48,7 @@ try {
     $order_date = $_POST['order_date'] ?? '';
     $delivery_date = $_POST['delivery_date'] ?? null;
     $salesperson_id = $_POST['salesperson_id'] ?? $_SESSION['user_id'];
-    $currency = $_POST['currency'] ?? 'TZS';
+    $currency = bmsEnforceDocCurrency($_POST['currency'] ?? bmsCompanyCurrency());   // core/currency.php: TZS company unchanged; other → own currency
     $payment_terms = $_POST['payment_terms'] ?? '';
     $reference = $_POST['reference'] ?? '';
     $notes = $_POST['notes'] ?? '';
