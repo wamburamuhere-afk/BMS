@@ -922,6 +922,19 @@ try {
                                       'first_login','first_product','first_sale','inactive') NOT NULL");
         say('  · superadmin_notifications.type ENUM expanded (first_login, first_product, first_sale, inactive added)');
     }
+    // Backup health alerts (core/backup_health.php, backup_plan.md PR 3). Re-read:
+    // the steps above may just have changed the column.
+    $snType = $admin->query("
+        SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = " . $admin->quote($controlDb) . "
+          AND TABLE_NAME = 'superadmin_notifications' AND COLUMN_NAME = 'type'
+    ")->fetchColumn();
+    if ($snType !== false && strpos((string)$snType, 'backup_problem') === false) {
+        $admin->exec("ALTER TABLE `{$controlDb}`.`superadmin_notifications`
+            MODIFY COLUMN `type` ENUM('trial_expired','subscription_expired','trial_grace_started','subscription_grace_started','bms_request',
+                                      'first_login','first_product','first_sale','inactive','backup_problem') NOT NULL");
+        say('  · superadmin_notifications.type ENUM expanded (backup_problem added)');
+    }
     // One row per company + alert already sent, so each rings once.
     $admin->exec("
         CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_activity_alerts` (

@@ -1,7 +1,7 @@
 # BMS — Tenant Backup Plan
 
 **Status:** DRAFT — awaiting approval (2026-10-31)
-**Scope:** BMS only (`/var/www/bms.bjptechnologies.co.tz`). Other systems on the same server
+**Scope:** BMS only (`/var/www/bms.bjptechnologies.co.tz/public_html`). Other systems on the same server
 (Vikundi etc.) are NOT touched.
 
 ---
@@ -95,7 +95,7 @@ email (no 25 MB attachment cap, no mailbox clutter, proper sync tool).
    filename encryption `standard`, directory names `true`, password: `g` (generate, 128+ bits),
    salt password: `g` (generate). **Write both generated passwords down and store them off the
    server (password manager + paper).** Without them the Drive copies can never be opened.
-4. Test: `sudo php /var/www/bms.bjptechnologies.co.tz/cron/offsite_backup.php --host=bms.bjptechnologies.co.tz --check`
+4. Test: `sudo php /var/www/bms.bjptechnologies.co.tz/public_html/cron/offsite_backup.php --host=bms.bjptechnologies.co.tz --check`
 5. First upload now: same command without `--check`.
 
 ### Restore from Drive (server lost)
@@ -132,11 +132,21 @@ Test `tests/test_offsite_backup_cli.php` (real rclone run against a crypt remote
 is available). Needs the one-time server setup in §4 before the first upload; until then the
 nightly job logs `NOT CONFIGURED` and changes nothing.
 
-### PR 3 — Monitoring + restore drills
-- Superadmin "Backup Health" page: per tenant last backup, size, ✅/❌, last email sent.
-- Alert (notification engine) when a backup fails or is > 26 h old.
-- Weekly automatic test-restore into a scratch DB + row/table count check.
-- Runbook: restore one tenant / restore the whole server.
+### PR 3 — Monitoring ✅
+- Superadmin **Backups** page (`app/superadmin/backups.php`, nav "Backups"): every database's
+  last good full backup, size, last snapshot, state (Healthy / Failed / Overdue / Never /
+  Pending for companies created < 26 h ago), last error; the off-site copy; failures of the
+  last 30 days. Data: `core/backup_health.php` over `tenant_backup_log` + `offsite_status.json`.
+- Alert after every scheduled run (`cron/backup_all_tenants.php`): if anything failed, is over
+  26 h old, never ran, or the off-site copy failed / is overdue / is not configured → one bell
+  notification (`backup_problem`, opens the Backups page) + one email to every superadmin,
+  **at most once per day** (`backups/_platform/.backup_alert_day`). The root-run off-site job
+  has no database access, so the next www-data run reports on it.
+- Not built (deliberately): an automatic weekly test-restore. Every backup is already re-opened
+  and checked when written (consistency, manifest, complete dump), and a real tenant backup was
+  restored end-to-end through the API (349/349 tables). A scheduled restore on the shared
+  production database server is extra load and risk for little gain at this size — revisit as
+  a monthly manual drill (restore one company's latest ZIP into a test company).
 
 ---
 
