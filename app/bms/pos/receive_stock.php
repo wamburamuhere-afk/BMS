@@ -5,8 +5,8 @@
 // list come here. Before, they opened the whole POS (?restock=1), which loaded
 // the till, product grid and cart before the form appeared. This page shows
 // only the Receive Stock window (restock_modal.php, the same one the POS uses):
-// saving clears it for the next product; X / Cancel goes back where the user
-// came from.
+// saving clears it for the next product; X / Cancel goes to the Products list
+// (stock belongs to a product, and that is where the new quantity shows).
 require_once __DIR__ . '/../../../roots.php';
 require_once ROOT_DIR . '/core/warehouse_scope.php';
 require_once ROOT_DIR . '/core/payment_source.php';
@@ -55,15 +55,16 @@ $(function () {
     document.getElementById('restockProductModal').setAttribute('data-no-autoclose', 'true');
     initRestockModal(restockResetForm);
 
-    // Closing the window (X / Cancel) leaves the page: back to where the user
-    // came from on this site, else the dashboard.
-    $('#restockProductModal').on('hidden.bs.modal', function () {
-        let back = null;
-        try {
-            const ref = document.referrer ? new URL(document.referrer) : null;
-            if (ref && ref.origin === location.origin && ref.pathname !== location.pathname) back = ref.href;
-        } catch (e) {}
-        location.href = back || <?= json_encode(getUrl('dashboard')) ?>;
+    // Closing the window (X / Cancel) leaves the page for the Products list — always the
+    // same place, no guessing from the browser's "referrer" (which could be missing and left
+    // a blank page). Users without access to Products go to the dashboard instead.
+    const LEAVE_URL = <?= json_encode(getUrl(canView('products') ? 'products' : 'dashboard')) ?>;
+    $('#restockProductModal').on('hidden.bs.modal', function () { location.replace(LEAVE_URL); });
+
+    // This page is only a shell around the window. If the browser restores it from its
+    // back/forward cache (window already closed), never leave the user on an empty page.
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted && !document.querySelector('#restockProductModal.show')) location.replace(LEAVE_URL);
     });
 
     <?php if (!empty($_pos_warehouse_scoped)): ?>
