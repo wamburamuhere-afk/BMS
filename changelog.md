@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-01 — ui(pos): Who Owes Me (Wanaodaiwa) — phone summary cards, no red, one labelled Actions menu
+
+**Changed:** `app/bms/pos/pos_credit_customers.php`, `assets/js/pos-credit-aging.js`, `app/bms/customer/customer_details.php` (one i18n key for the Madeni tab, which shares the JS).
+
+- **Summary cards (phone only, <768px):** the three cards were half-width, so the third sat alone with an empty space beside it. The first ("Total Owed") now spans the row and the other two share the next row; all three are white with a coloured edge bar (blue / amber / teal), like the Expenses page. Desktop keeps the green cards unchanged.
+- **No red:** overdue is a deep amber badge (was `bg-danger` red) and the amount owed is navy (was `text-danger`). Shared code, so the desktop table and the customer "Madeni" tab follow.
+- **Card actions:** the row of four icon-only buttons (it also ran past the card edge) is replaced by ONE full-width **Actions** button whose menu lists the written-out options — View, Repay, Edit, Delete — with the same permissions as the desktop gear (`canEdit` → Repay/Edit, `canDelete` → Delete; view-only users get just View). The menu uses a fixed position so the card or bottom bar never clips it.
+
 ## 2026-11-01 — feat(currency): "Other country (USD)" at registration
 
 **Changed:** `core/currency.php`, `register.php`, `app/superadmin/tenant_new.php`.
