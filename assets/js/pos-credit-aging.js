@@ -85,7 +85,7 @@
     }
 
     /**
-     * Phone card actions: ONE full-width "Actions" button that opens a menu with every
+     * Phone card actions: ONE small "Actions" button (right-aligned) that opens a compact menu with every
      * option written out (View / Repay / Edit / Delete — same items and permissions as the
      * desktop gear). Replaces the row of four icon-only buttons, which nobody could tell
      * apart and which ran past the edge of the card. strategy:fixed so the menu is never
@@ -93,18 +93,19 @@
      */
     function cardRowActions(cfg, row) {
         var id = cfg._id, sid = row.sale_id;
-        var html = '<div class="dropdown w-100">' +
-            '<button type="button" class="btn btn-outline-primary w-100 dropdown-toggle" data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false">' +
-            '<i class="bi bi-gear me-1"></i> ' + esc(cfg.i18n.actions || 'Actions') + '</button>' +
-            '<ul class="dropdown-menu dropdown-menu-end shadow-sm w-100">' +
-            '<li><a class="dropdown-item py-2" href="#" onclick="PosCreditAging.view(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-eye text-info me-2"></i>' + esc(cfg.i18n.view) + '</a></li>';
+        // Small button on the right; the menu is a compact floating panel under it (not full-width).
+        var html = '<div class="dropdown d-flex justify-content-end">' +
+            '<button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle px-3" data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false">' +
+            '<i class="bi bi-gear me-1"></i>' + esc(cfg.i18n.actions || 'Actions') + '</button>' +
+            '<ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width:200px;border-radius:12px;">' +
+            '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.view(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-eye text-info me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.view) + '</a></li>';
         if (cfg.canEdit) {
-            html += '<li><a class="dropdown-item py-2" href="#" onclick="PosCreditAging.repay(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-cash text-success me-2"></i>' + esc(cfg.i18n.repay) + '</a></li>' +
-                    '<li><a class="dropdown-item py-2" href="#" onclick="PosCreditAging.edit(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-pencil text-warning me-2"></i>' + esc(cfg.i18n.edit) + '</a></li>';
+            html += '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.repay(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-cash text-success me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.repay) + '</a></li>' +
+                    '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.edit(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-pencil text-warning me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.edit) + '</a></li>';
         }
         if (cfg.canDelete) {
-            html += '<li><hr class="dropdown-divider opacity-50"></li>' +
-                    '<li><a class="dropdown-item py-2 text-danger" href="#" onclick="PosCreditAging.remove(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-trash me-2"></i>' + esc(cfg.i18n.delete) + '</a></li>';
+            html += '<li><hr class="dropdown-divider opacity-50 my-1"></li>' +
+                    '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center text-danger" href="#" onclick="PosCreditAging.remove(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-trash me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.delete) + '</a></li>';
         }
         html += '</ul></div>';
         return html;

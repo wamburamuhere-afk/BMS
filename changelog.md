@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-11-01 — ui(pos): Who Owes Me — Actions button is small and right-aligned; menu is a compact floating panel
+
+**Changed:** `assets/js/pos-credit-aging.js`, `app/bms/pos/pos_credit_customers.php`.
+
+- The phone card's **Actions** button was full-width and took too much room; it is now a normal small button at the right of the card.
+- Its menu was stretched across the whole screen; it is now a compact rounded panel (min-width 200px, soft shadow, padded rows, icons aligned) that opens under the button, right-aligned. Same options and permissions (View / Repay / Edit / Delete).
+
 ## 2026-11-01 — ui(services): Huduma / Services — summary cards get a coloured edge bar
 
 **Changed:** `app/bms/product/services.php`.
