@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): dashboard Layout 2 "Side actions" with the chosen design's colours, and a notification bell
+
+**Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_dashboard_cli.php`, `tests/test_restaurant_phase6_cli.php`.
+**Not changed:** the retail dashboard (`app/dashboard.php`) and the mixed-company "Restaurant today" strip keep their layouts. Tested for retail, mixed, Hybrid and full BMS.
+
+Applies only to a restaurant-only Smart POS company, built from the owner's chosen design (layouts artifact, Layout 2):
+- **Quick actions down the left** (blue column), each with a live line: Take order, Tables (n with order), Kitchen (n waiting long, only when the kitchen screen/printer is on), Menu (n need a cost), Purchases (n running low), Expenses (n to approve), Reservations (n today), Sales report. On a phone they become a wrapping grid above the cards.
+- **Today cards:** sales today (with yesterday and the 7-day trend), orders today (with average bill), open tables ("2 of 14", with the unpaid amount), kitchen waiting.
+- **Money cards:** owed to me, expenses this month, profit this month (margin, Estimated/Complete). "We owe suppliers" is left out until supplier credit exists.
+- **Side panel with tabs:** Needs attention, Activities (only with the audit-log permission, like the retail dashboard), Running low, Orders. These replace the separate "Recent orders" and "Drinks and ingredients running low" cards.
+- **Colours as designed:** sales blue, costs orange, profit a dark line; the bar, legend, busy-hours and order-type charts follow. The charts keep their previous blue-only look for the mixed strip.
+- **Notification bell** in the top bar with the unread count; it opens the existing Notification Center. What appears there is decided later.
+- Money check, profit warnings and Performance / Where your money went / What earns you money / Busy hours are unchanged apart from layout and colour.
+
 ## 2026-11-02 — fix(restaurant): fixes found by testing on the live demo — Swahili groceries listed, only restaurant groups, no retail products to add, restaurant words on the till
 
 **Changed:** `api/restaurant/get_purchases.php`, `app/bms/product/categories.php`, `app/bms/restaurant/menu.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.

@@ -82,8 +82,8 @@ try {
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
     $setModes(array_fill_keys(array_keys($active), 'restaurant'));
     $o = worker(['page' => 'app/dashboard.php', 'session' => $sess, 'features' => $ON]);
-    ok($clean($o) && strpos($o, 'class="rd-actions') !== false && strpos($o, 'Quick Links') === false, 'restaurant-only company → restaurant dashboard (no shop Quick Links)');
-    ok(strpos($o, 'Where your money went') !== false && strpos($o, 'Recent orders') !== false, 'restaurant dashboard shows the profit story (restaurant dashboard pass) and recent orders');
+    ok($clean($o) && strpos($o, 'class="rd2-acts"') !== false && strpos($o, 'Quick Links') === false, 'restaurant-only company → restaurant dashboard (no shop Quick Links)');
+    ok(strpos($o, 'Where your money went') !== false && strpos($o, 'data-pt="ord"') !== false, 'restaurant dashboard shows the profit story (restaurant dashboard pass) and recent orders');
 
     $setModes(array_fill_keys(array_keys($active), 'retail'));
     $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$W]);
