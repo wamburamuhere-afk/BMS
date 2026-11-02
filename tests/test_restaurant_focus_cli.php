@@ -728,4 +728,54 @@ ok((int)posReceiptAccountId($pdo, 'cash') > 0, 'the cash account resolves');
 ok(strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "Stock is below zero") !== false, 'dashboard explains a stock value below zero instead of only showing the number');
 ok(strpos($pgP, 'text-truncate') === false && strpos($pgP, 'name="cost_price" min=') === false, 'Purchases: the title is not cut, and the New ingredient window asks no price');
 
+// ═══════════════════════════════════════════════════════════════════════════
+section('P8. Found on the live demo: Swahili groceries, retail groups, retail products, till words');
+// (a) a grocery saved in Swahili ("Viungo: …") is listed, with the Swahili prefix removed
+$accG = (int)restaurantIngredientsAccountId($pdo);
+$sfx8 = substr(bin2hex(random_bytes(3)), 0, 6);
+$pdo->prepare("INSERT INTO expenses (expense_date, expense_account_id, amount, description, status, warehouse_id, created_by) VALUES (?, ?, 4200, ?, 'paid', ?, ?)")->execute([date('Y-m-d'), $accG, "Viungo: RF8 nyanya $sfx8", $W2, $admin]);
+$EXP8 = (int)$pdo->lastInsertId();
+try {
+    $gpSw = runWorker(['page' => 'api/restaurant/get_purchases.php', 'get' => ['warehouse_id' => $W2]], $ON, [$W2 => 'restaurant'] + $retailAll, '1', 'sw');
+    $jSw = json_decode(trim(explode('___OUT___', $gpSw, 2)[1] ?? ''), true) ?: [];
+    $hit = null; foreach (($jSw['data'] ?? []) as $r) if (strpos((string)$r['item'], "RF8 nyanya $sfx8") !== false) $hit = $r;
+    ok($hit && $hit['kind'] === 'grocery' && near3($hit['total'], 4200), 'a grocery saved in Swahili ("Viungo: …") is in the Purchases list');
+    ok($hit && $hit['item'] === "RF8 nyanya $sfx8", 'its Swahili prefix is removed, like the English one');
+} finally {
+    $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$EXP8]);
+}
+// (b) Menu groups: a restaurant-only company sees only groups its menu uses (or still-empty ones)
+$pdo->prepare("INSERT INTO categories (category_name, type) VALUES (?, 'product')")->execute(["RF8 Retail Group $sfx8"]); $RCAT = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO categories (category_name, type) VALUES (?, 'product')")->execute(["RF8 Menu Group $sfx8"]); $MCAT = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO categories (category_name, type) VALUES (?, 'product')")->execute(["RF8 Empty Group $sfx8"]); $ECAT = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, selling_price, min_selling_price, is_service, track_inventory, warehouse_id, is_menu_item, status, created_by, category_id) VALUES (?, 'pcs', 'pcs', 1, 2, 0, 0, 1, ?, 0, 'active', ?, ?)")->execute(["RF8 Retail Thing $sfx8", $W2, $admin, $RCAT]); $RP8 = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, selling_price, min_selling_price, is_service, track_inventory, warehouse_id, is_menu_item, status, created_by, category_id) VALUES (?, 'pcs', 'pcs', 0, 5, 0, 1, 0, ?, 1, 'active', ?, ?)")->execute(["RF8 Dish $sfx8", $W2, $admin, $MCAT]); $MP8 = (int)$pdo->lastInsertId();
+try {
+    $cRest = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $onlyRest, '1'));
+    $cRet  = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $retailAll, '1'));
+    $cMix  = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $mixed, '1'));
+    $cFull = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $onlyRest, '0'));
+    ok(strpos($cRest, "RF8 Menu Group $sfx8") !== false && strpos($cRest, "RF8 Empty Group $sfx8") !== false, 'restaurant-only: Menu groups shows its menu groups and a new empty group');
+    ok(strpos($cRest, "RF8 Retail Group $sfx8") === false, 'restaurant-only: a retail group (used only by retail products) is not shown');
+    foreach (['retail company' => $cRet, 'mixed company' => $cMix, 'full BMS' => $cFull] as $nm => $h)
+        ok(strpos($h, "RF8 Retail Group $sfx8") !== false && strpos($h, "RF8 Menu Group $sfx8") !== false, "$nm: every group still shown (unchanged)");
+} finally {
+    $pdo->exec("DELETE FROM products WHERE product_id IN ($RP8, $MP8)");
+    $pdo->exec("DELETE FROM categories WHERE category_id IN ($RCAT, $MCAT, $ECAT)");
+}
+// (c) Menu: no "Already in my products" for a restaurant-only company
+$mRest = body(runWorker(['page' => 'app/bms/restaurant/menu.php'], $ON, $onlyRest, '1'));
+$mMix  = body(runWorker(['page' => 'app/bms/restaurant/menu.php'], $ON, $mixed, '1'));
+ok(strpos($mRest, 'data-type="existing"') === false && strpos($mRest, 'data-type="dish"') !== false && strpos($mRest, 'data-type="bought"') !== false, 'restaurant-only Menu: Dish and Bought item, no "Already in my products"');
+ok(strpos($mMix, 'data-type="existing"') !== false, 'mixed company Menu: "Already in my products" still there (it has retail products)');
+// (d) the till speaks restaurant for a restaurant-only company only
+$tRest = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $onlyRest, '1'));
+$tRet  = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $retailAll, '1'));
+$tMix  = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $mixed, '1'));
+$title = fn($h) => preg_match('#<span class="pos-hdr-title">([^<]*)</span>#', $h, $m) ? $m[1] : '?';
+ok($title($tRest) === 'Take order' && strpos($tRest, 'No items on this order yet') !== false && strpos($tRest, 'Tap a dish or drink to add it.') !== false, 'restaurant-only till: "Take order", "No items on this order yet"');
+ok($title($tRet) === $title($tMix) && $title($tRet) !== 'Take order' && strpos($tRet, 'Search or browse products to add items') !== false && strpos($tRet, 'No items on this order yet') === false, 'retail and mixed tills: the same words as before ("' . $title($tRet) . '")');
+$tSw = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $onlyRest, '1', 'sw'));
+ok($title($tSw) === 'Weka Oda' && strpos($tSw, 'Bado hakuna kitu kwenye oda hii') !== false && strpos($tSw, 'No items on this order yet') === false, 'Swahili till: "Weka Oda", no English left');
+
 // [later phases append here]

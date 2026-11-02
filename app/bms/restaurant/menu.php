@@ -136,10 +136,12 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                                 <i class="bi bi-cup-straw fs-4 text-primary me-2"></i>
                                 <span><strong><?= t('Bought item (has stock)') ?></strong><br><small class="text-muted"><?= t('Water, soda… you buy it and count the stock.') ?></small></span>
                             </button>
+                            <?php if (!restaurantOnlyCompany($pdo)): // a restaurant-only company has no retail products to bring in ?>
                             <button type="button" class="btn rm-type text-start" data-type="existing">
                                 <i class="bi bi-box-seam fs-4 text-primary me-2"></i>
                                 <span><strong><?= t('Already in my products') ?></strong><br><small class="text-muted"><?= t('Put a product you already have on the menu.') ?></small></span>
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
