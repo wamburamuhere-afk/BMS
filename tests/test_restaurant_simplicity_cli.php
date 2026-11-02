@@ -178,7 +178,101 @@ try {
     ok(strpos($selFn, 'update_table_status') === false, 'opening a table no longer marks it occupied by itself');
     ok(strpos($js, 'has_open_order') !== false, 'the picker applies the open-order rule');
 
+    // ───────────────────────────────────────────────────────────────────────
+    section('B. Till product list — Menu view and one-tap add');
+    $plain = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W]);
+    $menu  = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W, 'menu_only' => 1]);
+    $ids = fn($r) => array_map(fn($p) => (int)$p['product_id'], $r['data'] ?? []);
+    ok(!empty($plain['success']) && in_array($DISH, $ids($plain), true) && in_array($DRINK, $ids($plain), true), 'restaurant shop, no filter: dishes AND retail products are listed (hybrid view unchanged)');
+    ok(!empty($menu['success']) && in_array($DISH, $ids($menu), true), 'menu_only=1: the Menu dish is listed');
+    ok(!in_array($DRINK, $ids($menu), true), 'menu_only=1: a retail product that is not on the Menu is NOT listed');
+    $nonMenuInMenu = 0;
+    foreach ($ids($menu) as $pid) if (!(int)val("SELECT is_menu_item FROM products WHERE product_id = ?", [$pid])) $nonMenuInMenu++;
+    ok($nonMenuInMenu === 0, 'menu_only=1: every listed item really is a Menu item');
+    ok(count($ids($menu)) < count($ids($plain)), 'the Menu view is shorter than the full list');
+
+    $mcRow = null; foreach ($menu['data'] ?? [] as $p) if ((int)$p['product_id'] === $DISH) $mcRow = $p;
+    ok($mcRow !== null && array_key_exists('modifier_group_count', $mcRow) && (int)$mcRow['modifier_group_count'] === 0, 'a dish with no add-on groups reports modifier_group_count = 0 (one tap)');
+    $pdo->prepare("INSERT INTO modifier_groups (name, selection_type, min_select, max_select, is_required, status) VALUES (?, 'multiple', 0, 3, 0, 'active')")->execute(["SP Extras $sfx"]);
+    $mg = (int)$pdo->lastInsertId();
+    $pdo->prepare("INSERT INTO product_modifier_groups (product_id, group_id) VALUES (?, ?)")->execute([$DISH, $mg]);
+    $menu2 = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W, 'menu_only' => 1]);
+    $mc2 = null; foreach ($menu2['data'] ?? [] as $p) if ((int)$p['product_id'] === $DISH) $mc2 = $p;
+    ok($mc2 !== null && (int)$mc2['modifier_group_count'] === 1, 'once the dish has an add-on group, modifier_group_count = 1 (popup still opens)');
+
+    $pdo->prepare("UPDATE products SET is_available = 0 WHERE product_id = ?")->execute([$DISH]);
+    $menu3 = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W, 'menu_only' => 1]);
+    ok(!in_array($DISH, $ids($menu3), true), 'a dish switched off ("sold out today") stays hidden in the Menu view');
+    $pdo->prepare("UPDATE products SET is_available = 1 WHERE product_id = ?")->execute([$DISH]);
+
+    // RETAIL shop: the new parameter is ignored and no new field appears.
+    $pdo->prepare("UPDATE warehouses SET pos_mode = 'retail' WHERE warehouse_id = ?")->execute([$W]);
+    $rPlain = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W]);
+    $rMenu  = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W, 'menu_only' => 1]);
+    ok(!empty($rPlain['success']) && $ids($rPlain) === $ids($rMenu), 'retail shop: menu_only is ignored — identical product list');
+    ok(in_array($DRINK, $ids($rMenu), true), 'retail shop: its products are all still listed');
+    $anyKey = false; foreach ($rMenu['data'] ?? [] as $p) if (array_key_exists('modifier_group_count', $p)) $anyKey = true;
+    ok(!$anyKey, 'retail shop: products carry NO modifier_group_count field (response shape unchanged)');
+    $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$W]);
+
+    // Till script wiring (static).
+    $js = file_get_contents("$root/app/bms/pos/pos_scripts_new.php");
+    $tap = substr($js, (int)strpos($js, 'function posTapProduct('), 2200);
+    ok(strpos($tap, 'modifier_group_count') !== false && strpos($tap, 'restaurantNeedsPopup') !== false, 'one-tap: posTapProduct opens the popup only for add-on dishes on a restaurant shop');
+    ok(strpos($tap, 'const needsPopup = product.track_serials == 1 || restaurantNeedsPopup || unitCount !== 0;') !== false, 'serial / unit rules for the popup are unchanged');
+    ok(strpos($js, 'function posMenuModeOn() { return posRestaurantActive() && posMenuOnly; }') !== false, 'Menu mode is gated on posRestaurantActive() (never on a retail shop)');
+    ok(strpos($js, "menu_only: posMenuModeOn() ? 1 : ''") !== false, 'the till only asks for menu_only in Menu mode');
+    $scan = substr($js, (int)strpos($js, 'function handleBarcodeScanned('), 2600);
+    ok(strpos($scan, 'else if (posMenuModeOn())') !== false && strpos($scan, 'scanNotFound()') !== false, 'scanner: in Menu mode a miss is looked up on the server before "not found"');
+
+    section('B3. Table picker on the till — real bugs found in the browser');
+    $pick = substr($js, (int)strpos($js, 'function renderTablePickerFloor('), 1500);
+    ok(strpos($pick, "onclick=\"selectTable(\${t.table_id}, \${warehouseId}, \${JSON.stringify(t.table_number).replace(/\"/g, '&quot;')})\"") !== false,
+        'picker card escapes the quotes in its onclick (before, the attribute broke and tapping a table did nothing)');
+    ok(!preg_match('/onclick="[^"\n]*\$\{JSON\.stringify\((?![^)]*\)\.replace\(\/"\/g)/', $js), 'no double-quoted onclick in the till embeds an unescaped JSON.stringify');
+    $selBody = substr($js, (int)strpos($js, 'function selectTable('), 2400);
+    ok(strpos($selBody, 'keep whatever the waiter already added') !== false && !preg_match('/\}\s*else\s*\{\s*cart\s*=\s*\[\];\s*\}\s*updateCartDisplay/', $selBody),
+        'choosing a table with no open order keeps the items already in the cart');
+    ok(strpos($selBody, 'cart = JSON.parse(existing.items_data)') !== false, 'choosing a table WITH an open order still loads that order');
+
     // [later phases append here]
 } finally {
     $pdo->endOuter();
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+section('B2. Till markup — Menu switch only when the module is on; scripts parse');
+$renderTill = function (array $features, string $mode) use ($root, $W) {
+    $pdo2 = $GLOBALS['pdo'];
+    $origMode = $pdo2->query("SELECT pos_mode FROM warehouses WHERE warehouse_id = $W")->fetchColumn();
+    $origSimple = $pdo2->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+    $pdo2->prepare("UPDATE warehouses SET pos_mode = ? WHERE warehouse_id = ?")->execute([$mode, $W]);
+    $pdo2->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
+    $uid = (int)$pdo2->query("SELECT user_id FROM users WHERE is_active = 1 AND role_id = 1 ORDER BY user_id LIMIT 1")->fetchColumn();
+    $cfg = tempnam(sys_get_temp_dir(), 'rps');
+    file_put_contents($cfg, json_encode(['page' => 'app/bms/pos/pos.php', 'session' => ['user_id' => $uid, 'is_admin' => true, 'role_id' => 1, 'user_lang' => 'en'], 'features' => $features]));
+    $out = (string)shell_exec('php ' . escapeshellarg("$root/tests/test_restaurant_phase1_cli.php") . ' worker ' . escapeshellarg($cfg) . ' 2>&1');
+    @unlink($cfg);
+    $pdo2->prepare("UPDATE warehouses SET pos_mode = ? WHERE warehouse_id = ?")->execute([$origMode, $W]);
+    if ($origSimple === false) $pdo2->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
+    else $pdo2->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$origSimple]);
+    return $out;
+};
+$on = $renderTill(['pos' => true, 'restaurant_pos' => true], 'restaurant');
+ok(strpos($on, 'id="posMenuSwitchRow"') !== false && strpos($on, 'id="menuCategoryButtons"') !== false && strpos($on, 'id="posViewMenu"') !== false, 'module on: the till has the Menu | All products switch and the Menu group strip');
+ok(preg_match('/class="col-12 mt-2 d-none" id="posMenuSwitchRow"/', $on) === 1, 'the switch starts hidden (the till script reveals it only on a restaurant/hybrid shop)');
+ok(!preg_match('/PHP (Warning|Notice|Fatal)|___EXC___/', explode('___OUT___', $on)[0] ?? ''), 'pos.php renders with no PHP warnings');
+$off = $renderTill(['pos' => true, 'restaurant_pos' => false], 'retail');
+ok(strpos($off, 'id="posMenuSwitchRow"') === false && strpos($off, 'id="menuCategoryButtons"') === false && strpos($off, 'id="posViewMenu"') === false && strpos($off, 'id="posViewAll"') === false, 'module off: no Menu switch markup at all (retail till exactly as before)');
+ok(strpos($off, 'id="categoryButtons"') !== false && strpos($off, 'id="productSearch"') !== false, 'module off: the normal category strip and search are still there');
+$html = preg_replace('#<!--.*?-->#s', '', explode('___OUT___', $on, 2)[1] ?? '');
+preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $html, $mm);
+$bad = 0;
+foreach ($mm[1] as $i => $jsPart) {
+    if (trim($jsPart) === '' || strpos($jsPart, 'application/ld+json') !== false) continue;
+    $f = tempnam(sys_get_temp_dir(), 'pjs') . '.js'; file_put_contents($f, $jsPart);
+    exec('node --check ' . escapeshellarg($f) . ' 2>&1', $o, $rc); @unlink($f);
+    if ($rc !== 0) { $bad++; echo "     script #$i: " . implode(' ', array_slice($o, 0, 3)) . "\n"; }
+    $o = [];
+}
+ok($bad === 0, 'every inline script of the rendered till parses (' . count($mm[1]) . ' scripts)');

@@ -528,6 +528,19 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                         </button>
                     </div>
                     <?php endif; ?>
+                    <?php if ($restaurant_pos_enabled): ?>
+                    <!-- Restaurant simplicity pass — Menu | All products (restaurant/hybrid shops only;
+                         shown by applyPosModeUi(), so a retail shop never sees it). -->
+                    <div class="col-12 mt-2 d-none" id="posMenuSwitchRow">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="<?= htmlspecialchars(t('Menu')) ?>">
+                            <input type="radio" class="btn-check" name="posView" id="posViewMenu" value="menu" checked>
+                            <label class="btn btn-outline-primary" for="posViewMenu"><i class="bi bi-journal-text me-1"></i><?= t('Menu') ?></label>
+                            <input type="radio" class="btn-check" name="posView" id="posViewAll" value="all">
+                            <label class="btn btn-outline-primary" for="posViewAll"><i class="bi bi-grid me-1"></i><?= t('All Products') ?></label>
+                        </div>
+                        <div class="category-scroll-strip d-none mt-2" id="menuCategoryButtons"></div>
+                    </div>
+                    <?php endif; ?>
                     <div class="col-12 mt-2">
                         <div class="category-scroll-strip" id="categoryButtons">
                             <button type="button" class="btn btn-sm btn-outline-primary active" onclick="loadProductsByCategory('all')">
@@ -1201,7 +1214,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     #posWarehouseId, #posProjectId, #productSearch {
         font-size: 0.85rem;
     }
-    #categoryButtons .btn {
+    #categoryButtons .btn, #menuCategoryButtons .btn {
         font-size: 0.72rem;
         padding: 3px 10px;
     }
