@@ -527,7 +527,7 @@ $menuSrc = file_get_contents("$root/app/bms/restaurant/menu.php");
 ok(strpos($menuSrc, 'RM.buyUrl}?item=') !== false && strpos($menuSrc, "buyStock: <?= json_encode(t('Buy stock & ingredients')) ?>") !== false, 'the Menu offers "Buy stock & ingredients" on a bought item (not on a dish)');
 $hdr = file_get_contents("$root/header.php");
 ok(substr_count($hdr, "getUrl('restaurant/purchases')") === 2, 'the Purchases menu (desktop and phone) opens the new page');
-ok(strpos(file_get_contents("$root/includes/restaurant/dashboard.php"), "getUrl('restaurant/purchases')") !== false && strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "getUrl('restaurant/purchases')") !== false, 'the dashboard\'s low-stock links open Purchases');
+ok(substr_count(file_get_contents("$root/includes/restaurant/dash_panel.php"), "getUrl('restaurant/purchases')") >= 3, 'the dashboard\'s purchase and low-stock links open Purchases');
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('P4. Selling Settings — Restaurant first; retail-only options hidden for a restaurant-only company');
@@ -777,5 +777,69 @@ ok($title($tRest) === 'Take order' && strpos($tRest, 'No items on this order yet
 ok($title($tRet) === $title($tMix) && $title($tRet) !== 'Take order' && strpos($tRet, 'Search or browse products to add items') !== false && strpos($tRet, 'No items on this order yet') === false, 'retail and mixed tills: the same words as before ("' . $title($tRet) . '")');
 $tSw = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $onlyRest, '1', 'sw'));
 ok($title($tSw) === 'Weka Oda' && strpos($tSw, 'Bado hakuna kitu kwenye oda hii') !== false && strpos($tSw, 'No items on this order yet') === false, 'Swahili till: "Weka Oda", no English left');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P9. Dashboard Layout 2 (Side actions) — restaurant-only company only; notification bell');
+$d9 = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1'));
+$dc = preg_replace('#<!--.*?-->#s', '', $d9);
+ok(strpos($dc, 'class="rdp rdp-l2"') !== false && strpos($dc, 'class="rd2 ') !== false, 'restaurant-only: the Layout 2 grid is on the page');
+// the 8 quick actions (Take order, Tables, Kitchen, Menu, Purchases, Expenses, Reservations, Sales report), each with its live line
+preg_match('#<nav class="rd2-acts".*?</nav>#s', $dc, $nav9); $nav9 = $nav9[0] ?? '';
+foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaurant/kitchen-dashboard' => 'Kitchen', 'restaurant/menu' => 'Menu', 'restaurant/purchases' => 'Purchases', 'expenses' => 'Expenses', 'restaurant/reservations' => 'Reservations', 'restaurant/sales-report' => 'Sales report'] as $href => $lbl)
+    ok(strpos($nav9, '/' . $href . '"') !== false && strpos($nav9, "<b>$lbl</b>") !== false, "action: $lbl → /$href");
+ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
+// Today and Money cards; the supplier-credit card is deliberately NOT there
+foreach (['Sales today', 'Orders today', 'Open tables', 'Owed to me', 'Expenses this month', 'Profit this month'] as $lbl)
+    ok(strpos($dc, '<span class="rdp-label">' . $lbl . '</span>') !== false, "card: $lbl");
+ok(stripos($dc, 'We owe suppliers') === false && stripos($dc, 'owe suppliers') === false, 'no "We owe suppliers" card (supplier credit is not built)');
+// side panel
+foreach (['att', 'low', 'ord'] as $pt) ok(strpos($dc, 'data-pt="' . $pt . '"') !== false, "side panel tab: $pt");
+ok(strpos($dc, 'data-pt="act"') !== false, 'side panel: Activities tab for a user who may see the audit log (admin)');
+$dsrc9 = file_get_contents("$root/includes/restaurant/dash_panel.php");
+ok(strpos($dsrc9, "\$rdActs = canView('audit_logs') ?") !== false, 'Activities are read only with the audit_logs permission, like the retail dashboard');
+// colours of the chosen design: sales blue, costs orange
+ok(strpos($dc, '.rdp-l2 .rdp-bar-food { background:#d97706; }') !== false && strpos($dc, "backgroundColor: L2 ? AMBER : NAVY") !== false && strpos($dc, "AMBER = '#d97706'") !== false, 'colours: costs are orange in the bar, the legend and the chart');
+// the old stand-alone rows are gone from the page body (they moved into the panel)
+ok(strpos($dc, 'class="rd-actions') === false && strpos($dc, '>Recent orders<') === false, 'the old action row and the separate "Recent orders" card are gone (now in Layout 2)');
+// phone: one column, actions wrap
+ok(strpos($dc, '@media (max-width:1199.98px)') !== false && strpos($dc, 'grid-template-areas:none') !== false && strpos($dc, '.rd2-acts { flex-direction:row; flex-wrap:wrap; }') !== false, 'phone/tablet: single column, the actions become a wrapping row');
+// Kitchen action and card follow the kitchen setting
+$get9 = fn($k) => $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = " . $pdo->quote($k))->fetchColumn();
+$ko = $get9('restaurant_kitchen_mode');
+try {
+    $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode','none') ON DUPLICATE KEY UPDATE setting_value='none'");
+    $dn = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1')));
+    preg_match('#<nav class="rd2-acts".*?</nav>#s', $dn, $navn);
+    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($dn, '<span class="rdp-label">Kitchen waiting</span>') === false, 'kitchen "by mouth": no Kitchen action and no Kitchen waiting card');
+} finally {
+    if ($ko === false) $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
+    else $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$ko]);
+}
+// the helpers
+$x9 = rdDashExtras($pdo, [$W2]);
+ok(array_keys($x9) === ['tables_total', 'kitchen_waiting', 'kitchen_longest', 'reservations_today', 'expenses_pending', 'expenses_pending_amount'] && $x9['tables_total'] >= 0 && $x9['expenses_pending'] >= 0, 'rdDashExtras returns the six counts');
+$ac9 = rdRecentActivities($pdo, 5);
+$viewish = 0; foreach ($ac9 as $a) if (preg_match('/^(View|Filter|Searched)/', (string)$a['action']) || strpos((string)$a['description'], 'User viewed') === 0) $viewish++;
+ok(is_array($ac9) && count($ac9) <= 5 && $viewish === 0, 'rdRecentActivities: at most the limit, and no page views');
+// retail, mixed, Hybrid, full BMS: none of it
+foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'Hybrid shops' => [$hybridAll, '1'], 'full BMS (Smart POS off)' => [$onlyRest, '0']] as $nm => [$modes9, $simple9]) {
+    $h = body(runWorker(['page' => 'app/dashboard.php'], $ON, $modes9, $simple9));
+    ok(strpos($h, 'rd2-acts') === false && strpos($h, 'rdp-l2') === false && strpos($h, 'id="rdBell"') === false, "$nm: no Layout 2 and no notification bell");
+}
+$strip = body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'));
+ok(strpos($strip, 'class="rd2 ') === false && strpos($strip, 'class="rd2-acts"') === false && strpos($strip, 'rdp-stat') !== false, 'the mixed-company strip keeps its own layout (no Layout 2)');
+// the bell
+ok(strpos($dc, 'id="rdBell"') !== false, 'restaurant-only: the notification bell is in the top bar');
+ok(strpos($dc, 'href="' . '/notification_center"') !== false || preg_match('#id="rdBell"#', $dc) && preg_match('#<a href="[^"]*notification_center"[^>]*id="rdBell"|id="rdBell"[^>]*>#', $dc), 'the bell opens the existing Notification Center');
+$hdr9 = file_get_contents("$root/header.php");
+ok(strpos($hdr9, '$__bell_on = posSimpleModeEnabled() && canView(\'restaurant_pos\') && restaurantOnlyCompany($pdo);') !== false && strpos($hdr9, 'notifications WHERE user_id = ? AND is_read = 0') !== false, 'the bell is for a restaurant-only Smart POS company only and counts the user\'s unread notifications');
+// Swahili: everything new is translated, none left in English
+$dsw9 = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw')));
+foreach (['Leo' => 'Today', 'Fedha' => 'Money', 'Matumizi mwezi huu' => 'Expenses this month', 'Fungua kaunta ya mauzo' => 'Open the till', 'Yanayohitaji hatua' => 'Needs attention', 'Zinakaribia kuisha' => 'Running low', 'Ninazodai' => 'Owed to me', 'Ripoti ya mauzo' => 'Sales report'] as $swt => $en)
+    ok(strpos($dsw9, $swt) !== false && strpos($dsw9, '>' . $en . '<') === false && strpos($dsw9, '<b>' . $en . '</b>') === false, "Swahili: '$en' is '$swt', none left in English");
+// every inline script parses
+preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $dc, $m9); $bad9 = 0;
+foreach ($m9[1] as $js) { if (trim($js) === '') continue; $tmp = tempnam(sys_get_temp_dir(), 'djs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) $bad9++; $oo = []; }
+ok($bad9 === 0, 'dashboard: every inline script parses (' . count($m9[1]) . ' scripts)');
 
 // [later phases append here]

@@ -280,6 +280,53 @@ if (!function_exists('rdProfitWarnings')) {
     }
 }
 
+if (!function_exists('rdDashExtras')) {
+    /**
+     * The small counts the Layout-2 restaurant dashboard shows on its action buttons and summary cards (2026-11-02).
+     * Counts only, from the operational tables, scoped to the restaurant shops $ids (and the user's expense scope).
+     * @return array{tables_total:int, kitchen_waiting:int, kitchen_longest:int, reservations_today:int, expenses_pending:int, expenses_pending_amount:float, expenses_month:float}
+     */
+    function rdDashExtras(PDO $pdo, array $ids): array
+    {
+        $in = rdIn($ids);
+        $o = ['tables_total' => 0, 'kitchen_waiting' => 0, 'kitchen_longest' => 0, 'reservations_today' => 0,
+              'expenses_pending' => 0, 'expenses_pending_amount' => 0.0];
+        try { $o['tables_total'] = (int)$pdo->query("SELECT COUNT(*) FROM restaurant_tables WHERE warehouse_id IN ($in)")->fetchColumn(); }
+        catch (Throwable $e) { error_log('rdDashExtras tables: ' . $e->getMessage()); }
+        try {
+            $r = $pdo->query("SELECT COUNT(*) AS n, COALESCE(MAX(TIMESTAMPDIFF(MINUTE, created_at, NOW())),0) AS m FROM kitchen_tickets
+                               WHERE status = 'queued' AND warehouse_id IN ($in) AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) >= 20")->fetch(PDO::FETCH_ASSOC) ?: [];
+            $o['kitchen_waiting'] = (int)($r['n'] ?? 0); $o['kitchen_longest'] = (int)($r['m'] ?? 0);
+        } catch (Throwable $e) { /* kitchen tables are optional */ }
+        try {
+            $o['reservations_today'] = (int)$pdo->query("SELECT COUNT(*) FROM restaurant_reservations
+                WHERE warehouse_id IN ($in) AND DATE(reservation_time) = CURDATE() AND status IN ('booked','confirmed','pending','seated')")->fetchColumn();
+        } catch (Throwable $e) { /* reservations are optional */ }
+        try {
+            $st = $pdo->query("SELECT COUNT(*) AS c, COALESCE(SUM(e.amount),0) AS a FROM expenses e WHERE e.status = 'pending'"
+                . scopeFilterSqlNullable('warehouse', 'e') . scopeFilterSqlNullable('project', 'e'));
+            $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+            $o['expenses_pending'] = (int)($r['c'] ?? 0); $o['expenses_pending_amount'] = (float)($r['a'] ?? 0);
+        } catch (Throwable $e) { error_log('rdDashExtras expenses: ' . $e->getMessage()); }
+        return $o;
+    }
+}
+
+if (!function_exists('rdRecentActivities')) {
+    /** The latest things that happened (sales, payments, edits — not page views), newest first. Caller checks the permission. */
+    function rdRecentActivities(PDO $pdo, int $limit = 8): array
+    {
+        try {
+            $st = $pdo->query("SELECT al.action, al.description, al.created_at, u.username
+                                 FROM activity_logs al LEFT JOIN users u ON u.user_id = al.user_id
+                                WHERE NOT (al.action LIKE 'View%' OR al.action IN ('VIEW', 'view_list', 'FILTER') OR al.action LIKE 'Filter%' OR al.action LIKE 'Searched%'
+                                           OR COALESCE(al.description, '') LIKE 'User viewed%' OR COALESCE(al.description, '') LIKE '[LOG] User viewed%' OR COALESCE(al.description, '') LIKE '[VIEW]%')
+                             ORDER BY al.created_at DESC LIMIT " . (int)$limit);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { error_log('rdRecentActivities: ' . $e->getMessage()); return []; }
+    }
+}
+
 if (!function_exists('rdClassifyDishes')) {
     /**
      * Menu engineering on the COSTED items: popularity (plates sold) against profit per plate,
