@@ -527,4 +527,42 @@ $hdr = file_get_contents("$root/header.php");
 ok(substr_count($hdr, "getUrl('restaurant/purchases')") === 2, 'the Purchases menu (desktop and phone) opens the new page');
 ok(strpos(file_get_contents("$root/includes/restaurant/dashboard.php"), "getUrl('restaurant/purchases')") !== false && strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "getUrl('restaurant/purchases')") !== false, 'the dashboard\'s low-stock links open Purchases');
 
+// ═══════════════════════════════════════════════════════════════════════════
+section('P4. Selling Settings — Restaurant first; retail-only options hidden for a restaurant-only company');
+$sp = 'app/constant/settings/pos_config_settings.php';
+$strip = fn($h) => preg_replace('#<!--.*?-->#s', '', $h);
+$pr = body(runWorker(['page' => $sp], $ON, $onlyRest, '1'));
+$pRet = body(runWorker(['page' => $sp], $ON, $retailAll, '1'));
+$pMix = body(runWorker(['page' => $sp], $ON, $mixed, '1'));
+$pHyb = body(runWorker(['page' => $sp], $ON, $hybridAll, '1'));
+$pFull = body(runWorker(['page' => $sp], $ON, $onlyRest, '0'));
+$posOf = fn($h, $needle) => ($p = strpos($h, $needle)) === false ? -1 : $p;
+ok(strpos($pr, 'restaurant_kitchen_mode') !== false && $posOf($pr, 'restaurant_kitchen_mode') < $posOf($pr, 'pos_products_display_limit'), 'restaurant-only: the Restaurant options come first, before Display');
+ok(strpos($pr, 'pos_old_sale_max_days') === false && strpos($pr, 'Record Old Sale') === false, 'restaurant-only: Record Old Sale is hidden');
+ok(strpos($pr, 'pos_loyalty_enabled') === false && strpos($pr, 'Loyalty Program') === false && strpos($pr, 'Loyalty points are part of') === false, 'restaurant-only: Loyalty (and its upsell note) is hidden');
+ok(strpos($pr, 'pos_discount_type') !== false && strpos($pr, 'pos_receipt_width') !== false && strpos($pr, 'name="_csrf"') !== false && substr_count($pr, 'restaurant_kitchen_mode') >= 3 && substr_count($pr, 'id="rt_del"') === 1, 'restaurant-only: discounts, receipt printing, kitchen & order types all still there, each once');
+foreach (['retail company' => $pRet, 'mixed company' => $pMix, 'Hybrid shops' => $pHyb, 'full BMS (Smart POS off)' => $pFull] as $nm => $h) {
+    ok(strpos($h, 'pos_old_sale_max_days') !== false && strpos($h, 'Loyalty Program') !== false, "$nm: Record Old Sale and Loyalty still shown (unchanged)");
+    ok(strpos($h, 'pos_products_display_limit') !== false && strpos($h, 'pos_discount_type') !== false, "$nm: Display and Discount options still shown");
+}
+ok(strpos($pFull, 'restaurant_kitchen_mode') === false, 'full BMS (Smart POS off): still no Restaurant section');
+ok(strpos($pRet, 'restaurant_kitchen_mode') !== false && strpos($pRet, 'restaurant_kitchen_mode') > strpos($pRet, 'pos_old_sale_max_days'), 'retail company in Smart POS: Restaurant section where it always was (after Record Old Sale)');
+ok(strpos($pMix, 'restaurant_kitchen_mode') !== false && $posOf($pMix, 'restaurant_kitchen_mode') > $posOf($pMix, 'pos_old_sale_max_days'), 'mixed company: Restaurant section stays where it was (after Record Old Sale)');
+ok(strpos($pHyb, 'restaurant_kitchen_mode') !== false && $posOf($pHyb, 'restaurant_kitchen_mode') > $posOf($pHyb, 'pos_old_sale_max_days'), 'Hybrid: Restaurant section stays where it was');
+// saving from the trimmed page must not reset the hidden settings
+$get = fn($k) => $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = " . $pdo->quote($k))->fetchColumn();
+$put = function ($k, $v) use ($pdo) { if ($v === false) $pdo->prepare("DELETE FROM system_settings WHERE setting_key = ?")->execute([$k]); else $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute([$k, $v]); };
+$keys4 = ['pos_old_sale_max_days', 'pos_loyalty_enabled', 'pos_loyalty_spend_per_point', 'restaurant_kitchen_mode', 'pos_discount_type', 'pos_receipt_width', 'pos_products_display_limit', 'pos_products_display_limit_mobile', 'pos_auto_print_receipt', 'restaurant_order_take_away', 'restaurant_order_delivery']; $orig4 = []; foreach ($keys4 as $k4) $orig4[$k4] = $get($k4);
+try {
+    $put('pos_old_sale_max_days', '45'); $put('pos_loyalty_enabled', '1'); $put('pos_loyalty_spend_per_point', '777');
+    $base = ['_csrf' => 'tk', 'pos_discount_type' => 'fixed', 'pos_products_display_limit' => '30', 'pos_products_display_limit_mobile' => '10', 'pos_receipt_width' => '58', 'restaurant_kitchen_mode' => 'screen', 'restaurant_order_take_away' => '1'];
+    runWorker(['page' => $sp, 'post' => $base], $ON, $onlyRest, '1');
+    ok($get('pos_old_sale_max_days') === '45' && $get('pos_loyalty_enabled') === '1' && $get('pos_loyalty_spend_per_point') === '777', 'saving the trimmed (restaurant-only) page keeps Record Old Sale days and Loyalty exactly as they were');
+    ok($get('restaurant_kitchen_mode') === 'screen' && $get('pos_receipt_width') === '58' && $get('pos_discount_type') === 'fixed', 'saving the trimmed page still saves what it shows (kitchen mode, receipt width, discount)');
+    runWorker(['page' => $sp, 'post' => $base + ['pos_old_sale_max_days' => '60']], $ON, $retailAll, '1');
+    ok($get('pos_old_sale_max_days') === '60', 'retail company: saving Record Old Sale days works exactly as before');
+} finally {
+    foreach ($orig4 as $k4 => $v4) $put($k4, $v4);
+}
+
 // [later phases append here]
