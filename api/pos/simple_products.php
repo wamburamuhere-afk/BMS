@@ -142,6 +142,7 @@ try {
     // the variant columns are present, so it's built once and appended to
     // either variant of $buildSql() below.
     $sqlSuffix = '';
+    $restaurantShop = false;   // true only for an active restaurant/hybrid shop — retail never sets it
     // A specific warehouse was chosen: only list products actually available
     // there — a physical product needs a product_stocks row for THIS
     // warehouse; a service needs its own products.warehouse_id to match
@@ -158,7 +159,13 @@ try {
         // "sold out today" on its Menu. Retail shops never get this clause.
         require_once __DIR__ . '/../../core/restaurant_scope.php';
         if (restaurantShopActive($pdo, $warehouse_id)) {
+            $restaurantShop = true;
             $sqlSuffix .= " AND p.is_available = 1";
+            // Restaurant simplicity pass — the waiter's "Menu" view: only Menu dishes/drinks,
+            // not every retail product of a hybrid shop. Ignored on a retail shop.
+            if (!empty($_GET['menu_only']) && restaurantMenuSchemaReady($pdo)) {
+                $sqlSuffix .= " AND p.is_menu_item = 1";
+            }
         }
     }
 
@@ -291,6 +298,24 @@ try {
         $p['unit_count'] = $unitCounts === null ? null : ($unitCounts[$p['product_id']] ?? 0);
     }
     unset($p);
+
+    // Restaurant shops only — how many add-on groups (e.g. "Extras") each item has, so a tap on
+    // an item with none can add it straight away. null = unknown -> the terminal opens the popup.
+    // A retail shop's response gets no such field (unchanged).
+    if ($restaurantShop && $ids) {
+        $modCounts = null;
+        try {
+            $mc = $pdo->prepare("SELECT product_id, COUNT(*) AS n FROM product_modifier_groups WHERE product_id IN ($ph) GROUP BY product_id");
+            $mc->execute($ids);
+            $modCounts = array_map('intval', $mc->fetchAll(PDO::FETCH_KEY_PAIR));
+        } catch (PDOException $e) {
+            error_log('simple_products.php: modifier_group_count lookup failed — terminal will use the popup: ' . $e->getMessage());
+        }
+        foreach ($products as &$p) {
+            $p['modifier_group_count'] = $modCounts === null ? null : ($modCounts[$p['product_id']] ?? 0);
+        }
+        unset($p);
+    }
 
     echo json_encode([
         'success' => true,

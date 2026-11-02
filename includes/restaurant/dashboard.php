@@ -60,6 +60,11 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
             <div class="small text-muted"><?= t('Food profit this month') ?></div>
             <div class="rd-num <?= $rd['month_food_profit'] < 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($rd['month_food_profit']) ?></div>
             <div class="small text-muted"><?= sprintf(t('Sales %1$s − ingredients %2$s'), $rdFmt($rd['month_sales']), $rdFmt($rd['month_ingredients'])) ?></div>
+            <?php if (!empty($rd['uncosted_dishes'])): ?>
+            <a href="<?= getUrl('restaurant/menu') ?>" class="small text-decoration-none d-block mt-1 text-warning-emphasis" id="rdUncostedHint">
+                <i class="bi bi-exclamation-triangle me-1"></i><?= sprintf(t('%d dish(es) sold have no recipe, so their cost is not counted and profit may look too high. Add recipes in Menu.'), (int)$rd['uncosted_dishes']) ?>
+            </a>
+            <?php endif; ?>
         </div></div>
     </div>
     <div class="alert alert-light border small d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">

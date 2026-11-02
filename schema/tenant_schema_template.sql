@@ -4180,7 +4180,7 @@ CREATE TABLE `kitchen_tickets` (
   `status` enum('queued','preparing','ready','served') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `order_label` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `order_label` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sale_id` int DEFAULT NULL,
   PRIMARY KEY (`ticket_id`),
   KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
@@ -5889,7 +5889,7 @@ DROP TABLE IF EXISTS `pos_held_sales`;
 CREATE TABLE `pos_held_sales` (
   `hold_id` int NOT NULL AUTO_INCREMENT,
   `hold_reference` varchar(100) DEFAULT NULL,
-  `shift_id` int NOT NULL,
+  `shift_id` int DEFAULT NULL,
   `user_id` int NOT NULL,
   `customer_id` int DEFAULT NULL,
   `warehouse_id` int DEFAULT NULL,
@@ -8081,7 +8081,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=98 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=99 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
