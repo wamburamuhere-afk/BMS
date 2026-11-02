@@ -25,6 +25,7 @@ require_once __DIR__ . '/purchase_posting.php';
 require_once __DIR__ . '/money_guard.php';
 require_once __DIR__ . '/bank_register.php';
 require_once __DIR__ . '/pos_nav.php';
+require_once __DIR__ . '/sales_posting.php';    // posReceiptAccountId() — the Smart POS cash account
 
 if (!defined('RESTAURANT_BILL_MARK')) define('RESTAURANT_BILL_MARK', '[Restaurant] ');
 

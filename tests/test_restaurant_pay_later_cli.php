@@ -75,6 +75,9 @@ try {
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
     $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$W]);
     $pdo->prepare("UPDATE warehouses SET pos_mode = 'retail' WHERE warehouse_id = ?")->execute([$WR]);
+    // The pay-later file must stand on its own: the "Pay" API loads only it (a browser test caught posReceiptAccountId() missing).
+    require_once "$root/core/restaurant_supplier_credit.php";
+    ok(function_exists('posReceiptAccountId') && function_exists('cashBankAccounts') && function_exists('postGoodsInvoiceAccrual'), 'core/restaurant_supplier_credit.php loads everything it uses (the Pay API needs nothing else)');
     require_once "$root/core/restaurant_purchases.php";
     ok(restaurantShopActive($pdo, $W) && !restaurantShopActive($pdo, $WR), 'fixture: one restaurant shop, one retail shop');
 

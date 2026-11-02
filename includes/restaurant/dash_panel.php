@@ -21,6 +21,8 @@ $rdUid    = 'rdp' . substr(md5($rdScope . '|' . microtime(true)), 0, 6);   // un
 $rdTypes  = ['dine_in' => t('Dine in'), 'take_away' => t('Take away'), 'delivery' => t('Delivery')];
 $rdMonthFrom = date('Y-m-01');
 $rdToday  = date('Y-m-d');
+// The restaurant-only dashboard (Layout 2): summary cards + quick actions above, the side box beside Performance.
+$rdV2     = ($rdScope === 'company');
 
 // Small chip: ▲ 12% / ▼ 8% (blue up, red down — the UI standard has no green). null = nothing to compare.
 $rdDelta = function (?float $p, string $vs): string {
@@ -39,10 +41,10 @@ if ($rdScope === 'combined') {
     $rdShare = ($rdArea['restaurant']['profit'] > 0 && $rdArea['other']['profit'] >= 0 && $rdTotalProfit > 0) ? round($rdArea['restaurant']['profit'] / $rdTotalProfit * 100) : null;
 } else {
     $rdJe = rdJeScope($rdIds, $rdScope);
-    $rdHero = rdHero($pdo, $rdJe, $rdIds);
+    $rdHero ??= rdHero($pdo, $rdJe, $rdIds);           // already worked out by the restaurant-only dashboard
     $rdTrend = rdTrend($pdo, 'daily', $rdJe);
-    $rdStory = rdProfitStory($pdo, $rdJe);
-    $rdDishes = rdDishEarnings($pdo, $rdIds, $rdMonthFrom, $rdToday);
+    $rdStory ??= rdProfitStory($pdo, $rdJe);
+    $rdDishes ??= rdDishEarnings($pdo, $rdIds, $rdMonthFrom, $rdToday);
     $rdHours = rdOrdersByHour($pdo, $rdIds, 30);
     $rdTypeRows = restaurantSalesByOrderType($pdo, $rdMonthFrom, $rdToday, $rdIds);
     $rdData = restaurantDashboardData($pdo);
@@ -100,6 +102,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     <div class="small text-muted"><i class="bi bi-info-circle me-1"></i><?= t('Costs that belong to the whole company (payroll, rent) are counted under "Shops & other".') ?></div>
 
 <?php else: ?>
+    <?php if (!$rdV2): // the restaurant-only dashboard shows its own summary cards above ?>
     <!-- ───────── 1. Hero: how am I doing today? ───────── -->
     <div class="row g-2 g-md-3 mb-3">
         <div class="col-6 col-lg-3"><div class="rdp-stat h-100">
@@ -126,11 +129,11 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
             <div class="rdp-sub"><?= sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])) ?></div>
         </div></div>
     </div>
+    <?php endif; ?>
 
-    <!-- ───────── 2. Trend + the profit story ───────── -->
-    <?php if ($rdMoney): ?>
-    <div class="row g-3 mb-3">
-        <div class="col-lg-8">
+    <?php
+    // ── The cards, built once and placed below (restaurant pay-later + dashboard pass, 2026-11-02) ──
+    ob_start(); ?>
             <div class="rdp-card h-100">
                 <div class="rdp-card-h">
                     <h6><i class="bi bi-graph-up-arrow me-1"></i><?= t('Performance') ?></h6>
@@ -142,8 +145,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 </div>
                 <div class="rdp-chart"><canvas id="<?= $rdUid ?>-trend"></canvas></div>
             </div>
-        </div>
-        <div class="col-lg-4">
+    <?php $bPerf = ob_get_clean(); ob_start(); ?>
             <?php $cur = $rdStory['cur']; $hasSales = $cur['sales'] > 0; $unc = count($rdDishes['needs_cost']); ?>
             <div class="rdp-card h-100">
                 <div class="rdp-card-h">
@@ -192,14 +194,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <?php endif; ?>
-
-    <!-- ───────── 3. What earns the money ───────── -->
-    <div class="row g-3 mb-3">
-        <div class="col-lg-7">
+    <?php $bStory = ob_get_clean(); ob_start(); ?>
             <div class="rdp-card h-100">
                 <div class="rdp-card-h">
                     <h6><i class="bi bi-trophy me-1"></i><?= t('What earns you money') ?></h6>
@@ -256,14 +251,14 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 </a>
                 <?php endif; ?>
             </div>
-        </div>
-        <div class="col-lg-5 d-flex flex-column gap-3">
+    <?php $bEarn = ob_get_clean(); ob_start(); ?>
             <div class="rdp-card">
                 <div class="rdp-card-h"><h6><i class="bi bi-clock me-1"></i><?= t('Busy hours') ?></h6>
                     <?php if ($rdHours['peak'] !== null): ?><span class="rdp-sub"><?= sprintf(t('Busiest: %s'), sprintf('%02d:00', $rdHours['peak'])) ?></span><?php endif; ?></div>
                 <div class="rdp-chart rdp-chart-sm"><canvas id="<?= $rdUid ?>-hours"></canvas></div>
                 <?php if ($rdHours['total'] === 0): ?><div class="rdp-foot"><?= t('Orders by hour of the day (last 30 days) appear here.') ?></div><?php endif; ?>
             </div>
+    <?php $bBusy = ob_get_clean(); ob_start(); ?>
             <div class="rdp-card">
                 <div class="rdp-card-h"><h6><i class="bi bi-pie-chart me-1"></i><?= t('How customers order') ?></h6><span class="rdp-sub"><?= t('this month') ?></span></div>
                 <?php if ($rdTypeRows): ?>
@@ -280,14 +275,44 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <div class="rdp-empty"><i class="bi bi-pie-chart"></i><div><?= t('Dine in, take away and delivery split appears after your first orders.') ?></div></div>
                 <?php endif; ?>
             </div>
-        </div>
+    <?php $bTypes = ob_get_clean(); ?>
+
+    <?php if ($rdV2): ?>
+    <!-- Restaurant-only dashboard: Performance beside the Notifications / Activities / Running low / Orders box,
+         then money, what earns, busy hours — the summary cards and quick actions sit above (includes/restaurant/dashboard.php). -->
+    <div class="row g-3 mb-3">
+        <?php if ($rdMoney): ?><div class="col-xl-8"><?= $bPerf ?></div><?php endif; ?>
+        <div class="<?= $rdMoney ? 'col-xl-4' : 'col-12' ?>"><?= $rdPanelHtml ?? '' ?></div>
     </div>
+    <div class="row g-3 mb-3">
+        <?php if ($rdMoney): ?><div class="col-lg-4"><?= $bStory ?></div><?php endif; ?>
+        <div class="<?= $rdMoney ? 'col-lg-4' : 'col-lg-7' ?>"><?= $bEarn ?></div>
+        <div class="<?= $rdMoney ? 'col-lg-4' : 'col-lg-5' ?> d-flex flex-column gap-3"><?= $bBusy . $bTypes ?></div>
+    </div>
+    <?php else: ?>
+    <!-- ───────── 2. Trend + the profit story ───────── -->
+    <?php if ($rdMoney): ?>
+    <div class="row g-3 mb-3">
+        <div class="col-lg-8"><?= $bPerf ?></div>
+        <div class="col-lg-4"><?= $bStory ?></div>
+    </div>
+    <?php endif; ?>
+
+    <!-- ───────── 3. What earns the money ───────── -->
+    <div class="row g-3 mb-3">
+        <div class="col-lg-7"><?= $bEarn ?></div>
+        <div class="col-lg-5 d-flex flex-column gap-3"><?= $bBusy . $bTypes ?></div>
+    </div>
+    <?php endif; ?>
 
     <!-- ───────── Bought → used → left ───────── -->
     <?php if ($rdMoney && $rdScope === 'company'): ?>
     <div class="rdp-card mb-3">
-        <div class="rdp-card-h"><h6><i class="bi bi-arrow-left-right me-1"></i><?= t('Money check this month') ?></h6></div>
-        <div class="p-3">
+        <div class="rdp-card-h">
+            <h6><i class="bi bi-arrow-left-right me-1"></i><?= t('Money check this month') ?></h6>
+            <?php if ($rdV2): ?><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#<?= $rdUid ?>-check" aria-expanded="false"><i class="bi bi-chevron-down me-1"></i><?= t('Show') ?></button><?php endif; ?>
+        </div>
+        <div class="p-3<?= $rdV2 ? ' collapse' : '' ?>" id="<?= $rdUid ?>-check">
             <div class="row g-2">
                 <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Added to stock') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['added']) ?></div></div></div>
                 <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Used for food sold') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['used']) ?></div></div></div>
@@ -304,7 +329,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     <?php endif; ?>
 
     <!-- ───────── 4. Needs attention ───────── -->
-    <?php if ($rdAttention): ?>
+    <?php if ($rdAttention && !$rdV2): // the restaurant-only dashboard shows these in Notifications ?>
     <div class="rdp-card mb-3">
         <div class="rdp-card-h"><h6><i class="bi bi-bell me-1"></i><?= t('Needs your attention') ?></h6></div>
         <div class="list-group list-group-flush">

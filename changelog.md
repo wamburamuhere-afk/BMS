@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): smarter restaurant dashboard — Layout 2, summary cards that open their page, a notification bell, activity
+
+**Branch:** `feat/restaurant-pay-later` (second commit).
+**New:** `core/restaurant_notifications.php`.
+**Changed:** `includes/restaurant/dashboard.php`, `includes/restaurant/dash_panel.php`, `header.php` (bell only), `core/restaurant_supplier_credit.php`, `lang/sw.php`, `tests/test_restaurant_pay_later_cli.php`.
+**Only for a restaurant-only Smart POS company** (the same test as the restaurant menu). Retail Smart POS, mixed companies and Smart BMS: no bell, dashboard unchanged (checked in the browser on a database copy).
+
+- **Header:** unchanged except a notification bell next to the location. Its list opens under the bell; each item opens the page that fixes it; an engine notification is marked read when opened.
+- **Quick actions** in a blue side bar, each with a live count: Take order, Tables (with order), Kitchen (waiting long / cooking / by mouth), Menu (need a cost), Buy stock (running low), Expenses (to approve), Reservations (today), Sales report. A 4-column grid on a phone.
+- **Summary cards, each opens its page:** Today: Sales today (yesterday, 7-day trend), Orders today (average bill), Open tables (of all tables, not paid yet), Kitchen waiting (over 20 minutes). Money (users who see profit): Customers owe us (same figure as Who Owes Me), We owe suppliers (from the ledger: the restaurant's supplier bills and their payments), Expenses this month (ledger), Profit this month (ledger, margin, "Estimated" when an item has no cost).
+- **Notifications | Activities | Running low | Orders** in one box beside Performance. Notifications: bills open 90+ minutes, kitchen orders waiting 20+ minutes, reservations today, low stock, customer credit past due, expenses waiting for approval, supplier bills overdue or due in 3 days, and the user's unread notifications; filters All / Urgent / Today / Stock / Money. Activities: the retail dashboard's source and rule (page views hidden), with Sales / Kitchen / Stock / Staff filters.
+- **Shorter:** money, what earns and busy hours share one row; "Money check this month" folds away; the old "Needs your attention" list moved into Notifications. White with blue; urgent is amber, never red or black.
+- **Bug found by clicking in the browser:** paying a supplier from the "Pay" button failed (`posReceiptAccountId()` not loaded by the pay-later file on its own). Fixed, with a test.
+- **Tests:** restaurant suites all pass (pay-later 53, dashboard 67, phase 6 18, simplicity 70, focus 225, mode gating 22, phase 0 44, phase 7 26). `test_header_nav_menu_cli` (2), `test_mobile_side_menu_cli` (2), `test_pos_simple_mode_nav_hide_cli` (10) and `test_dashboard_kpi_row_cli` (3) fail identically on the base commit `3e1a4962` — not caused by this change.
+
 ## 2026-11-02 — feat(restaurant): buy on credit or partly paid, and pay suppliers later
 
 **Branch:** `feat/restaurant-pay-later`.

@@ -957,6 +957,65 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <i class="bi bi-geo-alt-fill text-warning me-1"></i>
                         <?= htmlspecialchars($company_location ?: 'Tanzania') ?>
                     </div>
+                    <?php
+                    // Restaurant dashboard (2026-11-02): a notification bell, ONLY for a restaurant-only Smart POS company
+                    // (the same test as the restaurant menu below). Retail Smart POS and Smart BMS see no change at all.
+                    require_once __DIR__ . '/core/restaurant_scope.php';
+                    if (posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo)):
+                        require_once __DIR__ . '/core/restaurant_notifications.php';
+                        $__rb_items = restaurantNotifications($pdo, rdRestaurantIds($pdo), hasReportsAccess() || canView('invoices') || canView('sales_report'));
+                        $__rb_lab = ['urgent' => t('Urgent'), 'today' => t('Today'), 'stock' => t('Stock'), 'money' => t('Money'), 'new' => t('New')];
+                    ?>
+                    <div class="rb-bell">
+                        <button class="btn btn-outline-light rb-bell-btn" type="button" aria-expanded="false" aria-controls="rbBellMenu"
+                                aria-label="<?= htmlspecialchars(sprintf(t('Notifications, %d'), count($__rb_items))) ?>" title="<?= htmlspecialchars(t('Notifications')) ?>">
+                            <i class="bi bi-bell"></i><?php if ($__rb_items): ?><span class="rb-bell-n"><?= count($__rb_items) ?></span><?php endif; ?>
+                        </button>
+                        <div class="rb-bell-menu" id="rbBellMenu" hidden>
+                            <div class="rb-bell-h"><?= t('Notifications') ?> <span><?= count($__rb_items) ?></span></div>
+                            <div class="rb-bell-list">
+                                <?php if (!$__rb_items): ?><div class="rb-bell-empty"><?= t('All good — nothing needs you right now.') ?></div><?php endif; ?>
+                                <?php foreach ($__rb_items as $__n): ?>
+                                <a class="rb-bell-row" href="<?= htmlspecialchars($__n['url'] ?: '#') ?>"<?= $__n['id'] ? ' data-nid="' . (int)$__n['id'] . '"' : '' ?>>
+                                    <i class="bi <?= $__n['icon'] ?> rb-bell-i rb-bell-<?= htmlspecialchars($__n['level']) ?>"></i>
+                                    <span><span class="rb-bell-lab rb-bell-lab-<?= htmlspecialchars($__n['level']) ?>"><?= $__rb_lab[$__n['level']] ?? '' ?></span><?= safe_output($__n['text']) ?></span>
+                                </a>
+                                <?php endforeach; ?>
+                            </div>
+                            <a class="rb-bell-f" href="<?= getUrl('dashboard') ?>"><?= t('Open the dashboard') ?> <i class="bi bi-chevron-right"></i></a>
+                        </div>
+                    </div>
+                    <style>
+                        .rb-bell-btn { position:relative; padding:2px 8px; font-size:.9rem; line-height:1.3; border-radius:8px; }
+                        .rb-bell-n { position:absolute; top:-6px; right:-7px; min-width:18px; height:18px; padding:0 4px; border-radius:9px; background:#fff; color:#0b5ed7; font-size:.68rem; font-weight:700; line-height:18px; text-align:center; }
+                        .rb-bell { position:relative; }
+                        .rb-bell-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:1080; width:360px; max-width:calc(100vw - 20px); background:#fff; border:1px solid #dbe6fb; border-radius:10px; box-shadow:0 8px 24px rgba(18,48,90,.22); overflow:hidden; text-align:left; }
+                        .rb-bell-h { padding:9px 12px; font-weight:700; color:#0b5ed7; border-bottom:1px solid #eef3fd; display:flex; justify-content:space-between; }
+                        .rb-bell-h span { font-size:.75rem; color:#4f6381; }
+                        .rb-bell-list { max-height:340px; overflow:auto; }
+                        .rb-bell-row { display:flex; gap:9px; padding:8px 12px; border-bottom:1px solid #eef3fd; color:#12305a; text-decoration:none; font-size:.82rem; white-space:normal; }
+                        .rb-bell-row:hover { background:#eef4ff; color:#12305a; }
+                        .rb-bell-i { font-size:1rem; margin-top:1px; color:#0b5ed7; }
+                        .rb-bell-urgent { color:#b45309; } .rb-bell-stock { color:#0f766e; } .rb-bell-money { color:#4338ca; }
+                        .rb-bell-lab { display:inline-block; font-size:.65rem; font-weight:700; padding:0 5px; border-radius:4px; margin-right:5px; background:#eef4ff; color:#0b5ed7; }
+                        .rb-bell-lab-urgent { background:#b45309; color:#fff; }
+                        .rb-bell-empty { padding:18px 12px; color:#4f6381; font-size:.85rem; text-align:center; }
+                        .rb-bell-f { display:block; padding:8px 12px; font-size:.82rem; font-weight:600; text-decoration:none; }
+                    </style>
+                    <script>
+                    document.addEventListener('click', function (e) {
+                        var btn = e.target.closest && e.target.closest('.rb-bell-btn'), menu = document.getElementById('rbBellMenu');
+                        if (btn && menu) { e.preventDefault(); e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); return; }
+                        if (menu && !menu.hidden && !(e.target.closest && e.target.closest('#rbBellMenu'))) { menu.hidden = true; document.querySelector('.rb-bell-btn').setAttribute('aria-expanded', 'false'); }
+                        var a = e.target.closest && e.target.closest('.rb-bell-row[data-nid]');
+                        if (a) { try { navigator.sendBeacon(<?= json_encode(buildUrl('api/mark_notification_read.php')) ?>, new URLSearchParams({ notification_id: a.dataset.nid })); } catch (x) {} }
+                    });
+                    document.addEventListener('keydown', function (e) {
+                        var menu = document.getElementById('rbBellMenu');
+                        if (e.key === 'Escape' && menu && !menu.hidden) { menu.hidden = true; document.querySelector('.rb-bell-btn').focus(); }
+                    });
+                    </script>
+                    <?php endif; ?>
                 </div>
 
             </div>

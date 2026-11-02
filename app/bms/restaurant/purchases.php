@@ -140,9 +140,9 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
                                 </select>
                                 <a href="#" class="small d-inline-block mt-1" id="rpNewSupplier"><i class="bi bi-person-plus me-1"></i><?= t('New supplier') ?></a>
                             </div>
-                            <div class="col-6 col-md-3 rp-owe-only" style="display:none;" id="rpPaidNowWrap">
+                            <div class="col-6 col-md-3 rp-owe-only" style="display:none;" id="rpNowAmtWrap">
                                 <label class="form-label"><?= t('Paid now') ?> <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="rpPaidNow" min="0" step="0.01" inputmode="decimal">
+                                <input type="number" class="form-control" id="rpNowAmt" min="0" step="0.01" inputmode="decimal">
                             </div>
                             <div class="col-6 col-md-3 rp-owe-only" style="display:none;">
                                 <label class="form-label"><?= t('Pay by') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
@@ -218,7 +218,7 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
                         <div class="col-6"><label class="form-label" for="rpPayAmount"><?= t('Amount') ?> <span class="text-danger">*</span></label><input type="number" class="form-control" id="rpPayAmount" min="0.01" step="0.01" inputmode="decimal"></div>
                         <div class="col-6"><label class="form-label" for="rpPayDate"><?= t('Date') ?></label><input type="date" class="form-control" id="rpPayDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></div>
                     </div>
-                    <div class="form-text"><?= t('Paid from cash. Pay part now and the rest later, or all of it.') ?></div>
+                    <div class="form-text"><?= t('The money comes from cash. Pay part now and the rest later, or all of it.') ?></div>
                     <div class="small mt-2" id="rpPayHistory"></div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button><button type="submit" class="btn btn-primary" id="rpPaySave"><i class="bi bi-check-circle me-1"></i><?= t('Pay') ?></button></div>
@@ -354,7 +354,7 @@ function rpPick(d) {
     rpSetMode('stock'); rpSync();
 }
 function rpReset() {
-    $('#rpQty, #rpPrice, #rpTotal, #rpSell, #rpOtherName, #rpOtherAmount, #rpPaidNow, #rpDue').val(''); $('#rpItem').val(null).trigger('change');
+    $('#rpQty, #rpPrice, #rpTotal, #rpSell, #rpOtherName, #rpOtherAmount, #rpNowAmt, #rpDue').val(''); $('#rpItem').val(null).trigger('change');
     $('#rpSupplier').val('').trigger('change'); $('#rpPayPaid').prop('checked', true);
     rpItem = null; rpLast = 'price'; $('#rpUnit, #rpItemInfo').text(''); $('#rpSellRow').hide(); rpSetMode('stock'); rpPreview(); rpPayUi();
 }
@@ -367,10 +367,10 @@ function rpPurchaseTotal() {
 }
 function rpPayUi() {
     const p = rpPayment(), owe = p !== 'paid';
-    $('.rp-owe-only').toggle(owe); $('#rpPaidNowWrap').toggle(p === 'partial');
+    $('.rp-owe-only').toggle(owe); $('#rpNowAmtWrap').toggle(p === 'partial');
     $('#rpSupHint').toggle(!owe); $('#rpSupStar').toggleClass('d-none', !owe);
     if (!owe) return;
-    const total = Math.round(rpPurchaseTotal() * 100) / 100, paid = p === 'partial' ? (parseFloat($('#rpPaidNow').val()) || 0) : 0;
+    const total = Math.round(rpPurchaseTotal() * 100) / 100, paid = p === 'partial' ? (parseFloat($('#rpNowAmt').val()) || 0) : 0;
     const owed = Math.max(0, total - paid);
     $('#rpOweNote').html(total > 0 ? (p === 'partial' ? RP.s.payNow.replace('%1$s', '<strong>' + fmt(paid) + '</strong>').replace('%2$s', '<strong>' + fmt(owed) + ' ' + RP.cur + '</strong>')
                                                        : RP.s.youWillOwe.replace('%s', '<strong>' + fmt(owed) + ' ' + RP.cur + '</strong>')) : RP.s.youWillOwe.replace('%s', '…'));
@@ -381,7 +381,7 @@ function rpPayData() {
     if (p === 'paid') return d;
     if (!$('#rpSupplier').val()) return { error: RP.s.chooseSupplier };
     if (p === 'partial') {
-        const paid = parseFloat($('#rpPaidNow').val()) || 0, total = rpPurchaseTotal();
+        const paid = parseFloat($('#rpNowAmt').val()) || 0, total = rpPurchaseTotal();
         if (paid <= 0) return { error: RP.s.enterPaidNow };
         if (paid >= total - 0.004) return { error: RP.s.paidNowLess };
         d.amount_paid = paid;
@@ -459,7 +459,7 @@ $(function () {
     }
 
     $('input[name="rpPayment"]').on('change', rpPayUi);
-    $('#rpPaidNow, #rpQty, #rpPrice, #rpTotal, #rpOtherAmount').on('input', rpPayUi);
+    $('#rpNowAmt, #rpQty, #rpPrice, #rpTotal, #rpOtherAmount').on('input', rpPayUi);
 
     // New supplier — just a name and a phone number
     $('#rpNewSupplier').on('click', function (e) { e.preventDefault(); $('#rpSupMsg').empty(); $('#rpSupName, #rpSupPhone').val(''); new bootstrap.Modal(document.getElementById('rpSupModal')).show(); setTimeout(() => $('#rpSupName').trigger('focus'), 300); });
