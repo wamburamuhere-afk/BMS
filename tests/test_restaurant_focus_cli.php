@@ -215,4 +215,115 @@ $leaks = [];
 foreach (['Menu items', 'Menu groups', 'Add-on options', 'Purchases', 'Orders', 'Take order'] as $k) { if (!isset($sw[$k]) || $sw[$k] === $k) $leaks[] = $k; }
 ok(!$leaks, 'every new menu label has its own Swahili text' . ($leaks ? ' — missing: ' . implode(', ', $leaks) : ''));
 
+// ═══════════════════════════════════════════════════════════════════════════
+section('P2. The till for a Restaurant shop — server side (real endpoint, rolled back)');
+class SavepointPDO extends PDO
+{
+    private int $depth = 0;
+    public function startOuter(): void { parent::beginTransaction(); $this->depth = 1; }
+    public function endOuter(): void { if ($this->depth > 0) { parent::rollBack(); $this->depth = 0; } }
+    public function beginTransaction(): bool { $this->depth++; $this->exec("SAVEPOINT sp{$this->depth}"); return true; }
+    public function commit(): bool { $this->exec("RELEASE SAVEPOINT sp{$this->depth}"); $this->depth--; return true; }
+    public function rollBack(): bool { $this->exec("ROLLBACK TO SAVEPOINT sp{$this->depth}"); $this->depth--; return true; }
+    public function inTransaction(): bool { return $this->depth > 1; }
+}
+class InputStub { public static string $body = ''; public $context; private int $pos = 0;
+    public function stream_open($p, $m, $o, &$op) { $this->pos = 0; return true; }
+    public function stream_read($n) { $r = substr(self::$body, $this->pos, $n); $this->pos += strlen($r); return $r; }
+    public function stream_eof() { return $this->pos >= strlen(self::$body); } public function stream_stat() { return []; } }
+$pdo = new SavepointPDO('mysql:host=' . DB_SERVER . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USERNAME, DB_PASSWORD);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $pdo->exec("SET time_zone = '+03:00'"); $GLOBALS['pdo'] = $pdo;
+function callApi(string $file, array $get): array {
+    $_SERVER['REQUEST_METHOD'] = 'GET'; $_GET = $get; $_POST = [];
+    ob_start();
+    try { (function () use ($file) { global $pdo; include $GLOBALS['root'] . '/' . $file; })(); } catch (Throwable $e) { echo json_encode(['success' => false, 'message' => 'EXC: ' . $e->getMessage()]); }
+    $out = ob_get_clean(); $j = json_decode($out, true);
+    return is_array($j) ? $j : ['success' => false, 'message' => 'non-JSON: ' . substr($out, 0, 200)];
+}
+$admin = (int)val("SELECT user_id FROM users WHERE is_active = 1 AND role_id = 1 ORDER BY user_id LIMIT 1");
+$_SESSION['user_id'] = $admin; $_SESSION['username'] = 'admin'; $_SESSION['role'] = 'admin'; $_SESSION['role_id'] = 1; $_SESSION['is_admin'] = true; $_SESSION['user_lang'] = 'en';
+$GLOBALS['__bms_features'] = ['pos' => true, 'restaurant_pos' => true];
+require_once "$root/core/restaurant_scope.php";
+$stk = $pdo->query("SELECT ps.product_id, ps.warehouse_id FROM product_stocks ps JOIN products p ON p.product_id = ps.product_id WHERE ps.stock_quantity >= 1 AND p.is_service = 0 AND p.status = 'active' AND COALESCE(p.is_menu_item,0) = 0 ORDER BY ps.stock_quantity DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if (!$stk) { ok(false, 'fixture: a stocked non-menu product'); exit; }
+$W2 = (int)$stk['warehouse_id']; $RETAILP = (int)$stk['product_id'];
+$pdo->startOuter();
+try {
+    $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
+    $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+    $DISH = restaurantCreateMenuItem($pdo, $W2, ['type' => 'dish', 'name' => "RF Pilau $sfx", 'price' => 3000, 'prep_area' => 'kitchen'], $admin);
+    $ids = fn($r) => array_map(fn($p) => (int)$p['product_id'], $r['data'] ?? []);
+    $set = fn($m) => $pdo->prepare("UPDATE warehouses SET pos_mode = ? WHERE warehouse_id = ?")->execute([$m, $W2]);
+
+    $set('restaurant');
+    ok(restaurantShopIsRestaurantOnly($pdo, $W2) === true, 'a plain Restaurant shop is recognised');
+    $r1 = callApi('api/pos/simple_products.php', ['warehouse_id' => $W2]);
+    ok(!empty($r1['success']) && in_array($DISH, $ids($r1), true) && !in_array($RETAILP, $ids($r1), true), 'Restaurant shop: with NO filter asked, only the Menu comes back (the retail/ingredient product is not offered)');
+    $r1b = callApi('api/pos/simple_products.php', ['warehouse_id' => $W2, 'menu_only' => 0]);
+    ok(!in_array($RETAILP, $ids($r1b), true), 'Restaurant shop: asking for "all products" does not bring them back');
+    $ok1 = true; foreach ($ids($r1) as $pid) if (!(int)val("SELECT is_menu_item FROM products WHERE product_id = ?", [$pid])) $ok1 = false;
+    ok($ok1, 'Restaurant shop: every product returned is a Menu item');
+    $r1c = callApi('api/pos/simple_products.php', ['warehouse_id' => $W2, 'search' => (string)val("SELECT product_name FROM products WHERE product_id = ?", [$RETAILP])]);
+    ok(!in_array($RETAILP, $ids($r1c), true), 'Restaurant shop: searching for the retail product by name still does not offer it');
+
+    $set('hybrid');
+    ok(restaurantShopIsRestaurantOnly($pdo, $W2) === false, 'a Hybrid shop is NOT a Restaurant-only shop');
+    $r2 = callApi('api/pos/simple_products.php', ['warehouse_id' => $W2]);
+    ok(in_array($DISH, $ids($r2), true) && in_array($RETAILP, $ids($r2), true), 'Hybrid shop: dishes AND retail products, as before');
+    $set('retail');
+    ok(restaurantShopIsRestaurantOnly($pdo, $W2) === false, 'a Retail shop is NOT a Restaurant-only shop');
+    $r3 = callApi('api/pos/simple_products.php', ['warehouse_id' => $W2]);
+    ok(in_array($RETAILP, $ids($r3), true), 'Retail shop: its products are listed exactly as before');
+    $kt = false; foreach ($r3['data'] ?? [] as $p) if (array_key_exists('modifier_group_count', $p)) $kt = true;
+    ok(!$kt, 'Retail shop: no new fields in the product list');
+    $set('restaurant');
+    $GLOBALS['__bms_features'] = ['pos' => true, 'restaurant_pos' => false];
+    ok(restaurantShopIsRestaurantOnly($pdo, $W2) === false, 'Restaurant POS off: not a Restaurant-only shop');
+    $GLOBALS['__bms_features'] = ['pos' => true, 'restaurant_pos' => true];
+} finally {
+    $pdo->endOuter();
+}
+
+section('P2b. The till page — what each kind of shop gets');
+$tillOf = fn($modes, $simple = '1', $feat = null) => runWorker(['page' => 'app/bms/pos/pos.php'], $feat ?? $ON, $modes, $simple);
+$o = $tillOf([$W => 'restaurant'] + $retailAll); $b = body($o);
+ok(clean($o) && preg_match('/const POS_REST_ONLY = \{"' . $W . '":true\};/', $b) === 1, 'a Restaurant shop is listed in POS_REST_ONLY');
+foreach (['mixed: the other shops are not' => [[$W => 'restaurant'] + $retailAll, true]] as $lbl => [$m, $_]) {
+    ok(preg_match('/const POS_REST_ONLY = \{[^}]*\};/', $b, $mm) === 1 && substr_count($mm[0], 'true') === 1, 'only the Restaurant shop is listed — the retail shops are not');
+}
+foreach (['Hybrid shop' => [[$W => 'hybrid'] + $retailAll, '1', $ON], 'Retail shops' => [$retailAll, '1', $ON], 'full BMS (Simple Mode off)' => [[$W => 'restaurant'] + $retailAll, '0', $ON], 'Restaurant POS off' => [[$W => 'restaurant'] + $retailAll, '1', $OFF]] as $lbl => [$m, $sm, $ft]) {
+    $o = runWorker(['page' => 'app/bms/pos/pos.php'], $ft, $m, $sm);
+    ok(clean($o) && strpos(body($o), 'const POS_REST_ONLY = {};') !== false, "$lbl: POS_REST_ONLY is empty — no Menu-only till");
+}
+$till = file_get_contents("$root/app/bms/pos/pos_scripts_new.php"); $tillPhp = file_get_contents("$root/app/bms/pos/pos.php");
+ok(strpos($till, 'function posRestaurantOnlyShop() { return !!POS_REST_ONLY[') !== false && strpos($till, 'function posMenuModeOn() { return posRestaurantActive() && (posMenuOnly || posRestaurantOnlyShop()); }') !== false, 'Menu view is forced only for a Restaurant-only shop (and only where the restaurant is active)');
+ok(strpos($till, "\$('#posMenuSwitchGroup').toggleClass('pos-rest-hide', restOnly);") !== false, 'the Menu | All products choice is hidden for a Restaurant-only shop');
+foreach (['.pos-restock-btn', '#addProductDropdown', '#scannerReadyBadge', 'button[onclick="holdSale()"]', 'button[onclick="showHeldSales()"]', '#loyaltyPointsSection', '#posPriceGroupId'] as $sel) {
+    ok(strpos($till, $sel) !== false, "Restaurant-only till hides: $sel");
+}
+ok(strpos($till, 'if (posRestaurantOnlyShop()) return;   // a Restaurant shop sells from its Menu') !== false, 'barcode scanning does nothing on a Restaurant-only shop');
+ok(strpos($till, 'if (posMenuModeOn() && !posRestaurantOnlyShop() && !searchTerm') !== false && strpos($till, 'PT.menuEmpty') !== false, 'an empty Menu on a Restaurant shop says so — it never falls back to retail products');
+ok(strpos($till, 'const allLabel = PT.allShort;') !== false && strpos($till, 'allShort: ') !== false, 'the first Menu group chip reads "All" (not "All Products")');
+ok(strpos($tillPhp, '.pos-rest-hide { display: none !important; }') !== false, 'the hiding class exists and is only ever added by the till script for a Restaurant-only shop');
+$apm = substr($till, (int)strpos($till, 'function applyPosModeUi('), 3200);
+ok(substr_count($apm, "toggleClass('pos-rest-hide', restOnly)") >= 3 && strpos($apm, "#loyaltyPointsSection').removeClass") === false, 'controls are hidden with their own class; the loyalty box\'s own d-none (set by the loyalty code) is never touched');
+
+// The hiding rule must be GLOBAL. (It was first put inside a phone-only @media block, so on a desktop the retail
+// controls stayed visible — caught in the browser. Brace depth at the rule must be 0.)
+$css = $tillPhp; $pos = strpos($css, '.pos-rest-hide { display: none !important; }');
+$depth = null;
+if ($pos !== false) {
+    $head = preg_replace('#/\*.*?\*/#s', '', substr($css, 0, $pos));          // comments out
+    $st = strrpos($head, '<style');                                            // from the start of the style block holding the rule
+    $seg = $st === false ? $head : substr($head, $st);
+    $depth = substr_count($seg, '{') - substr_count($seg, '}');
+}
+ok($pos !== false && $depth === 0, 'the .pos-rest-hide rule is a global rule (not inside a media query): brace depth ' . var_export($depth, true));
+// Every inline script of the rendered till parses (restaurant-only + retail)
+foreach (['Restaurant-only shop' => [$W => 'restaurant'] + $retailAll, 'Retail shops' => $retailAll] as $lbl => $m) {
+    $o = $tillOf($m); $h = preg_replace('#<!--.*?-->#s', '', body($o)); preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $h, $mm); $bad = 0;
+    foreach ($mm[1] as $js) { if (trim($js) === '' || strpos($js, 'application/ld+json') !== false) continue; $tmp = tempnam(sys_get_temp_dir(), 'tjs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) { $bad++; echo '     ' . implode(' ', array_slice($oo, 0, 2)) . "\n"; } $oo = []; }
+    ok($bad === 0, "$lbl: every inline script of the till parses (" . count($mm[1]) . ' scripts)');
+}
+
 // [later phases append here]

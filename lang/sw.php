@@ -6270,4 +6270,5 @@ return [
     'Menu items' => 'Vitu vya Menyu',
     'Menu groups' => 'Makundi ya Menyu',
     'Add-on options' => 'Nyongeza',
+    'Your menu is empty. Add dishes and drinks in Menu.' => 'Menyu yako haina kitu. Ongeza vyakula na vinywaji kwenye Menyu.',
 ];

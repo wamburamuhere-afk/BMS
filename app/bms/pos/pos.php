@@ -136,6 +136,16 @@ if ($restaurant_pos_enabled && !empty($_pos_warehouse_scoped)) {
     }
 }
 
+// Restaurant focus pass — the shops that are plain Restaurant (not Hybrid) of a Smart POS company with the module on.
+// Only these get the Menu-only till; for every other shop this is an empty object and nothing changes.
+$_pos_rest_only = [];
+if ($restaurant_pos_enabled && !empty($_pos_warehouse_modes)) {
+    require_once ROOT_DIR . '/core/restaurant_scope.php';
+    if (restaurantModuleOn($pdo)) {
+        foreach ($_pos_warehouse_modes as $_wid => $_wm) { if ($_wm === 'restaurant') $_pos_rest_only[(int)$_wid] = true; }
+    }
+}
+
 // "Add Product" shortcut (pos_upgrade_plan.md-style) — two options gated
 // independently: New Product needs the same permission product_create.php
 // itself enforces; Restock Product needs adjust_stock, the same permission
@@ -161,6 +171,7 @@ $cashier_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_na
 // per warehouse-change; the JS layer just looks up the selected id.
 const POS_WAREHOUSE_MODES = <?= json_encode($_pos_warehouse_modes ?? []) ?>;
 const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
+const POS_REST_ONLY = <?= json_encode((object)$_pos_rest_only) ?>; // warehouse_id => true for a plain Restaurant shop
 // restaurant_plan.md Phase 2 — the Tables screen opens a table's order here (?table=ID&wid=ID&tlabel=T3).
 const POS_OPEN_TABLE = <?= json_encode(($restaurant_pos_enabled && !empty($_GET['table']))
     ? ['id' => (int)$_GET['table'], 'wid' => (int)($_GET['wid'] ?? 0), 'label' => mb_substr((string)($_GET['tlabel'] ?? ''), 0, 50)]
@@ -532,7 +543,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                     <!-- Restaurant simplicity pass — Menu | All products (restaurant/hybrid shops only;
                          shown by applyPosModeUi(), so a retail shop never sees it). -->
                     <div class="col-12 mt-2 d-none" id="posMenuSwitchRow">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="<?= htmlspecialchars(t('Menu')) ?>">
+                        <div class="btn-group btn-group-sm" id="posMenuSwitchGroup" role="group" aria-label="<?= htmlspecialchars(t('Menu')) ?>">
                             <input type="radio" class="btn-check" name="posView" id="posViewMenu" value="menu" checked>
                             <label class="btn btn-outline-primary" for="posViewMenu"><i class="bi bi-journal-text me-1"></i><?= t('Menu') ?></label>
                             <input type="radio" class="btn-check" name="posView" id="posViewAll" value="all">
@@ -1033,6 +1044,10 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 }
 
 /* Category scroll strip — single horizontal row, scroll sideways on overflow */
+/* Restaurant focus: a plain Restaurant shop hides the retail-only controls. The class is only ever added by the till script
+   for such a shop — never on Retail / Hybrid. (Global rule: it must apply on desktop too, not only inside a phone media query.) */
+.pos-rest-hide { display: none !important; }
+
 .category-scroll-strip {
     display: flex;
     flex-wrap: nowrap;
