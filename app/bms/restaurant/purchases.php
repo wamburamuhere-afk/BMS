@@ -2,11 +2,12 @@
 /**
  * app/bms/restaurant/purchases.php — Purchases (restaurant focus pass, 2026-11-02).
  *
- * One place to buy what a restaurant counts:
- *   • Stock items — drinks and ingredients you COUNT: quantity, price, supplier, expiry, paid from. Adds stock, and the item's
- *     cost follows what you pay (weighted average), so the cost of every plate and the dashboard's profit stay true.
- *   • Groceries, not counted — market shopping you do not count (the existing "Buy ingredients": straight to cost of sales).
- * The page says which one to use, so the two are not mixed for the same ingredient.
+ * ONE form, the way the retail Receive Stock works — pick what you bought, say how many and what it cost:
+ *   • an item you COUNT (a drink, rice, oil, meat): stock goes up and its cost follows what you pay (weighted average), so the
+ *     cost of every plate and the profit stay true. Price for one OR the total paid (a goat, a crate, a sack). An item you sell
+ *     also shows its selling price and the profit it leaves.
+ *   • "Something else" (tomatoes, a bundle of greens) — not counted: just the amount, straight to the cost of food sold.
+ * No account is ever asked — it is paid from the default cash account, like every other Smart POS screen.
  *
  * Only for Smart POS + Restaurant POS, on Restaurant/Hybrid shops. Logic: core/restaurant_purchases.php.
  */
@@ -36,15 +37,17 @@ if ($module_on && $warehouses && !empty($_GET['item'])) {
     $preItem = $pi->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carton'];
+// "Something else" (not counted) is saved as an ordinary expense on the cost-of-food account — needs permission and that account.
+$other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAccountId($pdo) : null;
 ?>
 
 <div class="container-fluid mt-3 mt-md-4 rp-page">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
-        <h4 class="mb-0 text-truncate"><i class="bi bi-basket text-primary me-2"></i><?= t('Purchases') ?></h4>
+        <h4 class="mb-0"><i class="bi bi-basket text-primary me-2"></i><?= t('Purchases') ?></h4>
         <?php if (count($warehouses) > 1): ?>
-        <select id="rpShop" class="form-select form-select-sm select2-static" style="max-width:260px;">
+        <div style="width:260px;max-width:55%;"><select id="rpShop" class="form-select form-select-sm select2-static">
             <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
-        </select>
+        </select></div>
         <?php endif; ?>
     </div>
 
@@ -54,68 +57,85 @@ $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carto
     <div class="alert alert-warning"><i class="bi bi-lock me-1"></i><?= t('You do not have permission to buy stock.') ?></div>
     <?php else: ?>
 
-    <div class="rp-explain mb-3">
-        <i class="bi bi-lightbulb"></i>
-        <div>
-            <strong><?= t('Two ways to buy — pick one for each item.') ?></strong>
-            <span><?= t('Stock items are things you count (drinks, rice, oil): the stock goes up and the cost of every plate follows the price you pay. Groceries are market shopping you do not count: the amount goes straight to the cost of food sold.') ?></span>
-        </div>
-    </div>
-
     <div class="row g-3 mb-3">
-        <div class="col-lg-7">
+        <div class="col-lg-8">
             <div class="rp-card h-100">
-                <div class="rp-card-h"><h6><i class="bi bi-box-seam me-1"></i><?= t('Stock items') ?> <span class="rp-tag"><?= t('counted') ?></span></h6></div>
+                <div class="rp-card-h"><h6><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></h6></div>
                 <form id="rpForm" class="p-3" autocomplete="off">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="warehouse_id" id="rpWarehouse" value="<?= (int)$warehouses[0]['warehouse_id'] ?>">
                     <div id="rpMessage" class="mb-2"></div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold"><?= t('Item') ?> <span class="text-danger">*</span></label>
-                        <select id="rpItem" name="product_id" class="form-select" required style="width:100%">
-                            <?php if ($preItem): ?><option value="<?= (int)$preItem['product_id'] ?>" selected data-unit="<?= htmlspecialchars($preItem['unit']) ?>" data-cost="<?= (float)$preItem['cost_price'] ?>"><?= safe_output($preItem['product_name']) ?> (<?= htmlspecialchars($preItem['unit']) ?>)</option><?php endif; ?>
+                        <label class="form-label fw-semibold"><?= t('What did you buy?') ?> <span class="text-danger">*</span></label>
+                        <select id="rpItem" name="product_id" class="form-select" style="width:100%">
+                            <?php if ($preItem): ?><option value="<?= (int)$preItem['product_id'] ?>" selected><?= safe_output($preItem['product_name']) ?> (<?= htmlspecialchars($preItem['unit']) ?>)</option><?php endif; ?>
                         </select>
                         <div class="d-flex justify-content-between small mt-1">
                             <span class="text-muted" id="rpItemInfo"></span>
                             <?php if ($can_edit): ?><a href="#" id="rpNewIngredient"><i class="bi bi-plus-circle me-1"></i><?= t('New ingredient') ?></a><?php endif; ?>
                         </div>
                     </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label fw-semibold"><?= t('Quantity') ?> <span class="text-danger">*</span> <small class="text-muted" id="rpUnit"></small></label>
-                            <input type="number" class="form-control" id="rpQty" name="quantity" min="0.001" step="0.001" required>
+
+                    <!-- A counted item -->
+                    <div id="rpStockFields">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold"><?= t('Quantity') ?> <span class="text-danger">*</span> <small class="text-muted" id="rpUnit"></small></label>
+                                <input type="number" class="form-control" id="rpQty" min="0.001" step="0.001" inputmode="decimal">
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label fw-semibold"><?= t('Price for one') ?></label>
+                                <input type="number" class="form-control" id="rpPrice" min="0" step="0.01" inputmode="decimal">
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label fw-semibold"><?= t('Total paid') ?></label>
+                                <input type="number" class="form-control" id="rpTotal" min="0" step="0.01" inputmode="decimal">
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label fw-semibold"><?= t('Price for one') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="rpPrice" name="unit_cost" min="0" step="0.01" required>
+                        <div class="form-text"><?= t('Fill the price for one, or the total you paid — the other is worked out. Buying a goat or a crate? Enter what you can use and the total.') ?></div>
+                        <div class="mt-3" id="rpSellRow" style="display:none;">
+                            <label class="form-label fw-semibold"><?= t('Selling price') ?></label>
+                            <input type="number" class="form-control" id="rpSell" min="0" step="0.01" inputmode="decimal" style="max-width:220px;">
                         </div>
+                        <div class="rp-preview mt-3" id="rpPreview" style="display:none;"></div>
                     </div>
-                    <div class="rp-preview mt-3" id="rpPreview" style="display:none;"></div>
-                    <div class="row g-2 mt-1">
-                        <div class="col-md-7">
-                            <label class="form-label fw-semibold"><?= t('Paid from') ?></label>
-                            <select name="paid_from_account_id" id="rpPaid" class="form-select select2-static" style="width:100%"><?= paidFromSelectOptions($pdo) ?></select>
+
+                    <!-- Something else (not counted) -->
+                    <div id="rpOtherFields" style="display:none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><?= t('What is it?') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="rpOtherName" maxlength="200" placeholder="<?= htmlspecialchars(t('e.g. tomatoes, onions, a bundle of greens')) ?>">
                         </div>
+                        <div class="mb-1">
+                            <label class="form-label fw-semibold"><?= t('Amount paid') ?> <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="rpOtherAmount" min="1" step="any" inputmode="decimal" style="max-width:220px;">
+                        </div>
+                        <div class="form-text"><?= t('Not counted in stock — the amount is recorded as the cost of the food you sell.') ?></div>
+                    </div>
+
+                    <div class="row g-2 mt-2">
                         <div class="col-md-5">
                             <label class="form-label fw-semibold"><?= t('Date') ?></label>
                             <input type="date" class="form-control" name="date" id="rpDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>">
                         </div>
                     </div>
-                    <a class="small d-inline-block mt-2" data-bs-toggle="collapse" href="#rpMore" role="button"><i class="bi bi-sliders me-1"></i><?= t('More options') ?></a>
-                    <div class="collapse" id="rpMore">
-                        <div class="row g-2 mt-1">
-                            <?php if ($suppliers): ?>
-                            <div class="col-md-6">
-                                <label class="form-label"><?= t('Supplier') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
-                                <select name="supplier_id" id="rpSupplier" class="form-select select2-static" style="width:100%">
-                                    <option value=""><?= t('-- Select --') ?></option>
-                                    <?php foreach ($suppliers as $sp): ?><option value="<?= (int)$sp['supplier_id'] ?>"><?= caseFormat($sp['supplier_name']) ?></option><?php endforeach; ?>
-                                </select>
-                            </div>
-                            <?php endif; ?>
-                            <div class="col-md-6">
-                                <label class="form-label"><?= t('Expiry date') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
-                                <input type="date" class="form-control" name="expiry_date" id="rpExpiry">
+                    <div id="rpMoreWrap">
+                        <a class="small d-inline-block mt-2" data-bs-toggle="collapse" href="#rpMore" role="button"><i class="bi bi-sliders me-1"></i><?= t('More options') ?></a>
+                        <div class="collapse" id="rpMore">
+                            <div class="row g-2 mt-1">
+                                <?php if ($suppliers): ?>
+                                <div class="col-md-6">
+                                    <label class="form-label"><?= t('Supplier') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
+                                    <select name="supplier_id" id="rpSupplier" class="form-select select2-static" style="width:100%">
+                                        <option value=""><?= t('-- Select --') ?></option>
+                                        <?php foreach ($suppliers as $sp): ?><option value="<?= (int)$sp['supplier_id'] ?>"><?= caseFormat($sp['supplier_name']) ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <?php endif; ?>
+                                <div class="col-md-6">
+                                    <label class="form-label"><?= t('Expiry date') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
+                                    <input type="date" class="form-control" name="expiry_date" id="rpExpiry">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -125,24 +145,21 @@ $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carto
                 </form>
             </div>
         </div>
-        <div class="col-lg-5">
-            <div class="rp-card h-100">
-                <div class="rp-card-h"><h6><i class="bi bi-bag me-1"></i><?= t('Groceries') ?> <span class="rp-tag rp-tag-grey"><?= t('not counted') ?></span></h6></div>
-                <div class="p-3">
-                    <p class="small text-muted mb-2"><?= t('Use this for fresh market shopping you do not weigh or count — tomatoes, onions, a bundle of greens. The amount is recorded as the cost of food sold.') ?></p>
-                    <p class="small text-muted"><?= t('Do not use it for an ingredient you also track as a stock item — that would count its cost twice.') ?></p>
-                    <?php if (canCreate('expenses')): ?>
-                    <button type="button" class="btn btn-outline-primary w-100" onclick="rbiOpen()"><i class="bi bi-basket me-1"></i><?= t('Buy Ingredients') ?></button>
-                    <?php endif; ?>
+        <div class="col-lg-4">
+            <div class="rp-explain h-100">
+                <i class="bi bi-lightbulb"></i>
+                <div>
+                    <strong><?= t('How it works') ?></strong>
+                    <span><?= t('Drinks, rice, oil and meat are counted: stock goes up, and the cost of every plate follows the price you pay.') ?></span>
+                    <span class="mt-2"><?= t('Not on the list — tomatoes, a bundle of greens? Choose "Something else". It is not counted; the amount is the cost of food sold.') ?></span>
                 </div>
             </div>
         </div>
     </div>
-
     <div class="rp-card mb-3">
         <div class="rp-card-h"><h6><i class="bi bi-clock-history me-1"></i><?= t('Recent purchases') ?></h6></div>
         <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="rpTable">
-            <thead><tr><th><?= t('Date') ?></th><th><?= t('Item') ?></th><th><?= t('Quantity') ?></th><th><?= t('Price for one') ?></th><th><?= t('Total') ?></th><th><?= t('Reference') ?></th><th><?= t('By') ?></th></tr></thead>
+            <thead><tr><th><?= t('Date') ?></th><th><?= t('Item') ?></th><th><?= t('Quantity') ?></th><th><?= t('Price for one') ?></th><th><?= t('Total') ?></th><th><?= t('By') ?></th></tr></thead>
             <tbody></tbody>
         </table></div>
     </div>
@@ -155,16 +172,13 @@ $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carto
                 <div class="modal-body">
                     <div id="rpIngMsg" class="mb-2"></div>
                     <div class="mb-3"><label class="form-label"><?= t('Name') ?> <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required maxlength="100"></div>
-                    <div class="row g-2">
-                        <div class="col-6"><label class="form-label"><?= t('Unit') ?></label><select class="form-select" name="unit"><?php foreach ($units as $u): ?><option value="<?= $u ?>"><?= $u ?></option><?php endforeach; ?></select></div>
-                        <div class="col-6"><label class="form-label"><?= t('Price for one') ?></label><input type="number" class="form-control" name="cost_price" min="0" step="0.01" value="0"></div>
-                    </div>
+                    <div><label class="form-label"><?= t('Unit') ?></label><select class="form-select" name="unit"><?php foreach ($units as $u): ?><option value="<?= $u ?>"><?= $u ?></option><?php endforeach; ?></select></div>
+                    <input type="hidden" name="cost_price" value="0"><!-- the price comes from the purchase itself -->
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button></div>
             </form>
         </div></div>
     </div>
-    <?php require ROOT_DIR . '/includes/restaurant/buy_ingredients_modal.php'; ?>
     <?php endif; ?>
 </div>
 
@@ -184,37 +198,95 @@ $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carto
 <script>
 const RP = {
     api: <?= json_encode(buildUrl('api/restaurant/')) ?>,
+    expenseApi: <?= json_encode(buildUrl('api/add_expense.php')) ?>,
     csrf: <?= json_encode(csrf_token()) ?>,
     cur: <?= json_encode(getSetting('currency', 'TZS')) ?>,
+    otherAccount: <?= (int)($other_account ?: 0) ?>,
+    cashAccount: <?= (int)(posReceiptAccountId($pdo, 'cash') ?: 0) ?>,
     s: {
         search: <?= json_encode(t('Search the item...')) ?>, saving: <?= json_encode(t('Saving...')) ?>, error: <?= json_encode(t('Error')) ?>,
         serverError: <?= json_encode(t('Server error. Please try again.')) ?>, total: <?= json_encode(t('Total')) ?>,
         onHand: <?= json_encode(t('On hand')) ?>, cost: <?= json_encode(t('Cost')) ?>, newCost: <?= json_encode(t('New cost')) ?>,
         costFollows: <?= json_encode(t('The cost follows the prices you pay (average).')) ?>,
-        pickItem: <?= json_encode(t('Select an item.')) ?>, saved: <?= json_encode(t('Purchase saved.')) ?>,
-        costNow: <?= json_encode(t('Cost is now')) ?>, none: <?= json_encode(t('No purchases yet.')) ?>
+        pickItem: <?= json_encode(t('Pick what you bought, or choose "Something else".')) ?>, saved: <?= json_encode(t('Purchase saved.')) ?>,
+        costNow: <?= json_encode(t('Cost is now')) ?>, none: <?= json_encode(t('No purchases yet.')) ?>,
+        other: <?= json_encode(t('Something else (not counted)')) ?>, notCounted: <?= json_encode(t('Not counted')) ?>,
+        sells: <?= json_encode(t('Sells for')) ?>, costs: <?= json_encode(t('costs')) ?>, perOne: <?= json_encode(t('profit on each')) ?>,
+        belowCost: <?= json_encode(t('Selling below cost')) ?>, costsPer: <?= json_encode(t('Costs')) ?>, per: <?= json_encode(t('per')) ?>,
+        enterQty: <?= json_encode(t('Enter the quantity.')) ?>, enterPrice: <?= json_encode(t('Enter the price for one, or the total you paid.')) ?>,
+        enterName: <?= json_encode(t('Enter what you bought.')) ?>, enterAmount: <?= json_encode(t('Enter the amount paid.')) ?>,
+        groceryDesc: <?= json_encode(t('Ingredients')) ?>
     }
 };
 const fmt = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
-let rpItem = null;   // { stock, cost, unit } of the chosen item
+let rpItem = null;        // { stock, cost, unit, sell } of the chosen item
+let rpMode = 'stock';     // 'stock' = a counted item, 'other' = something else (not counted)
+let rpLast = 'price';     // which of price / total the user typed last
 
 function rpWh() { return parseInt($('#rpShop').length ? $('#rpShop').val() : $('#rpWarehouse').val(), 10); }
 
+function rpSetMode(m) {
+    rpMode = m;
+    $('#rpStockFields').toggle(m === 'stock'); $('#rpOtherFields').toggle(m === 'other'); $('#rpMoreWrap').toggle(m === 'stock');
+    if (m === 'other') { rpItem = null; $('#rpItemInfo').text(''); }
+}
+
+// price for one <-> total paid: whichever was typed last wins, the other follows
+function rpSync(from) {
+    const q = parseFloat($('#rpQty').val()) || 0;
+    if (from) rpLast = from;
+    if (q > 0) {
+        if (rpLast === 'total') { const t = parseFloat($('#rpTotal').val()); $('#rpPrice').val(isNaN(t) ? '' : Math.round(t / q * 100) / 100); }
+        else { const p = parseFloat($('#rpPrice').val()); $('#rpTotal').val(isNaN(p) ? '' : Math.round(p * q * 100) / 100); }
+    }
+    rpPreview();
+}
+function rpUnitPrice() {
+    const q = parseFloat($('#rpQty').val()) || 0;
+    if (rpLast === 'total' && q > 0) { const t = parseFloat($('#rpTotal').val()); return isNaN(t) ? 0 : t / q; }
+    return parseFloat($('#rpPrice').val()) || 0;
+}
+
 function rpPreview() {
-    const q = parseFloat($('#rpQty').val()) || 0, p = parseFloat($('#rpPrice').val()) || 0, box = $('#rpPreview');
+    const q = parseFloat($('#rpQty').val()) || 0, p = rpUnitPrice(), box = $('#rpPreview');
     if (!rpItem || q <= 0) { box.hide(); return; }
     const old = Math.max(0, rpItem.stock), tot = old + q;
     const nc = tot > 0 ? ((old * rpItem.cost) + (q * p)) / tot : p;
-    box.html(`<strong>${RP.s.total}: ${fmt(q * p)} ${RP.cur}</strong><br><span class="small">${RP.s.onHand}: ${fmt(rpItem.stock)} · ${RP.s.cost}: ${fmt(rpItem.cost)} → <strong>${RP.s.newCost}: ${fmt(nc)}</strong> — ${RP.s.costFollows}</span>`).show();
+    let h = `<strong>${RP.s.total}: ${fmt(q * p)} ${RP.cur}</strong><br><span class="small">${RP.s.onHand}: ${fmt(rpItem.stock)} · ${RP.s.cost}: ${fmt(rpItem.cost)} → <strong>${RP.s.newCost}: ${fmt(nc)}</strong></span>`;
+    const sell = rpItem.sell !== null ? (parseFloat($('#rpSell').val()) || 0) : null;
+    if (sell !== null) {
+        const pr = sell - nc, pc = sell > 0 ? Math.round(pr / sell * 100) : 0;
+        h += `<br><span class="small ${pr < 0 ? 'text-danger fw-bold' : ''}">${RP.s.sells} ${fmt(sell)} · ${RP.s.costs} ${fmt(nc)} → <strong>${RP.s.perOne} ${fmt(pr)} (${pc}%)</strong>${pr < 0 ? ' — ' + RP.s.belowCost : ''}</span>`;
+    } else {
+        h += `<br><span class="small">${RP.s.costsPer} ${fmt(nc)} ${RP.s.per} ${safeOutput(rpItem.unit)} — ${RP.s.costFollows}</span>`;
+    }
+    box.html(h).show();
+}
+
+function rpPick(d) {
+    rpItem = { stock: parseFloat(d.stock) || 0, cost: parseFloat(d.cost_price) || 0, unit: d.unit, sell: (d.selling_price === null || d.selling_price === undefined) ? null : parseFloat(d.selling_price) };
+    $('#rpUnit').text('(' + d.unit + ')'); $('#rpPrice').val(rpItem.cost > 0 ? rpItem.cost : ''); $('#rpTotal').val(''); rpLast = 'price';
+    $('#rpSellRow').toggle(rpItem.sell !== null); $('#rpSell').val(rpItem.sell !== null ? rpItem.sell : '');
+    $('#rpItemInfo').text(RP.s.onHand + ': ' + fmt(rpItem.stock) + ' · ' + RP.s.cost + ': ' + fmt(rpItem.cost));
+    rpSetMode('stock'); rpSync();
+}
+function rpReset() {
+    $('#rpQty, #rpPrice, #rpTotal, #rpSell, #rpOtherName, #rpOtherAmount').val(''); $('#rpItem').val(null).trigger('change');
+    rpItem = null; rpLast = 'price'; $('#rpUnit, #rpItemInfo').text(''); $('#rpSellRow').hide(); rpSetMode('stock'); rpPreview();
 }
 
 let rpDT = null;   // the Recent purchases DataTable (standard init; reloaded with clear().rows.add().draw())
 function loadPurchases() {
     $.getJSON(RP.api + 'get_purchases.php', { warehouse_id: rpWh() }, function (res) {
-        const rows = (res.success ? res.data : []).map(r => [
-            safeOutput(r.date), '<span class="fw-semibold">' + safeOutput(r.item) + '</span>', fmt(r.quantity) + ' ' + safeOutput(r.unit),
-            fmt(r.unit_cost), '<strong>' + fmt(r.total) + '</strong>', safeOutput(r.reference || ''), safeOutput(r.by || '')
-        ]);
+        const rows = (res.success ? res.data : []).map(r => {
+            const g = r.kind === 'grocery';
+            return [
+                safeOutput(r.date),
+                '<span class="fw-semibold">' + safeOutput(r.item) + '</span>' + (g ? ' <span class="rp-tag rp-tag-grey">' + RP.s.notCounted + '</span>' : ''),
+                g ? '—' : fmt(r.quantity) + ' ' + safeOutput(r.unit),
+                g ? '—' : fmt(r.unit_cost), '<strong>' + fmt(r.total) + '</strong>', safeOutput(r.by || '')
+            ];
+        });
         rpDT.clear().rows.add(rows).draw();
     });
 }
@@ -225,34 +297,59 @@ $(function () {
         columnDefs: [{ targets: [2, 3, 4], className: 'text-end' }],
         language: { emptyTable: RP.s.none, zeroRecords: RP.s.none }
     });
-    $('#rpPaid, #rpSupplier, #rpShop').select2({ theme: 'bootstrap-5', width: '100%' });
+    $('#rpSupplier, #rpShop').select2({ theme: 'bootstrap-5', width: '100%' });
     $('#rpItem').select2({
         theme: 'bootstrap-5', width: '100%', placeholder: RP.s.search, allowClear: true, minimumInputLength: 0,
-        ajax: { url: RP.api + 'search_stock_items.php', dataType: 'json', delay: 250, data: p => ({ q: p.term || '', warehouse_id: rpWh() }), processResults: d => ({ results: d.results || [] }), cache: false }
+        ajax: { url: RP.api + 'search_stock_items.php', dataType: 'json', delay: 250, data: p => ({ q: p.term || '', warehouse_id: rpWh() }),
+                processResults: d => { const r = d.results || []; if (RP.otherAccount) r.push({ id: '__other', text: RP.s.other }); return { results: r }; }, cache: false }
     }).on('select2:select', function (e) {
-        const d = e.params.data; rpItem = { stock: parseFloat(d.stock) || 0, cost: parseFloat(d.cost_price) || 0, unit: d.unit };
-        $('#rpUnit').text('(' + d.unit + ')'); $('#rpPrice').val(rpItem.cost > 0 ? rpItem.cost : '');
-        $('#rpItemInfo').text(RP.s.onHand + ': ' + fmt(rpItem.stock) + ' · ' + RP.s.cost + ': ' + fmt(rpItem.cost)); rpPreview();
-    }).on('select2:clear', function () { rpItem = null; $('#rpUnit, #rpItemInfo').text(''); rpPreview(); });
-    $('#rpQty, #rpPrice').on('input', rpPreview);
-    $('#rpShop').on('change', function () { $('#rpWarehouse').val(this.value); $('#rpItem').val(null).trigger('change'); rpItem = null; loadPurchases(); });
+        const d = e.params.data;
+        if (d.id === '__other') { rpSetMode('other'); setTimeout(() => $('#rpOtherName').trigger('focus'), 100); } else { rpPick(d); }
+    }).on('select2:clear', function () { rpItem = null; rpSetMode('stock'); $('#rpUnit, #rpItemInfo').text(''); $('#rpSellRow').hide(); rpPreview(); });
+    $('#rpQty').on('input', () => rpSync());
+    $('#rpPrice').on('input', () => rpSync('price'));
+    $('#rpTotal').on('input', () => rpSync('total'));
+    $('#rpSell').on('input', rpPreview);
+    $('#rpShop').on('change', function () { $('#rpWarehouse').val(this.value); rpReset(); loadPurchases(); });
     <?php if ($preItem): ?>
-    rpItem = { stock: 0, cost: <?= (float)$preItem['cost_price'] ?>, unit: <?= json_encode($preItem['unit']) ?> }; $('#rpUnit').text('(' + rpItem.unit + ')'); $('#rpPrice').val(rpItem.cost > 0 ? rpItem.cost : '');
     $.getJSON(RP.api + 'search_stock_items.php', { warehouse_id: rpWh(), q: <?= json_encode($preItem['product_name']) ?> }, function (r) {
-        const m = (r.results || []).find(x => x.id === <?= (int)$preItem['product_id'] ?>); if (m) { rpItem.stock = m.stock; rpItem.cost = m.cost_price; $('#rpItemInfo').text(RP.s.onHand + ': ' + fmt(m.stock) + ' · ' + RP.s.cost + ': ' + fmt(m.cost_price)); rpPreview(); }
+        const m = (r.results || []).find(x => x.id === <?= (int)$preItem['product_id'] ?>); if (m) rpPick(m);
     });
     <?php endif; ?>
 
+    function done(msgHtml) {
+        Swal.fire({ icon: 'success', title: RP.s.saved, html: msgHtml, timer: 2600, showConfirmButton: false });
+        $('#rpMessage').empty(); rpReset(); loadPurchases();
+    }
+    function fail(m) { $('#rpMessage').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(m) + '</div>'); }
+
     $('#rpForm').on('submit', function (e) {
         e.preventDefault();
-        if (!$('#rpItem').val()) { $('#rpMessage').html('<div class="alert alert-danger py-2 mb-0">' + RP.s.pickItem + '</div>'); return; }
-        const btn = $('#rpSave'), orig = btn.html(); btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>' + RP.s.saving);
-        $.post(RP.api + 'buy_stock.php', $(this).serialize(), function (res) {
-            if (res.success) {
-                Swal.fire({ icon: 'success', title: RP.s.saved, html: `${safeOutput(res.product_name)}<br><small>${RP.s.costNow} ${fmt(res.new_cost)} ${RP.cur}</small>`, timer: 2600, showConfirmButton: false });
-                $('#rpMessage').empty(); $('#rpQty, #rpPrice').val(''); $('#rpItem').val(null).trigger('change'); rpItem = null; $('#rpUnit, #rpItemInfo').text(''); rpPreview(); loadPurchases();
-            } else { $('#rpMessage').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message || RP.s.error) + '</div>'); }
-        }, 'json').fail(() => $('#rpMessage').html('<div class="alert alert-danger py-2 mb-0">' + RP.s.serverError + '</div>')).always(() => btn.prop('disabled', false).html(orig));
+        const btn = $('#rpSave'), orig = btn.html();
+        const finish = () => btn.prop('disabled', false).html(orig);
+        if (rpMode === 'other') {
+            const name = ($('#rpOtherName').val() || '').trim(), amt = parseFloat($('#rpOtherAmount').val()) || 0;
+            if (!name) return fail(RP.s.enterName);
+            if (amt <= 0) return fail(RP.s.enterAmount);
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>' + RP.s.saving);
+            $.post(RP.expenseApi, { _csrf: RP.csrf, expense_account_id: RP.otherAccount, bank_account_id: RP.cashAccount, status: 'paid', amount: amt, expense_date: $('#rpDate').val(),
+                                    warehouse_id: rpWh(), description: RP.s.groceryDesc + ': ' + name }, function (res) {
+                if (res.success) done(safeOutput(name) + '<br><small>' + fmt(amt) + ' ' + RP.cur + '</small>'); else fail(res.message || RP.s.error);
+            }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
+            return;
+        }
+        if (!$('#rpItem').val() || !rpItem) return fail(RP.s.pickItem);
+        const q = parseFloat($('#rpQty').val()) || 0;
+        if (q <= 0) return fail(RP.s.enterQty);
+        if ($('#rpPrice').val() === '' && $('#rpTotal').val() === '') return fail(RP.s.enterPrice);
+        const data = { _csrf: RP.csrf, warehouse_id: rpWh(), product_id: $('#rpItem').val(), quantity: q, date: $('#rpDate').val(),
+                       supplier_id: $('#rpSupplier').val() || '', expiry_date: $('#rpExpiry').val() || '' };
+        if (rpLast === 'total') data.total_paid = parseFloat($('#rpTotal').val()) || 0; else data.unit_cost = parseFloat($('#rpPrice').val()) || 0;
+        if (rpItem.sell !== null && $('#rpSell').val() !== '') data.selling_price = $('#rpSell').val();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>' + RP.s.saving);
+        $.post(RP.api + 'buy_stock.php', data, function (res) {
+            if (res.success) done(`${safeOutput(res.product_name)}<br><small>${RP.s.costNow} ${fmt(res.new_cost)} ${RP.cur}</small>`); else fail(res.message || RP.s.error);
+        }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
     });
 
     $('#rpNewIngredient').on('click', function (e) { e.preventDefault(); $('#rpIngMsg').empty(); $('#rpIngForm')[0].reset(); new bootstrap.Modal(document.getElementById('rpIngModal')).show(); });
@@ -261,18 +358,15 @@ $(function () {
         $.post(RP.api + 'recipe.php', $(this).serialize() + '&action=new_ingredient&warehouse_id=' + rpWh() + '&_csrf=' + encodeURIComponent(RP.csrf), function (res) {
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('rpIngModal')).hide();
-                rpItem = { stock: 0, cost: parseFloat(res.cost_price) || 0, unit: res.unit };
                 $('#rpItem').append(new Option(res.text, res.id, true, true)).trigger('change');
-                $('#rpUnit').text('(' + res.unit + ')'); $('#rpPrice').val(rpItem.cost > 0 ? rpItem.cost : ''); $('#rpItemInfo').text(RP.s.onHand + ': 0 · ' + RP.s.cost + ': ' + fmt(rpItem.cost)); rpPreview();
+                rpPick({ stock: 0, cost_price: res.cost_price, unit: res.unit, selling_price: null });
             } else { $('#rpIngMsg').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message || RP.s.error) + '</div>'); }
         }, 'json').fail(() => $('#rpIngMsg').html('<div class="alert alert-danger py-2 mb-0">' + RP.s.serverError + '</div>'));
     });
-    window.rbiSaved = function () { loadPurchases(); };
     loadPurchases();
 });
 </script>
 <?php endif; ?>
-
 <?php
 require_once 'footer.php';
 ob_end_flush();

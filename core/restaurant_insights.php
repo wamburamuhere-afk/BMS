@@ -220,6 +220,66 @@ if (!function_exists('rdProfitStory')) {
     }
 }
 
+if (!function_exists('rdProfitCheck')) {
+    /**
+     * Bought → used → left, from the one ledger: what went INTO stock this period, what came OUT of it (food sold),
+     * what is in stock now, and the groceries that went straight to cost. Purchases do not change profit the day you buy;
+     * they change it as the food is sold. This is what lets an owner confirm that.
+     */
+    function rdProfitCheck(PDO $pdo, string $jeScope, string $from, string $to): array
+    {
+        require_once __DIR__ . '/gl_accounts.php';
+        $out = ['added' => 0.0, 'used' => 0.0, 'in_stock' => 0.0, 'groceries' => 0.0];
+        try {
+            $inv = (int)inventoryAccountId($pdo);
+            $gro = (int)restaurantIngredientsAccountId($pdo);
+            if ($inv > 0) {
+                $st = $pdo->prepare("
+                    SELECT COALESCE(SUM(CASE WHEN jei.type='debit'  AND je.entry_date BETWEEN ? AND ? THEN jei.amount ELSE 0 END),0) AS added,
+                           COALESCE(SUM(CASE WHEN jei.type='credit' AND je.entry_date BETWEEN ? AND ? THEN jei.amount ELSE 0 END),0) AS used,
+                           COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END),0) AS in_stock
+                      FROM journal_entry_items jei
+                      JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
+                     WHERE jei.account_id = ? AND je.entry_date <= ? $jeScope");
+                $st->execute([$from, $to, $from, $to, $inv, $to]);
+                $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+                $out['added'] = round((float)($r['added'] ?? 0), 2); $out['used'] = round((float)($r['used'] ?? 0), 2); $out['in_stock'] = round((float)($r['in_stock'] ?? 0), 2);
+            }
+            if ($gro > 0) {
+                $st = $pdo->prepare("
+                    SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END),0)
+                      FROM journal_entry_items jei
+                      JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
+                     WHERE jei.account_id = ? AND je.entry_date BETWEEN ? AND ? $jeScope");
+                $st->execute([$gro, $from, $to]);
+                $out['groceries'] = round((float)$st->fetchColumn(), 2);
+            }
+        } catch (Throwable $e) { error_log('rdProfitCheck: ' . $e->getMessage()); }
+        return $out;
+    }
+}
+
+if (!function_exists('rdProfitWarnings')) {
+    /**
+     * Why this month's profit may look better than it really is. Pure: works on figures already loaded.
+     * @param array $cur   rdProfitStory()['cur']
+     * @param array $items rdDishEarnings()['items']
+     * @return array<int,array{type:string,n:int}>
+     */
+    function rdProfitWarnings(array $cur, array $items, float $groceries): array
+    {
+        $w = [];
+        if (($cur['sales'] ?? 0) <= 0) return $w;
+        $uncosted = count(array_filter($items, fn($i) => ($i['profit_per_plate'] ?? null) === null));
+        if ($uncosted > 0) $w[] = ['type' => 'no_cost', 'n' => $uncosted];
+        // A dish with no recipe uses no stock: its food cost only reaches the books as groceries you recorded.
+        $noRecipe = count(array_filter($items, fn($i) => ($i['kind'] ?? '') === 'dish'));
+        if ($noRecipe > 0 && $groceries <= 0) $w[] = ['type' => 'no_food_bought', 'n' => $noRecipe];
+        if (($cur['expenses'] ?? 0) <= 0) $w[] = ['type' => 'no_expenses', 'n' => 0];
+        return $w;
+    }
+}
+
 if (!function_exists('rdClassifyDishes')) {
     /**
      * Menu engineering on the COSTED items: popularity (plates sold) against profit per plate,
@@ -258,7 +318,7 @@ if (!function_exists('rdDishEarnings')) {
         $in = rdIn($ids);
         try {
             $st = $pdo->prepare("
-                SELECT p.product_id, p.product_name, p.is_service, p.selling_price, COALESCE(p.cost_price,0) AS cost_price,
+                SELECT p.product_id, p.product_name, p.is_service, p.selling_price, COALESCE(p.cost_price,0) AS cost_price, COALESCE(p.purchase_price,0) AS plate_cost,
                        SUM(psi.quantity) AS qty, SUM(psi.line_total) AS revenue,
                        (SELECT COUNT(*) FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id) AS comp_count,
                        (SELECT SUM(ac.qty_per_unit * COALESCE(cp.cost_price,0)) FROM product_assembly_components ac
@@ -268,7 +328,7 @@ if (!function_exists('rdDishEarnings')) {
                   JOIN products p   ON p.product_id = psi.product_id
                  WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
                    AND DATE(ps.sale_date) BETWEEN ? AND ? AND ps.warehouse_id IN ($in) AND p.is_menu_item = 1
-              GROUP BY p.product_id, p.product_name, p.is_service, p.selling_price, p.cost_price
+              GROUP BY p.product_id, p.product_name, p.is_service, p.selling_price, p.cost_price, p.purchase_price
               ORDER BY qty DESC");
             $st->execute([$from, $to]);
             $items = [];
@@ -278,6 +338,7 @@ if (!function_exists('rdDishEarnings')) {
                 $cost = null;
                 if ((int)$r['comp_count'] > 0) $cost = (float)$r['recipe_cost'];
                 elseif ((int)$r['is_service'] === 0 && (float)$r['cost_price'] > 0) $cost = (float)$r['cost_price'];
+                elseif ((int)$r['is_service'] === 1 && (float)$r['plate_cost'] > 0) $cost = (float)$r['plate_cost'];   // the owner's estimate of one plate
                 $ppp = $cost === null ? null : round($price - $cost, 2);
                 $items[(int)$r['product_id']] = [
                     'product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => $qty,

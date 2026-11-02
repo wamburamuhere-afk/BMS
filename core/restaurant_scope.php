@@ -257,7 +257,8 @@ if (!function_exists('restaurantCreateMenuItem')) {
             'selling_price'      => $price,
             'min_selling_price'  => 0,
             'cost_price'         => $cost,
-            'purchase_price'     => $cost,
+            // A dish keeps cost_price 0 (the Income Statement drill-down reads it). purchase_price holds its rough plate estimate: nothing financial reads that.
+            'purchase_price'     => $isDish ? max(0, (float)($d['plate_cost'] ?? 0)) : $cost,
             'unit'               => 'pcs',
             'unit_of_measure'    => 'pcs',
             'is_service'         => $isDish ? 1 : 0,

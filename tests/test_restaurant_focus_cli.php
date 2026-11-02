@@ -159,7 +159,7 @@ foreach (['rfOrdersDropdown', 'rfMenuDropdown', 'rfBuyDropdown'] as $id) ok(strp
 foreach (['Take order', 'Tables', 'Kitchen', 'Reservations', 'Who Owes Me', 'Menu items', 'Menu groups', 'Add-on options', 'Buy stock & ingredients', 'Suppliers', 'Customers', 'Restaurant Sales'] as $lbl) {
     ok(strpos($nav, '> ' . $lbl . '</a>') !== false || strpos($nav, '>' . $lbl . '</a>') !== false || strpos($nav, $lbl . '</a>') !== false, "restaurant-only menu has: $lbl");
 }
-foreach (['aria-labelledby="coreDropdown"', 'My Business', 'Shop Products', 'simpleShopDropdown', 'id="restaurantDropdown"', 'communicationDropdown', 'Comms', 'Campaigns', 'Service', 'Inventory Report'] as $gone) {
+foreach (['aria-labelledby="coreDropdown"', 'My Business', 'Shop Products', 'simpleShopDropdown', 'id="restaurantDropdown"', 'communicationDropdown', 'Comms', 'Campaigns', 'Service'] as $gone) {
     ok(strpos($nav, $gone) === false, "restaurant-only menu does NOT have: $gone");
 }
 ok(preg_match('#>\s*(?:<i[^>]*></i>)?\s*Sell\s*</a>#', $nav) === 0, 'restaurant-only menu has no stand-alone "Sell" link (Orders → Take order replaces it)');
@@ -170,7 +170,7 @@ $side = $sideOf($rest);
 foreach (['Orders', 'Menu', 'Purchases'] as $g) ok(in_array($g, $side, true), "phone side menu has the group: $g");
 ok(!in_array('Sales', $side, true) && !in_array('My Business', $side, true), 'phone side menu has no retail Sales / My Business groups');
 $sheet = body($rest); $sa = strpos($sheet, 'id="bmsReportsSheet"');
-ok($sa !== false && strpos(substr($sheet, $sa, 3500), 'Inventory Report') === false, 'phone Reports sheet has no Inventory Report');
+ok($sa !== false && strpos(substr($sheet, $sa, 3500), 'Inventory Report') !== false, 'phone Reports sheet has the Stock report (it shows what a restaurant counts)');
 
 // Everything that is NOT restaurant-only keeps its menu.
 $legacyMustHave = ['aria-labelledby="coreDropdown"', '/products"', '/suppliers"', '/customers"'];   // the links (their labels follow the company's Shop / Warehouse wording)
@@ -510,13 +510,15 @@ ok(strpos($qr, 'restaurant') === false && strpos($qr, 'cost_price') === false, '
 
 // Page + links
 $pg = runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $onlyRest, '1');
-ok(clean($pg) && strpos(body($pg), 'id="rpForm"') !== false && strpos(body($pg), 'id="rpItem"') !== false && strpos(body($pg), 'Two ways to buy') !== false && strpos(body($pg), 'Stock items') !== false && strpos(body($pg), 'Groceries') !== false, 'Purchases page: the stock form, the groceries option and the explanation');
-ok(strpos(body($pg), 'id="rbiModal"') !== false, 'Purchases page: the existing Buy Ingredients window is included for groceries');
+$bpg = body($pg);
+ok(clean($pg) && strpos($bpg, 'id="rpForm"') !== false && strpos($bpg, 'id="rpItem"') !== false && strpos($bpg, 'How it works') !== false && strpos($bpg, 'id="rpTotal"') !== false && strpos($bpg, 'id="rpSell"') !== false && strpos($bpg, 'id="rpOtherName"') !== false, 'Purchases page: ONE form — item, quantity, price for one / total paid, selling price, and "Something else"');
+ok(strpos($bpg, 'rpPaid') === false && stripos($bpg, 'Paid from') === false && strpos($bpg, 'paid_from_account_id') === false && stripos($bpg, 'Cash Drawer') === false, 'Purchases page: NO account list — nothing about "Paid from" or an account anywhere on the page');
+ok(strpos($bpg, 'id="rbiModal"') === false && strpos($bpg, 'rbiOpen') === false, 'Purchases page: no second "Buy Ingredients" window any more');
 $h = preg_replace('#<!--.*?-->#s', '', body($pg)); preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $h, $mm); $bad = 0;
 foreach ($mm[1] as $js) { if (trim($js) === '' || strpos($js, 'application/ld+json') !== false) continue; $tmp = tempnam(sys_get_temp_dir(), 'pjs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) { $bad++; echo '     ' . implode(' ', array_slice($oo, 0, 2)) . "\n"; } $oo = []; }
 ok($bad === 0, 'Purchases page: every inline script parses (' . count($mm[1]) . ' scripts)');
 $pgSw = runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $onlyRest, '1', 'sw'); $bsw = body($pgSw);
-foreach (['Stock items' => 'Bidhaa za stoo', 'Groceries' => 'Manunuzi ya sokoni', 'Recent purchases' => 'Manunuzi ya hivi karibuni', 'Save purchase' => 'Hifadhi ununuzi', 'Paid from' => 'Imelipwa kutoka'] as $en => $swt) {
+foreach (['Buy stock & ingredients' => 'Nunua bidhaa na viungo', 'Total paid' => 'Jumla uliyolipa', 'Recent purchases' => 'Manunuzi ya hivi karibuni', 'Save purchase' => 'Hifadhi ununuzi', 'How it works' => 'Jinsi Inavyofanya Kazi', 'Something else (not counted)' => 'Kitu kingine (hakihesabiwi)'] as $en => $swt) {
     ok(strpos($bsw, $swt) !== false && strpos($bsw, '>' . $en) === false && strpos($bsw, '> ' . $en) === false, "Swahili page: '$en' is '$swt' — no English left in its place");
 }
 $pgRetail = runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $retailAll, '1');
@@ -564,5 +566,166 @@ try {
 } finally {
     foreach ($orig4 as $k4 => $v4) $put($k4, $v4);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P5. Purchases — one form: total paid, selling price, no account, groceries in the list');
+$pdo->startOuter();
+try {
+    $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
+    $GLOBALS['__bms_features'] = ['pos' => true, 'restaurant_pos' => true];
+    $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$W2]);
+    $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+    $ins = $pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, purchase_price, selling_price, min_selling_price, is_service, track_inventory, warehouse_id, is_menu_item, status, created_by) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 1, ?, 0, 'active', ?)");
+    $ins->execute(["RFP Goat $sfx", 'kg', 'kg', $W2, $admin]); $GOAT = (int)$pdo->lastInsertId();
+    $JUICE5 = restaurantCreateMenuItem($pdo, $W2, ['type' => 'bought', 'name' => "RFP Juice $sfx", 'price' => 2000, 'cost' => 900, 'opening' => 0, 'prep_area' => 'none'], $admin);
+    $legs = function (int $txn) use ($pdo): array {
+        $q = $pdo->prepare("SELECT jei.type, jei.account_id, jei.amount FROM journal_entry_items jei JOIN journal_entries je ON je.entry_id = jei.entry_id WHERE je.entity_type = 'books_transaction' AND je.entity_id = ? AND je.status = 'posted'");
+        $q->execute([$txn]); return $q->fetchAll(PDO::FETCH_ASSOC);
+    };
+    $stockOf = fn(int $pid) => (float)$pdo->query("SELECT COALESCE(SUM(stock_quantity),0) FROM product_stocks WHERE product_id = $pid")->fetchColumn();
+    $val = fn(int $pid, string $col) => (float)$pdo->query("SELECT $col FROM products WHERE product_id = $pid")->fetchColumn();
+
+    // a goat: you know how much you can use (14 kg) and what you paid in total (350,000) — and NO account is given
+    $g = restaurantBuyStock($pdo, ['product_id' => $GOAT, 'warehouse_id' => $W2, 'quantity' => 14, 'total_paid' => 350000, 'date' => date('Y-m-d')], $admin);
+    ok(near3($g['total'], 350000) && near3($g['unit_cost'], 25000) && near3($g['new_cost'], 25000) && near3($stockOf($GOAT), 14), 'total paid: 14 kg for 350,000 → 25,000 per kg, cost 25,000, stock 14');
+    $lg = $legs((int)$g['transaction_id']); $dr = 0; $cr = 0; $crAcc = 0; $drAcc = 0;
+    foreach ($lg as $l) { if ($l['type'] === 'debit') { $dr += (float)$l['amount']; $drAcc = (int)$l['account_id']; } else { $cr += (float)$l['amount']; $crAcc = (int)$l['account_id']; } }
+    ok(near3($dr, 350000) && near3($cr, 350000) && $drAcc === (int)inventoryAccountId($pdo), 'total paid: posted exactly 350,000 — Dr Inventory');
+    ok($crAcc === (int)posReceiptAccountId($pdo, 'cash'), 'no account asked: it was paid from the default cash account, like every other Smart POS screen');
+    // a total that does not divide evenly stays exact in the books
+    $g2 = restaurantBuyStock($pdo, ['product_id' => $GOAT, 'warehouse_id' => $W2, 'quantity' => 3, 'total_paid' => 100000, 'date' => date('Y-m-d')], $admin);
+    $dr2 = 0; foreach ($legs((int)$g2['transaction_id']) as $l) if ($l['type'] === 'debit') $dr2 += (float)$l['amount'];
+    ok(near3($g2['total'], 100000, 0.001) && near3($dr2, 100000, 0.001), 'total paid 100,000 for 3 (33,333.33 each): the ledger still gets exactly 100,000.00, not 99,999.99');
+    ok(near3($g2['new_cost'], (14 * 25000 + 100000) / 17, 0.02), 'the cost is still the weighted average of what was paid (14 at 25,000 + 3 at 33,333.33)');
+    // price for one still works as before
+    $g3 = restaurantBuyStock($pdo, ['product_id' => $GOAT, 'warehouse_id' => $W2, 'quantity' => 2, 'unit_cost' => 30000, 'date' => date('Y-m-d')], $admin);
+    ok(near3($g3['total'], 60000), 'price for one still works: 2 at 30,000 → total 60,000');
+
+    // selling price on an item you sell
+    $s1 = restaurantBuyStock($pdo, ['product_id' => $JUICE5, 'warehouse_id' => $W2, 'quantity' => 10, 'unit_cost' => 1000, 'selling_price' => 2500, 'date' => date('Y-m-d')], $admin);
+    ok(near3($val($JUICE5, 'selling_price'), 2500) && near3($s1['selling_price'], 2500), 'selling price: changed at purchase time (2,000 → 2,500) for an item sold on the Menu');
+    $s2 = restaurantBuyStock($pdo, ['product_id' => $JUICE5, 'warehouse_id' => $W2, 'quantity' => 1, 'unit_cost' => 1000, 'selling_price' => '', 'date' => date('Y-m-d')], $admin);
+    ok(near3($val($JUICE5, 'selling_price'), 2500), 'selling price left empty: the price is not touched');
+    $before = [$stockOf($JUICE5), $val($JUICE5, 'selling_price'), $val($JUICE5, 'cost_price')];
+    $refused = 0; foreach ([0, -5] as $bad) { try { restaurantBuyStock($pdo, ['product_id' => $JUICE5, 'warehouse_id' => $W2, 'quantity' => 1, 'unit_cost' => 1000, 'selling_price' => $bad, 'date' => date('Y-m-d')], $admin); } catch (Throwable $e) { $refused++; } }
+    ok($refused === 2 && [$stockOf($JUICE5), $val($JUICE5, 'selling_price'), $val($JUICE5, 'cost_price')] === $before, 'a selling price of 0 or below is refused, and nothing changes (stock, price, cost)');
+    restaurantBuyStock($pdo, ['product_id' => $GOAT, 'warehouse_id' => $W2, 'quantity' => 1, 'unit_cost' => 26000, 'selling_price' => 9999, 'date' => date('Y-m-d')], $admin);
+    ok(near3($val($GOAT, 'selling_price'), 0), 'an ingredient has no selling price — one sent by mistake is ignored');
+    $stBefore = $stockOf($GOAT); $bad = 0;
+    try { restaurantBuyStock($pdo, ['product_id' => $GOAT, 'warehouse_id' => $W2, 'quantity' => 1, 'total_paid' => -5, 'date' => date('Y-m-d')], $admin); } catch (Throwable $e) { $bad++; }
+    ok($bad === 1 && $stockOf($GOAT) === $stBefore, 'a negative total paid is refused, stock unchanged');
+
+    // the search carries the selling price (only for an item sold on the Menu); history lists groceries too
+    $sr = callApi('api/restaurant/search_stock_items.php', ['warehouse_id' => $W2, 'q' => "RFP"]);
+    $byId = []; foreach ($sr['results'] as $x) $byId[$x['id']] = $x;
+    ok(isset($byId[$JUICE5]) && near3($byId[$JUICE5]['selling_price'], 2500) && array_key_exists('selling_price', $byId[$GOAT]) && $byId[$GOAT]['selling_price'] === null, 'search: a Menu drink carries its selling price; an ingredient carries none');
+    $acc5 = (int)restaurantIngredientsAccountId($pdo);
+    $pdo->prepare("INSERT INTO expenses (expense_date, expense_account_id, amount, description, status, warehouse_id, created_by) VALUES (?, ?, 7500, ?, 'paid', ?, ?)")->execute([date('Y-m-d'), $acc5, "Ingredients: RFP Tomatoes $sfx", $W2, $admin]);
+    $gp = callApi('api/restaurant/get_purchases.php', ['warehouse_id' => $W2]);
+    $gr = null; $stockRows = 0; foreach ($gp['data'] as $r) { if ($r['kind'] === 'grocery' && strpos($r['item'], "RFP Tomatoes $sfx") === 0) $gr = $r; if ($r['kind'] === 'stock') $stockRows++; }
+    ok($gr && near3($gr['total'], 7500) && $gr['quantity'] === null && $gr['unit_cost'] === null && strpos($gr['item'], 'Ingredients:') === false, 'history: a groceries purchase is listed too — amount only, with the "Ingredients:" prefix removed');
+    ok($stockRows >= 3 && count($gp['data']) <= 100, 'history: counted purchases and groceries are in one list, at most 100');
+    // another shop never sees it
+    $other = $pdo->query("SELECT warehouse_id FROM warehouses WHERE warehouse_id <> $W2 ORDER BY warehouse_id LIMIT 1")->fetchColumn();
+    if ($other) {
+        $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$other]);
+        $gp2 = callApi('api/restaurant/get_purchases.php', ['warehouse_id' => (int)$other]);
+        $leak = 0; foreach (($gp2['data'] ?? []) as $r) if (strpos($r['item'], "RFP Tomatoes $sfx") === 0) $leak++;
+        ok($leak === 0, 'history: another shop does not see this shop\'s groceries');
+    }
+    $bal = assertLedgerBalanced($pdo, date('Y-m-d'));
+    ok(!empty($bal['ledger_balanced']), 'ledger balanced (Σ Dr = Σ Cr) after all of them');
+} finally {
+    $pdo->endOuter();
+}
+// the page posts groceries through the existing Expenses engine, with the same fields the old window used
+$pgSrc = file_get_contents("$root/app/bms/restaurant/purchases.php");
+ok(strpos($pgSrc, "expenseApi: <?= json_encode(buildUrl('api/add_expense.php')) ?>") !== false && strpos($pgSrc, "status: 'paid'") !== false && strpos($pgSrc, 'expense_account_id: RP.otherAccount') !== false && strpos($pgSrc, 'restaurantIngredientsAccountId($pdo)') !== false, '"Something else" saves through the Expenses engine on the cost-of-food account, paid, for this shop');
+ok(strpos($pgSrc, 'canCreate(\'expenses\')') !== false, '"Something else" is offered only to people who may add expenses');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P6. Cost and profit where you can see them; a plate estimate never touches the books');
+$pdo->startOuter();
+try {
+    $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
+    $GLOBALS['__bms_features'] = ['pos' => true, 'restaurant_pos' => true];
+    $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$W2]);
+    $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+    $DISH6 = restaurantCreateMenuItem($pdo, $W2, ['type' => 'dish', 'name' => "RF6 Pilau $sfx", 'price' => 8000, 'plate_cost' => 3000, 'prep_area' => 'kitchen'], $admin);
+    $DISH0 = restaurantCreateMenuItem($pdo, $W2, ['type' => 'dish', 'name' => "RF6 Ugali $sfx", 'price' => 5000, 'prep_area' => 'kitchen'], $admin);
+    $row = $pdo->query("SELECT cost_price, purchase_price FROM products WHERE product_id = $DISH6")->fetch(PDO::FETCH_ASSOC);
+    ok(near3($row['cost_price'], 0) && near3($row['purchase_price'], 3000), 'a dish estimate is kept away from cost_price (which the Income Statement drill-down reads)');
+    $mi = callApi('api/restaurant/get_menu_items.php', ['warehouse_id' => $W2]);
+    $byP = []; foreach ($mi['data'] as $x) $byP[$x['product_id']] = $x;
+    ok(near3($byP[$DISH6]['plate_cost'], 3000) && near3($byP[$DISH0]['plate_cost'], 0), 'Menu data carries the plate estimate');
+    // a real sale of the dish: the books get NO cost from an estimate — otherwise food would count twice with groceries
+    $sid = (function () use ($pdo, $W2, $DISH6, $admin) {
+        $pdo->prepare("INSERT INTO pos_sales (receipt_number, shift_id, user_id, payment_method, warehouse_id, sale_date, sale_status, is_return_sale) VALUES (?, 0, ?, 'cash', ?, NOW(), 'completed', 0)")->execute(['RF6-' . bin2hex(random_bytes(3)), $admin, $W2]);
+        $id = (int)$pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO pos_sale_items (sale_id, product_id, product_name, quantity, unit_price, line_total) VALUES (?, ?, 'x', 2, 8000, 16000)")->execute([$id, $DISH6]);
+        return $id;
+    })();
+    ok(near3(posSaleCogs($pdo, $sid), 0), 'selling a dish with only an estimate posts NO cost of goods (groceries carry the real food cost)');
+    $earn = rdDishEarnings($pdo, [$W2], date('Y-m-d'), date('Y-m-d'));
+    $e6 = null; foreach ($earn['items'] as $i) if ($i['product_id'] === $DISH6) $e6 = $i;
+    ok($e6 && near3($e6['cost'], 3000) && near3($e6['profit_per_plate'], 5000) && $e6['kind'] === 'dish', 'profit per plate uses the estimate: 8,000 − 3,000 = 5,000');
+    // why a profit figure cannot be trusted yet
+    $cur = ['sales' => 100, 'cost' => 0, 'expenses' => 0];
+    $types = fn($w) => array_column($w, 'type');
+    $w1 = rdProfitWarnings($cur, [['profit_per_plate' => null, 'kind' => 'dish']], 0);
+    ok($types($w1) === ['no_cost', 'no_food_bought', 'no_expenses'], 'the live demo case (dish, no cost, nothing bought, no expenses): all three warnings');
+    ok($types(rdProfitWarnings($cur, [['profit_per_plate' => 5, 'kind' => 'dish']], 500)) === ['no_expenses'], 'groceries recorded and an estimate given: only the expenses warning is left');
+    ok(rdProfitWarnings(['sales' => 100, 'cost' => 10, 'expenses' => 5], [['profit_per_plate' => 5, 'kind' => 'recipe']], 0) === [], 'recipes and expenses in place: no warning, even with no groceries');
+    ok(rdProfitWarnings(['sales' => 0, 'cost' => 0, 'expenses' => 0], [], 0) === [], 'nothing sold yet: no warning');
+    // bought → used → left follows the ledger
+    $ins6 = $pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, purchase_price, selling_price, min_selling_price, is_service, track_inventory, warehouse_id, is_menu_item, status, created_by) VALUES (?, 'kg', 'kg', 0, 0, 0, 0, 0, 1, ?, 0, 'active', ?)");
+    $ins6->execute(["RF6 Rice $sfx", $W2, $admin]); $RICE6 = (int)$pdo->lastInsertId();
+    $c0 = rdProfitCheck($pdo, '', date('Y-m-01'), date('Y-m-d'));
+    restaurantBuyStock($pdo, ['product_id' => $RICE6, 'warehouse_id' => $W2, 'quantity' => 10, 'unit_cost' => 2000, 'date' => date('Y-m-d')], $admin);
+    $c1 = rdProfitCheck($pdo, '', date('Y-m-01'), date('Y-m-d'));
+    ok(near3($c1['added'] - $c0['added'], 20000) && near3($c1['in_stock'] - $c0['in_stock'], 20000) && near3($c1['used'], $c0['used']), 'money check: buying 20,000 of rice adds to stock and "in stock", and is not yet a cost');
+} finally {
+    $pdo->endOuter();
+}
+// pages
+$mp = file_get_contents("$root/app/bms/restaurant/menu.php");
+ok(strpos($mp, "t('Cost') ?></th>") !== false && strpos($mp, "t('Profit') ?></th>") !== false && strpos($mp, 'function itemCost(it)') !== false && strpos($mp, 'id="f-plate"') !== false, 'Menu list: Selling price, Cost and Profit columns; a dish can state what one plate costs');
+ok(strpos($mp, 'targets: [8, 9]') !== false && preg_match_all('/<th[ >]/', substr($mp, strpos($mp, '<thead class="table-dark">'), 900)) === 10, 'Menu list: 10 columns, the two unsortable ones moved with them');
+$h6 = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/bms/restaurant/menu.php'], $ON, $onlyRest, '1'))); preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $h6, $m6); $bad6 = 0;
+foreach ($m6[1] as $js) { if (trim($js) === '') continue; $tmp = tempnam(sys_get_temp_dir(), 'mjs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) $bad6++; $oo = []; }
+ok($bad6 === 0, 'Menu page: every inline script parses');
+$sr6 = runWorker(['page' => 'app/bms/restaurant/sales_report.php'], $ON, $onlyRest, '1');
+ok(clean($sr6) && strpos(body($sr6), 'Estimated profit') !== false && strpos(body($sr6), 'Profit on each') !== false, 'Sales report: each item shows its cost and profit, labelled an estimate');
+$dp = runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1');
+$bd = body($dp);
+$dpSrc = file_get_contents("$root/includes/restaurant/dash_panel.php");
+ok(clean($dp) && strpos($bd, 'Money check this month') !== false && strpos($bd, 'In stock now') !== false && strpos($bd, 'Net Profit') !== false, 'dashboard: the money check, and Net Profit');
+ok(strpos($dpSrc, "t('Cost of Goods')") !== false && strpos($dpSrc, "t('Gross Profit')") !== false && strpos($dpSrc, "t('Food cost')") === false, 'dashboard: same words as the retail Profit Report (shown once there are sales)');
+ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, 'restaurant/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
+$dsw = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw'));
+ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') !== false && strpos($dsw, 'Money check this month') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: the money check is in Swahili, no English left');
+$dr = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
+ok(strpos($dr, 'Money check this month') === false, 'a retail company\'s dashboard does not get any of this');
+// Stock report limited for a restaurant, untouched otherwise (static + the gate)
+$ir = file_get_contents("$root/api/account/get_inventory_report.php");
+ok(strpos($ir, "posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany(\$pdo)) \$where[] = restaurantStockItemSql('p');") !== false, 'Stock report: narrowed only for a restaurant-only Smart POS company');
+$irRet = json_decode(trim(explode('___OUT___', runWorker(['page' => 'api/account/get_inventory_report.php'], $ON, $retailAll, '1'), 2)[1] ?? ''), true);
+$irRest = json_decode(trim(explode('___OUT___', runWorker(['page' => 'api/account/get_inventory_report.php'], $ON, $onlyRest, '1'), 2)[1] ?? ''), true);
+$irFull = json_decode(trim(explode('___OUT___', runWorker(['page' => 'api/account/get_inventory_report.php'], $ON, $onlyRest, '0'), 2)[1] ?? ''), true);
+$cnt = fn($j) => is_array($j) ? count($j['data']['rows'] ?? $j['rows'] ?? $j['items'] ?? $j['data'] ?? []) : -1;
+ok($cnt($irRet) >= 0 && $cnt($irRet) === $cnt($irFull), 'Stock report: retail and full BMS list the same stock as each other (' . $cnt($irRet) . ' rows)');
+ok($cnt($irRest) >= 0 && $cnt($irRest) <= $cnt($irRet), 'Stock report: a restaurant-only company lists only counted items (' . $cnt($irRest) . ' rows)');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P7. Found by using the system: the money leaves the right account');
+$pgP = file_get_contents("$root/app/bms/restaurant/purchases.php");
+ok(strpos($pgP, "bank_account_id: RP.cashAccount") !== false && strpos($pgP, "posReceiptAccountId(\$pdo, 'cash')") !== false, 'Purchases "Something else": paid from the same cash account as the counted items and the sales');
+ok(strpos(file_get_contents("$root/includes/restaurant/buy_ingredients_modal.php"), "name=\"bank_account_id\" value=\"<?= (int)(posReceiptAccountId(\$pdo, 'cash')") !== false, 'the Buy Ingredients window says "Paid from cash" and now really is');
+$ae = file_get_contents("$root/api/account/add_expense.php");
+$iA = strpos($ae, '$bank_account_id = defaultCashAccountId($pdo);'); $iB = strpos($ae, 'if (restaurantOnlyCompany($pdo))');
+ok($iA !== false && $iB > $iA && strpos($ae, "\$bank_account_id = posReceiptAccountId(\$pdo, 'cash') ?: \$bank_account_id;") !== false, 'Add Expense: only a restaurant-only company changes account; everyone else keeps the default');
+ok((int)posReceiptAccountId($pdo, 'cash') > 0, 'the cash account resolves');
+ok(strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "Stock is below zero") !== false, 'dashboard explains a stock value below zero instead of only showing the number');
+ok(strpos($pgP, 'text-truncate') === false && strpos($pgP, 'name="cost_price" min=') === false, 'Purchases: the title is not cut, and the New ingredient window asks no price');
 
 // [later phases append here]

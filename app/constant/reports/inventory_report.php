@@ -29,9 +29,12 @@ $warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
       ORDER BY warehouse_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC) : [];
 
+// Restaurant focus (2026-11-02): a restaurant-only Smart POS company filters on what it counts (same rule as the report's data). Everyone else: unchanged.
+require_once __DIR__ . '/../../../core/restaurant_purchases.php';
+$rf_products_sql = (posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo)) ? ' AND ' . restaurantStockItemSql('products') : '';
 $products = $pdo->query(
     "SELECT product_id, product_code, product_name FROM products
-      WHERE status != 'discontinued' ORDER BY product_name ASC"
+      WHERE status != 'discontinued'$rf_products_sql ORDER BY product_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
 
 $categories = $pdo->query(

@@ -34,7 +34,7 @@ if (!restaurantShopActive($pdo, $warehouse_id)) {
 try {
     $st = $pdo->prepare("
         SELECT p.product_id, p.product_name, p.category_id, c.category_name,
-               p.selling_price, p.cost_price, p.is_service, p.is_available, p.image_url,
+               p.selling_price, p.cost_price, p.purchase_price, p.is_service, p.is_available, p.image_url,
                p.kitchen_station_id, ks.name AS station_name,
                p.is_combo,
                -- restaurant_plan.md Phase 7 — cost of one dish from its recipe (Σ ingredient qty × cost)
@@ -59,6 +59,8 @@ try {
         $r['is_available']  = (int)$r['is_available'];
         $r['selling_price'] = (float)$r['selling_price'];
         $r['cost_price']    = (float)$r['cost_price'];
+        $r['plate_cost']    = (int)$r['is_service'] === 1 ? (float)$r['purchase_price'] : 0.0;   // a dish's rough cost of one plate — an estimate only
+        unset($r['purchase_price']);
         $r['has_recipe']    = (int)$r['is_service'] === 1 && (int)$r['is_combo'] === 1;
         $r['recipe_cost']   = round((float)$r['recipe_cost'], 2);
         $r['stock']         = (float)$r['stock'];

@@ -2,7 +2,8 @@
 /**
  * API: buy stock for a restaurant shop — drinks and ingredients (restaurant focus pass).
  *
- * POST: product_id, warehouse_id, quantity, unit_cost, [date], [supplier_id], [expiry_date], [paid_from_account_id]
+ * POST: product_id, warehouse_id, quantity, unit_cost OR total_paid, [selling_price], [date], [supplier_id], [expiry_date]
+ * (Smart POS: paid from the default cash account — no account is asked; [paid_from_account_id] is still accepted.)
  * The logic lives in core/restaurant_purchases.php::restaurantBuyStock() (weighted-average cost, ingredients allowed,
  * Dr Inventory / Cr paid-from account, one ledger).
  *
@@ -38,6 +39,8 @@ try {
         'warehouse_id'         => $warehouse_id,
         'quantity'             => $_POST['quantity'] ?? 0,
         'unit_cost'            => $_POST['unit_cost'] ?? 0,
+        'total_paid'           => $_POST['total_paid'] ?? 0,
+        'selling_price'        => $_POST['selling_price'] ?? null,
         'date'                 => $_POST['date'] ?? '',
         'supplier_id'          => $_POST['supplier_id'] ?? 0,
         'expiry_date'          => $_POST['expiry_date'] ?? '',

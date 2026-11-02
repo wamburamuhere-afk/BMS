@@ -324,3 +324,12 @@ Goal: a company whose every shop is a Restaurant sees a restaurant, not a retail
 - **Phase 3** — Purchases page: stock items (weighted-average cost, ledger-posted) and groceries; Menu "Buy stock" row action; low-stock links.
 - **Phase 4** — Selling Settings: Restaurant first, Record Old Sale / Loyalty hidden (saving keeps hidden values).
 - Not built: pay-supplier-later (Procurement/GRN, not used by Smart POS).
+
+## Profit truth pass (2026-11-02) — built on branch `feat/restaurant-profit-truth`
+
+Rule from the owner: judge the restaurant by the retail Smart POS logic; change nothing in retail. Profit must confirm: what was bought, sold and spent gives the real net profit, and the system stays easy.
+
+- Stock items and dishes with a recipe: cost of goods comes automatically from what was used. A dish with no recipe: its real food cost reaches the books through "Something else" purchases.
+- A rough plate cost is an estimate for profit per plate only (`purchase_price`), never posted.
+- Purchases: one form, no account list, price for one or total paid, selling price with live profit. Menu and Sales report show cost and profit. Dashboard: retail wording, red reasons, money check. Stock report restored, counted items only.
+- Not built: paying a supplier later (decision pending); stock check.
