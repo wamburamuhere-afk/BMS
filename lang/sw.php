@@ -6292,6 +6292,8 @@ return [
     'No expenses are recorded this month — gas, wages, rent?' => 'Hakuna matumizi yaliyorekodiwa mwezi huu — gesi, mishahara, kodi?',
     'Until these are done, the real profit is lower than this figure.' => 'Hadi haya yakamilike, faida halisi ni ndogo kuliko kiasi hiki.',
     'Total paid' => 'Jumla uliyolipa',
+    'No items on this order yet' => 'Bado hakuna kitu kwenye oda hii',
+    'Tap a dish or drink to add it.' => 'Gusa chakula au kinywaji kukiongeza.',
     'With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.' => 'Ukiwa na mapishi, nunua viungo vyake kama bidhaa zinazohesabiwa kwenye Manunuzi (si "Kitu kingine"), ili visihesabiwe mara mbili.',
     'Stock is below zero: more was sold than was recorded as bought. Record your purchases.' => 'Stoo iko chini ya sifuri: kimeuzwa zaidi ya kilichorekodiwa kununuliwa. Rekodi manunuzi yako.',
     'Fill the price for one, or the total you paid — the other is worked out. Buying a goat or a crate? Enter what you can use and the total.' => 'Jaza bei ya moja, au jumla uliyolipa — nyingine itahesabiwa. Unanunua mbuzi au kreti? Weka kiasi utakachotumia na jumla.',

@@ -44,12 +44,15 @@ $ge = $pdo->prepare("
            TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS by_name
       FROM expenses e
  LEFT JOIN users u ON u.user_id = e.created_by
-     WHERE e.warehouse_id = ? AND e.description LIKE 'Ingredients:%' AND e.status IN ('paid', 'approved', 'pending', 'reviewed')
+     WHERE e.warehouse_id = ? AND e.status IN ('paid', 'approved', 'pending', 'reviewed')
+       AND (e.expense_account_id = ? OR e.description LIKE 'Ingredients:%')
   ORDER BY e.expense_id DESC LIMIT 100");
-$ge->execute([$warehouse_id]);
+// By the cost-of-food account, not by a word: the description is saved in the user's language ("Viungo: …" in Swahili).
+$ge->execute([$warehouse_id, (int)(restaurantIngredientsAccountId($pdo) ?: 0)]);
+$gPrefixes = array_unique(['Ingredients', t('Ingredients')]);
 foreach ($ge->fetchAll(PDO::FETCH_ASSOC) as $r) {
     $rows[] = [
-        'date' => $r['d'], 'item' => trim(preg_replace('/^Ingredients:\s*/i', '', (string)$r['description'])), 'quantity' => null, 'unit' => '', 'kind' => 'grocery',
+        'date' => $r['d'], 'item' => trim(preg_replace('/^(' . implode('|', array_map(fn($p) => preg_quote($p, '/'), $gPrefixes)) . '):\s*/iu', '', (string)$r['description'])), 'quantity' => null, 'unit' => '', 'kind' => 'grocery',
         'unit_cost' => null, 'total' => (float)$r['amount'], 'reference' => $r['ref'], 'by' => $r['by_name'], '_s' => 1000000000 + (int)$r['expense_id'],
     ];
 }

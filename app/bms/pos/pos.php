@@ -246,7 +246,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         <div>
             <div class="pos-hdr-top">
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> <span class="pos-hdr-title"><?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?></span>
+                <i class="bi bi-cash-register"></i> <span class="pos-hdr-title"><?= htmlspecialchars(($restaurant_pos_enabled && $pos_simple && restaurantOnlyCompany($pdo)) ? t('Take order') : wLabel('Point of Sale', 'Sell')) ?></span>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
                       title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>"
@@ -676,8 +676,9 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </table>
                 <div id="emptyCart" class="text-center py-5 bg-white rounded">
                     <i class="bi bi-cart-x" style="font-size: 3rem; color: #6c757d;"></i>
-                    <p class="text-muted mt-2 mb-1"><?= t('Cart is empty') ?></p>
-                    <p class="text-muted small"><?= t('Search or browse products to add items') ?></p>
+                    <?php $_rf_till = $restaurant_pos_enabled && $pos_simple && restaurantOnlyCompany($pdo); ?>
+                    <p class="text-muted mt-2 mb-1"><?= $_rf_till ? t('No items on this order yet') : t('Cart is empty') ?></p>
+                    <p class="text-muted small"><?= $_rf_till ? t('Tap a dish or drink to add it.') : t('Search or browse products to add items') ?></p>
                 </div>
             </div>
 
