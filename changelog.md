@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): simplicity pass — a waiter can take an order without a shift, one tap per dish, a till that shows the Menu, and a kitchen screen that explains itself
+
+**Plan:** `restaurant_plan.md` → "Simplicity pass (2026-11-02)".
+**New:** `api/restaurant/set_kitchen_mode.php`, `migrations/tenant/2026_11_02_restaurant_held_sales_shift_nullable.php`, `migrations/2026_11_02_restaurant_held_sales_shift_nullable_legacy_db.php`, `tests/test_restaurant_simplicity_cli.php`.
+**Changed:** `api/pos/hold_sale.php`, `api/pos/simple_products.php`, `api/restaurant/get_tables.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/kitchen_dashboard.php`, `app/bms/restaurant/floors.php`, `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`.
+
+Found by walking one real order through the restaurant on the demo, then fixed and re-checked in a browser. **Retail is untouched:** every change is behind an active restaurant shop; a retail shop's till, products list and hold rules are unchanged (each has a test that says so).
+
+- **Take an order with no cash shift.** Saving a table's order moved no money, yet it was refused with "Please start a cash register shift". `hold_sale.php` now allows a *table* order on an active restaurant shop with no shift (`pos_held_sales.shift_id` is nullable; migration for tenants + the legacy database). Paying still needs a shift. Retail holds, and table orders on a retail shop, still need one.
+- **The till shows the Menu.** A *Menu | All products* switch on restaurant/hybrid shops (default *Menu*): only Menu dishes and drinks, with the Menu's own group chips instead of the shop's retail categories; an empty Menu falls back to all products. `simple_products.php` takes `menu_only=1` (ignored on a retail shop). A barcode that is not on the Menu is looked up on the server before "not found".
+- **One tap per dish.** A dish with no add-on groups is added by one tap (the popup opens only for dishes with add-ons). `simple_products.php` returns `modifier_group_count` for restaurant shops only.
+- **Bug: "Choose table" on the till did nothing.** The table card's `onclick` embedded unescaped quotes, so the attribute broke and tapping a table did nothing. Fixed with the same escaping the other restaurant pages already use.
+- **Bug: choosing a table emptied the cart.** Items added before picking a table vanished. A table with no open order now keeps the cart; one with an open order still loads that order.
+- **Bug: picker and Tables board disagreed.** Opening a table marked it "occupied" in the database even with no order, so the picker showed it red while the board showed it free. A table is now busy only while it holds an open order (`get_tables.php` adds `has_open_order`; opening a table no longer sets the status).
+- **Kitchen Display explains itself.** "By mouth" is the default, so the screen stayed empty with no reason given. It now says orders are not sent to it and offers *Turn on kitchen screen* (new `set_kitchen_mode.php`: sets only `screen`, Selling Settings permission, CSRF). Ticket quantities read `1x`, not `1.000x`.
+- **Dashboard profit warning.** Food profit counts ingredient cost only for dishes with a recipe, so a dish with no recipe made profit look too high with no hint. The card now says how many such dishes were sold this month and links to the Menu (an operational count; every money figure still comes from the ledger).
+- **Floors & Tables: Add several tables.** The "I have N tables" action only existed in the Getting-started box, which disappears after first use. Same endpoint, now on the Floors & Tables page.
+- **Not changed (checked, and my first reading was wrong):** the till already has a payment-method choice (Cash by default) and an amount-received field that fills itself; they sit below the cart on a short screen. The Getting-started checklist is correct (earlier sales existed in the demo).
+- **Checked:** `test_restaurant_simplicity_cli` 72/0 (real endpoints in a rolled-back transaction, the till and pages rendered and script-parsed, retail regression cases); restaurant phases 0–7, mode gating and i18n coverage green; the new-company template refreshed (1 migration). Browser walk-through on localhost: tap Pilau ×2 → choose table from the popup → save with no shift → Tables board shows the order → Send to Kitchen → ticket on the Kitchen Display; retail shop control unchanged.
+
 ## 2026-11-02 — fix(print): wider Description column on service documents (default templates)
 
 **Changed:** `app/bms/invoice/invoice_print.php`, `app/bms/sales/print_sales_order.php`, `app/bms/sales/quotations/print_quotation.php`.

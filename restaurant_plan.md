@@ -262,3 +262,29 @@ Every new screen string goes through `t()` with an sw.php entry in the same phas
 ## Delivery
 Branch per phase off `develop`, commit per tested phase, push + PR into `develop`.
 Mobile API doc republished after any phase touching `api/mobile/**` or `api/pos/**`.
+
+---
+
+## Simplicity pass (2026-11-02) — built on branch `feat/restaurant-simplicity`
+
+Found by taking one real order through the demo shop as a waiter would. Principle: **fewer taps, fewer
+words, nothing the waiter does not need, and never a dead end.** Everything is behind an active restaurant
+shop; retail is untouched (each change has a test that proves it).
+
+| # | Problem found | Fix |
+|---|---|---|
+| 1 | Saving a table's order needed a cash shift ("Please start a cash register shift") | Table order on a restaurant shop saves with no shift; paying still needs one (`pos_held_sales.shift_id` nullable) |
+| 2 | The till listed every retail product (Dress, Car Washing…) and 30 categories | *Menu \| All products* switch (default Menu), the Menu's own group chips, scanner falls back to the server |
+| 3 | Two taps per dish and a retail-style popup ("No SKU", "Service") | One tap adds a dish with no add-ons; popup only for dishes with add-on groups |
+| 4 | "Choose table" popup did nothing (broken `onclick` quotes) | Quotes escaped, as on the other restaurant pages |
+| 5 | Choosing a table silently emptied the cart | A table with no open order keeps the cart |
+| 6 | Picker said "occupied", Tables board said "free" | One rule: busy only while an open order exists |
+| 7 | Kitchen Display empty with no reason ("by mouth" is the default) | Says so, and *Turn on kitchen screen* in one click; `1x` not `1.000x` |
+| 8 | Food profit ignored dishes with no recipe, with no hint | Card says how many such dishes were sold this month, links to Menu |
+| 9 | Adding 10 tables meant 10 dialogs | *Add several tables* on Floors & Tables |
+
+**Checked and NOT a problem** (first reading was wrong): the till does have a payment-method choice and an
+amount-received field (below the cart on a short screen); the Getting-started checklist is right.
+
+**Left as they are on purpose:** Receive Stock / Record Old Sale / Start Shift buttons on the till (a cashier
+and an owner use them); Title-Case wording on the hub tiles (system-wide convention); service charge (still not built).
