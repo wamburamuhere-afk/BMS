@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): a real dashboard — today vs yesterday, performance chart, "where your money went", profit per plate, busy hours, and an All | Restaurant | Shop switch for mixed companies
+
+**Plan:** `restaurant_plan.md` → "Dashboard pass (2026-11-02)".
+**New:** `core/restaurant_insights.php`, `includes/restaurant/dash_panel.php`, `api/restaurant/dashboard_panel.php`, `tests/test_restaurant_dashboard_cli.php`.
+**Changed:** `includes/restaurant/dashboard.php`, `includes/restaurant/today_strip.php`, `lang/sw.php`, `tests/test_restaurant_phase6_cli.php`, `tests/test_restaurant_simplicity_cli.php`.
+**Not changed:** `app/dashboard.php` — the retail dashboard — is untouched (a test says so), and a retail-only company sees nothing new.
+
+The restaurant dashboard was a handful of numbers with no chart, while the retail dashboard has a Performance chart; a mixed company saw only three numbers for the restaurant and no restaurant profit at all.
+
+- **One panel, three views.** The same panel (`dash_panel.php`) is the restaurant-only dashboard and, for a mixed company, loads into the "Restaurant today" strip behind a switch: **All** (company profit, split restaurant / shops & other, with a stacked chart), **Restaurant** (the full panel), **Shop** (folds the panel away — the shop dashboard below is exactly as before). The choice is remembered per browser.
+- **Hero.** Sales, orders, average bill, open tables. Today is never compared with a full day (that showed a scary "▼ 65%" at ten in the morning): each card shows *Yesterday* and a **last-7-days vs the 7 days before** chip, which compares complete days only.
+- **Performance chart.** Sales, costs and profit, Daily / Weekly / Monthly (30 days, 12 weeks, 12 months), same chart library and look as the retail card.
+- **Where your money went.** This month's profit and margin, one bar (food cost / other expenses / profit), a plain sentence ("For every 100 you sell: 42 goes to food, 19 to other costs, and 39 is yours"), compared with the same days last month. An **Estimated** badge appears while items sold have no cost, and **Complete** when every item has one.
+- **Profit per plate and menu engineering.** *Best earners* ranks items by estimated profit: price actually charged minus recipe cost (dish) or purchase cost (bought item), with margin and a class — **Star**, **Hidden gem**, **Popular, small profit**, **Review** (popularity and profit per plate split at the median; shown only with 3+ costed items). An item with no cost is never guessed: it is listed under "no cost yet" with a link to the Menu, which also nudges owners to add recipes. *Best sellers* is the plain ranking by plates.
+- **Busy hours, how customers order, needs attention.** Orders by hour of day (peak highlighted), dine in / take away / delivery split, and at most 3 attention items (bills open over 90 min, kitchen orders waiting over 20 min, low stock, items with no cost).
+- **Money comes from the one ledger.** Sales, food cost, expenses and profit read `journal_entries` ⨝ `journal_entry_items` ⨝ `accounts` (posted only, dated by `entry_date`, standard project/warehouse scope), so they equal the Income Statement for the same scope and dates — the new test reconciles them against `glProfitLoss`. Counts (orders, hours, open bills) come from the operational tables; profit per plate is a labelled estimate that never feeds the ledger figure above it.
+- **Who sees profit.** Profit, cost and earner figures follow the same rule as the retail Performance card (reports access, `invoices` or `sales_report`); other staff keep the hero, best sellers, busy hours and order-type split. The endpoint refuses everyone else and writes nothing.
+- **Replaced:** the four old number cards, the expenses strip and the "Best sellers today" card on the restaurant dashboard; recent orders, low-stock list, quick actions and Getting started stay. The phase-6 and simplicity tests that pinned the old "Food profit" card were updated to the new profit story.
+- **Checked:** `test_restaurant_dashboard_cli` 67/0 on both a busy database and a clean one (every money figure reconciled with the Income Statement; scoping; recipe, purchase and missing cost; panels and pages rendered and script-parsed; retail-only company shows nothing new). Browser walk-through on a month of generated orders: all three views, Daily/Weekly/Monthly, Best earners/Best sellers, Shop collapse and memory, 390px phone width, and the empty "no orders yet" state.
 ## 2026-11-02 — feat(restaurant): simplicity pass — a waiter can take an order without a shift, one tap per dish, a till that shows the Menu, and a kitchen screen that explains itself
 
 **Plan:** `restaurant_plan.md` → "Simplicity pass (2026-11-02)".

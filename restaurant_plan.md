@@ -288,3 +288,28 @@ amount-received field (below the cart on a short screen); the Getting-started ch
 
 **Left as they are on purpose:** Receive Stock / Record Old Sale / Start Shift buttons on the till (a cashier
 and an owner use them); Title-Case wording on the hub tiles (system-wide convention); service charge (still not built).
+
+---
+
+## Dashboard pass (2026-11-02) — built on branch `feat/restaurant-dashboard` (stacked on the simplicity pass)
+
+Goal: a dashboard that *convinces* an owner — restaurant-only or mixed — in three seconds, without touching the retail dashboard.
+
+| Block | What it answers | Source |
+|---|---|---|
+| Hero | How am I doing today? (yesterday + last-7-days trend, never today vs a full day) | ledger (sales) + operational counts |
+| Performance chart | Sales, costs, profit — daily / weekly / monthly | ledger |
+| Where your money went | Profit, margin, food cost vs other expenses vs profit, vs same days last month | ledger (`glProfitLoss`) |
+| What earns you money | Profit per plate, margin, Star / Hidden gem / Popular-small-profit / Review | menu price − recipe or purchase cost (labelled estimate) |
+| Busy hours · how customers order | When, and dine in / take away / delivery | operational counts · ledger |
+| Needs attention | ≤ 3 things to act on | operational |
+| Mixed companies | **All \| Restaurant \| Shop** switch; All = company profit split restaurant / shops & other | ledger by `warehouse_id` |
+
+**Profit per dish — decision:** show it only where a cost is known (recipe for a dish, purchase cost for a drink). An item with no cost is
+never estimated; it is listed as "no cost yet" and the panel says so (*Estimated* badge) and links to the Menu. That keeps the headline
+profit honest and makes adding recipes the obvious next step. Menu-engineering classes appear only with 3+ costed items.
+
+**Safety:** `app/dashboard.php` is not modified; a retail-only company, or the module off, renders exactly as before (tested). Profit blocks follow
+the retail Performance card's gate (reports access).
+
+**Not built:** per-waiter performance (no waiter on the sale in the data model yet), money-by-hour (the ledger is dated by day only — hours show order counts).
