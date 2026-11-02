@@ -242,22 +242,31 @@ try {
 
 // ───────────────────────────────────────────────────────────────────────────
 section('B2. Till markup — Menu switch only when the module is on; scripts parse');
-$renderTill = function (array $features, string $mode) use ($root, $W) {
+// Renders any page in a subprocess (the phase-1 worker) with the shop in $mode and optional settings,
+// then puts the shop mode and every setting back exactly as it was.
+$renderPage = function (string $page, array $features, string $mode, array $settings = []) use ($root, $W) {
     $pdo2 = $GLOBALS['pdo'];
+    $settings = ['pos_simple_mode' => '1'] + $settings;
     $origMode = $pdo2->query("SELECT pos_mode FROM warehouses WHERE warehouse_id = $W")->fetchColumn();
-    $origSimple = $pdo2->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
+    $orig = [];
+    foreach ($settings as $k => $v) {
+        $q = $pdo2->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?"); $q->execute([$k]); $orig[$k] = $q->fetchColumn();
+        $pdo2->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute([$k, $v]);
+    }
     $pdo2->prepare("UPDATE warehouses SET pos_mode = ? WHERE warehouse_id = ?")->execute([$mode, $W]);
-    $pdo2->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_simple_mode','1') ON DUPLICATE KEY UPDATE setting_value='1'");
     $uid = (int)$pdo2->query("SELECT user_id FROM users WHERE is_active = 1 AND role_id = 1 ORDER BY user_id LIMIT 1")->fetchColumn();
     $cfg = tempnam(sys_get_temp_dir(), 'rps');
-    file_put_contents($cfg, json_encode(['page' => 'app/bms/pos/pos.php', 'session' => ['user_id' => $uid, 'is_admin' => true, 'role_id' => 1, 'user_lang' => 'en'], 'features' => $features]));
+    file_put_contents($cfg, json_encode(['page' => $page, 'session' => ['user_id' => $uid, 'is_admin' => true, 'role_id' => 1, 'user_lang' => 'en'], 'features' => $features]));
     $out = (string)shell_exec('php ' . escapeshellarg("$root/tests/test_restaurant_phase1_cli.php") . ' worker ' . escapeshellarg($cfg) . ' 2>&1');
     @unlink($cfg);
     $pdo2->prepare("UPDATE warehouses SET pos_mode = ? WHERE warehouse_id = ?")->execute([$origMode, $W]);
-    if ($origSimple === false) $pdo2->exec("DELETE FROM system_settings WHERE setting_key = 'pos_simple_mode'");
-    else $pdo2->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'pos_simple_mode'")->execute([$origSimple]);
+    foreach ($orig as $k => $v) {
+        if ($v === false) $pdo2->prepare("DELETE FROM system_settings WHERE setting_key = ?")->execute([$k]);
+        else $pdo2->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?")->execute([$v, $k]);
+    }
     return $out;
 };
+$renderTill = fn(array $features, string $mode, array $settings = []) => $renderPage('app/bms/pos/pos.php', $features, $mode, $settings);
 $on = $renderTill(['pos' => true, 'restaurant_pos' => true], 'restaurant');
 ok(strpos($on, 'id="posMenuSwitchRow"') !== false && strpos($on, 'id="menuCategoryButtons"') !== false && strpos($on, 'id="posViewMenu"') !== false, 'module on: the till has the Menu | All products switch and the Menu group strip');
 ok(preg_match('/class="col-12 mt-2 d-none" id="posMenuSwitchRow"/', $on) === 1, 'the switch starts hidden (the till script reveals it only on a restaurant/hybrid shop)');
@@ -276,3 +285,58 @@ foreach ($mm[1] as $i => $jsPart) {
     $o = [];
 }
 ok($bad === 0, 'every inline script of the rendered till parses (' . count($mm[1]) . ' scripts)');
+
+// ───────────────────────────────────────────────────────────────────────────
+section('D. Kitchen Display — turn the screen on with one click (endpoint runs in a subprocess; it exits)');
+$runApi = function (string $file, string $method, array $sessionExtra, array $features, string $startMode) use ($root) {
+    $pdo2 = $GLOBALS['pdo'];
+    $q = $pdo2->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'"); $q->execute(); $orig = $q->fetchColumn();
+    $pdo2->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute([$startMode]);
+    $uid = (int)$pdo2->query("SELECT user_id FROM users WHERE is_active = 1 AND role_id = 1 ORDER BY user_id LIMIT 1")->fetchColumn();
+    $cfg = tempnam(sys_get_temp_dir(), 'rsa');
+    $c = ['page' => $file, 'session' => $sessionExtra + ['user_id' => $uid, 'is_admin' => true, 'role_id' => 1, 'user_lang' => 'en', 'csrf_token' => 'tk'], 'features' => $features];
+    if ($method === 'POST') $c['post'] = ['_csrf' => 'tk'];
+    file_put_contents($cfg, json_encode($c));
+    $out = (string)shell_exec('php ' . escapeshellarg("$root/tests/test_restaurant_phase1_cli.php") . ' worker ' . escapeshellarg($cfg) . ' 2>&1');
+    @unlink($cfg);
+    $q = $pdo2->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'"); $q->execute(); $after = $q->fetchColumn();
+    if ($orig === false) $pdo2->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
+    else $pdo2->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$orig]);
+    $j = json_decode(trim(explode('___OUT___', $out, 2)[1] ?? ''), true);
+    return ['json' => is_array($j) ? $j : ['success' => false, 'message' => 'non-JSON: ' . substr($out, 0, 200)], 'after' => $after];
+};
+$ON = ['pos' => true, 'restaurant_pos' => true];
+$r = $runApi('api/restaurant/set_kitchen_mode.php', 'GET', [], $ON, 'none');
+ok(empty($r['json']['success']) && $r['after'] === 'none', 'a GET is refused and changes nothing');
+$r = $runApi('api/restaurant/set_kitchen_mode.php', 'POST', ['is_admin' => false, 'role_id' => 999999, 'role' => 'nobody'], $ON, 'none');
+ok(empty($r['json']['success']) && $r['after'] === 'none', 'a user without the Selling Settings permission cannot switch it: "' . ($r['json']['message'] ?? '') . '"');
+$r = $runApi('api/restaurant/set_kitchen_mode.php', 'POST', [], ['pos' => true, 'restaurant_pos' => false], 'none');
+ok(empty($r['json']['success']) && $r['after'] === 'none', 'with the Restaurant module off the endpoint refuses (retail untouched)');
+$r = $runApi('api/restaurant/set_kitchen_mode.php', 'POST', [], $ON, 'none');
+ok(!empty($r['json']['success']) && $r['after'] === 'screen', 'an admin turns the kitchen screen on ("none" → "screen")');
+$r = $runApi('api/restaurant/set_kitchen_mode.php', 'POST', [], $ON, 'printer');
+ok(!empty($r['json']['success']) && $r['after'] === 'screen', 'it only ever sets "screen" (never any other value)');
+$src = file_get_contents("$root/api/restaurant/set_kitchen_mode.php");
+ok(strpos($src, "save_setting('restaurant_kitchen_mode', 'screen')") !== false && strpos($src, '$_POST') === false, 'the endpoint reads no input — the value is fixed');
+ok(strpos($src, "canEdit('pos_config_settings')") !== false && strpos($src, 'csrf_check()') !== false, 'the endpoint is guarded by the Selling Settings permission and a CSRF check');
+// ───────────────────────────────────────────────────────────────────────────
+section('D2. Kitchen Display page — explains "by mouth", offers the switch');
+$none = $renderPage('app/bms/restaurant/kitchen_dashboard.php', ['pos' => true, 'restaurant_pos' => true], 'restaurant', ['restaurant_kitchen_mode' => 'none']);
+ok(strpos($none, 'id="kitchenOffNotice"') !== false && strpos($none, 'id="kitchenOnBtn"') !== false, 'kitchen "by mouth": the page says orders are not sent here and shows the "Turn on kitchen screen" button');
+foreach (['screen', 'printer'] as $m) {
+    $o = $renderPage('app/bms/restaurant/kitchen_dashboard.php', ['pos' => true, 'restaurant_pos' => true], 'restaurant', ['restaurant_kitchen_mode' => $m]);
+    ok(strpos($o, 'id="kitchenOffNotice"') === false && strpos($o, 'id="ticketsContainer"') !== false, "kitchen mode \"$m\": no notice, the ticket list is there as before");
+}
+ok(!preg_match('/PHP (Warning|Notice|Fatal)|___EXC___/', explode('___OUT___', $none)[0] ?? ''), 'the page renders with no PHP warnings');
+$kh = preg_replace('#<!--.*?-->#s', '', explode('___OUT___', $none, 2)[1] ?? '');
+preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $kh, $km);
+$kbad = 0;
+foreach ($km[1] as $i => $jsPart) {
+    if (trim($jsPart) === '' || strpos($jsPart, 'application/ld+json') !== false) continue;
+    $ff = tempnam(sys_get_temp_dir(), 'kjs') . '.js'; file_put_contents($ff, $jsPart);
+    exec('node --check ' . escapeshellarg($ff) . ' 2>&1', $oo, $rc); @unlink($ff);
+    if ($rc !== 0) { $kbad++; echo "     script #$i: " . implode(' ', array_slice($oo, 0, 3)) . "\n"; }
+    $oo = [];
+}
+ok($kbad === 0, 'every inline script of the kitchen page parses (' . count($km[1]) . ' scripts)');
+ok(strpos(file_get_contents("$root/app/bms/restaurant/kitchen_dashboard.php"), '${parseFloat(it.quantity)}${STRINGS.qty}') !== false, 'a ticket line reads "1x Chai", not "1.000x Chai"');

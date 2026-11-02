@@ -6205,4 +6205,10 @@ return [
     'South Sudanese Pound' => 'Pauni ya Sudan Kusini',
     'US Dollar' => 'Dola ya Marekani',
     'Every price, receipt and report uses this currency. A company that is not on TZS issues all its documents in this one currency.' => 'Kila bei, risiti na ripoti hutumia sarafu hii. Kampuni isiyotumia TZS hutoa hati zake zote kwa sarafu hii moja.',
+    // Restaurant simplicity pass (2026-11-02)
+    'Orders are not sent to this screen.' => 'Oda hazitumwi kwenye skrini hii.',
+    'Your kitchen works "by mouth" — the waiter tells the cook. Turn the kitchen screen on to see new orders here.' => 'Jikoni inafanya kazi "kwa mdomo" — mhudumu anamwambia mpishi. Washa skrini ya jikoni ili kuona oda mpya hapa.',
+    'Turn on kitchen screen' => 'Washa skrini ya jikoni',
+    'Ask an admin to turn it on in Selling Settings.' => 'Mwombe msimamizi aiwashe kwenye Mipangilio ya Kuuza.',
+    'Kitchen screen is on.' => 'Skrini ya jikoni imewashwa.',
 ];
